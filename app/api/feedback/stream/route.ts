@@ -14,24 +14,23 @@
  */
 
 import { NextRequest } from "next/server"
-import { generateFeedbackResponse } from "@/lib/ai-providers"
-import { logger } from "@/lib/logger"
 import {
-  preScreenConversation,
-  validateConversationWithAI,
-  getDefaultValidation,
-  analyzeAICodeOverlap,
-  analyzeCodeCompleteness,
-  calculateValidatedScores,
-  applyScoreFloors,
-  parseFeedbackSections,
-  buildSilentNotesContext,
-} from "@/lib/feedback"
+  generateFeedbackResponseEdge,
+  validateConversationEdge,
+  extractConversationEvidenceEdge,
+} from "@/lib/ai-providers-edge"
+// Direct imports to avoid pulling in Node.js dependencies via barrel exports
+import { preScreenConversation } from "@/lib/feedback/pre-screening"
+import { analyzeCodeCompleteness } from "@/lib/feedback/completeness-analysis"
+import { parseFeedbackSections, buildSilentNotesContext } from "@/lib/feedback/parsers"
 import { calculateInstantScores, buildSignalsFromMetrics } from "@/lib/feedback/score-accumulator"
 import {
-  extractConversationEvidence,
+  analyzeAICodeOverlap,
+  getDefaultValidation,
+  calculateValidatedScores,
+  applyScoreFloors,
   buildEvidenceSummary,
-} from "@/lib/feedback/structured-extraction"
+} from "@/lib/feedback/edge-utils"
 
 // CRITICAL: Edge runtime for no timeout on streaming
 export const runtime = "edge"
@@ -149,8 +148,8 @@ export async function POST(request: NextRequest) {
 
       const [aiValidation, extractedEvidence] = await Promise.all([
         shouldValidateWithAI
-          ? validateConversationWithAI(
-              conversationTranscript,
+          ? validateConversationEdge(
+              transcriptMessages,
               code,
               efficiencyMetrics
                 ? {
@@ -161,13 +160,13 @@ export async function POST(request: NextRequest) {
             ).catch(() => getDefaultValidation())
           : Promise.resolve(getDefaultValidation()),
         transcriptMessages.length > 0
-          ? extractConversationEvidence(transcriptMessages, {
+          ? extractConversationEvidenceEdge(transcriptMessages, {
               title: scenarioTitle,
               optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
               optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
               criticalEdgeCases: ["empty input", "single element", "null values"],
-            }).catch(() => undefined)
-          : Promise.resolve(undefined),
+            }).catch(() => null)
+          : Promise.resolve(null),
       ])
 
       // Reconcile evidence
@@ -186,6 +185,7 @@ export async function POST(request: NextRequest) {
       // ========================================
       // PHASE 3: Calculate Final Scores
       // ========================================
+      // Note: extractedEvidence is already merged into aiValidation above
       const validatedScores = calculateValidatedScores(
         passRate,
         efficiencyMetrics,
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
         aiValidation,
         scenarioType,
         code,
-        extractedEvidence
+        null // Evidence already merged into aiValidation
       )
 
       if (hasBlindCopying && scenarioType !== "system-design") {
@@ -240,11 +240,7 @@ export async function POST(request: NextRequest) {
         testsTotal,
       })
 
-      const aiResponse = await generateFeedbackResponse(systemInstruction, prompt, [], {
-        userId,
-        sessionId,
-        scenarioId,
-      })
+      const aiResponse = await generateFeedbackResponseEdge(systemInstruction, prompt)
 
       const feedback = aiResponse.text
 
@@ -273,7 +269,7 @@ export async function POST(request: NextRequest) {
 
       await sendEvent("done", { success: true })
     } catch (error) {
-      logger.error("[Streaming Feedback] Error", { error })
+      console.error("[Streaming Feedback] Error", error)
       await sendEvent("error", {
         message: error instanceof Error ? error.message : "Failed to generate feedback",
       })
