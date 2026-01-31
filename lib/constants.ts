@@ -254,6 +254,17 @@ export const SESSION = {
 } as const
 
 // =============================================================================
+// Voice Recording
+// =============================================================================
+
+export const VOICE = {
+  /** Maximum recording duration in seconds (3 minutes) - prevents abuse */
+  MAX_RECORDING_SECONDS: 180,
+  /** Warning threshold before max duration (30 seconds before cutoff) */
+  WARNING_THRESHOLD_SECONDS: 150,
+} as const
+
+// =============================================================================
 // UI Constants
 // =============================================================================
 

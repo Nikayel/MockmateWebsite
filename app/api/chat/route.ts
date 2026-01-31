@@ -113,8 +113,9 @@ function pruneSessionRAGCache(): void {
 
   // If still over limit, remove oldest entries
   if (sessionRAGCache.size > MAX_SESSION_CACHE_SIZE) {
-    const entries = Array.from(sessionRAGCache.entries())
-      .sort((a, b) => a[1].createdAt - b[1].createdAt)
+    const entries = Array.from(sessionRAGCache.entries()).sort(
+      (a, b) => a[1].createdAt - b[1].createdAt
+    )
 
     const toRemove = sessionRAGCache.size - MAX_SESSION_CACHE_SIZE + 50
     for (let i = 0; i < toRemove && i < entries.length; i++) {
@@ -500,18 +501,28 @@ export async function POST(request: NextRequest) {
               content: m.message,
             }))
 
+          // Build optimal complexity context for real-time validation
+          const optimalComplexityContext = solutionComplexity
+            ? {
+                optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
+                optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
+              }
+            : undefined
+
           const result = await extractionService({
             messages: recentMessages,
             currentTracker: conversationTracker as ConversationTracker,
             messageCount,
             lastExtractionAt: lastExtraction,
             currentMessage: message,
+            optimalComplexity: optimalComplexityContext,
           })
 
           if (result.didRun) {
             enhancedTracker = result.tracker
             logger.info("[Chat API] Enhanced tracker with extraction service", {
               confidence: result.confidence,
+              silentNotesCount: result.tracker.silentNotes?.length || 0,
             })
           }
         } catch (extractionError) {
@@ -531,10 +542,21 @@ export async function POST(request: NextRequest) {
                 content: m.message,
               }))
 
+            // Build optimal complexity context for real-time validation
+            // This allows the extraction to detect when user claims wrong complexity
+            const optimalComplexityContext = solutionComplexity
+              ? {
+                  optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
+                  optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
+                }
+              : undefined
+
             // Run async extraction (non-blocking for response, enhances future requests)
+            // Now also validates complexity claims and adds silent notes for mistakes
             const extractionUpdates = await extractConversationState(
               recentMessages,
-              conversationTracker as ConversationTracker
+              conversationTracker as ConversationTracker,
+              optimalComplexityContext
             )
 
             // Merge extraction results with existing tracker
@@ -543,7 +565,10 @@ export async function POST(request: NextRequest) {
                 ...(conversationTracker as ConversationTracker),
                 ...extractionUpdates,
               }
-              logger.info("[Chat API] Enhanced tracker with LLM extraction", { extractionUpdates })
+              logger.info("[Chat API] Enhanced tracker with LLM extraction", {
+                extractionUpdates,
+                silentNotesCount: extractionUpdates.silentNotes?.length || 0,
+              })
             }
           } catch (extractionError) {
             // Extraction failed, continue with original tracker

@@ -542,16 +542,22 @@ CODE EFFICIENCY ANALYSIS:
           aiValidation.approachQuality === "none" ? "basic" : aiValidation.approachQuality
       }
 
-      if (extractedEvidence.timeComplexity.mentioned && extractedEvidence.timeComplexity.value) {
+      // FIXED: Mark complexity as discussed even if value is null (user hedged between options)
+      // Example: "Time would be O(n). Or O(h)." - they discussed complexity, just didn't give definitive value
+      if (extractedEvidence.timeComplexity.mentioned) {
         if (!aiValidation.complexityDiscussed) {
           logger.info("Reconciling complexityDiscussed: evidence shows YES, aiValidation said NO", {
             sessionId,
             evidenceValue: extractedEvidence.timeComplexity.value,
+            hedged: !extractedEvidence.timeComplexity.value, // null value = hedging
           })
         }
         aiValidation.complexityDiscussed = true
-        aiValidation.complexityAccurate = extractedEvidence.timeComplexity.isCorrect ?? false
-        aiValidation.statedComplexity = extractedEvidence.timeComplexity.value
+        // Only set accuracy and stated value if they gave a definitive answer
+        if (extractedEvidence.timeComplexity.value) {
+          aiValidation.complexityAccurate = extractedEvidence.timeComplexity.isCorrect ?? false
+          aiValidation.statedComplexity = extractedEvidence.timeComplexity.value
+        }
       }
 
       if (extractedEvidence.edgeCases.mentionedByCandidate.length > 0) {

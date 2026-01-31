@@ -16,6 +16,7 @@ import {
   extractConversationState,
   shouldRunExtraction,
   type ExtendedConversationTracker,
+  type OptimalComplexityContext,
 } from "@/lib/interview/conversation-extraction"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 
@@ -25,6 +26,8 @@ export interface ExtractionRequest {
   messageCount: number
   lastExtractionAt: number
   currentMessage: string
+  // Optional: Optimal complexity for real-time validation of user claims
+  optimalComplexity?: OptimalComplexityContext
 }
 
 export interface ExtractionResponse {
@@ -41,7 +44,14 @@ export interface ExtractionResponse {
  * @returns Extraction response with updated tracker and confidence
  */
 export async function extractionService(req: ExtractionRequest): Promise<ExtractionResponse> {
-  const { messages, currentTracker, messageCount, lastExtractionAt, currentMessage } = req
+  const {
+    messages,
+    currentTracker,
+    messageCount,
+    lastExtractionAt,
+    currentMessage,
+    optimalComplexity,
+  } = req
 
   // Check if extraction should run
   const shouldRun = shouldRunExtraction(messageCount, lastExtractionAt, currentMessage)
@@ -55,8 +65,8 @@ export async function extractionService(req: ExtractionRequest): Promise<Extract
     }
   }
 
-  // Run extraction
-  const updates = await extractConversationState(messages, currentTracker)
+  // Run extraction with optimal complexity for real-time validation
+  const updates = await extractConversationState(messages, currentTracker, optimalComplexity)
 
   // Calculate confidence based on what was extracted
   const confidence = calculateConfidence(updates)

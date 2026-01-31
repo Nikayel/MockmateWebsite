@@ -53,6 +53,7 @@ type TranscriptCallback = (transcript: string, isFinal: boolean) => void
 type ErrorCallback = (error: Error) => void
 type StatusCallback = (status: "connecting" | "connected" | "disconnected" | "error") => void
 type UtteranceEndCallback = (transcript: string) => void
+type MaxDurationCallback = (transcript: string) => void
 
 /**
  * Deepgram Voice Service
@@ -66,9 +67,12 @@ export class DeepgramVoiceService {
   private onError: ErrorCallback | null = null
   private onStatus: StatusCallback | null = null
   private onUtteranceEnd: UtteranceEndCallback | null = null
+  private onMaxDuration: MaxDurationCallback | null = null
   private accumulatedTranscript: string = ""
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null
+  private maxDurationTimeout: ReturnType<typeof setTimeout> | null = null
   private lastSentTranscript: string = ""
+  private maxDurationMs: number = 180000 // 3 minutes default
 
   constructor(config: DeepgramConfig = {}) {
     this.config = {
@@ -127,6 +131,21 @@ export class DeepgramVoiceService {
    */
   setOnUtteranceEnd(callback: UtteranceEndCallback): void {
     this.onUtteranceEnd = callback
+  }
+
+  /**
+   * Set callback for when max recording duration is reached
+   * Recording will be automatically stopped and this callback fired
+   */
+  setOnMaxDuration(callback: MaxDurationCallback): void {
+    this.onMaxDuration = callback
+  }
+
+  /**
+   * Set maximum recording duration in milliseconds
+   */
+  setMaxDuration(ms: number): void {
+    this.maxDurationMs = ms
   }
 
   /**
@@ -210,6 +229,14 @@ export class DeepgramVoiceService {
             ws.send(JSON.stringify({ type: "KeepAlive" }))
           }
         }, 8000)
+
+        // Set max duration timeout to prevent abuse (e.g., playing music indefinitely)
+        this.maxDurationTimeout = setTimeout(() => {
+          console.log("[Deepgram] Max recording duration reached, stopping automatically")
+          const transcript = this.accumulatedTranscript
+          this.onMaxDuration?.(transcript)
+          this.stopTranscription()
+        }, this.maxDurationMs)
       }
 
       ws.onmessage = (event) => {
@@ -450,6 +477,12 @@ export class DeepgramVoiceService {
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval)
       this.keepAliveInterval = null
+    }
+
+    // Clear max duration timeout
+    if (this.maxDurationTimeout) {
+      clearTimeout(this.maxDurationTimeout)
+      this.maxDurationTimeout = null
     }
 
     // Stop media recorder

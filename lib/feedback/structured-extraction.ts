@@ -368,6 +368,40 @@ function detectApproachType(content: string): "brute_force" | "optimized" | "unc
 }
 
 /**
+ * Deduplicate voice transcription artifacts.
+ * Voice transcription often repeats phrases like:
+ * "So the time complexity. So the time complexity would be O n."
+ *
+ * This function removes obvious duplications to save space before truncation.
+ */
+function deduplicateVoiceTranscription(text: string): string {
+  // Split into sentences/phrases
+  const sentences = text.split(/(?<=[.!?])\s+/)
+
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const sentence of sentences) {
+    // Normalize for comparison: lowercase, remove extra spaces
+    const normalized = sentence.toLowerCase().trim().replace(/\s+/g, " ")
+
+    // Skip very short fragments
+    if (normalized.length < 10) {
+      result.push(sentence)
+      continue
+    }
+
+    // Check if we've seen this or very similar sentence
+    if (!seen.has(normalized)) {
+      seen.add(normalized)
+      result.push(sentence)
+    }
+  }
+
+  return result.join(" ")
+}
+
+/**
  * Semantic extraction - uses AI for nuanced understanding
  * Now includes COMPLEXITY EXTRACTION to avoid false positives from regex
  */
@@ -380,8 +414,10 @@ async function extractSemantically(
     criticalEdgeCases: string[]
   }
 ): Promise<Partial<ExtractedEvidence>> {
+  // Deduplicate voice transcription artifacts before building transcript text
+  // This prevents truncation from cutting off important later messages
   const transcriptText = transcript
-    .map((m, i) => `[${i}] ${m.role.toUpperCase()}: ${m.content}`)
+    .map((m, i) => `[${i}] ${m.role.toUpperCase()}: ${deduplicateVoiceTranscription(m.content)}`)
     .join("\n\n")
 
   // Find coding phase start for context
@@ -400,7 +436,7 @@ CRITICAL EDGE CASES: ${problemContext.criticalEdgeCases.join(", ")}
 ${codingPhaseContext}
 
 TRANSCRIPT:
-${transcriptText.substring(0, 8000)}
+${transcriptText.substring(0, 12000)}
 
 EXTRACT THE FOLLOWING (use EXACT quotes from transcript):
 
@@ -443,15 +479,19 @@ Return JSON:
 {
   "complexityClaims": {
     "timeComplexity": {
+      "discussed": true/false,
       "claimedForSolution": "O(n)" or null,
       "quote": "exact quote where they stated this",
       "messageIndex": number or null,
-      "explanationGiven": true/false
+      "explanationGiven": true/false,
+      "hedged": true/false
     },
     "spaceComplexity": {
+      "discussed": true/false,
       "claimedForSolution": "O(n)" or null,
       "quote": "exact quote where they stated this",
-      "messageIndex": number or null
+      "messageIndex": number or null,
+      "hedged": true/false
     },
     "discussedAlternatives": ["O(n²) for brute force"]
   },
@@ -470,7 +510,13 @@ Return JSON:
 }
 
 RULES:
-- For complexity: Be PRECISE - only capture what they claimed for THEIR solution, not alternatives
+- For complexity:
+  * "discussed" = true if they talked about complexity AT ALL (even if hedging or uncertain)
+  * "claimedForSolution" = the specific value they settled on, or null if they hedged between options
+  * "hedged" = true if they gave multiple options like "O(n) or O(h)" without deciding
+  * Example: "Time would be O(n). Or O(h)." -> discussed=true, hedged=true, claimedForSolution=null
+  * Example: "Time complexity is O(n)" -> discussed=true, hedged=false, claimedForSolution="O(n)"
+  * IMPORTANT: If they discussed complexity, discussed MUST be true, even if value is null
 - Only include REAL questions (not rhetorical)
 - Only quote ACTUAL text from transcript
 - If uncertain, mark as "unanswered" not "good"
@@ -508,28 +554,41 @@ RULES:
         }
       }
 
+      // IMPORTANT: Use 'discussed' field to determine if complexity was mentioned
+      // Even if they hedged (no definitive value), they still DISCUSSED complexity
+      const timeDiscussed =
+        timeComplexityEvidence?.discussed ||
+        timeComplexityEvidence?.claimedForSolution ||
+        timeComplexityEvidence?.hedged
+      const spaceDiscussed =
+        spaceComplexityEvidence?.discussed ||
+        spaceComplexityEvidence?.claimedForSolution ||
+        spaceComplexityEvidence?.hedged
+
       return {
-        timeComplexity: timeComplexityEvidence?.claimedForSolution
+        timeComplexity: timeDiscussed
           ? {
               mentioned: true,
-              value: timeComplexityEvidence.claimedForSolution,
-              explanationGiven: timeComplexityEvidence.explanationGiven || false,
-              quote: timeComplexityEvidence.quote || null,
-              messageIndex: timeComplexityEvidence.messageIndex || null,
-              isCorrect:
-                timeComplexityEvidence.claimedForSolution.toUpperCase().replace(/\s+/g, "") ===
-                problemContext.optimalTimeComplexity.toUpperCase().replace(/\s+/g, ""),
+              value: timeComplexityEvidence?.claimedForSolution || null,
+              explanationGiven: timeComplexityEvidence?.explanationGiven || false,
+              quote: timeComplexityEvidence?.quote || null,
+              messageIndex: timeComplexityEvidence?.messageIndex || null,
+              isCorrect: timeComplexityEvidence?.claimedForSolution
+                ? timeComplexityEvidence.claimedForSolution.toUpperCase().replace(/\s+/g, "") ===
+                  problemContext.optimalTimeComplexity.toUpperCase().replace(/\s+/g, "")
+                : null, // Can't verify if they hedged
             }
           : undefined,
-        spaceComplexity: spaceComplexityEvidence?.claimedForSolution
+        spaceComplexity: spaceDiscussed
           ? {
               mentioned: true,
-              value: spaceComplexityEvidence.claimedForSolution,
-              quote: spaceComplexityEvidence.quote || null,
-              messageIndex: spaceComplexityEvidence.messageIndex || null,
-              isCorrect:
-                spaceComplexityEvidence.claimedForSolution.toUpperCase().replace(/\s+/g, "") ===
-                problemContext.optimalSpaceComplexity.toUpperCase().replace(/\s+/g, ""),
+              value: spaceComplexityEvidence?.claimedForSolution || null,
+              quote: spaceComplexityEvidence?.quote || null,
+              messageIndex: spaceComplexityEvidence?.messageIndex || null,
+              isCorrect: spaceComplexityEvidence?.claimedForSolution
+                ? spaceComplexityEvidence.claimedForSolution.toUpperCase().replace(/\s+/g, "") ===
+                  problemContext.optimalSpaceComplexity.toUpperCase().replace(/\s+/g, "")
+                : null, // Can't verify if they hedged
             }
           : undefined,
         interviewerQuestions: parsed.interviewerQuestions || [],

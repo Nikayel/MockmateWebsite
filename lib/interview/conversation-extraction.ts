@@ -9,11 +9,13 @@
  * - Detects approach explanation quality (not just presence)
  * - Tracks clarifying questions asked (positive signal)
  * - Understands context and intent
+ * - Detects WRONG complexity claims and adds silent notes (systemic fix)
  */
 
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
-import type { ConversationTracker } from "./interview-phases"
+import type { ConversationTracker, SilentNote } from "./interview-phases"
+import { getComplexityRank } from "./shared-patterns"
 
 interface ExtractionResult {
   approachExplained: boolean
@@ -29,6 +31,15 @@ interface ExtractionResult {
   edgeCasesMentioned: string[]
   clarifyingQuestionsAsked: boolean // NEW: Did they ask clarifying questions?
   answeredInterviewerQuestions: number // NEW: How many questions did they answer?
+}
+
+/**
+ * Context about the problem's optimal complexity
+ * Used to detect when user states wrong complexity
+ */
+export interface OptimalComplexityContext {
+  optimalTimeComplexity: string // e.g., "O(n)"
+  optimalSpaceComplexity: string // e.g., "O(h)" for recursive tree problems
 }
 
 const EXTRACTION_PROMPT = `You are analyzing a technical interview conversation to extract what the candidate has discussed.
@@ -97,10 +108,16 @@ export interface ExtendedConversationTracker extends ConversationTracker {
  *
  * Includes BOTH candidate and interviewer messages for full context
  * (needed to count answered questions and understand conversation flow)
+ *
+ * @param recentMessages - Recent conversation messages
+ * @param currentTracker - Current conversation tracker state
+ * @param optimalComplexity - Optional context about the problem's optimal complexity
+ *                           When provided, detects and tracks wrong complexity claims as silent notes
  */
 export async function extractConversationState(
   recentMessages: Array<{ role: string; content: string }>,
-  currentTracker: ConversationTracker
+  currentTracker: ConversationTracker,
+  optimalComplexity?: OptimalComplexityContext
 ): Promise<Partial<ExtendedConversationTracker>> {
   // Skip if no messages to analyze
   if (!recentMessages || recentMessages.length === 0) {
@@ -197,13 +214,86 @@ export async function extractConversationState(
       updates.answeredInterviewerQuestions = extracted.answeredInterviewerQuestions
     }
 
+    // =================================================================
+    // SYSTEMIC FIX: Detect wrong complexity claims and add silent notes
+    // This happens in REAL-TIME during the interview, not post-hoc
+    // =================================================================
+    if (optimalComplexity) {
+      const silentNotes: SilentNote[] = [...(currentTracker.silentNotes || [])]
+      const existingNoteTypes = new Set(silentNotes.map((n) => `${n.type}:${n.context}`))
+
+      // Check TIME complexity accuracy
+      if (extracted.timeComplexityValue && optimalComplexity.optimalTimeComplexity) {
+        const statedTimeRank = getComplexityRank(extracted.timeComplexityValue)
+        const optimalTimeRank = getComplexityRank(optimalComplexity.optimalTimeComplexity)
+
+        // User claimed significantly better than actual (e.g., O(1) when it's O(n))
+        if (
+          statedTimeRank !== -1 &&
+          optimalTimeRank !== -1 &&
+          statedTimeRank < optimalTimeRank - 1
+        ) {
+          const noteKey = "wrong_complexity:time complexity"
+          if (!existingNoteTypes.has(noteKey)) {
+            silentNotes.push({
+              type: "wrong_complexity",
+              timestamp: Date.now(),
+              userSaid: `Stated time complexity as ${extracted.timeComplexityValue}`,
+              correct: `Time complexity is ${optimalComplexity.optimalTimeComplexity}`,
+              context: "time complexity",
+            })
+            logger.info("[Extraction] Detected wrong time complexity claim", {
+              stated: extracted.timeComplexityValue,
+              actual: optimalComplexity.optimalTimeComplexity,
+            })
+          }
+        }
+      }
+
+      // Check SPACE complexity accuracy
+      if (extracted.spaceComplexityValue && optimalComplexity.optimalSpaceComplexity) {
+        const statedSpaceRank = getComplexityRank(extracted.spaceComplexityValue)
+        const optimalSpaceRank = getComplexityRank(optimalComplexity.optimalSpaceComplexity)
+
+        // User claimed significantly better than actual (e.g., O(1) for recursive when it's O(h))
+        if (
+          statedSpaceRank !== -1 &&
+          optimalSpaceRank !== -1 &&
+          statedSpaceRank < optimalSpaceRank - 1
+        ) {
+          const noteKey = "wrong_complexity:space complexity"
+          if (!existingNoteTypes.has(noteKey)) {
+            silentNotes.push({
+              type: "wrong_complexity",
+              timestamp: Date.now(),
+              userSaid: `Stated space complexity as ${extracted.spaceComplexityValue}`,
+              correct: `Space complexity is ${optimalComplexity.optimalSpaceComplexity}`,
+              context: "space complexity",
+            })
+            logger.info("[Extraction] Detected wrong space complexity claim", {
+              stated: extracted.spaceComplexityValue,
+              actual: optimalComplexity.optimalSpaceComplexity,
+            })
+          }
+        }
+      }
+
+      // Only update if we added new notes
+      if (silentNotes.length > (currentTracker.silentNotes?.length || 0)) {
+        updates.silentNotes = silentNotes
+      }
+    }
+
     logger.info("[Extraction] Successfully extracted conversation state", {
       approachExplained: extracted.approachExplained,
       approachQuality: extracted.approachQuality,
       timeComplexity: extracted.dominantComplexity || extracted.timeComplexityValue,
+      spaceComplexity: extracted.spaceComplexityValue,
       edgeCases: extracted.edgeCasesMentioned?.length || 0,
       clarifyingQuestions: extracted.clarifyingQuestionsAsked,
       questionsAnswered: extracted.answeredInterviewerQuestions,
+      silentNotesAdded:
+        (updates.silentNotes?.length || 0) - (currentTracker.silentNotes?.length || 0),
     })
 
     return updates

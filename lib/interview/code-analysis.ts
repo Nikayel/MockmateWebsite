@@ -29,34 +29,28 @@ export interface CodeEfficiencyMetrics {
 
 /**
  * Detect obvious brute force patterns relative to the optimal complexity.
- * Returns true if the code appears to use a clearly suboptimal approach.
+ *
+ * CONSERVATIVE APPROACH: Only flag clear brute force patterns.
+ * For complex patterns (bucket sort, amortized analysis), defer to LLM analysis.
+ *
+ * Returns true ONLY if there's clear evidence of suboptimal approach.
  */
 function detectBruteForcePattern(code: string, optimalTime?: string): boolean {
-  const forLoops = (code.match(/\bfor\b/gi) || []).length
-
-  // Count actual nested for loops (not just any loops)
-  const tripleNestedFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
+  // Only detect triple-nested loops as definite brute force
+  // This is conservative - we'd rather under-flag than over-flag
+  const tripleNestedFor =
+    (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
     (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
-
-  // For O(n) optimal: 2+ nested for loops is likely brute force
-  if (optimalTime === "O(n)" && forLoops >= 2) {
-    const hasNestedFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
-      (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
-    if (hasNestedFor) return true
-  }
 
   // For O(n²) optimal: 3 nested for loops is brute force (like brute force 3Sum)
   if (optimalTime === "O(n²)" && tripleNestedFor) {
     return true
   }
 
-  // For O(n log n) optimal: 2+ nested for loops is brute force
-  if (optimalTime === "O(n log n)" && forLoops >= 2) {
-    const hasNestedFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
-      (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
-    if (hasNestedFor) return true
-  }
-
+  // For other cases, defer to LLM analysis - regex can't reliably detect:
+  // - Bucket sort (nested loops that are O(n) amortized)
+  // - Sequential vs nested loops
+  // - Early termination patterns
   return false
 }
 
@@ -100,28 +94,18 @@ export function analyzeCodeEfficiency(
   // Handle both JavaScript/TypeScript ({}) and Python (:) syntax
   // Also handle mixed for/while nesting (common in two-pointer patterns)
 
-  // Count outer loops
+  // Count loops for basic pattern detection
   const forLoops = (code.match(/\bfor\b/gi) || []).length
   const whileLoops = (code.match(/\bwhile\b/gi) || []).length
-  const totalLoops = forLoops + whileLoops
 
-  // Detect duplicate-skipping while loops (common in two-pointer solutions like 3Sum)
-  // These loops check array element equality like nums[x] == nums[x-1] or nums[x] == nums[x+1]
-  // They don't add to time complexity - they're bounded by O(n) total across all iterations
-  // because each element is only visited/skipped once
-  const dedupeLoopPattern =
-    /\bwhile\b[^:\n{]*(?:nums|arr|array|s|str|list|result|res|candidates|numbers)\s*\[[^\]]+\]\s*==\s*(?:nums|arr|array|s|str|list|result|res|candidates|numbers)\s*\[[^\]]+(?:\+|\-)\s*1\s*\]/gi
-  const dedupeLoops = (code.match(dedupeLoopPattern) || []).length
-
-  // Adjust loop counts: dedupe loops don't contribute to higher complexity
-  const effectiveTotalLoops = totalLoops - dedupeLoops
-
-  // Detect two-pointer pattern: while with left < right (or similar)
-  // This is a classic O(n) scan pattern used in problems like 3Sum, Container With Most Water, etc.
+  // Detect two-pointer pattern: for loop + while with left < right
+  // This is O(n²) overall (outer O(n) × inner O(n) scan)
   const hasTwoPointerPattern =
     forLoops >= 1 &&
     whileLoops >= 1 &&
-    /\bwhile\b[^:\n{]*\b(left|l|lo|low|start|i)\b[^:\n{]*(<|<=)[^:\n{]*\b(right|r|hi|high|end|j)\b/i.test(code)
+    /\bwhile\b[^:\n{]*\b(left|l|lo|low|start|i)\b[^:\n{]*(<|<=)[^:\n{]*\b(right|r|hi|high|end|j)\b/i.test(
+      code
+    )
 
   // Detect nested loops more robustly:
   // - JavaScript: for...{ ... for/while
@@ -150,22 +134,31 @@ export function analyzeCodeEfficiency(
 
   let estimatedTimeComplexity = "O(n)"
 
-  // IMPORTANT: Two-pointer pattern with for + while(left < right) is O(n²)
-  // Even with dedupe loops, the overall complexity is O(n) for outer loop × O(n) for two-pointer scan
+  // CONSERVATIVE COMPLEXITY ESTIMATION
+  // Only flag what we can reliably detect with regex. For complex patterns
+  // (bucket sort, amortized analysis), let LLM analysis handle it.
+  //
+  // KEY FIX: Removed effectiveTotalLoops >= 4 check that was causing O(n³) false positives.
+  // Sequential loops (loop1; loop2; loop3; loop4) are O(n), NOT O(n³).
+  // Only NESTED loops multiply complexity.
+
   if (hasTwoPointerPattern) {
     // Two-pointer with optional duplicate skipping = O(n²)
     // Examples: 3Sum, 4Sum with two-pointer inner loop
     estimatedTimeComplexity = "O(n²)"
-  } else if (nestedLoopCount >= 2 || effectiveTotalLoops >= 4) {
-    // True O(n³): multiple levels of nesting without two-pointer optimization
+  } else if (nestedLoopCount >= 2) {
+    // True O(n³): multiple levels of actual nesting
+    // Conservative: only flag when we see 2+ levels of definite nesting
     estimatedTimeComplexity = "O(n³)"
-  } else if (nestedLoopCount >= 1 || effectiveTotalLoops >= 3) {
-    // for + nested while = O(n²) (e.g., 3Sum with two-pointer)
+  } else if (nestedLoopCount >= 1) {
+    // Single level of nesting = O(n²)
+    // Note: This may over-flag bucket sort, but LLM analysis will correct it
     estimatedTimeComplexity = "O(n²)"
   } else if (code.match(/\b(sort|sorted)\b/i)) {
     // Sort without nested loops = O(n log n)
     estimatedTimeComplexity = "O(n log n)"
   }
+  // Default: O(n) for sequential loops, single loops, etc.
 
   // Estimate space complexity based on data structures
   // Only count CREATION of new data structures, not access/indexing

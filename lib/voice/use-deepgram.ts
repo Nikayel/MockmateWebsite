@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { DeepgramVoiceService, DeepgramConfig } from "./deepgram-service"
+import { VOICE } from "@/lib/constants"
 
 // Web Speech API types (not included in standard TypeScript lib)
 interface SpeechRecognitionResult {
@@ -58,6 +59,7 @@ export interface UseDeepgramOptions extends DeepgramConfig {
   onError?: (error: Error) => void
   onStatusChange?: (status: VoiceStatus) => void
   onUtteranceEnd?: (transcript: string) => void
+  onMaxDuration?: (transcript: string) => void // Called when max recording duration reached
   autoSubmitOnSilence?: boolean
   silenceThresholdMs?: number
   // Auto-send configuration
@@ -107,8 +109,10 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
   // Store latest callbacks in refs to avoid stale closure issues
   const onUtteranceEndRef = useRef(options.onUtteranceEnd)
   const onTranscriptRef = useRef(options.onTranscript)
+  const onMaxDurationRef = useRef(options.onMaxDuration)
   onUtteranceEndRef.current = options.onUtteranceEnd
   onTranscriptRef.current = options.onTranscript
+  onMaxDurationRef.current = options.onMaxDuration
 
   // Initialize service on mount
   useEffect(() => {
@@ -160,6 +164,17 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       setStatus(mappedStatus)
       setIsRecording(newStatus === "connected")
       options.onStatusChange?.(mappedStatus)
+    })
+
+    // Set max recording duration from constants (prevents abuse)
+    serviceRef.current.setMaxDuration(VOICE.MAX_RECORDING_SECONDS * 1000)
+
+    // Set up max duration callback
+    serviceRef.current.setOnMaxDuration((text) => {
+      console.log("[useDeepgram] Max duration reached, auto-stopping")
+      setStatus("idle")
+      setIsRecording(false)
+      onMaxDurationRef.current?.(text)
     })
 
     // Set up utterance end callback for live mode auto-send

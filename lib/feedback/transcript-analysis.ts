@@ -177,14 +177,14 @@ function detectMistakesAlgorithmically(
     }
 
     if (msg.role === "user") {
-      // 1. Wrong complexity detection
-      const complexityNote = detectWrongComplexity(
+      // 1. Wrong complexity detection (time AND space)
+      const complexityNotes = detectWrongComplexity(
         msg.content,
         problemContext,
         isInterviewerNext ? nextMsg?.content : undefined
       )
-      if (complexityNote && !interviewerCorrectedTopics.has("complexity")) {
-        notes.push(complexityNote)
+      if (complexityNotes.length > 0 && !interviewerCorrectedTopics.has("complexity")) {
+        notes.push(...complexityNotes)
       }
 
       // 2. Missed edge case detection (use existing evidence if available)
@@ -234,15 +234,16 @@ function detectMistakesAlgorithmically(
 }
 
 /**
- * Detect when user states wrong complexity
+ * Detect when user states wrong complexity (time or space)
+ * Returns an array of notes since user might get both wrong
  */
 function detectWrongComplexity(
   userMessage: string,
   problemContext: ProblemContext,
   interviewerResponse?: string
-): SilentNote | null {
-  const statedComplexity = extractComplexityFromText(userMessage)
-  if (!statedComplexity) return null
+): SilentNote[] {
+  const notes: SilentNote[] = []
+  const content = userMessage.toLowerCase()
 
   // Check if interviewer corrected (if so, not a silent note)
   if (interviewerResponse) {
@@ -252,56 +253,88 @@ function detectWrongComplexity(
       responseLC.includes("not quite") ||
       responseLC.includes("that's not correct")
     ) {
-      return null // Interviewer corrected, not a silent mistake
+      return [] // Interviewer corrected, not a silent mistake
     }
   }
 
-  // Compare to optimal complexity
+  // Determine if this message is about space or time complexity
+  const isAboutSpace =
+    content.includes("space") || content.includes("memory") || content.includes("auxiliary")
+  const isAboutTime =
+    content.includes("time") ||
+    content.includes("runtime") ||
+    (!isAboutSpace && !content.includes("space")) // Default to time if not explicitly space
+
+  // Extract complexity value from the message
+  const statedComplexity = extractComplexityFromText(userMessage)
+  if (!statedComplexity) return []
+
   const statedRank = getComplexityRank(statedComplexity)
-  const optimalRank = getComplexityRank(problemContext.optimalTimeComplexity)
 
-  // If user's stated complexity is significantly better than optimal, they're wrong
-  // (e.g., claiming O(1) when optimal is O(n))
-  if (statedRank !== -1 && optimalRank !== -1 && statedRank < optimalRank - 1) {
-    // Check if this is about their approach or the optimal
-    const content = userMessage.toLowerCase()
-    const isClaimingTheirSolution =
-      content.includes("my") ||
-      content.includes("this") ||
-      content.includes("solution") ||
-      content.includes("approach")
+  // Check SPACE complexity if user mentioned space
+  if (isAboutSpace && problemContext.optimalSpaceComplexity) {
+    const optimalSpaceRank = getComplexityRank(problemContext.optimalSpaceComplexity)
 
-    if (isClaimingTheirSolution) {
-      return {
+    // If user's stated space complexity is significantly better than actual, they're wrong
+    // e.g., claiming O(1) space for recursive solution when actual is O(h) or O(n)
+    if (statedRank !== -1 && optimalSpaceRank !== -1 && statedRank < optimalSpaceRank - 1) {
+      notes.push({
         type: "wrong_complexity",
         timestamp: Date.now(),
         userSaid: extractRelevantQuote(userMessage, statedComplexity),
-        correct: problemContext.optimalTimeComplexity,
-        context: "time complexity",
+        correct: `Space complexity is ${problemContext.optimalSpaceComplexity}`,
+        context: "space complexity",
+      })
+    }
+  }
+
+  // Check TIME complexity
+  if (isAboutTime) {
+    const optimalTimeRank = getComplexityRank(problemContext.optimalTimeComplexity)
+
+    // If user's stated complexity is significantly better than optimal, they're wrong
+    // (e.g., claiming O(1) when optimal is O(n))
+    if (statedRank !== -1 && optimalTimeRank !== -1 && statedRank < optimalTimeRank - 1) {
+      // Check if this is about their approach or the optimal
+      const isClaimingTheirSolution =
+        content.includes("my") ||
+        content.includes("this") ||
+        content.includes("solution") ||
+        content.includes("approach") ||
+        content.includes("would be") ||
+        content.includes("is")
+
+      if (isClaimingTheirSolution) {
+        notes.push({
+          type: "wrong_complexity",
+          timestamp: Date.now(),
+          userSaid: extractRelevantQuote(userMessage, statedComplexity),
+          correct: `Time complexity is ${problemContext.optimalTimeComplexity}`,
+          context: "time complexity",
+        })
+      }
+    }
+
+    // Also check if user stated complexity is significantly worse than what's achievable
+    // but they thought it was optimal
+    if (statedRank > optimalTimeRank + 1) {
+      if (
+        content.includes("optimal") ||
+        content.includes("best") ||
+        content.includes("can't do better")
+      ) {
+        notes.push({
+          type: "wrong_optimality",
+          timestamp: Date.now(),
+          userSaid: extractRelevantQuote(userMessage, statedComplexity),
+          correct: `Can achieve ${problemContext.optimalTimeComplexity}`,
+          context: "better solution exists",
+        })
       }
     }
   }
 
-  // Also check if user stated complexity is significantly worse than what's achievable
-  // but they thought it was optimal
-  if (statedRank > optimalRank + 1) {
-    const content = userMessage.toLowerCase()
-    if (
-      content.includes("optimal") ||
-      content.includes("best") ||
-      content.includes("can't do better")
-    ) {
-      return {
-        type: "wrong_optimality",
-        timestamp: Date.now(),
-        userSaid: extractRelevantQuote(userMessage, statedComplexity),
-        correct: `Can achieve ${problemContext.optimalTimeComplexity}`,
-        context: "better solution exists",
-      }
-    }
-  }
-
-  return null
+  return notes
 }
 
 /**
