@@ -374,6 +374,7 @@ function InterviewPageContent() {
   const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
   const [ragHints, setRagHints] = useState<{ level: number; hint: string; id?: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
+  const [hintFetchStatus, setHintFetchStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [revealedAIHintIndices, setRevealedAIHintIndices] = useState<Set<number>>(new Set())
   const [hintFeedback, setHintFeedback] = useState<Map<string, "helpful" | "unhelpful">>(new Map())
 
@@ -1246,6 +1247,7 @@ Let's continue!`
     if (!selectedScenario || !user?.id) return
 
     setIsLoadingHints(true)
+    setHintFetchStatus("loading")
     try {
       const response = await fetch("/api/agents/hints", {
         method: "POST",
@@ -1261,6 +1263,9 @@ Let's continue!`
           userCode: code,
           language: selectedLanguage,
           trigger: "initial",
+          // Pass optimal complexity and constraints for better hint tailoring
+          optimalComplexity: (selectedScenario as any).optimalComplexity,
+          constraints: (selectedScenario as any).constraints,
         }),
       })
 
@@ -1275,13 +1280,17 @@ Let's continue!`
           })
         )
         setRagHints(transformedHints)
+        setHintFetchStatus(transformedHints.length > 0 ? "success" : "error")
+      } else {
+        setHintFetchStatus("error")
       }
     } catch (error) {
       console.error("Error fetching hints:", error)
+      setHintFetchStatus("error")
     } finally {
       setIsLoadingHints(false)
     }
-  }, [selectedScenario, code, selectedLanguage, user?.id, setIsLoadingHints, setRagHints])
+  }, [selectedScenario, code, selectedLanguage, user?.id])
 
   // Fetch AI hints only when user has written meaningful code BEYOND starter code
   // This prevents showing hints before user even starts coding
@@ -2497,6 +2506,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
     setRagHints([])
+    setHintFetchStatus("idle")
     setRevealedAIHintIndices(new Set())
     setHintFeedback(new Map())
     setWorkspaceContext([])
@@ -2773,6 +2783,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
     setRagHints([])
+    setHintFetchStatus("idle")
     setRevealedAIHintIndices(new Set())
     setHintFeedback(new Map())
     setWorkspaceContext([])
@@ -4790,22 +4801,38 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
                           {/* AI Insights - Shown independently, right after description */}
                           {/* Only show hints when user has written meaningful code beyond starter code */}
+                          {/* Use hintFetchStatus to prevent flickering - section stays visible after first fetch attempt */}
                           {isInterviewStarted &&
                             code.trim().length - starterCode.trim().length >= 30 &&
-                            (ragHints.length > 0 || isLoadingHints) && (
+                            hintFetchStatus !== "idle" && (
                               <div className="space-y-2">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
                                   <span className="h-4 w-1 rounded-full bg-purple-400"></span>
                                   <Sparkles className="h-4 w-4" />
                                   AI Insights
-                                  <span className="text-xs font-normal text-gray-500">
-                                    ({revealedAIHintIndices.size}/{ragHints.length} revealed)
-                                  </span>
+                                  {ragHints.length > 0 && (
+                                    <span className="text-xs font-normal text-gray-500">
+                                      ({revealedAIHintIndices.size}/{ragHints.length} revealed)
+                                    </span>
+                                  )}
                                 </h3>
-                                {isLoadingHints ? (
+                                {hintFetchStatus === "loading" ? (
                                   <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-gray-400">
                                     <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
                                     Generating personalized hints...
+                                  </div>
+                                ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
+                                  <div className="rounded-lg border border-gray-600/30 bg-gray-800/30 p-3">
+                                    <p className="text-sm text-gray-400">
+                                      Hints will appear here as you code. Keep working on your solution!
+                                    </p>
+                                    <button
+                                      onClick={fetchRAGHints}
+                                      className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                                    >
+                                      <Sparkles className="h-3 w-3" />
+                                      Try generating hints
+                                    </button>
                                   </div>
                                 ) : (
                                   <div className="space-y-2">

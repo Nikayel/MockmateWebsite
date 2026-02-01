@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Trophy,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -146,6 +147,8 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   // Default to showing analysis for DSA problems
   const [showAnalysis, setShowAnalysis] = useState(scenario.type === "dsa")
+  // Collapsible optimal approach section - collapsed by default to not give away solution
+  const [showOptimalApproach, setShowOptimalApproach] = useState(false)
   const {
     isInterviewStarted,
     elapsedTime,
@@ -157,9 +160,10 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
   const hints = (scenario as any).hints || []
 
-  // Reset analysis visibility when scenario changes
+  // Reset visibility states when scenario changes
   useEffect(() => {
     setShowAnalysis(scenario.type === "dsa")
+    setShowOptimalApproach(false) // Always start collapsed
   }, [scenario.id])
 
   // Get pattern metadata for DSA problems
@@ -291,6 +295,57 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Optimal Approach - Collapsible (DSA only) */}
+        {scenario.type === "dsa" && (scenario as DSAScenario).optimalComplexity && (
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+            <button
+              onClick={() => setShowOptimalApproach(!showOptimalApproach)}
+              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-emerald-500/10 transition-colors rounded-lg"
+            >
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-300">Optimal Approach</span>
+                <span className="text-xs text-gray-500">(click to reveal)</span>
+              </div>
+              {showOptimalApproach ? (
+                <ChevronUp className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-emerald-400" />
+              )}
+            </button>
+
+            {showOptimalApproach && (
+              <div className="px-3 pb-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Time Complexity */}
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-300">Time</span>
+                    </div>
+                    <code className="text-lg font-semibold text-emerald-100">
+                      {(scenario as DSAScenario).optimalComplexity.time}
+                    </code>
+                  </div>
+                  {/* Space Complexity */}
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <HardDrive className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-300">Space</span>
+                    </div>
+                    <code className="text-lg font-semibold text-emerald-100">
+                      {(scenario as DSAScenario).optimalComplexity.space}
+                    </code>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-gray-400 italic">
+                  Try to achieve this complexity before revealing hints!
+                </p>
+              </div>
+            )}
           </div>
         )}
 

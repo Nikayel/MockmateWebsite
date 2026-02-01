@@ -32,6 +32,13 @@ export interface LLMHintRequest {
   userId?: string
   existingHints?: string[]
   testFailures?: string[]
+
+  // Problem-specific context for better tailoring
+  optimalComplexity?: {
+    time: string
+    space: string
+  }
+  constraints?: string[]
 }
 
 interface LLMHintResponse {
@@ -131,6 +138,8 @@ export async function generateLLMHint(request: LLMHintRequest): Promise<Generate
       language: request.language,
       struggleLevel: request.struggleLevel,
       testFailures: request.testFailures,
+      optimalComplexity: request.optimalComplexity,
+      constraints: request.constraints,
       patternKnowledge: patternKnowledge
         ? {
             displayName: patternKnowledge.displayName,

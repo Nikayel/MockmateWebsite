@@ -92,6 +92,12 @@ async function handleGenerateHints(params: {
   }
   existingHints?: string[]
   trigger?: HintTrigger
+  // Problem-specific context for better hint tailoring
+  optimalComplexity?: {
+    time: string
+    space: string
+  }
+  constraints?: string[]
 }) {
   const {
     userId,
@@ -106,6 +112,8 @@ async function handleGenerateHints(params: {
     testResults,
     existingHints,
     trigger = "initial",
+    optimalComplexity,
+    constraints,
   } = params
 
   // Validate required fields
@@ -150,6 +158,8 @@ async function handleGenerateHints(params: {
     existingHints,
     testResults,
     trigger,
+    optimalComplexity,
+    constraints,
   }
 
   try {
