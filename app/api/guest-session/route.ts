@@ -9,13 +9,13 @@
  * PUT /api/guest-session - Update guest session
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { logger } from '@/lib/logger'
-import { guestSessionRateLimit } from '@/lib/rate-limit'
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb } from "@/lib/firebase-admin"
+import { logger } from "@/lib/logger"
+import { guestSessionRateLimit } from "@/lib/rate-limit"
 
 // Mark route as dynamic
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 /**
  * Validate guest ID format
@@ -39,36 +39,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      guestId,
-      scenarioTitle,
-      scenarioType,
-      scenarioId,
-      difficulty,
-      pattern,
-    } = body
+    const { guestId, scenarioTitle, scenarioType, scenarioId, difficulty, pattern } = body
 
     // Validate guest ID
     if (!isValidGuestId(guestId)) {
-      return NextResponse.json(
-        { error: 'Invalid guest ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid guest ID format" }, { status: 400 })
     }
 
     // Validate required fields
     if (!scenarioTitle || !scenarioType || !difficulty) {
       return NextResponse.json(
-        { error: 'Missing required fields: scenarioTitle, scenarioType, difficulty' },
+        { error: "Missing required fields: scenarioTitle, scenarioType, difficulty" },
         { status: 400 }
       )
     }
 
     // Check if this guest already has an active session (prevent abuse)
     const existingSessionsQuery = await adminDb
-      .collection('interview_sessions')
-      .where('user_id', '==', guestId)
-      .where('is_guest', '==', true)
+      .collection("interview_sessions")
+      .where("user_id", "==", guestId)
+      .where("is_guest", "==", true)
       .limit(5)
       .get()
 
@@ -82,9 +72,9 @@ export async function POST(request: NextRequest) {
       if (hasCompletedSession) {
         return NextResponse.json(
           {
-            error: 'Free trial already used',
-            code: 'FREE_TRIAL_EXHAUSTED',
-            message: 'You have already used your free trial. Sign up to continue practicing!',
+            error: "Free trial already used",
+            code: "FREE_TRIAL_EXHAUSTED",
+            message: "You have already used your free trial. Sign up to continue practicing!",
           },
           { status: 403 }
         )
@@ -97,14 +87,14 @@ export async function POST(request: NextRequest) {
       if (incompleteSession) {
         return NextResponse.json({
           sessionId: incompleteSession.id,
-          message: 'Returning existing session',
+          message: "Returning existing session",
           isExisting: true,
         })
       }
     }
 
     // Create new session
-    const sessionRef = adminDb.collection('interview_sessions').doc()
+    const sessionRef = adminDb.collection("interview_sessions").doc()
     const now = new Date().toISOString()
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
 
@@ -125,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     await sessionRef.set(sessionData)
 
-    logger.info('Guest session created', {
+    logger.info("Guest session created", {
       sessionId: sessionRef.id,
       guestId,
       scenarioType,
@@ -133,15 +123,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       sessionId: sessionRef.id,
-      message: 'Session created',
+      message: "Session created",
       expiresAt,
     })
   } catch (error) {
-    logger.error('Failed to create guest session', { error })
-    return NextResponse.json(
-      { error: 'Failed to create session' },
-      { status: 500 }
-    )
+    logger.error("Failed to create guest session", { error })
+    return NextResponse.json({ error: "Failed to create session" }, { status: 500 })
   }
 }
 
@@ -152,54 +139,36 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const sessionId = searchParams.get('sessionId')
-    const guestId = searchParams.get('guestId')
+    const sessionId = searchParams.get("sessionId")
+    const guestId = searchParams.get("guestId")
 
     if (!sessionId || !guestId) {
-      return NextResponse.json(
-        { error: 'sessionId and guestId are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "sessionId and guestId are required" }, { status: 400 })
     }
 
     if (!isValidGuestId(guestId)) {
-      return NextResponse.json(
-        { error: 'Invalid guest ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid guest ID format" }, { status: 400 })
     }
 
-    const sessionDoc = await adminDb
-      .collection('interview_sessions')
-      .doc(sessionId)
-      .get()
+    const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
 
     if (!sessionDoc.exists) {
-      return NextResponse.json(
-        { error: 'Session not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
     const sessionData = sessionDoc.data()
 
     // Verify ownership
     if (sessionData?.user_id !== guestId || !sessionData?.is_guest) {
-      return NextResponse.json(
-        { error: 'Session not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
     return NextResponse.json({
       session: sessionData,
     })
   } catch (error) {
-    logger.error('Failed to get guest session', { error })
-    return NextResponse.json(
-      { error: 'Failed to get session' },
-      { status: 500 }
-    )
+    logger.error("Failed to get guest session", { error })
+    return NextResponse.json({ error: "Failed to get session" }, { status: 500 })
   }
 }
 
@@ -209,6 +178,12 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    // SECURITY: Apply rate limiting (same as POST) to prevent abuse
+    const rateLimitResponse = await guestSessionRateLimit(request)
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
+
     const body = await request.json()
     const {
       sessionId,
@@ -225,39 +200,24 @@ export async function PUT(request: NextRequest) {
     } = body
 
     if (!sessionId || !guestId) {
-      return NextResponse.json(
-        { error: 'sessionId and guestId are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "sessionId and guestId are required" }, { status: 400 })
     }
 
     if (!isValidGuestId(guestId)) {
-      return NextResponse.json(
-        { error: 'Invalid guest ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid guest ID format" }, { status: 400 })
     }
 
     // Verify session ownership
-    const sessionDoc = await adminDb
-      .collection('interview_sessions')
-      .doc(sessionId)
-      .get()
+    const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
 
     if (!sessionDoc.exists) {
-      return NextResponse.json(
-        { error: 'Session not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
     const sessionData = sessionDoc.data()
 
     if (sessionData?.user_id !== guestId || !sessionData?.is_guest) {
-      return NextResponse.json(
-        { error: 'Session not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
     // Build update data
@@ -295,20 +255,14 @@ export async function PUT(request: NextRequest) {
     if (spaceComplexity) updateData.space_complexity = spaceComplexity
     if (efficiencyScore) updateData.efficiency_score = efficiencyScore
 
-    await adminDb
-      .collection('interview_sessions')
-      .doc(sessionId)
-      .update(updateData)
+    await adminDb.collection("interview_sessions").doc(sessionId).update(updateData)
 
     return NextResponse.json({
       success: true,
-      message: 'Session updated',
+      message: "Session updated",
     })
   } catch (error) {
-    logger.error('Failed to update guest session', { error })
-    return NextResponse.json(
-      { error: 'Failed to update session' },
-      { status: 500 }
-    )
+    logger.error("Failed to update guest session", { error })
+    return NextResponse.json({ error: "Failed to update session" }, { status: 500 })
   }
 }

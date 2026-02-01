@@ -11,6 +11,7 @@ import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
 import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
+import { csrfProtection } from "@/lib/csrf"
 
 export const dynamic = "force-dynamic"
 
@@ -20,11 +21,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // SECURITY: CSRF protection for state-changing operation
+    const csrfResult = csrfProtection(request)
+    if (csrfResult) {
+      logger.warn("Delete account CSRF validation failed", {
+        ip: request.headers.get("x-forwarded-for") || "unknown",
+      })
+      return csrfResult
+    }
+
     // SECURITY FIX: Apply strict rate limiting to prevent abuse
     const rateLimitResponse = await sensitiveOperationRateLimit(request)
     if (rateLimitResponse) {
       logger.warn("Delete account rate limit exceeded", {
-        ip: request.headers.get("x-forwarded-for") || "unknown"
+        ip: request.headers.get("x-forwarded-for") || "unknown",
       })
       return rateLimitResponse
     }
@@ -32,10 +42,7 @@ export async function DELETE(request: NextRequest) {
     // Get authorization token
     const authHeader = request.headers.get("Authorization")
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
     const idToken = authHeader.split("Bearer ")[1]
@@ -64,7 +71,10 @@ export async function DELETE(request: NextRequest) {
       try {
         await stripe.subscriptions.cancel(profileData.stripe_subscription_id)
       } catch (stripeError) {
-        logger.error("Failed to cancel Stripe subscription", { error: stripeError, subscriptionId: profileData.stripe_subscription_id })
+        logger.error("Failed to cancel Stripe subscription", {
+          error: stripeError,
+          subscriptionId: profileData.stripe_subscription_id,
+        })
       }
     }
 
@@ -102,10 +112,7 @@ export async function DELETE(request: NextRequest) {
           }
         } else if (col.field) {
           // Query and delete documents by field
-          const snapshot = await adminDb
-            .collection(col.name)
-            .where(col.field, "==", userId)
-            .get()
+          const snapshot = await adminDb.collection(col.name).where(col.field, "==", userId).get()
 
           snapshot.docs.forEach((doc) => {
             batch.delete(doc.ref)
@@ -141,10 +148,7 @@ export async function DELETE(request: NextRequest) {
             // Delete vectors by userId metadata filter
             await index.namespace(namespace).deleteMany({
               filter: {
-                $or: [
-                  { userId: { $eq: userId } },
-                  { user_id: { $eq: userId } },
-                ],
+                $or: [{ userId: { $eq: userId } }, { user_id: { $eq: userId } }],
               },
             })
           } catch (nsError) {

@@ -22,6 +22,7 @@ import { advancedRetrieve } from "@/lib/rag/retrieval/advanced-retrieval"
 import { rateLimit } from "@/lib/rate-limit"
 import { withTimeout, validateProblemText, validateUserCode, TimeoutError } from "@/lib/rag/utils"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { getUserIdFromRequest } from "@/lib/auth-server"
 
 /**
  * RAG API Endpoint
@@ -59,6 +60,26 @@ export async function POST(request: NextRequest) {
     const rateLimitResponse = await (isStorageAction ? ragStorageRateLimit : ragRateLimit)(request)
     if (rateLimitResponse) {
       return rateLimitResponse
+    }
+
+    // SECURITY: Actions that require authentication
+    const authRequiredActions = [
+      "store-solution",
+      "store-onboarding",
+      "get-similar-solutions",
+      "get-recommendations",
+      "get-next-problems",
+      "get-learning-path",
+      "record-feedback",
+    ]
+
+    if (authRequiredActions.includes(action)) {
+      const verifiedUserId = await getUserIdFromRequest(request)
+      if (!verifiedUserId) {
+        return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      }
+      // Override client-provided userId with verified one to prevent spoofing
+      params.userId = verifiedUserId
     }
 
     switch (action) {
@@ -569,7 +590,16 @@ async function handleGetSimilarSolutions(params: {
     similarSolutions: similar.map((s) => ({
       code: s.text,
       similarity: Math.round(s.similarity * 100),
-      metadata: s.metadata,
+      // SECURITY: Only expose safe metadata fields, exclude userId and internal data
+      metadata: {
+        problemId: s.metadata?.problemId,
+        problemTitle: s.metadata?.problemTitle,
+        language: s.metadata?.language,
+        passed: s.metadata?.passed,
+        score: s.metadata?.score,
+        problemType: s.metadata?.problemType,
+        tags: s.metadata?.tags,
+      },
     })),
     message:
       similar.length > 0

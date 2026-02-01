@@ -122,6 +122,20 @@ class RequestCache {
 export const requestCache = new RequestCache()
 
 /**
+ * Simple hash function for cache key generation
+ * Used to hash sensitive values like Authorization headers
+ */
+function simpleHash(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash
+  }
+  return hash.toString(36)
+}
+
+/**
  * Cached fetch wrapper for API calls
  */
 export async function cachedFetch<T>(
@@ -130,10 +144,21 @@ export async function cachedFetch<T>(
 ): Promise<T> {
   const { cacheTTL, forceRefresh, ...fetchOptions } = options
 
-  // Create cache key from URL and relevant options
+  // SECURITY: Extract Authorization header to include in cache key
+  // This prevents different users from getting the same cached response
+  let authHeader: string | null = null
+  if (fetchOptions.headers instanceof Headers) {
+    authHeader = fetchOptions.headers.get("Authorization")
+  } else if (fetchOptions.headers && typeof fetchOptions.headers === "object") {
+    authHeader = (fetchOptions.headers as Record<string, string>)["Authorization"] || null
+  }
+
+  // Create cache key from URL and relevant options (including auth hash)
   const cacheKey = `fetch:${url}:${JSON.stringify({
-    method: fetchOptions.method || 'GET',
+    method: fetchOptions.method || "GET",
     body: fetchOptions.body,
+    // Hash the auth header to avoid storing tokens in cache keys
+    authHash: authHeader ? simpleHash(authHeader) : undefined,
   })}`
 
   return requestCache.getOrFetch<T>(
@@ -157,8 +182,11 @@ export function createCacheKey(prefix: string, params: Record<string, any>): str
 }
 
 // Auto-cleanup every 5 minutes
-if (typeof window !== 'undefined') {
-  setInterval(() => {
-    requestCache.cleanup()
-  }, 5 * 60 * 1000)
+if (typeof window !== "undefined") {
+  setInterval(
+    () => {
+      requestCache.cleanup()
+    },
+    5 * 60 * 1000
+  )
 }

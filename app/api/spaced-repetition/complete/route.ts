@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { getScenarioById } from "@/lib/scenarios"
 import { logger } from "@/lib/logger"
+import { csrfProtection } from "@/lib/csrf"
 import {
   updateProblemMastery,
   initializeProblemMasteryFromSession,
@@ -60,6 +61,12 @@ interface CompleteRequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: CSRF protection for state-changing operation
+    const csrfResult = csrfProtection(request)
+    if (csrfResult) {
+      return csrfResult
+    }
+
     // Verify authentication
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {

@@ -1612,6 +1612,17 @@ Generate a compliant response NOW:`
             skipCache: true, // Must skip cache for regeneration - cache key only uses first 500 chars of system prompt
           }
         )
+
+        // COST TRACKING: Log retry for cost monitoring
+        // Each retry is a full AI call that adds to costs
+        logger.warn("[Chat API] Response regenerated due to violation (adds to cost)", {
+          sessionId,
+          userId,
+          retryReason: hint.substring(0, 100),
+          provider: regeneratedResponse.provider,
+          tokensUsed: regeneratedResponse.tokensUsed,
+        })
+
         return regeneratedResponse.text
       }
 
@@ -1682,7 +1693,18 @@ Generate a compliant response NOW:`
         messageLength: message?.length || 0,
         responseTimeMs,
         provider: aiResponse.provider, // Track which provider was used
-      }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+      }).catch((err) => {
+        // COST TRACKING: Log with high severity - costs won't be recorded if this fails
+        logger.error("CRITICAL: Analytics tracking failed - usage costs may not be recorded", {
+          error: err,
+          sessionId,
+          userId,
+          provider: aiResponse.provider,
+          // Include enough info to manually reconcile costs if needed
+          tokensUsed: aiResponse.tokensUsed,
+          latencyMs: aiResponse.latencyMs,
+        })
+      })
     }
 
     // End request tracking for tier-based rate limiting

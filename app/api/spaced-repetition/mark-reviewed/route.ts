@@ -9,10 +9,11 @@
  * - scenario_id: string - The scenario ID
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth-helpers';
-import { getScenarioById, scenarios } from '@/lib/scenarios';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from "next/server"
+import { verifyAuth } from "@/lib/auth-helpers"
+import { getScenarioById, scenarios } from "@/lib/scenarios"
+import { logger } from "@/lib/logger"
+import { csrfProtection } from "@/lib/csrf"
 import {
   updateProblemMastery,
   getAllUserProblems,
@@ -25,75 +26,85 @@ import {
   estimateRetentionForAlgorithm,
   // Research Tracking
   recordReviewEvent,
-} from '@/lib/spaced-repetition';
-import type { Difficulty } from '@/lib/spaced-repetition';
-import type { SpacedRepetitionMasteryLevel } from '@/lib/types';
+} from "@/lib/spaced-repetition"
+import type { Difficulty } from "@/lib/spaced-repetition"
+import type { SpacedRepetitionMasteryLevel } from "@/lib/types"
 
 interface MarkReviewedRequestBody {
-  problem_id: string;
-  scenario_id: string;
+  problem_id: string
+  scenario_id: string
 }
 
-const DEFAULT_MANUAL_REVIEW_SCORE = 75; // Assume decent performance for manual reviews
+const DEFAULT_MANUAL_REVIEW_SCORE = 75 // Assume decent performance for manual reviews
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const authResult = await verifyAuth(request);
-    if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized', message: authResult.error },
-        { status: 401 }
-      );
+    // SECURITY: CSRF protection for state-changing operation
+    const csrfResult = csrfProtection(request)
+    if (csrfResult) {
+      return csrfResult
     }
 
-    const userId = authResult.userId;
+    // Verify authentication
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json(
+        { error: "Unauthorized", message: authResult.error },
+        { status: 401 }
+      )
+    }
+
+    const userId = authResult.userId
 
     // Parse request body
-    const body: MarkReviewedRequestBody = await request.json();
-    const { problem_id, scenario_id } = body;
+    const body: MarkReviewedRequestBody = await request.json()
+    const { problem_id, scenario_id } = body
 
     // Validate required fields
     if (!problem_id) {
       return NextResponse.json(
-        { error: 'Bad Request', message: 'problem_id is required' },
+        { error: "Bad Request", message: "problem_id is required" },
         { status: 400 }
-      );
+      )
     }
 
     // Get existing problem mastery
-    const problems = await getAllUserProblems(userId);
-    const existingMastery = problems.find((p) => p.problem_id === problem_id);
+    const problems = await getAllUserProblems(userId)
+    const existingMastery = problems.find((p) => p.problem_id === problem_id)
 
     if (!existingMastery) {
       return NextResponse.json(
-        { error: 'Not Found', message: 'Problem mastery record not found. Complete the problem first.' },
+        {
+          error: "Not Found",
+          message: "Problem mastery record not found. Complete the problem first.",
+        },
         { status: 404 }
-      );
+      )
     }
 
     // Try to find the scenario for canonical difficulty
-    let scenario = getScenarioById(scenario_id);
+    let scenario = getScenarioById(scenario_id)
     if (!scenario) {
       // Try by title
-      scenario = scenarios.find(s => s.title === existingMastery.title);
+      scenario = scenarios.find((s) => s.title === existingMastery.title)
     }
-    const difficulty = (scenario?.difficulty || existingMastery.difficulty) as Difficulty;
+    const difficulty = (scenario?.difficulty || existingMastery.difficulty) as Difficulty
 
     // Get user's assigned algorithm
-    const userAlgorithm = await getUserAlgorithm(userId);
+    const userAlgorithm = await getUserAlgorithm(userId)
 
     // Calculate next interval using user's assigned algorithm
-    const now = new Date();
-    const lastReviewAt = new Date(existingMastery.last_reviewed_at);
+    const now = new Date()
+    const lastReviewAt = new Date(existingMastery.last_reviewed_at)
     const daysSinceReview = Math.floor(
       (now.getTime() - lastReviewAt.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const nextReviewAtDate = new Date(existingMastery.next_review_at);
-    const daysOverdue = nextReviewAtDate < now
-      ? Math.floor((now.getTime() - nextReviewAtDate.getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
-    const isEarlyReview = nextReviewAtDate > now;
+    )
+    const nextReviewAtDate = new Date(existingMastery.next_review_at)
+    const daysOverdue =
+      nextReviewAtDate < now
+        ? Math.floor((now.getTime() - nextReviewAtDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 0
+    const isEarlyReview = nextReviewAtDate > now
 
     // Reconstruct algorithm state
     // Include scores_history for consecutive perfect score detection in SM-2
@@ -106,14 +117,14 @@ export async function POST(request: NextRequest) {
       ease_factor: existingMastery.ease_factor,
       last_reviewed_at: existingMastery.last_reviewed_at,
       scores_history: existingMastery.scores_history,
-    });
+    })
 
     // Estimate pre-review retention
     const predictedRetention = estimateRetentionForAlgorithm(
       userAlgorithm,
       currentState,
       daysSinceReview
-    );
+    )
 
     // Calculate next review using algorithm router
     const reviewResult = await calculateNextReview(userId, currentState, {
@@ -124,7 +135,7 @@ export async function POST(request: NextRequest) {
       problem_difficulty: difficulty,
       is_early_review: isEarlyReview,
       days_overdue: daysOverdue,
-    });
+    })
 
     // Prepare storage data
     const storageData = prepareStateForStorage({
@@ -136,7 +147,7 @@ export async function POST(request: NextRequest) {
       confidence: reviewResult.confidence,
       ease_factor: reviewResult.ease_factor,
       fsrs_state: reviewResult.fsrs_state,
-    });
+    })
 
     // Update problem mastery
     // NOTE: Use increment_review_count for atomic increment to prevent race conditions
@@ -146,7 +157,7 @@ export async function POST(request: NextRequest) {
       hints_used: 0,
       ...storageData,
       increment_review_count: true, // Atomic increment prevents race conditions
-    });
+    })
 
     // Record research event
     try {
@@ -179,17 +190,17 @@ export async function POST(request: NextRequest) {
         isEarlyReview,
         isFirstReview: false,
         sessionNumber: existingMastery.review_count + 1,
-      });
+      })
     } catch (researchError) {
-      logger.error('Failed to record research event for manual review', { error: researchError });
+      logger.error("Failed to record research event for manual review", { error: researchError })
     }
 
     // Update learning state summary
-    await updateUserLearningStateSummary(userId);
+    await updateUserLearningStateSummary(userId)
 
     return NextResponse.json({
       success: true,
-      message: 'Problem marked as reviewed',
+      message: "Problem marked as reviewed",
       data: {
         problem_id: updatedMastery.problem_id,
         next_review_at: updatedMastery.next_review_at,
@@ -197,12 +208,12 @@ export async function POST(request: NextRequest) {
         mastery_level: updatedMastery.mastery_level,
         review_count: updatedMastery.review_count,
       },
-    });
+    })
   } catch (error: any) {
-    logger.error('Error marking problem as reviewed', { error });
+    logger.error("Error marking problem as reviewed", { error })
     return NextResponse.json(
-      { error: 'Internal Server Error', message: error.message },
+      { error: "Internal Server Error", message: error.message },
       { status: 500 }
-    );
+    )
   }
 }

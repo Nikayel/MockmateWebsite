@@ -494,6 +494,7 @@ export async function trackEmbeddingUsageAccurate(params: {
 
 /**
  * Get usage stats for admin dashboard
+ * OPTIMIZED: Uses collectionGroup query to avoid N+1 reads
  */
 export async function getAdminUsageStats(options?: {
   startDate?: Date
@@ -515,8 +516,40 @@ export async function getAdminUsageStats(options?: {
   const now = new Date()
   const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
-  // Get users with their usage summaries (limit to prevent unbounded reads)
-  const usersSnapshot = await adminDb.collection("users").limit(10000).get()
+  // OPTIMIZATION: Fetch all usage summaries for this period in ONE query
+  // using collectionGroup instead of N individual reads
+  const summariesSnapshot = await adminDb
+    .collectionGroup("usage_summaries")
+    .where("periodStart", ">=", new Date(now.getFullYear(), now.getMonth(), 1))
+    .limit(10000)
+    .get()
+
+  // Build a map of userId -> summary data
+  const summaryMap = new Map<string, { totalCost: number; totalRequests: number }>()
+  for (const doc of summariesSnapshot.docs) {
+    // Path is: users/{userId}/usage_summaries/{periodKey}
+    const userId = doc.ref.parent.parent?.id
+    if (userId) {
+      const data = doc.data()
+      summaryMap.set(userId, {
+        totalCost: data.totalCost || 0,
+        totalRequests: data.totalRequests || 0,
+      })
+    }
+  }
+
+  // Get user profiles in a single query (not N individual reads)
+  const profilesSnapshot = await adminDb.collection("profiles").limit(10000).get()
+
+  // Build user map for email and tier lookup
+  const userMap = new Map<string, { email: string; tier: string }>()
+  for (const doc of profilesSnapshot.docs) {
+    const data = doc.data()
+    userMap.set(doc.id, {
+      email: data.email || "Unknown",
+      tier: data.subscription_tier || "free",
+    })
+  }
 
   const userStats: Array<{
     userId: string
@@ -530,34 +563,23 @@ export async function getAdminUsageStats(options?: {
   let totalCost = 0
   let totalRequests = 0
 
-  for (const userDoc of usersSnapshot.docs) {
-    const userData = userDoc.data()
-    const tier = userData.subscription_tier || "free"
+  // Combine the data
+  for (const [userId, summary] of summaryMap.entries()) {
+    const user = userMap.get(userId)
+    const tier = user?.tier || "free"
     const budgetCap = BUDGET_CAPS[tier as keyof typeof BUDGET_CAPS] || BUDGET_CAPS.free
 
-    // Get usage summary for this user
-    const summaryDoc = await adminDb
-      .collection("users")
-      .doc(userDoc.id)
-      .collection("usage_summaries")
-      .doc(periodKey)
-      .get()
+    totalCost += summary.totalCost
+    totalRequests += summary.totalRequests
 
-    const summaryData = summaryDoc.data() || {}
-    const cost = summaryData.totalCost || 0
-    const requests = summaryData.totalRequests || 0
-
-    totalCost += cost
-    totalRequests += requests
-
-    if (cost > 0 || requests > 0) {
+    if (summary.totalCost > 0 || summary.totalRequests > 0) {
       userStats.push({
-        userId: userDoc.id,
-        email: userData.email || "Unknown",
+        userId,
+        email: user?.email || "Unknown",
         tier,
-        cost,
-        requests,
-        budgetUsedPercent: (cost / budgetCap) * 100,
+        cost: summary.totalCost,
+        requests: summary.totalRequests,
+        budgetUsedPercent: (summary.totalCost / budgetCap) * 100,
       })
     }
   }
@@ -566,7 +588,7 @@ export async function getAdminUsageStats(options?: {
   userStats.sort((a, b) => b.cost - a.cost)
 
   return {
-    totalUsers: usersSnapshot.size,
+    totalUsers: profilesSnapshot.size,
     totalCost,
     totalRequests,
     userStats,

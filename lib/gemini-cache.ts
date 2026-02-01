@@ -20,13 +20,29 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 // Simple in-memory cache for system prompts
 // This avoids re-instantiating models with the same system instructions
-const modelCache = new Map<string, {
-  model: any,
-  createdAt: Date
-}>()
+const modelCache = new Map<
+  string,
+  {
+    model: any
+    createdAt: Date
+  }
+>()
 
 // Cache TTL: 1 hour
 const CACHE_TTL_MS = 60 * 60 * 1000
+
+/**
+ * Simple hash function for cache key generation
+ */
+function simpleHash(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash
+  }
+  return hash.toString(36)
+}
 
 /**
  * Get a Gemini model with system instructions
@@ -42,12 +58,16 @@ export async function getCachedModel(
   systemInstruction: string,
   modelName: string = "gemini-2.5-flash"
 ) {
+  // SECURITY FIX: Include systemInstruction hash AND modelName in cache key
+  // This prevents returning a cached model with different instructions
+  const fullCacheKey = `${cacheKey}:${simpleHash(systemInstruction)}:${modelName}`
+
   // Check if cached model exists and is not expired
-  const cached = modelCache.get(cacheKey)
+  const cached = modelCache.get(fullCacheKey)
   const now = new Date()
 
-  if (cached && (now.getTime() - cached.createdAt.getTime()) < CACHE_TTL_MS) {
-    logger.debug("Using cached Gemini model", { cacheKey })
+  if (cached && now.getTime() - cached.createdAt.getTime() < CACHE_TTL_MS) {
+    logger.debug("Using cached Gemini model", { cacheKey: fullCacheKey })
     return cached.model
   }
 
@@ -56,25 +76,25 @@ export async function getCachedModel(
     // additional setup. For now, we use simple model instance caching.
     // Future improvement: Implement full prompt caching when SDK supports it robustly.
 
-    logger.debug("Creating new Gemini model instance", { cacheKey })
+    logger.debug("Creating new Gemini model instance", { cacheKey: fullCacheKey })
 
     const model = genAI.getGenerativeModel({
       model: modelName,
       systemInstruction: systemInstruction,
     })
 
-    // Cache the model instance
-    modelCache.set(cacheKey, {
+    // Cache the model instance using fullCacheKey
+    modelCache.set(fullCacheKey, {
       model,
-      createdAt: now
+      createdAt: now,
     })
 
     return model
   } catch (error) {
-    logger.error("Failed to create Gemini model", { cacheKey, error })
+    logger.error("Failed to create Gemini model", { cacheKey: fullCacheKey, error })
 
     // Fallback: create model without caching
-    logger.warn("Falling back to non-cached Gemini model", { cacheKey })
+    logger.warn("Falling back to non-cached Gemini model", { cacheKey: fullCacheKey })
     return genAI.getGenerativeModel({
       model: modelName,
       systemInstruction: systemInstruction,
@@ -109,7 +129,7 @@ export function getCacheStats() {
     caches: Array.from(modelCache.entries()).map(([key, value]) => ({
       key,
       createdAt: value.createdAt.toISOString(),
-      isExpired: (now.getTime() - value.createdAt.getTime()) >= CACHE_TTL_MS,
+      isExpired: now.getTime() - value.createdAt.getTime() >= CACHE_TTL_MS,
     })),
   }
   return stats
@@ -123,7 +143,7 @@ export function cleanupExpiredCaches(): void {
   let removed = 0
 
   for (const [key, value] of modelCache.entries()) {
-    if ((now.getTime() - value.createdAt.getTime()) >= CACHE_TTL_MS) {
+    if (now.getTime() - value.createdAt.getTime() >= CACHE_TTL_MS) {
       modelCache.delete(key)
       removed++
     }

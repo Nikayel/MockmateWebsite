@@ -4,6 +4,7 @@ import { getUserIdFromRequest } from "@/lib/auth-server"
 import { PRICING_CONFIG } from "@/lib/config"
 import { promoCodeRateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { csrfProtection } from "@/lib/csrf"
 
 // Promo codes stored server-side (not in git)
 // These are only visible in the server-side API route, not in client code
@@ -14,6 +15,12 @@ const PROMO_CODES: Record<string, { discount: number; type: "percentage" | "free
 }
 
 export async function POST(request: NextRequest) {
+  // SECURITY: CSRF protection for state-changing operation
+  const csrfResult = csrfProtection(request)
+  if (csrfResult) {
+    return csrfResult
+  }
+
   // Apply rate limiting to prevent brute-force attacks on promo codes
   const rateLimitResponse = await promoCodeRateLimit(request)
   if (rateLimitResponse) {

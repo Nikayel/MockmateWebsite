@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { batchDeferProblems, getMaxDailyReviews } from "@/lib/spaced-repetition"
 import { logger } from "@/lib/logger"
+import { csrfProtection } from "@/lib/csrf"
 
 interface BatchDeferRequestBody {
   target_limit?: number
@@ -25,6 +26,12 @@ interface BatchDeferRequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: CSRF protection for state-changing operation
+    const csrfResult = csrfProtection(request)
+    if (csrfResult) {
+      return csrfResult
+    }
+
     // Verify authentication
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {

@@ -10,9 +10,9 @@
  * - Max entries: 1000 in-memory, unlimited in Firestore
  */
 
-import crypto from 'crypto'
-import { adminDb } from './firebase-admin'
-import { FieldValue, Timestamp } from 'firebase-admin/firestore'
+import crypto from "crypto"
+import { adminDb } from "./firebase-admin"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
 
 // Cache configuration
 const CACHE_CONFIG = {
@@ -22,10 +22,10 @@ const CACHE_CONFIG = {
 
   // Firestore cache TTLs (in seconds)
   ttlByType: {
-    chat: 24 * 60 * 60,           // 24 hours
-    feedback: 7 * 24 * 60 * 60,   // 7 days
-    hint: 7 * 24 * 60 * 60,       // 7 days
-    system: 30 * 24 * 60 * 60,    // 30 days for system prompts
+    chat: 24 * 60 * 60, // 24 hours
+    feedback: 7 * 24 * 60 * 60, // 7 days
+    hint: 7 * 24 * 60 * 60, // 7 days
+    system: 30 * 24 * 60 * 60, // 30 days for system prompts
   } as Record<string, number>,
 
   // Default TTL
@@ -53,7 +53,7 @@ const MAX_NEGATIVE_CACHE_SIZE = 5000 // Limit memory usage
 
 /**
  * Generate a cache key from request parameters
- * Uses a hash of the semantic content, not exact string match
+ * Uses a hash of the FULL semantic content to prevent collisions
  */
 export function generateCacheKey(params: {
   type: string
@@ -63,17 +63,18 @@ export function generateCacheKey(params: {
   scenarioId?: string
   language?: string
 }): string {
-  // Normalize and extract key elements
+  // SECURITY FIX: Hash FULL content instead of truncating
+  // Truncation caused cache key collisions when prompts shared prefixes
   const normalized = {
     type: params.type,
-    // For system prompts, use first 500 chars (they're usually stable)
-    systemPromptPrefix: params.systemPrompt?.slice(0, 500) || '',
-    // Normalize user message (trim, lowercase for comparison)
-    userMessageNorm: params.userMessage.trim().toLowerCase().slice(0, 1000),
-    // Include context summary if present
-    contextHash: params.context ? hashString(params.context.slice(0, 2000)) : '',
-    scenarioId: params.scenarioId || '',
-    language: params.language || '',
+    // Hash the FULL system prompt to prevent collision on shared prefixes
+    systemPromptHash: params.systemPrompt ? hashString(params.systemPrompt) : "",
+    // Hash the FULL user message (normalize first)
+    userMessageHash: hashString(params.userMessage.trim().toLowerCase()),
+    // Hash context if present
+    contextHash: params.context ? hashString(params.context) : "",
+    scenarioId: params.scenarioId || "",
+    language: params.language || "",
   }
 
   const keyString = JSON.stringify(normalized)
@@ -84,7 +85,7 @@ export function generateCacheKey(params: {
  * Hash a string using SHA-256
  */
 function hashString(str: string): string {
-  return crypto.createHash('sha256').update(str).digest('hex').slice(0, 32)
+  return crypto.createHash("sha256").update(str).digest("hex").slice(0, 32)
 }
 
 /**
@@ -94,7 +95,7 @@ function hashString(str: string): string {
 export async function getCachedResponse(cacheKey: string): Promise<{
   hit: boolean
   response?: string
-  source?: 'memory' | 'firestore'
+  source?: "memory" | "firestore"
 }> {
   // Check memory cache first
   const memoryEntry = memoryCache.get(cacheKey)
@@ -102,7 +103,7 @@ export async function getCachedResponse(cacheKey: string): Promise<{
     const age = Date.now() - memoryEntry.createdAt
     if (age < CACHE_CONFIG.memoryTTLMs) {
       memoryEntry.hitCount++
-      return { hit: true, response: memoryEntry.response, source: 'memory' }
+      return { hit: true, response: memoryEntry.response, source: "memory" }
     } else {
       // Expired, remove from memory
       memoryCache.delete(cacheKey)
@@ -124,7 +125,7 @@ export async function getCachedResponse(cacheKey: string): Promise<{
 
   // Check Firestore cache
   try {
-    const cacheDoc = await adminDb.collection('ai_cache').doc(cacheKey).get()
+    const cacheDoc = await adminDb.collection("ai_cache").doc(cacheKey).get()
 
     if (cacheDoc.exists) {
       const data = cacheDoc.data()!
@@ -144,22 +145,30 @@ export async function getCachedResponse(cacheKey: string): Promise<{
         negativeCache.delete(cacheKey)
 
         // Update hit count in Firestore (fire and forget)
-        adminDb.collection('ai_cache').doc(cacheKey).update({
-          hitCount: FieldValue.increment(1),
-          lastAccessedAt: FieldValue.serverTimestamp(),
-        }).catch(() => {})
+        adminDb
+          .collection("ai_cache")
+          .doc(cacheKey)
+          .update({
+            hitCount: FieldValue.increment(1),
+            lastAccessedAt: FieldValue.serverTimestamp(),
+          })
+          .catch(() => {})
 
-        return { hit: true, response, source: 'firestore' }
+        return { hit: true, response, source: "firestore" }
       } else {
         // Expired, delete from Firestore (fire and forget)
-        adminDb.collection('ai_cache').doc(cacheKey).delete().catch(() => {})
+        adminDb
+          .collection("ai_cache")
+          .doc(cacheKey)
+          .delete()
+          .catch(() => {})
       }
     }
 
     // Cache miss - add to negative cache to avoid re-checking Firestore
     addToNegativeCache(cacheKey)
   } catch (error) {
-    console.error('[AI Cache] Firestore read error:', error)
+    console.error("[AI Cache] Firestore read error:", error)
   }
 
   return { hit: false }
@@ -172,8 +181,9 @@ function addToNegativeCache(cacheKey: string): void {
   // Prune if over limit
   if (negativeCache.size >= MAX_NEGATIVE_CACHE_SIZE) {
     // Remove oldest 500 entries
-    const entries = Array.from(negativeCache.entries())
-      .sort((a, b) => a[1].checkedAt - b[1].checkedAt)
+    const entries = Array.from(negativeCache.entries()).sort(
+      (a, b) => a[1].checkedAt - b[1].checkedAt
+    )
 
     for (let i = 0; i < 500 && i < entries.length; i++) {
       negativeCache.delete(entries[i][0])
@@ -189,7 +199,7 @@ function addToNegativeCache(cacheKey: string): void {
 export async function setCachedResponse(
   cacheKey: string,
   response: string,
-  type: string = 'chat'
+  type: string = "chat"
 ): Promise<void> {
   const ttlSeconds = CACHE_CONFIG.ttlByType[type] || CACHE_CONFIG.defaultTTLSeconds
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000)
@@ -207,16 +217,19 @@ export async function setCachedResponse(
 
   // Store in Firestore (fire and forget)
   try {
-    await adminDb.collection('ai_cache').doc(cacheKey).set({
-      response,
-      type,
-      createdAt: FieldValue.serverTimestamp(),
-      expiresAt: Timestamp.fromDate(expiresAt),
-      hitCount: 0,
-      lastAccessedAt: FieldValue.serverTimestamp(),
-    })
+    await adminDb
+      .collection("ai_cache")
+      .doc(cacheKey)
+      .set({
+        response,
+        type,
+        createdAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expiresAt),
+        hitCount: 0,
+        lastAccessedAt: FieldValue.serverTimestamp(),
+      })
   } catch (error) {
-    console.error('[AI Cache] Firestore write error:', error)
+    console.error("[AI Cache] Firestore write error:", error)
   }
 }
 
@@ -228,8 +241,7 @@ function pruneMemoryCache(): void {
   if (memoryCache.size <= CACHE_CONFIG.maxMemoryEntries) return
 
   // Convert to array and sort by hit count (ascending)
-  const entries = Array.from(memoryCache.entries())
-    .sort((a, b) => a[1].hitCount - b[1].hitCount)
+  const entries = Array.from(memoryCache.entries()).sort((a, b) => a[1].hitCount - b[1].hitCount)
 
   // Remove least used entries until under limit
   const toRemove = memoryCache.size - CACHE_CONFIG.maxMemoryEntries + 100 // Remove 100 extra
@@ -272,8 +284,8 @@ export async function clearCache(options?: { memoryOnly?: boolean }): Promise<vo
     // Delete expired Firestore entries (batch delete)
     try {
       const expiredDocs = await adminDb
-        .collection('ai_cache')
-        .where('expiresAt', '<', Timestamp.now())
+        .collection("ai_cache")
+        .where("expiresAt", "<", Timestamp.now())
         .limit(500)
         .get()
 
@@ -283,7 +295,7 @@ export async function clearCache(options?: { memoryOnly?: boolean }): Promise<vo
 
       console.log(`[AI Cache] Cleaned ${expiredDocs.size} expired entries`)
     } catch (error) {
-      console.error('[AI Cache] Failed to clean expired entries:', error)
+      console.error("[AI Cache] Failed to clean expired entries:", error)
     }
   }
 }
@@ -315,7 +327,7 @@ export async function withCache<T>(
   const result = await fetchFn()
 
   // Cache the result if it's a string (most AI responses)
-  if (typeof result === 'string') {
+  if (typeof result === "string") {
     await setCachedResponse(cacheKey, result, type)
   }
 
