@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Clock,
   Archive,
@@ -16,10 +16,14 @@ import {
   PartyPopper,
   Sparkles,
   AlertTriangle,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+  CheckCircle2,
+  Circle,
+  SkipForward,
+  BookOpen,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
-export type RoadmapStatusType = 'expired' | 'archived' | 'completed' | 'abandoned'
+export type RoadmapStatusType = "expired" | "archived" | "completed" | "abandoned"
 
 interface RoadmapStatusBannerProps {
   type: RoadmapStatusType
@@ -41,39 +45,39 @@ interface RoadmapStatusBannerProps {
 const statusConfig = {
   expired: {
     icon: Clock,
-    iconBg: 'bg-amber-500/10',
-    iconColor: 'text-amber-600 dark:text-amber-400',
-    borderColor: 'border-amber-500/30',
-    bgColor: 'bg-amber-500/5',
-    title: 'Interview Date Passed',
-    expandedTitle: 'Your interview date has passed',
+    iconBg: "bg-amber-500/10",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    borderColor: "border-amber-500/30",
+    bgColor: "bg-amber-500/5",
+    title: "Interview Date Passed",
+    expandedTitle: "Your interview date has passed",
   },
   archived: {
     icon: Archive,
-    iconBg: 'bg-slate-500/10',
-    iconColor: 'text-slate-500 dark:text-slate-400',
-    borderColor: 'border-slate-500/30',
-    bgColor: 'bg-slate-500/5',
-    title: 'Roadmap Archived',
-    expandedTitle: 'This roadmap was ended early',
+    iconBg: "bg-slate-500/10",
+    iconColor: "text-slate-500 dark:text-slate-400",
+    borderColor: "border-slate-500/30",
+    bgColor: "bg-slate-500/5",
+    title: "Roadmap Archived",
+    expandedTitle: "This roadmap was ended early",
   },
   completed: {
     icon: Trophy,
-    iconBg: 'bg-green-500/10',
-    iconColor: 'text-green-600 dark:text-green-400',
-    borderColor: 'border-green-500/30',
-    bgColor: 'bg-green-500/5',
-    title: 'Roadmap Completed!',
-    expandedTitle: 'Congratulations! You completed all questions',
+    iconBg: "bg-green-500/10",
+    iconColor: "text-green-600 dark:text-green-400",
+    borderColor: "border-green-500/30",
+    bgColor: "bg-green-500/5",
+    title: "Roadmap Completed!",
+    expandedTitle: "Congratulations! You completed all questions",
   },
   abandoned: {
     icon: XCircle,
-    iconBg: 'bg-slate-500/10',
-    iconColor: 'text-slate-500 dark:text-slate-400',
-    borderColor: 'border-slate-500/30',
-    bgColor: 'bg-slate-500/5',
-    title: 'Roadmap Replaced',
-    expandedTitle: 'This roadmap was replaced by a new one',
+    iconBg: "bg-slate-500/10",
+    iconColor: "text-slate-500 dark:text-slate-400",
+    borderColor: "border-slate-500/30",
+    bgColor: "bg-slate-500/5",
+    title: "Roadmap Replaced",
+    expandedTitle: "This roadmap was replaced by a new one",
   },
 }
 
@@ -95,14 +99,14 @@ export function RoadmapStatusBanner({
   const now = new Date()
   const daysUntil = Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   const isExpired = daysUntil < 0
-  const canReactivate = (type === 'archived' || type === 'abandoned') && !isExpired
+  const canReactivate = (type === "archived" || type === "abandoned") && !isExpired
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        'border rounded-xl overflow-hidden transition-all',
+        "overflow-hidden rounded-xl border transition-all",
         config.borderColor,
         config.bgColor,
         className
@@ -111,20 +115,18 @@ export function RoadmapStatusBanner({
       {/* Collapsed Header - Always Visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        className="flex w-full items-center justify-between px-4 py-3 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
       >
         <div className="flex items-center gap-3">
-          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', config.iconBg)}>
-            <Icon className={cn('h-4 w-4', config.iconColor)} />
+          <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", config.iconBg)}>
+            <Icon className={cn("h-4 w-4", config.iconColor)} />
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-sm text-foreground">{config.title}</span>
-              {type === 'completed' && (
-                <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
-              )}
+              <span className="text-foreground text-sm font-medium">{config.title}</span>
+              {type === "completed" && <Sparkles className="h-3.5 w-3.5 text-yellow-500" />}
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {roadmap.companyName} • {progress}% complete
             </span>
           </div>
@@ -132,17 +134,17 @@ export function RoadmapStatusBanner({
 
         <div className="flex items-center gap-3">
           {/* Quick action buttons - visible in collapsed state */}
-          <div className="hidden sm:flex items-center gap-2">
-            {type === 'expired' && onArchive && (
+          <div className="hidden items-center gap-2 sm:flex">
+            {type === "expired" && onArchive && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   onArchive()
                 }}
                 disabled={isArchiving}
-                className="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+                className="border-border hover:bg-muted rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
               >
-                {isArchiving ? 'Archiving...' : 'Archive'}
+                {isArchiving ? "Archiving..." : "Archive"}
               </button>
             )}
             {canReactivate && onReactivate && (
@@ -151,9 +153,9 @@ export function RoadmapStatusBanner({
                   e.stopPropagation()
                   onReactivate()
                 }}
-                className="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors"
+                className="border-border hover:bg-muted rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
               >
-                <RefreshCw className="h-3 w-3 inline mr-1" />
+                <RefreshCw className="mr-1 inline h-3 w-3" />
                 Resume
               </button>
             )}
@@ -162,17 +164,17 @@ export function RoadmapStatusBanner({
                 e.stopPropagation()
                 onCreateNew()
               }}
-              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
             >
-              <Plus className="h-3 w-3 inline mr-1" />
+              <Plus className="mr-1 inline h-3 w-3" />
               New
             </button>
           </div>
 
           {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            <ChevronUp className="text-muted-foreground h-4 w-4" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="text-muted-foreground h-4 w-4" />
           )}
         </div>
       </button>
@@ -182,113 +184,139 @@ export function RoadmapStatusBanner({
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 pt-1 border-t border-border/50">
+            <div className="border-border/50 border-t px-4 pt-1 pb-4">
               {/* Status-specific message */}
-              <p className="text-sm text-muted-foreground mb-4">
-                {type === 'expired' && (
+              <p className="text-muted-foreground mb-4 text-sm">
+                {type === "expired" && (
                   <>
-                    Your interview was on{' '}
-                    <span className="font-medium text-foreground">
-                      {interviewDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    Your interview was on{" "}
+                    <span className="text-foreground font-medium">
+                      {interviewDate.toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </span>
                     . Archive this roadmap to clear it, or create a new one.
                   </>
                 )}
-                {type === 'archived' && (
+                {type === "archived" && (
                   <>
                     This roadmap was ended early.
-                    {canReactivate && ' You can resume it since the interview date hasn\'t passed yet.'}
+                    {canReactivate &&
+                      " You can resume it since the interview date hasn't passed yet."}
                   </>
                 )}
-                {type === 'completed' && (
+                {type === "completed" && (
                   <>
                     Amazing work! You've completed all {roadmap.totalQuestions} questions.
                     {daysUntil > 0 && ` ${daysUntil} days until your interview.`}
                   </>
                 )}
-                {type === 'abandoned' && (
+                {type === "abandoned" && (
                   <>
                     This roadmap was replaced when you created a new one.
-                    {canReactivate && ' You can still resume it.'}
+                    {canReactivate && " You can still resume it."}
                   </>
                 )}
               </p>
 
               {/* Progress Stats - Compact Grid */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="mb-4 grid grid-cols-3 gap-3">
                 <div className="bg-background/50 rounded-lg p-2.5 text-center">
-                  <p className={cn(
-                    "text-lg font-bold",
-                    type === 'completed' ? 'text-green-600 dark:text-green-400' : 'text-foreground'
-                  )}>
+                  <p
+                    className={cn(
+                      "text-lg font-bold",
+                      type === "completed"
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-foreground"
+                    )}
+                  >
                     {progress}%
                   </p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Completed</p>
+                  <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                    Completed
+                  </p>
                 </div>
                 <div className="bg-background/50 rounded-lg p-2.5 text-center">
-                  <p className="text-lg font-bold text-foreground">{roadmap.questionsCompleted}/{roadmap.totalQuestions}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Questions</p>
+                  <p className="text-foreground text-lg font-bold">
+                    {roadmap.questionsCompleted}/{roadmap.totalQuestions}
+                  </p>
+                  <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                    Questions
+                  </p>
                 </div>
                 <div className="bg-background/50 rounded-lg p-2.5 text-center">
-                  <p className="text-lg font-bold text-foreground">{Math.round(roadmap.actualHoursSpent || 0)}h</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Studied</p>
+                  <p className="text-foreground text-lg font-bold">
+                    {Math.round(roadmap.actualHoursSpent || 0)}h
+                  </p>
+                  <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                    Studied
+                  </p>
                 </div>
               </div>
 
               {/* Interview Date Info */}
-              {type !== 'completed' && (
-                <div className={cn(
-                  "flex items-center gap-2 p-2.5 rounded-lg mb-4 text-xs",
-                  isExpired
-                    ? "bg-red-500/10 text-red-600 dark:text-red-400"
-                    : "bg-muted/50 text-muted-foreground"
-                )}>
+              {type !== "completed" && (
+                <div
+                  className={cn(
+                    "mb-4 flex items-center gap-2 rounded-lg p-2.5 text-xs",
+                    isExpired
+                      ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                      : "bg-muted/50 text-muted-foreground"
+                  )}
+                >
                   <Calendar className="h-3.5 w-3.5" />
                   <span>
-                    Interview: {interviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    {isExpired ? ' (passed)' : ` (${daysUntil} days)`}
+                    Interview:{" "}
+                    {interviewDate.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    {isExpired ? " (passed)" : ` (${daysUntil} days)`}
                   </span>
                 </div>
               )}
 
               {/* Completed celebration */}
-              {type === 'completed' && daysUntil > 0 && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg mb-4 bg-primary/5 border border-primary/20 text-xs text-primary">
+              {type === "completed" && daysUntil > 0 && (
+                <div className="bg-primary/5 border-primary/20 text-primary mb-4 flex items-center gap-2 rounded-lg border p-2.5 text-xs">
                   <PartyPopper className="h-3.5 w-3.5" />
                   <span>{daysUntil} days to polish your skills before the interview!</span>
                 </div>
               )}
 
               {/* Action Buttons - Mobile friendly */}
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   onClick={onCreateNew}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Create New Roadmap
                 </button>
 
-                {type === 'expired' && onArchive && (
+                {type === "expired" && onArchive && (
                   <button
                     onClick={onArchive}
                     disabled={isArchiving}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                    className="border-border hover:bg-muted flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                   >
                     <Archive className="h-4 w-4" />
-                    {isArchiving ? 'Archiving...' : 'Archive & Clear'}
+                    {isArchiving ? "Archiving..." : "Archive & Clear"}
                   </button>
                 )}
 
                 {canReactivate && onReactivate && (
                   <button
                     onClick={onReactivate}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                    className="border-border hover:bg-muted flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors"
                   >
                     <RefreshCw className="h-4 w-4" />
                     Resume Roadmap
@@ -307,14 +335,39 @@ export function RoadmapStatusBanner({
  * Compact archived roadmaps list - shows as small cards/badges
  * For displaying multiple archived roadmaps without taking up space
  */
+interface ArchivedRoadmapQuestion {
+  scenarioId: string
+  title: string
+  pattern: string
+  difficulty: "easy" | "medium" | "hard"
+  status: "pending" | "in_progress" | "completed" | "skipped" | "evaluating"
+  score?: number
+}
+
 interface ArchivedRoadmapItemProps {
   roadmap: {
     id: string
     companyName: string
-    status: 'archived' | 'completed' | 'abandoned'
+    status: "archived" | "completed" | "abandoned"
     questionsCompleted: number
     totalQuestions: number
     interviewDate: Date
+    actualHoursSpent?: number
+    patternCoverage?: Array<{
+      pattern: string
+      total: number
+      completed: number
+      percentage: number
+    }>
+    dailyPlans?: Array<{
+      dayNumber: number
+      theme: string
+      questions: ArchivedRoadmapQuestion[]
+    }>
+    assessment?: {
+      experienceLevel?: string
+      hoursPerDay?: number
+    }
   }
   onReactivate?: (id: string) => void
   isReactivating?: boolean
@@ -325,18 +378,27 @@ export function ArchivedRoadmapItem({
   onReactivate,
   isReactivating = false,
 }: ArchivedRoadmapItemProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
   const interviewDate = new Date(roadmap.interviewDate)
   const isExpired = interviewDate < new Date()
-  const canReactivate = !isExpired && roadmap.status !== 'completed'
+  const canReactivate = !isExpired && roadmap.status !== "completed"
+
+  // Collect all questions from daily plans
+  const allQuestions = roadmap.dailyPlans?.flatMap((day) => day.questions) || []
+  const completedQuestions = allQuestions.filter((q) => q.status === "completed")
+  const skippedQuestions = allQuestions.filter((q) => q.status === "skipped")
+  const pendingQuestions = allQuestions.filter(
+    (q) => q.status === "pending" || q.status === "in_progress"
+  )
 
   const getStatusIcon = () => {
     switch (roadmap.status) {
-      case 'completed':
+      case "completed":
         return <Trophy className="h-3 w-3 text-green-600" />
-      case 'archived':
+      case "archived":
         return <Archive className="h-3 w-3 text-slate-500" />
-      case 'abandoned':
+      case "abandoned":
         return <XCircle className="h-3 w-3 text-slate-500" />
       default:
         return <Target className="h-3 w-3 text-slate-500" />
@@ -346,27 +408,27 @@ export function ArchivedRoadmapItem({
   const getStatusBadge = () => {
     if (isExpired) {
       return (
-        <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded">
+        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
           Expired
         </span>
       )
     }
     switch (roadmap.status) {
-      case 'completed':
+      case "completed":
         return (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
+          <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
             Completed
           </span>
         )
-      case 'archived':
+      case "archived":
         return (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
             Archived
           </span>
         )
-      case 'abandoned':
+      case "abandoned":
         return (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
             Replaced
           </span>
         )
@@ -375,43 +437,217 @@ export function ArchivedRoadmapItem({
     }
   }
 
-  return (
-    <div className="flex items-center justify-between gap-3 p-3 bg-muted/30 border border-border rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
-          {getStatusIcon()}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm text-foreground truncate">{roadmap.companyName}</span>
-            {getStatusBadge()}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{progress}% complete</span>
-            <span>•</span>
-            <span>{roadmap.questionsCompleted}/{roadmap.totalQuestions}</span>
-          </div>
-        </div>
-      </div>
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case "easy":
+        return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
+      case "medium":
+        return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30"
+      case "hard":
+        return "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30"
+      default:
+        return "text-muted-foreground bg-muted"
+    }
+  }
 
-      {canReactivate && onReactivate && (
-        <button
-          onClick={() => onReactivate(roadmap.id)}
-          disabled={isReactivating}
-          className="shrink-0 px-2.5 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-50"
-        >
-          {isReactivating ? (
-            <span className="flex items-center gap-1">
-              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            </span>
-          ) : (
-            <span className="flex items-center gap-1">
-              <RefreshCw className="h-3 w-3" />
-              Resume
-            </span>
+  const getQuestionStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+      case "skipped":
+        return <SkipForward className="h-3.5 w-3.5 text-slate-400" />
+      default:
+        return <Circle className="text-muted-foreground h-3.5 w-3.5" />
+    }
+  }
+
+  const hasDetails = roadmap.dailyPlans && roadmap.dailyPlans.length > 0
+
+  return (
+    <div className="bg-muted/30 border-border overflow-hidden rounded-lg border">
+      {/* Header - Always Visible */}
+      <button
+        onClick={() => hasDetails && setIsExpanded(!isExpanded)}
+        className={cn(
+          "flex w-full items-center justify-between p-3 transition-colors",
+          hasDetails && "hover:bg-muted/50 cursor-pointer"
+        )}
+        disabled={!hasDetails}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-md">
+            {getStatusIcon()}
+          </div>
+          <div className="min-w-0 text-left">
+            <div className="flex items-center gap-2">
+              <span className="text-foreground truncate text-sm font-medium">
+                {roadmap.companyName}
+              </span>
+              {getStatusBadge()}
+            </div>
+            <div className="text-muted-foreground flex items-center gap-2 text-xs">
+              <span>{progress}% complete</span>
+              <span>•</span>
+              <span>
+                {roadmap.questionsCompleted}/{roadmap.totalQuestions}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {canReactivate && onReactivate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onReactivate(roadmap.id)
+              }}
+              disabled={isReactivating}
+              className="border-border hover:bg-muted shrink-0 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {isReactivating ? (
+                <span className="flex items-center gap-1">
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" />
+                  Resume
+                </span>
+              )}
+            </button>
           )}
-        </button>
-      )}
+          {hasDetails &&
+            (isExpanded ? (
+              <ChevronUp className="text-muted-foreground h-4 w-4" />
+            ) : (
+              <ChevronDown className="text-muted-foreground h-4 w-4" />
+            ))}
+        </div>
+      </button>
+
+      {/* Expanded Details */}
+      <AnimatePresence>
+        {isExpanded && hasDetails && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-border/50 border-t px-3 pt-0 pb-3">
+              {/* High-Level Stats */}
+              <div className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-4">
+                <div className="bg-background/50 rounded-lg p-2 text-center">
+                  <Calendar className="text-muted-foreground mx-auto mb-1 h-3.5 w-3.5" />
+                  <p className="text-foreground text-xs font-medium">
+                    {interviewDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </p>
+                  <p className="text-muted-foreground text-[10px]">Interview</p>
+                </div>
+                <div className="bg-background/50 rounded-lg p-2 text-center">
+                  <Clock className="text-muted-foreground mx-auto mb-1 h-3.5 w-3.5" />
+                  <p className="text-foreground text-xs font-medium">
+                    {Math.round(roadmap.actualHoursSpent || 0)}h
+                  </p>
+                  <p className="text-muted-foreground text-[10px]">Studied</p>
+                </div>
+                <div className="bg-background/50 rounded-lg p-2 text-center">
+                  <CheckCircle2 className="mx-auto mb-1 h-3.5 w-3.5 text-green-600" />
+                  <p className="text-foreground text-xs font-medium">{completedQuestions.length}</p>
+                  <p className="text-muted-foreground text-[10px]">Completed</p>
+                </div>
+                <div className="bg-background/50 rounded-lg p-2 text-center">
+                  <SkipForward className="mx-auto mb-1 h-3.5 w-3.5 text-slate-400" />
+                  <p className="text-foreground text-xs font-medium">{skippedQuestions.length}</p>
+                  <p className="text-muted-foreground text-[10px]">Skipped</p>
+                </div>
+              </div>
+
+              {/* Pattern Coverage (if available) */}
+              {roadmap.patternCoverage && roadmap.patternCoverage.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+                    <Target className="h-3 w-3" />
+                    Pattern Coverage
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {roadmap.patternCoverage.slice(0, 6).map((pattern) => (
+                      <span
+                        key={pattern.pattern}
+                        className="bg-muted flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px]"
+                      >
+                        <span className="text-foreground capitalize">
+                          {pattern.pattern.replace(/-/g, " ")}
+                        </span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            pattern.percentage >= 75
+                              ? "text-green-600"
+                              : pattern.percentage >= 50
+                                ? "text-yellow-600"
+                                : "text-muted-foreground"
+                          )}
+                        >
+                          {pattern.percentage}%
+                        </span>
+                      </span>
+                    ))}
+                    {roadmap.patternCoverage.length > 6 && (
+                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px]">
+                        +{roadmap.patternCoverage.length - 6} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Questions List */}
+              <div>
+                <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+                  <BookOpen className="h-3 w-3" />
+                  Questions ({allQuestions.length})
+                </p>
+                <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+                  {allQuestions.map((question, idx) => (
+                    <div
+                      key={`${question.scenarioId}-${idx}`}
+                      className="bg-background/50 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs"
+                    >
+                      {getQuestionStatusIcon(question.status)}
+                      <span
+                        className={cn(
+                          "flex-1 truncate",
+                          question.status === "completed"
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {question.title}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium capitalize",
+                          getDifficultyColor(question.difficulty)
+                        )}
+                      >
+                        {question.difficulty}
+                      </span>
+                      {question.score !== undefined && (
+                        <span className="text-muted-foreground shrink-0 text-[10px]">
+                          {question.score}%
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -424,10 +660,26 @@ interface ArchivedRoadmapsListProps {
   roadmaps: Array<{
     id: string
     companyName: string
-    status: 'archived' | 'completed' | 'abandoned'
+    status: "archived" | "completed" | "abandoned"
     questionsCompleted: number
     totalQuestions: number
     interviewDate: Date
+    actualHoursSpent?: number
+    patternCoverage?: Array<{
+      pattern: string
+      total: number
+      completed: number
+      percentage: number
+    }>
+    dailyPlans?: Array<{
+      dayNumber: number
+      theme: string
+      questions: ArchivedRoadmapQuestion[]
+    }>
+    assessment?: {
+      experienceLevel?: string
+      hoursPerDay?: number
+    }
   }>
   onReactivate?: (id: string) => void
   reactivatingId?: string | null
@@ -443,20 +695,20 @@ export function ArchivedRoadmapsList({
   if (roadmaps.length === 0) return null
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className="border-border overflow-hidden rounded-lg border">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-2.5 flex items-center justify-between bg-muted/30 hover:bg-muted/50 transition-colors"
+        className="bg-muted/30 hover:bg-muted/50 flex w-full items-center justify-between px-4 py-2.5 transition-colors"
       >
         <div className="flex items-center gap-2 text-sm">
-          <Archive className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium text-foreground">Archived Roadmaps</span>
+          <Archive className="text-muted-foreground h-4 w-4" />
+          <span className="text-foreground font-medium">Archived Roadmaps</span>
           <span className="text-muted-foreground">({roadmaps.length})</span>
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          <ChevronUp className="text-muted-foreground h-4 w-4" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronDown className="text-muted-foreground h-4 w-4" />
         )}
       </button>
 
@@ -464,12 +716,12 @@ export function ArchivedRoadmapsList({
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-3 space-y-2 bg-background">
+            <div className="bg-background space-y-2 p-3">
               {roadmaps.map((roadmap) => (
                 <ArchivedRoadmapItem
                   key={roadmap.id}

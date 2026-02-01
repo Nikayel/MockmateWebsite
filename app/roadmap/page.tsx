@@ -1077,6 +1077,48 @@ export default function RoadmapPage() {
                   questionsCompleted: r.questionsCompleted,
                   totalQuestions: r.totalQuestions,
                   interviewDate: new Date(r.interviewDate),
+                  actualHoursSpent: r.actualHoursSpent,
+                  patternCoverage: r.patternCoverage,
+                  dailyPlans: r.dailyPlans?.map(
+                    (day: {
+                      dayNumber: number
+                      theme: string
+                      questions: Array<{
+                        scenarioId: string
+                        title: string
+                        pattern: string
+                        difficulty: "easy" | "medium" | "hard"
+                        status: "pending" | "in_progress" | "completed" | "skipped" | "evaluating"
+                        score?: number
+                      }>
+                    }) => ({
+                      dayNumber: day.dayNumber,
+                      theme: day.theme,
+                      questions: day.questions.map(
+                        (q: {
+                          scenarioId: string
+                          title: string
+                          pattern: string
+                          difficulty: "easy" | "medium" | "hard"
+                          status: "pending" | "in_progress" | "completed" | "skipped" | "evaluating"
+                          score?: number
+                        }) => ({
+                          scenarioId: q.scenarioId,
+                          title: q.title,
+                          pattern: q.pattern,
+                          difficulty: q.difficulty,
+                          status: q.status,
+                          score: q.score,
+                        })
+                      ),
+                    })
+                  ),
+                  assessment: r.assessment
+                    ? {
+                        experienceLevel: r.assessment.experienceLevel,
+                        hoursPerDay: r.assessment.hoursPerDay,
+                      }
+                    : undefined,
                 }))}
                 onReactivate={handleReactivateRoadmap}
                 reactivatingId={null}
