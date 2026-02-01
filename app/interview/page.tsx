@@ -2647,38 +2647,49 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     if (shouldUpdate) {
       try {
-        // Use performance score if available (already 0-100), otherwise use pass rate
-        const scoreToSave =
-          performanceScore !== null ? performanceScore : hasTests ? testSummary.passRate : 0
-        const feedbackText = isSystemDesign
-          ? comprehensiveFeedback || `Completed system design interview: ${selectedScenario?.title}`
-          : comprehensiveFeedback ||
-            `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+        // IMPORTANT: Only update session if feedback has NOT been persisted by the streaming flow
+        // The persist endpoint saves the authoritative feedback/scores to Firestore
+        // We should NOT overwrite that data with potentially stale React state
+        const feedbackWasPersisted = streamingFeedback.state.isPersisted
 
-        await updateInterviewSession(currentSessionId, scoreToSave, feedbackText, {
-          code: code || (isSystemDesign ? "// Design notes" : ""),
-          language: isSystemDesign ? "notes" : selectedLanguage,
-          testResults: hasTests ? testResults : undefined,
-          timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
-          spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
-          efficiencyScore: efficiencyMetrics?.efficiencyScore,
-          feedbackStatus: "complete", // Feedback generation is done
-          // Pass pre-calculated technical score from API for consistency
-          technicalScore: technicalScore ?? undefined,
-          // CRITICAL: Include scoreBreakdown to prevent overwriting scores
-          scoreBreakdown: scoreBreakdown
-            ? {
-                understanding: scoreBreakdown.understandingScore,
-                problemSolving: scoreBreakdown.problemSolvingScore,
-                codeQuality: scoreBreakdown.codeQualityScore,
-                communication: scoreBreakdown.communicationScore,
-              }
-            : undefined,
-          clarifyingQuestionsAssessment: clarifyingQuestionsAssessment || undefined,
-        })
+        if (!feedbackWasPersisted) {
+          // Feedback wasn't persisted (maybe user left early or streaming failed)
+          // Save whatever we have as a fallback
+          const scoreToSave =
+            performanceScore !== null ? performanceScore : hasTests ? testSummary.passRate : 0
+          const feedbackText = isSystemDesign
+            ? comprehensiveFeedback ||
+              `Completed system design interview: ${selectedScenario?.title}`
+            : comprehensiveFeedback ||
+              `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
 
-        // Store system design notes if not already stored
+          await updateInterviewSession(currentSessionId, scoreToSave, feedbackText, {
+            code: code || (isSystemDesign ? "// Design notes" : ""),
+            language: isSystemDesign ? "notes" : selectedLanguage,
+            testResults: hasTests ? testResults : undefined,
+            timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
+            spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
+            efficiencyScore: efficiencyMetrics?.efficiencyScore,
+            feedbackStatus: "complete", // Mark as complete even if fallback
+            technicalScore: technicalScore ?? undefined,
+            scoreBreakdown: scoreBreakdown
+              ? {
+                  understanding: scoreBreakdown.understandingScore,
+                  problemSolving: scoreBreakdown.problemSolvingScore,
+                  codeQuality: scoreBreakdown.codeQualityScore,
+                  communication: scoreBreakdown.communicationScore,
+                }
+              : undefined,
+            clarifyingQuestionsAssessment: clarifyingQuestionsAssessment || undefined,
+          })
+        }
+        // If feedbackWasPersisted is true, the persist endpoint already saved the correct data
+        // to Firestore, so we don't need to do anything here
+
+        // Store system design notes if not already stored (this is separate from feedback)
         if (isSystemDesign && selectedScenario?.id && user) {
+          const scoreForRag =
+            performanceScore !== null ? performanceScore : hasTests ? testSummary.passRate : 0
           fetch("/api/rag", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2690,7 +2701,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               solutionCode: code.trim() || "// Design discussion completed via chat",
               language: "notes",
               passed: true,
-              score: scoreToSave,
+              score: scoreForRag,
               problemType: "system-design",
             }),
           }).catch((err) => {
@@ -5585,7 +5596,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   proceedToFinalFeedback={proceedToFinalFeedback}
                   onClose={() => router.push("/dashboard")}
                 />
-              ) : isGeneratingFeedback ? (
+              ) : isGeneratingFeedback ||
+                (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
+                (streamingFeedback.state.phase !== "idle" &&
+                  streamingFeedback.state.phase !== "complete" &&
+                  streamingFeedback.state.phase !== "error") ? (
                 <FeedbackLoadingState
                   onGoToDashboard={() => router.push("/dashboard")}
                   interviewStats={{
@@ -5595,6 +5610,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                     messagesExchanged: interviewerMessages.length,
                     codeLines: code.split("\n").filter((line) => line.trim()).length,
                   }}
+                  // Pass streaming phase for better UX messaging
+                  streamingPhase={streamingFeedback.state.phase}
+                  phaseMessage={streamingFeedback.state.phaseMessage}
                 />
               ) : (
                 <>

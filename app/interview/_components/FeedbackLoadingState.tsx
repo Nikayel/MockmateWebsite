@@ -12,23 +12,48 @@ export interface FeedbackLoadingStateProps {
     messagesExchanged?: number
     codeLines?: number
   }
+  // Optional streaming phase info for more accurate progress display
+  streamingPhase?: string
+  phaseMessage?: string
 }
 
 const ANALYSIS_STEPS = [
   "Reading your code",
   "Evaluating solution",
   "Reviewing discussion",
-  "Generating feedback",
+  "Saving your results",
 ]
+
+// Map streaming phases to step indices
+const PHASE_TO_STEP: Record<string, number> = {
+  calculating_scores: 0,
+  analyzing: 1,
+  generating: 2,
+  persisting: 3,
+  complete: 4,
+}
 
 export function FeedbackLoadingState({
   interviewStats,
+  streamingPhase,
+  phaseMessage,
 }: FeedbackLoadingStateProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
 
-  // Progress through steps
+  // Use streaming phase if available, otherwise fall back to timed animation
   useEffect(() => {
+    if (streamingPhase && PHASE_TO_STEP[streamingPhase] !== undefined) {
+      // Use actual streaming progress
+      setCurrentStep(Math.min(PHASE_TO_STEP[streamingPhase], ANALYSIS_STEPS.length - 1))
+    }
+  }, [streamingPhase])
+
+  // Fallback: Progress through steps with animation if no streaming phase
+  useEffect(() => {
+    // If we have streaming phase info, don't use timed animation
+    if (streamingPhase) return
+
     const stepDurations = [2000, 4000, 3000, 6000]
     const timers: NodeJS.Timeout[] = []
     let totalDelay = 0
@@ -42,7 +67,7 @@ export function FeedbackLoadingState({
     })
 
     return () => timers.forEach((t) => clearTimeout(t))
-  }, [])
+  }, [streamingPhase])
 
   // Track elapsed time
   useEffect(() => {
@@ -92,11 +117,7 @@ export function FeedbackLoadingState({
                 </div>
                 <span
                   className={`text-sm font-medium transition-colors duration-300 ${
-                    isComplete
-                      ? "text-zinc-500"
-                      : isCurrent
-                        ? "text-white"
-                        : "text-zinc-600"
+                    isComplete ? "text-zinc-500" : isCurrent ? "text-white" : "text-zinc-600"
                   }`}
                 >
                   {step}
@@ -128,9 +149,7 @@ export function FeedbackLoadingState({
             )}
             {interviewStats.codeLines !== undefined && (
               <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
-                <span className="text-lg font-semibold text-white">
-                  {interviewStats.codeLines}
-                </span>
+                <span className="text-lg font-semibold text-white">{interviewStats.codeLines}</span>
                 <span className="text-xs font-medium text-zinc-500">lines</span>
               </div>
             )}
