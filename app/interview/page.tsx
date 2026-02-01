@@ -456,51 +456,86 @@ function InterviewPageContent() {
   }, [calmMode])
 
   // Handle two-phase feedback: update state when rich feedback arrives
+  // Track if we've already shown completion toast to prevent duplicates
+  const feedbackCompletionToastShown = useRef(false)
+
   useEffect(() => {
-    const { state: feedbackState } = streamingFeedback
+    const feedbackState = streamingFeedback.state
 
     // Update scores as they stream in (instant first, then refined)
-    const bestScores = streamingFeedback.getBestScores()
+    // Use refined scores if available, otherwise instant scores
+    const bestScores = feedbackState.refinedScores || feedbackState.instantScores
     if (bestScores) {
-      setScoreBreakdown({
-        understandingScore: bestScores.understanding,
-        problemSolvingScore: bestScores.problemSolving,
-        codeQualityScore: bestScores.codeQuality,
-        communicationScore: bestScores.communication,
+      // Only update if scores actually changed to prevent unnecessary re-renders
+      setScoreBreakdown((prev) => {
+        if (
+          prev?.understandingScore === bestScores.understanding &&
+          prev?.problemSolvingScore === bestScores.problemSolving &&
+          prev?.codeQualityScore === bestScores.codeQuality &&
+          prev?.communicationScore === bestScores.communication
+        ) {
+          return prev
+        }
+        return {
+          understandingScore: bestScores.understanding,
+          problemSolvingScore: bestScores.problemSolving,
+          codeQualityScore: bestScores.codeQuality,
+          communicationScore: bestScores.communication,
+        }
       })
-      setPerformanceScore(bestScores.overall)
+      setPerformanceScore((prev) => (prev === bestScores.overall ? prev : bestScores.overall))
       // Technical score = average of understanding, problemSolving, codeQuality
-      setTechnicalScore(
-        Math.round(
-          (bestScores.understanding + bestScores.problemSolving + bestScores.codeQuality) / 3
-        )
+      const newTechnicalScore = Math.round(
+        (bestScores.understanding + bestScores.problemSolving + bestScores.codeQuality) / 3
       )
+      setTechnicalScore((prev) => (prev === newTechnicalScore ? prev : newTechnicalScore))
     }
 
     // When full feedback arrives, update structured sections
     if (feedbackState.feedback) {
-      setComprehensiveFeedback(feedbackState.feedback.raw)
-      setStructuredFeedback({
-        whatWorked: feedbackState.feedback.whatWorked || [],
-        fixNext: feedbackState.feedback.fixNext || [],
-        actionPlan: feedbackState.feedback.actionPlan || [],
-        tldr: feedbackState.feedback.tldr || "",
+      setComprehensiveFeedback((prev) =>
+        prev === feedbackState.feedback?.raw ? prev : (feedbackState.feedback?.raw ?? "")
+      )
+      setStructuredFeedback((prev) => {
+        const newFeedback = {
+          whatWorked: feedbackState.feedback?.whatWorked || [],
+          fixNext: feedbackState.feedback?.fixNext || [],
+          actionPlan: feedbackState.feedback?.actionPlan || [],
+          tldr: feedbackState.feedback?.tldr || "",
+        }
+        // Simple equality check for arrays
+        if (
+          prev?.tldr === newFeedback.tldr &&
+          prev?.whatWorked?.length === newFeedback.whatWorked.length &&
+          prev?.fixNext?.length === newFeedback.fixNext.length &&
+          prev?.actionPlan?.length === newFeedback.actionPlan.length
+        ) {
+          return prev
+        }
+        return newFeedback
       })
     }
 
-    // Handle completion
-    if (feedbackState.isComplete && !feedbackState.error) {
+    // Handle completion - only show toast once
+    if (feedbackState.isComplete && !feedbackState.error && !feedbackCompletionToastShown.current) {
+      feedbackCompletionToastShown.current = true
       setIsGeneratingFeedback(false)
       toast.success("Feedback ready!", {
         description: "Your personalized analysis is complete.",
       })
-    } else if (feedbackState.error) {
+    } else if (feedbackState.error && !feedbackCompletionToastShown.current) {
+      feedbackCompletionToastShown.current = true
       setIsGeneratingFeedback(false)
       toast.error("Feedback generation failed", {
         description: feedbackState.error,
       })
     }
-  }, [streamingFeedback.state, streamingFeedback])
+
+    // Reset toast flag when state resets to idle
+    if (feedbackState.phase === "idle") {
+      feedbackCompletionToastShown.current = false
+    }
+  }, [streamingFeedback.state])
 
   // Toggle focus mode class on document for CSS cascade
   useEffect(() => {
