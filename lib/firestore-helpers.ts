@@ -518,7 +518,7 @@ export async function createInterviewSession(
  * - 'complete': Feedback generation finished, scores are final
  * - 'failed': Feedback generation failed (user can retry)
  */
-export type FeedbackStatus = "pending" | "complete" | "failed"
+export type FeedbackStatus = "pending" | "processing" | "complete" | "failed"
 
 /**
  * Update interview session on completion

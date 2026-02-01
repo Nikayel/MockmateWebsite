@@ -374,7 +374,9 @@ function InterviewPageContent() {
   const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
   const [ragHints, setRagHints] = useState<{ level: number; hint: string; id?: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
-  const [hintFetchStatus, setHintFetchStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [hintFetchStatus, setHintFetchStatus] = useState<"idle" | "loading" | "success" | "error">(
+    "idle"
+  )
   const [revealedAIHintIndices, setRevealedAIHintIndices] = useState<Set<number>>(new Set())
   const [hintFeedback, setHintFeedback] = useState<Map<string, "helpful" | "unhelpful">>(new Map())
 
@@ -456,69 +458,53 @@ function InterviewPageContent() {
     return () => document.documentElement.classList.remove("calm")
   }, [calmMode])
 
-  // Handle two-phase feedback: update state when rich feedback arrives
+  // Handle streaming feedback: update state when feedback arrives and is persisted
   // Track if we've already shown completion toast to prevent duplicates
   const feedbackCompletionToastShown = useRef(false)
 
   useEffect(() => {
     const feedbackState = streamingFeedback.state
 
-    // Update scores as they stream in (instant first, then refined)
-    // Use refined scores if available, otherwise instant scores
-    const bestScores = feedbackState.refinedScores || feedbackState.instantScores
-    if (bestScores) {
-      // Only update if scores actually changed to prevent unnecessary re-renders
-      setScoreBreakdown((prev) => {
-        if (
-          prev?.understandingScore === bestScores.understanding &&
-          prev?.problemSolvingScore === bestScores.problemSolving &&
-          prev?.codeQualityScore === bestScores.codeQuality &&
-          prev?.communicationScore === bestScores.communication
-        ) {
-          return prev
-        }
-        return {
-          understandingScore: bestScores.understanding,
-          problemSolvingScore: bestScores.problemSolving,
-          codeQualityScore: bestScores.codeQuality,
-          communicationScore: bestScores.communication,
-        }
-      })
-      setPerformanceScore((prev) => (prev === bestScores.overall ? prev : bestScores.overall))
-      // Technical score = average of understanding, problemSolving, codeQuality
-      const newTechnicalScore = Math.round(
-        (bestScores.understanding + bestScores.problemSolving + bestScores.codeQuality) / 3
-      )
-      setTechnicalScore((prev) => (prev === newTechnicalScore ? prev : newTechnicalScore))
-    }
+    // IMPORTANT: Only update scores/feedback when fully persisted to avoid showing partial data
+    // During streaming, we just track progress via the phase message
 
-    // When full feedback arrives, update structured sections
-    if (feedbackState.feedback) {
-      setComprehensiveFeedback((prev) =>
-        prev === feedbackState.feedback?.raw ? prev : (feedbackState.feedback?.raw ?? "")
-      )
-      setStructuredFeedback((prev) => {
-        const newFeedback = {
-          whatWorked: feedbackState.feedback?.whatWorked || [],
-          fixNext: feedbackState.feedback?.fixNext || [],
-          actionPlan: feedbackState.feedback?.actionPlan || [],
-          tldr: feedbackState.feedback?.tldr || "",
-        }
-        // Simple equality check for arrays
-        if (
-          prev?.tldr === newFeedback.tldr &&
-          prev?.whatWorked?.length === newFeedback.whatWorked.length &&
-          prev?.fixNext?.length === newFeedback.fixNext.length &&
-          prev?.actionPlan?.length === newFeedback.actionPlan.length
-        ) {
-          return prev
-        }
-        return newFeedback
+    // Wait for feedback to be persisted before showing final scores
+    // This prevents the "flickering scores" issue where instant scores show then get replaced
+    if (feedbackState.isPersisted && feedbackState.feedback) {
+      // Use the final scores from the feedback (which includes refined scores)
+      const finalScores = feedbackState.feedback.scores
+      if (finalScores) {
+        setScoreBreakdown({
+          understandingScore: finalScores.understanding,
+          problemSolvingScore: finalScores.problemSolving,
+          codeQualityScore: finalScores.codeQuality,
+          communicationScore: finalScores.communication,
+        })
+        setPerformanceScore(finalScores.overall)
+      }
+
+      // Use mastery/technical scores from persist endpoint (properly calculated)
+      if (feedbackState.technicalScore !== null) {
+        setTechnicalScore(feedbackState.technicalScore)
+      }
+
+      // Update feedback content
+      setComprehensiveFeedback(feedbackState.feedback.raw || "")
+      setStructuredFeedback({
+        whatWorked: feedbackState.feedback.whatWorked || [],
+        fixNext: feedbackState.feedback.fixNext || [],
+        actionPlan: feedbackState.feedback.actionPlan || [],
+        tldr: feedbackState.feedback.tldr || "",
       })
     }
 
-    // Handle completion - only show toast once
-    if (feedbackState.isComplete && !feedbackState.error && !feedbackCompletionToastShown.current) {
+    // Handle completion - only show toast once AND only after persist completes
+    if (
+      feedbackState.phase === "complete" &&
+      feedbackState.isPersisted &&
+      !feedbackState.error &&
+      !feedbackCompletionToastShown.current
+    ) {
       feedbackCompletionToastShown.current = true
       setIsGeneratingFeedback(false)
       toast.success("Feedback ready!", {
@@ -527,9 +513,16 @@ function InterviewPageContent() {
     } else if (feedbackState.error && !feedbackCompletionToastShown.current) {
       feedbackCompletionToastShown.current = true
       setIsGeneratingFeedback(false)
-      toast.error("Feedback generation failed", {
-        description: feedbackState.error,
-      })
+      // If we have feedback but persist failed, still show success (feedback is in UI)
+      if (feedbackState.feedback) {
+        toast.warning("Feedback generated", {
+          description: "Results may not be saved to history.",
+        })
+      } else {
+        toast.error("Feedback generation failed", {
+          description: feedbackState.error,
+        })
+      }
     }
 
     // Reset toast flag when state resets to idle
@@ -2924,6 +2917,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           // STREAMING FEEDBACK: Edge function with NO TIMEOUT
           // Scores stream in immediately, then rich feedback follows
           // ================================================================
+          const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
           const feedbackRequest = {
             sessionId: currentSessionId,
             userId: user.id,
@@ -2943,6 +2937,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             efficiencyMetrics: efficiencyData,
             submittedFromPhase: getCurrentInterviewPhase(),
             testsRanBeforeSubmit: testResults.length > 0,
+            // For mastery score calculation in persist endpoint
+            hintsUsed: hintsUsedCount,
+            elapsedTimeSeconds: elapsedTime,
           }
 
           // Start streaming feedback - scores come first, then rich feedback
@@ -2986,51 +2983,26 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         }
       }
 
-      setComprehensiveFeedback(feedbackText)
+      // Don't set placeholder feedback - wait for streaming to complete
+      // The useEffect watching streamingFeedback.state will update these
+      // Only set initial performance score based on test results (will be updated by streaming)
       setPerformanceScore(calculatedPerformanceScore)
 
-      // Save session completion data
+      // Save basic session completion data (code, test results, etc.)
+      // NOTE: The persist endpoint will handle saving the AI-generated feedback and scores
+      // We only save basic data here with feedbackStatus: "processing"
       if (currentSessionId && user) {
         try {
-          // Ensure scoreBreakdown only contains defined values
-          const cleanScoreBreakdown = scoreBreakdownData
-            ? {
-                understanding:
-                  scoreBreakdownData.understanding !== undefined &&
-                  scoreBreakdownData.understanding !== null
-                    ? scoreBreakdownData.understanding
-                    : undefined,
-                problemSolving:
-                  scoreBreakdownData.problemSolving !== undefined &&
-                  scoreBreakdownData.problemSolving !== null
-                    ? scoreBreakdownData.problemSolving
-                    : undefined,
-                codeQuality:
-                  scoreBreakdownData.codeQuality !== undefined &&
-                  scoreBreakdownData.codeQuality !== null
-                    ? scoreBreakdownData.codeQuality
-                    : undefined,
-                communication:
-                  scoreBreakdownData.communication !== undefined &&
-                  scoreBreakdownData.communication !== null
-                    ? scoreBreakdownData.communication
-                    : undefined,
-              }
-            : undefined
-
-          await updateInterviewSession(currentSessionId, calculatedPerformanceScore, feedbackText, {
+          // Save basic session data - feedback and scores will be updated by /api/feedback/persist
+          await updateInterviewSession(currentSessionId, undefined, undefined, {
             code,
             language: selectedLanguage,
             testResults,
             timeComplexity: efficiencyData?.estimatedTimeComplexity,
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
-            feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
-            // Pass pre-calculated technical score from API for consistency
-            technicalScore: localTechnicalScore,
-            scoreBreakdown: cleanScoreBreakdown,
-            constitutionalAICritique: localConstitutionalAICritique || undefined,
-            clarifyingQuestionsAssessment: localClarifyingQuestionsAssessment || undefined,
+            // Mark as processing - persist endpoint will update to "complete"
+            feedbackStatus: "processing",
           })
 
           trackSessionCompletion({
@@ -3042,24 +3014,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             efficiencyScore: efficiencyData?.efficiencyScore || 50,
           }).catch((err) => console.error("Session metrics tracking failed:", err))
 
-          if (selectedScenario) {
-            const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
-            updateSpacedRepetition({
-              problemId: selectedScenario.id,
-              performanceScore: calculatedPerformanceScore,
-              masteryScore: scoreBreakdownData
-                ? Math.round(
-                    (scoreBreakdownData.understanding || 0) * 0.3 +
-                      (scoreBreakdownData.problemSolving || 0) * 0.4 +
-                      (scoreBreakdownData.codeQuality || 0) * 0.3
-                  )
-                : undefined,
-              timeSpentMinutes: Math.round(elapsedTime / 60),
-              hintsUsed: hintsUsedCount,
-              testCasesPassed: testSummary.passed,
-              testCasesTotal: testSummary.total,
-            }).catch((err) => console.error("Spaced repetition update failed:", err))
-          }
+          // Note: Spaced repetition update will be triggered by persist endpoint
+          // after mastery score is properly calculated
 
           if (isFromRoadmap && selectedScenario && activeRoadmap) {
             markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
@@ -4824,11 +4780,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                 ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
                                   <div className="rounded-lg border border-gray-600/30 bg-gray-800/30 p-3">
                                     <p className="text-sm text-gray-400">
-                                      Hints will appear here as you code. Keep working on your solution!
+                                      Hints will appear here as you code. Keep working on your
+                                      solution!
                                     </p>
                                     <button
                                       onClick={fetchRAGHints}
-                                      className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                                      className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 transition-colors hover:text-purple-300"
                                     >
                                       <Sparkles className="h-3 w-3" />
                                       Try generating hints

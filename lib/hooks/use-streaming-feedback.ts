@@ -4,6 +4,13 @@
  * Connects to the Edge streaming endpoint and handles
  * Server-Sent Events (SSE) for real-time feedback updates.
  *
+ * Flow:
+ * 1. Connect to /api/feedback/stream (Edge runtime, no timeout)
+ * 2. Receive instant scores immediately
+ * 3. Receive refined scores after AI validation
+ * 4. Receive full feedback at the end
+ * 5. Call /api/feedback/persist to save to Firestore (Edge can't access Firebase)
+ *
  * Events:
  * - phase: Current processing phase
  * - scores: Instant algorithmic scores
@@ -36,9 +43,17 @@ export interface StreamingFeedbackState {
   // Connection state
   isConnected: boolean
   isComplete: boolean
+  isPersisted: boolean // True after results are saved to Firestore
 
   // Current phase
-  phase: "idle" | "calculating_scores" | "analyzing" | "generating" | "complete" | "error"
+  phase:
+    | "idle"
+    | "calculating_scores"
+    | "analyzing"
+    | "generating"
+    | "persisting"
+    | "complete"
+    | "error"
   phaseMessage: string
 
   // Scores (instant first, then refined)
@@ -52,6 +67,10 @@ export interface StreamingFeedbackState {
 
   // Rich feedback (arrives at end)
   feedback: StreamingFeedback | null
+
+  // Persisted scores (from Firestore save)
+  masteryScore: number | null
+  technicalScore: number | null
 
   // Error
   error: string | null
@@ -76,118 +95,243 @@ export interface StreamingFeedbackRequest {
   efficiencyMetrics?: unknown
   submittedFromPhase?: string
   testsRanBeforeSubmit?: boolean
+  // For mastery score calculation
+  hintsUsed?: number
+  elapsedTimeSeconds?: number
 }
 
 export function useStreamingFeedback() {
   const [state, setState] = useState<StreamingFeedbackState>({
     isConnected: false,
     isComplete: false,
+    isPersisted: false,
     phase: "idle",
     phaseMessage: "",
     instantScores: null,
     refinedScores: null,
     flags: null,
     feedback: null,
+    masteryScore: null,
+    technicalScore: null,
     error: null,
   })
 
   const abortControllerRef = useRef<AbortController | null>(null)
+  const requestRef = useRef<StreamingFeedbackRequest | null>(null)
+
+  /**
+   * Persist feedback to Firestore after streaming completes
+   */
+  const persistFeedback = useCallback(
+    async (
+      request: StreamingFeedbackRequest,
+      scores: StreamingScores,
+      feedback: StreamingFeedback
+    ) => {
+      setState((prev) => ({
+        ...prev,
+        phase: "persisting",
+        phaseMessage: "Saving your results...",
+      }))
+
+      try {
+        const response = await fetch("/api/feedback/persist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: request.sessionId,
+            userId: request.userId,
+            scores,
+            feedback: {
+              raw: feedback.raw,
+              tldr: feedback.tldr,
+              whatWorked: feedback.whatWorked,
+              fixNext: feedback.fixNext,
+              actionPlan: feedback.actionPlan,
+            },
+            testsPassed: request.testsPassed,
+            testsTotal: request.testsTotal,
+            timeSpentMinutes: Math.round((request.elapsedTimeSeconds || 1800) / 60),
+            hintsUsed: request.hintsUsed || 0,
+            difficulty: request.scenarioDifficulty || "medium",
+            scenarioType: request.scenarioType || "dsa",
+            scenarioTitle: request.scenarioTitle || "Unknown",
+            scenarioId: request.scenarioId,
+            scenarioPattern: request.scenarioPattern,
+            conversationTranscript: request.conversationTranscript,
+            efficiencyMetrics: request.efficiencyMetrics,
+            existingSilentNotes: request.silentNotes,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Persist failed: ${response.status}`)
+        }
+
+        const result = await response.json()
+
+        setState((prev) => ({
+          ...prev,
+          isPersisted: true,
+          phase: "complete",
+          phaseMessage: "Done!",
+          masteryScore: result.masteryScore,
+          technicalScore: result.technicalScore,
+        }))
+
+        return result
+      } catch (error) {
+        console.error("[StreamingFeedback] Persist failed:", error)
+        // Don't fail the whole flow if persist fails - feedback is still shown
+        setState((prev) => ({
+          ...prev,
+          isPersisted: false,
+          phase: "complete",
+          phaseMessage: "Done!",
+          error: `Persist failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        }))
+        return null
+      }
+    },
+    []
+  )
 
   /**
    * Start streaming feedback
    */
-  const startStreaming = useCallback(async (request: StreamingFeedbackRequest) => {
-    // Abort any existing connection
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
+  const startStreaming = useCallback(
+    async (request: StreamingFeedbackRequest) => {
+      // Abort any existing connection
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
 
-    // Reset state
-    setState({
-      isConnected: true,
-      isComplete: false,
-      phase: "calculating_scores",
-      phaseMessage: "Starting...",
-      instantScores: null,
-      refinedScores: null,
-      flags: null,
-      feedback: null,
-      error: null,
-    })
+      // Store request for persist call
+      requestRef.current = request
 
-    const abortController = new AbortController()
-    abortControllerRef.current = abortController
-
-    try {
-      const response = await fetch("/api/feedback/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-        signal: abortController.signal,
+      // Reset state
+      setState({
+        isConnected: true,
+        isComplete: false,
+        isPersisted: false,
+        phase: "calculating_scores",
+        phaseMessage: "Starting...",
+        instantScores: null,
+        refinedScores: null,
+        flags: null,
+        feedback: null,
+        masteryScore: null,
+        technicalScore: null,
+        error: null,
       })
 
-      if (!response.ok) {
-        throw new Error(`Stream failed: ${response.status}`)
-      }
+      const abortController = new AbortController()
+      abortControllerRef.current = abortController
 
-      const reader = response.body?.getReader()
-      if (!reader) {
-        throw new Error("No response body")
-      }
+      // Variables to capture final state for persist
+      let finalScores: StreamingScores | null = null
+      let finalFeedback: StreamingFeedback | null = null
 
-      const decoder = new TextDecoder()
-      let buffer = ""
+      try {
+        const response = await fetch("/api/feedback/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+          signal: abortController.signal,
+        })
 
-      while (true) {
-        const { done, value } = await reader.read()
-
-        if (done) {
-          break
+        if (!response.ok) {
+          throw new Error(`Stream failed: ${response.status}`)
         }
 
-        buffer += decoder.decode(value, { stream: true })
+        const reader = response.body?.getReader()
+        if (!reader) {
+          throw new Error("No response body")
+        }
 
-        // Parse SSE events from buffer
-        const lines = buffer.split("\n")
-        buffer = lines.pop() || "" // Keep incomplete line in buffer
+        const decoder = new TextDecoder()
+        let buffer = ""
 
-        let currentEvent = ""
-        let currentData = ""
+        while (true) {
+          const { done, value } = await reader.read()
 
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7)
-          } else if (line.startsWith("data: ")) {
-            currentData = line.slice(6)
+          if (done) {
+            break
+          }
 
-            // Process complete event
-            if (currentEvent && currentData) {
-              try {
-                const data = JSON.parse(currentData)
-                handleEvent(currentEvent, data)
-              } catch {
-                // Invalid JSON, skip
+          buffer += decoder.decode(value, { stream: true })
+
+          // Parse SSE events from buffer
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || "" // Keep incomplete line in buffer
+
+          let currentEvent = ""
+          let currentData = ""
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              currentEvent = line.slice(7)
+            } else if (line.startsWith("data: ")) {
+              currentData = line.slice(6)
+
+              // Process complete event
+              if (currentEvent && currentData) {
+                try {
+                  const data = JSON.parse(currentData)
+
+                  // Capture final scores and feedback for persist
+                  if (currentEvent === "refined_scores") {
+                    finalScores = data as StreamingScores
+                  } else if (currentEvent === "scores" && !finalScores) {
+                    finalScores = data as StreamingScores
+                  } else if (currentEvent === "feedback") {
+                    finalFeedback = data as StreamingFeedback
+                    // Also update finalScores from feedback if available
+                    if ((data as StreamingFeedback).scores) {
+                      finalScores = (data as StreamingFeedback).scores
+                    }
+                  }
+
+                  handleEvent(currentEvent, data)
+                } catch {
+                  // Invalid JSON, skip
+                }
+                currentEvent = ""
+                currentData = ""
               }
-              currentEvent = ""
-              currentData = ""
             }
           }
         }
-      }
-    } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        // User cancelled, don't treat as error
-        return
-      }
 
-      setState((prev) => ({
-        ...prev,
-        isConnected: false,
-        phase: "error",
-        error: error instanceof Error ? error.message : "Stream failed",
-      }))
-    }
-  }, [])
+        // After streaming completes, persist to Firestore
+        if (finalScores && finalFeedback && requestRef.current) {
+          await persistFeedback(requestRef.current, finalScores, finalFeedback)
+        } else {
+          // Streaming completed but missing data
+          setState((prev) => ({
+            ...prev,
+            isConnected: false,
+            isComplete: true,
+            phase: "complete",
+            error: finalFeedback ? null : "Feedback generation incomplete",
+          }))
+        }
+      } catch (error) {
+        if ((error as Error).name === "AbortError") {
+          // User cancelled, don't treat as error
+          return
+        }
+
+        setState((prev) => ({
+          ...prev,
+          isConnected: false,
+          phase: "error",
+          error: error instanceof Error ? error.message : "Stream failed",
+        }))
+      }
+    },
+    [persistFeedback]
+  )
 
   /**
    * Handle incoming SSE events
@@ -245,11 +389,12 @@ export function useStreamingFeedback() {
         break
 
       case "done":
+        // Note: Don't set phase to "complete" here - wait for persist
         setState((prev) => ({
           ...prev,
           isConnected: false,
           isComplete: true,
-          phase: "complete",
+          // Phase will be set to "complete" after persist succeeds
         }))
         break
     }
@@ -274,15 +419,19 @@ export function useStreamingFeedback() {
    */
   const reset = useCallback(() => {
     cancel()
+    requestRef.current = null
     setState({
       isConnected: false,
       isComplete: false,
+      isPersisted: false,
       phase: "idle",
       phaseMessage: "",
       instantScores: null,
       refinedScores: null,
       flags: null,
       feedback: null,
+      masteryScore: null,
+      technicalScore: null,
       error: null,
     })
   }, [cancel])
