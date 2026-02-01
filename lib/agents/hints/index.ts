@@ -73,6 +73,8 @@ export async function generateHints(
         userId: request.userId,
         existingHints: request.existingHints,
         testFailures: request.testResults?.failingTests,
+        optimalComplexity: request.optimalComplexity,
+        constraints: request.constraints,
       }).catch((err) => {
         console.error(`[HintAgent] LLM hint level ${level} failed:`, err)
         return null

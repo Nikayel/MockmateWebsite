@@ -64,6 +64,12 @@ export interface HintGenerationRequest {
     failingTests?: string[]
   }
   trigger?: HintTrigger
+  // Problem-specific context for better hint tailoring
+  optimalComplexity?: {
+    time: string
+    space: string
+  }
+  constraints?: string[]
 }
 
 export interface HintGenerationResponse {
