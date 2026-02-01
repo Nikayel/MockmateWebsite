@@ -31,6 +31,7 @@ import {
   applyScoreFloors,
   buildEvidenceSummary,
 } from "@/lib/feedback/edge-utils"
+import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-analysis-edge"
 
 // CRITICAL: Edge runtime for no timeout on streaming
 export const runtime = "edge"
@@ -141,12 +142,21 @@ export async function POST(request: NextRequest) {
             )
           : []
 
-      // Run validation and extraction in parallel
+      // Run validation, extraction, and silent notes analysis in parallel
       const shouldValidateWithAI =
         scenarioType === "system-design" ||
         (preScreen.hasContent && preScreen.candidateMessageCount >= 1)
 
-      const [aiValidation, extractedEvidence] = await Promise.all([
+      // Problem context for silent notes analysis
+      const problemContext = {
+        title: scenarioTitle || "Unknown Problem",
+        optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+        optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+        criticalEdgeCases: ["empty input", "single element", "null values"],
+        scenarioType: scenarioType || "dsa",
+      }
+
+      const [aiValidation, extractedEvidence, silentNotesAnalysis] = await Promise.all([
         shouldValidateWithAI
           ? validateConversationEdge(
               transcriptMessages,
@@ -160,14 +170,32 @@ export async function POST(request: NextRequest) {
             ).catch(() => getDefaultValidation())
           : Promise.resolve(getDefaultValidation()),
         transcriptMessages.length > 0
-          ? extractConversationEvidenceEdge(transcriptMessages, {
-              title: scenarioTitle,
-              optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
-              optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
-              criticalEdgeCases: ["empty input", "single element", "null values"],
-            }).catch(() => null)
+          ? extractConversationEvidenceEdge(transcriptMessages, problemContext).catch(() => null)
           : Promise.resolve(null),
+        // Generate silent notes if we don't have existing ones and have transcript
+        !existingSilentNotes?.length && transcriptMessages.length >= 2
+          ? analyzeTranscriptForMistakesEdge(
+              transcriptMessages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+              problemContext
+            ).catch((err) => {
+              console.warn("[Streaming Feedback] Silent notes analysis failed:", err)
+              return { silentNotes: [], analysisMetadata: null }
+            })
+          : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
       ])
+
+      // Use generated silent notes or existing ones
+      const finalSilentNotes = silentNotesAnalysis.silentNotes || existingSilentNotes || []
+      if (silentNotesAnalysis.analysisMetadata) {
+        console.log("[Streaming Feedback] Silent notes generated:", {
+          count: finalSilentNotes.length,
+          algorithmicDetections: silentNotesAnalysis.analysisMetadata.algorithmicDetections,
+          semanticDetections: silentNotesAnalysis.analysisMetadata.semanticDetections,
+        })
+      }
 
       // Reconcile evidence
       if (extractedEvidence) {
@@ -232,7 +260,7 @@ export async function POST(request: NextRequest) {
         finalScores: finalScores as unknown as Record<string, number>,
         aiValidation: aiValidation as unknown as Record<string, unknown>,
         extractedEvidence,
-        silentNotes: existingSilentNotes || [],
+        silentNotes: finalSilentNotes,
         code,
         language,
         efficiencyMetrics,
@@ -258,6 +286,7 @@ export async function POST(request: NextRequest) {
         whatWorked: sections.whatWorked || [],
         fixNext: sections.fixNext || [],
         actionPlan: sections.actionPlan || [],
+        silentNotes: finalSilentNotes,
         scores: {
           understanding: finalScores.understanding,
           problemSolving: finalScores.problemSolving,

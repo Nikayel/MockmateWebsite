@@ -30,12 +30,21 @@ export interface StreamingScores {
   overall: number
 }
 
+export interface SilentNote {
+  type: string
+  timestamp: number
+  userSaid: string
+  correct?: string
+  context?: string
+}
+
 export interface StreamingFeedback {
   raw: string
   tldr: string
   whatWorked: string[]
   fixNext: string[]
   actionPlan: string[]
+  silentNotes?: SilentNote[]
   scores: StreamingScores
 }
 
@@ -149,6 +158,8 @@ export function useStreamingFeedback() {
               fixNext: feedback.fixNext,
               actionPlan: feedback.actionPlan,
             },
+            // Include generated silent notes from streaming (takes precedence)
+            silentNotes: feedback.silentNotes || request.silentNotes || [],
             testsPassed: request.testsPassed,
             testsTotal: request.testsTotal,
             timeSpentMinutes: Math.round((request.elapsedTimeSeconds || 1800) / 60),
@@ -160,7 +171,6 @@ export function useStreamingFeedback() {
             scenarioPattern: request.scenarioPattern,
             conversationTranscript: request.conversationTranscript,
             efficiencyMetrics: request.efficiencyMetrics,
-            existingSilentNotes: request.silentNotes,
           }),
         })
 
