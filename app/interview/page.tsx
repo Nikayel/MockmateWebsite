@@ -39,6 +39,8 @@ import {
   Leaf,
   ThumbsUp,
   ThumbsDown,
+  Trophy,
+  HardDrive,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -448,6 +450,9 @@ function InterviewPageContent() {
   // State for focus mode problem peek overlay
   const [showProblemPeek, setShowProblemPeek] = useState(false)
 
+  // State for collapsible optimal approach section (collapsed by default to not give away solution)
+  const [showOptimalApproach, setShowOptimalApproach] = useState(false)
+
   // Toggle calm mode on document for CSS cascade
   useEffect(() => {
     if (calmMode) {
@@ -787,6 +792,7 @@ function InterviewPageContent() {
         const scenario = getScenarioById(scenarioId)
         if (scenario) {
           setSelectedScenario(scenario)
+          setShowOptimalApproach(false) // Reset optimal approach visibility
           setCurrentSessionId(sessionId)
           setShowScenarioBrowser(false)
 
@@ -1004,6 +1010,7 @@ Let's continue!`
 
           // Select the scenario and hide browser to show the problem view
           setSelectedScenario(scenario)
+          setShowOptimalApproach(false) // Reset optimal approach visibility
           setShowScenarioBrowser(false)
 
           // If from roadmap, call startInterview to trigger proper initialization
@@ -2325,6 +2332,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     // If we received a scenario override, update state
     if (scenarioOverride) {
       setSelectedScenario(scenarioOverride)
+      setShowOptimalApproach(false) // Reset optimal approach visibility for new scenario
     }
 
     // Determine target company:
@@ -4948,6 +4956,64 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                     </li>
                                   ))}
                                 </ul>
+                              </div>
+                            )}
+
+                          {/* Optimal Approach - Collapsible (DSA only) */}
+                          {selectedScenario.type === "dsa" &&
+                            (selectedScenario as any).optimalComplexity && (
+                              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+                                <button
+                                  onClick={() => setShowOptimalApproach(!showOptimalApproach)}
+                                  className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-emerald-500/10"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Trophy className="h-4 w-4 text-emerald-400" />
+                                    <span className="text-sm font-medium text-emerald-300">
+                                      Optimal Approach
+                                    </span>
+                                    <span className="text-xs text-gray-500">(click to reveal)</span>
+                                  </div>
+                                  {showOptimalApproach ? (
+                                    <ChevronUp className="h-4 w-4 text-emerald-400" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-emerald-400" />
+                                  )}
+                                </button>
+
+                                {showOptimalApproach && (
+                                  <div className="animate-in slide-in-from-top-2 px-3 pb-3 duration-200">
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {/* Time Complexity */}
+                                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                                        <div className="mb-1.5 flex items-center gap-2">
+                                          <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                                          <span className="text-xs font-medium text-emerald-300">
+                                            Time
+                                          </span>
+                                        </div>
+                                        <code className="text-lg font-semibold text-emerald-100">
+                                          {(selectedScenario as any).optimalComplexity.time}
+                                        </code>
+                                      </div>
+                                      {/* Space Complexity */}
+                                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                                        <div className="mb-1.5 flex items-center gap-2">
+                                          <HardDrive className="h-3.5 w-3.5 text-emerald-400" />
+                                          <span className="text-xs font-medium text-emerald-300">
+                                            Space
+                                          </span>
+                                        </div>
+                                        <code className="text-lg font-semibold text-emerald-100">
+                                          {(selectedScenario as any).optimalComplexity.space}
+                                        </code>
+                                      </div>
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-400 italic">
+                                      Try to achieve this complexity before revealing hints!
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             )}
 
