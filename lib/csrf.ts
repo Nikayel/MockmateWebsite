@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { timingSafeEqual } from "crypto"
 
 const CSRF_TOKEN_HEADER = "X-CSRF-Token"
 const CSRF_COOKIE_NAME = "csrf_token"
@@ -11,25 +12,25 @@ const CSRF_TOKEN_LENGTH = 32
 
 /**
  * Constant-time string comparison to prevent timing attacks
- * Returns true if strings are equal, false otherwise
- * Always takes the same amount of time regardless of where strings differ
+ * Uses Node.js crypto.timingSafeEqual for proper constant-time comparison
  */
 function constantTimeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    // Still do a comparison to maintain constant time even for length mismatch
-    // Compare against self to consume similar time
-    let result = 0
-    for (let i = 0; i < a.length; i++) {
-      result |= a.charCodeAt(i) ^ a.charCodeAt(i)
-    }
+  // Use Node.js built-in constant-time comparison
+  // Must convert strings to Buffers of equal length
+  const aBuffer = Buffer.from(a, "utf8")
+  const bBuffer = Buffer.from(b, "utf8")
+
+  // If lengths differ, compare a against itself to maintain constant time
+  // but still return false
+  if (aBuffer.length !== bBuffer.length) {
+    // Create a buffer of same length as a, filled with different content
+    // This ensures we do a real comparison (constant time) but always fail
+    const dummyBuffer = Buffer.alloc(aBuffer.length, 0)
+    timingSafeEqual(aBuffer, dummyBuffer)
     return false
   }
 
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
-  return result === 0
+  return timingSafeEqual(aBuffer, bBuffer)
 }
 
 /**
@@ -38,7 +39,7 @@ function constantTimeCompare(a: string, b: string): boolean {
 function generateCSRFToken(): string {
   const array = new Uint8Array(CSRF_TOKEN_LENGTH)
   crypto.getRandomValues(array)
-  return Array.from(array, byte => byte.toString(16).padStart(2, "0")).join("")
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 /**
@@ -85,10 +86,7 @@ export function verifyCSRFToken(request: NextRequest): boolean {
  */
 export function csrfProtection(request: NextRequest): NextResponse | null {
   if (!verifyCSRFToken(request)) {
-    return NextResponse.json(
-      { error: "CSRF token validation failed" },
-      { status: 403 }
-    )
+    return NextResponse.json({ error: "CSRF token validation failed" }, { status: 403 })
   }
 
   return null

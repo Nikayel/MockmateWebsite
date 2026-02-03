@@ -7,7 +7,7 @@ import { NextRequest } from "next/server"
 import { adminAuth } from "./firebase-admin"
 
 // Development mode check - logs only appear in development
-const isDev = process.env.NODE_ENV === 'development'
+const isDev = process.env.NODE_ENV === "development"
 
 /**
  * Get Firebase user ID from request with proper token verification
@@ -76,11 +76,5 @@ export async function getUserIdFromRequest(request: NextRequest): Promise<string
   }
 }
 
-/**
- * Alternative: Get user ID from request body (less secure, but works if token not available)
- * Only use this if the client can't send the token
- */
-export function getUserIdFromBody(request: NextRequest): Promise<string | null> {
-  return request.json().then(body => body.userId || null).catch(() => null)
-}
-
+// REMOVED: getUserIdFromBody was a security risk that allowed userId spoofing
+// All authentication must use verified Firebase ID tokens via getUserIdFromRequest()

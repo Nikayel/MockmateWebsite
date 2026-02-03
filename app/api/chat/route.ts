@@ -66,6 +66,60 @@ import {
 } from "@/lib/interview/interviewer-prompts"
 import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
 import { truncateText, truncateFileContent } from "@/lib/utils"
+import { z } from "zod"
+
+// Schema validation for chat API request body
+// Uses passthrough() to allow additional fields while validating known fields
+const chatRequestSchema = z
+  .object({
+    message: z.string().max(10000).optional(),
+    context: z
+      .array(
+        z.object({
+          type: z.string(),
+          message: z.string(),
+        })
+      )
+      .optional(),
+    role: z.enum(["interviewer", "partner"]).optional(),
+    userContext: z.record(z.unknown()).optional(), // Flexible user context
+    workspaceContext: z
+      .array(
+        z.object({
+          path: z.string(),
+          content: z.string(),
+        })
+      )
+      .optional(),
+    currentCode: z.string().max(100000).optional(),
+    isProactive: z.boolean().optional(),
+    scenarioTitle: z.string().optional(),
+    scenarioType: z.string().optional(),
+    scenarioPattern: z.string().optional(),
+    scenarioCompany: z.string().optional(),
+    elapsedTime: z.number().optional(),
+    sessionId: z.string().optional(),
+    userId: z.string().optional(),
+    partnerMessagesCount: z.number().optional(),
+    lastPartnerExchange: z.string().optional(),
+    recentNudgeTopics: z.array(z.string()).optional(),
+    userAnsweredTopics: z.array(z.string()).optional(),
+    timeSinceLastMessage: z.number().optional(),
+    isWrapUp: z.boolean().optional(),
+    edgeCases: z.array(z.record(z.unknown())).optional(), // Flexible edge cases
+    testResults: z.array(z.record(z.unknown())).optional(), // Flexible test results
+    consoleLogs: z.array(z.record(z.unknown())).optional(), // Flexible console logs
+    interviewPhase: z.string().optional(),
+    conversationTracker: z.record(z.unknown()).optional(),
+    hasSubmitted: z.boolean().optional(),
+    solutionComplexity: z.record(z.unknown()).optional(), // Flexible complexity
+    realInterviewMode: z.boolean().optional(),
+    hasFuzzyStatement: z.boolean().optional(),
+    scenarioClarifyingQuestions: z.unknown().optional(), // Can be string[] or object[]
+    scenarioFuzzyStatement: z.string().optional(),
+    starterCodeLength: z.number().optional(),
+  })
+  .passthrough() // Allow additional unknown fields
 
 interface UserContext {
   email?: string
@@ -74,6 +128,20 @@ interface UserContext {
   sessions_used?: number
   previous_topics?: string[]
   skill_level?: string
+}
+
+interface TestResultItem {
+  description?: string
+  passed?: boolean
+  input?: unknown
+  expected?: unknown
+  actual?: unknown
+  error?: string | null
+}
+
+interface ConsoleLogItem {
+  type?: string
+  message?: string
 }
 
 // Context window management constants
@@ -402,83 +470,72 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const {
-      message,
-      context,
-      role,
-      userContext,
-      workspaceContext,
-      currentCode,
-      isProactive,
-      scenarioTitle,
-      scenarioType,
-      scenarioPattern,
-      scenarioCompany,
-      elapsedTime,
-      sessionId,
-      userId,
-      // NEW: AI Partner usage tracking for interviewer awareness
-      partnerMessagesCount,
-      lastPartnerExchange,
-      // NEW: Nudge tracking to prevent repetitive questions
-      recentNudgeTopics,
-      // NEW: User-answered topics tracking
-      userAnsweredTopics,
-      // NEW: Time since last candidate message (for time-based proactive)
-      timeSinceLastMessage,
-      // NEW: Is this a wrap-up request?
-      isWrapUp,
-      // NEW: Edge cases for interviewer to ask about
-      edgeCases,
-      // NEW: Console context for interviewer awareness
-      testResults,
-      consoleLogs,
-      // NEW: Phase-aware interview system
-      interviewPhase,
-      conversationTracker,
-      hasSubmitted,
-      solutionComplexity,
-      // NEW: Real Interview Mode (fuzzy problem statements)
-      realInterviewMode,
-      hasFuzzyStatement,
-      scenarioClarifyingQuestions, // Clarifying questions from scenario for fuzzy mode
-      scenarioFuzzyStatement, // The vague problem statement
-      // NEW: Starter code length for deterministic phase detection
-      starterCodeLength,
-    } = await request.json()
+    // Parse and validate request body with Zod schema
+    const rawBody = await request.json()
+    const parseResult = chatRequestSchema.safeParse(rawBody)
+
+    if (!parseResult.success) {
+      logger.warn("[Chat API] Invalid request body", {
+        errors: parseResult.error.errors.map((e) => ({
+          path: e.path.join("."),
+          message: e.message,
+        })),
+      })
+      return NextResponse.json(
+        { error: "Invalid request body", details: parseResult.error.errors.map((e) => e.message) },
+        { status: 400 }
+      )
+    }
+
+    // Extract validated data with type assertions for complex types
+    const validatedData = parseResult.data
+    const message = validatedData.message
+    const context = validatedData.context
+    const role = validatedData.role
+    const userContext = validatedData.userContext as UserContext | undefined
+    const workspaceContext = validatedData.workspaceContext
+    const currentCode = validatedData.currentCode
+    const isProactive = validatedData.isProactive
+    const scenarioTitle = validatedData.scenarioTitle
+    const scenarioType = validatedData.scenarioType
+    const scenarioPattern = validatedData.scenarioPattern
+    const scenarioCompany = validatedData.scenarioCompany
+    const elapsedTime = validatedData.elapsedTime
+    const sessionId = validatedData.sessionId
+    const userId = validatedData.userId
+    const partnerMessagesCount = validatedData.partnerMessagesCount
+    const lastPartnerExchange = validatedData.lastPartnerExchange
+    const recentNudgeTopics = validatedData.recentNudgeTopics
+    const userAnsweredTopics = validatedData.userAnsweredTopics
+    const timeSinceLastMessage = validatedData.timeSinceLastMessage
+    const isWrapUp = validatedData.isWrapUp
+    const edgeCases = validatedData.edgeCases as
+      | Array<{ description: string; input: unknown }>
+      | undefined
+    const testResults = validatedData.testResults as TestResultItem[] | undefined
+    const consoleLogs = validatedData.consoleLogs as ConsoleLogItem[] | undefined
+    const interviewPhase = validatedData.interviewPhase
+    const conversationTracker = validatedData.conversationTracker
+    const hasSubmitted = validatedData.hasSubmitted
+    const solutionComplexity = validatedData.solutionComplexity as
+      | { estimated?: string; optimal?: string; optimalSpace?: string; isOptimal?: boolean }
+      | undefined
+    const realInterviewMode = validatedData.realInterviewMode
+    const hasFuzzyStatement = validatedData.hasFuzzyStatement
+    const scenarioClarifyingQuestions = validatedData.scenarioClarifyingQuestions
+    const scenarioFuzzyStatement = validatedData.scenarioFuzzyStatement
+    const starterCodeLength = validatedData.starterCodeLength
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
-    // Input validation: reject oversized messages to prevent abuse
-    const MAX_INPUT_MESSAGE_LENGTH = 10000 // 10KB limit for user input
-    if (message && message.length > MAX_INPUT_MESSAGE_LENGTH) {
-      logger.warn("[Chat API] Message too large", { messageLength: message.length })
-      return NextResponse.json(
-        {
-          error: `Message exceeds maximum length of ${MAX_INPUT_MESSAGE_LENGTH} characters`,
-        },
-        { status: 400 }
-      )
-    }
-
-    // Input validation: reject oversized code context
-    const MAX_CODE_CONTEXT_LENGTH = 100000 // 100KB limit for code
-    if (currentCode && currentCode.length > MAX_CODE_CONTEXT_LENGTH) {
-      logger.warn("[Chat API] Code context too large", { codeLength: currentCode.length })
-      return NextResponse.json(
-        {
-          error: `Code context exceeds maximum length of ${MAX_CODE_CONTEXT_LENGTH} characters`,
-        },
-        { status: 400 }
-      )
-    }
+    // Note: Size validation is now handled by Zod schema (message: 10KB, currentCode: 100KB)
 
     // LLM-based conversation extraction for more accurate tracking
     // Only run for interviewer mode and when key signals detected
-    let enhancedTracker = conversationTracker as ConversationTracker | undefined
+    let enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
     const ENABLE_LLM_EXTRACTION = true
     if (
       ENABLE_LLM_EXTRACTION &&
@@ -511,7 +568,7 @@ export async function POST(request: NextRequest) {
 
           const result = await extractionService({
             messages: recentMessages,
-            currentTracker: conversationTracker as ConversationTracker,
+            currentTracker: conversationTracker as unknown as ConversationTracker,
             messageCount,
             lastExtractionAt: lastExtraction,
             currentMessage: message,
@@ -555,14 +612,14 @@ export async function POST(request: NextRequest) {
             // Now also validates complexity claims and adds silent notes for mistakes
             const extractionUpdates = await extractConversationState(
               recentMessages,
-              conversationTracker as ConversationTracker,
+              conversationTracker as unknown as ConversationTracker,
               optimalComplexityContext
             )
 
             // Merge extraction results with existing tracker
             if (Object.keys(extractionUpdates).length > 0) {
               enhancedTracker = {
-                ...(conversationTracker as ConversationTracker),
+                ...(conversationTracker as unknown as ConversationTracker),
                 ...extractionUpdates,
               }
               logger.info("[Chat API] Enhanced tracker with LLM extraction", {
@@ -616,7 +673,7 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
     const levelContext = buildInterviewerLevelContext(candidateLevel)
 
     // Manage workspace context with sliding window
-    const managedWorkspace = manageWorkspaceContext(workspaceContext)
+    const managedWorkspace = manageWorkspaceContext(workspaceContext || [])
     let workspaceContextStr = ""
     if (managedWorkspace.length > 0) {
       workspaceContextStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
@@ -712,20 +769,9 @@ DO NOT skip edge cases - real interviewers always ask about them. If they haven'
         : ""
 
     // Build console/test results context for interviewer awareness
-    interface TestResultItem {
-      description?: string
-      passed?: boolean
-      input?: unknown
-      expected?: unknown
-      actual?: unknown
-      error?: string | null
-    }
-    interface ConsoleLogItem {
-      type?: string
-      message?: string
-    }
-    const testResultsArray = testResults as TestResultItem[] | undefined
-    const consoleLogsArray = consoleLogs as ConsoleLogItem[] | undefined
+    // TestResultItem and ConsoleLogItem interfaces defined at module level
+    const testResultsArray = testResults
+    const consoleLogsArray = consoleLogs
 
     let consoleContext = ""
     if (testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0) {
@@ -912,7 +958,7 @@ DO NOT:
       starterCodeLength: starterLen,
       approachExplained:
         enhancedTracker?.approachExplained ||
-        (conversationTracker as ConversationTracker)?.approachExplained,
+        (conversationTracker as unknown as ConversationTracker)?.approachExplained,
       messageCount,
     }
 
@@ -927,7 +973,7 @@ DO NOT:
         starterCodeLength: starterLen,
         approachExplained:
           enhancedTracker?.approachExplained ||
-          (conversationTracker as ConversationTracker)?.approachExplained ||
+          (conversationTracker as unknown as ConversationTracker)?.approachExplained ||
           false,
         messageCount,
       })
@@ -961,7 +1007,7 @@ DO NOT:
 
     // Build hint guidance if hints have been given
     const hintsGiven =
-      (enhancedTracker || (conversationTracker as ConversationTracker))?.hintsGiven || 0
+      (enhancedTracker || (conversationTracker as unknown as ConversationTracker))?.hintsGiven || 0
     const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ""
 
     // CODE-ENFORCED CHECKLIST INJECTION
@@ -1143,7 +1189,7 @@ SOLUTION COMPLEXITY:
     // DRY: Use helper that derives context from scenario clarifying questions
     const fuzzyModeContext =
       realInterviewMode && hasFuzzyStatement
-        ? buildFuzzyModeContext(scenarioClarifyingQuestions, scenarioFuzzyStatement)
+        ? buildFuzzyModeContext(scenarioClarifyingQuestions as any, scenarioFuzzyStatement)
         : ""
 
     // Build interviewer prompt using consolidated function
@@ -1248,7 +1294,15 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
       userId,
       sessionId, // For session-level caching of static context
       userMessage: message, // Pass user message for dynamic context
-      testResults, // Pass test results for debugging context
+      testResults: testResults
+        ? {
+            passed: testResults.filter((t) => t.passed).length,
+            total: testResults.length,
+            failingTests: testResults
+              .filter((t) => !t.passed)
+              .map((t) => t.description || "Unknown test"),
+          }
+        : undefined,
     })
 
     if (ragContext) {
@@ -1289,7 +1343,7 @@ GROUNDING RULES (prevent hallucination):
     }
 
     // Manage conversation history with sliding window
-    const managedContext = manageContextWindow(context)
+    const managedContext = manageContextWindow(context || [])
 
     // Convert to provider-agnostic format
     const history: Array<{ role: "user" | "model"; content: string }> = []
@@ -1417,8 +1471,8 @@ ${proactivePrompts
 Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`
     } else if (isWrapUp && role === "interviewer") {
       // WRAP-UP: Interview is ending, provide detailed retrospective debrief
-      const passedTests = message?.testsPassed || 0
-      const totalTests = message?.testsTotal || 0
+      const passedTests = testResults?.filter((t) => t.passed).length || 0
+      const totalTests = testResults?.length || 0
       const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0
       const allTestsPassed = passedTests === totalTests && totalTests > 0
 
@@ -1497,7 +1551,7 @@ Keep it conversational and real - like you're actually debriefing someone after 
 
       // Regular message - let the AI naturally handle conversation flow
       // The AI will determine if this is a farewell based on full context
-      fullUserMessage = message
+      fullUserMessage = message || ""
       if (workspaceContextStr || currentCodeContext) {
         fullUserMessage += workspaceContextStr + currentCodeContext
       }

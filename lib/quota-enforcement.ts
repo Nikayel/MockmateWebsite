@@ -12,15 +12,91 @@
  * - /api/execute (code execution)
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { adminDb, adminAuth } from './firebase-admin'
-import { logger } from './logger'
-import { PRICING_CONFIG } from './config'
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb, adminAuth } from "./firebase-admin"
+import { logger } from "./logger"
+import { PRICING_CONFIG } from "./config"
+
+// Circuit breaker state for fail-open protection
+// Tracks consecutive failures to prevent unlimited access during extended outages
+interface CircuitBreakerState {
+  consecutiveFailures: number
+  lastFailureTime: number
+  isOpen: boolean
+}
+
+const circuitBreaker: CircuitBreakerState = {
+  consecutiveFailures: 0,
+  lastFailureTime: 0,
+  isOpen: false,
+}
+
+// Circuit breaker config
+const CIRCUIT_BREAKER_THRESHOLD = 5 // Open circuit after 5 consecutive failures
+const CIRCUIT_BREAKER_RESET_MS = 60 * 1000 // Reset after 1 minute of no failures
+const MAX_FAIL_OPEN_REQUESTS = 10 // Max requests allowed when circuit is open (per user)
+
+// Track fail-open requests per user (in-memory, resets on deploy)
+const failOpenRequestCounts = new Map<string, { count: number; resetTime: number }>()
+
+function recordCircuitFailure(): void {
+  circuitBreaker.consecutiveFailures++
+  circuitBreaker.lastFailureTime = Date.now()
+
+  if (circuitBreaker.consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+    circuitBreaker.isOpen = true
+    logger.error("CRITICAL: Quota circuit breaker OPEN - Firestore may be down", {
+      consecutiveFailures: circuitBreaker.consecutiveFailures,
+    })
+  }
+}
+
+function recordCircuitSuccess(): void {
+  circuitBreaker.consecutiveFailures = 0
+  circuitBreaker.isOpen = false
+}
+
+function checkCircuitBreaker(userId: string): { allowed: boolean; reason?: string } {
+  // Reset circuit breaker if enough time has passed
+  if (
+    circuitBreaker.isOpen &&
+    Date.now() - circuitBreaker.lastFailureTime > CIRCUIT_BREAKER_RESET_MS
+  ) {
+    circuitBreaker.isOpen = false
+    circuitBreaker.consecutiveFailures = 0
+    logger.info("Quota circuit breaker reset - attempting normal operation")
+  }
+
+  // If circuit is open, apply per-user rate limiting
+  if (circuitBreaker.isOpen) {
+    const userTrack = failOpenRequestCounts.get(userId)
+    const now = Date.now()
+
+    if (!userTrack || now > userTrack.resetTime) {
+      // Start new tracking window
+      failOpenRequestCounts.set(userId, { count: 1, resetTime: now + 60 * 1000 })
+      return { allowed: true }
+    }
+
+    if (userTrack.count >= MAX_FAIL_OPEN_REQUESTS) {
+      logger.warn("Fail-open rate limit exceeded during circuit break", { userId })
+      return {
+        allowed: false,
+        reason: "Service temporarily unavailable. Please try again in a minute.",
+      }
+    }
+
+    userTrack.count++
+    return { allowed: true }
+  }
+
+  return { allowed: true }
+}
 
 interface QuotaCheckResult {
   allowed: boolean
   userId: string
-  tier: 'free' | 'pro' | 'enterprise'
+  tier: "free" | "pro" | "enterprise"
   sessionsUsed: number
   sessionsLimit: number
   budgetUsed: number
@@ -40,9 +116,9 @@ interface UserQuota {
 
 // Budget limits per tier (in dollars)
 const BUDGET_LIMITS = {
-  free: 0.50,
-  pro: 25.00,
-  enterprise: 100.00,
+  free: 0.5,
+  pro: 25.0,
+  enterprise: 100.0,
 } as const
 
 /**
@@ -50,8 +126,8 @@ const BUDGET_LIMITS = {
  */
 async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
   try {
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
+    const authHeader = request.headers.get("Authorization")
+    if (!authHeader?.startsWith("Bearer ")) {
       return null
     }
 
@@ -59,7 +135,7 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
     const decodedToken = await adminAuth.verifyIdToken(token)
     return decodedToken.uid
   } catch (error) {
-    logger.warn('Failed to verify auth token', { error })
+    logger.warn("Failed to verify auth token", { error })
     return null
   }
 }
@@ -68,7 +144,7 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
  * Get guest ID from request header
  */
 function getGuestIdFromRequest(request: NextRequest): string | null {
-  const guestId = request.headers.get('X-Guest-Id')
+  const guestId = request.headers.get("X-Guest-Id")
   if (!guestId) return null
 
   // Validate guest ID format
@@ -87,41 +163,53 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
   try {
     // Query Firestore for completed sessions by this guest
     const completedSessionsQuery = await adminDb
-      .collection('interview_sessions')
-      .where('user_id', '==', guestId)
-      .where('is_guest', '==', true)
+      .collection("interview_sessions")
+      .where("user_id", "==", guestId)
+      .where("is_guest", "==", true)
       .limit(5) // Only need to check if any completed sessions exist
       .get()
 
     // Check if any session was completed (has feedback or completed_at)
     const hasCompletedSession = completedSessionsQuery.docs.some(
-      (doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data().completed_at || doc.data().feedback
+      (doc: FirebaseFirestore.QueryDocumentSnapshot) =>
+        doc.data().completed_at || doc.data().feedback
     )
 
     if (hasCompletedSession) {
       return {
         allowed: false,
-        reason: 'Free trial already used. Sign up to continue practicing!',
+        reason: "Free trial already used. Sign up to continue practicing!",
       }
     }
 
     // Check if they have an active (non-expired) session already
-    const hasActiveSession = completedSessionsQuery.docs.some((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
-      const data = doc.data()
-      if (data.completed_at || data.feedback) return false
+    const hasActiveSession = completedSessionsQuery.docs.some(
+      (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+        const data = doc.data()
+        if (data.completed_at || data.feedback) return false
 
-      // Check if session is expired (48 hours)
-      const expiresAt = data.expires_at ? new Date(data.expires_at) : null
-      if (expiresAt && expiresAt < new Date()) return false
+        // Check if session is expired (48 hours)
+        const expiresAt = data.expires_at ? new Date(data.expires_at) : null
+        if (expiresAt && expiresAt < new Date()) return false
 
-      return true
-    })
+        return true
+      }
+    )
 
     // Allow if no completed session and either no active session or has one active
+    recordCircuitSuccess()
     return { allowed: true }
   } catch (error) {
-    logger.error('Failed to check guest quota', { guestId, error })
-    // Fail open for guest - don't block if check fails
+    logger.error("Failed to check guest quota", { guestId, error })
+    recordCircuitFailure()
+
+    // Check circuit breaker before failing open
+    const circuitCheck = checkCircuitBreaker(guestId)
+    if (!circuitCheck.allowed) {
+      return { allowed: false, reason: circuitCheck.reason }
+    }
+
+    // Fail open for guest - but with circuit breaker protection
     return { allowed: true }
   }
 }
@@ -142,34 +230,29 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
 async function getUserQuota(userId: string): Promise<UserQuota | null> {
   try {
     const now = new Date()
-    const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
     const currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
     // Batch fetch profile and quota in parallel for better performance
     const [profileDoc, quotaQuery, usageSummaryDoc] = await Promise.all([
       // Get user profile for tier
-      adminDb.collection('profiles').doc(userId).get(),
+      adminDb.collection("profiles").doc(userId).get(),
 
       // Get quota documents - limit to recent entries only (max 12 months of history)
       adminDb
-        .collection('profile_quota')
-        .where('user_id', '==', userId)
-        .orderBy('period_start', 'desc')
+        .collection("profile_quota")
+        .where("user_id", "==", userId)
+        .orderBy("period_start", "desc")
         .limit(12)
         .get(),
 
       // Get usage summary for budget tracking
-      adminDb
-        .collection('users')
-        .doc(userId)
-        .collection('usage_summaries')
-        .doc(periodKey)
-        .get(),
+      adminDb.collection("users").doc(userId).collection("usage_summaries").doc(periodKey).get(),
     ])
 
     const profile = profileDoc.data()
-    const tier = (profile?.subscription_tier || 'free') as 'free' | 'pro' | 'enterprise'
+    const tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
 
     // Find current period quota from limited results
     const quota = quotaQuery.docs
@@ -184,9 +267,9 @@ async function getUserQuota(userId: string): Promise<UserQuota | null> {
 
     // Get session limits based on tier
     const sessionsLimit =
-      tier === 'pro'
+      tier === "pro"
         ? PRICING_CONFIG.pro.sessionsPerMonth
-        : tier === 'enterprise'
+        : tier === "enterprise"
           ? 999 // Effectively unlimited
           : PRICING_CONFIG.free.sessionsPerMonth
 
@@ -200,7 +283,7 @@ async function getUserQuota(userId: string): Promise<UserQuota | null> {
       periodEnd: currentPeriodEnd.toISOString(),
     }
   } catch (error) {
-    logger.error('Failed to get user quota', { userId, error })
+    logger.error("Failed to get user quota", { userId, error })
     return null
   }
 }
@@ -225,19 +308,19 @@ export async function checkQuota(
       if (!guestQuota.allowed) {
         const response = NextResponse.json(
           {
-            error: 'Free trial exhausted',
-            message: guestQuota.reason || 'Free trial already used. Sign up to continue!',
-            code: 'FREE_TRIAL_EXHAUSTED',
+            error: "Free trial exhausted",
+            message: guestQuota.reason || "Free trial already used. Sign up to continue!",
+            code: "FREE_TRIAL_EXHAUSTED",
           },
           { status: 403 }
         )
 
-        logger.warn('Guest quota exceeded', { guestId })
+        logger.warn("Guest quota exceeded", { guestId })
 
         return {
           allowed: false,
           userId: guestId,
-          tier: 'free',
+          tier: "free",
           sessionsUsed: 1,
           sessionsLimit: 1,
           budgetUsed: 0,
@@ -251,7 +334,7 @@ export async function checkQuota(
       return {
         allowed: true,
         userId: guestId,
-        tier: 'free',
+        tier: "free",
         sessionsUsed: 0,
         sessionsLimit: 1,
         budgetUsed: 0,
@@ -262,8 +345,8 @@ export async function checkQuota(
     // No auth and no guest ID - anonymous request, rely on rate limits only
     return {
       allowed: true,
-      userId: 'anonymous',
-      tier: 'free',
+      userId: "anonymous",
+      tier: "free",
       sessionsUsed: 0,
       sessionsLimit: 0,
       budgetUsed: 0,
@@ -273,15 +356,15 @@ export async function checkQuota(
 
   // Get user profile for tier
   try {
-    const profileDoc = await adminDb.collection('profiles').doc(userId).get()
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
     const profile = profileDoc.data()
-    const tier = (profile?.subscription_tier || 'free') as 'free' | 'pro' | 'enterprise'
+    const tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
 
     // Get user quota
     const quota = await getUserQuota(userId)
     if (!quota) {
       // If we can't get quota, allow but log warning
-      logger.warn('Could not retrieve user quota, allowing request', { userId })
+      logger.warn("Could not retrieve user quota, allowing request", { userId })
       return {
         allowed: true,
         userId,
@@ -297,9 +380,9 @@ export async function checkQuota(
     if (quota.freeOpensRemaining <= 0 && quota.sessionsUsed >= quota.sessionsLimit) {
       const response = NextResponse.json(
         {
-          error: 'Session limit exceeded',
+          error: "Session limit exceeded",
           message: `You've used all ${quota.sessionsLimit} sessions for this month. Upgrade to Pro for more sessions.`,
-          code: 'QUOTA_EXCEEDED',
+          code: "QUOTA_EXCEEDED",
           quota: {
             sessionsUsed: quota.sessionsUsed,
             sessionsLimit: quota.sessionsLimit,
@@ -309,7 +392,7 @@ export async function checkQuota(
         { status: 429 }
       )
 
-      logger.warn('Quota exceeded - session limit', {
+      logger.warn("Quota exceeded - session limit", {
         userId,
         tier,
         sessionsUsed: quota.sessionsUsed,
@@ -324,7 +407,7 @@ export async function checkQuota(
         sessionsLimit: quota.sessionsLimit,
         budgetUsed: quota.budgetUsed,
         budgetLimit: quota.budgetLimit,
-        message: 'Session limit exceeded',
+        message: "Session limit exceeded",
         response,
       }
     }
@@ -333,9 +416,9 @@ export async function checkQuota(
     if (quota.budgetUsed >= quota.budgetLimit) {
       const response = NextResponse.json(
         {
-          error: 'Budget limit exceeded',
+          error: "Budget limit exceeded",
           message: `You've reached your $${quota.budgetLimit.toFixed(2)} monthly budget. Upgrade your plan or wait until next month.`,
-          code: 'BUDGET_EXCEEDED',
+          code: "BUDGET_EXCEEDED",
           quota: {
             budgetUsed: quota.budgetUsed,
             budgetLimit: quota.budgetLimit,
@@ -345,7 +428,7 @@ export async function checkQuota(
         { status: 429 }
       )
 
-      logger.warn('Quota exceeded - budget limit', {
+      logger.warn("Quota exceeded - budget limit", {
         userId,
         tier,
         budgetUsed: quota.budgetUsed,
@@ -360,12 +443,13 @@ export async function checkQuota(
         sessionsLimit: quota.sessionsLimit,
         budgetUsed: quota.budgetUsed,
         budgetLimit: quota.budgetLimit,
-        message: 'Budget limit exceeded',
+        message: "Budget limit exceeded",
         response,
       }
     }
 
     // All checks passed
+    recordCircuitSuccess()
     return {
       allowed: true,
       userId,
@@ -376,12 +460,38 @@ export async function checkQuota(
       budgetLimit: quota.budgetLimit,
     }
   } catch (error) {
-    logger.error('Quota check failed', { userId, error })
-    // Fail open - don't block users if quota check fails
+    logger.error("Quota check failed", { userId, error })
+    recordCircuitFailure()
+
+    // Check circuit breaker before failing open
+    const circuitCheck = checkCircuitBreaker(userId)
+    if (!circuitCheck.allowed) {
+      const response = NextResponse.json(
+        {
+          error: "Service temporarily unavailable",
+          message: circuitCheck.reason,
+          code: "SERVICE_UNAVAILABLE",
+        },
+        { status: 503 }
+      )
+      return {
+        allowed: false,
+        userId,
+        tier: "free",
+        sessionsUsed: 0,
+        sessionsLimit: 0,
+        budgetUsed: 0,
+        budgetLimit: 0,
+        message: circuitCheck.reason,
+        response,
+      }
+    }
+
+    // Fail open - but with circuit breaker protection limiting abuse
     return {
       allowed: true,
       userId,
-      tier: 'free',
+      tier: "free",
       sessionsUsed: 0,
       sessionsLimit: 0,
       budgetUsed: 0,
