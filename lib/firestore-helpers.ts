@@ -238,6 +238,60 @@ function calculateAnniversaryPeriod(
 }
 
 /**
+ * Calculate the current monthly billing period for a user.
+ * Single source of truth used by all quota operations.
+ *
+ * Priority:
+ * 1. Pro users with Stripe monthly billing → derive monthly window from Stripe's period_end
+ * 2. Any user with a signup date → anniversary-based monthly billing
+ * 3. Fallback → calendar month (1st to end of month)
+ *
+ * For yearly plans: subscription_current_period_end is 1 year out, so we
+ * must NOT use it as a monthly period boundary. Yearly plans use anniversary billing.
+ */
+export function calculateBillingPeriod(options: {
+  subscriptionTier?: "free" | "pro" | "enterprise"
+  subscriptionType?: string
+  signupDate?: Date | string
+  stripeCurrentPeriodEnd?: Date | string
+  referenceDate?: Date
+}): { periodStart: Date; periodEnd: Date } {
+  const now = options.referenceDate ?? new Date()
+  const tier = options.subscriptionTier ?? "free"
+  const isMonthlyStripe = tier === "pro" && options.subscriptionType !== "yearly"
+
+  // For monthly Pro users with Stripe billing info, derive monthly window from Stripe's period_end
+  if (isMonthlyStripe && options.stripeCurrentPeriodEnd) {
+    const stripeEnd =
+      typeof options.stripeCurrentPeriodEnd === "string"
+        ? new Date(options.stripeCurrentPeriodEnd)
+        : options.stripeCurrentPeriodEnd
+
+    const periodEnd = new Date(stripeEnd)
+    periodEnd.setHours(23, 59, 59, 999)
+
+    const periodStart = new Date(periodEnd)
+    periodStart.setMonth(periodStart.getMonth() - 1)
+    periodStart.setDate(periodStart.getDate() + 1)
+    periodStart.setHours(0, 0, 0, 0)
+
+    return { periodStart, periodEnd }
+  }
+
+  // Anniversary billing based on signup date (works for yearly plans and free users)
+  if (options.signupDate) {
+    const signup =
+      typeof options.signupDate === "string" ? new Date(options.signupDate) : options.signupDate
+    return calculateAnniversaryPeriod(signup, now)
+  }
+
+  // Fallback to calendar month (shouldn't happen for real users)
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  return { periodStart, periodEnd }
+}
+
+/**
  * Initialize user quota for the current billing period
  * Uses anniversary-based billing (resets monthly from signup date, not 1st of month)
  * For paid users with Stripe, uses Stripe's billing period
@@ -246,36 +300,18 @@ export async function initializeUserQuota(
   userId: string,
   subscriptionTier: "free" | "pro" | "enterprise" = "free",
   signupDate?: Date | string,
-  stripeCurrentPeriodEnd?: Date | string
+  stripeCurrentPeriodEnd?: Date | string,
+  subscriptionType?: string
 ): Promise<ProfileQuota> {
   const now = new Date()
-  let periodStart: Date
-  let periodEnd: Date
 
-  // For Pro users with Stripe billing info, use Stripe's period
-  if (subscriptionTier === "pro" && stripeCurrentPeriodEnd) {
-    const stripeEnd =
-      typeof stripeCurrentPeriodEnd === "string"
-        ? new Date(stripeCurrentPeriodEnd)
-        : stripeCurrentPeriodEnd
-    periodEnd = new Date(stripeEnd)
-    periodEnd.setHours(23, 59, 59, 999)
-    // Period start is one month before period end
-    periodStart = new Date(periodEnd)
-    periodStart.setMonth(periodStart.getMonth() - 1)
-    periodStart.setDate(periodStart.getDate() + 1)
-    periodStart.setHours(0, 0, 0, 0)
-  } else if (signupDate) {
-    // Use anniversary billing based on signup date
-    const signup = typeof signupDate === "string" ? new Date(signupDate) : signupDate
-    const period = calculateAnniversaryPeriod(signup, now)
-    periodStart = period.periodStart
-    periodEnd = period.periodEnd
-  } else {
-    // Fallback to calendar month if no signup date (shouldn't happen for real users)
-    periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-  }
+  const { periodStart, periodEnd } = calculateBillingPeriod({
+    subscriptionTier,
+    subscriptionType,
+    signupDate,
+    stripeCurrentPeriodEnd,
+    referenceDate: now,
+  })
 
   // Query by user_id with limit to prevent unbounded reads
   // Limit to 12 months of quota history (reasonable maximum)
@@ -288,21 +324,17 @@ export async function initializeUserQuota(
   const quotaSnap = await getDocs(quotaQuery)
 
   // Filter by date range in memory to avoid composite index requirement
-  // Find quota where current date falls within the stored period OR period_start is in current month
+  // Match quota whose period_start falls within the calculated billing period
   if (!quotaSnap.empty) {
+    const matchQuota = (quota: ProfileQuota): boolean => {
+      const quotaStart = new Date(quota.period_start)
+      // Primary match: stored period_start falls within the calculated billing period
+      return quotaStart >= periodStart && quotaStart <= periodEnd
+    }
+
     const currentPeriodQuota = quotaSnap.docs
       .map((doc) => doc.data() as ProfileQuota)
-      .find((quota) => {
-        const quotaStart = new Date(quota.period_start)
-        const quotaEnd = new Date(quota.period_end)
-        // Check if now falls within the stored period (handles existing quotas)
-        // OR if the quota's start month matches the calculated period's month (handles mismatched dates)
-        const nowInStoredPeriod = now >= quotaStart && now <= quotaEnd
-        const sameMonth =
-          quotaStart.getFullYear() === periodStart.getFullYear() &&
-          quotaStart.getMonth() === periodStart.getMonth()
-        return nowInStoredPeriod || sameMonth
-      })
+      .find(matchQuota)
 
     if (currentPeriodQuota) {
       // Update quota limit if subscription tier changed
@@ -331,11 +363,15 @@ export async function initializeUserQuota(
         needsUpdate = true
       }
 
-      // Update period_end if it differs (e.g., Stripe billing period changed)
+      // Sync period_start and period_end to the calculated values
+      const storedPeriodStart = new Date(currentPeriodQuota.period_start).getTime()
       const storedPeriodEnd = new Date(currentPeriodQuota.period_end).getTime()
-      const calculatedPeriodEnd = periodEnd.getTime()
-      if (Math.abs(storedPeriodEnd - calculatedPeriodEnd) > 60000) {
-        // More than 1 minute difference
+      if (Math.abs(storedPeriodStart - periodStart.getTime()) > 60000) {
+        updateData.period_start = periodStart.toISOString()
+        currentPeriodQuota.period_start = periodStart.toISOString()
+        needsUpdate = true
+      }
+      if (Math.abs(storedPeriodEnd - periodEnd.getTime()) > 60000) {
         updateData.period_end = periodEnd.toISOString()
         currentPeriodQuota.period_end = periodEnd.toISOString()
         needsUpdate = true
@@ -344,13 +380,7 @@ export async function initializeUserQuota(
       if (needsUpdate) {
         const quotaRef = quotaSnap.docs.find((doc) => {
           const quota = doc.data() as ProfileQuota
-          const quotaStart = new Date(quota.period_start)
-          const quotaEnd = new Date(quota.period_end)
-          const nowInStoredPeriod = now >= quotaStart && now <= quotaEnd
-          const sameMonth =
-            quotaStart.getFullYear() === periodStart.getFullYear() &&
-            quotaStart.getMonth() === periodStart.getMonth()
-          return nowInStoredPeriod || sameMonth
+          return matchQuota(quota)
         })?.ref
 
         if (quotaRef) {
@@ -404,7 +434,8 @@ export async function checkUsageLimit(userId: string): Promise<{
     userId,
     profile?.subscription_tier || "free",
     profile?.created_at,
-    profile?.subscription_current_period_end
+    profile?.subscription_current_period_end,
+    profile?.subscription_type
   )
 
   return {
@@ -436,7 +467,8 @@ export async function checkSessionCost(userId: string): Promise<{
     userId,
     profile?.subscription_tier || "free",
     profile?.created_at,
-    profile?.subscription_current_period_end
+    profile?.subscription_current_period_end,
+    profile?.subscription_type
   )
 
   const freeOpens = quota.free_opens_remaining || 0
@@ -989,7 +1021,8 @@ export async function recordSessionStart(userId: string): Promise<{
     userId,
     profile?.subscription_tier || "free",
     profile?.created_at,
-    profile?.subscription_current_period_end
+    profile?.subscription_current_period_end,
+    profile?.subscription_type
   )
 
   const quotaQuery = query(
@@ -1070,10 +1103,17 @@ export async function updateQuotaForSubscriptionTier(
   userId: string,
   subscriptionTier: "free" | "pro" | "enterprise",
   signupDate?: string,
-  stripeCurrentPeriodEnd?: string
+  stripeCurrentPeriodEnd?: string,
+  subscriptionType?: string
 ): Promise<void> {
   // This will update the quota limit if it exists, or create a new one
-  await initializeUserQuota(userId, subscriptionTier, signupDate, stripeCurrentPeriodEnd)
+  await initializeUserQuota(
+    userId,
+    subscriptionTier,
+    signupDate,
+    stripeCurrentPeriodEnd,
+    subscriptionType
+  )
 }
 
 // ============================================================================

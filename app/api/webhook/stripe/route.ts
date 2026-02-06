@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
+import { calculateBillingPeriod } from "@/lib/firestore-helpers"
 import {
   sendPaymentFailedEmail,
   sendSubscriptionConfirmationEmail,
@@ -49,15 +50,27 @@ const paymentLogger = logger.child({ service: "stripe-webhook" })
 /**
  * Update user quota for subscription tier using Admin SDK
  * @param resetUsage - If true, reset sessions_used to 0 (for new billing periods or tier changes)
+ * @param profileData - User profile data for correct period calculation
  */
 async function updateQuotaForSubscriptionTierAdmin(
   userId: string,
   subscriptionTier: "free" | "pro" | "enterprise",
-  resetUsage: boolean = false
+  resetUsage: boolean = false,
+  profileData?: {
+    created_at?: string
+    subscription_type?: string
+    subscription_current_period_end?: string
+  }
 ): Promise<void> {
   const now = new Date()
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+  const { periodStart, periodEnd } = calculateBillingPeriod({
+    subscriptionTier,
+    subscriptionType: profileData?.subscription_type,
+    signupDate: profileData?.created_at,
+    stripeCurrentPeriodEnd: profileData?.subscription_current_period_end,
+    referenceDate: now,
+  })
 
   const sessionsLimit =
     subscriptionTier === "pro"
@@ -70,7 +83,7 @@ async function updateQuotaForSubscriptionTierAdmin(
     .where("user_id", "==", userId)
     .get()
 
-  // Find current period quota
+  // Find current period quota by checking if stored period_start falls within calculated period
   const currentQuotaDoc = quotaSnapshot.docs.find((doc) => {
     const data = doc.data()
     const quotaStart = new Date(data.period_start)
@@ -81,6 +94,8 @@ async function updateQuotaForSubscriptionTierAdmin(
     const currentData = currentQuotaDoc.data()
     const updateData: Record<string, unknown> = {
       sessions_limit: sessionsLimit,
+      period_start: periodStart.toISOString(),
+      period_end: periodEnd.toISOString(),
       updated_at: new Date().toISOString(),
     }
 
@@ -91,7 +106,6 @@ async function updateQuotaForSubscriptionTierAdmin(
       paymentLogger.info("Resetting usage for new billing period", { userId, sessionsLimit })
     } else if ((currentData.sessions_used as number) > sessionsLimit) {
       // If user has used more than new limit (e.g., downgrade from pro to free), cap it
-      // This ensures display shows correct "X/Y" where X <= Y
       updateData.sessions_used = sessionsLimit
       paymentLogger.info("Capping sessions_used due to downgrade", {
         userId,
@@ -336,7 +350,11 @@ export async function POST(request: NextRequest) {
           })
 
           // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true, {
+            created_at: profile?.created_at as string | undefined,
+            subscription_type: "monthly",
+            subscription_current_period_end: currentPeriodEnd,
+          })
 
           // Record payment in history
           await recordPaymentHistory(userId, {
@@ -609,7 +627,10 @@ export async function POST(request: NextRequest) {
           )
 
           // Update quota to Pro limit - reset usage for new subscription
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true, {
+            created_at: (profile?.created_at as string | undefined) ?? new Date().toISOString(),
+            subscription_type: "yearly",
+          })
 
           // Record payment in history
           await recordPaymentHistory(userId, {
@@ -894,7 +915,11 @@ export async function POST(request: NextRequest) {
               { merge: true }
             )
 
-            await updateQuotaForSubscriptionTierAdmin(userId, "free")
+            const refundProfile = profileDoc.data()
+            await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
+              created_at: refundProfile?.created_at,
+              subscription_type: refundProfile?.subscription_type,
+            })
             paymentLogger.info("User downgraded due to full refund", { userId })
           }
         }
@@ -970,7 +995,14 @@ export async function POST(request: NextRequest) {
             )
 
             // Reset usage for new billing period
-            await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
+            const newPeriodEnd = invoice.period_end
+              ? new Date(invoice.period_end * 1000).toISOString()
+              : undefined
+            await updateQuotaForSubscriptionTierAdmin(userId, "pro", true, {
+              created_at: profile?.created_at,
+              subscription_type: profile?.subscription_type ?? "monthly",
+              subscription_current_period_end: newPeriodEnd,
+            })
 
             logger.payment("Subscription renewed", { userId })
           }
@@ -989,7 +1021,11 @@ export async function POST(request: NextRequest) {
             )
 
             // Restore Pro quota (don't reset usage - they're catching up)
-            await updateQuotaForSubscriptionTierAdmin(userId, "pro", false)
+            await updateQuotaForSubscriptionTierAdmin(userId, "pro", false, {
+              created_at: profile?.created_at,
+              subscription_type: profile?.subscription_type ?? "monthly",
+              subscription_current_period_end: profile?.subscription_current_period_end,
+            })
 
             logger.payment("Subscription recovered", { userId })
           }
@@ -1150,7 +1186,10 @@ export async function POST(request: NextRequest) {
             { merge: true }
           )
 
-          await updateQuotaForSubscriptionTierAdmin(userId, "free")
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
+            created_at: profile?.created_at,
+            subscription_type: profile?.subscription_type,
+          })
 
           logger.payment("User downgraded to Free", {
             userId,

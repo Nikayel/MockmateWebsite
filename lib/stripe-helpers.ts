@@ -11,6 +11,7 @@ import Stripe from "stripe"
 import { adminDb } from "./firebase-admin"
 import { Profile } from "./types"
 import { PRICING_CONFIG } from "./config"
+import { calculateBillingPeriod } from "./firestore-helpers"
 import { logger } from "./logger"
 
 // Create a child logger for subscription operations
@@ -32,22 +33,38 @@ try {
 /**
  * Update user quota for subscription tier using Admin SDK
  */
-async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionTier: "free" | "pro" | "enterprise"): Promise<void> {
+async function updateQuotaForSubscriptionTierAdmin(
+  userId: string,
+  subscriptionTier: "free" | "pro" | "enterprise",
+  profileData?: {
+    created_at?: string
+    subscription_type?: string
+    subscription_current_period_end?: string
+  }
+): Promise<void> {
   const now = new Date()
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
-  const sessionsLimit = subscriptionTier === "pro"
-    ? PRICING_CONFIG.pro.sessionsPerMonth
-    : PRICING_CONFIG.free.sessionsPerMonth
+  const { periodStart, periodEnd } = calculateBillingPeriod({
+    subscriptionTier,
+    subscriptionType: profileData?.subscription_type,
+    signupDate: profileData?.created_at,
+    stripeCurrentPeriodEnd: profileData?.subscription_current_period_end,
+    referenceDate: now,
+  })
+
+  const sessionsLimit =
+    subscriptionTier === "pro"
+      ? PRICING_CONFIG.pro.sessionsPerMonth
+      : PRICING_CONFIG.free.sessionsPerMonth
 
   // Query for existing quota
-  const quotaSnapshot = await adminDb.collection("profile_quota")
+  const quotaSnapshot = await adminDb
+    .collection("profile_quota")
     .where("user_id", "==", userId)
     .get()
 
-  // Find current period quota
-  const currentQuotaDoc = quotaSnapshot.docs.find(doc => {
+  // Find current period quota by checking if stored period_start falls within calculated period
+  const currentQuotaDoc = quotaSnapshot.docs.find((doc) => {
     const data = doc.data()
     const quotaStart = new Date(data.period_start)
     return quotaStart >= periodStart && quotaStart <= periodEnd
@@ -57,6 +74,8 @@ async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionT
     // Update existing quota
     await currentQuotaDoc.ref.update({
       sessions_limit: sessionsLimit,
+      period_start: periodStart.toISOString(),
+      period_end: periodEnd.toISOString(),
       updated_at: new Date().toISOString(),
     })
     subscriptionLogger.info("Updated quota", { userId, sessionsLimit })
@@ -130,13 +149,19 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         if (now > periodEndDate) {
           // Yearly plan has expired - downgrade to free
-          await profileRef.set({
-            subscription_tier: "free",
-            subscription_status: "expired",
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await profileRef.set(
+            {
+              subscription_tier: "free",
+              subscription_status: "expired",
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
-          await updateQuotaForSubscriptionTierAdmin(userId, "free")
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+            created_at: profile.created_at,
+            subscription_type: profile.subscription_type,
+          })
 
           subscriptionLogger.info("Yearly plan expired - downgraded to Free", {
             userId,
@@ -158,30 +183,45 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
               })
 
               // First, look for a customer with matching userId in metadata
-              const matchingCustomer = customers.data.find(c => c.metadata?.userId === userId)
+              const matchingCustomer = customers.data.find((c) => c.metadata?.userId === userId)
 
               if (matchingCustomer) {
                 stripeCustomerId = matchingCustomer.id
-                await profileRef.set({
-                  stripe_customer_id: stripeCustomerId,
-                  updated_at: new Date().toISOString(),
-                }, { merge: true })
-                subscriptionLogger.info("Found customer with matching userId for yearly plan", { userId, customerId: stripeCustomerId })
+                await profileRef.set(
+                  {
+                    stripe_customer_id: stripeCustomerId,
+                    updated_at: new Date().toISOString(),
+                  },
+                  { merge: true }
+                )
+                subscriptionLogger.info("Found customer with matching userId for yearly plan", {
+                  userId,
+                  customerId: stripeCustomerId,
+                })
               } else if (customers.data.length === 1) {
                 // Single customer with this email - safe to link
                 stripeCustomerId = customers.data[0].id
-                await profileRef.set({
-                  stripe_customer_id: stripeCustomerId,
-                  updated_at: new Date().toISOString(),
-                }, { merge: true })
-                subscriptionLogger.info("Found single customer by email for yearly plan", { userId, customerId: stripeCustomerId })
+                await profileRef.set(
+                  {
+                    stripe_customer_id: stripeCustomerId,
+                    updated_at: new Date().toISOString(),
+                  },
+                  { merge: true }
+                )
+                subscriptionLogger.info("Found single customer by email for yearly plan", {
+                  userId,
+                  customerId: stripeCustomerId,
+                })
               } else if (customers.data.length > 1) {
                 // Multiple customers - don't auto-link to avoid conflicts
-                subscriptionLogger.warn("Multiple customers with email, none match userId - skipping auto-link", {
-                  userId,
-                  email: userEmail,
-                  customerCount: customers.data.length
-                })
+                subscriptionLogger.warn(
+                  "Multiple customers with email, none match userId - skipping auto-link",
+                  {
+                    userId,
+                    email: userEmail,
+                    customerCount: customers.data.length,
+                  }
+                )
               }
             } catch (error) {
               subscriptionLogger.warn("Failed to find customer for yearly plan", { userId, error })
@@ -209,9 +249,14 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
       try {
         subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
         customerId = subscription.customer as string
-        subscriptionLogger.info("Found subscription by ID", { subscriptionId: stripeSubscriptionId })
+        subscriptionLogger.info("Found subscription by ID", {
+          subscriptionId: stripeSubscriptionId,
+        })
       } catch (error) {
-        subscriptionLogger.error("Error retrieving subscription", { subscriptionId: stripeSubscriptionId, error })
+        subscriptionLogger.error("Error retrieving subscription", {
+          subscriptionId: stripeSubscriptionId,
+          error,
+        })
       }
     }
 
@@ -226,10 +271,15 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         if (subscriptions.data.length > 0) {
           subscription = subscriptions.data[0]
-          subscriptionLogger.info("Found subscription via customer ID", { customerId: stripeCustomerId })
+          subscriptionLogger.info("Found subscription via customer ID", {
+            customerId: stripeCustomerId,
+          })
         }
       } catch (error) {
-        subscriptionLogger.error("Error listing subscriptions for customer", { customerId: stripeCustomerId, error })
+        subscriptionLogger.error("Error listing subscriptions for customer", {
+          customerId: stripeCustomerId,
+          error,
+        })
       }
     }
 
@@ -245,11 +295,14 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           limit: 10, // Get multiple in case of duplicates
         })
 
-        subscriptionLogger.info("Found customers", { email: userEmail, count: customers.data.length })
+        subscriptionLogger.info("Found customers", {
+          email: userEmail,
+          count: customers.data.length,
+        })
 
         // First pass: Only check customers with matching userId metadata (safest)
-        const matchingCustomers = customers.data.filter(c => c.metadata?.userId === userId)
-        const otherCustomers = customers.data.filter(c => c.metadata?.userId !== userId)
+        const matchingCustomers = customers.data.filter((c) => c.metadata?.userId === userId)
+        const otherCustomers = customers.data.filter((c) => c.metadata?.userId !== userId)
 
         // Check matching customers first
         for (const customer of matchingCustomers) {
@@ -262,7 +315,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (subscriptions.data.length > 0) {
             subscription = subscriptions.data[0]
             customerId = customer.id
-            subscriptionLogger.info("Found active subscription with matching userId", { customerId: customer.id })
+            subscriptionLogger.info("Found active subscription with matching userId", {
+              customerId: customer.id,
+            })
             break
           }
 
@@ -276,7 +331,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (trialingSubscriptions.data.length > 0) {
             subscription = trialingSubscriptions.data[0]
             customerId = customer.id
-            subscriptionLogger.info("Found trialing subscription with matching userId", { customerId: customer.id })
+            subscriptionLogger.info("Found trialing subscription with matching userId", {
+              customerId: customer.id,
+            })
             break
           }
         }
@@ -294,7 +351,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (subscriptions.data.length > 0) {
             subscription = subscriptions.data[0]
             customerId = customer.id
-            subscriptionLogger.info("Found active subscription (single customer by email)", { customerId: customer.id })
+            subscriptionLogger.info("Found active subscription (single customer by email)", {
+              customerId: customer.id,
+            })
           } else {
             const trialingSubscriptions = await stripe.subscriptions.list({
               customer: customer.id,
@@ -305,16 +364,21 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
             if (trialingSubscriptions.data.length > 0) {
               subscription = trialingSubscriptions.data[0]
               customerId = customer.id
-              subscriptionLogger.info("Found trialing subscription (single customer by email)", { customerId: customer.id })
+              subscriptionLogger.info("Found trialing subscription (single customer by email)", {
+                customerId: customer.id,
+              })
             }
           }
         } else if (!subscription && otherCustomers.length > 1) {
           // Multiple customers with same email but none match userId - don't auto-link
-          subscriptionLogger.warn("Multiple customers with email, none match userId - skipping auto-link", {
-            userId,
-            email: userEmail,
-            customerCount: otherCustomers.length
-          })
+          subscriptionLogger.warn(
+            "Multiple customers with email, none match userId - skipping auto-link",
+            {
+              userId,
+              email: userEmail,
+              customerCount: otherCustomers.length,
+            }
+          )
         }
       } catch (error) {
         subscriptionLogger.error("Error searching customers by email", { email: userEmail, error })
@@ -335,37 +399,48 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           ? new Date(subscription.created * 1000).toISOString()
           : undefined
         const periodEnd = subscription.items?.data?.[0]?.current_period_end
-        const currentPeriodEnd = periodEnd
-          ? new Date(periodEnd * 1000).toISOString()
-          : undefined
+        const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined
 
         // Update profile with subscription info
-        await profileRef.set({
-          subscription_tier: "pro",
-          subscription_status: subscription.status,
-          stripe_subscription_id: subscription.id,
-          stripe_customer_id: customerId,
-          subscription_start_date: subscriptionStartDate,
-          subscription_current_period_end: currentPeriodEnd,
-          updated_at: new Date().toISOString(),
-        }, { merge: true })
+        await profileRef.set(
+          {
+            subscription_tier: "pro",
+            subscription_status: subscription.status,
+            stripe_subscription_id: subscription.id,
+            stripe_customer_id: customerId,
+            subscription_start_date: subscriptionStartDate,
+            subscription_current_period_end: currentPeriodEnd,
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        )
 
         // Update quota to Pro limit
-        await updateQuotaForSubscriptionTierAdmin(userId, "pro")
+        await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+          created_at: profile.created_at,
+          subscription_type: profile.subscription_type ?? "monthly",
+          subscription_current_period_end: currentPeriodEnd,
+        })
 
         logger.payment("Synced user to Pro", { userId, subscriptionId: subscription.id })
       } else {
         // Subscription is canceled, past_due, etc. - downgrade to free
-        await profileRef.set({
-          subscription_tier: "free",
-          subscription_status: subscription.status,
-          stripe_subscription_id: subscription.id,
-          stripe_customer_id: customerId,
-          updated_at: new Date().toISOString(),
-        }, { merge: true })
+        await profileRef.set(
+          {
+            subscription_tier: "free",
+            subscription_status: subscription.status,
+            stripe_subscription_id: subscription.id,
+            stripe_customer_id: customerId,
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        )
 
         // Update quota to free limit
-        await updateQuotaForSubscriptionTierAdmin(userId, "free")
+        await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+          created_at: profile.created_at,
+          subscription_type: profile.subscription_type,
+        })
 
         subscriptionLogger.info("Synced user to Free", { userId, status: subscription.status })
       }
@@ -381,13 +456,19 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
           if (now > periodEndDate) {
             // Yearly plan has expired - downgrade to free
-            await profileRef.set({
-              subscription_tier: "free",
-              subscription_status: "expired",
-              updated_at: new Date().toISOString(),
-            }, { merge: true })
+            await profileRef.set(
+              {
+                subscription_tier: "free",
+                subscription_status: "expired",
+                updated_at: new Date().toISOString(),
+              },
+              { merge: true }
+            )
 
-            await updateQuotaForSubscriptionTierAdmin(userId, "free")
+            await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+              created_at: profile.created_at,
+              subscription_type: profile.subscription_type,
+            })
 
             subscriptionLogger.info("Yearly plan expired - downgraded to Free", {
               userId,
@@ -402,25 +483,37 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           }
         } else {
           // No period end date - treat as expired
-          await profileRef.set({
-            subscription_tier: "free",
-            subscription_status: "expired",
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await profileRef.set(
+            {
+              subscription_tier: "free",
+              subscription_status: "expired",
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
-          await updateQuotaForSubscriptionTierAdmin(userId, "free")
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+            created_at: profile.created_at,
+            subscription_type: profile.subscription_type,
+          })
 
           subscriptionLogger.warn("Yearly plan missing period end - downgraded to Free", { userId })
         }
       } else if (profile.subscription_tier === "pro") {
         // Pro user with no subscription and not yearly - downgrade
-        await profileRef.set({
-          subscription_tier: "free",
-          subscription_status: "none",
-          updated_at: new Date().toISOString(),
-        }, { merge: true })
+        await profileRef.set(
+          {
+            subscription_tier: "free",
+            subscription_status: "none",
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        )
 
-        await updateQuotaForSubscriptionTierAdmin(userId, "free")
+        await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+          created_at: profile.created_at,
+          subscription_type: profile.subscription_type,
+        })
 
         subscriptionLogger.info("No active subscription - downgraded to Free", { userId })
       }
