@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { guestSessionRateLimit } from "@/lib/rate-limit"
+import { SESSION } from "@/lib/constants"
 
 // Mark route as dynamic
 export const dynamic = "force-dynamic"
@@ -96,7 +97,9 @@ export async function POST(request: NextRequest) {
     // Create new session
     const sessionRef = adminDb.collection("interview_sessions").doc()
     const now = new Date().toISOString()
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    const expiresAt = new Date(
+      Date.now() + SESSION.GUEST_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString()
 
     const sessionData = {
       id: sessionRef.id,

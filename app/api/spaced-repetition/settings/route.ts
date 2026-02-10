@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { requireTier } from "@/lib/quota-enforcement"
 import { getPracticeSettings, setDailyGoal, setMaxDailyReviews } from "@/lib/spaced-repetition"
 import { logger } from "@/lib/logger"
 
@@ -27,6 +28,10 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    // Server-side tier gate: spaced repetition is a Pro feature
+    const tierCheck = await requireTier(request, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
     const settings = await getPracticeSettings(userId)
@@ -60,6 +65,10 @@ export async function PATCH(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    // Server-side tier gate: spaced repetition is a Pro feature
+    const tierCheck = await requireTier(request, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
     const body: SettingsUpdateBody = await request.json()

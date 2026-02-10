@@ -26,6 +26,7 @@ import {
   TrendingUp,
   HelpCircle,
 } from "lucide-react"
+import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -640,6 +641,9 @@ export default function DashboardPage() {
               <MetricsOverview />
             </div>
           </div>
+
+          {/* Subscription Status Warning - payment issues, cancellation, etc. */}
+          <SubscriptionStatusBanner profile={profile} />
 
           {/* Usage Warning - Show when low */}
           {!isPro && usagePercentage >= 80 && (

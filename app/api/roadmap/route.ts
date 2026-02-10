@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { requireTier } from "@/lib/quota-enforcement"
 import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
 import { scenarios, type DSAScenario } from "@/lib/scenarios"
@@ -22,6 +23,10 @@ export async function GET(request: NextRequest) {
       logger.warn("[Roadmap API] Unauthorized request")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // Server-side tier gate: roadmap is a Pro feature
+    const tierCheck = await requireTier(request, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
     logger.info("[Roadmap API] GET request for user:", { userId })
@@ -381,6 +386,10 @@ export async function PATCH(request: NextRequest) {
     if (!authResult.authenticated || !authResult.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // Server-side tier gate: roadmap is a Pro feature
+    const tierCheck = await requireTier(request, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
     const body = await request.json()

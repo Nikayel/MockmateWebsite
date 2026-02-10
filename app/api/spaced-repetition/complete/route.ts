@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { requireTier } from "@/lib/quota-enforcement"
 import { getScenarioById } from "@/lib/scenarios"
 import { logger } from "@/lib/logger"
 import { csrfProtection } from "@/lib/csrf"
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    // Server-side tier gate: spaced repetition is a Pro feature
+    const tierCheck = await requireTier(request, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
 

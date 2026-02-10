@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
 import { PRICING_CONFIG } from "./config"
+import { CIRCUIT_BREAKER } from "./constants"
 
 // Circuit breaker state for fail-open protection
 // Tracks consecutive failures to prevent unlimited access during extended outages
@@ -31,10 +32,10 @@ const circuitBreaker: CircuitBreakerState = {
   isOpen: false,
 }
 
-// Circuit breaker config
-const CIRCUIT_BREAKER_THRESHOLD = 5 // Open circuit after 5 consecutive failures
-const CIRCUIT_BREAKER_RESET_MS = 60 * 1000 // Reset after 1 minute of no failures
-const MAX_FAIL_OPEN_REQUESTS = 10 // Max requests allowed when circuit is open (per user)
+// Circuit breaker config (from centralized constants)
+const CIRCUIT_BREAKER_THRESHOLD = CIRCUIT_BREAKER.FAILURE_THRESHOLD
+const CIRCUIT_BREAKER_RESET_MS = CIRCUIT_BREAKER.RESET_MS
+const MAX_FAIL_OPEN_REQUESTS = CIRCUIT_BREAKER.MAX_FAIL_OPEN_REQUESTS
 
 // Track fail-open requests per user (in-memory, resets on deploy)
 const failOpenRequestCounts = new Map<string, { count: number; resetTime: number }>()
@@ -93,6 +94,16 @@ function checkCircuitBreaker(userId: string): { allowed: boolean; reason?: strin
   return { allowed: true }
 }
 
+// Subscription statuses that indicate the user should NOT have Pro access
+const INACTIVE_SUBSCRIPTION_STATUSES = new Set([
+  "past_due",
+  "canceled",
+  "expired",
+  "unpaid",
+  "refunded",
+  "deleted",
+])
+
 interface QuotaCheckResult {
   allowed: boolean
   userId: string
@@ -102,6 +113,7 @@ interface QuotaCheckResult {
   budgetUsed: number
   budgetLimit: number
   message?: string
+  code?: string
 }
 
 interface UserQuota {
@@ -359,6 +371,55 @@ export async function checkQuota(
     const profileDoc = await adminDb.collection("profiles").doc(userId).get()
     const profile = profileDoc.data()
     const tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
+    const subscriptionStatus = profile?.subscription_status as string | undefined
+
+    // P0 FIX: Block access when subscription is in a degraded state
+    // This prevents users from continuing to use Pro features after payment failure,
+    // cancellation, or expiration — even mid-session.
+    if (
+      tier === "pro" &&
+      subscriptionStatus &&
+      INACTIVE_SUBSCRIPTION_STATUSES.has(subscriptionStatus)
+    ) {
+      const statusMessages: Record<string, string> = {
+        past_due: "Your payment failed. Please update your payment method to continue.",
+        canceled: "Your subscription has been canceled.",
+        expired: "Your subscription has expired. Renew to continue.",
+        unpaid: "Your subscription is unpaid. Please update your payment method.",
+        refunded: "Your subscription was refunded.",
+        deleted: "Your subscription is no longer active.",
+      }
+
+      const message = statusMessages[subscriptionStatus] || "Your subscription is inactive."
+      const response = NextResponse.json(
+        {
+          error: "Subscription inactive",
+          message,
+          code: "SUBSCRIPTION_INACTIVE",
+          subscription_status: subscriptionStatus,
+        },
+        { status: 403 }
+      )
+
+      logger.warn("Blocked request due to inactive subscription", {
+        userId,
+        tier,
+        subscriptionStatus,
+      })
+
+      return {
+        allowed: false,
+        userId,
+        tier,
+        sessionsUsed: 0,
+        sessionsLimit: 0,
+        budgetUsed: 0,
+        budgetLimit: 0,
+        message,
+        code: "SUBSCRIPTION_INACTIVE",
+        response,
+      }
+    }
 
     // Get user quota
     const quota = await getUserQuota(userId)
@@ -555,4 +616,71 @@ export async function checkBudgetWarning(userId: string): Promise<{
   }
 
   return { warn: false, percentUsed }
+}
+
+/**
+ * Server-side tier gate for Pro-only API routes.
+ * Verifies the user's subscription tier from Firestore and blocks free-tier users.
+ *
+ * Usage:
+ *   const tierCheck = await requireTier(request, "pro")
+ *   if (tierCheck.response) return tierCheck.response
+ *   // Continue — tierCheck.userId is the verified user
+ */
+export async function requireTier(
+  request: NextRequest,
+  requiredTier: "pro" | "enterprise"
+): Promise<{ allowed: boolean; response?: NextResponse; userId?: string; tier?: string }> {
+  const userId = await getUserIdFromRequest(request)
+
+  if (!userId) {
+    return {
+      allowed: false,
+      response: NextResponse.json(
+        { error: "Authentication required", code: "AUTH_REQUIRED" },
+        { status: 401 }
+      ),
+    }
+  }
+
+  try {
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+    const profile = profileDoc.data()
+    const tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
+    const subscriptionStatus = profile?.subscription_status as string | undefined
+
+    // Check tier level (enterprise satisfies pro requirement)
+    const tierHierarchy = { free: 0, pro: 1, enterprise: 2 }
+    const hasRequiredTier = tierHierarchy[tier] >= tierHierarchy[requiredTier]
+
+    // Also check that subscription is not in a degraded state
+    const isInactive = subscriptionStatus && INACTIVE_SUBSCRIPTION_STATUSES.has(subscriptionStatus)
+
+    if (!hasRequiredTier || isInactive) {
+      const message = isInactive
+        ? "Your subscription is inactive. Please resolve your payment issue to access this feature."
+        : `This feature requires a ${requiredTier} subscription.`
+
+      return {
+        allowed: false,
+        userId,
+        tier,
+        response: NextResponse.json(
+          {
+            error: "Pro feature required",
+            message,
+            code: "PRO_REQUIRED",
+            subscription_status: subscriptionStatus || null,
+          },
+          { status: 403 }
+        ),
+      }
+    }
+
+    return { allowed: true, userId, tier }
+  } catch (error) {
+    logger.error("Tier check failed", { userId, error })
+    // Fail open for tier check — don't block users due to transient errors
+    return { allowed: true, userId }
+  }
 }

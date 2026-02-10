@@ -95,6 +95,10 @@ export async function DELETE(request: NextRequest) {
       { name: "problem_mastery", field: "userId" },
       { name: "user_roadmaps", field: "userId" },
       { name: "analytics_events", field: "userId" },
+      { name: "referral_relationships", field: "referrer_id" },
+      { name: "referral_relationships", field: "referred_id" },
+      { name: "referral_rewards", field: "user_id" },
+      { name: "subscription_history", field: "user_id" },
       { name: "webhook_events", field: null }, // No user reference, skip
     ]
 

@@ -45,6 +45,7 @@ import {
   Brain,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
@@ -632,6 +633,9 @@ export default function AccountPage() {
               </Button>
             )}
           </div>
+
+          {/* Subscription Status Warning */}
+          <SubscriptionStatusBanner profile={profile} />
 
           {/* Sections */}
           <div className="space-y-3">
