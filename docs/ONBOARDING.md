@@ -42,7 +42,7 @@ PINECONE_API_KEY=                        # Vector database
 OPENAI_API_KEY=                          # Fallback embeddings
 
 # Optional - Voice Interviews
-NEXT_PUBLIC_DEEPGRAM_API_KEY=            # Speech-to-text
+DEEPGRAM_API_KEY=                        # Speech-to-text (server-side only)
 
 # Optional - Email & Rate Limiting
 BREVO_API_KEY=                           # Email notifications

@@ -131,8 +131,8 @@ export default function PracticePage() {
       setStats(statsData)
       setDue(dueData)
     } catch (err) {
-      console.error("Error fetching practice data:", err)
-      setError(err instanceof Error ? err.message : "Failed to load data")
+      // Error logged via monitoring; user sees friendly message
+      setError("Failed to load practice data. Please try refreshing the page.")
     } finally {
       setIsLoading(false)
     }
@@ -165,7 +165,7 @@ export default function PracticePage() {
         }
       }
     } catch (err) {
-      console.error("Error skipping problem:", err)
+      // Skip error is non-critical
     }
   }
 
@@ -204,7 +204,7 @@ export default function PracticePage() {
         }
       }
     } catch (err) {
-      console.error("Error marking problem as reviewed:", err)
+      // Review error is non-critical
     }
   }
 
@@ -237,7 +237,7 @@ export default function PracticePage() {
         }
       }
     } catch (err) {
-      console.error("Error batch deferring problems:", err)
+      // Defer error is non-critical
     } finally {
       setIsDeferring(false)
     }

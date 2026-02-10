@@ -74,14 +74,14 @@ export async function POST(request: NextRequest) {
 
     // Handle case where problem mastery doesn't exist
     if (error instanceof Error && error.message.includes("not found")) {
-      return NextResponse.json({ error: "Not Found", message: error.message }, { status: 404 })
+      return NextResponse.json(
+        { error: "Not Found", message: "Problem not found" },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(
-      {
-        error: "Internal Server Error",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Internal Server Error", message: "Failed to skip problem" },
       { status: 500 }
     )
   }

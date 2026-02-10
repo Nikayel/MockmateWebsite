@@ -328,14 +328,15 @@
   }
 
   /* Better focus states - Research: Clear focus indicators improve accessibility (WCAG 2.1)
-     Only show focus ring for keyboard navigation, not mouse clicks */
+     Only show focus ring for keyboard navigation, not mouse clicks
+     Full opacity ring + 2px offset for strong visibility per WCAG 2.4.7 */
   button:focus-visible,
   a:focus-visible,
   [role="button"]:focus-visible,
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    @apply ring-accent/50 ring-offset-background ring-2 ring-offset-1 outline-none;
+    @apply ring-accent ring-offset-background ring-2 ring-offset-2 outline-none;
   }
 
   /* Remove default outline on click/tap */

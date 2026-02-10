@@ -28,9 +28,9 @@ function UpgradePageContent() {
   const [profileLoading, setProfileLoading] = useState(true)
   const [loading, setLoading] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly')
-  const proPricing = getProPricing('website')
-  const currentPrice = billingPeriod === 'yearly' ? proPricing.yearly : proPricing.monthly
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("yearly")
+  const proPricing = getProPricing("website")
+  const currentPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
 
   useEffect(() => {
     setMounted(true)
@@ -78,24 +78,29 @@ function UpgradePageContent() {
 
                   if (syncData.profile?.subscription_tier === "pro") {
                     syncSuccess = true
-                    setProfile(prev => ({
-                      ...prev,
-                      ...syncData.profile,
-                    } as Profile))
+                    setProfile(
+                      (prev) =>
+                        ({
+                          ...prev,
+                          ...syncData.profile,
+                        }) as Profile
+                    )
                     toast.success("You're now a Pro member!")
                   } else {
-                    await new Promise(resolve => setTimeout(resolve, 1500))
+                    await new Promise((resolve) => setTimeout(resolve, 1500))
                   }
                 } else {
-                  await new Promise(resolve => setTimeout(resolve, 1000))
+                  await new Promise((resolve) => setTimeout(resolve, 1000))
                 }
               } catch {
-                await new Promise(resolve => setTimeout(resolve, 1000))
+                await new Promise((resolve) => setTimeout(resolve, 1000))
               }
             }
 
             if (!syncSuccess) {
-              toast.info("Redirecting to your account. If Pro status isn't showing, please refresh the page.")
+              toast.info(
+                "Redirecting to your account. If Pro status isn't showing, please refresh the page."
+              )
             }
           }
 
@@ -135,7 +140,7 @@ function UpgradePageContent() {
     loadProfile()
   }, [authLoading, initialized, mounted, firebaseUser])
 
-  const handleUpgrade = async (planType: 'monthly' | 'yearly') => {
+  const handleUpgrade = async (planType: "monthly" | "yearly") => {
     if (isProUser) {
       toast.success("You're already on Pro!")
       router.push("/account")
@@ -155,7 +160,7 @@ function UpgradePageContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           platform: "website",
@@ -175,9 +180,8 @@ function UpgradePageContent() {
         throw new Error(data.error || "Failed to create checkout session")
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       toast.error("Upgrade failed", {
-        description: errorMessage,
+        description: "Something went wrong. Please try again or contact support.",
         duration: 5000,
       })
       setLoading(null)
@@ -189,37 +193,38 @@ function UpgradePageContent() {
       <Header />
 
       <div className="pt-20 pb-6">
-        <div className="container mx-auto px-4 max-w-4xl">
-
+        <div className="container mx-auto max-w-4xl px-4">
           {/* Minimal Header */}
-          <div className="text-center mb-4">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">
-              Choose Your Plan
-            </h1>
+          <div className="mb-4 text-center">
+            <h1 className="text-2xl font-bold text-white md:text-3xl">Choose Your Plan</h1>
           </div>
 
           {/* Billing Toggle - Inline */}
           {!isProUser && (
-            <div className="flex justify-center mb-5">
+            <div className="mb-5 flex justify-center">
               <div className="inline-flex items-center gap-1 text-sm">
                 <button
-                  onClick={() => setBillingPeriod('monthly')}
-                  className={`px-3 py-1 rounded-full transition-all ${
-                    billingPeriod === 'monthly' ? "text-white bg-white/10" : "text-gray-500 hover:text-white"
+                  onClick={() => setBillingPeriod("monthly")}
+                  className={`rounded-full px-3 py-1 transition-all ${
+                    billingPeriod === "monthly"
+                      ? "bg-white/10 text-white"
+                      : "text-gray-500 hover:text-white"
                   }`}
                 >
                   Monthly
                 </button>
                 <button
-                  onClick={() => setBillingPeriod('yearly')}
-                  className={`px-3 py-1 rounded-full transition-all ${
-                    billingPeriod === 'yearly' ? "text-white bg-white/10" : "text-gray-500 hover:text-white"
+                  onClick={() => setBillingPeriod("yearly")}
+                  className={`rounded-full px-3 py-1 transition-all ${
+                    billingPeriod === "yearly"
+                      ? "bg-white/10 text-white"
+                      : "text-gray-500 hover:text-white"
                   }`}
                 >
                   Annually
                 </button>
-                {billingPeriod === 'yearly' && (
-                  <span className="text-green-400 text-xs ml-1">Save 25%</span>
+                {billingPeriod === "yearly" && (
+                  <span className="ml-1 text-xs text-green-400">Save 25%</span>
                 )}
               </div>
             </div>
@@ -227,49 +232,50 @@ function UpgradePageContent() {
 
           {/* Pricing Cards - Ultra Compact */}
           {!isProUser && (
-            <div className="grid grid-cols-1 gap-4 mb-4 max-w-xl mx-auto">
-
+            <div className="mx-auto mb-4 grid max-w-xl grid-cols-1 gap-4">
               {/* Pro Plan */}
-              <div className="rounded-xl p-5 border-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/50">
-                <h3 className="text-base font-semibold text-white mb-3">Pro</h3>
+              <div className="from-accent/5 border-accent/50 rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
+                <h3 className="mb-3 text-base font-semibold text-white">Pro</h3>
 
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-4xl font-bold text-accent">
-                    {billingPeriod === 'yearly' && 'totalDisplay' in currentPrice && currentPrice.totalDisplay
-                      ? currentPrice.totalDisplay 
+                <div className="mb-2 flex items-baseline gap-1">
+                  <span className="text-accent text-4xl font-bold">
+                    {billingPeriod === "yearly" &&
+                    "totalDisplay" in currentPrice &&
+                    currentPrice.totalDisplay
+                      ? currentPrice.totalDisplay
                       : currentPrice.priceDisplay}
                   </span>
-                  <span className="text-gray-400 text-sm">
-                    {billingPeriod === 'yearly' ? '/year' : currentPrice.period}
+                  <span className="text-sm text-gray-400">
+                    {billingPeriod === "yearly" ? "/year" : currentPrice.period}
                   </span>
                 </div>
 
                 <Button
                   onClick={() => handleUpgrade(billingPeriod)}
                   disabled={loading === billingPeriod}
-                  className="w-full bg-accent hover:bg-accent/90 text-black font-semibold mb-4"
+                  className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-black"
                 >
                   {loading === billingPeriod ? "Processing..." : "Subscribe"}
                 </Button>
 
-                <p className="text-gray-400 text-xs mb-2">Everything you need to get hired.</p>
+                <p className="mb-2 text-xs text-gray-400">Everything you need to get hired.</p>
 
-                <p className="text-xs text-gray-500 mb-2">Everything in Free, plus...</p>
+                <p className="mb-2 text-xs text-gray-500">Everything in Free, plus...</p>
                 <ul className="space-y-1.5 text-sm text-gray-300">
                   <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-accent" />
+                    <Check className="text-accent h-3.5 w-3.5" />
                     350+ problems/month
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-accent" />
+                    <Check className="text-accent h-3.5 w-3.5" />
                     Spaced repetition scheduling
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-accent" />
+                    <Check className="text-accent h-3.5 w-3.5" />
                     Personalized study roadmap
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-accent" />
+                    <Check className="text-accent h-3.5 w-3.5" />
                     Priority support
                   </li>
                 </ul>
@@ -280,13 +286,14 @@ function UpgradePageContent() {
           {/* Trust - Single line */}
           {!isProUser && (
             <p className="text-center text-xs text-gray-600">
-              30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta, Amazon
+              30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta,
+              Amazon
             </p>
           )}
 
           {/* Already Pro Message */}
           {isProUser && (
-            <div className="text-center space-y-4 py-8">
+            <div className="space-y-4 py-8 text-center">
               <div className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-200">
                 <CheckCircle className="mr-2 h-5 w-5 text-emerald-400" />
                 You're already enjoying CodeSparring Pro!
@@ -295,14 +302,12 @@ function UpgradePageContent() {
                 <Button
                   onClick={() => router.push("/account")}
                   size="lg"
-                  className="bg-gray-100 text-black font-semibold px-8 hover:bg-white"
+                  className="bg-gray-100 px-8 font-semibold text-black hover:bg-white"
                 >
                   Manage subscription
                 </Button>
               </div>
-              <p className="text-gray-400 text-sm">
-                Need help? Contact support@codesparring.dev
-              </p>
+              <p className="text-sm text-gray-400">Need help? Contact support@codesparring.dev</p>
             </div>
           )}
         </div>
@@ -316,11 +321,13 @@ function UpgradePageContent() {
 export default function UpgradePage() {
   return (
     <ErrorBoundary>
-      <Suspense fallback={
-        <main className="min-h-screen bg-black flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
-        </main>
-      }>
+      <Suspense
+        fallback={
+          <main className="flex min-h-screen items-center justify-center bg-black">
+            <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+          </main>
+        }
+      >
         <UpgradePageContent />
       </Suspense>
     </ErrorBoundary>

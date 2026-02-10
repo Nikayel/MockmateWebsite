@@ -28,17 +28,28 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
 }
 
-// Support both production webhook secret and local Stripe CLI secret
-// IMPORTANT: In production, ONLY use STRIPE_WEBHOOK_SECRET
-// STRIPE_WEBHOOK_SECRET_LOCAL should ONLY be set in development (from `stripe listen`)
-// If both are set, prefer production secret unless explicitly in development
+// SECURITY: Strict webhook secret selection
+// In production, ONLY use STRIPE_WEBHOOK_SECRET — never fall back to a dev secret.
+// STRIPE_WEBHOOK_SECRET_LOCAL is only used when NODE_ENV is exactly "development".
 const isDevelopment = process.env.NODE_ENV === "development"
 const webhookSecret = isDevelopment
   ? process.env.STRIPE_WEBHOOK_SECRET_LOCAL || process.env.STRIPE_WEBHOOK_SECRET
   : process.env.STRIPE_WEBHOOK_SECRET
 
 if (!webhookSecret) {
-  throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required")
+  throw new Error(
+    isDevelopment
+      ? "STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET_LOCAL is required in development"
+      : "STRIPE_WEBHOOK_SECRET environment variable is required in production"
+  )
+}
+
+// SECURITY: In production, ensure we're not accidentally using a local/test secret
+if (!isDevelopment && process.env.STRIPE_WEBHOOK_SECRET_LOCAL) {
+  logger.warn(
+    "STRIPE_WEBHOOK_SECRET_LOCAL is set in a non-development environment — it will be ignored. " +
+      "Remove it from production environment variables."
+  )
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {

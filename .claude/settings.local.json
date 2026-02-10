@@ -99,7 +99,14 @@
       "Bash(pnpm run typecheck:*)",
       "Skill(build)",
       "Skill(build:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(curl:*)",
+      "Bash(file:*)",
+      "Bash(pgrep:*)",
+      "Bash(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 public/audio/whoosh.mp3)",
+      "Bash(afinfo:*)",
+      "Bash(npm audit:*)",
+      "Bash(python3:*)"
     ]
   }
 }

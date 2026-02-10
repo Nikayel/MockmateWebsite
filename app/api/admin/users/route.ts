@@ -19,15 +19,19 @@ import { logAdminAction } from "@/lib/admin/audit"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
+import { rateLimit } from "@/lib/rate-limit"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover" as any,
 })
 
-// Rate limiting: Track recent deletions to prevent abuse
-const deletionRateLimit = new Map<string, { count: number; resetAt: number }>()
-const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
-const RATE_LIMIT_MAX_DELETIONS = 5 // Max 5 deletions per minute per admin
+// Distributed rate limiting for admin deletions (works across serverless instances)
+const adminDeletionRateLimit = rateLimit({
+  interval: 60 * 1000, // 1 minute
+  uniqueTokenPerInterval: 100,
+  maxRequests: 5, // Max 5 deletions per minute per admin
+  prefix: "rl:admin-delete",
+})
 
 // Protected emails that cannot be deleted via API
 // SECURITY: Load from environment variable instead of hardcoding in source
@@ -35,23 +39,6 @@ const PROTECTED_EMAILS = (process.env.ADMIN_PROTECTED_EMAILS || "")
   .split(",")
   .map((email: string) => email.trim().toLowerCase())
   .filter((email: string) => email.length > 0)
-
-function checkRateLimit(adminId: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now()
-  const record = deletionRateLimit.get(adminId)
-
-  if (!record || now >= record.resetAt) {
-    deletionRateLimit.set(adminId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
-    return { allowed: true }
-  }
-
-  if (record.count >= RATE_LIMIT_MAX_DELETIONS) {
-    return { allowed: false, retryAfter: Math.ceil((record.resetAt - now) / 1000) }
-  }
-
-  record.count++
-  return { allowed: true }
-}
 
 // Collections to delete when removing a user
 const collectionsToDelete = [
@@ -218,21 +205,11 @@ export async function DELETE(request: NextRequest) {
       return errorResponse("userId is required and must be a string", 400)
     }
 
-    // Rate limiting check
-    const rateCheck = checkRateLimit(adminId)
-    if (!rateCheck.allowed) {
+    // Distributed rate limiting check (works across serverless instances)
+    const rateLimitResult = await adminDeletionRateLimit(request)
+    if (rateLimitResult) {
       logger.warn("Rate limit exceeded for user deletion", { adminId, userId })
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Rate limit exceeded. Too many deletion requests.",
-          retryAfter: rateCheck.retryAfter,
-        },
-        {
-          status: 429,
-          headers: { "Retry-After": String(rateCheck.retryAfter) },
-        }
-      )
+      return rateLimitResult
     }
 
     // 1. Get user profile to check existence and protected status

@@ -19,7 +19,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { timingSafeEqual } from "crypto"
 import { adminDb } from "@/lib/firebase-admin"
+import { logger } from "@/lib/logger"
 import {
   sendInactivityEmail,
   sendSpacedRepetitionEmail,
@@ -85,10 +87,18 @@ export async function GET(request: NextRequest) {
     // Verify the request is from Vercel Cron - ALWAYS require secret
     const authHeader = request.headers.get("authorization")
     if (!CRON_SECRET) {
-      console.error("[Cron Email] CRON_SECRET not configured - rejecting request")
+      logger.error("[Cron Email] CRON_SECRET not configured - rejecting request")
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
     }
-    if (authHeader !== `Bearer ${CRON_SECRET}`) {
+
+    // SECURITY: Use timing-safe comparison to prevent timing attacks
+    const expectedToken = `Bearer ${CRON_SECRET}`
+    const headerValue = authHeader || ""
+    const isValidLength = headerValue.length === expectedToken.length
+    const isValid =
+      isValidLength && timingSafeEqual(Buffer.from(headerValue), Buffer.from(expectedToken))
+
+    if (!isValid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -145,8 +155,8 @@ export async function GET(request: NextRequest) {
       results,
     })
   } catch (error: any) {
-    console.error("[Cron Email] Error:", error)
-    return NextResponse.json({ error: error.message || "Cron job failed" }, { status: 500 })
+    logger.error("[Cron Email] Error", { error })
+    return NextResponse.json({ error: "Cron job failed" }, { status: 500 })
   }
 }
 
@@ -198,7 +208,7 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
 
       try {
         // Send welcome email
-        console.log(`[Cron Email] Sending welcome email to ${profile.email} (user: ${userId})`)
+        logger.info("[Cron Email] Sending welcome email", { email: profile.email, userId })
         const result = await sendWelcomeEmail(userId, profile.email, profile.full_name)
 
         if (result.success) {
@@ -236,10 +246,10 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
               createdAt: now.toISOString(),
             })
           } catch (notifError) {
-            console.warn(
-              `[Cron Email] Failed to create in-app notification for ${userId}:`,
-              notifError
-            )
+            logger.warn("[Cron Email] Failed to create in-app notification", {
+              userId,
+              error: notifError,
+            })
           }
 
           // Log the notification
@@ -262,7 +272,7 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
       }
     }
   } catch (error: any) {
-    console.error("[Cron Email] Error processing welcome emails:", error)
+    logger.error("[Cron Email] Error processing welcome emails", { error })
     results.errors.push(`Welcome email processing failed: ${error.message}`)
   }
 }
@@ -287,10 +297,9 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
     )
   } catch (indexError: any) {
     // Index may not exist yet - continue without deduplication
-    console.warn(
-      "[Cron Email] Inactivity dedup query failed (index may be building):",
-      indexError.message
-    )
+    logger.warn("[Cron Email] Inactivity dedup query failed (index may be building)", {
+      error: indexError.message,
+    })
   }
 
   // Get learning states where last_session_at is before 24h ago
@@ -303,7 +312,7 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
       .limit(100)
       .get()
   } catch (queryError: any) {
-    console.error("[Cron Email] Firestore query failed:", queryError.message)
+    logger.error("[Cron Email] Firestore query failed", { error: queryError.message })
     results.errors.push(`Firestore query failed: ${queryError.message}`)
     return
   }
@@ -439,7 +448,9 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
     usersWithRecentSREmail = new Set(recentSREmailsSnap.docs.map((doc) => doc.data().user_id))
   } catch (indexError: any) {
     // Index may not exist yet - continue without deduplication
-    console.warn("[Cron Email] SR dedup query failed (index may be building):", indexError.message)
+    logger.warn("[Cron Email] SR dedup query failed (index may be building)", {
+      error: indexError.message,
+    })
   }
 
   // Find users with problem mastery data (new system)
@@ -720,10 +731,9 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
     )
   } catch (indexError: any) {
     // Index may not exist yet - continue without deduplication
-    console.warn(
-      "[Cron Email] Roadmap dedup query failed (index may be building):",
-      indexError.message
-    )
+    logger.warn("[Cron Email] Roadmap dedup query failed (index may be building)", {
+      error: indexError.message,
+    })
   }
 
   // Get all active roadmaps
@@ -794,11 +804,11 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
         }
         // Validate the date is valid
         if (isNaN(interviewDate.getTime())) {
-          console.warn(`[Cron Email] Invalid interviewDate for user ${userId}`)
+          logger.warn("[Cron Email] Invalid interviewDate for user", { userId })
           continue
         }
       } catch {
-        console.warn(`[Cron Email] Failed to parse interviewDate for user ${userId}`)
+        logger.warn("[Cron Email] Failed to parse interviewDate for user", { userId })
         continue
       }
 
@@ -1035,12 +1045,12 @@ async function processStreakAlerts(results: {
           results.streakAlerts.skipped++
         }
       } catch (err) {
-        console.error(`[Cron] Error checking streak for ${userId}:`, err)
+        logger.error("[Cron] Error checking streak", { userId, error: err })
         results.streakAlerts.skipped++
       }
     }
   } catch (error) {
-    console.error("[Cron] Error processing streak alerts:", error)
+    logger.error("[Cron] Error processing streak alerts", { error })
   }
 }
 
@@ -1077,7 +1087,7 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         })
 
         results.subscriptionExpiry.downgrades++
-        console.log(`[Cron] Downgraded user ${userId} - yearly plan expired`)
+        logger.info("[Cron] Downgraded user - yearly plan expired", { userId })
 
         // Send expiration email (check timezone)
         if (profile.email) {
@@ -1091,12 +1101,12 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
                 accessUntil: now.toISOString(),
               })
             } catch (emailError) {
-              console.error(`[Cron] Failed to send expiry email to ${userId}:`, emailError)
+              logger.error("[Cron] Failed to send expiry email", { userId, error: emailError })
             }
           }
         }
       } catch (error) {
-        console.error(`[Cron] Failed to downgrade user ${userId}:`, error)
+        logger.error("[Cron] Failed to downgrade user", { userId, error })
       }
     }
 
@@ -1140,7 +1150,7 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
 
           results.subscriptionExpiry.reminders7d++
         } catch (error) {
-          console.error(`[Cron] Failed to send 7-day reminder to ${userId}:`, error)
+          logger.error("[Cron] Failed to send 7-day reminder", { userId, error })
         }
       }
     }
@@ -1180,12 +1190,12 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
 
           results.subscriptionExpiry.reminders1d++
         } catch (error) {
-          console.error(`[Cron] Failed to send 1-day reminder to ${userId}:`, error)
+          logger.error("[Cron] Failed to send 1-day reminder", { userId, error })
         }
       }
     }
   } catch (error) {
-    console.error("[Cron] Error in subscription expiry processing:", error)
+    logger.error("[Cron] Error in subscription expiry processing", { error })
     results.errors.push(`Subscription expiry error: ${error}`)
   }
 }

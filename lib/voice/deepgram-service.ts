@@ -9,6 +9,8 @@
  * - Automatic punctuation and formatting
  */
 
+import { logger } from "@/lib/logger"
+
 export interface DeepgramConfig {
   apiKey?: string
   language?: string
@@ -73,10 +75,11 @@ export class DeepgramVoiceService {
   private maxDurationTimeout: ReturnType<typeof setTimeout> | null = null
   private lastSentTranscript: string = ""
   private maxDurationMs: number = 180000 // 3 minutes default
+  private authToken: string = ""
 
   constructor(config: DeepgramConfig = {}) {
     this.config = {
-      apiKey: config.apiKey || process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY || "",
+      apiKey: config.apiKey || "",
       language: config.language || "en-US",
       model: config.model || "nova-2",
       punctuate: config.punctuate !== false,
@@ -98,10 +101,40 @@ export class DeepgramVoiceService {
   }
 
   /**
-   * Check if Deepgram is configured
+   * Set the auth token for fetching the API key from the server
+   */
+  setAuthToken(token: string): void {
+    this.authToken = token
+  }
+
+  /**
+   * Fetch the Deepgram API key from the server-side proxy
+   * This avoids exposing the key in client-side bundles
+   */
+  async fetchApiKey(): Promise<void> {
+    if (this.config.apiKey) return
+
+    if (!this.authToken) {
+      throw new Error("Auth token required to fetch Deepgram API key")
+    }
+
+    const response = await fetch("/api/voice/token", {
+      headers: { Authorization: `Bearer ${this.authToken}` },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch voice token")
+    }
+
+    const data = await response.json()
+    this.config.apiKey = data.apiKey
+  }
+
+  /**
+   * Check if Deepgram is configured (has API key or can fetch one)
    */
   isConfigured(): boolean {
-    return !!this.config.apiKey && this.config.apiKey.length > 0
+    return !!this.config.apiKey || !!this.authToken
   }
 
   /**
@@ -173,12 +206,14 @@ export class DeepgramVoiceService {
    * Start real-time transcription
    */
   async startTranscription(): Promise<void> {
-    if (!this.isConfigured()) {
+    // Fetch API key from server if not already set
+    await this.fetchApiKey()
+
+    if (!this.config.apiKey) {
       throw new Error("Deepgram API key not configured")
     }
 
     if (this.connection.isRecording) {
-      console.warn("[Deepgram] Already recording")
       return
     }
 
@@ -200,7 +235,7 @@ export class DeepgramVoiceService {
       // Listen for stream/track ending (e.g., mic unplugged, permission revoked)
       stream.getTracks().forEach((track) => {
         track.onended = () => {
-          console.warn("[Deepgram] Audio track ended unexpectedly")
+          logger.warn("[Deepgram] Audio track ended unexpectedly")
           this.onError?.(new Error("Microphone disconnected. Please reconnect and try again."))
           this.cleanup()
           this.onStatus?.("disconnected")
@@ -208,14 +243,13 @@ export class DeepgramVoiceService {
       })
 
       // Create WebSocket connection to Deepgram
-      console.log(
-        "[Deepgram] Connecting with API key:",
-        this.config.apiKey?.substring(0, 8) + "..."
-      )
+      logger.info("[Deepgram] Connecting with API key", {
+        apiKeyPrefix: this.config.apiKey?.substring(0, 8) + "...",
+      })
       const ws = new WebSocket(this.buildWebSocketUrl(), ["token", this.config.apiKey!])
 
       ws.onopen = () => {
-        console.log("[Deepgram] WebSocket connected")
+        logger.info("[Deepgram] WebSocket connected")
         this.connection.isConnected = true
         this.connection.isRecording = true
         this.onStatus?.("connected")
@@ -232,7 +266,7 @@ export class DeepgramVoiceService {
 
         // Set max duration timeout to prevent abuse (e.g., playing music indefinitely)
         this.maxDurationTimeout = setTimeout(() => {
-          console.log("[Deepgram] Max recording duration reached, stopping automatically")
+          logger.info("[Deepgram] Max recording duration reached, stopping automatically")
           const transcript = this.accumulatedTranscript
           this.onMaxDuration?.(transcript)
           this.stopTranscription()
@@ -260,7 +294,7 @@ export class DeepgramVoiceService {
             }
           } else if (data.type === "UtteranceEnd") {
             // Speech pause detected - this is the key event for live mode auto-send
-            console.log("[Deepgram] Utterance end detected")
+            logger.info("[Deepgram] Utterance end detected")
             if (
               this.accumulatedTranscript &&
               this.accumulatedTranscript !== this.lastSentTranscript
@@ -278,25 +312,25 @@ export class DeepgramVoiceService {
             }
           }
         } catch (error) {
-          console.error("[Deepgram] Error parsing message:", error)
+          logger.error("[Deepgram] Error parsing message", { error })
         }
       }
 
       ws.onerror = (event) => {
-        console.error("[Deepgram] WebSocket error:", event)
+        logger.error("[Deepgram] WebSocket error", { event })
         this.onStatus?.("error")
         this.onError?.(new Error("WebSocket connection error"))
       }
 
       ws.onclose = (event) => {
-        console.log("[Deepgram] WebSocket closed:", event.code, event.reason)
+        logger.info("[Deepgram] WebSocket closed", { code: event.code, reason: event.reason })
         this.cleanup()
         this.onStatus?.("disconnected")
       }
 
       this.connection.socket = ws
     } catch (error) {
-      console.error("[Deepgram] Error starting transcription:", error)
+      logger.error("[Deepgram] Error starting transcription", { error })
       this.cleanup()
       this.onStatus?.("error")
       throw error
@@ -311,7 +345,7 @@ export class DeepgramVoiceService {
       // Check if stream is active - this can happen if mic permission was revoked
       // or if there's a hardware issue
       if (!stream || stream.active === false) {
-        console.warn("[Deepgram] MediaStream became inactive - requesting new stream")
+        logger.warn("[Deepgram] MediaStream became inactive - requesting new stream")
         // Don't throw - let the caller handle reconnection
         this.onError?.(
           new Error(
@@ -325,7 +359,7 @@ export class DeepgramVoiceService {
       // Verify we have audio tracks
       const audioTracks = stream.getAudioTracks()
       if (audioTracks.length === 0) {
-        console.warn("[Deepgram] No audio tracks in MediaStream")
+        logger.warn("[Deepgram] No audio tracks in MediaStream")
         this.onError?.(
           new Error("No microphone detected. Please ensure a microphone is connected.")
         )
@@ -334,12 +368,10 @@ export class DeepgramVoiceService {
       }
 
       // Log track status for debugging
-      console.log(
-        "[Deepgram] Audio track status:",
-        audioTracks[0].readyState,
-        "enabled:",
-        audioTracks[0].enabled
-      )
+      logger.info("[Deepgram] Audio track status", {
+        readyState: audioTracks[0].readyState,
+        enabled: audioTracks[0].enabled,
+      })
 
       // Check if MediaRecorder is supported
       if (typeof MediaRecorder === "undefined") {
@@ -376,10 +408,9 @@ export class DeepgramVoiceService {
         })
       } catch (error) {
         // Fallback: try without options
-        console.warn(
-          "[Deepgram] Failed to create MediaRecorder with options, trying without:",
-          error
-        )
+        logger.warn("[Deepgram] Failed to create MediaRecorder with options, trying without", {
+          error,
+        })
         mediaRecorder = new MediaRecorder(stream)
       }
 
@@ -390,13 +421,13 @@ export class DeepgramVoiceService {
       }
 
       mediaRecorder.onerror = (event) => {
-        console.error("[Deepgram] MediaRecorder error:", event)
+        logger.error("[Deepgram] MediaRecorder error", { event })
         this.onError?.(new Error("MediaRecorder error occurred"))
       }
 
       // Check MediaRecorder state before starting
       if (mediaRecorder.state === "recording") {
-        console.warn("[Deepgram] MediaRecorder already recording")
+        logger.warn("[Deepgram] MediaRecorder already recording")
         return
       }
 
@@ -406,14 +437,14 @@ export class DeepgramVoiceService {
         mediaRecorder.start(100)
       } catch (error) {
         // Fallback: start without timeslice
-        console.warn("[Deepgram] Failed to start with timeslice, trying without:", error)
+        logger.warn("[Deepgram] Failed to start with timeslice, trying without", { error })
         mediaRecorder.start()
       }
 
       this.connection.mediaRecorder = mediaRecorder
-      console.log("[Deepgram] Audio capture started with mime type:", mimeType)
+      logger.info("[Deepgram] Audio capture started", { mimeType })
     } catch (error) {
-      console.error("[Deepgram] Error starting audio capture:", error)
+      logger.error("[Deepgram] Error starting audio capture", { error })
       this.onError?.(error instanceof Error ? error : new Error("Failed to start audio capture"))
       throw error
     }
@@ -423,7 +454,7 @@ export class DeepgramVoiceService {
    * Stop transcription
    */
   stopTranscription(): string {
-    console.log("[Deepgram] Stopping transcription")
+    logger.info("[Deepgram] Stopping transcription")
 
     // Send close stream message
     if (this.connection.socket?.readyState === WebSocket.OPEN) {
@@ -541,8 +572,11 @@ export function createDeepgramService(config?: DeepgramConfig): DeepgramVoiceSer
 }
 
 /**
- * Check if Deepgram is available
+ * Check if Deepgram is available.
+ * On the server, checks DEEPGRAM_API_KEY; on the client, always true
+ * (the actual key is fetched via /api/voice/token at runtime).
  */
 export function isDeepgramAvailable(): boolean {
-  return !!process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
+  if (typeof window !== "undefined") return true
+  return !!process.env.DEEPGRAM_API_KEY
 }

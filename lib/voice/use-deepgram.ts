@@ -10,6 +10,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { DeepgramVoiceService, DeepgramConfig } from "./deepgram-service"
 import { VOICE } from "@/lib/constants"
+import { logger } from "@/lib/logger"
 
 // Web Speech API types (not included in standard TypeScript lib)
 interface SpeechRecognitionResult {
@@ -116,7 +117,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
   // Initialize service on mount
   useEffect(() => {
-    serviceRef.current = new DeepgramVoiceService({
+    const service = new DeepgramVoiceService({
       apiKey: options.apiKey,
       language: options.language,
       model: options.model,
@@ -127,6 +128,13 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       vadEvents: options.vadEvents,
       endpointing: options.endpointing,
     })
+
+    // Pass auth token so the service can fetch the API key from the server
+    if (options.authToken) {
+      service.setAuthToken(options.authToken)
+    }
+
+    serviceRef.current = service
 
     // Set up callbacks
     serviceRef.current.setOnTranscript((text, isFinal) => {
@@ -171,7 +179,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
     // Set up max duration callback
     serviceRef.current.setOnMaxDuration((text) => {
-      console.log("[useDeepgram] Max duration reached, auto-stopping")
+      logger.info("[useDeepgram] Max duration reached, auto-stopping")
       setStatus("idle")
       setIsRecording(false)
       onMaxDurationRef.current?.(text)
@@ -265,7 +273,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
           }),
         }).catch((err) => {
           // Non-critical - log but don't throw
-          console.warn("[Voice Usage] Failed to track usage:", err)
+          logger.warn("[Voice Usage] Failed to track usage", { error: err })
         })
       }
     }
@@ -375,7 +383,7 @@ export function useVoiceInput(
     }
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error("Web Speech API error:", event.error)
+      logger.error("Web Speech API error", { error: event.error })
       options.onError?.(new Error(`Speech recognition error: ${event.error}`))
       setWebSpeechRecording(false)
     }

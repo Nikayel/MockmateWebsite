@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { timingSafeEqual } from "crypto"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 import { calculateBillingPeriod } from "@/lib/firestore-helpers"
@@ -129,7 +130,14 @@ export async function GET(request: NextRequest) {
       cronLogger.error("CRON_SECRET not configured")
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
     }
-    if (authHeader !== `Bearer ${CRON_SECRET}`) {
+    // SECURITY: Use timing-safe comparison to prevent timing attacks
+    const expectedToken = `Bearer ${CRON_SECRET}`
+    const headerValue = authHeader || ""
+    const isValidLength = headerValue.length === expectedToken.length
+    const isValid =
+      isValidLength && timingSafeEqual(Buffer.from(headerValue), Buffer.from(expectedToken))
+
+    if (!isValid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

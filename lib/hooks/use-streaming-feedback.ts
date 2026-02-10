@@ -21,6 +21,7 @@
  */
 
 import { useState, useCallback, useRef } from "react"
+import { logger } from "@/lib/logger"
 
 export interface StreamingScores {
   understanding: number
@@ -191,14 +192,14 @@ export function useStreamingFeedback() {
 
         return result
       } catch (error) {
-        console.error("[StreamingFeedback] Persist failed:", error)
+        logger.error("[StreamingFeedback] Persist failed:", { error })
         // Don't fail the whole flow if persist fails - feedback is still shown
         setState((prev) => ({
           ...prev,
           isPersisted: false,
           phase: "complete",
           phaseMessage: "Done!",
-          error: `Persist failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          error: "Results could not be saved. Your feedback is still available below.",
         }))
         return null
       }
@@ -323,7 +324,7 @@ export function useStreamingFeedback() {
             isConnected: false,
             isComplete: true,
             phase: "complete",
-            error: finalFeedback ? null : "Feedback generation incomplete",
+            error: finalFeedback ? null : "Feedback generation did not complete. Please try again.",
           }))
         }
       } catch (error) {
@@ -332,11 +333,12 @@ export function useStreamingFeedback() {
           return
         }
 
+        logger.error("[StreamingFeedback] Stream failed:", { error })
         setState((prev) => ({
           ...prev,
           isConnected: false,
           phase: "error",
-          error: error instanceof Error ? error.message : "Stream failed",
+          error: "Something went wrong generating feedback. Please try again.",
         }))
       }
     },
@@ -391,10 +393,11 @@ export function useStreamingFeedback() {
         break
 
       case "error":
+        logger.error("[StreamingFeedback] Server error event:", { data })
         setState((prev) => ({
           ...prev,
           phase: "error",
-          error: (data as { message: string }).message,
+          error: "Something went wrong generating feedback. Please try again.",
         }))
         break
 

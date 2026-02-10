@@ -27,27 +27,27 @@ export class ErrorBoundary extends React.Component<
     logger.error("ErrorBoundary caught an error", {
       message: error.message,
       stack: error.stack,
-      componentStack: errorInfo.componentStack
+      componentStack: errorInfo.componentStack,
     })
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-gray-900 border border-gray-700 rounded-lg p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
-            <p className="text-gray-300 mb-6">
-              {this.state.error?.message || "An unexpected error occurred"}
+        <div className="flex min-h-screen items-center justify-center bg-black p-4">
+          <div className="w-full max-w-md rounded-lg border border-gray-700 bg-gray-900 p-6 text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+            <h1 className="mb-2 text-2xl font-bold text-white">Something went wrong</h1>
+            <p className="mb-6 text-gray-300">
+              An unexpected error occurred. Please try refreshing the page.
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex justify-center gap-3">
               <Button
                 onClick={() => {
                   this.setState({ hasError: false, error: null })
                   window.location.href = "/"
                 }}
-                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
+                className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
               >
                 Go Home
               </Button>
@@ -67,4 +67,3 @@ export class ErrorBoundary extends React.Component<
     return this.props.children
   }
 }
-
