@@ -215,7 +215,7 @@ html {
             <RateLimitProvider>
               <AnnouncementProvider>
                 <div id="main-content">{children}</div>
-                <Toaster position="top-right" richColors />
+                <Toaster position="top-right" richColors closeButton duration={4000} />
                 <CookieConsent />
                 <ConsentAnalytics />
               </AnnouncementProvider>

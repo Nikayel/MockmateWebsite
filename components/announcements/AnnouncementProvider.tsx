@@ -104,7 +104,7 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
 
         const toastOptions = {
           id: announcement.id,
-          duration: announcement.dismissible ? 10000 : Infinity,
+          duration: announcement.dismissible ? 8000 : 15000,
           action: announcement.cta
             ? {
                 label: announcement.cta.text,

@@ -525,7 +525,7 @@ function InterviewPageContent() {
         })
       } else {
         toast.error("Feedback generation failed", {
-          description: feedbackState.error,
+          description: "Something went wrong. Please try ending the session again.",
         })
       }
     }
@@ -3543,6 +3543,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         ])
         toast.error("Failed to send message", {
           description: "Network error. Please check your connection and try again.",
+          duration: 6000,
           action: {
             label: "Retry",
             onClick: () => handleSendMessage(isInterviewer),
@@ -3617,6 +3618,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       console.error("System design submission error:", error)
       toast.error("Failed to submit design", {
         description: "There was a problem submitting your design. Please try again.",
+        duration: 6000,
         action: {
           label: "Retry",
           onClick: () => submitSystemDesign(),
@@ -4137,6 +4139,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       console.error("Code execution error:", error)
       toast.error("Failed to run tests", {
         description: "There was a problem executing your code. Please try again.",
+        duration: 6000,
         action: {
           label: "Retry",
           onClick: () => runCode(),
@@ -5336,6 +5339,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                   `${selectedLanguage.toUpperCase()} execution not supported yet`,
                                   {
                                     description: "Switch to JavaScript or Python to run tests.",
+                                    duration: 6000,
                                     action: {
                                       label: "Use JavaScript",
                                       onClick: () => setSelectedLanguage("javascript"),
@@ -5362,6 +5366,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                   `${selectedLanguage.toUpperCase()} execution not supported yet`,
                                   {
                                     description: "Switch to JavaScript or Python to submit.",
+                                    duration: 6000,
                                     action: {
                                       label: "Use JavaScript",
                                       onClick: () => setSelectedLanguage("javascript"),
