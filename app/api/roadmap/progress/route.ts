@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { requireTier } from "@/lib/quota-enforcement"
 import { logger } from "@/lib/logger"
 
 const COLLECTION = "user_roadmaps"
@@ -14,6 +15,10 @@ export async function PATCH(request: NextRequest) {
     if (!authResult.authenticated || !authResult.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // Server-side tier gate: roadmap is a Pro feature
+    const tierCheck = await requireTier(request, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
     const body = await request.json()

@@ -280,6 +280,30 @@ export const UI = {
 } as const
 
 // =============================================================================
+// Webhook & Security
+// =============================================================================
+
+export const WEBHOOK = {
+  /** Maximum age of a webhook event in seconds before rejecting (replay protection) */
+  MAX_EVENT_AGE_SECONDS: 300,
+  /** TTL for processed event deduplication records in days */
+  IDEMPOTENCY_TTL_DAYS: 30,
+} as const
+
+// =============================================================================
+// Circuit Breaker
+// =============================================================================
+
+export const CIRCUIT_BREAKER = {
+  /** Open circuit after this many consecutive failures */
+  FAILURE_THRESHOLD: 5,
+  /** Reset circuit after this duration of no failures (ms) */
+  RESET_MS: 60 * 1000,
+  /** Max requests allowed per user when circuit is open */
+  MAX_FAIL_OPEN_REQUESTS: 10,
+} as const
+
+// =============================================================================
 // Scoring Utility Functions
 // =============================================================================
 

@@ -16,6 +16,7 @@ import {
   sendTrialEndingEmail,
 } from "@/lib/email"
 import { logger } from "@/lib/logger"
+import { WEBHOOK } from "@/lib/constants"
 import { trackEventServer } from "@/lib/analytics-server"
 import {
   markReferralConverted,
@@ -195,18 +196,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
-  // SECURITY: Replay attack protection - reject events older than 5 minutes
+  // SECURITY: Replay attack protection - reject events older than configured threshold
   // Stripe events have a 'created' timestamp (Unix seconds)
   const eventAge = Date.now() / 1000 - event.created
-  const MAX_EVENT_AGE_SECONDS = 300 // 5 minutes
 
-  if (eventAge > MAX_EVENT_AGE_SECONDS) {
+  if (eventAge > WEBHOOK.MAX_EVENT_AGE_SECONDS) {
     paymentLogger.warn("Webhook event too old, possible replay attack", {
       eventId: event.id,
       eventType: event.type,
       eventCreated: event.created,
       eventAgeSeconds: Math.round(eventAge),
-      maxAgeSeconds: MAX_EVENT_AGE_SECONDS,
+      maxAgeSeconds: WEBHOOK.MAX_EVENT_AGE_SECONDS,
     })
     return NextResponse.json({ error: "Event too old" }, { status: 400 })
   }
@@ -235,8 +235,10 @@ export async function POST(request: NextRequest) {
       event_type: event.type,
       processed_at: new Date().toISOString(),
       created: event.created,
-      // TTL: 30 days for cleanup
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      // TTL for cleanup
+      expires_at: new Date(
+        Date.now() + WEBHOOK.IDEMPOTENCY_TTL_DAYS * 24 * 60 * 60 * 1000
+      ).toISOString(),
     })
   } catch (idempotencyError) {
     paymentLogger.error("Error checking event idempotency", {
@@ -1295,6 +1297,122 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       paymentLogger.error("Error handling customer deletion", { error })
+    }
+  }
+
+  // Handle charge disputes (chargebacks) - downgrade user and record
+  if (event.type === "charge.dispute.created") {
+    const dispute = event.data.object as Stripe.Dispute
+
+    logger.payment("Charge dispute created (chargeback)", {
+      disputeId: dispute.id,
+      chargeId: dispute.charge,
+      amount: dispute.amount,
+      reason: dispute.reason,
+    })
+
+    try {
+      // Get the charge to find the customer
+      const charge =
+        typeof dispute.charge === "string"
+          ? await stripe.charges.retrieve(dispute.charge)
+          : dispute.charge
+
+      const customerId = typeof charge === "object" ? (charge.customer as string) : null
+      if (customerId) {
+        const profilesQuery = await adminDb
+          .collection("profiles")
+          .where("stripe_customer_id", "==", customerId)
+          .get()
+
+        if (!profilesQuery.empty) {
+          const profileDoc = profilesQuery.docs[0]
+          const userId = profileDoc.id
+
+          // Downgrade to free tier on dispute
+          await adminDb.collection("profiles").doc(userId).set(
+            {
+              subscription_tier: "free",
+              subscription_status: "disputed",
+              dispute_id: dispute.id,
+              dispute_reason: dispute.reason,
+              dispute_created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
+
+          const profile = profileDoc.data()
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
+            created_at: profile?.created_at,
+            subscription_type: profile?.subscription_type,
+          })
+
+          // Void referral rewards (same as refund)
+          try {
+            await voidReferralRewards(userId, `Dispute/chargeback: ${dispute.reason}`)
+            await voidReferrerConversionRewards(userId, `Dispute/chargeback: ${dispute.reason}`)
+          } catch (clawbackError) {
+            paymentLogger.error("Failed to void referral rewards on dispute", {
+              userId,
+              error: clawbackError,
+            })
+          }
+
+          paymentLogger.warn("User downgraded due to chargeback dispute", {
+            userId,
+            disputeId: dispute.id,
+            reason: dispute.reason,
+          })
+        }
+      }
+    } catch (error) {
+      paymentLogger.error("Error handling charge dispute", { error })
+    }
+  }
+
+  // Handle invoices marked as uncollectible - downgrade user
+  if (event.type === "invoice.marked_uncollectible") {
+    const invoice = event.data.object as Stripe.Invoice
+
+    logger.payment("Invoice marked uncollectible", {
+      invoiceId: invoice.id,
+      customerId: invoice.customer,
+      amountDue: invoice.amount_due,
+    })
+
+    try {
+      const customerId = invoice.customer as string
+      if (customerId) {
+        const profilesQuery = await adminDb
+          .collection("profiles")
+          .where("stripe_customer_id", "==", customerId)
+          .get()
+
+        if (!profilesQuery.empty) {
+          const profileDoc = profilesQuery.docs[0]
+          const userId = profileDoc.id
+
+          await adminDb.collection("profiles").doc(userId).set(
+            {
+              subscription_tier: "free",
+              subscription_status: "uncollectible",
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
+
+          const profile = profileDoc.data()
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
+            created_at: profile?.created_at,
+            subscription_type: profile?.subscription_type,
+          })
+
+          paymentLogger.warn("User downgraded due to uncollectible invoice", { userId })
+        }
+      }
+    } catch (error) {
+      paymentLogger.error("Error handling uncollectible invoice", { error })
     }
   }
 
