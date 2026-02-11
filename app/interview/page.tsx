@@ -3454,6 +3454,18 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         const data = await response.json()
         if (!response.ok) {
           console.warn("[API] Request failed:", response.status, response.url, data)
+          const errorMsg = data?.message || data?.error || "Something went wrong. Please try again."
+          setMessages((prev) => [
+            ...prev,
+            { type: "ai", message: errorMsg },
+          ])
+          if (response.status === 429) {
+            toast.error("Rate limit reached", {
+              description: errorMsg,
+              duration: 6000,
+            })
+          }
+          return
         }
 
         // Check if conversation has ended (AI already said goodbye)
