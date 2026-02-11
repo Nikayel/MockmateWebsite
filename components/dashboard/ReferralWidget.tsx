@@ -49,6 +49,11 @@ export function ReferralWidget() {
             setError(true)
           }
         } else {
+          const body = await response
+            .clone()
+            .json()
+            .catch(() => ({}))
+          console.warn("[API] Request failed:", response.status, response.url, body)
           setError(true)
         }
       } catch (error) {

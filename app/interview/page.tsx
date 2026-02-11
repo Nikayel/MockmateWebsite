@@ -1244,14 +1244,18 @@ Let's continue!`
 
   // Fetch AI-powered hints for the current problem
   const fetchRAGHints = useCallback(async () => {
-    if (!selectedScenario || !user?.id) return
+    if (!selectedScenario || !user?.id || !firebaseUser) return
 
     setIsLoadingHints(true)
     setHintFetchStatus("loading")
     try {
+      const token = await firebaseUser.getIdToken()
       const response = await fetch("/api/agents/hints", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           action: "generate",
           userId: user.id,
@@ -1290,7 +1294,7 @@ Let's continue!`
     } finally {
       setIsLoadingHints(false)
     }
-  }, [selectedScenario, code, selectedLanguage, user?.id])
+  }, [selectedScenario, code, selectedLanguage, user?.id, firebaseUser])
 
   // Fetch AI hints only when user has written meaningful code BEYOND starter code
   // This prevents showing hints before user even starts coding
@@ -1756,6 +1760,9 @@ Let's continue!`
       })
 
       const data = await response.json()
+      if (!response.ok) {
+        console.warn("[API] Request failed:", response.status, response.url, data)
+      }
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
@@ -1891,6 +1898,9 @@ Interviews are conversations, not just coding exercises.`
       })
 
       const data = await response.json()
+      if (!response.ok) {
+        console.warn("[API] Request failed:", response.status, response.url, data)
+      }
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
@@ -2271,6 +2281,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       })
 
       const data = await response.json()
+      if (!response.ok) {
+        console.warn("[API] Request failed:", response.status, response.url, data)
+      }
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
@@ -3439,6 +3452,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         })
 
         const data = await response.json()
+        if (!response.ok) {
+          console.warn("[API] Request failed:", response.status, response.url, data)
+        }
 
         // Check if conversation has ended (AI already said goodbye)
         if (data.conversationEnded) {
@@ -3949,6 +3965,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       })
 
       const data = await response.json()
+      if (!response.ok) {
+        console.warn("[API] Request failed:", response.status, response.url, data)
+      }
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
         // Track interviewer response for conversation context

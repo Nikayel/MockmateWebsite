@@ -112,7 +112,7 @@ const chatRequestSchema = z
     interviewPhase: z.string().optional(),
     conversationTracker: z.record(z.unknown()).optional(),
     hasSubmitted: z.boolean().optional(),
-    solutionComplexity: z.record(z.unknown()).optional(), // Flexible complexity
+    solutionComplexity: z.record(z.unknown()).nullish(), // Flexible complexity; null for system design
     realInterviewMode: z.boolean().optional(),
     hasFuzzyStatement: z.boolean().optional(),
     scenarioClarifyingQuestions: z.unknown().optional(), // Can be string[] or object[]
