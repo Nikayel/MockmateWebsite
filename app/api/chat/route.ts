@@ -96,7 +96,7 @@ const chatRequestSchema = z
     scenarioTitle: z.string().optional(),
     scenarioType: z.string().optional(),
     scenarioPattern: z.string().optional(),
-    scenarioCompany: z.string().optional(),
+    scenarioCompany: z.string().nullish(),
     elapsedTime: z.number().optional(),
     sessionId: z.string().optional(),
     userId: z.string().optional(),
