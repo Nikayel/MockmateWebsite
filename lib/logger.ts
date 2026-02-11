@@ -204,16 +204,25 @@ async function sendToExternalService(
           'X-API-KEY': process.env.LOGFLARE_API_KEY,
         },
         body: JSON.stringify({
-          message,
-          metadata: {
-            level,
-            ...context,
-            timestamp: new Date().toISOString(),
-            environment: process.env.NODE_ENV,
-          },
+          batch: [
+            {
+              message,
+              metadata: {
+                level,
+                ...context,
+                timestamp: new Date().toISOString(),
+                environment: process.env.NODE_ENV,
+              },
+            },
+          ],
         }),
-      }).catch(() => {
-        // Silently fail - don't create infinite error loops
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.text().catch(() => '')
+          console.error(`[Logflare] Failed to send log (${res.status}): ${body}`)
+        }
+      }).catch((err) => {
+        console.error('[Logflare] Network error sending log:', err?.message || err)
       })
     }
 

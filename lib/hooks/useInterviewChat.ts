@@ -108,7 +108,7 @@ export function useInterviewChat({
           },
           body: JSON.stringify({
             message: userMessage,
-            context: code,
+            currentCode: code,
             role: "partner",
             userContext: {
               scenarioId,
@@ -116,9 +116,9 @@ export function useInterviewChat({
               scenarioType,
             },
             workspaceContext,
-            conversationHistory: partnerMessages.slice(-10).map((m) => ({
-              role: m.type === "user" ? "user" : "assistant",
-              content: m.message,
+            context: partnerMessages.slice(-10).map((m) => ({
+              type: m.type === "user" ? "user" : "ai",
+              message: m.message,
             })),
           }),
           signal: partnerAbortRef.current.signal,
@@ -130,11 +130,11 @@ export function useInterviewChat({
             .json()
             .catch(() => ({}))
           console.warn("[API] Request failed:", response.status, response.url, body)
-          throw new Error("Failed to get response")
+          throw new Error(body?.message || body?.error || "Failed to get response")
         }
 
         const data = await response.json()
-        setPartnerMessages((prev) => [...prev, { type: "ai", message: data.response }])
+        setPartnerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return // Request was cancelled
@@ -176,16 +176,16 @@ export function useInterviewChat({
           },
           body: JSON.stringify({
             message: userMessage,
-            context: code,
+            currentCode: code,
             role: "interviewer",
             userContext: {
               scenarioId,
               scenarioTitle,
               scenarioType,
             },
-            conversationHistory: interviewerMessages.slice(-10).map((m) => ({
-              role: m.type === "user" ? "user" : "assistant",
-              content: m.message,
+            context: interviewerMessages.slice(-10).map((m) => ({
+              type: m.type === "user" ? "user" : "ai",
+              message: m.message,
             })),
           }),
           signal: interviewerAbortRef.current.signal,
@@ -197,11 +197,11 @@ export function useInterviewChat({
             .json()
             .catch(() => ({}))
           console.warn("[API] Request failed:", response.status, response.url, body)
-          throw new Error("Failed to get response")
+          throw new Error(body?.message || body?.error || "Failed to get response")
         }
 
         const data = await response.json()
-        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.response }])
+        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
           return // Request was cancelled
