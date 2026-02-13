@@ -1286,7 +1286,7 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
     const ragContext = await buildRAGContext({
       scenarioTitle,
       scenarioPattern,
-      scenarioCompany,
+      scenarioCompany: scenarioCompany ?? undefined,
       scenarioType,
       scenarioId,
       problemText: scenarioTitle, // Use title as problem text

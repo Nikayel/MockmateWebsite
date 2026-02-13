@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
-  Trophy,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -300,50 +299,39 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
         {/* Optimal Approach - Collapsible (DSA only) */}
         {scenario.type === "dsa" && (scenario as DSAScenario).optimalComplexity && (
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+          <div className="rounded-md border border-gray-600/60 bg-gray-800/40">
             <button
               onClick={() => setShowOptimalApproach(!showOptimalApproach)}
-              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-emerald-500/10 transition-colors rounded-lg"
+              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-gray-700/30"
             >
               <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-300">Optimal Approach</span>
-                <span className="text-xs text-gray-500">(click to reveal)</span>
+                <span className="h-4 w-1 rounded-full bg-[#00d9ff]"></span>
+                <span className="text-sm font-medium text-gray-200">Target complexity</span>
               </div>
               {showOptimalApproach ? (
-                <ChevronUp className="h-4 w-4 text-emerald-400" />
+                <ChevronUp className="h-4 w-4 text-gray-400" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-emerald-400" />
+                <ChevronDown className="h-4 w-4 text-gray-400" />
               )}
             </button>
 
             {showOptimalApproach && (
-              <div className="px-3 pb-3 animate-in slide-in-from-top-2 duration-200">
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Time Complexity */}
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Clock className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-xs font-medium text-emerald-300">Time</span>
-                    </div>
-                    <code className="text-lg font-semibold text-emerald-100">
+              <div className="animate-in slide-in-from-top-2 px-3 pt-0.5 pb-3 duration-200">
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+                  <span className="flex items-center gap-1.5 text-gray-400">
+                    <Clock className="h-3.5 w-3.5 text-gray-500" />
+                    <code className="font-mono text-[#00d9ff]">
                       {(scenario as DSAScenario).optimalComplexity.time}
                     </code>
-                  </div>
-                  {/* Space Complexity */}
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <HardDrive className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-xs font-medium text-emerald-300">Space</span>
-                    </div>
-                    <code className="text-lg font-semibold text-emerald-100">
+                  </span>
+                  <span className="flex items-center gap-1.5 text-gray-400">
+                    <HardDrive className="h-3.5 w-3.5 text-gray-500" />
+                    <code className="font-mono text-[#00d9ff]">
                       {(scenario as DSAScenario).optimalComplexity.space}
                     </code>
-                  </div>
+                  </span>
                 </div>
-                <p className="mt-2 text-xs text-gray-400 italic">
-                  Try to achieve this complexity before revealing hints!
-                </p>
+                <p className="mt-2 text-xs text-gray-500">Aim for this before checking hints.</p>
               </div>
             )}
           </div>

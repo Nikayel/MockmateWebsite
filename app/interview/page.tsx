@@ -39,7 +39,6 @@ import {
   Leaf,
   ThumbsUp,
   ThumbsDown,
-  Trophy,
   HardDrive,
 } from "lucide-react"
 import {
@@ -1350,16 +1349,54 @@ Let's continue!`
     // The scoring system handles communication separately
     // Users can choose to communicate when they want to
 
-    // Still track for metrics purposes
-    const userMessages = interviewerMessages.filter((m) => m.type === "user")
-    if (userMessages.length > 0) {
+    const lastMsg = interviewerMessages[interviewerMessages.length - 1]
+    if (lastMsg?.type === "user") {
       lastInterviewerMessageRef.current = Date.now()
       hasTriggeredSilenceRef.current = false
     }
 
+    if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) {
+      return () => {
+        if (silenceTimerRef.current) {
+          clearInterval(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
+      }
+    }
+
+    const SILENCE_THRESHOLD_SEC = 120
+    const COOLDOWN_MS = 3 * 60 * 1000
+
+    const checkAndTrigger = () => {
+      if (hasTriggeredSilenceRef.current || isLoadingInterviewer) return
+
+      const userMessages = interviewerMessages.filter((m) => m.type === "user")
+      const hasEverMessaged = userMessages.length > 0
+
+      let timeSilentSec: number
+      if (hasEverMessaged) {
+        timeSilentSec = (Date.now() - lastInterviewerMessageRef.current) / 1000
+      } else {
+        timeSilentSec = elapsedTime
+      }
+
+      if (timeSilentSec >= SILENCE_THRESHOLD_SEC) {
+        hasTriggeredSilenceRef.current = true
+        const contextType = hasEverMessaged ? "silence_stopped" : "silence_no_communication"
+        triggerProactiveInterviewerWithContext(contextType, Math.floor(timeSilentSec))
+        setTimeout(() => {
+          hasTriggeredSilenceRef.current = false
+        }, COOLDOWN_MS)
+      }
+    }
+
+    checkAndTrigger()
+    silenceTimerRef.current = setInterval(checkAndTrigger, 30 * 1000)
+
     return () => {
       if (silenceTimerRef.current) {
         clearInterval(silenceTimerRef.current)
+        silenceTimerRef.current = null
       }
     }
   }, [
@@ -1368,6 +1405,7 @@ Let's continue!`
     showPostInterviewDiscussion,
     interviewerMessages,
     elapsedTime,
+    isLoadingInterviewer,
   ])
 
   // Cleanup all proactive timers on unmount
@@ -1782,7 +1820,10 @@ Let's continue!`
   }
 
   // Context-aware proactive interviewer for different scenarios
-  const triggerProactiveInterviewerWithContext = async (contextType: string) => {
+  const triggerProactiveInterviewerWithContext = async (
+    contextType: string,
+    timeSilentSeconds?: number
+  ) => {
     if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
 
     setIsLoadingInterviewer(true)
@@ -1894,6 +1935,7 @@ Interviews are conversations, not just coding exercises.`
           consoleLogs: consoleLogs,
           // Phase-aware interview tracking
           ...getInterviewerChatParams(),
+          timeSinceLastMessage: timeSilentSeconds,
         }),
       })
 
@@ -3455,10 +3497,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         if (!response.ok) {
           console.warn("[API] Request failed:", response.status, response.url, data)
           const errorMsg = data?.message || data?.error || "Something went wrong. Please try again."
-          setMessages((prev) => [
-            ...prev,
-            { type: "ai", message: errorMsg },
-          ])
+          setMessages((prev) => [...prev, { type: "ai", message: errorMsg }])
           if (response.status === 429) {
             toast.error("Rate limit reached", {
               description: errorMsg,
@@ -4996,55 +5035,42 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                           {/* Optimal Approach - Collapsible (DSA only) */}
                           {selectedScenario.type === "dsa" &&
                             (selectedScenario as any).optimalComplexity && (
-                              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+                              <div className="rounded-md border border-gray-600/60 bg-gray-800/40">
                                 <button
                                   onClick={() => setShowOptimalApproach(!showOptimalApproach)}
-                                  className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-emerald-500/10"
+                                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-gray-700/30"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <Trophy className="h-4 w-4 text-emerald-400" />
-                                    <span className="text-sm font-medium text-emerald-300">
-                                      Optimal Approach
+                                    <span className="bg-accent h-4 w-1 rounded-full"></span>
+                                    <span className="text-sm font-medium text-gray-200">
+                                      Target complexity
                                     </span>
-                                    <span className="text-xs text-gray-500">(click to reveal)</span>
                                   </div>
                                   {showOptimalApproach ? (
-                                    <ChevronUp className="h-4 w-4 text-emerald-400" />
+                                    <ChevronUp className="h-4 w-4 text-gray-400" />
                                   ) : (
-                                    <ChevronDown className="h-4 w-4 text-emerald-400" />
+                                    <ChevronDown className="h-4 w-4 text-gray-400" />
                                   )}
                                 </button>
 
                                 {showOptimalApproach && (
-                                  <div className="animate-in slide-in-from-top-2 px-3 pb-3 duration-200">
-                                    <div className="grid grid-cols-2 gap-3">
-                                      {/* Time Complexity */}
-                                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-                                        <div className="mb-1.5 flex items-center gap-2">
-                                          <Clock className="h-3.5 w-3.5 text-emerald-400" />
-                                          <span className="text-xs font-medium text-emerald-300">
-                                            Time
-                                          </span>
-                                        </div>
-                                        <code className="text-lg font-semibold text-emerald-100">
+                                  <div className="animate-in slide-in-from-top-2 px-3 pt-0.5 pb-3 duration-200">
+                                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+                                      <span className="flex items-center gap-1.5 text-gray-400">
+                                        <Clock className="h-3.5 w-3.5 text-gray-500" />
+                                        <code className="text-accent font-mono">
                                           {(selectedScenario as any).optimalComplexity.time}
                                         </code>
-                                      </div>
-                                      {/* Space Complexity */}
-                                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-                                        <div className="mb-1.5 flex items-center gap-2">
-                                          <HardDrive className="h-3.5 w-3.5 text-emerald-400" />
-                                          <span className="text-xs font-medium text-emerald-300">
-                                            Space
-                                          </span>
-                                        </div>
-                                        <code className="text-lg font-semibold text-emerald-100">
+                                      </span>
+                                      <span className="flex items-center gap-1.5 text-gray-400">
+                                        <HardDrive className="h-3.5 w-3.5 text-gray-500" />
+                                        <code className="text-accent font-mono">
                                           {(selectedScenario as any).optimalComplexity.space}
                                         </code>
-                                      </div>
+                                      </span>
                                     </div>
-                                    <p className="mt-2 text-xs text-gray-400 italic">
-                                      Try to achieve this complexity before revealing hints!
+                                    <p className="mt-2 text-xs text-gray-500">
+                                      Aim for this before checking hints.
                                     </p>
                                   </div>
                                 )}
