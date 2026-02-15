@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { adminDb } from "@/lib/firebase-admin"
+import { FieldPath } from "firebase-admin/firestore"
+import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import {
   getFirebaseAnalyticsOverview,
   getFirebaseAnalyticsEvents,
@@ -20,11 +21,13 @@ import {
   parseISO,
 } from "date-fns"
 
+type UserForTimeSeries = { createdAt: string; tier: string }
+
 /**
  * Generate time-series data for charts
  */
 async function generateTimeSeriesData(
-  profilesSnapshot: FirebaseFirestore.QuerySnapshot | { docs: any[] },
+  usersForSeries: UserForTimeSeries[],
   sessionsSnapshot: FirebaseFirestore.QuerySnapshot | { docs: any[] },
   startDate: Date | null,
   timeRange: string
@@ -73,35 +76,27 @@ async function generateTimeSeriesData(
     sessionsByDate[key] = { total: 0, completed: 0 }
   })
 
-  // Process profiles for user growth
-  if (profilesSnapshot.docs) {
-    profilesSnapshot.docs.forEach((doc: any) => {
-      const profile = doc.data()
-      const createdAt = profile.created_at || profile.createdAt
+  // Process users for growth (from auth + profiles merge)
+  usersForSeries.forEach((user) => {
+    const createdAt = user.createdAt
+    if (createdAt) {
+      try {
+        const date = typeof createdAt === "string" ? parseISO(createdAt) : new Date(createdAt)
+        const intervalStart = getIntervalStart(date)
+        const key = format(intervalStart, "yyyy-MM-dd")
 
-      if (createdAt) {
-        try {
-          const date =
-            typeof createdAt === "string"
-              ? parseISO(createdAt)
-              : createdAt.toDate?.() || new Date(createdAt)
-
-          const intervalStart = getIntervalStart(date)
-          const key = format(intervalStart, "yyyy-MM-dd")
-
-          if (usersByDate[key]) {
-            usersByDate[key].total++
-            const tier = profile.subscription_tier || "free"
-            if (tier === "pro") usersByDate[key].pro++
-            else if (tier === "enterprise") usersByDate[key].enterprise++
-            else usersByDate[key].free++
-          }
-        } catch {
-          // Skip invalid dates
+        if (usersByDate[key]) {
+          usersByDate[key].total++
+          const tier = user.tier || "free"
+          if (tier === "pro") usersByDate[key].pro++
+          else if (tier === "enterprise") usersByDate[key].enterprise++
+          else usersByDate[key].free++
         }
+      } catch {
+        // Skip invalid dates
       }
-    })
-  }
+    }
+  })
 
   // Process sessions
   if (sessionsSnapshot.docs) {
@@ -214,32 +209,52 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all users
-    let profilesSnapshot
+    // Fetch all users from Firebase Auth (Google, GitHub, etc.) - matches user list
+    const authUsers: import("firebase-admin/auth").UserRecord[] = []
+    let pageToken: string | undefined
     try {
-      profilesSnapshot = await adminDb.collection("profiles").get()
+      do {
+        const result = await adminAuth.listUsers(1000, pageToken)
+        authUsers.push(...result.users)
+        pageToken = result.pageToken
+      } while (pageToken)
     } catch (error) {
-      console.error("Error fetching profiles:", error)
-      profilesSnapshot = { size: 0, docs: [] } as any
-    }
-    const totalUsers = profilesSnapshot.size || 0
-
-    // Count by subscription tier
-    const tierCounts = {
-      free: 0,
-      pro: 0,
-      enterprise: 0,
+      console.error("Error fetching auth users:", error)
     }
 
-    if (profilesSnapshot.docs) {
-      profilesSnapshot.docs.forEach((doc: any) => {
-        const profile = doc.data()
-        const tier = profile.subscription_tier || "free"
-        if (tier in tierCounts) {
-          tierCounts[tier as keyof typeof tierCounts]++
-        }
-      })
+    const totalUsers = authUsers.length
+
+    // Build profile map for tier data
+    const profileMap = new Map<string, { subscription_tier?: string }>()
+    const PROFILE_BATCH = 30
+    for (let i = 0; i < authUsers.length; i += PROFILE_BATCH) {
+      const batch = authUsers.slice(i, i + PROFILE_BATCH)
+      const ids = batch.map((u) => u.uid)
+      const profilesSnap = await adminDb
+        .collection("profiles")
+        .where(FieldPath.documentId(), "in", ids)
+        .get()
+      profilesSnap.docs.forEach((doc) => profileMap.set(doc.id, doc.data()))
     }
+
+    // Count by subscription tier (auth users without profile = free)
+    const tierCounts = { free: 0, pro: 0, enterprise: 0 }
+    authUsers.forEach((authUser) => {
+      const profile = profileMap.get(authUser.uid)
+      const tier = profile?.subscription_tier || "free"
+      if (tier in tierCounts) {
+        tierCounts[tier as keyof typeof tierCounts]++
+      }
+    })
+
+    // Build user list for time-series (createdAt from auth or profile, tier from profile)
+    const usersForTimeSeries: UserForTimeSeries[] = authUsers.map((authUser) => {
+      const profile = profileMap.get(authUser.uid)
+      const createdAt =
+        authUser.metadata?.creationTime || profile?.created_at || new Date().toISOString()
+      const tier = profile?.subscription_tier || "free"
+      return { createdAt, tier }
+    })
 
     // Fetch sessions (with time range filter if applicable)
     let sessionsSnapshot
@@ -389,7 +404,7 @@ export async function GET(request: NextRequest) {
 
     // Generate time-series data for charts
     const timeSeries = await generateTimeSeriesData(
-      profilesSnapshot,
+      usersForTimeSeries,
       sessionsSnapshot,
       startDate,
       timeRange

@@ -122,15 +122,52 @@ export async function validateConversationEdge(
     return defaultResult
   }
 
-  const transcriptText = transcript
-    .slice(-15) // Last 15 messages
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n\n")
+  // Full context: use entire transcript so AI has complete semantic understanding
+  const MAX_MESSAGE_CHARS = 400
+  const MAX_TRANSCRIPT_CHARS = 24000 // ~6k tokens; typical 60-80 message interview fits
 
-  const prompt = `Analyze this interview transcript and extract:
+  const formatMessage = (m: { role: string; content: string }) => {
+    const content =
+      m.content.length > MAX_MESSAGE_CHARS
+        ? m.content.slice(0, MAX_MESSAGE_CHARS) + "..."
+        : m.content
+    return `${m.role.toUpperCase()}: ${content}`
+  }
+
+  const fullText = transcript.map(formatMessage).join("\n\n")
+  let transcriptText: string
+  if (fullText.length <= MAX_TRANSCRIPT_CHARS) {
+    transcriptText = fullText
+  } else {
+    // Very long: include start (approach) + end (complexity/wrap-up), preserve message boundaries
+    const FIRST_PART_CHARS = 16000
+    const LAST_PART_CHARS = 7000
+    const lines = transcript.map(formatMessage)
+    const firstLines: string[] = []
+    let len = 0
+    for (const line of lines) {
+      if (len + line.length > FIRST_PART_CHARS) break
+      firstLines.push(line)
+      len += line.length
+    }
+    const lastLines: string[] = []
+    len = 0
+    for (let i = lines.length - 1; i >= 0 && len < LAST_PART_CHARS; i--) {
+      lastLines.unshift(lines[i])
+      len += lines[i].length
+    }
+    transcriptText = [...firstLines, "[... middle of conversation ...]", ...lastLines].join("\n\n")
+  }
+
+  const prompt = `You are a semantic interviewer evaluator. Analyze this FULL transcript - use meaning, not keyword matching.
+
+SEMANTIC RULES:
+- approachExplained: true if they described HOW they'll solve it in ANY natural way (e.g. "I'll use a dictionary", "loop over and get frequency", "two pointers", tracing through an example)
+- complexityDiscussed: true if they mentioned time/space complexity (O(n), linear, constant, etc.)
+- edgeCasesConsidered: true if they discussed empty input, null, single element, boundaries, or answered edge-case questions thoughtfully
 
 TRANSCRIPT:
-${transcriptText.substring(0, 6000)}
+${transcriptText}
 
 ${code ? `CODE:\n\`\`\`\n${code.substring(0, 1000)}\n\`\`\`` : ""}
 ${complexity ? `OPTIMAL: Time=${complexity.time || "?"}, Space=${complexity.space || "?"}` : ""}
@@ -155,15 +192,27 @@ Return JSON only:
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
+      const approachExplained = parsed.approachExplained ?? false
+      const complexityDiscussed = parsed.complexityDiscussed ?? false
+      const complexityAccurate = parsed.complexityAccurate ?? false
+      const edgeCasesConsidered = parsed.edgeCasesConsidered ?? false
+
+      // Graduated communication score based on detected signals (not binary 60/30)
+      let communicationScore = 30
+      if (approachExplained) communicationScore += 30
+      if (complexityDiscussed) communicationScore += complexityAccurate ? 20 : 10
+      if (edgeCasesConsidered) communicationScore += 10
+      communicationScore = Math.min(100, communicationScore)
+
       return {
         ...defaultResult,
-        approachExplained: parsed.approachExplained ?? false,
+        approachExplained,
         approachQuality: parsed.approachQuality ?? "none",
-        complexityDiscussed: parsed.complexityDiscussed ?? false,
-        complexityAccurate: parsed.complexityAccurate ?? false,
-        edgeCasesConsidered: parsed.edgeCasesConsidered ?? false,
+        complexityDiscussed,
+        complexityAccurate,
+        edgeCasesConsidered,
         statedComplexity: parsed.statedComplexity ?? null,
-        communicationScore: parsed.approachExplained ? 60 : 30,
+        communicationScore,
       }
     }
   } catch {
@@ -194,19 +243,39 @@ export async function extractConversationEvidenceEdge(
     return null
   }
 
-  const transcriptText = transcript
-    .filter((m) => m.role === "user")
-    .slice(-10)
-    .map((m) => m.content)
-    .join("\n\n")
+  // Full context: all candidate messages for semantic evidence extraction
+  const candidateMessages = transcript.filter((m) => m.role === "user")
+  const MAX_EVIDENCE_CHARS = 12000
+  const fullText = candidateMessages.map((m) => m.content).join("\n\n")
+  let transcriptText: string
+  if (fullText.length <= MAX_EVIDENCE_CHARS) {
+    transcriptText = fullText
+  } else {
+    const firstPartChars = 8000
+    const lastPartChars = 3500
+    const firstParts: string[] = []
+    let len = 0
+    for (const m of candidateMessages) {
+      if (len + m.content.length > firstPartChars) break
+      firstParts.push(m.content)
+      len += m.content.length
+    }
+    const lastParts: string[] = []
+    len = 0
+    for (let i = candidateMessages.length - 1; i >= 0 && len < lastPartChars; i--) {
+      lastParts.unshift(candidateMessages[i].content)
+      len += candidateMessages[i].content.length
+    }
+    transcriptText = `${firstParts.join("\n\n")}\n\n[... middle ...]\n\n${lastParts.join("\n\n")}`
+  }
 
   const prompt = `Extract evidence from candidate messages:
 
 PROBLEM: ${problemContext.title}
 OPTIMAL: Time=${problemContext.optimalTimeComplexity}, Space=${problemContext.optimalSpaceComplexity}
 
-CANDIDATE MESSAGES:
-${transcriptText.substring(0, 4000)}
+CANDIDATE MESSAGES (full context):
+${transcriptText}
 
 Return JSON only:
 {

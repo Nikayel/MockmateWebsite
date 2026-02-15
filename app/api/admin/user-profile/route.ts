@@ -20,7 +20,7 @@ import {
   getAccurateBehavioralProfile,
   getUserDataQuality,
 } from "@/lib/rag/enhanced-user-profile"
-import { adminDb } from "@/lib/firebase-admin"
+import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { getDaysDifference, DEFAULT_TIMEZONE } from "@/lib/email/timezone"
 import type { Profile } from "@/lib/types"
@@ -41,15 +41,76 @@ export async function GET(request: NextRequest) {
       return errorResponse("userId query parameter is required", 400)
     }
 
-    // Verify user exists
-    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    if (!profileDoc.exists) {
+    // Verify user exists (Firebase Auth has all users; profiles may be missing for GitHub-only)
+    const [profileDoc, authUser] = await Promise.all([
+      adminDb.collection("profiles").doc(userId).get(),
+      adminAuth.getUser(userId).catch(() => null),
+    ])
+
+    if (!authUser) {
       return errorResponse("User not found", 404)
     }
 
-    const profileData = profileDoc.data()
+    const profileData = profileDoc.exists ? profileDoc.data() : null
+    const email = profileData?.email || authUser.email || ""
+    const fullName = profileData?.full_name || authUser.displayName || ""
+    const createdAt =
+      profileData?.created_at || authUser.metadata?.creationTime || new Date().toISOString()
 
-    // Fetch all enhanced profile data in parallel
+    // Auth-only users (no profile): still fetch sessions & learning state (they may have activity)
+    if (!profileDoc.exists) {
+      const [recentSessions, learningState] = await Promise.all([
+        getRecentSessionsForUser(userId),
+        getLearningStateForUser(userId),
+      ])
+
+      await logAdminAction(adminId, "view_user_profile", {
+        targetUserId: userId,
+        targetEmail: email,
+      })
+      return successResponse({
+        user: {
+          id: userId,
+          email,
+          fullName,
+          subscriptionTier: "free",
+          subscriptionStatus: "none",
+          createdAt,
+          onboardingCompleted: false,
+          authOnly: true,
+        },
+        enhancedProfile: null,
+        insights: [],
+        interviewReadiness: null,
+        misconceptions: {
+          total: 0,
+          resolved: 0,
+          active: 0,
+          totalOccurrences: 0,
+          byPattern: {},
+          byType: {},
+          topMisconceptions: [],
+        },
+        recentSessions,
+        learningState,
+        accurateBehavior: {
+          dataQuality: "insufficient",
+          sessionsAnalyzed: 0,
+          missingDataPoints: [],
+          planning: null,
+          debugging: null,
+          helpSeeking: null,
+          persistence: null,
+          learningVelocity: null,
+          temporalPerformance: null,
+          strengths: [],
+          areasForImprovement: [],
+          recommendations: [],
+        },
+      })
+    }
+
+    // Fetch all enhanced profile data in parallel (user has profile)
     const [
       enhancedProfile,
       insights,
@@ -81,7 +142,7 @@ export async function GET(request: NextRequest) {
     return successResponse({
       user: {
         id: userId,
-        email: profileData?.email,
+        email: profileData?.email || "",
         fullName: profileData?.full_name,
         subscriptionTier: profileData?.subscription_tier,
         subscriptionStatus: profileData?.subscription_status,

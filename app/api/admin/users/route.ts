@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { FieldPath } from "firebase-admin/firestore"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import {
   verifyAdminAccess,
@@ -60,12 +61,20 @@ const collectionsToDelete = [
 
 /**
  * GET /api/admin/users
- * List all users with pagination
+ * List all users with pagination (from Firebase Auth - includes Google, GitHub, etc.)
  *
- * PERFORMANCE: Uses Firestore cursor-based pagination when no search.
- * For search, loads up to MAX_SEARCH_RESULTS and filters in memory.
+ * Fetches from Firebase Auth (source of truth for all sign-ups) and merges with
+ * Firestore profiles for subscription/onboarding data.
  */
-const MAX_SEARCH_RESULTS = 1000 // Cap for search to prevent memory issues
+const MAX_AUTH_USERS = 5000 // Cap to prevent timeout on listUsers
+const AUTH_BATCH_SIZE = 1000 // Firebase listUsers max per call
+
+function getAuthProvider(authUser: import("firebase-admin/auth").UserRecord): string {
+  const provider = authUser.providerData?.[0]?.providerId
+  if (provider === "google.com") return "google"
+  if (provider === "github.com") return "github"
+  return provider || "unknown"
+}
 
 export async function GET(request: NextRequest) {
   const authResult = await verifyAdminAccess(request)
@@ -77,99 +86,77 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)))
-    const search = searchParams.get("search") || ""
-    const cursor = searchParams.get("cursor") || "" // For cursor-based pagination
+    const search = (searchParams.get("search") || "").toLowerCase()
 
-    // Helper to map profile doc to user object
-    const mapProfileToUser = (doc: FirebaseFirestore.DocumentSnapshot) => {
-      const data = doc.data() || {}
-      return {
-        id: doc.id,
-        email: data.email || "",
-        full_name: data.full_name || "",
-        subscription_tier: data.subscription_tier || "free",
-        subscription_status: data.subscription_status || "none",
-        created_at: data.created_at || "",
-        updated_at: data.updated_at || "",
-        onboarding_completed: data.onboarding_completed || false,
-        stripe_customer_id: data.stripe_customer_id || null,
-      }
-    }
+    // 1. Fetch all users from Firebase Auth (Google, GitHub, etc.)
+    const authUsers: import("firebase-admin/auth").UserRecord[] = []
+    let pageToken: string | undefined
 
-    // If search is provided, we need to load and filter in memory (Firestore limitation)
-    if (search) {
-      const searchLower = search.toLowerCase()
+    do {
+      const result = await adminAuth.listUsers(AUTH_BATCH_SIZE, pageToken)
+      authUsers.push(...result.users)
+      pageToken = result.pageToken
+      if (authUsers.length >= MAX_AUTH_USERS) break
+    } while (pageToken)
 
-      // Load limited set of profiles for search
+    // 2. Batch fetch profiles for these users (Firestore 'in' supports up to 30)
+    const profileMap = new Map<string, FirebaseFirestore.DocumentData>()
+    const PROFILE_BATCH = 30
+    for (let i = 0; i < authUsers.length; i += PROFILE_BATCH) {
+      const batch = authUsers.slice(i, i + PROFILE_BATCH)
+      const ids = batch.map((u) => u.uid)
       const profilesSnap = await adminDb
         .collection("profiles")
-        .orderBy("created_at", "desc")
-        .limit(MAX_SEARCH_RESULTS)
+        .where(FieldPath.documentId(), "in", ids)
         .get()
+      profilesSnap.docs.forEach((doc) => profileMap.set(doc.id, doc.data()))
+    }
 
-      let users = profilesSnap.docs.map(mapProfileToUser)
+    // 3. Merge auth + profile, sort by creation (newest first)
+    let users = authUsers.map((authUser) => {
+      const profile = profileMap.get(authUser.uid)
+      const createdAt =
+        authUser.metadata?.creationTime || profile?.created_at || new Date().toISOString()
+      return {
+        id: authUser.uid,
+        email: authUser.email || profile?.email || "",
+        full_name: authUser.displayName || profile?.full_name || "",
+        auth_provider: getAuthProvider(authUser),
+        subscription_tier: profile?.subscription_tier || "free",
+        subscription_status: profile?.subscription_status || "none",
+        created_at: createdAt,
+        updated_at: profile?.updated_at || "",
+        onboarding_completed: profile?.onboarding_completed || false,
+        stripe_customer_id: profile?.stripe_customer_id || null,
+      }
+    })
 
-      // Filter by search query
+    users.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+
+    // 4. Apply search filter
+    if (search) {
       users = users.filter(
         (user) =>
-          user.email.toLowerCase().includes(searchLower) ||
-          user.full_name.toLowerCase().includes(searchLower) ||
-          user.id.toLowerCase().includes(searchLower)
+          user.email.toLowerCase().includes(search) ||
+          (user.full_name || "").toLowerCase().includes(search) ||
+          user.id.toLowerCase().includes(search) ||
+          (user.auth_provider || "").toLowerCase().includes(search)
       )
-
-      // Paginate filtered results
-      const total = users.length
-      const startIndex = (page - 1) * limit
-      const paginatedUsers = users.slice(startIndex, startIndex + limit)
-
-      return successResponse({
-        users: paginatedUsers,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-          isSearchResult: true,
-          searchCapped: profilesSnap.size >= MAX_SEARCH_RESULTS,
-        },
-      })
     }
 
-    // No search: Use efficient Firestore cursor-based pagination
-    let query = adminDb
-      .collection("profiles")
-      .orderBy("created_at", "desc")
-      .limit(limit + 1) // Fetch one extra to check if there's a next page
-
-    // Apply cursor if provided (for subsequent pages)
-    if (cursor) {
-      const cursorDoc = await adminDb.collection("profiles").doc(cursor).get()
-      if (cursorDoc.exists) {
-        query = query.startAfter(cursorDoc)
-      }
-    }
-
-    const profilesSnap = await query.get()
-    const hasNextPage = profilesSnap.size > limit
-    const docs = hasNextPage ? profilesSnap.docs.slice(0, limit) : profilesSnap.docs
-    const users = docs.map(mapProfileToUser)
-
-    // Get next cursor (last doc id)
-    const nextCursor = hasNextPage ? docs[docs.length - 1].id : null
-
-    // Get total count (cached for performance - updates every few minutes)
-    const countSnap = await adminDb.collection("profiles").count().get()
-    const total = countSnap.data().count
+    const total = users.length
+    const startIndex = (page - 1) * limit
+    const paginatedUsers = users.slice(startIndex, startIndex + limit)
 
     return successResponse({
-      users,
+      users: paginatedUsers,
       pagination: {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
-        nextCursor,
-        hasNextPage,
+        isSearchResult: !!search,
+        searchCapped: authUsers.length >= MAX_AUTH_USERS,
       },
     })
   } catch (error: any) {
@@ -212,12 +199,15 @@ export async function DELETE(request: NextRequest) {
       return rateLimitResult
     }
 
-    // 1. Get user profile to check existence and protected status
-    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    const profileData = profileDoc.data()
+    // 1. Get user profile and auth user for protected check
+    const [profileDoc, authUser] = await Promise.all([
+      adminDb.collection("profiles").doc(userId).get(),
+      adminAuth.getUser(userId).catch(() => null),
+    ])
+    const profileData = profileDoc.exists ? profileDoc.data() : null
 
-    // Idempotency check: If user doesn't exist, return success (already deleted)
-    if (!profileDoc.exists) {
+    // Idempotency: If neither profile nor auth user exists, already deleted
+    if (!profileDoc.exists && !authUser) {
       logger.info("User already deleted (idempotent)", { userId, adminId })
       return successResponse({
         message: "User not found or already deleted",
@@ -226,17 +216,17 @@ export async function DELETE(request: NextRequest) {
       })
     }
 
-    // Protected email check
-    if (profileData?.email && PROTECTED_EMAILS.includes(profileData.email.toLowerCase())) {
+    const emailForCheck = profileData?.email || authUser?.email || ""
+    if (emailForCheck && PROTECTED_EMAILS.includes(emailForCheck.toLowerCase())) {
       logger.warn("Attempted to delete protected user", {
         userId,
-        email: profileData.email,
+        email: emailForCheck,
         adminId,
       })
       return errorResponse("This user account is protected and cannot be deleted", 403)
     }
 
-    logger.info("Admin deleting user", { userId, email: profileData?.email, adminId })
+    logger.info("Admin deleting user", { userId, email: emailForCheck, adminId })
 
     // 2. Cancel any active Stripe subscription
     if (profileData?.stripe_subscription_id) {
@@ -335,7 +325,7 @@ export async function DELETE(request: NextRequest) {
     // 6. Log the admin action for audit trail
     await logAdminAction(adminId, "delete_user", {
       targetUserId: userId,
-      targetEmail: profileData?.email,
+      targetEmail: emailForCheck,
       targetTier: profileData?.subscription_tier,
       deletedDocuments: deletedDocCount,
       stripeSubscriptionCancelled: !!profileData?.stripe_subscription_id,
@@ -346,7 +336,7 @@ export async function DELETE(request: NextRequest) {
       message: "User and all associated data have been permanently deleted",
       deletedDocuments: deletedDocCount,
       userId,
-      email: profileData?.email,
+      email: emailForCheck,
     })
   } catch (error: any) {
     logger.error("Error deleting user", { error, adminId })

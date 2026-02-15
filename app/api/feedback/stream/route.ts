@@ -83,6 +83,20 @@ export async function POST(request: NextRequest) {
         ? analyzeCodeCompleteness(code, language || "javascript")
         : { isIncomplete: true, hasActualLogic: false }
 
+      // Derive actual message counts from transcript (not hardcoded 0)
+      const transcriptArray =
+        conversationTranscript && Array.isArray(conversationTranscript)
+          ? conversationTranscript
+          : []
+      const candidateMessageCount = transcriptArray.filter(
+        (m: { role?: string; type?: string }) =>
+          m.role === "candidate" || m.role === "user" || m.type === "user"
+      ).length
+      const interviewerMessageCount = transcriptArray.filter(
+        (m: { role?: string; type?: string }) =>
+          m.role === "interviewer" || m.type === "interviewer"
+      ).length
+
       const signals = buildSignalsFromMetrics({
         testsPassed,
         testsTotal,
@@ -93,8 +107,8 @@ export async function POST(request: NextRequest) {
         complexityDiscussed: phaseTracking?.conversationTracker?.timeComplexityMentioned || false,
         edgeCasesIdentified: phaseTracking?.conversationTracker?.edgeCasesMentioned || [],
         hintsViewed: [],
-        totalInterviewerMessages: 0,
-        totalChatMessages: 0,
+        totalInterviewerMessages: interviewerMessageCount,
+        totalChatMessages: candidateMessageCount,
         aiSuggestionsCopiedBlindly: 0,
         testsRanBeforeSubmit: testsRanBeforeSubmit ?? false,
         submittedFromPhase: submittedFromPhase || "unknown",
@@ -197,13 +211,16 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Reconcile evidence
+      // Reconcile evidence - extracted evidence overrides AI when it finds concrete quotes
       if (extractedEvidence) {
         if (extractedEvidence.approach.explained) {
           aiValidation.approachExplained = true
         }
         if (extractedEvidence.timeComplexity.mentioned) {
           aiValidation.complexityDiscussed = true
+          if (extractedEvidence.timeComplexity.isCorrect !== undefined) {
+            aiValidation.complexityAccurate = extractedEvidence.timeComplexity.isCorrect
+          }
         }
         if (extractedEvidence.edgeCases.mentionedByCandidate.length > 0) {
           aiValidation.edgeCasesConsidered = true

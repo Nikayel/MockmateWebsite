@@ -17,7 +17,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { MetricCard, TimeSeriesChart, DistributionChart } from "@/components/admin/charts"
-import { PageHeader, MetricsGridSkeleton, ChartSkeleton, UserListSkeleton } from "@/components/admin/shared"
+import {
+  PageHeader,
+  MetricsGridSkeleton,
+  ChartSkeleton,
+  UserListSkeleton,
+} from "@/components/admin/shared"
 import { UserProfileDrawer } from "@/components/admin/UserProfileDrawer"
 import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X, Eye, Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
@@ -26,6 +31,7 @@ interface UserProfile {
   id: string
   email: string
   full_name?: string
+  auth_provider?: string
   subscription_tier: string
   subscription_status?: string
   created_at: string
@@ -169,10 +175,10 @@ export default function UsersPage() {
 
   const tierDistribution = metrics
     ? [
-      { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
-      { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
-      { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
-    ]
+        { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
+        { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
+        { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
+      ]
     : []
 
   const conversionRate =
@@ -273,12 +279,13 @@ export default function UsersPage() {
                       <span className="font-semibold text-white">{item.count}</span>
                       <div className="h-2 w-32 overflow-hidden rounded-full bg-gray-700">
                         <div
-                          className={`h-full rounded-full ${item.color === "yellow"
-                            ? "bg-yellow-400"
-                            : item.color === "purple"
-                              ? "bg-purple-400"
-                              : "bg-gray-400"
-                            }`}
+                          className={`h-full rounded-full ${
+                            item.color === "yellow"
+                              ? "bg-yellow-400"
+                              : item.color === "purple"
+                                ? "bg-purple-400"
+                                : "bg-gray-400"
+                          }`}
                           style={{
                             width: `${metrics.users.total > 0 ? (item.count / metrics.users.total) * 100 : 0}%`,
                           }}
@@ -344,6 +351,9 @@ export default function UsersPage() {
                   <tr className="border-b border-gray-800">
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Email</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Name</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">
+                      Provider
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Tier</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">
                       Created
@@ -371,6 +381,19 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-300">{user.full_name || "-"}</td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            className={
+                              user.auth_provider === "github"
+                                ? "border-gray-600/30 bg-gray-600/20 text-gray-300"
+                                : user.auth_provider === "google"
+                                  ? "border-blue-600/30 bg-blue-600/20 text-blue-300"
+                                  : "border-gray-600/30 bg-gray-600/20 text-gray-400"
+                            }
+                          >
+                            {user.auth_provider || "-"}
+                          </Badge>
+                        </td>
                         <td className="px-4 py-3">
                           <Badge
                             className={
