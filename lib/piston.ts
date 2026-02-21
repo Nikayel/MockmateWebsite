@@ -111,6 +111,27 @@ export interface PistonResponse {
 const MAX_RETRIES = 3
 const BASE_DELAY_MS = 500 // 500ms, 1s, 2s exponential backoff
 
+const EXECUTION_SERVICE_ERROR_PATTERNS = [
+  "Code execution failed (401)",
+  "Code execution failed (5",
+  "temporarily unavailable",
+  "whitelist",
+  "Piston",
+  "code execution service",
+  "Unable to connect to code execution",
+  "Code execution failed after multiple attempts",
+]
+
+/**
+ * Returns true if the error is due to the execution service being unavailable
+ * (e.g. Piston 401/5xx, whitelist, timeout), not due to the user's code.
+ */
+export function isExecutionServiceError(errorMessage: string | null | undefined): boolean {
+  if (!errorMessage || typeof errorMessage !== "string") return false
+  const lower = errorMessage.toLowerCase()
+  return EXECUTION_SERVICE_ERROR_PATTERNS.some((p) => lower.includes(p.toLowerCase()))
+}
+
 /**
  * Execute code securely using Piston API
  * Includes retry logic with exponential backoff for rate limit errors (429)

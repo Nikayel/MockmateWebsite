@@ -76,6 +76,7 @@ export class DeepgramVoiceService {
   private lastSentTranscript: string = ""
   private maxDurationMs: number = 180000 // 3 minutes default
   private authToken: string = ""
+  private transcriptMuted: boolean = false
 
   constructor(config: DeepgramConfig = {}) {
     this.config = {
@@ -217,6 +218,7 @@ export class DeepgramVoiceService {
       return
     }
 
+    this.transcriptMuted = false
     this.onStatus?.("connecting")
 
     try {
@@ -281,7 +283,7 @@ export class DeepgramVoiceService {
             const transcript = data.channel?.alternatives?.[0]?.transcript || ""
             const isFinal = data.is_final || data.speech_final
 
-            if (transcript) {
+            if (transcript && !this.transcriptMuted) {
               if (isFinal) {
                 this.accumulatedTranscript += (this.accumulatedTranscript ? " " : "") + transcript
                 this.onTranscript?.(this.accumulatedTranscript, true)
@@ -292,7 +294,7 @@ export class DeepgramVoiceService {
                 this.onTranscript?.(fullTranscript, false)
               }
             }
-          } else if (data.type === "UtteranceEnd") {
+          } else if (data.type === "UtteranceEnd" && !this.transcriptMuted) {
             // Speech pause detected - this is the key event for live mode auto-send
             logger.info("[Deepgram] Utterance end detected")
             if (
@@ -455,6 +457,7 @@ export class DeepgramVoiceService {
    */
   stopTranscription(): string {
     logger.info("[Deepgram] Stopping transcription")
+    this.transcriptMuted = true
 
     // Send close stream message
     if (this.connection.socket?.readyState === WebSocket.OPEN) {
@@ -482,6 +485,7 @@ export class DeepgramVoiceService {
    * Reset accumulated transcript
    */
   resetTranscript(): void {
+    this.transcriptMuted = true
     this.accumulatedTranscript = ""
     this.lastSentTranscript = ""
   }

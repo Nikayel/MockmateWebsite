@@ -75,6 +75,7 @@ import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
+import { isExecutionServiceError } from "@/lib/piston"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
 import { toast } from "sonner"
 // Interview phase tracking
@@ -3382,16 +3383,20 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     if (input.trim()) {
       const newUserMessage: ChatMessage = { type: "user", message: input }
       setMessages((prev) => [...prev, newUserMessage])
-      setInput("")
       setLoading(true)
 
-      // Stop recording and reset voice transcript after sending
+      // Reset voice state first so late WS/onTranscript callbacks don't repopulate input
       const voice = isInterviewer ? interviewerVoice : partnerVoice
       if (voice.isRecording) {
         voice.stopRecording()
       }
       voice.resetTranscript()
       voice.clearSentTracker()
+
+      setInput("")
+      // Deferred clear wins over any in-flight onTranscript from queued WebSocket messages
+      const clearInput = setInput
+      setTimeout(() => clearInput(""), 0)
 
       // Track user message for conversation context (phase tracking)
       if (isInterviewer) {
@@ -4061,43 +4066,55 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       // Handle API errors (scenario not found, execution timeout, etc.)
       if (!response.ok || data.error) {
         const errorMessage = data.error || `Server error (${response.status})`
+        const isServiceDown = isExecutionServiceError(errorMessage)
 
-        // Show error in console instead of just toast
         setConsoleLogs([
-          { type: "error", message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() },
+          {
+            type: "error",
+            message: isServiceDown
+              ? "❌ Code execution service is temporarily unavailable. Please try again in a few minutes."
+              : `❌ Execution Error: ${errorMessage}`,
+            timestamp: Date.now(),
+          },
         ])
         setTestResults([
           {
             description: "Execution Error",
             passed: false,
-            error: errorMessage,
+            error: isServiceDown
+              ? "Code execution service is temporarily unavailable. Please try again in a few minutes."
+              : errorMessage,
             input: "",
             expected: "",
             actual: "",
           },
         ])
 
-        // Add interviewer message about the error
-        // GUARD: Only add if we haven't added a similar error message in the last 2 messages
-        setInterviewerMessages((prev) => {
-          const recentMessages = prev.slice(-2)
-          const hasRecentErrorMsg = recentMessages.some(
-            (msg) =>
-              msg.type === "ai" &&
-              (msg.message.includes("problem running your code") ||
-                msg.message.includes("error in your code"))
-          )
-          if (hasRecentErrorMsg) {
-            return prev
-          }
-          return [
-            ...prev,
-            {
-              type: "ai",
-              message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
-            },
-          ]
-        })
+        if (!isServiceDown) {
+          setInterviewerMessages((prev) => {
+            const recentMessages = prev.slice(-2)
+            const hasRecentErrorMsg = recentMessages.some(
+              (msg) =>
+                msg.type === "ai" &&
+                (msg.message.includes("problem running your code") ||
+                  msg.message.includes("error in your code"))
+            )
+            if (hasRecentErrorMsg) return prev
+            return [
+              ...prev,
+              {
+                type: "ai",
+                message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
+              },
+            ]
+          })
+        } else {
+          toast.error("Code execution unavailable", {
+            description:
+              "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+            duration: 8000,
+          })
+        }
 
         playSound("fail")
         setIsRunningTests(false)
@@ -4143,15 +4160,25 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           setConsoleLogs(data.consoleLogs)
         }
 
-        // Check for syntax/compilation errors - keep user in editing mode so they can fix
+        // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)
         const allFailed = data.summary.passRate === 0
 
-        // If all tests failed due to code errors, keep user in editing mode
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
+          const isServiceDown = isExecutionServiceError(firstError)
 
-          // Check if it's a syntax or compilation error
+          if (isServiceDown) {
+            toast.error("Code execution unavailable", {
+              description:
+                "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+              duration: 8000,
+            })
+            playSound("fail")
+            setIsRunningTests(false)
+            return
+          }
+
           const isSyntaxError =
             firstError &&
             (firstError.includes("SyntaxError") ||
@@ -4162,34 +4189,20 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               firstError.includes("IndentationError") ||
               firstError.includes("invalid syntax"))
 
-          // Keep user in editing mode so they can fix the error
-          // Console panel will show the error - no need for toast
           playSound("fail")
           setIsRunningTests(false)
 
-          // Add a helpful message from the interviewer about the error
-          // GUARD: Only add if we haven't added a similar error message in the last 2 messages
           const errorMsgText = `I see there's ${isSyntaxError ? "a syntax error" : "an error"} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`
           setInterviewerMessages((prev) => {
-            // Check if recent messages already contain a similar error message
             const recentMessages = prev.slice(-2)
             const hasRecentErrorMsg = recentMessages.some(
               (msg) => msg.type === "ai" && msg.message.includes("error in your code")
             )
-            if (hasRecentErrorMsg) {
-              // Don't add duplicate error message
-              return prev
-            }
-            return [
-              ...prev,
-              {
-                type: "ai",
-                message: errorMsgText,
-              },
-            ]
+            if (hasRecentErrorMsg) return prev
+            return [...prev, { type: "ai", message: errorMsgText }]
           })
 
-          return // Don't proceed to post-interview discussion
+          return
         }
 
         // Play sound based on results
@@ -4248,42 +4261,55 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       // Handle API errors (scenario not found, execution timeout, etc.)
       if (!response.ok || data.error) {
         const errorMessage = data.error || `Server error (${response.status})`
+        const isServiceDown = isExecutionServiceError(errorMessage)
 
-        // Show error in console instead of just toast
         setConsoleLogs([
-          { type: "error", message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() },
+          {
+            type: "error",
+            message: isServiceDown
+              ? "❌ Code execution service is temporarily unavailable. Please try again in a few minutes."
+              : `❌ Execution Error: ${errorMessage}`,
+            timestamp: Date.now(),
+          },
         ])
         setTestResults([
           {
             description: "Execution Error",
             passed: false,
-            error: errorMessage,
+            error: isServiceDown
+              ? "Code execution service is temporarily unavailable. Please try again in a few minutes."
+              : errorMessage,
             input: "",
             expected: "",
             actual: "",
           },
         ])
 
-        // GUARD: Only add if we haven't added a similar error message in the last 2 messages
-        setInterviewerMessages((prev) => {
-          const recentMessages = prev.slice(-2)
-          const hasRecentErrorMsg = recentMessages.some(
-            (msg) =>
-              msg.type === "ai" &&
-              (msg.message.includes("problem running your code") ||
-                msg.message.includes("error in your code"))
-          )
-          if (hasRecentErrorMsg) {
-            return prev
-          }
-          return [
-            ...prev,
-            {
-              type: "ai",
-              message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
-            },
-          ]
-        })
+        if (!isServiceDown) {
+          setInterviewerMessages((prev) => {
+            const recentMessages = prev.slice(-2)
+            const hasRecentErrorMsg = recentMessages.some(
+              (msg) =>
+                msg.type === "ai" &&
+                (msg.message.includes("problem running your code") ||
+                  msg.message.includes("error in your code"))
+            )
+            if (hasRecentErrorMsg) return prev
+            return [
+              ...prev,
+              {
+                type: "ai",
+                message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
+              },
+            ]
+          })
+        } else {
+          toast.error("Code execution unavailable", {
+            description:
+              "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+            duration: 8000,
+          })
+        }
 
         playSound("fail")
         setIsRunningTests(false)
@@ -4329,12 +4355,25 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           setConsoleLogs(data.consoleLogs)
         }
 
-        // Check for syntax/compilation errors
+        // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)
         const allFailed = data.summary.passRate === 0
 
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
+          const isServiceDown = isExecutionServiceError(firstError)
+
+          if (isServiceDown) {
+            playSound("fail")
+            setIsRunningTests(false)
+            toast.error("Code execution unavailable", {
+              description:
+                "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+              duration: 8000,
+            })
+            return
+          }
+
           const isSyntaxError =
             firstError &&
             (firstError.includes("SyntaxError") ||

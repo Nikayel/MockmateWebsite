@@ -12,6 +12,7 @@ import { useState, useCallback } from "react"
 import { Scenario } from "@/lib/scenarios"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
+import { isExecutionServiceError } from "@/lib/piston"
 
 export interface TestResult {
   description: string
@@ -212,12 +213,14 @@ export function useTestExecution({
       // Handle API errors (scenario not found, execution timeout, etc.)
       if (!response.ok || data.error) {
         const errorMessage = data.error || `Server error (${response.status})`
+        const isServiceDown = isExecutionServiceError(errorMessage)
 
-        // Show error in console
         setConsoleLogs([
           {
             type: "error",
-            message: `❌ Execution Error: ${errorMessage}`,
+            message: isServiceDown
+              ? "❌ Code execution service is temporarily unavailable. Please try again in a few minutes."
+              : `❌ Execution Error: ${errorMessage}`,
             timestamp: Date.now(),
           },
         ])
@@ -232,6 +235,13 @@ export function useTestExecution({
           },
         ])
 
+        if (isServiceDown) {
+          toast.error("Code execution unavailable", {
+            description:
+              "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+            duration: 8000,
+          })
+        }
         playSound?.("fail")
         onTestError?.(errorMessage)
         setIsRunning(false)
@@ -247,28 +257,28 @@ export function useTestExecution({
           setConsoleLogs(data.consoleLogs)
         }
 
-        // Check for syntax/compilation errors
+        // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)
         const allFailed = data.summary.passRate === 0
 
-        // If all tests failed due to code errors, keep user in editing mode
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
+          const isServiceDown = isExecutionServiceError(firstError)
 
-          // Check if it's a syntax or compilation error
-          const isSyntaxError =
-            firstError &&
-            (firstError.includes("SyntaxError") ||
-              firstError.includes("Compilation error") ||
-              firstError.includes("Unexpected token") ||
-              firstError.includes("unexpected token") ||
-              firstError.includes("Parse error") ||
-              firstError.includes("IndentationError") ||
-              firstError.includes("invalid syntax"))
+          if (isServiceDown) {
+            toast.error("Code execution unavailable", {
+              description:
+                "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+              duration: 8000,
+            })
+            playSound?.("fail")
+            setIsRunning(false)
+            return
+          }
 
           playSound?.("fail")
           setIsRunning(false)
-          return // Don't proceed to callback
+          return // Don't proceed to callback (code errors)
         }
 
         // Play sound based on results
