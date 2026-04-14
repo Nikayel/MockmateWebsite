@@ -20,45 +20,42 @@ interface CareersPageClientProps {
 
 export function CareersPageClient({ roles }: CareersPageClientProps) {
   return (
-    <main className="min-h-screen bg-background relative overflow-hidden">
+    <main className="bg-background relative min-h-screen overflow-hidden">
       <GridBackground />
       <Header />
 
       {/* Hero - Clean and centered like Apple */}
-      <section className="min-h-[70vh] flex items-center justify-center pt-20 relative z-10">
+      <section className="relative z-10 flex min-h-[70vh] items-center justify-center pt-20">
         <motion.div
           className="container mx-auto px-4"
           variants={staggerContainer}
           initial="initial"
           animate="animate"
         >
-          <div className="max-w-2xl mx-auto text-center">
-            <motion.p
-              variants={staggerItem}
-              className="text-accent text-sm font-medium mb-4"
-            >
+          <div className="mx-auto max-w-2xl text-center">
+            <motion.p variants={staggerItem} className="text-accent mb-4 text-sm font-medium">
               We're building something cool
             </motion.p>
 
             <motion.h1
               variants={staggerItem}
-              className="text-5xl sm:text-6xl md:text-7xl font-bold text-foreground mb-6 tracking-tight"
+              className="text-foreground mb-6 text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl"
             >
               Join the team
             </motion.h1>
 
             <motion.p
               variants={staggerItem}
-              className="text-xl text-muted-foreground leading-relaxed mb-8"
+              className="text-muted-foreground mb-8 text-xl leading-relaxed"
             >
               Small team. Big ideas. Help developers nail their interviews.
             </motion.p>
 
             <motion.div
               variants={staggerItem}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/5 border border-accent/10 text-sm text-muted-foreground"
+              className="bg-accent/5 border-accent/10 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
             >
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
               <span>Actively hiring</span>
             </motion.div>
           </div>
@@ -66,14 +63,14 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
       </section>
 
       {/* Roles - Minimal cards */}
-      <section className="py-24 relative z-10">
+      <section className="relative z-10 py-24">
         <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl">
             <motion.p
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-muted-foreground/60 text-xs uppercase tracking-widest mb-8"
+              className="text-muted-foreground/60 mb-8 text-xs tracking-widest uppercase"
             >
               Open Roles
             </motion.p>
@@ -86,29 +83,23 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className="group p-6 rounded-2xl bg-secondary/30 border border-border hover:border-accent/30 transition-all cursor-pointer"
+                  className="group bg-secondary/30 border-border hover:border-accent/30 cursor-pointer rounded-2xl border p-6 transition-all"
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="mb-3 flex items-start justify-between">
                     <div>
-                      <h3 className="text-xl font-semibold text-foreground mb-1">
-                        {role.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground/60">
-                        {role.type} · Equity
-                      </p>
+                      <h3 className="text-foreground mb-1 text-xl font-semibold">{role.title}</h3>
+                      <p className="text-muted-foreground/60 text-sm">{role.type} · Equity</p>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground/40 group-hover:text-accent group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="text-muted-foreground/40 group-hover:text-accent h-5 w-5 transition-all group-hover:translate-x-1" />
                   </div>
 
-                  <p className="text-muted-foreground mb-4">
-                    {role.description}
-                  </p>
+                  <p className="text-muted-foreground mb-4">{role.description}</p>
 
                   <div className="flex flex-wrap gap-2">
                     {role.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="px-3 py-1 text-xs rounded-full bg-background border border-border text-muted-foreground"
+                        className="bg-background border-border text-muted-foreground rounded-full border px-3 py-1 text-xs"
                       >
                         {tag}
                       </span>
@@ -122,25 +113,31 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
       </section>
 
       {/* Contact - Super minimal */}
-      <section className="py-24 relative z-10">
+      <section className="relative z-10 py-24">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="max-w-xl mx-auto text-center"
+            className="mx-auto max-w-xl text-center"
           >
-            <h2 className="text-3xl font-bold text-foreground mb-4 tracking-tight">
-              Interested?
-            </h2>
+            <h2 className="text-foreground mb-4 text-3xl font-bold tracking-tight">Interested?</h2>
             <p className="text-muted-foreground mb-8">
               No formal applications. Just reach out and tell me what excites you about this.
             </p>
+            <p className="text-muted-foreground/80 mb-8 text-sm">
+              If you do not get a response, reach out on LinkedIn (Nikayel Ali) or at my personal
+              email:{" "}
+              <a href="mailto:alinikayeljamal@gmail.com" className="text-accent hover:underline">
+                alinikayeljamal@gmail.com
+              </a>
+              .
+            </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <a
                 href="mailto:nikayel_ali@codesparring.dev"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 text-white border border-gray-800 rounded-full hover:border-gray-600 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-gray-800 px-6 py-3 text-white transition-colors hover:border-gray-600"
               >
                 <Mail className="h-4 w-4" />
                 nikayel_ali@codesparring.dev
@@ -149,14 +146,14 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
                 href="https://linkedin.com/in/nikayel-ali"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 h-12 px-6 bg-foreground text-background rounded-xl hover:bg-foreground/90 transition-all"
+                className="bg-foreground text-background hover:bg-foreground/90 inline-flex h-12 items-center justify-center gap-2 rounded-xl px-6 transition-all"
               >
                 <Linkedin className="h-4 w-4" />
                 LinkedIn
               </a>
             </div>
 
-            <p className="mt-8 text-sm text-muted-foreground/60">
+            <p className="text-muted-foreground/60 mt-8 text-sm">
               Sacramento State senior · Building this because I needed it myself
             </p>
           </motion.div>
