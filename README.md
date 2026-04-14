@@ -177,8 +177,12 @@ MockmateWebsite/
 
 | Document | Description |
 |----------|-------------|
-| [API Reference](docs/API.md) | Complete API documentation |
 | [Architecture](docs/ARCHITECTURE.md) | System design & data flow |
+| [Platform Architecture (Quick)](docs/PLATFORM-ARCHITECTURE.md) | High-level architecture and runtime flows |
+| [Backend](docs/BACKEND.md) | API domains, integrations, request lifecycle |
+| [PRD](docs/PRD.md) | Product vision, requirements, success metrics |
+| [Mermaid architecture](docs/PLATFORM-ARCHITECTURE-MERMAID.md) | Diagrams for Mermaid Live / GitHub |
+| [API Reference](docs/API.md) | Complete API documentation |
 | [Onboarding Guide](docs/ONBOARDING.md) | New engineer setup |
 | [Firebase Structure](docs/FIREBASE_STRUCTURE.md) | Database schema |
 | [Testing Guide](docs/TESTING_GUIDE.md) | How to write tests |
