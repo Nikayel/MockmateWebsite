@@ -5,9 +5,9 @@
  * Supports both Firestore (default) and Pinecone (when PINECONE_API_KEY is set)
  */
 
-import type { VectorDB, VectorDocument, QueryOptions, QueryResult } from '../types'
-import { FirestoreVectorDB } from './firestore'
-import { PineconeVectorDB } from './pinecone'
+import type { VectorDB, VectorDocument, QueryOptions, QueryResult } from "../types"
+import { FirestoreVectorDB } from "./firestore"
+import { PineconeVectorDB } from "./pinecone"
 
 // Export the interface
 export type { VectorDB, VectorDocument, QueryOptions, QueryResult }
@@ -20,15 +20,15 @@ export { PineconeVectorDB }
  * Determine which vector DB to use based on environment
  */
 function createVectorDB(): VectorDB {
-    const usePinecone = process.env.PINECONE_API_KEY && process.env.USE_PINECONE !== 'false'
+  const usePinecone = process.env.PINECONE_API_KEY && process.env.USE_PINECONE !== "false"
 
-    if (usePinecone) {
-        console.log('[VectorDB] Using Pinecone for vector storage')
-        return new PineconeVectorDB()
-    }
+  if (usePinecone) {
+    console.log("[VectorDB] Using Pinecone for vector storage")
+    return new PineconeVectorDB()
+  }
 
-    console.log('[VectorDB] Using Firestore for vector storage')
-    return new FirestoreVectorDB()
+  console.log("[VectorDB] Using Firestore for vector storage")
+  return new FirestoreVectorDB()
 }
 
 // Default instance (automatically selects based on environment)
@@ -38,12 +38,22 @@ export const vectorDB: VectorDB = createVectorDB()
  * Check if Pinecone is currently being used
  */
 export function isPineconeEnabled(): boolean {
-    return vectorDB instanceof PineconeVectorDB
+  return vectorDB instanceof PineconeVectorDB
 }
 
 /**
  * Get the current vector DB provider name
  */
-export function getVectorDBProvider(): 'pinecone' | 'firestore' {
-    return vectorDB instanceof PineconeVectorDB ? 'pinecone' : 'firestore'
+export function getVectorDBProvider(): "pinecone" | "firestore" {
+  return vectorDB instanceof PineconeVectorDB ? "pinecone" : "firestore"
+}
+
+/**
+ * Get the required embedding dimension when using Pinecone.
+ * Returns null when using Firestore (no dimension constraint).
+ * Used by the hybrid embedding provider to avoid returning 256D when the index expects 768D.
+ */
+export async function getRequiredEmbeddingDimension(): Promise<number | null> {
+  if (!(vectorDB instanceof PineconeVectorDB)) return null
+  return (vectorDB as PineconeVectorDB).getDimension()
 }
