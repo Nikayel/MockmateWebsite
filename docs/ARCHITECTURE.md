@@ -2,6 +2,14 @@
 
 Technical architecture overview for the CodeSparring platform.
 
+**Related documentation**
+
+- [Backend (API domains & services)](./BACKEND.md)
+- [Product requirements (PRD)](./PRD.md)
+- [API reference](./API.md)
+- [Firestore structure](./FIREBASE_STRUCTURE.md)
+- [Mermaid diagrams (copy-paste)](./PLATFORM-ARCHITECTURE-MERMAID.md)
+
 ## System Overview
 
 ```
@@ -51,7 +59,7 @@ Technical architecture overview for the CodeSparring platform.
 ```
 MockmateWebsite/
 ├── app/                      # Next.js App Router
-│   ├── api/                  # API routes (50+ endpoints)
+│   ├── api/                  # API routes (~86 route.ts files)
 │   │   ├── chat/             # AI interview chat
 │   │   ├── execute/          # Code execution
 │   │   ├── admin/            # Admin endpoints
@@ -105,6 +113,266 @@ MockmateWebsite/
 
 ---
 
+## Complete HTTP API tree (`app/api`)
+
+Every file is a Next.js **Route Handler** (`route.ts`). Methods vary per file (`GET`, `POST`, etc.); see [API.md](./API.md) for contracts.
+
+```
+app/api/
+├── admin/
+│   ├── admins/                 # Admin user / role management
+│   ├── algorithm-research/     # SR algorithm research data
+│   ├── analytics/              # Platform analytics
+│   ├── announcements/          # In-app announcements (admin CRUD)
+│   ├── audit/                  # Audit log queries
+│   ├── cleanup-orphans/      # Data hygiene jobs
+│   ├── cohorts/                # User cohort analysis
+│   ├── cost-anomalies/         # AI cost anomaly detection
+│   ├── email-diagnostics/      # Email system health
+│   ├── feature-flags/          # Feature flag management
+│   ├── feedback/               # Aggregated feedback / moderation
+│   ├── funnel/                 # Conversion funnel metrics
+│   ├── health/                 # Internal health checks
+│   ├── insight-effectiveness/  # Insight quality metrics
+│   ├── nps/                    # NPS responses (admin)
+│   ├── payments/               # Payment records
+│   ├── query-performance/      # DB/query performance
+│   ├── rag-health/             # RAG / vector pipeline health
+│   ├── rate-limits/            # Rate limit observability
+│   ├── referrals/              # Referral program admin
+│   ├── referrals/rewards/      # Referral rewards
+│   ├── research/               # Research exports
+│   ├── research/enhanced/      # Enhanced research datasets
+│   ├── research/export/        # Data export
+│   ├── research/users/         # Per-user research
+│   ├── revenue/                # Revenue reporting
+│   ├── scoring/                # Scoring analytics
+│   ├── usage/                  # AI usage (admin)
+│   └── user-profile/           # Impersonation / support profile view
+├── agents/
+│   ├── hints/                  # Hint agent (LLM-backed)
+│   └── recommendations/        # Next-problem / learning recommendations
+├── analyze-complexity/         # Problem complexity analysis (LLM)
+├── announcements/              # Public announcements (read)
+├── chat/                       # Main AI interviewer chat (Gemini + RAG context)
+├── create-checkout/            # Stripe Checkout session
+├── cron/
+│   ├── email-notifications/    # Spaced repetition / engagement (Bearer CRON_SECRET)
+│   └── subscription-expiry/    # Subscription lifecycle (Bearer CRON_SECRET)
+├── customer-portal/             # Stripe billing portal URL
+├── debug-promo-code/           # Dev/debug promo validation
+├── delete-account/             # GDPR-style account deletion
+├── email/welcome/              # Welcome email trigger
+├── execute/                    # Run user code vs tests (Piston) — see § Code execution
+├── execute/ast/                # AST-oriented execution helpers
+├── feedback/
+│   ├── instant/                # Quick feedback path
+│   ├── persist/                # Persist feedback payload
+│   ├── process/                # Process feedback job
+│   ├── status/                 # Feedback job status
+│   └── stream/                 # Streaming feedback
+├── generate-feedback/          # Full post-session feedback generation
+├── guest-session/              # Anonymous session create/extend
+├── guest-session/migrate/      # Guest → authenticated migration
+├── health/                     # Public liveness
+├── nps/                        # Net Promoter Score submit
+├── notifications/              # User notifications
+├── notifications/preferences/  # Notification prefs (alias path)
+├── promo-code/               # Promo code validation / apply
+├── rag/                        # RAG operations (POST actions: hints, similar, store, …)
+├── rag/health/                 # RAG subsystem health
+├── rag/v2/                     # RAG v2 experiments / alternate pipeline
+├── rate-limit-feedback/       # Client feedback on rate limits
+├── referral/                   # Referral link / stats
+├── roadmap/                    # Roadmap CRUD / generation
+├── roadmap/progress/           # Roadmap progress updates
+├── seed-vectors/               # Ops: seed vector index
+├── session/metrics/            # Per-session analytics
+├── spaced-repetition/
+│   ├── batch-defer/            # Bulk defer due items
+│   ├── complete/               # Mark review complete
+│   ├── due/                    # Due cards
+│   ├── mark-reviewed/          # Mark reviewed without full cycle
+│   ├── recommendations/      # SR-based recommendations
+│   ├── settings/               # User SR settings
+│   ├── skip/                   # Skip a card
+│   └── stats/                  # SR statistics
+├── sync-subscription/          # Manual Stripe ↔ Firestore sync
+├── test-email/                 # Dev email test
+├── usage/voice/                # Voice usage accounting
+├── user/
+│   ├── mastered-problems/      # Mastery list
+│   ├── metrics/                # User KPIs
+│   ├── notification-preferences/
+│   ├── profile/                # Profile CRUD
+│   ├── subscription-status/    # Entitlements
+│   └── usage/                  # AI usage (user-facing)
+├── vectorize-problems/         # Batch vectorize problem bank
+├── vectorize-session/          # Vectorize session for RAG memory
+├── voice/token/                # Deepgram (or STT) client token
+└── webhook/stripe/             # Stripe webhooks (signature verified)
+```
+
+**How to read this tree:** Folders map 1:1 to URL paths (e.g. `app/api/chat/route.ts` → `POST /api/chat`). Some routes expose multiple HTTP methods on one file.
+
+**Maintenance:** After adding or removing API routes, update the tree and run `find app/api -name 'route.ts' | wc -l` so the “~86 route handlers” note in the directory structure stays accurate.
+
+---
+
+## Code execution and console output
+
+### Execution service (Piston)
+
+- **Transport:** HTTP to a **Piston**-compatible API (`PISTON_API_URL`, default public `emkc.org` Piston).
+- **Isolation:** User code runs in Piston’s sandbox (no access to your env vars, host filesystem, or network).
+- **Entry:** `POST /api/execute` → `lib/piston.ts` (`executeWithPiston`) → Piston `run` API.
+
+### What happens on each run
+
+1. **Rate limits & quota** — Same tiered limits as other heavy endpoints (`lib/rate-limiter`, `lib/quota-enforcement`).
+2. **Scenario load** — Problem definition and test cases from `lib/scenarios` / scenario id.
+3. **Wrapper injection** — User source is wrapped in a language-specific template (JavaScript/TypeScript/Python, etc.) that:
+   - Defines helpers (e.g. `TreeNode`, `ListNode`, tree/list builders) for DSA problems.
+   - **Patches `console.log` / `warn` / `error` / `info`** to append structured entries to an in-memory `_consoleLogs` array while still printing to stdout.
+   - Invokes the user’s solution function (or class-based workflow for design-style problems).
+   - Emits machine-readable lines: `__LOGS__:` + JSON array, then `__RESULT__:` + JSON return value.
+4. **Parse** — `parseExecutionOutput` in `lib/piston.ts` scans stdout for `__LOGS__:` and `__RESULT__:` lines and returns `{ result, consoleLogs }`.
+5. **Validate** — Test outputs are compared with expected values via `lib/validators` (property-based validators with legacy fallback in `app/api/execute/route.ts`).
+
+### Console in the UI
+
+Structured `ConsoleLog` objects (`type`: `log` | `error` | `warn` | `info`, `message`, `timestamp`) are returned to the client with the execution response so the interview UI can show a **console panel** separate from raw **stdout/stderr** and from **pass/fail** test rows.
+
+### Line numbers in errors
+
+Wrapper code adds many lines before user code. Constants such as `PYTHON_WRAPPER_LINE_OFFSET` / `JAVASCRIPT_WRAPPER_LINE_OFFSET` adjust reported line numbers back toward the user’s editor.
+
+### Related route
+
+- **`/api/execute/ast`** — Additional execution path for AST-related analysis (see `app/api/execute/ast/route.ts`).
+
+---
+
+## AI layer (LLM orchestration)
+
+### Primary module
+
+- **`lib/ai-providers.ts`** — Central abstraction for chat completions.
+
+### Providers (configured in code)
+
+| Provider | Typical use | Notes |
+|----------|-------------|--------|
+| **Gemini** (`gemini-2.5-flash`) | Default interview dialogue | Primary |
+| **Gemini Lite** | Cheaper / shorter replies | Same API key |
+| **DeepSeek** | Fallback chat | OpenAI-compatible HTTP, optional API key |
+| **Claude** | Heavier reasoning / feedback | Optional `ANTHROPIC_API_KEY` |
+
+Availability is gated by env vars (`GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`).
+
+### `generateAIResponse` pipeline
+
+1. **Rate limit** — Per-user sliding window when `userId` is passed (`checkRateLimit`).
+2. **Provider selection** — Based on `TaskComplexity` (`simple` | `standard` | `complex` | `dialogue` | `code` | `critique`) and optional `preferredProvider`.
+3. **Cache** — `lib/ai-cache.ts` key/value cache to avoid repeat spend on identical prompts (skippable via `skipCache`).
+4. **Call** — Google Generative AI SDK for Gemini; HTTP for OpenAI-compatible providers.
+5. **Usage tracking** — `lib/usage-tracking.ts` records tokens/cost to Firestore (`usage_events`, aggregates) for billing and admin dashboards.
+6. **Return** — `{ text, provider, tokensUsed, latencyMs }`.
+
+### Where AI is invoked
+
+| Area | Typical entry |
+|------|----------------|
+| Live interview | `/api/chat` → `generateAIResponse` + interview prompts (`lib/interview/`) |
+| Feedback | `/api/generate-feedback`, `/api/feedback/*`, streaming routes |
+| Hints | `/api/agents/hints`, hint paths inside chat |
+| Complexity / analysis | `/api/analyze-complexity` |
+| Roadmap / copy | `lib/roadmap/*`, prompts in `lib/prompts/` |
+
+**Edge vs Node:** Some flows use `lib/ai-providers-edge.ts` where the runtime requires edge-safe imports; keep one mental model: **same product behavior, different bundle constraints**.
+
+---
+
+## RAG architecture
+
+Retrieval-Augmented Generation (RAG) is implemented under **`lib/rag/`** and is consumed by chat, roadmap, hint agents, and `/api/rag` actions.
+
+### Layer diagram
+
+```
+                         ┌─────────────────────────────────────────┐
+                         │           Consumers                        │
+                         │  /api/chat  /api/rag  roadmap  hints     │
+                         └─────────────────────┬───────────────────┘
+                                               │
+                         ┌─────────────────────▼───────────────────┐
+                         │     Context builder & knowledge-base     │
+                         │  lib/rag/context-builder.ts              │
+                         │  lib/rag/knowledge-base/* (DSA, company, │
+                         │    complexity, debugging, behavior…)     │
+                         └─────────────────────┬───────────────────┘
+                                               │
+              ┌────────────────────────────────┼────────────────────────────┐
+              │                                │                            │
+              ▼                                ▼                            ▼
+   ┌──────────────────────┐      ┌────────────────────────┐   ┌──────────────────┐
+   │ Advanced retrieval    │      │ Dynamic chat context    │   │ User profile RAG  │
+   │ lib/rag/retrieval/    │      │ lib/rag/dynamic-chat-   │   │ lib/rag/enhanced-  │
+   │   advanced-retrieval  │      │   context.ts            │   │   user-profile.ts  │
+   └───────────┬──────────┘      └────────────┬────────────┘   └─────────┬─────────┘
+              │                                │                          │
+              └────────────────────┬───────────┴──────────────────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │  Vector query + filters       │
+                    │  lib/rag/index.ts (orchestrator)│
+                    │  similarity search, stores    │
+                    └───────────────┬───────────────┘
+                                   │
+              ┌────────────────────┴────────────────────┐
+              ▼                                         ▼
+   ┌─────────────────────────┐             ┌─────────────────────────┐
+   │   Embeddings             │             │   Vector database        │
+   │   lib/rag/embeddings/    │             │   lib/rag/vectordb/      │
+   │   hybrid-provider.ts     │             │   FirestoreVectorDB OR   │
+   │   Gemini (768D primary)  │             │   PineconeVectorDB       │
+   │   TF-IDF / OpenAI fallbacks│           │   (env: PINECONE_API_KEY) │
+   └─────────────────────────┘             └─────────────────────────┘
+```
+
+### Embeddings (`lib/rag/embeddings/`)
+
+- **`HybridEmbeddingProvider`** — Modes such as `gemini-with-fallback`: try **Gemini `text-embedding-004`** (768-dim), then **TF-IDF** (or other fallbacks) if needed.
+- **Caching** — `embeddingCache` reduces duplicate embedding calls.
+- **Pinecone alignment** — `getRequiredEmbeddingDimension()` ensures vectors match the Pinecone index when Pinecone is enabled.
+
+### Vector storage (`lib/rag/vectordb/`)
+
+- **Default:** `FirestoreVectorDB` — vectors stored in Firestore when Pinecone is not configured.
+- **Scaled:** `PineconeVectorDB` when `PINECONE_API_KEY` is set and `USE_PINECONE` is not `'false'`.
+- **Factory:** `lib/rag/vectordb/index.ts` exports a singleton `vectorDB` and helpers `isPineconeEnabled()`, `getVectorDBProvider()`.
+
+### Retrieval (`lib/rag/retrieval/advanced-retrieval.ts`)
+
+- Query expansion, hybrid semantic + keyword signals, optional reranking with weights (similarity, recency, user history, etc.).
+- Returns `EnhancedRetrievalResult[]` consumed by `RAGContextBuilder`.
+
+### Orchestrator (`lib/rag/index.ts`)
+
+Exports used across the app: `generateTextEmbedding`, `getSimilarProblems`, `getRelevantHints`, similarity search, storing solutions/sessions, recommendations, etc., all building on `vectorDB` + `HybridEmbeddingProvider`.
+
+### HTTP surface
+
+- **`POST /api/rag`** — Action-based JSON body (`action`: hints, similar problems, store solution, recommendations, …); some actions require auth (see `app/api/rag/route.ts`).
+- **`/api/rag/v2`**, **`/api/rag/health`** — Alternate or health paths.
+
+### Knowledge not in the vector index
+
+Static and curated content in **`lib/rag/knowledge-base/`** (e.g. DSA patterns, company interview norms) is merged with retrieved chunks so the model always gets **curated priors** plus **personalized retrieval**.
+
+---
+
 ## Core Systems
 
 ### 1. Interview Engine
@@ -129,35 +397,15 @@ The core interview experience combining AI chat, code execution, and real-time f
 ```
 
 **Data Flow:**
-1. User writes code → Sent to `/api/execute`
-2. User sends message → Sent to `/api/chat` with context
-3. AI responds with hints/feedback
-4. Test results update in real-time
-5. Session metrics tracked continuously
+1. User writes code → `POST /api/execute` (Piston + validation; console captured — see [Code execution and console output](#code-execution-and-console-output))
+2. User sends message → `POST /api/chat` with code, scenario, history; **RAG** augments prompts (see [RAG architecture](#rag-architecture)); **AI** routed via `lib/ai-providers.ts` (see [AI layer](#ai-layer-llm-orchestration))
+3. AI responds with interviewer dialogue / hints
+4. Test results and structured console logs returned to the client
+5. Session metrics tracked (`/api/session/metrics`, analytics)
 
-### 2. RAG System (Retrieval-Augmented Generation)
+### 2. RAG System (summary)
 
-Enhances AI responses with contextual knowledge.
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Question   │────▶│  Embeddings  │────▶│   Vector DB  │
-│   Context    │     │   (Gemini)   │     │  (Pinecone)  │
-└──────────────┘     └──────────────┘     └──────────────┘
-                                                  │
-                                                  ▼
-                                          ┌──────────────┐
-┌──────────────┐     ┌──────────────┐     │   Relevant   │
-│  AI Response │◀────│    Gemini    │◀────│   Context    │
-│              │     │   + Context  │     └──────────────┘
-└──────────────┘     └──────────────┘
-```
-
-**Knowledge Sources:**
-- DSA patterns & explanations
-- Company-specific interview styles
-- Common misconceptions & corrections
-- Hint progressions (level 1-4)
+Full pipeline (embeddings → Firestore or Pinecone → advanced retrieval → context builder → chat/RAG API) is documented in **[RAG architecture](#rag-architecture)** above. High level: retrieved chunks plus **knowledge-base** priors (DSA, company styles, misconceptions) feed Gemini prompts.
 
 ### 3. Spaced Repetition System
 
@@ -464,4 +712,4 @@ See `.env.example` for required configuration.
 
 ---
 
-**Last Updated:** January 2026
+**Last Updated:** April 2026
