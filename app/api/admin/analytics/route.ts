@@ -225,7 +225,7 @@ export async function GET(request: NextRequest) {
     const totalUsers = authUsers.length
 
     // Build profile map for tier data
-    const profileMap = new Map<string, { subscription_tier?: string }>()
+    const profileMap = new Map<string, { subscription_tier?: string; created_at?: string }>()
     const PROFILE_BATCH = 30
     for (let i = 0; i < authUsers.length; i += PROFILE_BATCH) {
       const batch = authUsers.slice(i, i + PROFILE_BATCH)
