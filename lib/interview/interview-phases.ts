@@ -8,8 +8,6 @@
  * - Phase type definitions
  * - Phase detection (deterministic)
  * - Conversation tracking
- *
- * DRY: Uses shared-patterns.ts for pattern detection.
  */
 
 import {
