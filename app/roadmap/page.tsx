@@ -47,6 +47,7 @@ import {
 } from "@/components/roadmap"
 import { useRoadmapStore, useActiveRoadmap } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
+import type { DailyPlan, Milestone, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
 import { getStudyRecommendations } from "@/lib/roadmap/prioritization-algorithm"
 import { generatePersonalizedGuide } from "@/lib/roadmap/personalized-guide-generator"
 import { cn, getStoredDateComponents, getLocalDateComponents } from "@/lib/utils"
@@ -72,6 +73,56 @@ import {
 
 // Tab-based view to reduce cognitive load
 type RoadmapTab = "today" | "schedule" | "progress" | "guide"
+
+type SerializedDailyPlan = Omit<DailyPlan, "date" | "questions"> & {
+  date: string | Date
+  questions?: Array<
+    Omit<DailyPlan["questions"][number], "completedAt"> & {
+      completedAt?: string | Date
+    }
+  >
+}
+
+type SerializedMilestone = Omit<Milestone, "targetDate" | "completedAt"> & {
+  targetDate: string | Date
+  completedAt?: string | Date
+}
+
+type SerializedRoadmap = Omit<
+  PersonalizedRoadmap,
+  "interviewDate" | "createdAt" | "updatedAt" | "dailyPlans" | "milestones"
+> & {
+  interviewDate: string | Date
+  createdAt?: string | Date
+  updatedAt?: string | Date
+  dailyPlans?: SerializedDailyPlan[]
+  milestones?: SerializedMilestone[]
+}
+
+function hydrateRoadmap(serializedRoadmap: SerializedRoadmap): PersonalizedRoadmap {
+  return {
+    ...serializedRoadmap,
+    interviewDate: new Date(serializedRoadmap.interviewDate),
+    createdAt: serializedRoadmap.createdAt ? new Date(serializedRoadmap.createdAt) : new Date(),
+    updatedAt: serializedRoadmap.updatedAt ? new Date(serializedRoadmap.updatedAt) : new Date(),
+    dailyPlans:
+      serializedRoadmap.dailyPlans?.map((plan) => ({
+        ...plan,
+        date: new Date(plan.date),
+        questions:
+          plan.questions?.map((question) => ({
+            ...question,
+            completedAt: question.completedAt ? new Date(question.completedAt) : undefined,
+          })) || [],
+      })) || [],
+    milestones:
+      serializedRoadmap.milestones?.map((milestone) => ({
+        ...milestone,
+        targetDate: new Date(milestone.targetDate),
+        completedAt: milestone.completedAt ? new Date(milestone.completedAt) : undefined,
+      })) || [],
+  }
+}
 
 export default function RoadmapPage() {
   const router = useRouter()
@@ -176,30 +227,7 @@ export default function RoadmapPage() {
 
           if (activeData.roadmap) {
             // Convert date strings back to Date objects for the store
-            const roadmap = {
-              ...activeData.roadmap,
-              interviewDate: new Date(activeData.roadmap.interviewDate),
-              createdAt: activeData.roadmap.createdAt
-                ? new Date(activeData.roadmap.createdAt)
-                : new Date(),
-              updatedAt: activeData.roadmap.updatedAt
-                ? new Date(activeData.roadmap.updatedAt)
-                : new Date(),
-              dailyPlans:
-                activeData.roadmap.dailyPlans?.map((plan: any) => ({
-                  ...plan,
-                  date: new Date(plan.date),
-                  questions: plan.questions?.map((q: any) => ({
-                    ...q,
-                    completedAt: q.completedAt ? new Date(q.completedAt) : undefined,
-                  })),
-                })) || [],
-              milestones:
-                activeData.roadmap.milestones?.map((m: any) => ({
-                  ...m,
-                  targetDate: new Date(m.targetDate),
-                })) || [],
-            }
+            const roadmap = hydrateRoadmap(activeData.roadmap as SerializedRoadmap)
             setActiveRoadmap(roadmap)
 
             // Calculate and set the correct day index immediately after loading
@@ -214,7 +242,7 @@ export default function RoadmapPage() {
 
             // First try to find an exact match for today
             let correctDayIndex =
-              roadmap.dailyPlans?.findIndex((plan: any) => {
+              roadmap.dailyPlans?.findIndex((plan) => {
                 const planDate = new Date(plan.date)
                 const planDateComponents = getStoredDateComponents(planDate)
                 return (
@@ -450,30 +478,7 @@ export default function RoadmapPage() {
       if (activeResponse.ok) {
         const activeData = await activeResponse.json()
         if (activeData.roadmap) {
-          const roadmap = {
-            ...activeData.roadmap,
-            interviewDate: new Date(activeData.roadmap.interviewDate),
-            createdAt: activeData.roadmap.createdAt
-              ? new Date(activeData.roadmap.createdAt)
-              : new Date(),
-            updatedAt: activeData.roadmap.updatedAt
-              ? new Date(activeData.roadmap.updatedAt)
-              : new Date(),
-            dailyPlans:
-              activeData.roadmap.dailyPlans?.map((plan: any) => ({
-                ...plan,
-                date: new Date(plan.date),
-                questions: plan.questions?.map((q: any) => ({
-                  ...q,
-                  completedAt: q.completedAt ? new Date(q.completedAt) : undefined,
-                })),
-              })) || [],
-            milestones:
-              activeData.roadmap.milestones?.map((m: any) => ({
-                ...m,
-                targetDate: new Date(m.targetDate),
-              })) || [],
-          }
+          const roadmap = hydrateRoadmap(activeData.roadmap as SerializedRoadmap)
           setActiveRoadmap(roadmap)
 
           // Calculate and set the correct day index immediately
@@ -487,7 +492,7 @@ export default function RoadmapPage() {
 
           // First try to find an exact match for today
           let correctDayIndex =
-            roadmap.dailyPlans?.findIndex((plan: any) => {
+            roadmap.dailyPlans?.findIndex((plan) => {
               const planDate = new Date(plan.date)
               const planDateComponents = getStoredDateComponents(planDate)
               return (

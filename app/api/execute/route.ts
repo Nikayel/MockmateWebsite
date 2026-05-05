@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getScenarioById } from "@/lib/scenarios"
+import { getScenarioById, type Scenario } from "@/lib/scenarios"
 import { executeRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
 import {
@@ -16,6 +16,44 @@ import { validateResultEnhanced, Normalizers } from "@/lib/validators"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = "force-dynamic"
+
+type JsonLike = null | boolean | number | string | JsonLike[] | { [key: string]: JsonLike }
+
+interface ExecutionTestCase {
+  description: string
+  input: JsonLike | Record<string, unknown>
+  expected: unknown
+  orderMatters?: boolean
+  compareAsSet?: boolean
+  caseSensitive?: boolean
+}
+
+interface CodebaseFile {
+  fileName: string
+  content: string
+}
+
+type ScenarioWithCodebase = Scenario & {
+  codebaseFiles?: Partial<Record<string, CodebaseFile[]>>
+}
+
+interface ExecuteRequestBody {
+  code?: string
+  scenarioId?: string
+  language?: string
+  sessionId?: string
+  userId?: string
+}
+
+interface ExecutionResultItem {
+  description?: string
+  input: ExecutionTestCase["input"]
+  expected: unknown
+  actual: unknown
+  passed: boolean
+  error: string | null
+  serviceError?: boolean
+}
 
 /**
  * Validate test results using property-based validation system
@@ -38,9 +76,9 @@ export const dynamic = "force-dynamic"
  * - String/number comparisons
  */
 function validateResult(
-  actual: any,
-  expected: any,
-  testCase: any,
+  actual: unknown,
+  expected: unknown,
+  testCase: ExecutionTestCase,
   scenarioType: string,
   scenarioId: string = "",
   language: string = "javascript"
@@ -71,9 +109,9 @@ function validateResult(
 
 // Legacy validation logic (kept for backwards compatibility)
 function legacyValidateResult(
-  actual: any,
-  expected: any,
-  testCase: any,
+  actual: unknown,
+  expected: unknown,
+  testCase: ExecutionTestCase,
   scenarioType: string
 ): boolean {
   // For DSA array problems, check if arrays are equal
@@ -82,16 +120,18 @@ function legacyValidateResult(
 
     // For array of arrays (like 2D arrays), deep compare
     if (expected.length > 0 && Array.isArray(expected[0])) {
-      return expected.every((expectedRow: any, rowIdx: number) => {
+      return expected.every((expectedRow, rowIdx) => {
         if (!Array.isArray(actual[rowIdx])) return false
-        return expectedRow.every((val: any, colIdx: number) => val === actual[rowIdx][colIdx])
+        return (expectedRow as unknown[]).every(
+          (val: unknown, colIdx: number) => val === actual[rowIdx][colIdx]
+        )
       })
     }
 
     // For arrays where order doesn't matter (set-like), check as sets
     if (testCase.orderMatters === false || testCase.compareAsSet) {
-      const expectedSet = new Set(expected.map((x: any) => JSON.stringify(x)))
-      const actualSet = new Set(actual.map((x: any) => JSON.stringify(x)))
+      const expectedSet = new Set(expected.map((x) => JSON.stringify(x)))
+      const actualSet = new Set(actual.map((x) => JSON.stringify(x)))
       if (expectedSet.size !== actualSet.size) return false
       for (const item of expectedSet) {
         if (!actualSet.has(item)) return false
@@ -100,7 +140,7 @@ function legacyValidateResult(
     }
 
     // Default array comparison (order matters)
-    return expected.every((val: any, idx: number) => {
+    return expected.every((val, idx) => {
       if (typeof val === "number" && typeof actual[idx] === "number") {
         return Math.abs(val - actual[idx]) < 0.0001
       }
@@ -129,18 +169,26 @@ function legacyValidateResult(
   }
 
   // For object comparisons (deep equality)
-  if (typeof expected === "object" && typeof actual === "object" && !Array.isArray(expected)) {
+  if (
+    typeof expected === "object" &&
+    expected !== null &&
+    typeof actual === "object" &&
+    actual !== null &&
+    !Array.isArray(expected)
+  ) {
     try {
       // Handle nested objects
       const expectedKeys = Object.keys(expected).sort()
       const actualKeys = Object.keys(actual).sort()
+      const expectedRecord = expected as Record<string, unknown>
+      const actualRecord = actual as Record<string, unknown>
 
       if (expectedKeys.length !== actualKeys.length) return false
 
       return expectedKeys.every((key) => {
         return legacyValidateResult(
-          actual[key],
-          expected[key],
+          actualRecord[key],
+          expectedRecord[key],
           { ...testCase, orderMatters: true },
           scenarioType
         )
@@ -158,20 +206,19 @@ function legacyValidateResult(
 /**
  * Build full code with supporting codebase files for bugfix/add-functionality scenarios
  */
-function buildFullCode(code: string, scenario: any, language: string): string {
+function buildFullCode(code: string, scenario: ScenarioWithCodebase, language: string): string {
   if (scenario.type !== "bugfix" && scenario.type !== "add-functionality") {
     return code
   }
 
-  const scenarioWithCodebase = scenario as any
-  const codebaseFiles = scenarioWithCodebase.codebaseFiles?.[language] || []
+  const codebaseFiles = scenario.codebaseFiles?.[language] || []
 
   if (codebaseFiles.length === 0) {
     return code
   }
 
   const supportingCode = codebaseFiles
-    .map((file: any) => {
+    .map((file) => {
       let fileContent = file.content
 
       // For JavaScript/TypeScript, remove ES6 export/import statements
@@ -231,7 +278,13 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioId, language = "javascript", sessionId, userId } = await request.json()
+    const {
+      code,
+      scenarioId,
+      language = "javascript",
+      sessionId,
+      userId,
+    } = (await request.json()) as ExecuteRequestBody
 
     logger.info("Execute API called", { scenarioId, language, codeLength: code?.length })
 
@@ -258,8 +311,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate language parameter
-    const validLanguages = ["javascript", "typescript", "python"]
-    if (!validLanguages.includes(language)) {
+    const validLanguages = ["javascript", "typescript", "python"] as const
+    if (!validLanguages.includes(language as (typeof validLanguages)[number])) {
       logger.warn("Execute API: Invalid language", { language, scenarioId })
       return NextResponse.json(
         {
@@ -268,6 +321,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    const executionLanguage = language as (typeof validLanguages)[number]
 
     // Get scenario from scenarios.ts
     const scenario = getScenarioById(scenarioId)
@@ -283,7 +337,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get test cases from scenario (only DSA and some other types have testCases)
-    const testCases = "testCases" in scenario ? scenario.testCases || [] : []
+    const testCases: ExecutionTestCase[] =
+      "testCases" in scenario && Array.isArray(scenario.testCases)
+        ? (scenario.testCases as ExecutionTestCase[])
+        : []
 
     if (testCases.length === 0) {
       return NextResponse.json(
@@ -293,16 +350,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Build full code with supporting files for bugfix/add-functionality
-    const fullCode = buildFullCode(code, scenario, language)
+    const fullCode = buildFullCode(code, scenario as ScenarioWithCodebase, executionLanguage)
 
-    const results = []
+    const results: ExecutionResultItem[] = []
     let allPassed = true
-    let allConsoleLogs: any[] = []
+    let allConsoleLogs: unknown[] = []
 
     // Execute each test case using Piston (secure sandbox)
     // Add small delay between test cases to avoid rate limit bursts on Piston API
     for (let i = 0; i < testCases.length; i++) {
-      const testCase = testCases[i]
+      const testCase: ExecutionTestCase = {
+        ...testCases[i],
+        description: testCases[i].description || `Test case ${i + 1}`,
+      }
 
       // Add 100ms delay between test cases (not before first one)
       if (i > 0) {
@@ -310,7 +370,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const executionResult = await executeWithPiston(fullCode, language, testCase.input)
+        const executionResult = await executeWithPiston(fullCode, executionLanguage, testCase.input)
 
         if (!executionResult.success || executionResult.error) {
           // Check if this is an infrastructure error (service busy, timeout, etc.)
@@ -370,7 +430,7 @@ export async function POST(request: NextRequest) {
           testCase,
           scenario.type,
           scenarioId,
-          language
+          executionLanguage
         )
 
         if (!passed) {
@@ -400,7 +460,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate summary
     // Exclude service errors from the count - they're infrastructure issues, not code failures
-    const serviceErrorCount = results.filter((r: any) => r.serviceError).length
+    const serviceErrorCount = results.filter((r) => r.serviceError).length
     const passedCount = results.filter((r) => r.passed).length
     const effectiveTotal = testCases.length - serviceErrorCount // Tests that actually ran
     const totalCount = testCases.length
