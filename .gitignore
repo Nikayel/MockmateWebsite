@@ -32,6 +32,8 @@ next-env.d.ts
 
 # Claude Code
 CLAUDE.md
+.agents/CLAUDE.md
+.agents/AI_ASSISTANT.md
 .claude/settings.local.json
 .claude/skills/
 
