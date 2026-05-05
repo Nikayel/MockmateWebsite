@@ -1,0 +1,138 @@
+import type { SystemDesignScenario } from "../types"
+
+export const urlShortenerScenario: SystemDesignScenario = {
+  id: "system-design-url-shortener",
+  title: "Design a URL Shortener",
+  type: "system-design",
+  difficulty: "easy",
+  companies: ["Google", "Amazon", "Meta", "Microsoft"],
+  description: "Design a scalable URL shortening service like bit.ly or tinyurl.com",
+  tags: ["system-design", "scalability", "distributed-systems", "hashing"],
+  estimatedTime: 45,
+  problemStatement: `Design a URL shortening service that converts long URLs into short, shareable links. Users should be able to create short URLs, and when someone visits a short URL, they should be redirected to the original URL.
+
+The service should handle millions of URL shortenings per day and billions of redirections per month. Consider how you would design the system to be scalable, reliable, and performant.`,
+  functionalRequirements: [
+    "Users can submit a long URL and get back a shortened URL",
+    "When users visit a short URL, they are redirected to the original long URL",
+    "Short URLs should be as short as possible (ideally 6-8 characters)",
+    "Users should optionally be able to customize their short URL",
+    "Short URLs should never expire (or have a configurable expiration)",
+    "Analytics: track how many times each short URL has been clicked",
+  ],
+  nonFunctionalRequirements: [
+    "System should be highly available (99.9% uptime)",
+    "Redirection should happen with minimal latency (< 100ms)",
+    "System should be scalable to handle millions of requests",
+    "Short URLs should be unique and not guessable",
+    "Service should be resilient to failures",
+  ],
+  constraints: [
+    "Expected 100M new URLs per month",
+    "Expected 10B redirections per month",
+    "Data should be stored for at least 5 years",
+    "Read:Write ratio is 100:1",
+    "Traffic is not evenly distributed (some URLs are very popular)",
+  ],
+  keyComponents: [
+    "API Gateway / Load Balancer",
+    "Application Servers",
+    "Database (SQL or NoSQL)",
+    "Cache Layer (Redis/Memcached)",
+    "Short URL Generation Service",
+    "Analytics Service",
+    "Monitoring & Logging",
+  ],
+  hints: [
+    "Start with defining the API endpoints: POST /shorten and GET /{shortUrl}",
+    "Consider using a hash function (MD5, Base62) for generating short URLs",
+    "Think about how to handle collisions when generating short URLs",
+    "A cache layer can significantly reduce database reads for popular URLs",
+    "Consider using a NoSQL database for better horizontal scalability",
+    "Pre-generate a pool of unique short codes for better performance",
+    "Use consistent hashing for distributing cache across multiple servers",
+  ],
+  evaluationCriteria: [
+    {
+      category: "Requirements Gathering",
+      description: "Clarified functional and non-functional requirements",
+      weight: 15,
+    },
+    {
+      category: "High-Level Architecture",
+      description: "Proposed clear architecture with major components",
+      weight: 25,
+    },
+    {
+      category: "Data Model",
+      description: "Designed appropriate database schema",
+      weight: 15,
+    },
+    {
+      category: "API Design",
+      description: "Defined clean and RESTful API endpoints",
+      weight: 10,
+    },
+    {
+      category: "Scalability",
+      description: "Addressed scaling concerns (caching, sharding, CDN)",
+      weight: 20,
+    },
+    {
+      category: "Trade-offs",
+      description: "Discussed trade-offs and alternative approaches",
+      weight: 15,
+    },
+  ],
+  exampleSolution: {
+    overview:
+      "A distributed URL shortening service using Base62 encoding for short code generation, Redis for caching popular URLs, and a NoSQL database for persistent storage. The system uses consistent hashing for cache distribution and database sharding for horizontal scalability.",
+    architecture: [
+      "Load Balancer: Distributes incoming requests across multiple app servers",
+      "Application Servers: Stateless servers handling URL creation and redirection",
+      "Redis Cache Cluster: Caches popular URLs to reduce database load",
+      "Database Cluster: Sharded NoSQL database (Cassandra/DynamoDB) for URL mappings",
+      "Analytics Service: Async service for tracking click events",
+      "Short Code Generator: Pre-generates unique short codes using Base62",
+    ],
+    dataModel: [
+      "URL Table: { shortCode (PK), longUrl, createdAt, expiresAt, userId, clicks }",
+      "Analytics Table: { shortCode, timestamp, userAgent, ipAddress, location }",
+      "User Table: { userId, email, createdAt, tier }",
+      "Index on shortCode for O(1) lookups",
+      "Sharding key: hash(shortCode) for distributing data",
+    ],
+    apiDesign: [
+      "POST /api/v1/shorten - Body: { longUrl, customAlias?, userId? } - Returns: { shortUrl, shortCode }",
+      "GET /{shortCode} - Redirects to long URL (302 redirect)",
+      "GET /api/v1/analytics/{shortCode} - Returns click statistics",
+      "DELETE /api/v1/{shortCode} - Deletes a short URL",
+    ],
+    scalability: [
+      "Horizontal scaling: Add more app servers behind load balancer",
+      "Database sharding: Partition data by hash(shortCode) across multiple DB nodes",
+      "Caching: Cache popular URLs in Redis (80-20 rule: 20% URLs get 80% traffic)",
+      "CDN: Serve static content and potentially cache redirects geographically",
+      "Rate limiting: Prevent abuse by limiting requests per user/IP",
+      "Async analytics: Use message queue (Kafka) to handle click tracking asynchronously",
+    ],
+    tradeoffs: [
+      "Short code generation: Random generation vs Counter-based vs Hash-based",
+      "Database choice: SQL (ACID guarantees) vs NoSQL (better scalability)",
+      "Cache eviction: LRU vs LFU vs TTL-based",
+      "Redirect type: 301 (permanent, cached by browsers) vs 302 (temporary, always hits server)",
+      "Custom aliases: Allow customization but need to handle conflicts",
+      "Analytics granularity: Real-time vs batch processing",
+    ],
+  },
+  discussionPoints: [
+    "How would you generate unique short codes? What are the pros/cons of different approaches?",
+    "How would you handle a short URL that goes viral and gets millions of requests?",
+    "What happens if the database goes down? How do you ensure availability?",
+    "How would you prevent abuse (e.g., someone creating millions of short URLs)?",
+    "How would you implement custom aliases while ensuring uniqueness?",
+    "What metrics would you track to monitor system health?",
+    "How would you handle URL expiration and cleanup?",
+    "What security concerns should you address (malicious URLs, DDoS)?",
+  ],
+}
