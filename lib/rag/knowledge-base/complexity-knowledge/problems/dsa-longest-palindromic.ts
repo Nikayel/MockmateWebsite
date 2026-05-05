@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const longestPalindromicComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-longest-palindromic",
+  leetcodeNumber: 5,
+  slug: "longest-palindromic-substring",
+  problemTitle: "Longest Palindromic Substring",
+  sourceUrl: "https://leetcode.com/problems/longest-palindromic-substring/editorial/",
+  difficulty: "Medium",
+  tags: ["Two Pointers", "String", "Dynamic Programming"],
+  approaches: [
+    {
+      name: "Expand Around Center",
+      timeComplexity: "O(n^2)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Best practical approach - optimal space",
+      whenToUse: "Preferred for interviews",
+      codePattern: "Try each center (odd and even), expand outward",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Dynamic Programming",
+      timeComplexity: "O(n^2)",
+      spaceComplexity: "O(n^2)",
+      tradeOff: "Same time, more space, but shows DP skills",
+      whenToUse: "When DP approach is requested",
+      codePattern: "dp[i][j] = true if s[i:j] is palindrome",
+      isOptimalTime: false,
+      isOptimalSpace: false,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Manacher's Algorithm",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Optimal time but complex to implement",
+      whenToUse: "When O(n) is strictly required",
+      codePattern: "Transform string, use palindrome symmetry",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "leetcode-editorial",
+    },
+  ],
+  commonMistakes: [
+    "Forgetting to check both odd and even length palindromes",
+    "Not tracking actual substring (just length)",
+    "DP table fill order wrong",
+  ],
+  keyOperations: [
+    { operation: "Center expansion", complexity: "O(n) per center" },
+    { operation: "n centers", complexity: "O(n) centers" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "leetcode-editorial",
+}

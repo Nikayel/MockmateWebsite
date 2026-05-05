@@ -1,0 +1,40 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const maxDepthTreeComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-max-depth-tree",
+  leetcodeNumber: 104,
+  slug: "maximum-depth-of-binary-tree",
+  problemTitle: "Maximum Depth of Binary Tree",
+  sourceUrl: "https://leetcode.com/problems/maximum-depth-of-binary-tree/",
+  difficulty: "Easy",
+  tags: ["Tree", "Depth-First Search", "Breadth-First Search", "Binary Tree"],
+  approaches: [
+    {
+      name: "Recursive DFS",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(h)",
+      tradeOff: "Clean one-liner, uses call stack",
+      whenToUse: "Preferred for simplicity",
+      codePattern: "1 + max(left_depth, right_depth)",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Iterative BFS",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Count levels, space for widest level",
+      whenToUse: "When avoiding recursion",
+      codePattern: "Level order traversal, count levels",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: ["Not handling empty tree (return 0, not error)", "Off-by-one in depth counting"],
+  keyOperations: [{ operation: "Tree traversal", complexity: "O(n)" }],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const wordBreakComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-word-break",
+  leetcodeNumber: 139,
+  slug: "word-break",
+  problemTitle: "Word Break",
+  sourceUrl: "https://leetcode.com/problems/word-break/editorial/",
+  difficulty: "Medium",
+  tags: ["Array", "Hash Table", "String", "Dynamic Programming", "Trie", "Memoization"],
+  approaches: [
+    {
+      name: "Bottom-Up DP",
+      timeComplexity: "O(n * m * k)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Standard DP approach, k = avg word length",
+      whenToUse: "Preferred approach",
+      codePattern: "dp[i] = true if s[0:i] can be segmented",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Top-Down with Memoization",
+      timeComplexity: "O(n * m * k)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Same complexity, recursive thinking",
+      whenToUse: "When recursion is clearer",
+      codePattern: "Try each word at current position",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Trie Optimization",
+      timeComplexity: "O(n^2 + m * k)",
+      spaceComplexity: "O(n + m * k)",
+      tradeOff: "Faster word lookup with trie",
+      whenToUse: "When dictionary is large",
+      codePattern: "Build trie from dictionary, DP with trie lookup",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "leetcode-editorial",
+    },
+  ],
+  commonMistakes: [
+    "Not using set for O(1) word lookup",
+    "Wrong substring boundaries",
+    "Not handling empty string correctly",
+  ],
+  keyOperations: [
+    { operation: "Word lookup", complexity: "O(k) or O(1) with set" },
+    { operation: "DP transitions", complexity: "O(n * m)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "leetcode-editorial",
+}

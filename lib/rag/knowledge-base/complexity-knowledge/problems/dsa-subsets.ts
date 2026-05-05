@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const subsetsComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-subsets",
+  leetcodeNumber: 78,
+  slug: "subsets",
+  problemTitle: "Subsets",
+  sourceUrl: "https://leetcode.com/problems/subsets/editorial/",
+  difficulty: "Medium",
+  tags: ["Array", "Backtracking", "Bit Manipulation"],
+  approaches: [
+    {
+      name: "Backtracking",
+      timeComplexity: "O(n * 2^n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Standard approach, space for recursion stack",
+      whenToUse: "Most intuitive for subset generation",
+      codePattern: "Include/exclude each element recursively",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Iterative (Cascading)",
+      timeComplexity: "O(n * 2^n)",
+      spaceComplexity: "O(n * 2^n)",
+      tradeOff: "No recursion, but builds all subsets in memory",
+      whenToUse: "When avoiding recursion",
+      codePattern: "Start empty, add each element to all existing subsets",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Bit Manipulation",
+      timeComplexity: "O(n * 2^n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Elegant but less intuitive",
+      whenToUse: "When showing bit manipulation skills",
+      codePattern: "Each number 0 to 2^n-1 represents a subset",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "leetcode-editorial",
+    },
+  ],
+  commonMistakes: [
+    "Not understanding 2^n subsets exist",
+    "Missing empty subset",
+    "Modifying list while iterating",
+  ],
+  keyOperations: [
+    { operation: "Generate each subset", complexity: "O(n) to copy" },
+    { operation: "Total subsets", complexity: "O(2^n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "leetcode-editorial",
+}

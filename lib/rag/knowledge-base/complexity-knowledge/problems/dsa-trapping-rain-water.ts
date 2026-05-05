@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const trappingRainWaterComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-trapping-rain-water",
+  leetcodeNumber: 42,
+  slug: "trapping-rain-water",
+  problemTitle: "Trapping Rain Water",
+  sourceUrl: "https://leetcode.com/problems/trapping-rain-water/",
+  difficulty: "Hard",
+  tags: ["Array", "Two Pointers", "Dynamic Programming", "Stack", "Monotonic Stack"],
+  approaches: [
+    {
+      name: "Two Pointers",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Optimal in both time and space",
+      whenToUse: "Best approach when you understand the logic",
+      codePattern: "Track left_max and right_max, process shorter side",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Dynamic Programming",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Easier to understand but uses extra space",
+      whenToUse: "When two-pointer logic is confusing",
+      codePattern: "Precompute left_max and right_max arrays",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Monotonic Stack",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Alternative approach using stack",
+      whenToUse: "When you're comfortable with monotonic stacks",
+      codePattern: "Maintain decreasing stack, compute water when popping",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Computing water incorrectly - it's min(left_max, right_max) - height",
+    "Off-by-one errors at boundaries",
+    "Not understanding why two-pointer works (processing shorter side)",
+  ],
+  keyOperations: [
+    { operation: "Water at position", complexity: "O(1)" },
+    { operation: "Array traversal", complexity: "O(n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

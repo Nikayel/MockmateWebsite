@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const coinChangeComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-coin-change",
+  leetcodeNumber: 322,
+  slug: "coin-change",
+  problemTitle: "Coin Change",
+  sourceUrl: "https://leetcode.com/problems/coin-change/",
+  difficulty: "Medium",
+  tags: ["Array", "Dynamic Programming", "Breadth-First Search"],
+  approaches: [
+    {
+      name: "Bottom-Up DP",
+      timeComplexity: "O(amount * n)",
+      spaceComplexity: "O(amount)",
+      tradeOff: "Standard unbounded knapsack approach",
+      whenToUse: "Preferred approach for this problem",
+      codePattern: "dp[i] = min coins to make amount i",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Top-Down with Memoization",
+      timeComplexity: "O(amount * n)",
+      spaceComplexity: "O(amount)",
+      tradeOff: "Same complexity, recursive approach",
+      whenToUse: "When top-down is more intuitive",
+      codePattern: "Recursive with memo, try each coin",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "BFS",
+      timeComplexity: "O(amount * n)",
+      spaceComplexity: "O(amount)",
+      tradeOff: "Alternative graph-based approach",
+      whenToUse: "When thinking of it as shortest path",
+      codePattern: "BFS from 0 to amount, edges are coins",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Greedy doesn't work (counterexample: coins [1,3,4], amount 6)",
+    "Not initializing dp array to infinity",
+    "Not handling impossible case (return -1)",
+  ],
+  keyOperations: [
+    { operation: "DP state transition", complexity: "O(n) per amount" },
+    { operation: "Fill dp array", complexity: "O(amount)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

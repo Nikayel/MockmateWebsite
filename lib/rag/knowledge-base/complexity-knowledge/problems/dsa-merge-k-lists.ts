@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const mergeKListsComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-merge-k-lists",
+  leetcodeNumber: 23,
+  slug: "merge-k-sorted-lists",
+  problemTitle: "Merge k Sorted Lists",
+  sourceUrl: "https://leetcode.com/problems/merge-k-sorted-lists/",
+  difficulty: "Hard",
+  tags: ["Linked List", "Divide and Conquer", "Heap (Priority Queue)", "Merge Sort"],
+  approaches: [
+    {
+      name: "Min Heap",
+      timeComplexity: "O(n log k)",
+      spaceComplexity: "O(k)",
+      tradeOff: "Optimal - heap always has at most k elements",
+      whenToUse: "When you're comfortable with heaps",
+      codePattern: "Add heads to heap, pop min and add its next",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Divide and Conquer",
+      timeComplexity: "O(n log k)",
+      spaceComplexity: "O(log k)",
+      tradeOff: "Same time, less space than heap (recursion only)",
+      whenToUse: "Alternative approach using merge sort pattern",
+      codePattern: "Recursively merge pairs until one list",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Merge One by One",
+      timeComplexity: "O(nk)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Simple but slower",
+      whenToUse: "When k is small",
+      codePattern: "Merge first two, then merge with third, etc.",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Using merge-one-by-one when k is large",
+    "Not handling null lists in heap",
+    "Heap comparison function wrong for custom nodes",
+  ],
+  keyOperations: [
+    { operation: "Heap push/pop", complexity: "O(log k)" },
+    { operation: "Total nodes processed", complexity: "O(n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

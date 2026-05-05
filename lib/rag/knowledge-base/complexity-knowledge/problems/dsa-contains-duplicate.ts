@@ -1,0 +1,57 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const containsDuplicateComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-contains-duplicate",
+  leetcodeNumber: 217,
+  slug: "contains-duplicate",
+  problemTitle: "Contains Duplicate",
+  sourceUrl: "https://leetcode.com/problems/contains-duplicate/",
+  difficulty: "Easy",
+  tags: ["Array", "Hash Table", "Sorting"],
+  approaches: [
+    {
+      name: "Hash Set",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Fast lookup at cost of extra space",
+      whenToUse: "When you need O(n) time and space is available",
+      codePattern: "Add to set, return true if element already exists",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Sorting",
+      timeComplexity: "O(n log n)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Uses less space but modifies input and slower",
+      whenToUse: "When you can modify input and space is limited",
+      codePattern: "Sort then check adjacent elements",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Brute Force",
+      timeComplexity: "O(n^2)",
+      spaceComplexity: "O(1)",
+      tradeOff: "No extra space but very slow",
+      whenToUse: "Never in practice - just for understanding",
+      codePattern: "Compare each pair of elements",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Forgetting sorting approach modifies the original array",
+    "Not considering in-place sorting space is O(log n) for the call stack",
+  ],
+  keyOperations: [
+    { operation: "Set lookup/insert", complexity: "O(1) average" },
+    { operation: "Sorting", complexity: "O(n log n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

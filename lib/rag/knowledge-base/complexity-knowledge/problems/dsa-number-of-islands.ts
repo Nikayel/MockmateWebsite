@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const numberOfIslandsComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-number-of-islands",
+  leetcodeNumber: 200,
+  slug: "number-of-islands",
+  problemTitle: "Number of Islands",
+  sourceUrl: "https://leetcode.com/problems/number-of-islands/",
+  difficulty: "Medium",
+  tags: ["Array", "Depth-First Search", "Breadth-First Search", "Union Find", "Matrix"],
+  approaches: [
+    {
+      name: "DFS",
+      timeComplexity: "O(m * n)",
+      spaceComplexity: "O(m * n)",
+      tradeOff: "Simple, stack space for recursion in worst case",
+      whenToUse: "Most common approach",
+      codePattern: "For each land cell, DFS to mark connected component",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "BFS",
+      timeComplexity: "O(m * n)",
+      spaceComplexity: "O(min(m, n))",
+      tradeOff: "Better space in practice (queue width-bounded)",
+      whenToUse: "When avoiding deep recursion",
+      codePattern: "For each land cell, BFS to mark connected component",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Union Find",
+      timeComplexity: "O(m * n * α(m * n))",
+      spaceComplexity: "O(m * n)",
+      tradeOff: "Good for dynamic updates, but overkill here",
+      whenToUse: "When practicing Union Find",
+      codePattern: "Union adjacent land cells, count components",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Not marking visited cells (infinite loop)",
+    "Checking bounds incorrectly",
+    "Counting water cells instead of land",
+  ],
+  keyOperations: [
+    { operation: "DFS/BFS per cell", complexity: "O(1) amortized" },
+    { operation: "Total cells", complexity: "O(m * n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

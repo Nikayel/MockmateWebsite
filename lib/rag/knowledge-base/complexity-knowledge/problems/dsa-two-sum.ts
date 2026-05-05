@@ -1,0 +1,63 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const twoSumComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-two-sum",
+  leetcodeNumber: 1,
+  slug: "two-sum",
+  problemTitle: "Two Sum",
+  sourceUrl: "https://leetcode.com/problems/two-sum/editorial/",
+  difficulty: "Easy",
+  tags: ["Array", "Hash Table"],
+  approaches: [
+    {
+      name: "Brute Force",
+      timeComplexity: "O(n^2)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Simple but slow - checks all pairs",
+      whenToUse: "When space is extremely limited or for very small inputs",
+      codePattern: "Nested loops comparing all pairs",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "Two-pass Hash Table",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Fast lookup at cost of extra space",
+      whenToUse: "Standard approach when return indices are needed",
+      codePattern: "First pass builds map, second pass looks up complements",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "leetcode-editorial",
+    },
+    {
+      name: "One-pass Hash Table",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Slightly more efficient - single pass",
+      whenToUse: "Preferred when you want clean, single-pass code",
+      codePattern: "Check and insert in same loop iteration",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "leetcode-editorial",
+    },
+  ],
+  commonMistakes: [
+    "Claiming O(1) space when using a hash map",
+    "Forgetting hash map operations are O(1) average, O(n) worst case",
+    "Not considering that returning indices requires hash map (can't sort)",
+  ],
+  keyOperations: [
+    {
+      operation: "Hash map lookup",
+      complexity: "O(1) average",
+      note: "Can degrade to O(n) with collisions",
+    },
+    { operation: "Hash map insert", complexity: "O(1) average" },
+    { operation: "Array iteration", complexity: "O(n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "leetcode-editorial",
+}

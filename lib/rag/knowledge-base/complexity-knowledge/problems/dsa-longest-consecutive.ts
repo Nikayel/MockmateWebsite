@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const longestConsecutiveComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-longest-consecutive",
+  leetcodeNumber: 128,
+  slug: "longest-consecutive-sequence",
+  problemTitle: "Longest Consecutive Sequence",
+  sourceUrl: "https://leetcode.com/problems/longest-consecutive-sequence/",
+  difficulty: "Medium",
+  tags: ["Array", "Hash Table", "Union Find"],
+  approaches: [
+    {
+      name: "Hash Set",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Optimal time with hash set lookups",
+      whenToUse: "Standard approach - only start counting from sequence starts",
+      codePattern: "Only count from numbers where n-1 doesn't exist",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Sorting",
+      timeComplexity: "O(n log n)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Uses less space but doesn't meet O(n) requirement",
+      whenToUse: "When O(n) time isn't required",
+      codePattern: "Sort then iterate checking consecutive pairs",
+      isOptimalTime: false,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Union Find",
+      timeComplexity: "O(n * α(n))",
+      spaceComplexity: "O(n)",
+      tradeOff: "Practically O(n) with inverse Ackermann function",
+      whenToUse: "When you're comfortable with Union Find",
+      codePattern: "Union consecutive numbers, track set sizes",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Starting count from every number (makes it O(n^2))",
+    "Not handling duplicates in the array",
+    "Forgetting the key insight: only start from sequence beginnings",
+  ],
+  keyOperations: [
+    { operation: "Hash set lookup", complexity: "O(1) average" },
+    { operation: "Sequence traversal", complexity: "O(k) where k is sequence length" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}

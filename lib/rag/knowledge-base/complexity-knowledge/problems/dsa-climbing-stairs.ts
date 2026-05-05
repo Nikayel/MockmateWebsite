@@ -1,0 +1,58 @@
+import type { ProblemComplexityKnowledge } from "../../types"
+
+export const climbingStairsComplexity: ProblemComplexityKnowledge = {
+  problemId: "dsa-climbing-stairs",
+  leetcodeNumber: 70,
+  slug: "climbing-stairs",
+  problemTitle: "Climbing Stairs",
+  sourceUrl: "https://leetcode.com/problems/climbing-stairs/",
+  difficulty: "Easy",
+  tags: ["Math", "Dynamic Programming", "Memoization"],
+  approaches: [
+    {
+      name: "Bottom-Up DP (Space Optimized)",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Optimal - only need last two values",
+      whenToUse: "Preferred production approach",
+      codePattern: "Track prev and curr, iterate forward",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Top-Down with Memoization",
+      timeComplexity: "O(n)",
+      spaceComplexity: "O(n)",
+      tradeOff: "Intuitive but uses more space",
+      whenToUse: "When top-down thinking is clearer",
+      codePattern: "Recursive with memo array",
+      isOptimalTime: true,
+      isOptimalSpace: false,
+      source: "algorithm-textbook",
+    },
+    {
+      name: "Matrix Exponentiation",
+      timeComplexity: "O(log n)",
+      spaceComplexity: "O(1)",
+      tradeOff: "Fastest but overkill for interviews",
+      whenToUse: "When you want to show off",
+      codePattern: "Fibonacci via matrix power",
+      isOptimalTime: true,
+      isOptimalSpace: true,
+      source: "algorithm-textbook",
+    },
+  ],
+  commonMistakes: [
+    "Not recognizing this is Fibonacci",
+    "Using full DP array when only need two values",
+    "Off-by-one with base cases",
+  ],
+  keyOperations: [
+    { operation: "State transition", complexity: "O(1)" },
+    { operation: "Iterations", complexity: "O(n)" },
+  ],
+  verified: true,
+  verifiedAt: "2026-01-13",
+  verificationSource: "algorithm-textbook",
+}
