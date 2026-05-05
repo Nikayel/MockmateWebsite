@@ -243,9 +243,8 @@ export async function getScenarioById(id: string): Promise<Scenario | undefined>
       scenarios = await loadSystemDesignScenarios()
       break
     default:
-      // Try loading from legacy module for add-functionality
-      const legacy = await import("../scenarios-add-functionality")
-      scenarios = legacy.addFunctionalityScenarios as unknown as Scenario[]
+      const addFunctionality = await import("./add-functionality")
+      scenarios = addFunctionality.addFunctionalityScenarios as unknown as Scenario[]
   }
 
   return scenarios.find((s) => s.id === id)
@@ -290,8 +289,8 @@ export async function getScenariosByType(type: ScenarioType): Promise<Scenario[]
       return loadSystemDesignScenarios()
 
     case "add-functionality":
-      const legacy = await import("../scenarios-add-functionality")
-      return legacy.addFunctionalityScenarios as unknown as Scenario[]
+      const addFunctionality = await import("./add-functionality")
+      return addFunctionality.addFunctionalityScenarios as unknown as Scenario[]
 
     default:
       return []

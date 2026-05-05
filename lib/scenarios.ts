@@ -9,7 +9,7 @@
 
 // External scenario imports (real-world scenarios from separate files)
 import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from "./scenarios-realworld"
-import { addFunctionalityScenarios } from "./scenarios-add-functionality"
+import { addFunctionalityScenarios } from "./scenarios/add-functionality"
 import { DSAPattern, DSA_PATTERNS } from "./types/dsa-patterns"
 
 // Import modular DSA scenarios

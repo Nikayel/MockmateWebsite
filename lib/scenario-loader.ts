@@ -59,7 +59,7 @@ const scenarioLoaders: Record<string, () => Promise<Scenario[]>> = {
 
   // Add functionality scenarios
   "add-functionality": () =>
-    import("./scenarios-add-functionality").then((m) => m.addFunctionalityScenarios as Scenario[]),
+    import("./scenarios/add-functionality").then((m) => m.addFunctionalityScenarios as Scenario[]),
 }
 
 type ScenarioCategory =
