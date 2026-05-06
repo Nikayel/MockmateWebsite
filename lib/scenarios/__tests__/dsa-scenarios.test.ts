@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest"
 
+import { arraysHashingScenarios } from "../dsa/arrays-hashing"
+import { binarySearchScenarios } from "../dsa/binary-search"
+import { binarySearchTreeScenarios } from "../dsa/binary-search-tree"
 import { dpScenarios } from "../dsa/dynamic-programming"
 import { graphsScenarios } from "../dsa/graphs"
 import { linkedListScenarios } from "../dsa/linked-list"
+import { stackScenarios } from "../dsa/stack"
 import { treesScenarios } from "../dsa/trees"
+import { twoPointersScenarios } from "../dsa/two-pointers"
 
 const scenarioGroups = {
+  arraysHashingScenarios,
+  twoPointersScenarios,
+  stackScenarios,
+  binarySearchScenarios,
+  binarySearchTreeScenarios,
   treesScenarios,
   graphsScenarios,
   linkedListScenarios,
@@ -13,6 +23,87 @@ const scenarioGroups = {
 }
 
 const expectedScenarioIds = {
+  arraysHashingScenarios: [
+    "dsa-two-sum",
+    "dsa-contains-duplicate",
+    "dsa-product-array-except-self",
+    "dsa-group-anagrams",
+    "dsa-longest-consecutive-sequence",
+    "dsa-first-missing-positive",
+    "dsa-valid-anagram",
+    "dsa-top-k-frequent-elements",
+    "dsa-encode-decode-strings",
+    "dsa-subarray-sum-equals-k",
+    "dsa-find-all-duplicates",
+    "dsa-next-permutation",
+    "dsa-majority-element",
+    "dsa-rotate-array",
+  ],
+  twoPointersScenarios: [
+    "dsa-3sum",
+    "dsa-trapping-rain-water-two-pointers",
+    "dsa-container-with-most-water",
+    "dsa-longest-palindromic-substring",
+    "dsa-remove-duplicates-sorted-array",
+    "dsa-move-zeroes",
+    "dsa-valid-palindrome",
+    "dsa-sort-colors",
+    "dsa-reverse-string",
+    "dsa-partition-labels",
+    "dsa-two-sum-ii-sorted",
+    "dsa-4sum",
+    "dsa-squares-sorted-array",
+    "dsa-boats-save-people",
+    "dsa-merge-sorted-array",
+    "dsa-even-odd-index-sum-difference",
+    "dsa-student-highest-average",
+  ],
+  stackScenarios: [
+    "dsa-valid-parentheses",
+    "dsa-min-stack",
+    "dsa-daily-temperatures",
+    "dsa-largest-rectangle-histogram",
+    "dsa-evaluate-reverse-polish",
+    "dsa-decode-string",
+    "dsa-asteroid-collision",
+    "dsa-simplify-path",
+    "dsa-basic-calculator",
+    "dsa-remove-duplicates-string",
+    "dsa-longest-valid-parentheses",
+    "dsa-car-fleet",
+    "dsa-trapping-rain-water",
+    "dsa-next-greater-element-i",
+    "dsa-next-greater-element-ii",
+    "dsa-online-stock-span",
+    "dsa-132-pattern",
+    "dsa-max-frequency-stack",
+  ],
+  binarySearchScenarios: [
+    "dsa-binary-search",
+    "dsa-search-rotated-sorted-array",
+    "dsa-find-first-last-position",
+    "dsa-find-minimum-rotated-sorted-array",
+    "dsa-search-2d-matrix",
+    "dsa-koko-eating-bananas",
+    "dsa-median-two-sorted-arrays",
+    "dsa-first-bad-version",
+    "dsa-search-insert-position",
+    "dsa-time-based-key-value-store",
+    "dsa-capacity-ship-packages",
+  ],
+  binarySearchTreeScenarios: [
+    "dsa-valid-binary-search-tree",
+    "dsa-lowest-common-ancestor-bst",
+    "dsa-kth-smallest-bst",
+    "dsa-delete-node-bst",
+    "dsa-convert-sorted-array-bst",
+    "dsa-two-sum-bst",
+    "dsa-bst-iterator",
+    "dsa-range-sum-bst",
+    "dsa-serialize-deserialize-bst",
+    "dsa-closest-bst-value",
+    "dsa-inorder-successor-bst",
+  ],
   treesScenarios: [
     "dsa-invert-binary-tree",
     "dsa-same-tree",
