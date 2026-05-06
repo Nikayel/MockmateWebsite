@@ -3,8 +3,23 @@ import { adminDb } from "@/lib/firebase-admin"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { requireTier } from "@/lib/quota-enforcement"
 import { logger } from "@/lib/logger"
+import {
+  isRoadmapQuestionStatus,
+  toDateValue,
+  type FirestoreDailyPlan,
+  type FirestoreRoadmapData,
+  type RoadmapQuestionStatus,
+} from "@/lib/roadmap/roadmap-serialization"
 
 const COLLECTION = "user_roadmaps"
+
+interface RoadmapProgressRequestBody {
+  roadmapId?: string
+  scenarioId?: string
+  status?: RoadmapQuestionStatus
+  score?: number
+  timeSpentMinutes?: number
+}
 
 /**
  * PATCH /api/roadmap/progress - Update question progress
@@ -21,7 +36,7 @@ export async function PATCH(request: NextRequest) {
     if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
-    const body = await request.json()
+    const body = (await request.json()) as RoadmapProgressRequestBody
 
     const { roadmapId, scenarioId, status, score, timeSpentMinutes } = body
 
@@ -32,7 +47,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    if (!["pending", "in_progress", "completed", "skipped", "evaluating"].includes(status)) {
+    if (!isRoadmapQuestionStatus(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
@@ -46,7 +61,7 @@ export async function PATCH(request: NextRequest) {
         throw new Error("ROADMAP_NOT_FOUND")
       }
 
-      const roadmapData = doc.data()
+      const roadmapData = doc.data() as FirestoreRoadmapData | undefined
 
       // Verify ownership
       if (roadmapData?.userId !== userId) {
@@ -60,9 +75,9 @@ export async function PATCH(request: NextRequest) {
       let skippedCount = roadmapData.questionsSkipped || 0
       let actualHoursSpent = roadmapData.actualHoursSpent || 0
 
-      const updatedPlans = dailyPlans.map((plan: any) => ({
+      const updatedPlans = dailyPlans.map((plan) => ({
         ...plan,
-        questions: plan.questions.map((q: any) => {
+        questions: (plan.questions || []).map((q) => {
           if (q.scenarioId === scenarioId) {
             questionFound = true
 
@@ -150,15 +165,15 @@ export async function PATCH(request: NextRequest) {
 /**
  * Calculate if user is on track based on expected vs actual progress
  */
-function calculateIsOnTrack(dailyPlans: any[], interviewDate: any): boolean {
+function calculateIsOnTrack(dailyPlans: FirestoreDailyPlan[], interviewDate: unknown): boolean {
   const now = new Date()
-  const interview = interviewDate?.toDate?.() || new Date(interviewDate)
+  const interview = toDateValue(interviewDate)
   const totalDays = dailyPlans.length
 
   // Find today's index
   let todayIndex = 0
   for (let i = 0; i < dailyPlans.length; i++) {
-    const planDate = dailyPlans[i].date?.toDate?.() || new Date(dailyPlans[i].date)
+    const planDate = toDateValue(dailyPlans[i].date)
     if (planDate <= now) {
       todayIndex = i
     }
@@ -171,7 +186,7 @@ function calculateIsOnTrack(dailyPlans: any[], interviewDate: any): boolean {
   let completedQuestions = 0
   let totalQuestions = 0
   dailyPlans.forEach((plan) => {
-    plan.questions?.forEach((q: any) => {
+    plan.questions?.forEach((q) => {
       totalQuestions++
       if (q.status === "completed") completedQuestions++
     })

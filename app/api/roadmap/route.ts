@@ -7,8 +7,36 @@ import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/r
 import { scenarios, type DSAScenario } from "@/lib/scenarios"
 import { UserRoadmapAssessment, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
 import { logger } from "@/lib/logger"
+import {
+  serializeRoadmapDocument,
+  sortRoadmapsByCreatedAt,
+  toDateValue,
+  type FirestoreRoadmapData,
+} from "@/lib/roadmap/roadmap-serialization"
 
 const COLLECTION = "user_roadmaps"
+
+type RoadmapStatus = PersonalizedRoadmap["status"]
+
+interface CreateRoadmapRequestBody {
+  targetCompany?: UserRoadmapAssessment["targetCompany"]
+  interviewDate?: string | Date
+  experienceLevel?: UserRoadmapAssessment["experienceLevel"]
+  problemsSolved?: number
+  hoursPerDay?: number
+  patternFamiliarity?: UserRoadmapAssessment["patternFamiliarity"]
+}
+
+interface UpdateRoadmapRequestBody {
+  roadmapId?: string
+  status?: RoadmapStatus
+}
+
+function isRoadmapStatus(value: unknown): value is RoadmapStatus {
+  return (
+    value === "active" || value === "archived" || value === "completed" || value === "abandoned"
+  )
+}
 
 /**
  * GET /api/roadmap - Get user's active roadmap or all roadmaps
@@ -52,8 +80,8 @@ export async function GET(request: NextRequest) {
     let hasExpired = false
 
     activeSnapshot.docs.forEach((doc) => {
-      const data = doc.data()
-      const interviewDate = data.interviewDate?.toDate?.() || new Date(data.interviewDate)
+      const data = doc.data() as FirestoreRoadmapData
+      const interviewDate = toDateValue(data.interviewDate)
       if (interviewDate < now) {
         batch.update(doc.ref, { status: "archived", updatedAt: new Date() })
         hasExpired = true
@@ -99,9 +127,9 @@ export async function GET(request: NextRequest) {
 
       // Find roadmaps that need status field fix
       const docsNeedingFix = allDocsSnapshot.docs.filter((doc) => {
-        const data = doc.data()
+        const data = doc.data() as FirestoreRoadmapData
         const hasNoStatus = !data.status
-        const interviewDate = data.interviewDate?.toDate?.() || new Date(data.interviewDate)
+        const interviewDate = toDateValue(data.interviewDate)
         const isNotExpired = interviewDate >= new Date()
         logger.debug("[Roadmap API] Doc status check", {
           docId: doc.id,
@@ -121,8 +149,8 @@ export async function GET(request: NextRequest) {
 
         // Set the most recent one as active, others as abandoned
         const sortedDocs = docsNeedingFix.sort((a, b) => {
-          const aCreated = a.data().createdAt?.toDate?.() || new Date(0)
-          const bCreated = b.data().createdAt?.toDate?.() || new Date(0)
+          const aCreated = toDateValue((a.data() as FirestoreRoadmapData).createdAt, new Date(0))
+          const bCreated = toDateValue((b.data() as FirestoreRoadmapData).createdAt, new Date(0))
           return bCreated.getTime() - aCreated.getTime()
         })
 
@@ -137,27 +165,10 @@ export async function GET(request: NextRequest) {
 
         // Return the now-active roadmap
         const fixedDoc = sortedDocs[0]
-        const data = fixedDoc.data()
-
-        // Convert all date fields properly
-        const convertedRoadmap = {
-          id: fixedDoc.id,
-          ...data,
+        const convertedRoadmap = serializeRoadmapDocument(fixedDoc, {
           status: "active",
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
           updatedAt: new Date().toISOString(),
-          interviewDate: data.interviewDate?.toDate?.()?.toISOString() || data.interviewDate,
-          dailyPlans:
-            data.dailyPlans?.map((plan: any) => ({
-              ...plan,
-              date: plan.date?.toDate?.()?.toISOString() || plan.date,
-            })) || [],
-          milestones:
-            data.milestones?.map((m: any) => ({
-              ...m,
-              targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
-            })) || [],
-        }
+        })
 
         logger.info("[Roadmap API] Returning fixed roadmap", { roadmapId: convertedRoadmap.id })
         return NextResponse.json({ roadmap: convertedRoadmap })
@@ -168,45 +179,20 @@ export async function GET(request: NextRequest) {
 
     logger.info("[Roadmap API] Found roadmaps matching query", { count: snapshot.docs.length })
 
-    const convertRoadmap = (doc: any) => {
-      const data = doc.data()
-      return {
-        id: doc.id,
-        ...data,
-        // Convert Firestore timestamps to ISO strings
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
-        interviewDate: data.interviewDate?.toDate?.()?.toISOString() || data.interviewDate,
-        // Convert nested dates in dailyPlans and milestones
-        dailyPlans:
-          data.dailyPlans?.map((plan: any) => ({
-            ...plan,
-            date: plan.date?.toDate?.()?.toISOString() || plan.date,
-          })) || [],
-        milestones:
-          data.milestones?.map((m: any) => ({
-            ...m,
-            targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
-          })) || [],
-      }
-    }
-
     if (getAll || statusFilter) {
       // Sort by createdAt descending (client-side to avoid index requirement)
-      const roadmaps = snapshot.docs.map(convertRoadmap).sort((a: any, b: any) => {
-        const aDate = new Date(a.createdAt || 0).getTime()
-        const bDate = new Date(b.createdAt || 0).getTime()
-        return bDate - aDate
-      })
+      const roadmaps = snapshot.docs
+        .map((doc) => serializeRoadmapDocument(doc))
+        .sort(sortRoadmapsByCreatedAt)
       return NextResponse.json({ roadmaps })
     } else {
       // Get the most recent active roadmap (sort client-side)
       const sortedDocs = snapshot.docs.sort((a, b) => {
-        const aCreated = a.data().createdAt?.toDate?.() || new Date(0)
-        const bCreated = b.data().createdAt?.toDate?.() || new Date(0)
+        const aCreated = toDateValue((a.data() as FirestoreRoadmapData).createdAt, new Date(0))
+        const bCreated = toDateValue((b.data() as FirestoreRoadmapData).createdAt, new Date(0))
         return bCreated.getTime() - aCreated.getTime()
       })
-      const roadmap = convertRoadmap(sortedDocs[0])
+      const roadmap = serializeRoadmapDocument(sortedDocs[0])
       return NextResponse.json({ roadmap })
     }
   } catch (error) {
@@ -252,7 +238,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    const body = (await request.json()) as CreateRoadmapRequestBody
     const { searchParams } = new URL(request.url)
     const enableRAG = searchParams.get("rag") !== "false" // RAG enabled by default
 
@@ -392,14 +378,14 @@ export async function PATCH(request: NextRequest) {
     if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
-    const body = await request.json()
+    const body = (await request.json()) as UpdateRoadmapRequestBody
     const { roadmapId, status } = body
 
     if (!roadmapId || !status) {
       return NextResponse.json({ error: "Roadmap ID and status are required" }, { status: 400 })
     }
 
-    if (!["active", "archived", "completed", "abandoned"].includes(status)) {
+    if (!isRoadmapStatus(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
