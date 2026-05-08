@@ -35,7 +35,8 @@ export const SEMANTIC_RULES: SemanticRule[] = [
   },
   {
     id: "no-explaining-complexity",
-    description: "AI explains THEIR solution's complexity instead of asking user to explain. NOTE: Answering clarifying questions about the PROBLEM is allowed!",
+    description:
+      "AI explains THEIR solution's complexity instead of asking user to explain. NOTE: Answering clarifying questions about the PROBLEM is allowed!",
     examples: [
       "BAD: 'It's O(n²) because of the nested loops' (explaining their solution's complexity)",
       "BAD: 'The sort adds O(n log n) to your solution' (explaining their approach)",
