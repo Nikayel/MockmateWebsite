@@ -10,6 +10,8 @@
  * - Algorithmic intent, not just syntax
  */
 
+import { extractComplexityFromText } from "./patterns/complexity-patterns"
+
 export interface LLMComplexityResult {
   timeComplexity: string
   spaceComplexity: string
@@ -123,7 +125,17 @@ Return ONLY valid JSON, no markdown code blocks.`
     }
   } catch (error) {
     console.error("LLM complexity analysis failed, using fallback:", error)
-    // Return a fallback that indicates we couldn't analyze
+    const fallbackComplexity = extractComplexityFromText(code)
+
+    if (fallbackComplexity) {
+      return {
+        timeComplexity: fallbackComplexity,
+        spaceComplexity: "Unknown",
+        confidence: "low",
+        reasoning: "LLM analysis unavailable; used deterministic complexity pattern fallback.",
+      }
+    }
+
     return {
       timeComplexity: "Unknown",
       spaceComplexity: "Unknown",

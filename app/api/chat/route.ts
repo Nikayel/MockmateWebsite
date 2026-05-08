@@ -17,22 +17,9 @@ import { trackAIChatServer } from "@/lib/analytics-server"
 import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
 import {
-  buildHintContext,
-  buildFeedbackContext,
-  buildComplexityContext,
-} from "@/lib/rag/context-builder"
-import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
-import { getCompanyInterviewKnowledge } from "@/lib/rag/knowledge-base/company-knowledge"
-import {
   buildInterviewerLevelContext,
   type InterviewLevel,
 } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
-import type { CompanyId } from "@/lib/data/company-questions/types"
-import {
-  getDynamicChatContext,
-  formatDynamicContextForPrompt,
-  shouldRetrieveDynamicContext,
-} from "@/lib/rag/dynamic-chat-context"
 // NEW: Phase-aware interview system with deterministic phase detection
 import {
   type InterviewPhase,
@@ -40,8 +27,6 @@ import {
   type PhaseDetectionContext,
   buildTrackingContext,
   getHintGuidance,
-  createEmptyTracker,
-  updateTrackerFromMessage,
   detectInterviewPhase,
 } from "@/lib/interview/interview-phases"
 import {
@@ -50,396 +35,27 @@ import {
 } from "@/lib/interview/conversation-extraction"
 import { extractionService } from "@/lib/services/extraction-service"
 import { phaseService } from "@/lib/services/phase-service"
-import { getFlag, logShadowComparison } from "@/lib/feature-flags"
-import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
+import { getFlag } from "@/lib/feature-flags"
 import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
 import {
   executeTool,
   formatToolResultsForPrompt,
   type ToolContext,
 } from "@/lib/interview/interviewer-tools"
-import {
-  buildInterviewerPrompt,
-  PHASE_PROMPTS,
-  FEW_SHOT_EXAMPLES,
-  QUICK_INJECTIONS,
-} from "@/lib/interview/interviewer-prompts"
+import { buildInterviewerPrompt } from "@/lib/interview/interviewer-prompts"
 import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
-import { truncateText, truncateFileContent } from "@/lib/utils"
-import { z } from "zod"
-
-// Schema validation for chat API request body
-// Uses passthrough() to allow additional fields while validating known fields
-const chatRequestSchema = z
-  .object({
-    message: z.string().max(10000).optional(),
-    context: z
-      .array(
-        z.object({
-          type: z.string(),
-          message: z.string(),
-        })
-      )
-      .optional(),
-    role: z.enum(["interviewer", "partner"]).optional(),
-    userContext: z.record(z.unknown()).optional(), // Flexible user context
-    workspaceContext: z
-      .array(
-        z.object({
-          path: z.string(),
-          content: z.string(),
-        })
-      )
-      .optional(),
-    currentCode: z.string().max(100000).optional(),
-    isProactive: z.boolean().optional(),
-    scenarioTitle: z.string().optional(),
-    scenarioType: z.string().optional(),
-    scenarioPattern: z.string().optional(),
-    scenarioCompany: z.string().nullish(),
-    elapsedTime: z.number().optional(),
-    sessionId: z.string().optional(),
-    userId: z.string().optional(),
-    partnerMessagesCount: z.number().optional(),
-    lastPartnerExchange: z.string().optional(),
-    recentNudgeTopics: z.array(z.string()).optional(),
-    userAnsweredTopics: z.array(z.string()).optional(),
-    timeSinceLastMessage: z.number().optional(),
-    isWrapUp: z.boolean().optional(),
-    edgeCases: z.array(z.record(z.unknown())).optional(), // Flexible edge cases
-    testResults: z.array(z.record(z.unknown())).optional(), // Flexible test results
-    consoleLogs: z.array(z.record(z.unknown())).optional(), // Flexible console logs
-    interviewPhase: z.string().optional(),
-    conversationTracker: z.record(z.unknown()).optional(),
-    hasSubmitted: z.boolean().optional(),
-    solutionComplexity: z.record(z.unknown()).nullish(), // Flexible complexity; null for system design
-    realInterviewMode: z.boolean().optional(),
-    hasFuzzyStatement: z.boolean().optional(),
-    scenarioClarifyingQuestions: z.unknown().optional(), // Can be string[] or object[]
-    scenarioFuzzyStatement: z.string().optional(),
-    starterCodeLength: z.number().optional(),
-  })
-  .passthrough() // Allow additional unknown fields
-
-interface UserContext {
-  email?: string
-  full_name?: string
-  subscription_tier?: string
-  sessions_used?: number
-  previous_topics?: string[]
-  skill_level?: string
-}
-
-interface TestResultItem {
-  description?: string
-  passed?: boolean
-  input?: unknown
-  expected?: unknown
-  actual?: unknown
-  error?: string | null
-}
-
-interface ConsoleLogItem {
-  type?: string
-  message?: string
-}
-
-// Context window management constants
-// Full context: Modern LLMs have large context windows (Gemini 1M, Claude 200K, DeepSeek 64K)
-// Most interviews have 30-60 messages, so 200 gives full history with safety cap
-const MAX_HISTORY_MESSAGES = 30 // Reduced for latency (was 200)
-const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
-const MAX_WORKSPACE_FILES = 5 // Limit workspace files
-const MAX_FILE_SIZE = 10000 // 10KB per file max
-
-// Session-level cache for static RAG context (pattern knowledge, company knowledge)
-// This saves rebuilding the same context on every message in a session
-interface SessionRAGCache {
-  staticContext: string
-  sessionId: string
-  scenarioId: string
-  createdAt: number
-}
-
-const sessionRAGCache = new Map<string, SessionRAGCache>()
-const SESSION_RAG_CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes (typical session duration)
-const MAX_SESSION_CACHE_SIZE = 500 // Limit memory usage
-
-/**
- * Prune old session cache entries
- */
-function pruneSessionRAGCache(): void {
-  if (sessionRAGCache.size <= MAX_SESSION_CACHE_SIZE) return
-
-  const now = Date.now()
-  // Remove expired entries first
-  for (const [key, entry] of sessionRAGCache.entries()) {
-    if (now - entry.createdAt > SESSION_RAG_CACHE_TTL_MS) {
-      sessionRAGCache.delete(key)
-    }
-  }
-
-  // If still over limit, remove oldest entries
-  if (sessionRAGCache.size > MAX_SESSION_CACHE_SIZE) {
-    const entries = Array.from(sessionRAGCache.entries()).sort(
-      (a, b) => a[1].createdAt - b[1].createdAt
-    )
-
-    const toRemove = sessionRAGCache.size - MAX_SESSION_CACHE_SIZE + 50
-    for (let i = 0; i < toRemove && i < entries.length; i++) {
-      sessionRAGCache.delete(entries[i][0])
-    }
-  }
-}
-
-/**
- * Sliding window for conversation history
- * Keeps most recent messages, summarizes old ones if needed
- */
-function manageContextWindow(
-  context: Array<{ type: string; message: string }>,
-  maxMessages: number = MAX_HISTORY_MESSAGES
-): Array<{ type: string; message: string }> {
-  if (!context || !Array.isArray(context)) return []
-
-  // If within limits, return as-is
-  if (context.length <= maxMessages) {
-    return context.map((msg) => ({
-      ...msg,
-      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
-    }))
-  }
-
-  // Keep first message (usually greeting) and last N-1 messages
-  const firstMessage = context[0]
-  const recentMessages = context.slice(-(maxMessages - 1))
-
-  // Create summary of dropped messages
-  const droppedCount = context.length - maxMessages
-  const summaryMessage = {
-    type: "model",
-    message: `[Previous ${droppedCount} messages summarized for context management]`,
-  }
-
-  return [
-    {
-      ...firstMessage,
-      message: truncateText(firstMessage.message, MAX_MESSAGE_LENGTH),
-    },
-    summaryMessage,
-    ...recentMessages.map((msg) => ({
-      ...msg,
-      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
-    })),
-  ]
-}
-
-/**
- * Manage workspace context size
- */
-function manageWorkspaceContext(
-  workspaceContext: Array<{ path: string; content: string }>,
-  maxFiles: number = MAX_WORKSPACE_FILES,
-  maxFileSize: number = MAX_FILE_SIZE
-): Array<{ path: string; content: string }> {
-  if (!workspaceContext || !Array.isArray(workspaceContext)) return []
-
-  // Take only the most relevant files (first N)
-  const limitedFiles = workspaceContext.slice(0, maxFiles)
-
-  // Truncate large files
-  return limitedFiles.map((file) => ({
-    path: file.path,
-    content: truncateFileContent(file.content, maxFileSize),
-  }))
-}
-
-/**
- * Build the STATIC parts of RAG context (pattern knowledge, company knowledge, complexity)
- * These don't change during a session, so we cache them
- */
-function buildStaticRAGContext(options: {
-  scenarioPattern?: string
-  scenarioCompany?: string
-  scenarioId?: string
-}): string {
-  const staticParts: string[] = []
-
-  // 1. Get pattern-specific knowledge if pattern is known
-  if (options.scenarioPattern) {
-    const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
-    if (patternKnowledge) {
-      staticParts.push(`
-## Pattern Knowledge: ${patternKnowledge.displayName}
-
-### When to Use
-${patternKnowledge.whenToUse
-  .slice(0, 3)
-  .map((w) => `- ${w}`)
-  .join("\n")}
-
-### Key Insights
-${patternKnowledge.keyInsights
-  .slice(0, 3)
-  .map((i) => `- ${i}`)
-  .join("\n")}
-
-### Common Mistakes to Avoid
-${patternKnowledge.commonMistakes
-  .slice(0, 2)
-  .map((m) => `- ${m}`)
-  .join("\n")}
-
-### Expected Complexity
-- Time: ${patternKnowledge.timeComplexity.typical}
-- Space: ${patternKnowledge.spaceComplexity.typical}
-`)
-    }
-  }
-
-  // 2. Get company-specific interview knowledge
-  if (options.scenarioCompany && options.scenarioCompany !== "Generic") {
-    const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
-    if (companyKnowledge) {
-      staticParts.push(`
-## ${companyKnowledge.companyName} Interview Tips
-
-### Interview Style
-${companyKnowledge.interviewStyle.description}
-Pace: ${companyKnowledge.interviewStyle.pace}
-Expectations: ${companyKnowledge.interviewStyle.expectations
-        .slice(0, 3)
-        .map((e) => `- ${e}`)
-        .join("\n")}
-
-### Focus Areas
-${companyKnowledge.topPatterns
-  .slice(0, 4)
-  .map((p) => `- ${p.pattern}`)
-  .join("\n")}
-
-### What They Value
-${companyKnowledge.cultureTips
-  .slice(0, 2)
-  .map((t) => `- ${t}`)
-  .join("\n")}
-`)
-    }
-  }
-
-  // 3. Build complexity knowledge context for interviewer
-  if (options.scenarioId || options.scenarioPattern) {
-    const complexityContext = buildComplexityContext(
-      options.scenarioId || "",
-      options.scenarioPattern as DSAPattern
-    )
-    if (complexityContext) {
-      staticParts.push(complexityContext)
-    }
-  }
-
-  return staticParts.join("\n")
-}
-
-/**
- * Build RAG-enhanced context for the AI partner role
- * Retrieves relevant patterns, hints, and knowledge from the RAG system
- * Now includes DYNAMIC context based on what the user is currently discussing
- *
- * OPTIMIZATION: Static parts (pattern, company, complexity) are cached per-session
- * to avoid rebuilding on every message. Only dynamic context is fetched per-message.
- */
-async function buildRAGContext(options: {
-  scenarioTitle?: string
-  scenarioPattern?: string
-  scenarioCompany?: string
-  scenarioType?: string
-  scenarioId?: string
-  problemText?: string
-  userCode?: string
-  userId?: string
-  sessionId?: string // NEW: For session-level caching
-  userMessage?: string // Current user message for dynamic context
-  testResults?: { passed: number; total: number; failingTests?: string[] } // Test results for debugging context
-}): Promise<string> {
-  const ragContextParts: string[] = []
-
-  try {
-    // NEW: Dynamic context based on user's current message (changes per message)
-    if (options.userMessage && shouldRetrieveDynamicContext(options.userMessage)) {
-      const dynamicContext = await getDynamicChatContext({
-        userMessage: options.userMessage,
-        currentCode: options.userCode,
-        pattern: options.scenarioPattern as DSAPattern,
-        problemTitle: options.scenarioTitle,
-        testResults: options.testResults,
-      })
-
-      // Only add if we got meaningful context
-      if (dynamicContext.retrievedContext || dynamicContext.debuggingHints) {
-        ragContextParts.push(`
-## Dynamic Context (based on user's current question)
-${formatDynamicContextForPrompt(dynamicContext)}
-`)
-      }
-    }
-
-    // STATIC CONTEXT: Check session cache first (saves ~50ms per message)
-    const sessionCacheKey = options.sessionId || `${options.userId}-${options.scenarioId}`
-    let staticContext: string
-
-    const cachedSession = sessionRAGCache.get(sessionCacheKey)
-    if (
-      cachedSession &&
-      cachedSession.scenarioId === (options.scenarioId || "") &&
-      Date.now() - cachedSession.createdAt < SESSION_RAG_CACHE_TTL_MS
-    ) {
-      // Use cached static context
-      staticContext = cachedSession.staticContext
-    } else {
-      // Build and cache static context
-      staticContext = buildStaticRAGContext({
-        scenarioPattern: options.scenarioPattern,
-        scenarioCompany: options.scenarioCompany,
-        scenarioId: options.scenarioId,
-      })
-
-      // Cache it for the session
-      sessionRAGCache.set(sessionCacheKey, {
-        staticContext,
-        sessionId: sessionCacheKey,
-        scenarioId: options.scenarioId || "",
-        createdAt: Date.now(),
-      })
-      pruneSessionRAGCache()
-    }
-
-    if (staticContext) {
-      ragContextParts.push(staticContext)
-    }
-
-    // 4. Build hint context from RAG if we have problem text
-    // DISABLED: Redundant with getDynamicChatContext() above - was causing duplicate embeddings
-    // The dynamic context already retrieves relevant hints based on user intent
-    // Keeping this disabled saves ~5s per message (2-3 embedding calls)
-    // if (options.problemText && options.problemText.length > 20) {
-    //   const hintContext = await buildHintContext({...})
-    // }
-  } catch (error) {
-    // RAG errors should not break the chat - log and continue
-    logger.error("[Chat API] RAG context build error", { error })
-  }
-
-  if (ragContextParts.length === 0) {
-    return ""
-  }
-
-  return `
-=== RAG-ENHANCED CONTEXT ===
-${ragContextParts.join("\n")}
-=== END RAG CONTEXT ===
-`
-}
+import {
+  chatRequestSchema,
+  type ConsoleLogItem,
+  type TestResultItem,
+  type UserContext,
+} from "@/lib/interview/chat-request-schema"
+import {
+  MAX_FILE_SIZE,
+  manageContextWindow,
+  manageWorkspaceContext,
+} from "@/lib/interview/context-window"
+import { buildRAGContext } from "@/lib/interview/chat-rag-context"
 
 export async function POST(request: NextRequest) {
   // Apply IP-based rate limiting (first layer - prevents abuse)
@@ -514,7 +130,6 @@ export async function POST(request: NextRequest) {
       | undefined
     const testResults = validatedData.testResults as TestResultItem[] | undefined
     const consoleLogs = validatedData.consoleLogs as ConsoleLogItem[] | undefined
-    const interviewPhase = validatedData.interviewPhase
     const conversationTracker = validatedData.conversationTracker
     const hasSubmitted = validatedData.hasSubmitted
     const solutionComplexity = validatedData.solutionComplexity as
@@ -966,7 +581,6 @@ EVALUATION CRITERIA FOR BUG FIX:
 
     // Feature flag: Use phase service or direct call
     let currentPhase: InterviewPhase
-    let phasePrompt: string
     if (getFlag("USE_PHASE_SERVICE")) {
       const phaseResult = phaseService({
         hasSubmitted: hasSubmitted || false,
@@ -980,7 +594,6 @@ EVALUATION CRITERIA FOR BUG FIX:
         messageCount,
       })
       currentPhase = phaseResult.phase
-      phasePrompt = phaseResult.prompt
       logger.debug("[Chat API] Phase detected via service", {
         phase: currentPhase,
         codeWritten: phaseResult.metadata.codeWritten,
@@ -988,7 +601,6 @@ EVALUATION CRITERIA FOR BUG FIX:
     } else {
       // Original code path
       currentPhase = detectInterviewPhase(phaseContext)
-      phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
     }
 
     // Debug logging for phase detection
@@ -1373,8 +985,6 @@ GROUNDING RULES (prevent hallucination):
     if (isProactive && role === "interviewer") {
       // Smart proactive engagement - jump in like a real interviewer
       const hasSubstantialCode = currentCode && currentCode.trim().length > 100
-      const codeLines = currentCode?.split("\n").length || 0
-      const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
 
       // TIME-BASED TRIGGER: Check in after 2+ minutes of silence
       // Real interviewers don't wait forever for code - they check in on thinking
