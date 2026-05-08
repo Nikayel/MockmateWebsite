@@ -98,6 +98,7 @@ import {
 import { PostInterviewView, FeedbackLoadingState } from "./_components"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
+import { useHintAgent } from "@/lib/hooks/useHintAgent"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -374,11 +375,28 @@ function InterviewPageContent() {
 
   // AI hints states
   const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
-  const [ragHints, setRagHints] = useState<{ level: number; hint: string; id?: string }[]>([])
-  const [isLoadingHints, setIsLoadingHints] = useState(false)
-  const [hintFetchStatus, setHintFetchStatus] = useState<"idle" | "loading" | "success" | "error">(
-    "idle"
-  )
+  const hintAgent = useHintAgent({
+    userId: user?.id || "",
+    problemId: selectedScenario?.id || "",
+    problemTitle: selectedScenario?.title || "",
+    problemText: selectedScenario?.problemStatement || "",
+    problemPattern: (selectedScenario as any)?.pattern,
+    difficulty: (selectedScenario?.difficulty as "easy" | "medium" | "hard") || "medium",
+    autoGenerate: false,
+    getAuthToken: async () => {
+      if (!firebaseUser) return null
+      return firebaseUser.getIdToken()
+    },
+  })
+  const ragHints = hintAgent.hints.map((h) => ({ level: h.level, hint: h.content, id: h.id }))
+  const isLoadingHints = hintAgent.isLoading
+  const hintFetchStatus: "idle" | "loading" | "success" | "error" = isLoadingHints
+    ? "loading"
+    : hintAgent.error
+      ? "error"
+      : ragHints.length > 0
+        ? "success"
+        : "idle"
   const [revealedAIHintIndices, setRevealedAIHintIndices] = useState<Set<number>>(new Set())
   const [hintFeedback, setHintFeedback] = useState<Map<string, "helpful" | "unhelpful">>(new Map())
 
@@ -1043,27 +1061,6 @@ Let's continue!`
     return () => clearInterval(interval)
   }, [isInterviewStarted, showFeedback, startTime])
 
-  // Progressive hints reveal effect
-  useEffect(() => {
-    if (!isInterviewStarted || !selectedScenario || showFeedback) return
-
-    const hints = (selectedScenario as any).hints || []
-    if (hints.length === 0) return
-
-    // Reveal hints at intervals: 3min, 6min, 9min, etc.
-    const hintInterval = 180 // 3 minutes in seconds
-
-    // Check if it's time to reveal a new hint
-    const hintsToReveal = Math.floor(elapsedTime / hintInterval)
-    const maxHints = Math.min(hintsToReveal, hints.length)
-
-    if (maxHints > revealedHints) {
-      setRevealedHints(maxHints)
-      // Show notification (no sound to avoid interrupting focus)
-      toast.info(`💡 New hint available! (${maxHints}/${hints.length})`)
-    }
-  }, [elapsedTime, isInterviewStarted, selectedScenario, showFeedback, revealedHints])
-
   // Sound effects - disabled in calm mode for reduced stimulation
   const playSound = (type: "hint" | "success" | "fail" | "milestone") => {
     // Skip sounds in calm mode - reduces anxiety triggers
@@ -1242,59 +1239,35 @@ Let's continue!`
     }
   }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, proactiveTimer])
 
-  // Fetch AI-powered hints for the current problem
   const fetchRAGHints = useCallback(async () => {
     if (!selectedScenario || !user?.id || !firebaseUser) return
+    hintAgent.updateCode(code)
+    await hintAgent.regenerateHints("initial")
+    setRevealedAIHintIndices(new Set())
+  }, [selectedScenario, user?.id, firebaseUser, hintAgent, code])
 
-    setIsLoadingHints(true)
-    setHintFetchStatus("loading")
-    try {
-      const token = await firebaseUser.getIdToken()
-      const response = await fetch("/api/agents/hints", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: "generate",
-          userId: user.id,
-          problemId: selectedScenario.id,
-          problemTitle: selectedScenario.title,
-          problemText: selectedScenario.problemStatement,
-          problemPattern: (selectedScenario as any).pattern,
-          difficulty: selectedScenario.difficulty,
-          userCode: code,
-          language: selectedLanguage,
-          trigger: "initial",
-          // Pass optimal complexity and constraints for better hint tailoring
-          optimalComplexity: (selectedScenario as any).optimalComplexity,
-          constraints: (selectedScenario as any).constraints,
-        }),
+  const syncHintAgentWithTestOutcome = useCallback(
+    (
+      summary: { passed: number; total: number; failed: number },
+      results: TestResult[] | undefined
+    ) => {
+      if (!results) return
+
+      hintAgent.updateCode(code)
+      hintAgent.updateTestResults({
+        passed: summary.passed,
+        total: summary.total,
+        failingTests: results.filter((r) => !r.passed).map((r) => r.description),
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        // Transform hints from AI agent format to display format
-        const transformedHints = (data.hints || []).map(
-          (h: { level: number; content: string; id?: string }) => ({
-            level: h.level,
-            hint: h.content,
-            id: h.id,
-          })
-        )
-        setRagHints(transformedHints)
-        setHintFetchStatus(transformedHints.length > 0 ? "success" : "error")
-      } else {
-        setHintFetchStatus("error")
+      if (summary.failed > 0) {
+        void hintAgent.regenerateHints("test_failed")
+      } else if (summary.passed === summary.total) {
+        void hintAgent.regenerateHints("test_passed")
       }
-    } catch (error) {
-      console.error("Error fetching hints:", error)
-      setHintFetchStatus("error")
-    } finally {
-      setIsLoadingHints(false)
-    }
-  }, [selectedScenario, code, selectedLanguage, user?.id, firebaseUser])
+    },
+    [hintAgent, code]
+  )
 
   // Fetch AI hints only when user has written meaningful code BEYOND starter code
   // This prevents showing hints before user even starts coding
@@ -2562,8 +2535,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setElapsedTime(0)
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
-    setRagHints([])
-    setHintFetchStatus("idle")
+    hintAgent.resetHints()
     setRevealedAIHintIndices(new Set())
     setHintFeedback(new Map())
     setWorkspaceContext([])
@@ -2850,8 +2822,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setCurrentSessionId(null)
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
-    setRagHints([])
-    setHintFetchStatus("idle")
+    hintAgent.resetHints()
     setRevealedAIHintIndices(new Set())
     setHintFeedback(new Map())
     setWorkspaceContext([])
@@ -4125,35 +4096,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setTestResults(data.results)
         setTestSummary(data.summary)
 
-        // Wire up to hint agent - regenerate hints based on test outcome
-        const hintAgent = (
-          window as unknown as {
-            __hintAgent?: {
-              updateTestResults: (r: {
-                passed: number
-                total: number
-                failingTests?: string[]
-              }) => void
-              regenerateHints: (t: string) => Promise<void>
-            }
-          }
-        ).__hintAgent
-        if (hintAgent) {
-          hintAgent.updateTestResults({
-            passed: data.summary.passed,
-            total: data.summary.total,
-            failingTests: data.results
-              .filter((r: TestResult) => !r.passed)
-              .map((r: TestResult) => r.description),
-          })
-
-          // Regenerate hints based on test outcome
-          if (data.summary.failed > 0) {
-            hintAgent.regenerateHints("test_failed")
-          } else if (data.summary.passed === data.summary.total) {
-            hintAgent.regenerateHints("test_passed")
-          }
-        }
+        syncHintAgentWithTestOutcome(data.summary, data.results)
 
         // Store console logs from execution
         if (data.consoleLogs && data.consoleLogs.length > 0) {
@@ -4320,35 +4263,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setTestResults(data.results)
         setTestSummary(data.summary)
 
-        // Wire up to hint agent - regenerate hints based on test outcome (submit flow)
-        const hintAgentSubmit = (
-          window as unknown as {
-            __hintAgent?: {
-              updateTestResults: (r: {
-                passed: number
-                total: number
-                failingTests?: string[]
-              }) => void
-              regenerateHints: (t: string) => Promise<void>
-            }
-          }
-        ).__hintAgent
-        if (hintAgentSubmit) {
-          hintAgentSubmit.updateTestResults({
-            passed: data.summary.passed,
-            total: data.summary.total,
-            failingTests: data.results
-              .filter((r: TestResult) => !r.passed)
-              .map((r: TestResult) => r.description),
-          })
-
-          // Regenerate hints based on test outcome
-          if (data.summary.failed > 0) {
-            hintAgentSubmit.regenerateHints("test_failed")
-          } else if (data.summary.passed === data.summary.total) {
-            hintAgentSubmit.regenerateHints("test_passed")
-          }
-        }
+        syncHintAgentWithTestOutcome(data.summary, data.results)
 
         // Store console logs from execution
         if (data.consoleLogs && data.consoleLogs.length > 0) {
@@ -4889,42 +4804,45 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                           {/* AI Insights - Shown independently, right after description */}
                           {/* Only show hints when user has written meaningful code beyond starter code */}
                           {/* Use hintFetchStatus to prevent flickering - section stays visible after first fetch attempt */}
-                          {isInterviewStarted &&
-                            code.trim().length - starterCode.trim().length >= 30 &&
-                            hintFetchStatus !== "idle" && (
-                              <div className="space-y-2">
-                                <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
-                                  <span className="h-4 w-1 rounded-full bg-purple-400"></span>
-                                  <Sparkles className="h-4 w-4" />
-                                  AI Insights
-                                  {ragHints.length > 0 && (
-                                    <span className="text-xs font-normal text-gray-500">
-                                      ({revealedAIHintIndices.size}/{ragHints.length} revealed)
-                                    </span>
-                                  )}
-                                </h3>
-                                {hintFetchStatus === "loading" ? (
-                                  <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-gray-400">
-                                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
-                                    Generating personalized hints...
-                                  </div>
-                                ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
-                                  <div className="rounded-lg border border-gray-600/30 bg-gray-800/30 p-3">
-                                    <p className="text-sm text-gray-400">
-                                      Hints will appear here as you code. Keep working on your
-                                      solution!
-                                    </p>
-                                    <button
-                                      onClick={fetchRAGHints}
-                                      className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 transition-colors hover:text-purple-300"
-                                    >
-                                      <Sparkles className="h-3 w-3" />
-                                      Try generating hints
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-2">
-                                    {ragHints.map((hint, i) => {
+                          {isInterviewStarted && hintFetchStatus !== "idle" && (
+                            <div className="space-y-2">
+                              <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
+                                <span className="h-4 w-1 rounded-full bg-purple-400"></span>
+                                <Sparkles className="h-4 w-4" />
+                                AI Insights
+                                {ragHints.length > 0 && (
+                                  <span className="text-xs font-normal text-gray-500">
+                                    ({revealedAIHintIndices.size}/{ragHints.length} revealed)
+                                  </span>
+                                )}
+                              </h3>
+                              {hintFetchStatus === "loading" ? (
+                                <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-gray-400">
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
+                                  Generating personalized hints...
+                                </div>
+                              ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
+                                <div className="rounded-lg border border-gray-600/30 bg-gray-800/30 p-3">
+                                  <p className="text-sm text-gray-400">
+                                    Hints will appear here as you code. Keep working on your
+                                    solution!
+                                  </p>
+                                  <button
+                                    onClick={fetchRAGHints}
+                                    className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 transition-colors hover:text-purple-300"
+                                  >
+                                    <Sparkles className="h-3 w-3" />
+                                    Try generating hints
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {ragHints
+                                    .slice(
+                                      0,
+                                      Math.min(revealedAIHintIndices.size + 1, ragHints.length)
+                                    )
+                                    .map((hint, i) => {
                                       const hintId = `hint-${selectedScenario?.id}-${i}`
                                       const isRevealed = revealedAIHintIndices.has(i)
                                       const feedback = hintFeedback.get(hintId)
@@ -4980,6 +4898,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                             <div
                                               className="relative p-3"
                                               onClick={() => {
+                                                if (hint.id) {
+                                                  hintAgent.revealHint(hint.id)
+                                                }
                                                 setRevealedAIHintIndices(
                                                   (prev) => new Set([...prev, i])
                                                 )
@@ -5002,10 +4923,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                         </div>
                                       )
                                     })}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* IMPROVED: Examples with better visual hierarchy */}
                           {selectedScenario.type === "dsa" &&
@@ -5116,8 +5037,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                               </div>
                             )}
 
-                          {/* Hints Section */}
-                          {isInterviewStarted &&
+                          {/* Legacy static hints are kept hidden during interviews so generated insights are the single hint surface. */}
+                          {!isInterviewStarted &&
                             (selectedScenario as any).hints &&
                             (selectedScenario as any).hints.length > 0 && (
                               <div className="mt-3 border-t border-gray-700 pt-3">

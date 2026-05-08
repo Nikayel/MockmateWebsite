@@ -7,6 +7,13 @@ import {
   type GeneratedHint,
   type HintTrigger,
 } from "@/lib/agents/hints"
+import type {
+  BaseHintRequestPayload,
+  GenerateHintsPayload,
+  GetNextHintPayload,
+  HintApiRequestBody,
+  HintTestResults,
+} from "@/lib/agents/hints/contracts"
 import { rateLimit } from "@/lib/rate-limit"
 import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from "@/lib/rag/utils"
 import { embedAndStoreHint, getSimilarHintsFromRAG } from "@/lib/rag"
@@ -49,19 +56,22 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse
     }
 
-    const body = await request.json()
-    const { action, ...params } = body
+    const body = (await request.json()) as HintApiRequestBody
 
-    // Override userId from request body with authenticated userId for security
-    params.userId = authenticatedUserId
-
-    switch (action) {
-      case "generate":
+    switch (body.action) {
+      case "generate": {
+        const params: GenerateHintsPayload = { ...body, userId: authenticatedUserId }
         return handleGenerateHints(params)
-      case "get-next":
+      }
+      case "get-next": {
+        const params: GetNextHintPayload = { ...body, userId: authenticatedUserId }
         return handleGetNextHint(params)
+      }
       default:
-        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
+        return NextResponse.json(
+          { error: `Unknown action: ${(body as { action?: string }).action}` },
+          { status: 400 }
+        )
     }
   } catch (error) {
     logger.error("[Hint Agent API] Error:", { error })
@@ -72,33 +82,73 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function buildStruggleMetrics(
+  struggleMetrics: Partial<StruggleMetrics> | undefined,
+  hintsRevealedFallback = 0
+): StruggleMetrics {
+  return {
+    timeSpentMinutes: struggleMetrics?.timeSpentMinutes ?? 0,
+    codeChanges: struggleMetrics?.codeChanges ?? 0,
+    testsRun: struggleMetrics?.testsRun ?? 0,
+    testsFailed: struggleMetrics?.testsFailed ?? 0,
+    hintsRevealed: struggleMetrics?.hintsRevealed ?? hintsRevealedFallback,
+    lastCodeChangeMinutesAgo: struggleMetrics?.lastCodeChangeMinutesAgo ?? 0,
+    errorCount: struggleMetrics?.errorCount ?? 0,
+  }
+}
+
+function mapRagHintToGeneratedHint(
+  ragHint: {
+    id: string
+    level?: number
+    category?: string
+    problemTitle: string
+    content: string
+    similarity: number
+    pattern?: string
+  },
+  fallbackLevel: 1 | 2 | 3 | 4
+): GeneratedHint {
+  return {
+    id: `rag_${ragHint.id}`,
+    level: (ragHint.level || fallbackLevel) as 1 | 2 | 3 | 4,
+    category: (ragHint.category || "approach") as GeneratedHint["category"],
+    title: `Insight from ${ragHint.problemTitle}`,
+    content: ragHint.content,
+    isBlurred: true,
+    source: "rag",
+    relevanceScore: ragHint.similarity,
+    metadata: {
+      pattern: ragHint.pattern as DSAPattern,
+      relatedConcepts: [],
+    },
+  }
+}
+
+function buildHintRequest(
+  params: BaseHintRequestPayload,
+  fullMetrics: StruggleMetrics
+): HintGenerationRequest {
+  return {
+    userId: params.userId,
+    problemId: params.problemId,
+    problemTitle: params.problemTitle,
+    problemText: params.problemText,
+    problemPattern: params.problemPattern as DSAPattern | undefined,
+    difficulty: (params.difficulty ?? "medium") as "easy" | "medium" | "hard",
+    userCode: params.userCode ?? "",
+    language: params.language ?? "javascript",
+    struggleMetrics: fullMetrics,
+    testResults: params.testResults as HintTestResults | undefined,
+    optimalComplexity: params.optimalComplexity,
+    constraints: params.constraints,
+  }
+}
+
 /**
  * Generate personalized hints
  */
-async function handleGenerateHints(params: {
-  userId: string
-  problemId: string
-  problemTitle: string
-  problemText: string
-  problemPattern?: string
-  difficulty?: string
-  userCode?: string
-  language?: string
-  struggleMetrics?: Partial<StruggleMetrics>
-  testResults?: {
-    passed: number
-    total: number
-    failingTests?: string[]
-  }
-  existingHints?: string[]
-  trigger?: HintTrigger
-  // Problem-specific context for better hint tailoring
-  optimalComplexity?: {
-    time: string
-    space: string
-  }
-  constraints?: string[]
-}) {
+async function handleGenerateHints(params: GenerateHintsPayload) {
   const {
     userId,
     problemId,
@@ -133,33 +183,22 @@ async function handleGenerateHints(params: {
     return NextResponse.json({ error: codeValidation.error }, { status: 400 })
   }
 
-  // Build full struggle metrics with defaults
-  const fullMetrics: StruggleMetrics = {
-    timeSpentMinutes: struggleMetrics.timeSpentMinutes ?? 0,
-    codeChanges: struggleMetrics.codeChanges ?? 0,
-    testsRun: struggleMetrics.testsRun ?? 0,
-    testsFailed: struggleMetrics.testsFailed ?? 0,
-    hintsRevealed: struggleMetrics.hintsRevealed ?? 0,
-    lastCodeChangeMinutesAgo: struggleMetrics.lastCodeChangeMinutesAgo ?? 0,
-    errorCount: struggleMetrics.errorCount ?? 0,
-  }
+  const fullMetrics = buildStruggleMetrics(struggleMetrics)
 
   // Build request with sanitized inputs
   const request: HintGenerationRequest = {
-    userId,
-    problemId,
-    problemTitle,
+    ...buildHintRequest(
+      {
+        ...params,
+        userCode: codeValidation.sanitized!,
+        problemText: problemValidation.sanitized!,
+      },
+      fullMetrics
+    ),
     problemText: problemValidation.sanitized!,
-    problemPattern: problemPattern as DSAPattern | undefined,
-    difficulty: difficulty as "easy" | "medium" | "hard",
     userCode: codeValidation.sanitized!,
-    language,
-    struggleMetrics: fullMetrics,
     existingHints,
-    testResults,
     trigger,
-    optimalComplexity,
-    constraints,
   }
 
   try {
@@ -178,20 +217,7 @@ async function handleGenerateHints(params: {
       )
 
       // Convert RAG hints to GeneratedHint format
-      ragHints = similarHints.map((h, _idx) => ({
-        id: `rag_${h.id}`,
-        level: (h.level || 2) as 1 | 2 | 3 | 4,
-        category: (h.category || "approach") as GeneratedHint["category"],
-        title: `Insight from ${h.problemTitle}`,
-        content: h.content,
-        isBlurred: true,
-        source: "rag" as const,
-        relevanceScore: h.similarity,
-        metadata: {
-          pattern: h.pattern as DSAPattern,
-          relatedConcepts: [],
-        },
-      }))
+      ragHints = similarHints.map((h) => mapRagHintToGeneratedHint(h, 2))
 
       logger.info("[Hints API] Retrieved hints from RAG", { count: ragHints.length, problemId })
     } catch (ragError) {
@@ -202,8 +228,8 @@ async function handleGenerateHints(params: {
     // Generate new hints with timeout (45 seconds for AI-intensive operation)
     const response = await withTimeout(generateHints(request), 45000, "Hint generation")
 
-    // Merge RAG hints with generated hints (RAG first for variety)
-    const allHints = [...ragHints, ...response.hints]
+    // Generated hints are based on the candidate's current code. RAG hints stay supplementary.
+    const allHints = [...response.hints, ...ragHints]
 
     // Deduplicate by content similarity (simple check)
     const seenContent = new Set<string>()
@@ -284,23 +310,7 @@ async function storeHintsInRAG(
 /**
  * Get the next unrevealed hint
  */
-async function handleGetNextHint(params: {
-  userId: string
-  problemId: string
-  problemTitle: string
-  problemText: string
-  problemPattern?: string
-  difficulty?: string
-  userCode?: string
-  language?: string
-  struggleMetrics?: Partial<StruggleMetrics>
-  testResults?: {
-    passed: number
-    total: number
-    failingTests?: string[]
-  }
-  previousHintIds: string[]
-}) {
+async function handleGetNextHint(params: GetNextHintPayload) {
   const {
     userId,
     problemId,
@@ -323,16 +333,7 @@ async function handleGetNextHint(params: {
     )
   }
 
-  // Build full struggle metrics
-  const fullMetrics: StruggleMetrics = {
-    timeSpentMinutes: struggleMetrics.timeSpentMinutes ?? 0,
-    codeChanges: struggleMetrics.codeChanges ?? 0,
-    testsRun: struggleMetrics.testsRun ?? 0,
-    testsFailed: struggleMetrics.testsFailed ?? 0,
-    hintsRevealed: struggleMetrics.hintsRevealed ?? previousHintIds.length,
-    lastCodeChangeMinutesAgo: struggleMetrics.lastCodeChangeMinutesAgo ?? 0,
-    errorCount: struggleMetrics.errorCount ?? 0,
-  }
+  const fullMetrics = buildStruggleMetrics(struggleMetrics, previousHintIds.length)
 
   // First, try to get a relevant hint from RAG if we haven't shown many hints yet
   if (previousHintIds.length < 2) {
@@ -349,20 +350,10 @@ async function handleGetNextHint(params: {
         const ragHint = ragHints[0]
         // Check if this hint wasn't already shown
         if (!previousHintIds.includes(`rag_${ragHint.id}`)) {
-          const hint: GeneratedHint = {
-            id: `rag_${ragHint.id}`,
-            level: (ragHint.level || previousHintIds.length + 1) as 1 | 2 | 3 | 4,
-            category: (ragHint.category || "approach") as GeneratedHint["category"],
-            title: `Insight from ${ragHint.problemTitle}`,
-            content: ragHint.content,
-            isBlurred: true,
-            source: "rag",
-            relevanceScore: ragHint.similarity,
-            metadata: {
-              pattern: ragHint.pattern as DSAPattern,
-              relatedConcepts: [],
-            },
-          }
+          const hint = mapRagHintToGeneratedHint(
+            ragHint,
+            (previousHintIds.length + 1) as 1 | 2 | 3 | 4
+          )
 
           return NextResponse.json({
             hint,
@@ -377,18 +368,20 @@ async function handleGetNextHint(params: {
   }
 
   // Fall back to generating a new hint
-  const request: HintGenerationRequest = {
-    userId,
-    problemId,
-    problemTitle,
-    problemText,
-    problemPattern: problemPattern as DSAPattern | undefined,
-    difficulty: difficulty as "easy" | "medium" | "hard",
-    userCode,
-    language,
-    struggleMetrics: fullMetrics,
-    testResults,
-  }
+  const request: HintGenerationRequest = buildHintRequest(
+    {
+      userId,
+      problemId,
+      problemTitle,
+      problemText,
+      problemPattern: problemPattern as DSAPattern | undefined,
+      difficulty: difficulty as "easy" | "medium" | "hard",
+      userCode,
+      language,
+      testResults,
+    },
+    fullMetrics
+  )
 
   const hint = await getNextHint(request, previousHintIds)
 

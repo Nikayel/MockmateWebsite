@@ -7,6 +7,12 @@ import type {
   StruggleMetrics,
   HintTrigger,
 } from "@/lib/agents/hint-agent"
+import type {
+  GenerateHintsPayload,
+  GetNextHintPayload,
+  GenerateHintsApiResponse,
+  GetNextHintApiResponse,
+} from "@/lib/agents/hints/contracts"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
 
@@ -32,6 +38,7 @@ interface UseHintAgentOptions {
   difficulty: "easy" | "medium" | "hard"
   staticHints?: string[]
   autoGenerate?: boolean
+  getAuthToken?: () => Promise<string | null>
 }
 
 interface UseHintAgentReturn {
@@ -52,6 +59,8 @@ interface UseHintAgentReturn {
   revealHint: (hintId: string) => void
   getNextHint: () => Promise<GeneratedHint | null>
   updateStruggleMetrics: (metrics: Partial<StruggleMetrics>) => void
+  updateCode: (code: string) => void
+  updateTestResults: (results: { passed: number; total: number; failingTests?: string[] }) => void
   resetHints: () => void
 }
 
@@ -65,6 +74,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     difficulty,
     staticHints = [],
     autoGenerate = true,
+    getAuthToken,
   } = options
 
   // State
@@ -94,6 +104,28 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     { passed: number; total: number; failingTests?: string[] } | undefined
   >(undefined)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const buildHeaders = useCallback(async (): Promise<HeadersInit> => {
+    const token = getAuthToken ? await getAuthToken() : null
+    return token
+      ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+      : { "Content-Type": "application/json" }
+  }, [getAuthToken])
+
+  const buildBasePayload = useCallback(
+    () => ({
+      userId,
+      problemId,
+      problemTitle,
+      problemText,
+      problemPattern,
+      difficulty,
+      userCode: userCodeRef.current,
+      language: "javascript",
+      struggleMetrics: struggleMetricsRef.current,
+      testResults: testResultsRef.current,
+    }),
+    [userId, problemId, problemTitle, problemText, problemPattern, difficulty]
+  )
 
   // Timer for elapsed time
   useEffect(() => {
@@ -120,31 +152,25 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       setError(null)
 
       try {
+        const payload: GenerateHintsPayload = {
+          action: "generate",
+          ...buildBasePayload(),
+          existingHints: staticHints,
+          trigger,
+        }
+
+        const headers = await buildHeaders()
         const response = await fetch("/api/agents/hints", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "generate",
-            userId,
-            problemId,
-            problemTitle,
-            problemText,
-            problemPattern,
-            difficulty,
-            userCode: userCodeRef.current,
-            language: "javascript",
-            struggleMetrics: struggleMetricsRef.current,
-            testResults: testResultsRef.current,
-            existingHints: staticHints,
-            trigger,
-          }),
+          headers,
+          body: JSON.stringify(payload),
         })
 
         if (!response.ok) {
           throw new Error("Failed to generate hints")
         }
 
-        const data = await response.json()
+        const data = (await response.json()) as GenerateHintsApiResponse
 
         setHints(data.hints || [])
         setStruggleLevel(data.struggleLevel || "none")
@@ -157,7 +183,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
         setIsLoading(false)
       }
     },
-    [userId, problemId, problemTitle, problemText, problemPattern, difficulty, staticHints]
+    [buildBasePayload, buildHeaders, staticHints]
   )
 
   // Generate hints (for backwards compatibility, uses 'initial' trigger)
@@ -206,39 +232,34 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     setError(null)
 
     try {
+      const payload: GetNextHintPayload = {
+        action: "get-next",
+        ...buildBasePayload(),
+        previousHintIds: Array.from(revealedHintIds),
+      }
+
+      const headers = await buildHeaders()
       const response = await fetch("/api/agents/hints", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "get-next",
-          userId,
-          problemId,
-          problemTitle,
-          problemText,
-          problemPattern,
-          difficulty,
-          userCode: userCodeRef.current,
-          language: "javascript",
-          struggleMetrics: struggleMetricsRef.current,
-          testResults: testResultsRef.current,
-          previousHintIds: Array.from(revealedHintIds),
-        }),
+        headers,
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
         throw new Error("Failed to get next hint")
       }
 
-      const data = await response.json()
+      const data = (await response.json()) as GetNextHintApiResponse
 
       if (data.hint) {
+        const nextHint = data.hint
         // Add the new hint to the list
         setHints((prev) => {
-          const exists = prev.some((h) => h.id === data.hint.id)
+          const exists = prev.some((h) => h.id === nextHint.id)
           if (exists) return prev
-          return [...prev, data.hint]
+          return [...prev, nextHint]
         })
-        return data.hint
+        return nextHint
       }
 
       return null
@@ -254,7 +275,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [userId, problemId, problemTitle, problemText, problemPattern, difficulty, revealedHintIds])
+  }, [buildBasePayload, buildHeaders, revealedHintIds, problemId, recommendedLevel, userId])
 
   // Update struggle metrics
   const updateStruggleMetrics = useCallback((metrics: Partial<StruggleMetrics>) => {
@@ -272,6 +293,23 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       struggleMetricsRef.current.errorCount = metrics.errorCount
     }
   }, [])
+
+  const updateCode = useCallback((code: string) => {
+    userCodeRef.current = code
+    struggleMetricsRef.current.codeChanges++
+    struggleMetricsRef.current.lastCodeChangeMinutesAgo = 0
+  }, [])
+
+  const updateTestResults = useCallback(
+    (results: { passed: number; total: number; failingTests?: string[] }) => {
+      testResultsRef.current = results
+      struggleMetricsRef.current.testsRun++
+      if (results.passed < results.total) {
+        struggleMetricsRef.current.testsFailed++
+      }
+    },
+    []
+  )
 
   // Reset hints
   const resetHints = useCallback(() => {
@@ -293,44 +331,6 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     }
   }, [])
 
-  // Expose methods to update code and test results
-  useEffect(() => {
-    // Attach methods to window for external access if needed
-    ;(
-      window as {
-        __hintAgent?: {
-          updateCode: (code: string) => void
-          updateTestResults: (results: {
-            passed: number
-            total: number
-            failingTests?: string[]
-          }) => void
-          regenerateHints: (trigger: HintTrigger) => Promise<void>
-        }
-      }
-    ).__hintAgent = {
-      updateCode: (code: string) => {
-        userCodeRef.current = code
-        struggleMetricsRef.current.codeChanges++
-        struggleMetricsRef.current.lastCodeChangeMinutesAgo = 0
-      },
-      updateTestResults: (results: { passed: number; total: number; failingTests?: string[] }) => {
-        testResultsRef.current = results
-        struggleMetricsRef.current.testsRun++
-        if (results.passed < results.total) {
-          struggleMetricsRef.current.testsFailed++
-        }
-      },
-      regenerateHints: async (trigger: HintTrigger) => {
-        await regenerateHints(trigger)
-      },
-    }
-
-    return () => {
-      delete (window as { __hintAgent?: unknown }).__hintAgent
-    }
-  }, [regenerateHints])
-
   return {
     hints,
     staticHints,
@@ -346,6 +346,8 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     revealHint,
     getNextHint,
     updateStruggleMetrics,
+    updateCode,
+    updateTestResults,
     resetHints,
   }
 }
