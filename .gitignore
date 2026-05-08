@@ -5,6 +5,10 @@
 package-lock.json
 yarn.lock
 
+# OS / editor artifacts
+.DS_Store
+**/.DS_Store
+
 # next.js
 /.next/
 /out/
@@ -34,7 +38,11 @@ next-env.d.ts
 .agents/CLAUDE.md
 .agents/AI_ASSISTANT.md
 .claude/settings.local.json
+.claude/commands/
 .claude/skills/
+
+# Local assistant planning notes
+/PLAN.md
 
 # Extension directory (cloned repo for context, not part of website build)
 /extension/

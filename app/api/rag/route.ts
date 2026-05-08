@@ -23,6 +23,7 @@ import { rateLimit } from "@/lib/rate-limit"
 import { withTimeout, validateProblemText, validateUserCode, TimeoutError } from "@/lib/rag/utils"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { getUserIdFromRequest } from "@/lib/auth-server"
+import { logger } from "@/lib/logger"
 
 /**
  * RAG API Endpoint
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error) {
-    console.error("RAG API error:", error)
+    logger.error("[RAG API] Request failed", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "RAG operation failed" },
       { status: 500 }
@@ -270,7 +271,7 @@ async function handleGetHints(params: {
       }
     }
   } catch (error) {
-    console.error("[RAG API] Enhanced hints error:", error)
+    logger.warn("[RAG API] Enhanced hints failed; falling back to basic hints", { error })
     // Continue with basic hints if RAG fails
   }
 
@@ -865,7 +866,7 @@ async function handleRecordFeedback(params: {
   }
 
   // Log feedback for analytics (in production, this would go to a database)
-  console.log("[RAG Feedback]", {
+  logger.info("[RAG Feedback]", {
     hintId,
     feedbackType,
     userId: userId || "anonymous",
