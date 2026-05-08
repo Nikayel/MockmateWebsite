@@ -7,6 +7,7 @@ import { Search, Building2, ChevronRight, Clock, Users } from "lucide-react"
 import { ALL_COMPANIES, COMPANY_TIERS } from "@/lib/data/company-questions"
 import { CompanyId, CompanyQuestionData } from "@/lib/data/company-questions/types"
 import { cn } from "@/lib/utils"
+import { formatPatternLabel } from "@/lib/pattern-labels"
 
 interface CompanySelectorProps {
   onSelect: (companyId: CompanyId) => void
@@ -214,17 +215,10 @@ function CompanyCard({
             key={p.pattern}
             className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs"
           >
-            {formatPatternName(p.pattern)}
+            {formatPatternLabel(p.pattern)}
           </span>
         ))}
       </div>
     </motion.button>
   )
-}
-
-function formatPatternName(pattern: string): string {
-  return pattern
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
 }

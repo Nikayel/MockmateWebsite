@@ -5,24 +5,21 @@
  * Shows tokens used, costs, and breakdown by service.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuth } from 'firebase-admin/auth'
-import '@/lib/firebase-admin' // Initialize Firebase Admin
-import {
-  getUserUsageSummary,
-  getUserServiceBreakdown,
-  BUDGET_CAPS,
-} from '@/lib/usage-tracking'
+import { NextRequest, NextResponse } from "next/server"
+import { getAuth } from "firebase-admin/auth"
+import "@/lib/firebase-admin" // Initialize Firebase Admin
+import { getUserUsageSummary, getUserServiceBreakdown, BUDGET_CAPS } from "@/lib/usage-tracking"
+import { logger } from "@/lib/logger"
 
 export async function GET(req: NextRequest) {
   try {
     // Verify authentication
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authHeader = req.headers.get("Authorization")
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const token = authHeader.split('Bearer ')[1]
+    const token = authHeader.split("Bearer ")[1]
     const decodedToken = await getAuth().verifyIdToken(token)
     const userId = decodedToken.uid
 
@@ -81,18 +78,15 @@ export async function GET(req: NextRequest) {
         cacheStats: {
           hits: summary.cacheHits,
           misses: summary.cacheMisses,
-          hitRate: summary.cacheHits + summary.cacheMisses > 0
-            ? (summary.cacheHits / (summary.cacheHits + summary.cacheMisses)) * 100
-            : 0,
+          hitRate:
+            summary.cacheHits + summary.cacheMisses > 0
+              ? (summary.cacheHits / (summary.cacheHits + summary.cacheMisses)) * 100
+              : 0,
         },
       },
     })
-
   } catch (error) {
-    console.error('[User Usage API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch usage data' },
-      { status: 500 }
-    )
+    logger.error("[User Usage API] Error", { error })
+    return NextResponse.json({ error: "Failed to fetch usage data" }, { status: 500 })
   }
 }

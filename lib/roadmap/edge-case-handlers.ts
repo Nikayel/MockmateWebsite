@@ -7,6 +7,7 @@
 
 import { PersonalizedRoadmap, DailyPlan } from "@/lib/data/company-questions/types"
 import { DSAPattern } from "@/lib/types/dsa-patterns"
+import { formatPatternLabel } from "@/lib/pattern-labels"
 
 /**
  * Roadmap health status
@@ -254,7 +255,7 @@ function handleStruggling(
   ]
 
   if (worstPattern) {
-    suggestions.push(`Let's focus on building ${formatPattern(worstPattern)} fundamentals`)
+    suggestions.push(`Let's focus on building ${formatPatternLabel(worstPattern)} fundamentals`)
   }
 
   if (indicators.consecutiveLowScores >= 3) {
@@ -571,16 +572,6 @@ export function getMotivationalMessage(health: RoadmapHealth): string {
 
   const options = messages[health]
   return options[Math.floor(Math.random() * options.length)]
-}
-
-/**
- * Format pattern name
- */
-function formatPattern(pattern: DSAPattern): string {
-  return pattern
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
 }
 
 /**

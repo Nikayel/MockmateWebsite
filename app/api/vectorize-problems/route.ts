@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server"
 import {
   vectorizeAllProblems,
   getVectorizationStatus,
   vectorizeSingleProblem,
-} from '@/lib/rag/problem-vectorization'
-import { getScenarioById } from '@/lib/scenarios/index'
-import type { DSAScenario } from '@/lib/scenarios/types'
-import { getUserIdFromRequest } from '@/lib/auth-server'
+} from "@/lib/rag/problem-vectorization"
+import { getScenarioById } from "@/lib/scenarios/index"
+import type { DSAScenario } from "@/lib/scenarios/types"
+import { getUserIdFromRequest } from "@/lib/auth-server"
+import { logger } from "@/lib/logger"
 
 /**
  * Problem Vectorization API
@@ -21,7 +22,7 @@ import { getUserIdFromRequest } from '@/lib/auth-server'
  */
 
 // Admin user IDs from environment (same pattern as seed-vectors)
-const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(',').filter(Boolean) || []
+const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",").filter(Boolean) || []
 
 /**
  * Check if user is admin
@@ -36,16 +37,16 @@ export async function GET() {
     const status = await getVectorizationStatus()
 
     return NextResponse.json({
-      status: 'ok',
+      status: "ok",
       vectorization: status,
       message: status.hasProblems
         ? `Found ${status.problemCount} vectorized problems, ${status.companyCount} company entries, ${status.patternCount} pattern knowledge entries`
-        : 'No problems vectorized yet. POST to this endpoint to start vectorization.',
+        : "No problems vectorized yet. POST to this endpoint to start vectorization.",
     })
   } catch (error) {
-    console.error('[Vectorize Problems API] Status check error:', error)
+    logger.error("[Vectorize Problems API] Status check error", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to check status' },
+      { error: error instanceof Error ? error.message : "Failed to check status" },
       { status: 500 }
     )
   }
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     const userId = await getUserIdFromRequest(request)
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentication required. Please log in.' },
+        { error: "Authentication required. Please log in." },
         { status: 401 }
       )
     }
@@ -65,36 +66,36 @@ export async function POST(request: NextRequest) {
     // Require admin role
     if (!isAdmin(userId)) {
       return NextResponse.json(
-        { error: 'Admin access required. Your user ID is not in ADMIN_USER_IDS.' },
+        { error: "Admin access required. Your user ID is not in ADMIN_USER_IDS." },
         { status: 403 }
       )
     }
 
     const body = await request.json()
-    const { action = 'vectorize-all', scenarioId } = body
+    const { action = "vectorize-all", scenarioId } = body
 
     switch (action) {
-      case 'status':
+      case "status":
         const status = await getVectorizationStatus()
         return NextResponse.json({ status })
 
-      case 'vectorize-single':
+      case "vectorize-single":
         if (!scenarioId) {
           return NextResponse.json(
-            { error: 'scenarioId is required for vectorize-single' },
+            { error: "scenarioId is required for vectorize-single" },
             { status: 400 }
           )
         }
         return handleVectorizeSingle(scenarioId)
 
-      case 'vectorize-all':
+      case "vectorize-all":
       default:
         return handleVectorizeAll()
     }
   } catch (error) {
-    console.error('[Vectorize Problems API] Error:', error)
+    logger.error("[Vectorize Problems API] Error", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Vectorization failed' },
+      { error: error instanceof Error ? error.message : "Vectorization failed" },
       { status: 500 }
     )
   }
@@ -104,13 +105,13 @@ export async function POST(request: NextRequest) {
  * Vectorize all problems
  */
 async function handleVectorizeAll(): Promise<NextResponse> {
-  console.log('[Vectorize Problems] Starting full vectorization...')
+  logger.info("[Vectorize Problems] Starting full vectorization")
 
   const result = await vectorizeAllProblems((stage, current, total, item) => {
-    console.log(`[Vectorize Problems] ${stage}: ${current}/${total} - ${item}`)
+    logger.info("[Vectorize Problems] Progress", { stage, current, total, item })
   })
 
-  console.log('[Vectorize Problems] Completed:', result)
+  logger.info("[Vectorize Problems] Completed", { result })
 
   return NextResponse.json({
     success: true,
@@ -134,20 +135,17 @@ async function handleVectorizeAll(): Promise<NextResponse> {
  * Vectorize a single problem
  */
 async function handleVectorizeSingle(scenarioId: string): Promise<NextResponse> {
-  console.log(`[Vectorize Problems] Vectorizing single problem: ${scenarioId}`)
+  logger.info("[Vectorize Problems] Vectorizing single problem", { scenarioId })
 
   const scenario = await getScenarioById(scenarioId)
 
   if (!scenario) {
-    return NextResponse.json(
-      { error: `Scenario not found: ${scenarioId}` },
-      { status: 404 }
-    )
+    return NextResponse.json({ error: `Scenario not found: ${scenarioId}` }, { status: 404 })
   }
 
-  if (scenario.type !== 'dsa') {
+  if (scenario.type !== "dsa") {
     return NextResponse.json(
-      { error: 'Only DSA scenarios can be vectorized with this endpoint' },
+      { error: "Only DSA scenarios can be vectorized with this endpoint" },
       { status: 400 }
     )
   }

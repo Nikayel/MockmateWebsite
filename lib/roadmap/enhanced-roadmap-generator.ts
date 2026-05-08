@@ -20,6 +20,7 @@ import {
 } from "@/lib/data/company-questions/types"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { DSAScenario } from "@/lib/scenarios"
+import { formatPatternLabel } from "@/lib/pattern-labels"
 
 // Import new modules
 import {
@@ -624,7 +625,7 @@ function interleaveQuestions(questions: PrioritizedQuestion[]): PrioritizedQuest
  */
 function generateDayTheme(patterns: DSAPattern[], focusCluster: string): string {
   if (patterns.length === 1) {
-    return `${formatPatternName(patterns[0])} Focus`
+    return `${formatPatternLabel(patterns[0])} Focus`
   }
 
   const clusterNames: Record<string, string> = {
@@ -639,16 +640,6 @@ function generateDayTheme(patterns: DSAPattern[], focusCluster: string): string 
   }
 
   return clusterNames[focusCluster] || "Mixed Practice"
-}
-
-/**
- * Format pattern name
- */
-function formatPatternName(pattern: DSAPattern): string {
-  return pattern
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
 }
 
 /**
@@ -679,8 +670,8 @@ export function createEnhancedMilestones(
 
       milestones.push({
         id: `pattern-${pattern.pattern}`,
-        name: `${formatPatternName(pattern.pattern)} Mastery`,
-        description: `Complete all ${formatPatternName(pattern.pattern)} problems`,
+        name: `${formatPatternLabel(pattern.pattern)} Mastery`,
+        description: `Complete all ${formatPatternLabel(pattern.pattern)} problems`,
         targetDate,
         requiredScenarios: [],
         bonusScenarios: [],

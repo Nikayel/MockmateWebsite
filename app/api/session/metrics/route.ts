@@ -9,8 +9,8 @@
  * - Session completion
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth } from '@/lib/firebase-admin'
+import { NextRequest, NextResponse } from "next/server"
+import { adminAuth } from "@/lib/firebase-admin"
 import {
   initSessionMetrics,
   trackChatMessage,
@@ -21,14 +21,15 @@ import {
   trackAISuggestionApplied,
   completeSessionMetrics,
   getSessionMetrics,
-} from '@/lib/session-metrics'
+} from "@/lib/session-metrics"
+import { logger } from "@/lib/logger"
 
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const authHeader = request.headers.get("Authorization")
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const token = authHeader.substring(7)
@@ -39,11 +40,11 @@ export async function POST(request: NextRequest) {
     const { event, sessionId, data } = body
 
     if (!event || !sessionId) {
-      return NextResponse.json({ error: 'Missing event or sessionId' }, { status: 400 })
+      return NextResponse.json({ error: "Missing event or sessionId" }, { status: 400 })
     }
 
     switch (event) {
-      case 'session_start': {
+      case "session_start": {
         const state = await initSessionMetrics({
           sessionId,
           userId,
@@ -51,23 +52,23 @@ export async function POST(request: NextRequest) {
           scenarioTitle: data.scenarioTitle,
           pattern: data.pattern,
           difficulty: data.difficulty,
-          scenarioType: data.scenarioType || 'dsa',
+          scenarioType: data.scenarioType || "dsa",
           hintsTotal: data.hintsTotal || 3,
         })
         return NextResponse.json({ success: true, state: { sessionId: state.sessionId } })
       }
 
-      case 'chat_message': {
+      case "chat_message": {
         await trackChatMessage({
           sessionId,
           type: data.type,
           message: data.message,
-          chatType: data.chatType || 'partner',
+          chatType: data.chatType || "partner",
         })
         return NextResponse.json({ success: true })
       }
 
-      case 'hint_reveal': {
+      case "hint_reveal": {
         await trackHintReveal({
           sessionId,
           hintIndex: data.hintIndex,
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
 
-      case 'code_execution': {
+      case "code_execution": {
         await trackCodeExecution({
           sessionId,
           passed: data.passed,
@@ -86,22 +87,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
 
-      case 'file_view': {
+      case "file_view": {
         trackFileView(sessionId, data.fileName)
         return NextResponse.json({ success: true })
       }
 
-      case 'optimization_attempt': {
+      case "optimization_attempt": {
         trackOptimizationAttempt(sessionId)
         return NextResponse.json({ success: true })
       }
 
-      case 'ai_suggestion_applied': {
+      case "ai_suggestion_applied": {
         trackAISuggestionApplied(sessionId, data.wasUnderstood)
         return NextResponse.json({ success: true })
       }
 
-      case 'session_complete': {
+      case "session_complete": {
         const summary = await completeSessionMetrics({
           sessionId,
           finalCode: data.finalCode,
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (!summary) {
-          return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+          return NextResponse.json({ error: "Session not found" }, { status: 404 })
         }
 
         return NextResponse.json({
@@ -128,10 +129,10 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      case 'get_metrics': {
+      case "get_metrics": {
         const metrics = getSessionMetrics(sessionId)
         if (!metrics) {
-          return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+          return NextResponse.json({ error: "Session not found" }, { status: 404 })
         }
         return NextResponse.json({ success: true, metrics })
       }
@@ -140,10 +141,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `Unknown event: ${event}` }, { status: 400 })
     }
   } catch (error) {
-    console.error('[Session Metrics API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to track session event' },
-      { status: 500 }
-    )
+    logger.error("[Session Metrics API] Error", { error })
+    return NextResponse.json({ error: "Failed to track session event" }, { status: 500 })
   }
 }

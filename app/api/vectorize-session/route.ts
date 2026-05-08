@@ -9,6 +9,7 @@ import {
   type SessionMetrics,
 } from "@/lib/rag"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { logger } from "@/lib/logger"
 
 /**
  * API endpoint to vectorize and store session data for RAG
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
       message: "Session vectorized and stored successfully",
     })
   } catch (error) {
-    console.error("Vectorization error:", error)
+    logger.error("Vectorization error", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to vectorize session" },
       { status: 500 }

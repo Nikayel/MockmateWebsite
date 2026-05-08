@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminAuth } from "@/lib/firebase-admin"
 import { getMasteredProblems } from "@/lib/scoring"
+import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       count: masteredProblems.length,
     })
   } catch (error) {
-    console.error("Error fetching mastered problems:", error)
+    logger.error("Error fetching mastered problems", { error })
     return NextResponse.json({ error: "Failed to fetch mastered problems" }, { status: 500 })
   }
 }

@@ -4,15 +4,12 @@
  * Endpoints for viewing database query performance metrics.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getQueryPerformanceStats, cleanupQueryMetrics } from '@/lib/query-performance'
-import {
-  requirePermission,
-  errorResponse,
-  unauthorizedResponse,
-} from '@/lib/admin/middleware'
-import { PERMISSIONS } from '@/lib/admin/rbac'
-import { logAdminAction } from '@/lib/admin/audit'
+import { NextRequest, NextResponse } from "next/server"
+import { getQueryPerformanceStats, cleanupQueryMetrics } from "@/lib/query-performance"
+import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { logAdminAction } from "@/lib/admin/audit"
+import { logger } from "@/lib/logger"
 
 /**
  * GET /api/admin/query-performance
@@ -29,7 +26,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const hours = parseInt(searchParams.get('hours') || '24', 10)
+  const hours = parseInt(searchParams.get("hours") || "24", 10)
 
   try {
     const stats = await getQueryPerformanceStats(hours)
@@ -39,9 +36,9 @@ export async function GET(request: NextRequest) {
       data: stats,
     })
   } catch (error) {
-    console.error('[Admin Query Performance API] Error:', error)
+    logger.error("[Admin Query Performance API] Error", { error })
     return errorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch query performance data',
+      error instanceof Error ? error.message : "Failed to fetch query performance data",
       500
     )
   }
@@ -68,11 +65,11 @@ export async function POST(request: NextRequest) {
     const { action } = body
 
     switch (action) {
-      case 'cleanup': {
+      case "cleanup": {
         const daysToKeep = body.daysToKeep || 3
         await cleanupQueryMetrics(daysToKeep)
 
-        await logAdminAction(adminContext.userId, 'cleanup_query_metrics', {
+        await logAdminAction(adminContext.userId, "cleanup_query_metrics", {
           daysToKeep,
         })
 
@@ -86,10 +83,7 @@ export async function POST(request: NextRequest) {
         return errorResponse(`Unknown action: ${action}`, 400)
     }
   } catch (error) {
-    console.error('[Admin Query Performance API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to perform action',
-      500
-    )
+    logger.error("[Admin Query Performance API] Error", { error })
+    return errorResponse(error instanceof Error ? error.message : "Failed to perform action", 500)
   }
 }

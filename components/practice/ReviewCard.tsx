@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Clock, Play, AlertTriangle, Check, SkipForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DueItem } from "@/lib/hooks"
+import { formatPatternLabel } from "@/lib/pattern-labels"
 
 interface ReviewCardProps {
   item: DueItem
@@ -21,13 +22,6 @@ const difficultyStyles = {
   easy: "text-emerald-400",
   medium: "text-amber-400",
   hard: "text-rose-400",
-}
-
-function formatPattern(pattern: string): string {
-  return pattern
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ")
 }
 
 /**
@@ -342,7 +336,7 @@ export function ReviewCard({
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm">
               <span className={difficultyStyles[item.difficulty]}>{item.difficulty}</span>
-              <span className="text-gray-500">{formatPattern(item.pattern)}</span>
+              <span className="text-gray-500">{formatPatternLabel(item.pattern)}</span>
               <span className="text-gray-600">{item.estimated_minutes}m</span>
               {item.last_score > 0 && (
                 <span

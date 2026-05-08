@@ -14,6 +14,7 @@ import { getUserStats, getRecentSessions, getPerformanceTrends } from "@/lib/ses
 import { getUserUsageSummary } from "@/lib/usage-tracking"
 import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring"
 import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
+import { logger } from "@/lib/logger"
 
 /**
  * @deprecated Technical score is now unified with Mastery score.
@@ -246,7 +247,7 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
       lastSessionAt,
     }
   } catch (error) {
-    console.error("[User Metrics API] Fallback stats error:", error)
+    logger.error("[User Metrics API] Fallback stats error", { error })
     return null
   }
 }
@@ -489,7 +490,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error("[User Metrics API] Error:", error)
+    logger.error("[User Metrics API] Error", { error })
     return NextResponse.json({ error: "Failed to fetch metrics" }, { status: 500 })
   }
 }

@@ -15,6 +15,7 @@ import {
 } from "@/lib/data/company-questions/types"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { DSAScenario } from "@/lib/scenarios"
+import { formatPatternLabel } from "@/lib/pattern-labels"
 import {
   PRIORITY_WEIGHTS,
   BASE_TIME_ESTIMATES,
@@ -370,7 +371,7 @@ export function buildDailySchedule(
       targetMinutes: todaysMinutes,
       theme:
         todaysPatterns.length === 1
-          ? `${formatPatternName(todaysPatterns[0])} Day`
+          ? `${formatPatternLabel(todaysPatterns[0])} Day`
           : `Mixed Practice`,
       focusPatterns: todaysPatterns,
       questions: todaysQuestions.map((q) => ({
@@ -463,8 +464,8 @@ export function createMilestones(
 
       milestones.push({
         id: `pattern-${pattern.pattern}`,
-        name: `${formatPatternName(pattern.pattern)} Mastery`,
-        description: `Complete all ${formatPatternName(pattern.pattern)} questions`,
+        name: `${formatPatternLabel(pattern.pattern)} Mastery`,
+        description: `Complete all ${formatPatternLabel(pattern.pattern)} questions`,
         targetDate,
         requiredScenarios: [],
         bonusScenarios: [],
@@ -655,16 +656,6 @@ export function recalculateRoadmap(
 }
 
 /**
- * Helper: Format pattern name for display
- */
-function formatPatternName(pattern: DSAPattern): string {
-  return pattern
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
-/**
  * Get study recommendations based on current progress
  * Provides tailored advice for interns, beginners, and experienced candidates
  */
@@ -706,14 +697,14 @@ export function getStudyRecommendations(roadmap: PersonalizedRoadmap): string[] 
         recommendations.push(
           `Start with fundamentals: ${internFriendlyWeak
             .slice(0, 2)
-            .map((p) => formatPatternName(p))
+            .map((p) => formatPatternLabel(p))
             .join(", ")}`
         )
       } else {
         recommendations.push(
           `Focus on improving: ${weakPatterns
             .slice(0, 2)
-            .map((p) => formatPatternName(p))
+            .map((p) => formatPatternLabel(p))
             .join(", ")}`
         )
       }
@@ -721,7 +712,7 @@ export function getStudyRecommendations(roadmap: PersonalizedRoadmap): string[] 
       recommendations.push(
         `Focus on improving: ${weakPatterns
           .slice(0, 2)
-          .map((p) => formatPatternName(p))
+          .map((p) => formatPatternLabel(p))
           .join(", ")}`
       )
     }

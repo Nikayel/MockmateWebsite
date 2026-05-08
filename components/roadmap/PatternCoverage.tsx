@@ -1,11 +1,12 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, TrendingUp, ChevronDown, ChevronUp, Layers } from 'lucide-react'
-import { PersonalizedRoadmap } from '@/lib/data/company-questions/types'
-import { PATTERN_METADATA, DSAPattern } from '@/lib/types/dsa-patterns'
-import { cn } from '@/lib/utils'
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { CheckCircle2, Circle, TrendingUp, ChevronDown, ChevronUp, Layers } from "lucide-react"
+import { PersonalizedRoadmap } from "@/lib/data/company-questions/types"
+import { PATTERN_METADATA, DSAPattern } from "@/lib/types/dsa-patterns"
+import { cn } from "@/lib/utils"
+import { formatPatternLabel } from "@/lib/pattern-labels"
 
 interface PatternCoverageProps {
   roadmap: PersonalizedRoadmap
@@ -14,12 +15,19 @@ interface PatternCoverageProps {
 
 // Group patterns by category for better organization
 const PATTERN_CATEGORIES: Record<string, DSAPattern[]> = {
-  'Arrays & Strings': ['arrays-hashing', 'two-pointers', 'sliding-window', 'string'],
-  'Data Structures': ['stack', 'linked-list', 'heap', 'trie'],
-  'Trees & Graphs': ['trees', 'binary-search-tree', 'bfs', 'dfs', 'graphs', 'union-find'],
-  'Dynamic Programming': ['dp-1d', 'dp-2d', 'dp-knapsack', 'dp-lcs', 'dp-tree'],
-  'Algorithms': ['binary-search', 'sorting', 'greedy', 'backtracking', 'topological-sort'],
-  'Math & Other': ['math-geometry', 'bit-manipulation', 'intervals', 'matrix', 'monotonic-stack', 'monotonic-queue'],
+  "Arrays & Strings": ["arrays-hashing", "two-pointers", "sliding-window", "string"],
+  "Data Structures": ["stack", "linked-list", "heap", "trie"],
+  "Trees & Graphs": ["trees", "binary-search-tree", "bfs", "dfs", "graphs", "union-find"],
+  "Dynamic Programming": ["dp-1d", "dp-2d", "dp-knapsack", "dp-lcs", "dp-tree"],
+  Algorithms: ["binary-search", "sorting", "greedy", "backtracking", "topological-sort"],
+  "Math & Other": [
+    "math-geometry",
+    "bit-manipulation",
+    "intervals",
+    "matrix",
+    "monotonic-stack",
+    "monotonic-queue",
+  ],
 }
 
 export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCoverageProps) {
@@ -44,58 +52,65 @@ export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCov
   )
 
   // Group coverage data by category
-  const coverageByCategory = Object.entries(PATTERN_CATEGORIES).map(([category, patterns]) => {
-    const categoryPatterns = sortedCoverage.filter(c => patterns.includes(c.pattern))
-    const completed = categoryPatterns.filter(p => p.percentage === 100).length
-    const total = categoryPatterns.length
-    const avgProgress = total > 0
-      ? Math.round(categoryPatterns.reduce((sum, p) => sum + p.percentage, 0) / total)
-      : 0
-    return { category, patterns: categoryPatterns, completed, total, avgProgress }
-  }).filter(c => c.total > 0)
+  const coverageByCategory = Object.entries(PATTERN_CATEGORIES)
+    .map(([category, patterns]) => {
+      const categoryPatterns = sortedCoverage.filter((c) => patterns.includes(c.pattern))
+      const completed = categoryPatterns.filter((p) => p.percentage === 100).length
+      const total = categoryPatterns.length
+      const avgProgress =
+        total > 0
+          ? Math.round(categoryPatterns.reduce((sum, p) => sum + p.percentage, 0) / total)
+          : 0
+      return { category, patterns: categoryPatterns, completed, total, avgProgress }
+    })
+    .filter((c) => c.total > 0)
 
   const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }))
+    setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }))
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border-border overflow-hidden rounded-xl border">
       {/* Compact Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-3 flex items-center justify-between hover:bg-muted/30 transition-colors"
+        className="hover:bg-muted/30 flex w-full items-center justify-between p-3 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-primary/10 rounded-md">
-            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+          <div className="bg-primary/10 rounded-md p-1.5">
+            <TrendingUp className="text-primary h-3.5 w-3.5" />
           </div>
           <div className="text-left">
             <h2 className="text-sm font-semibold">Pattern Coverage</h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               {masteredCount}/{totalPatterns} mastered • {overallProgress}% overall
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {/* Mini progress indicator */}
-          <div className="hidden sm:flex items-center gap-1">
+          <div className="hidden items-center gap-1 sm:flex">
             {coverageByCategory.slice(0, 4).map((cat) => (
               <div
                 key={cat.category}
                 className={cn(
-                  "w-1.5 h-4 rounded-full",
-                  cat.avgProgress === 100 ? "bg-green-500" :
-                  cat.avgProgress >= 50 ? "bg-primary" :
-                  cat.avgProgress > 0 ? "bg-yellow-500" : "bg-muted"
+                  "h-4 w-1.5 rounded-full",
+                  cat.avgProgress === 100
+                    ? "bg-green-500"
+                    : cat.avgProgress >= 50
+                      ? "bg-primary"
+                      : cat.avgProgress > 0
+                        ? "bg-yellow-500"
+                        : "bg-muted"
                 )}
                 title={`${cat.category}: ${cat.avgProgress}%`}
               />
             ))}
           </div>
           {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            <ChevronUp className="text-muted-foreground h-4 w-4" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="text-muted-foreground h-4 w-4" />
           )}
         </div>
       </button>
@@ -104,29 +119,32 @@ export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCov
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 space-y-2">
+            <div className="space-y-2 px-3 pb-3">
               {/* Category-based collapsible sections */}
               {coverageByCategory.map((cat) => (
-                <div key={cat.category} className="border border-border/50 rounded-lg overflow-hidden">
+                <div
+                  key={cat.category}
+                  className="border-border/50 overflow-hidden rounded-lg border"
+                >
                   <button
                     onClick={() => toggleCategory(cat.category)}
-                    className="w-full px-2.5 py-2 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                    className="hover:bg-muted/30 flex w-full items-center justify-between px-2.5 py-2 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <Layers className="h-3 w-3 text-muted-foreground" />
+                      <Layers className="text-muted-foreground h-3 w-3" />
                       <span className="text-xs font-medium">{cat.category}</span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-muted-foreground text-[10px]">
                         {cat.completed}/{cat.total}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       {/* Compact progress bar */}
-                      <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="bg-muted h-1 w-12 overflow-hidden rounded-full">
                         <div
                           className={cn(
                             "h-full rounded-full transition-all",
@@ -135,13 +153,13 @@ export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCov
                           style={{ width: `${cat.avgProgress}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-muted-foreground w-6 text-right">
+                      <span className="text-muted-foreground w-6 text-right text-[10px]">
                         {cat.avgProgress}%
                       </span>
                       {expandedCategories[cat.category] ? (
-                        <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                        <ChevronUp className="text-muted-foreground h-3 w-3" />
                       ) : (
-                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        <ChevronDown className="text-muted-foreground h-3 w-3" />
                       )}
                     </div>
                   </button>
@@ -150,12 +168,12 @@ export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCov
                     {expandedCategories[cat.category] && (
                       <motion.div
                         initial={{ height: 0 }}
-                        animate={{ height: 'auto' }}
+                        animate={{ height: "auto" }}
                         exit={{ height: 0 }}
                         transition={{ duration: 0.15 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-2.5 pb-2 grid grid-cols-2 gap-1.5">
+                        <div className="grid grid-cols-2 gap-1.5 px-2.5 pb-2">
                           {cat.patterns.map((pattern, index) => (
                             <PatternChip
                               key={pattern.pattern}
@@ -194,7 +212,7 @@ export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCov
           {sortedCoverage.length > 6 && (
             <button
               onClick={() => setIsExpanded(true)}
-              className="mt-2 w-full text-[10px] text-primary hover:underline"
+              className="text-primary mt-2 w-full text-[10px] hover:underline"
             >
               +{sortedCoverage.length - 6} more patterns
             </button>
@@ -224,7 +242,7 @@ function PatternChip({
   compact?: boolean
 }) {
   const metadata = PATTERN_METADATA[pattern.pattern]
-  const displayName = metadata?.name || formatPatternName(pattern.pattern)
+  const displayName = metadata?.name || formatPatternLabel(pattern.pattern)
   const isComplete = pattern.percentage === 100
 
   return (
@@ -233,9 +251,9 @@ function PatternChip({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.02 }}
       className={cn(
-        "relative flex items-center gap-1.5 px-2 py-1.5 rounded-md border transition-colors",
+        "relative flex items-center gap-1.5 rounded-md border px-2 py-1.5 transition-colors",
         isComplete
-          ? "bg-green-500/10 border-green-500/30"
+          ? "border-green-500/30 bg-green-500/10"
           : "bg-muted/30 border-border/50 hover:bg-muted/50",
         compact && "py-1"
       )}
@@ -246,7 +264,7 @@ function PatternChip({
           <CheckCircle2 className="h-3 w-3 text-green-500" />
         ) : (
           <div className="relative h-3 w-3">
-            <Circle className="h-3 w-3 text-muted-foreground/50" />
+            <Circle className="text-muted-foreground/50 h-3 w-3" />
             {pattern.percentage > 0 && (
               <svg className="absolute inset-0 -rotate-90" viewBox="0 0 12 12">
                 <circle
@@ -266,31 +284,21 @@ function PatternChip({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
-        <span className={cn(
-          "text-[10px] font-medium truncate",
-          isComplete && "text-green-600"
-        )}>
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
+        <span className={cn("truncate text-[10px] font-medium", isComplete && "text-green-600")}>
           {displayName}
         </span>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
           {isTopPattern && (
-            <span className="px-1 py-0.5 text-[8px] font-semibold bg-primary/20 text-primary rounded">
+            <span className="bg-primary/20 text-primary rounded px-1 py-0.5 text-[8px] font-semibold">
               #{rank}
             </span>
           )}
-          <span className="text-[9px] text-muted-foreground">
+          <span className="text-muted-foreground text-[9px]">
             {pattern.completed}/{pattern.total}
           </span>
         </div>
       </div>
     </motion.div>
   )
-}
-
-function formatPatternName(pattern: string): string {
-  return pattern
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
 }

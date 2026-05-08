@@ -4,24 +4,21 @@
  * Endpoints for viewing NPS (Net Promoter Score) data.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { getNPSStats } from '@/lib/nps'
-import {
-  requirePermission,
-  errorResponse,
-  unauthorizedResponse,
-} from '@/lib/admin/middleware'
-import { PERMISSIONS } from '@/lib/admin/rbac'
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb } from "@/lib/firebase-admin"
+import { getNPSStats } from "@/lib/nps"
+import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { logger } from "@/lib/logger"
 
 async function getRecentNPSResponses(limit: number = 50) {
   const snapshot = await adminDb
-    .collection('nps_responses')
-    .orderBy('createdAt', 'desc')
+    .collection("nps_responses")
+    .orderBy("createdAt", "desc")
     .limit(limit)
     .get()
 
-  return snapshot.docs.map(doc => ({
+  return snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate() || new Date(),
@@ -40,11 +37,11 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const view = searchParams.get('view') || 'overview'
+  const view = searchParams.get("view") || "overview"
 
   try {
     switch (view) {
-      case 'overview': {
+      case "overview": {
         const [stats, recentResponses] = await Promise.all([
           getNPSStats(),
           getRecentNPSResponses(20),
@@ -59,8 +56,8 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      case 'responses': {
-        const limit = parseInt(searchParams.get('limit') || '50', 10)
+      case "responses": {
+        const limit = parseInt(searchParams.get("limit") || "50", 10)
         const responses = await getRecentNPSResponses(limit)
 
         return NextResponse.json({
@@ -73,10 +70,7 @@ export async function GET(request: NextRequest) {
         return errorResponse(`Unknown view: ${view}`, 400)
     }
   } catch (error) {
-    console.error('[Admin NPS API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch NPS data',
-      500
-    )
+    logger.error("[Admin NPS API] Error", { error })
+    return errorResponse(error instanceof Error ? error.message : "Failed to fetch NPS data", 500)
   }
 }

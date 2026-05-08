@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getUserIdFromRequest } from "@/lib/auth-server"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
+import { logger } from "@/lib/logger"
 
 // Mark route as dynamic to avoid build-time issues with server-only packages
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 /**
  * API endpoint to manually sync subscription status from Stripe
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get user ID from Firebase ID token in Authorization header
     const userId = await getUserIdFromRequest(request)
-    
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -44,11 +45,10 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Sync subscription error:", error)
+    logger.error("Sync subscription error", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to sync subscription" },
       { status: 500 }
     )
   }
 }
-

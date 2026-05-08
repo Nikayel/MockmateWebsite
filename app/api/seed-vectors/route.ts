@@ -7,7 +7,7 @@ import {
   type TextEmbedding,
 } from "@/lib/rag"
 import { getUserIdFromRequest } from "@/lib/auth-server"
-import { adminDb } from "@/lib/firebase-admin"
+import { logger } from "@/lib/logger"
 
 // Admin user IDs - add your admin user IDs here
 const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",") || []
@@ -103,7 +103,10 @@ export async function POST(request: NextRequest) {
 
         // Log progress every 10 scenarios
         if (results.processed % 10 === 0) {
-          console.log(`[Seed Vectors] Processed ${results.processed}/${scenariosToProcess.length}`)
+          logger.info("[Seed Vectors] Progress", {
+            processed: results.processed,
+            total: scenariosToProcess.length,
+          })
         }
       } catch (error) {
         results.errors.push(`Error processing ${scenario.id}: ${error}`)
@@ -116,7 +119,7 @@ export async function POST(request: NextRequest) {
       results,
     })
   } catch (error) {
-    console.error("Seed vectors error:", error)
+    logger.error("Seed vectors error", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to seed vectors" },
       { status: 500 }
