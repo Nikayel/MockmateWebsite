@@ -124,12 +124,7 @@ export type {
 } from "./interview-phases"
 
 // Interviewer prompts (few-shot examples - preferred over verbose rules)
-export {
-  FEW_SHOT_EXAMPLES,
-  PHASE_PROMPTS,
-  QUICK_INJECTIONS,
-  buildInterviewerPrompt,
-} from "./interviewer-prompts"
+export { FEW_SHOT_EXAMPLES, PHASE_PROMPTS, buildInterviewerPrompt } from "./interviewer-prompts"
 export type { PromptContext } from "./interviewer-prompts"
 
 // Interviewer tools (function calling for state queries)

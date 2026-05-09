@@ -1,7 +1,3 @@
-/**
- * LLM prompt templates for hint generation
- */
-
 export const HINT_SYSTEM_PROMPT = `You are an expert coding interview tutor generating personalized, progressive hints.
 
 HINT LEVELS:
@@ -12,19 +8,26 @@ HINT LEVELS:
 
 CRITICAL RULES:
 1. NEVER give complete solutions in levels 1-3
-2. ALWAYS reference the user's actual code - mention specific lines, variables, or logic you see
+2. ALWAYS reference the user's actual code - mention specific variables, branches, loops, return values, or logic you see
 3. ALWAYS tie hints to the problem's constraints (e.g., "Given n can be up to 10^5, your O(n²) approach will timeout")
 4. If optimal complexity is provided, guide toward achieving it
 5. For failing tests, analyze the specific input/output discrepancy
 6. Be direct - no filler phrases like "Great start!" or "You're on the right track!"
 7. Keep hints focused: 1-2 sentences for L1-L2, up to a short paragraph for L3-L4
+8. Do not output generic template advice. If the hint could apply to many problems, rewrite it with evidence from THIS problem and THIS code.
 
 CODE ANALYSIS - Assess before generating:
 - What data structure/approach are they using? Is it appropriate?
 - Are there off-by-one errors, boundary issues, or missing edge cases?
 - Is their complexity worse than optimal? What's causing the inefficiency?
 - Are they close to a solution or fundamentally on the wrong path?
-- If tests fail: what specific input causes failure and why?`
+- If tests fail: what specific input causes failure and why?
+
+SPECIFICITY CHECK:
+- If code exists, the hint must include at least one concrete detail from it.
+- If code is still starter code, say what first decision they should make based on the problem constraints.
+- Prefer "your map lookup happens after..." over "consider using a hash map".
+- Prefer "with nums.length up to 10^5..." over "think about performance".`
 
 export const LEVEL_PROMPTS: Record<1 | 2 | 3 | 4, string> = {
   1: `Generate a NUDGE hint (Level 1).
@@ -74,9 +77,6 @@ export const CATEGORY_CONTEXT: Record<string, string> = {
   implementation: `Focus on IMPLEMENTATION: They know the approach but struggle with coding it. Help with specific syntax or logic.`,
 }
 
-/**
- * Build the user prompt with all context
- */
 export function buildUserPrompt(params: {
   level: 1 | 2 | 3 | 4
   category: string
@@ -103,7 +103,6 @@ export function buildUserPrompt(params: {
   const levelPrompt = LEVEL_PROMPTS[params.level]
   const categoryContext = CATEGORY_CONTEXT[params.category] || ""
 
-  // Build problem context with constraints and optimal complexity
   let problemContext = `## Problem: ${params.problemTitle} (${params.difficulty})
 ${params.problemText.slice(0, 600)}${params.problemText.length > 600 ? "..." : ""}`
 
@@ -112,7 +111,10 @@ ${params.problemText.slice(0, 600)}${params.problemText.length > 600 ? "..." : "
   }
 
   if (params.constraints?.length) {
-    problemContext += `\n\n**Constraints:**\n${params.constraints.slice(0, 4).map(c => `- ${c}`).join("\n")}`
+    problemContext += `\n\n**Constraints:**\n${params.constraints
+      .slice(0, 4)
+      .map((c) => `- ${c}`)
+      .join("\n")}`
   }
 
   if (params.optimalComplexity) {
@@ -125,7 +127,6 @@ ${categoryContext}
 
 ${problemContext}`
 
-  // Add pattern knowledge if available
   if (params.patternKnowledge) {
     prompt += `
 
@@ -135,7 +136,6 @@ ${problemContext}`
 - Common mistakes to avoid: ${params.patternKnowledge.commonMistakes.slice(0, 2).join("; ")}`
   }
 
-  // User's code with analysis context
   prompt += `
 
 ## User's Current Code (${params.language})
@@ -147,7 +147,6 @@ ${params.userCode || "// No code written yet - user hasn't started"}
 - Struggle level: ${params.struggleLevel}
 - Hint level requested: Level ${params.level}`
 
-  // Add test failures if present - crucial for debugging hints
   if (params.testFailures?.length) {
     prompt += `
 
@@ -159,6 +158,12 @@ ${params.testFailures
   }
 
   prompt += `
+
+## Quality Bar
+- Anchor the hint in the code above. Mention a variable, condition, loop, helper, return path, or missing branch when possible.
+- Use the problem constraints to justify the next move.
+- Do not reveal a full implementation unless the requested level is 4.
+- Do not reuse generic phrases like "consider edge cases" unless you name the exact edge case.
 
 ---
 RESPOND WITH JSON ONLY (no markdown, no explanation):
