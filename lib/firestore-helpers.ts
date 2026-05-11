@@ -581,6 +581,14 @@ export async function updateInterviewSession(
       communication?: number
       communicationScore?: number
     }
+    structuredFeedback?: {
+      scores?: Record<string, number>
+      tldr?: string
+      whatWorked?: string[]
+      fixNext?: string[]
+      actionPlan?: string[]
+      rawFeedback?: string
+    }
     // Complexity analysis - stores both user-stated and code-analyzed
     complexityAnalysis?: {
       codeAnalyzed: {
@@ -721,6 +729,9 @@ export async function updateInterviewSession(
         })
         updateData.mastery_score = updateData.technical_score
       }
+    }
+    if (additionalData.structuredFeedback) {
+      updateData.structured_feedback = additionalData.structuredFeedback
     }
     // Save complexity analysis (user-stated vs code-analyzed)
     if (additionalData.complexityAnalysis) {

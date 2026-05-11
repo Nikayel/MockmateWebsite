@@ -26,6 +26,7 @@ import {
   applyScoreFloors,
   critiqueScores,
   parseFeedbackSections,
+  completeStructuredFeedback,
   injectScoresIntoFeedback,
   sanitizeFeedbackForScoreConsistency,
   buildSilentNotesContext,
@@ -443,15 +444,23 @@ async function processJob(
     overall: finalScores.overall,
   }
 
-  const structured: StructuredFeedback = {
-    scores,
-    tldr: sections.tldr || "Feedback generated successfully.",
-    whatWorked: sections.whatWorked || [],
-    fixNext: sections.fixNext || [],
-    actionPlan: sections.actionPlan || [],
-    aiWatchlist: sections.aiWatchlist || "",
-    rawFeedback: finalFeedback,
-  }
+  const structured: StructuredFeedback = completeStructuredFeedback(
+    {
+      scores,
+      tldr: sections.tldr,
+      whatWorked: sections.whatWorked,
+      fixNext: sections.fixNext,
+      actionPlan: sections.actionPlan,
+      aiWatchlist: sections.aiWatchlist,
+      rawFeedback: finalFeedback,
+    },
+    {
+      rawFeedback: finalFeedback,
+      scenarioTitle,
+      testsPassed,
+      testsTotal,
+    }
+  )
 
   // Calculate technical score (same as instant)
   const technicalScore = Math.round(

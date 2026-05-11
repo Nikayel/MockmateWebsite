@@ -106,6 +106,13 @@ export interface InterviewSession {
   mastery_score?: number // Same as technical_score, for backwards compatibility
   feedback?: string
   feedback_status?: "pending" | "complete" | "failed" // Track feedback generation state
+  structured_feedback?: {
+    tldr?: string
+    whatWorked?: string[]
+    fixNext?: string[]
+    actionPlan?: string[]
+    rawFeedback?: string
+  }
   // Additional completion data
   final_code?: string
   language?: string

@@ -3,6 +3,7 @@
  */
 
 import { parseFeedback, parseFeedbackSections } from "../parsers"
+import { completeFeedbackSections } from "../structured-feedback-schema"
 
 describe("Feedback Parsers", () => {
   describe("parseFeedbackSections", () => {
@@ -93,6 +94,67 @@ describe("Feedback Parsers", () => {
       expect(sections.scores.problemSolving).toBe(85)
       expect(sections.scores.codeQuality).toBe(87)
       expect(sections.scores.communication).toBe(78)
+    })
+  })
+
+  describe("completeFeedbackSections", () => {
+    it("uses structured arrays when present", () => {
+      const sections = completeFeedbackSections(
+        {
+          tldr: "Structured summary",
+          whatWorked: ["Saved strength"],
+          fixNext: ["Saved improvement"],
+          actionPlan: ["Saved action"],
+        },
+        {
+          rawFeedback: `**What Worked**
+- Markdown strength
+
+**Fix Next**
+- Markdown improvement`,
+        }
+      )
+
+      expect(sections.whatWorked).toEqual(["Saved strength"])
+      expect(sections.fixNext).toEqual(["Saved improvement"])
+      expect(sections.actionPlan).toEqual(["Saved action"])
+    })
+
+    it("fills missing arrays from markdown before using fallback text", () => {
+      const sections = completeFeedbackSections(
+        { whatWorked: [], fixNext: [], actionPlan: [] },
+        {
+          rawFeedback: `**What Worked**
+- Clear approach
+
+**Fix Next**
+- Discuss complexity earlier
+
+**Action Plan**
+1. Practice dry runs`,
+        }
+      )
+
+      expect(sections.whatWorked).toEqual(["Clear approach"])
+      expect(sections.fixNext).toEqual(["Discuss complexity earlier"])
+      expect(sections.actionPlan).toEqual(["Practice dry runs"])
+    })
+
+    it("generates non-empty fallbacks when structured and markdown sections are absent", () => {
+      const sections = completeFeedbackSections(
+        { whatWorked: [], fixNext: [], actionPlan: [] },
+        {
+          scenarioTitle: "Two Sum",
+          testsPassed: 3,
+          testsTotal: 4,
+          overallScore: 72,
+        }
+      )
+
+      expect(sections.tldr).toBe("Interview score: 72%.")
+      expect(sections.whatWorked.length).toBeGreaterThan(0)
+      expect(sections.fixNext.length).toBeGreaterThan(0)
+      expect(sections.actionPlan.length).toBeGreaterThan(0)
     })
   })
 })

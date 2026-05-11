@@ -21,6 +21,7 @@ import {
   calculateMasteryScore,
   type MasteryScoreInput,
 } from "@/lib/spaced-repetition/mastery-score"
+import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
 
 // Vercel Hobby plan has 10 second timeout for serverless functions
 // We skip AI calls here to stay within limits - silent notes should be
@@ -170,6 +171,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const completeFeedback = completeFeedbackSections(feedback, {
+      rawFeedback: feedback.raw,
+      scenarioTitle,
+      testsPassed,
+      testsTotal,
+      overallScore: scores.overall,
+    })
+
     // ========================================
     // 3. Update Firestore Session
     // ========================================
@@ -196,10 +205,10 @@ export async function POST(request: NextRequest) {
       // Structured feedback
       structured_feedback: {
         scores: scores,
-        tldr: feedback.tldr,
-        whatWorked: feedback.whatWorked,
-        fixNext: feedback.fixNext,
-        actionPlan: feedback.actionPlan,
+        tldr: completeFeedback.tldr,
+        whatWorked: completeFeedback.whatWorked,
+        fixNext: completeFeedback.fixNext,
+        actionPlan: completeFeedback.actionPlan,
         rawFeedback: feedback.raw,
       },
 

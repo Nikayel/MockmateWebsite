@@ -34,6 +34,7 @@ import {
   trackConstitutionalAIIntervention,
   buildRAGFeedbackContext,
   parseFeedbackSections,
+  completeStructuredFeedback,
   injectScoresIntoFeedback,
   sanitizeFeedbackForScoreConsistency,
   buildSilentNotesContext,
@@ -1276,15 +1277,23 @@ CRITICAL INSTRUCTIONS:
     }
 
     // Build structured response
-    const structuredFeedback: StructuredFeedback = {
-      scores,
-      tldr: sections.tldr || "Feedback generated successfully.",
-      whatWorked: sections.whatWorked || [],
-      fixNext: sections.fixNext || [],
-      actionPlan: sections.actionPlan || [],
-      aiWatchlist: sections.aiWatchlist || "No watchlist items captured.",
-      rawFeedback: finalFeedback,
-    }
+    const structuredFeedback: StructuredFeedback = completeStructuredFeedback(
+      {
+        scores,
+        tldr: sections.tldr,
+        whatWorked: sections.whatWorked,
+        fixNext: sections.fixNext,
+        actionPlan: sections.actionPlan,
+        aiWatchlist: sections.aiWatchlist,
+        rawFeedback: finalFeedback,
+      },
+      {
+        rawFeedback: finalFeedback,
+        scenarioTitle,
+        testsPassed,
+        testsTotal,
+      }
+    )
 
     // Track feedback generation
     const durationMinutes = Math.round((Date.now() - startTime) / 60000)

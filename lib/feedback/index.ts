@@ -88,6 +88,13 @@ export {
   buildSilentNotesContext,
 } from "./parsers"
 
+export {
+  completeFeedbackSections,
+  completeStructuredFeedback,
+  feedbackSectionsSchema,
+  structuredFeedbackSchema,
+} from "./structured-feedback-schema"
+
 // ============================================================================
 // SCORE ACCUMULATOR EXPORTS (Two-Phase Feedback)
 // ============================================================================

@@ -2716,6 +2716,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   communication: scoreBreakdown.communicationScore,
                 }
               : undefined,
+            structuredFeedback: structuredFeedback
+              ? {
+                  ...structuredFeedback,
+                  rawFeedback: feedbackText,
+                }
+              : undefined,
             clarifyingQuestionsAssessment: clarifyingQuestionsAssessment || undefined,
           })
         }
@@ -3793,10 +3799,29 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         communication?: number
       } | null = null
       let systemDesignTechnicalScore: number | undefined = undefined
+      let systemDesignStructuredFeedback:
+        | {
+            scores?: Record<string, number>
+            tldr?: string
+            whatWorked?: string[]
+            fixNext?: string[]
+            actionPlan?: string[]
+            rawFeedback?: string
+          }
+        | undefined
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json()
         comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
         calculatedPerformanceScore = feedbackData.scores?.overall || 0
+        if (feedbackData.structured) {
+          systemDesignStructuredFeedback = feedbackData.structured
+          setStructuredFeedback({
+            whatWorked: feedbackData.structured.whatWorked || [],
+            fixNext: feedbackData.structured.fixNext || [],
+            actionPlan: feedbackData.structured.actionPlan || [],
+            tldr: feedbackData.structured.tldr || "",
+          })
+        }
         // Store technical score (mastery-based) for Overall/Technical toggle
         if (feedbackData.technicalScore !== undefined) {
           systemDesignTechnicalScore = feedbackData.technicalScore
@@ -3849,6 +3874,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               // Pass pre-calculated technical score from API for consistency
               technicalScore: systemDesignTechnicalScore,
               scoreBreakdown: systemDesignScoreBreakdown || undefined,
+              structuredFeedback: systemDesignStructuredFeedback,
             }
           )
 

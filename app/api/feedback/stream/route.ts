@@ -23,6 +23,7 @@ import {
 import { preScreenConversation } from "@/lib/feedback/pre-screening"
 import { analyzeCodeCompleteness } from "@/lib/feedback/completeness-analysis"
 import { parseFeedbackSections, buildSilentNotesContext } from "@/lib/feedback/parsers"
+import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
 import { calculateInstantScores, buildSignalsFromMetrics } from "@/lib/feedback/score-accumulator"
 import {
   analyzeAICodeOverlap,
@@ -290,7 +291,14 @@ export async function POST(request: NextRequest) {
       const feedback = aiResponse.text
 
       // Parse sections
-      const sections = parseFeedbackSections(feedback)
+      const parsedSections = parseFeedbackSections(feedback)
+      const sections = completeFeedbackSections(parsedSections, {
+        rawFeedback: feedback,
+        scenarioTitle,
+        testsPassed,
+        testsTotal,
+        overallScore: finalScores.overall,
+      })
 
       // ========================================
       // PHASE 5: Stream Final Results
