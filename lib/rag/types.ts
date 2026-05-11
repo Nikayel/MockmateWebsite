@@ -10,7 +10,7 @@ export interface TextEmbedding {
   metadata: {
     problemId?: string
     userId?: string
-    user_id?: string // For Firestore rules compatibility
+    user_id?: string // For Firestore rules compatibility (remove this after fixing firestore rulez)
     difficulty?: string
     tags?: string[]
     timestamp: string
