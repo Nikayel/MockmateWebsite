@@ -16,7 +16,6 @@ export interface TextEmbedding {
     timestamp: string
     role?: string
     goal?: string
-    // Hint-specific metadata
     problemTitle?: string
     hintLevel?: 1 | 2 | 3 | 4
     category?: "approach" | "conceptual" | "implementation" | "optimization" | "debugging"
