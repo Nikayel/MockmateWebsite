@@ -131,6 +131,10 @@ export type { PromptContext } from "./interviewer-prompts"
 export { INTERVIEWER_TOOLS, executeTool, formatToolResultsForPrompt } from "./interviewer-tools"
 export type { ToolDefinition, ToolContext, ToolResult } from "./interviewer-tools"
 
+// Pre-LLM interviewer policy (server-side state constraints)
+export { buildPreLLMInterviewerPolicy, formatPreLLMInterviewerPolicy } from "./interviewer-policy"
+export type { PreLLMInterviewerPolicy, PreLLMPolicyContext } from "./interviewer-policy"
+
 // Response validation (hard gates + semantic LLM validation)
 export {
   validateInterviewerResponse,

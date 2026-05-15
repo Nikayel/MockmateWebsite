@@ -42,6 +42,10 @@ import {
   formatToolResultsForPrompt,
   type ToolContext,
 } from "@/lib/interview/interviewer-tools"
+import {
+  buildPreLLMInterviewerPolicy,
+  formatPreLLMInterviewerPolicy,
+} from "@/lib/interview/interviewer-policy"
 import { buildInterviewerPrompt } from "@/lib/interview/interviewer-prompts"
 import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
 import {
@@ -624,98 +628,18 @@ EVALUATION CRITERIA FOR BUG FIX:
       (enhancedTracker || (conversationTracker as unknown as ConversationTracker))?.hintsGiven || 0
     const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ""
 
-    // CODE-ENFORCED CHECKLIST INJECTION
-    // This dynamically injects requirements based on tracker state
-    // The LLM cannot ignore this because it's injected based on code logic
-    let enforcedChecklist = ""
     const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
 
-    // Run checklist in discussion AND coding phases (before tests run)
-    // This catches cases where starter code pushes phase to "coding" too early
-    const shouldEnforceChecklist =
-      (currentPhase === "discussion" || currentPhase === "coding") &&
-      tracker &&
-      !tracker.hasRunTests
-    if (shouldEnforceChecklist) {
-      const missingItems: string[] = []
-
-      // IMPORTANT: Only ask about complexity AFTER they've explained their approach
-      // Don't rush to complexity questions when they're still exploring the problem
-      const hasExplainedApproach =
-        tracker.approachExplained ||
-        tracker.approachQuality === "specific" ||
-        tracker.approachQuality === "detailed"
-
-      // Check if complexity has been discussed (only if they've explained approach)
-      if (hasExplainedApproach && !tracker.timeComplexityMentioned) {
-        missingItems.push(
-          '⚠️ ASK ABOUT COMPLEXITY: "What time and space complexity do you expect with your approach?"'
-        )
-      }
-
-      // Check if edge cases have been discussed (only if they've explained approach)
-      if (hasExplainedApproach && tracker.edgeCasesMentioned.length === 0) {
-        missingItems.push('⚠️ ASK ABOUT EDGE CASES: "What edge cases should we consider?"')
-      }
-
-      if (missingItems.length > 0) {
-        enforcedChecklist = `
-═══════════════════════════════════════════════════════════════
-🚫 DO NOT SAY "GO CODE" OR "CODE IT UP" IN THIS RESPONSE 🚫
-You MUST ask about these first:
-${missingItems.join("\n")}
-═══════════════════════════════════════════════════════════════
-    `
-      }
-    }
-
-    // TESTING PHASE: Dynamic override to prevent re-asking already covered topics
-    // The static testing phase prompt says "ask about complexity" but we need to
-    // skip that if complexity was already discussed during the approach phase
-    let testingPhaseOverride = ""
-    if (currentPhase === "testing" && tracker) {
-      const alreadyCovered: string[] = []
-
-      if (tracker.timeComplexityMentioned && tracker.timeComplexityValue) {
-        alreadyCovered.push(
-          `✅ COMPLEXITY ALREADY DISCUSSED: ${tracker.timeComplexityValue} - DO NOT ask again`
-        )
-      }
-      if (tracker.edgeCasesMentioned.length > 0) {
-        alreadyCovered.push(
-          `✅ EDGE CASES ALREADY DISCUSSED: ${tracker.edgeCasesMentioned.join(", ")} - DO NOT ask again`
-        )
-      }
-
-      // Check if ALL key topics are covered
-      const allTopicsCovered =
-        tracker.timeComplexityMentioned && tracker.edgeCasesMentioned.length > 0
-
-      if (allTopicsCovered && testsHaveRunNow) {
-        // All topics covered - guide to Submit immediately
-        testingPhaseOverride = `
-═══════════════════════════════════════════════════════════════
-ALL KEY TOPICS COVERED - GUIDE TO SUBMIT:
-✅ Complexity: DISCUSSED(${tracker.timeComplexityValue || "mentioned"})
-✅ Edge cases: DISCUSSED(${tracker.edgeCasesMentioned.join(", ")})
-✅ Tests: PASSED
-
-    ACTION: Give brief acknowledgment, then say "When you're ready, click Submit to wrap up the interview."
-DO NOT ask more questions - the interview discussion is complete.
-═══════════════════════════════════════════════════════════════
-    `
-      } else if (alreadyCovered.length > 0) {
-        // Some topics covered - don't re-ask, but still need to cover missing topics
-        testingPhaseOverride = `
-═══════════════════════════════════════════════════════════════
-ALREADY COVERED(DO NOT RE - ASK):
-${alreadyCovered.join("\n")}
-
-    REMAINING: Ask ONE question about any missing topic, then guide to Submit.
-═══════════════════════════════════════════════════════════════
-    `
-      }
-    }
+    const preLLMPolicy = buildPreLLMInterviewerPolicy({
+      phase: currentPhase,
+      tracker,
+      hasSubmitted: hasSubmitted || false,
+      testsHaveRun: testsHaveRunNow || false,
+      testsPassed: testResultsArray?.filter((t) => t.passed === true).length || 0,
+      testsTotal: testResultsArray?.length || 0,
+    })
+    const enforcedChecklist = formatPreLLMInterviewerPolicy(preLLMPolicy)
+    const testingPhaseOverride = ""
 
     // Build complexity context - tells interviewer if solution is optimal
     let complexityContext = ""

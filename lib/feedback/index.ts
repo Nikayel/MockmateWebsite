@@ -33,9 +33,11 @@ export {
   normalizeCode,
   calculateCodeSimilarity,
   analyzeAICodeOverlap,
-  validateConversationWithAI,
-  getDefaultValidation,
-} from "./validation"
+} from "./ai-code-overlap"
+
+export { validateConversationWithAI } from "./conversation-validation"
+export { detectApproachHeuristically } from "./conversation-heuristics"
+export { getDefaultValidation } from "./validation-defaults"
 
 // ============================================================================
 // COMPLETENESS ANALYSIS EXPORTS
@@ -58,7 +60,7 @@ export {
   calculateBugFixScores,
   calculateValidatedScores,
   applyScoreFloors,
-} from "./scoring-algorithms"
+} from "./scoring"
 
 // ============================================================================
 // CONSTITUTIONAL AI EXPORTS

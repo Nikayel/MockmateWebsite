@@ -614,9 +614,24 @@ CODE EFFICIENCY ANALYSIS:
     if (phaseTracking && scenarioType !== "system-design") {
       // Detect skipped phases
       const tracker = phaseTracking.conversationTracker
+      // Final grading must use reconciled evidence, not tracker-only phase flags.
+      // The tracker is still useful for live flow state, but it can miss natural explanations.
+      const evidenceShowsApproach =
+        extractedEvidence?.approach.explained === true || aiValidation.approachExplained === true
+      const evidenceShowsComplexity =
+        extractedEvidence?.timeComplexity.mentioned === true ||
+        aiValidation.complexityDiscussed === true
+
+      if (!tracker?.approachExplained && evidenceShowsApproach) {
+        logger.info("[Feedback API] Skipping discussion penalty; evidence shows approach", {
+          sessionId,
+          evidenceQuote: extractedEvidence?.approach.quote?.substring(0, 100),
+          aiValidationApproachExplained: aiValidation.approachExplained,
+        })
+      }
 
       // 1. No discussion phase (jumped to coding without explaining approach)
-      if (!tracker?.approachExplained && preScreen.candidateMessageCount > 0) {
+      if (!evidenceShowsApproach && preScreen.candidateMessageCount > 0) {
         phaseAnalysis.skippedPhases.push("discussion")
         phaseAnalysis.penalties.push({
           phase: "discussion",
@@ -640,11 +655,7 @@ CODE EFFICIENCY ANALYSIS:
       }
 
       // 3. No complexity discussion (tests passed but never discussed complexity)
-      if (
-        passRate >= 80 &&
-        !tracker?.timeComplexityMentioned &&
-        !aiValidation.complexityDiscussed
-      ) {
+      if (passRate >= 80 && !evidenceShowsComplexity) {
         phaseAnalysis.skippedPhases.push("complexity_discussion")
         phaseAnalysis.penalties.push({
           phase: "complexity_discussion",
