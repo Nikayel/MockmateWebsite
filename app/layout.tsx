@@ -200,7 +200,10 @@ html {
           }}
         />
       </head>
-      <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
+      <body
+        className={`${workSans.variable} ${openSans.variable} antialiased`}
+        suppressHydrationWarning
+      >
         {/* Skip link for keyboard accessibility - hidden until focused */}
         <a
           href="#main-content"
