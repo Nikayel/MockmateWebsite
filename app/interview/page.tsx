@@ -52,6 +52,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
+import type { Profile } from "@/lib/types"
 import {
   checkUsageLimit,
   recordSessionStart,
@@ -440,6 +441,8 @@ function InterviewPageContent() {
     limit: number
     allowed: boolean
   } | null>(null)
+  const [cachedUserProfile, setCachedUserProfile] = useState<Profile | null>(null)
+  const userProfileRequestRef = useRef<Promise<Profile | null> | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
   // Code viewer dialog state
@@ -456,6 +459,35 @@ function InterviewPageContent() {
   // Experience level from roadmap (for level-appropriate interviewer questions)
   // Falls back to "intermediate" if no roadmap (direct practice mode)
   const experienceLevel = activeRoadmap?.assessment?.experienceLevel || "intermediate"
+
+  useEffect(() => {
+    setCachedUserProfile(null)
+    userProfileRequestRef.current = null
+  }, [user?.id])
+
+  const getCachedUserProfile = useCallback(async (): Promise<Profile | null> => {
+    if (!user) return null
+
+    if (cachedUserProfile) {
+      return cachedUserProfile
+    }
+
+    if (!userProfileRequestRef.current) {
+      userProfileRequestRef.current = getUserProfile(user.id, false)
+        .then((profile) => {
+          setCachedUserProfile(profile)
+          return profile
+        })
+        .catch((error) => {
+          userProfileRequestRef.current = null
+          console.warn("Failed to load cached user profile for chat context:", error)
+          return null
+        })
+    }
+
+    return userProfileRequestRef.current
+  }, [cachedUserProfile, user])
+
   // Calm mode - muted colors for anxiety reduction (research-backed)
   // Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
   const [calmMode, setCalmMode] = useState(false)
@@ -1731,7 +1763,7 @@ Let's continue!`
     setIsLoadingInterviewer(true)
     try {
       // Get user profile for context
-      const userProfile = user ? await getUserProfile(user.id) : null
+      const userProfile = await getCachedUserProfile()
 
       // Analyze code patterns for context-aware feedback
       const codeAnalysis = analyzeCodeForProactiveFeedback(code)
@@ -1802,7 +1834,7 @@ Let's continue!`
 
     setIsLoadingInterviewer(true)
     try {
-      const userProfile = user ? await getUserProfile(user.id) : null
+      const userProfile = await getCachedUserProfile()
       const minutesSpent = Math.floor(elapsedTime / 60)
 
       // Build context-specific prompt
@@ -2228,7 +2260,7 @@ Ask ONE focused question based on these observations.`)
       // Trigger interviewer to discuss the solution
       // NOTE: Feedback generation is now DEFERRED until user clicks "View Detailed Feedback"
       // This allows post-interview discussion to be included in the final scoring
-      const userProfile = user ? await getUserProfile(user.id) : null
+      const userProfile = await getCachedUserProfile()
 
       const discussionPrompt = `[POST-INTERVIEW DISCUSSION - CONTINUE CONVERSATION] This is a continuation of our interview conversation. The candidate has just completed their coding solution.
 
@@ -3350,15 +3382,17 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
   }
 
-  const handleSendMessage = async (isInterviewer = false) => {
-    const input = isInterviewer ? interviewerInput : chatInput
+  const handleSendMessage = async (isInterviewer = false, messageOverride?: string) => {
+    const input = messageOverride ?? (isInterviewer ? interviewerInput : chatInput)
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
     const messages = isInterviewer ? interviewerMessages : chatMessages
     const setMessages = isInterviewer ? setInterviewerMessages : setChatMessages
     const setLoading = isInterviewer ? setIsLoadingInterviewer : setIsLoadingChat
 
-    if (input.trim()) {
-      const newUserMessage: ChatMessage = { type: "user", message: input }
+    const userMessage = input.trim()
+
+    if (userMessage) {
+      const newUserMessage: ChatMessage = { type: "user", message: userMessage }
       setMessages((prev) => [...prev, newUserMessage])
       setLoading(true)
 
@@ -3377,7 +3411,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       // Track user message for conversation context (phase tracking)
       if (isInterviewer) {
-        updateTrackerOnMessage(input, "user")
+        updateTrackerOnMessage(userMessage, "user")
       }
 
       // Track user message for scoring (fire-and-forget)
@@ -3387,7 +3421,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           .then((token) => {
             trackUserMessage(
               currentSessionId,
-              input,
+              userMessage,
               isInterviewer ? "interviewer" : "partner",
               token
             )
@@ -3416,12 +3450,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         "lets wrap",
       ]
       const isEndingSession = conclusionSignals.some((signal) =>
-        input.toLowerCase().includes(signal)
+        userMessage.toLowerCase().includes(signal)
       )
 
       try {
         // Get user profile for context
-        const userProfile = user ? await getUserProfile(user.id) : null
+        const userProfile = await getCachedUserProfile()
 
         // Extract name for personalization
         const userName =
@@ -3442,7 +3476,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: input + additionalContext,
+            message: userMessage + additionalContext,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
             userContext: userProfile
@@ -3595,7 +3629,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           duration: 6000,
           action: {
             label: "Retry",
-            onClick: () => handleSendMessage(isInterviewer),
+            onClick: () => handleSendMessage(isInterviewer, userMessage),
           },
         })
       } finally {
@@ -3611,7 +3645,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       const voice = isInterviewer ? interviewerVoice : partnerVoice
 
       // Update input with final transcript
-      setInput(transcript)
+      const userMessage = transcript.trim()
+      if (!userMessage) return
+
+      setInput(userMessage)
 
       // Stop recording
       if (voice.isRecording) {
@@ -3619,7 +3656,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
 
       // Send the message
-      await handleSendMessage(isInterviewer)
+      await handleSendMessage(isInterviewer, userMessage)
     },
     [interviewerVoice, partnerVoice, handleSendMessage]
   )

@@ -236,8 +236,9 @@ export function InterviewerChat({
 
   const handleSubmit = async () => {
     if (inputValue.trim() && !isLoadingInterviewer) {
-      await onSendMessage(inputValue)
+      const message = inputValue.trim()
       onInputChange("")
+      await onSendMessage(message)
     }
   }
 
@@ -474,8 +475,9 @@ export function AIChatPartner({
 
   const handleSubmit = async () => {
     if (inputValue.trim() && !isLoadingChat) {
-      await onSendMessage(inputValue)
+      const message = inputValue.trim()
       onInputChange("")
+      await onSendMessage(message)
     }
   }
 

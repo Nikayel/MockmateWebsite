@@ -1,0 +1,82 @@
+import { SCORING } from "@/lib/constants"
+import type { ConversationValidation, ExtendedScoreResult, ScoreResult } from "../types"
+
+/**
+ * Apply score floors for correct solutions while preserving interview communication penalties.
+ */
+export function applyScoreFloors(
+  scores: ScoreResult,
+  passRate: number,
+  efficiencyScore: number | undefined,
+  aiValidation: ConversationValidation
+): ExtendedScoreResult {
+  const isOptimal = (efficiencyScore || 0) >= 80
+  const explainedApproach =
+    aiValidation.approachExplained &&
+    aiValidation.isCoherent &&
+    aiValidation.approachQuality !== "none" &&
+    aiValidation.approachQuality !== "poor"
+  const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
+  const isSilentSolution = passRate >= 80 && !explainedApproach
+
+  let overall = scores.overall
+  let communication = scores.communication
+  let understanding = scores.understanding
+  let problemSolving = scores.problemSolving
+  let codeQuality = scores.codeQuality
+
+  if (passRate >= 100 && isOptimal && hasGoodComm) {
+    overall = Math.max(85, overall)
+    communication = Math.max(70, communication)
+  } else if (passRate >= 100 && isOptimal && explainedApproach) {
+    overall = Math.max(78, overall)
+    communication = Math.max(55, communication)
+  } else if (passRate >= 100 && isOptimal) {
+    overall = Math.max(55, overall)
+    communication = Math.min(35, communication)
+  } else if (passRate >= 100 && explainedApproach) {
+    overall = Math.max(72, overall)
+  } else if (passRate >= 100) {
+    overall = Math.max(52, overall)
+    communication = Math.min(40, communication)
+  } else if (passRate >= 90) {
+    overall = Math.max(50, overall)
+  } else if (passRate >= 80) {
+    overall = Math.max(45, overall)
+  }
+
+  if (passRate >= 100) {
+    understanding = Math.max(60, understanding)
+    problemSolving = Math.max(65, problemSolving)
+    codeQuality = Math.max(70, codeQuality)
+
+    if (isOptimal) {
+      understanding = Math.max(70, understanding)
+      problemSolving = Math.max(75, problemSolving)
+      codeQuality = Math.max(80, codeQuality)
+    }
+
+    const pw = SCORING.PERFORMANCE_WEIGHTS
+    const newOverall = Math.round(
+      understanding * pw.UNDERSTANDING +
+        problemSolving * pw.PROBLEM_SOLVING +
+        codeQuality * pw.CODE_QUALITY +
+        communication * pw.COMMUNICATION
+    )
+    overall = Math.max(overall, newOverall)
+  } else if (passRate >= 80) {
+    understanding = Math.max(50, understanding)
+    problemSolving = Math.max(55, problemSolving)
+    codeQuality = Math.max(55, codeQuality)
+  }
+
+  return {
+    ...scores,
+    understanding,
+    problemSolving,
+    codeQuality,
+    communication,
+    overall,
+    silentSolution: isSilentSolution,
+  }
+}

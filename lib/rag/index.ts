@@ -28,7 +28,6 @@ const embeddingProvider = getHybridProvider({
   cacheEnabled: true, // Enable caching for speed and cost savings
 })
 
-// Log which vector DB and embedding provider is being used on startup
 const activeProvider = embeddingProvider.getActiveProvider()
 console.log(
   `[RAG] Initialized with ${getVectorDBProvider()} backend and ${activeProvider} embeddings`
