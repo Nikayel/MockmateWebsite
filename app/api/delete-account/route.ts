@@ -144,6 +144,7 @@ export async function DELETE(request: NextRequest) {
           "mockmate_feedback",
           "mockmate_hint",
           "mockmate_onboarding",
+          "mockmate_user-performance",
           "mockmate_general",
         ]
 

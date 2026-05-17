@@ -6,6 +6,7 @@
  */
 
 import { Pinecone } from "@pinecone-database/pinecone"
+import { VECTOR_CONTENT_TYPES } from "../types"
 import type { VectorDB, VectorDocument, QueryOptions, QueryResult } from "../types"
 
 // Pinecone index configuration
@@ -352,7 +353,7 @@ export class PineconeVectorDB implements VectorDB {
     const index = await this.getIndex()
 
     // Delete from all namespaces since we don't know which one
-    const namespaces = ["problem", "solution", "hint", "feedback", "onboarding", "general"]
+    const namespaces = [...VECTOR_CONTENT_TYPES, "general"]
 
     for (const ns of namespaces) {
       try {

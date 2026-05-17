@@ -1,13 +1,13 @@
 /**
  * Metadata Filters
- * 
+ *
  * Provides filtering utilities for RAG queries
  */
 
-import type { SimilaritySearchOptions } from '../types'
+import type { SimilaritySearchOptions, VectorContentType } from "../types"
 
 export interface FilterCriteria {
-  type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding' | 'knowledge'
+  type?: VectorContentType
   userId?: string
   problemId?: string
   problemType?: string
@@ -72,7 +72,7 @@ export function matchesFilter(
   // Tags filter (all tags must be present)
   if (criteria.tags && criteria.tags.length > 0) {
     const docTags = document.metadata?.tags || []
-    const hasAllTags = criteria.tags.every(tag => docTags.includes(tag))
+    const hasAllTags = criteria.tags.every((tag) => docTags.includes(tag))
     if (!hasAllTags) {
       return false
     }
@@ -92,4 +92,3 @@ export function optionsToFilterCriteria(options: SimilaritySearchOptions): Filte
     excludeIds: options.excludeIds,
   }
 }
-

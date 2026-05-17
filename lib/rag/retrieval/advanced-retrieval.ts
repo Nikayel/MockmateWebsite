@@ -9,11 +9,11 @@
  * - Personalized retrieval based on user history
  */
 
-import { getHybridProvider } from '../embeddings/hybrid-provider'
-import { vectorDB } from '../vectordb'
-import type { SimilarResult, QueryResult, VectorDocument } from '../types'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
+import { getHybridProvider } from "../embeddings/hybrid-provider"
+import { vectorDB } from "../vectordb"
+import type { QueryResult, VectorContentType } from "../types"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { CompanyId } from "@/lib/data/company-questions/types"
 
 /**
  * Advanced retrieval options
@@ -25,27 +25,27 @@ export interface AdvancedRetrievalOptions {
   minSimilarity?: number
 
   // Filtering
-  types?: ('problem' | 'solution' | 'hint' | 'feedback' | 'onboarding' | 'knowledge')[]
+  types?: VectorContentType[]
   userId?: string
   patterns?: DSAPattern[]
   companies?: CompanyId[]
-  difficulty?: ('easy' | 'medium' | 'hard')[]
+  difficulty?: ("easy" | "medium" | "hard")[]
   excludeIds?: string[]
 
   // Advanced options
-  enableQueryExpansion?: boolean      // Generate related queries
-  enableHybridSearch?: boolean        // Combine semantic + keyword
-  enableReranking?: boolean           // Apply advanced reranking
-  enablePersonalization?: boolean     // Personalize based on user
-  contextDocuments?: string[]         // Additional context for retrieval
+  enableQueryExpansion?: boolean // Generate related queries
+  enableHybridSearch?: boolean // Combine semantic + keyword
+  enableReranking?: boolean // Apply advanced reranking
+  enablePersonalization?: boolean // Personalize based on user
+  contextDocuments?: string[] // Additional context for retrieval
 
   // Reranking weights
   rerankingWeights?: {
-    similarity: number      // Base similarity (default: 0.5)
-    recency: number         // Recency boost (default: 0.1)
-    relevance: number       // Query relevance (default: 0.2)
-    popularity: number      // Document popularity (default: 0.1)
-    userHistory: number     // User history match (default: 0.1)
+    similarity: number // Base similarity (default: 0.5)
+    recency: number // Recency boost (default: 0.1)
+    relevance: number // Query relevance (default: 0.2)
+    popularity: number // Document popularity (default: 0.1)
+    userHistory: number // User history match (default: 0.1)
   }
 }
 
@@ -56,11 +56,11 @@ export interface EnhancedRetrievalResult {
   id: string
   text: string
   type: string
-  baseScore: number           // Original similarity score
-  finalScore: number          // After reranking
+  baseScore: number // Original similarity score
+  finalScore: number // After reranking
   metadata: Record<string, unknown>
-  highlights?: string[]       // Relevant snippets
-  matchedQueries?: string[]   // Which expanded queries matched
+  highlights?: string[] // Relevant snippets
+  matchedQueries?: string[] // Which expanded queries matched
 }
 
 /**
@@ -146,33 +146,34 @@ export class AdvancedRetriever {
     let candidates = Array.from(allCandidates.values())
 
     if (options.patterns?.length) {
-      candidates = candidates.filter(c =>
-        options.patterns!.some(p =>
-          c.metadata?.pattern === p ||
-          (c.metadata?.patterns as string[])?.includes(p) ||
-          (c.metadata?.tags as string[])?.includes(p)
+      candidates = candidates.filter((c) =>
+        options.patterns!.some(
+          (p) =>
+            c.metadata?.pattern === p ||
+            (c.metadata?.patterns as string[])?.includes(p) ||
+            (c.metadata?.tags as string[])?.includes(p)
         )
       )
     }
 
     if (options.companies?.length) {
-      candidates = candidates.filter(c =>
-        options.companies!.some(cid =>
-          c.metadata?.companyId === cid ||
-          (c.metadata?.companyIds as string[])?.includes(cid)
+      candidates = candidates.filter((c) =>
+        options.companies!.some(
+          (cid) =>
+            c.metadata?.companyId === cid || (c.metadata?.companyIds as string[])?.includes(cid)
         )
       )
     }
 
     if (options.difficulty?.length) {
-      candidates = candidates.filter(c =>
-        options.difficulty!.includes(c.metadata?.difficulty as 'easy' | 'medium' | 'hard')
+      candidates = candidates.filter((c) =>
+        options.difficulty!.includes(c.metadata?.difficulty as "easy" | "medium" | "hard")
       )
     }
 
     if (options.types && options.types.length > 1) {
-      candidates = candidates.filter(c =>
-        options.types!.includes(c.metadata?.type as typeof options.types extends (infer T)[] ? T : never)
+      candidates = candidates.filter((c) =>
+        options.types!.includes(c.metadata?.type as VectorContentType)
       )
     }
 
@@ -185,10 +186,10 @@ export class AdvancedRetriever {
     if (options.enableReranking !== false) {
       enhancedResults = await this.rerank(candidates, options)
     } else {
-      enhancedResults = candidates.map(c => ({
+      enhancedResults = candidates.map((c) => ({
         id: c.id,
-        text: (c.metadata?.text as string) || '',
-        type: (c.metadata?.type as string) || '',
+        text: (c.metadata?.text as string) || "",
+        type: (c.metadata?.type as string) || "",
         baseScore: c.score,
         finalScore: c.score,
         metadata: c.metadata || {},
@@ -216,25 +217,25 @@ export class AdvancedRetriever {
 
     // Add pattern-based expansions
     const patternKeywords = {
-      'two pointers': ['two pointer', 'dual pointer', 'opposite ends'],
-      'sliding window': ['window', 'substring', 'subarray', 'contiguous'],
-      'binary search': ['search', 'sorted', 'log n', 'logarithmic'],
-      'dynamic programming': ['dp', 'memoization', 'tabulation', 'optimal substructure'],
-      'dfs': ['depth first', 'recursion', 'backtracking'],
-      'bfs': ['breadth first', 'level order', 'shortest path'],
-      'graph': ['node', 'edge', 'vertex', 'connected'],
-      'tree': ['binary tree', 'bst', 'node', 'traversal'],
-      'hash': ['hashmap', 'dictionary', 'map', 'set'],
+      "two pointers": ["two pointer", "dual pointer", "opposite ends"],
+      "sliding window": ["window", "substring", "subarray", "contiguous"],
+      "binary search": ["search", "sorted", "log n", "logarithmic"],
+      "dynamic programming": ["dp", "memoization", "tabulation", "optimal substructure"],
+      dfs: ["depth first", "recursion", "backtracking"],
+      bfs: ["breadth first", "level order", "shortest path"],
+      graph: ["node", "edge", "vertex", "connected"],
+      tree: ["binary tree", "bst", "node", "traversal"],
+      hash: ["hashmap", "dictionary", "map", "set"],
     }
 
     const lowerQuery = query.toLowerCase()
 
     for (const [pattern, variations] of Object.entries(patternKeywords)) {
-      if (lowerQuery.includes(pattern) || variations.some(v => lowerQuery.includes(v))) {
+      if (lowerQuery.includes(pattern) || variations.some((v) => lowerQuery.includes(v))) {
         // Add related terms as separate queries
         for (const variation of variations.slice(0, 2)) {
           if (!lowerQuery.includes(variation)) {
-            queries.push(query + ' ' + variation)
+            queries.push(query + " " + variation)
           }
         }
         break
@@ -242,10 +243,10 @@ export class AdvancedRetriever {
     }
 
     // Add difficulty variations if mentioned
-    if (lowerQuery.includes('easy')) {
-      queries.push(query.replace(/easy/gi, 'beginner friendly'))
-    } else if (lowerQuery.includes('hard')) {
-      queries.push(query.replace(/hard/gi, 'challenging advanced'))
+    if (lowerQuery.includes("easy")) {
+      queries.push(query.replace(/easy/gi, "beginner friendly"))
+    } else if (lowerQuery.includes("hard")) {
+      queries.push(query.replace(/hard/gi, "challenging advanced"))
     }
 
     return queries.slice(0, 5) // Max 5 query variations
@@ -270,70 +271,79 @@ export class AdvancedRetriever {
     const now = Date.now()
     const maxAge = 365 * 24 * 60 * 60 * 1000 // 1 year
 
-    return candidates.map(candidate => {
-      let finalScore = 0
+    return candidates
+      .map((candidate) => {
+        let finalScore = 0
 
-      // 1. Base similarity score
-      finalScore += candidate.score * weights.similarity
+        // 1. Base similarity score
+        finalScore += candidate.score * weights.similarity
 
-      // 2. Recency boost
-      const timestamp = candidate.metadata?.timestamp || candidate.metadata?.createdAt
-      if (timestamp) {
-        const age = now - new Date(timestamp as string).getTime()
-        const recencyScore = Math.max(0, 1 - (age / maxAge))
-        finalScore += recencyScore * weights.recency
-      }
-
-      // 3. Relevance boost (based on matched queries)
-      const queryMatchBoost = Math.min(1, candidate.matchedQueries.length / 3)
-      finalScore += queryMatchBoost * weights.relevance
-
-      // 4. Popularity/importance boost
-      const importance = (candidate.metadata?.importance as number) || 5
-      const popularityScore = importance / 10
-      finalScore += popularityScore * weights.popularity
-
-      // 5. User history match (if enabled)
-      if (options.enablePersonalization && options.userId) {
-        const isUserContent = candidate.metadata?.userId === options.userId ||
-                              candidate.metadata?.user_id === options.userId
-        if (isUserContent) {
-          finalScore += weights.userHistory
+        // 2. Recency boost
+        const timestamp = candidate.metadata?.timestamp || candidate.metadata?.createdAt
+        if (timestamp) {
+          const age = now - new Date(timestamp as string).getTime()
+          const recencyScore = Math.max(0, 1 - age / maxAge)
+          finalScore += recencyScore * weights.recency
         }
-      }
 
-      // 6. Pattern match boost
-      if (options.patterns?.length) {
-        const matchedPatterns = options.patterns.filter(p =>
-          candidate.metadata?.pattern === p ||
-          (candidate.metadata?.patterns as string[])?.includes(p)
-        )
-        if (matchedPatterns.length > 0) {
-          finalScore += 0.1 * (matchedPatterns.length / options.patterns.length)
+        // 3. Relevance boost (based on matched queries)
+        const queryMatchBoost = Math.min(1, candidate.matchedQueries.length / 3)
+        finalScore += queryMatchBoost * weights.relevance
+
+        // 4. Popularity/importance boost
+        const importance = (candidate.metadata?.importance as number) || 5
+        const popularityScore = importance / 10
+        finalScore += popularityScore * weights.popularity
+
+        // 5. User history match (if enabled)
+        if (options.enablePersonalization && options.userId) {
+          const isUserContent =
+            candidate.metadata?.userId === options.userId ||
+            candidate.metadata?.user_id === options.userId
+          if (isUserContent) {
+            finalScore += weights.userHistory
+          }
         }
-      }
 
-      // 7. Company match boost
-      if (options.companies?.length) {
-        const matchedCompanies = options.companies.filter(c =>
-          candidate.metadata?.companyId === c ||
-          (candidate.metadata?.companyIds as string[])?.includes(c)
-        )
-        if (matchedCompanies.length > 0) {
-          finalScore += 0.1 * (matchedCompanies.length / options.companies.length)
+        // 6. Pattern match boost
+        if (options.patterns?.length) {
+          const matchedPatterns = options.patterns.filter(
+            (p) =>
+              candidate.metadata?.pattern === p ||
+              (candidate.metadata?.patterns as string[])?.includes(p)
+          )
+          if (matchedPatterns.length > 0) {
+            finalScore += 0.1 * (matchedPatterns.length / options.patterns.length)
+          }
         }
-      }
 
-      return {
-        id: candidate.id,
-        text: (candidate.metadata?.text as string) || (candidate.metadata?.content as string) || '',
-        type: (candidate.metadata?.type as string) || (candidate.metadata?.knowledgeType as string) || '',
-        baseScore: candidate.score,
-        finalScore: Math.min(1, finalScore), // Cap at 1.0
-        metadata: candidate.metadata || {},
-        matchedQueries: candidate.matchedQueries,
-      }
-    }).sort((a, b) => b.finalScore - a.finalScore)
+        // 7. Company match boost
+        if (options.companies?.length) {
+          const matchedCompanies = options.companies.filter(
+            (c) =>
+              candidate.metadata?.companyId === c ||
+              (candidate.metadata?.companyIds as string[])?.includes(c)
+          )
+          if (matchedCompanies.length > 0) {
+            finalScore += 0.1 * (matchedCompanies.length / options.companies.length)
+          }
+        }
+
+        return {
+          id: candidate.id,
+          text:
+            (candidate.metadata?.text as string) || (candidate.metadata?.content as string) || "",
+          type:
+            (candidate.metadata?.type as string) ||
+            (candidate.metadata?.knowledgeType as string) ||
+            "",
+          baseScore: candidate.score,
+          finalScore: Math.min(1, finalScore), // Cap at 1.0
+          metadata: candidate.metadata || {},
+          matchedQueries: candidate.matchedQueries,
+        }
+      })
+      .sort((a, b) => b.finalScore - a.finalScore)
   }
 
   /**
@@ -352,7 +362,7 @@ export class AdvancedRetriever {
     const { results } = await this.retrieve({
       query,
       limit: options.limit || 5,
-      types: ['knowledge'],
+      types: ["knowledge"],
       patterns: [pattern],
       companies: options.company ? [options.company] : undefined,
       enableQueryExpansion: true,
@@ -377,7 +387,7 @@ export class AdvancedRetriever {
     const { results } = await this.retrieve({
       query,
       limit: options.limit || 5,
-      types: ['knowledge'],
+      types: ["knowledge"],
       companies: [company],
       patterns: options.patterns,
       enableQueryExpansion: true,
@@ -402,7 +412,7 @@ export class AdvancedRetriever {
     const { results } = await this.retrieve({
       query: problemText,
       limit: options.limit || 10,
-      types: ['problem'],
+      types: ["problem"],
       excludeIds: options.excludeProblemId ? [options.excludeProblemId] : undefined,
       enableReranking: true,
     })
@@ -426,7 +436,7 @@ export class AdvancedRetriever {
     const { results } = await this.retrieve({
       query: combinedQuery,
       limit: options.limit || 3,
-      types: ['hint', 'knowledge'],
+      types: ["hint", "knowledge"],
       patterns: options.pattern ? [options.pattern] : undefined,
       enableQueryExpansion: true,
       enableReranking: true,
@@ -449,16 +459,14 @@ export class AdvancedRetriever {
     const { results } = await this.retrieve({
       query: currentProblem,
       limit: options.limit || 5,
-      types: ['solution'],
+      types: ["solution"],
       userId,
       enablePersonalization: true,
       enableReranking: true,
     })
 
     if (options.onlyPassed) {
-      return results.filter(r =>
-        (r.metadata?.tags as string[])?.includes('passed')
-      )
+      return results.filter((r) => (r.metadata?.tags as string[])?.includes("passed"))
     }
 
     return results

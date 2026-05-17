@@ -2,10 +2,32 @@
  * Shared types for RAG operations
  */
 
+export const VECTOR_CONTENT_TYPES = [
+  "problem",
+  "solution",
+  "hint",
+  "feedback",
+  "onboarding",
+  "knowledge",
+  "company",
+  "company-question",
+  "system-design",
+  "bugfix",
+  "pattern-knowledge",
+  "user-performance",
+] as const
+
+export type VectorContentType = (typeof VECTOR_CONTENT_TYPES)[number]
+
+export interface VectorMetadata {
+  type?: VectorContentType
+  [key: string]: unknown
+}
+
 export interface TextEmbedding {
   id?: string
   text: string
-  type: "problem" | "solution" | "hint" | "feedback" | "onboarding" | "knowledge"
+  type: VectorContentType
   vector: number[]
   metadata: {
     problemId?: string
@@ -156,7 +178,7 @@ export interface ChunkOptions {
 export interface VectorDocument {
   id: string
   vector: number[]
-  metadata: Record<string, any>
+  metadata: VectorMetadata
   text?: string
 }
 
@@ -171,7 +193,7 @@ export interface VectorDB {
 export interface QueryOptions {
   topK?: number
   filter?: {
-    type?: "problem" | "solution" | "hint" | "feedback" | "onboarding" | "knowledge"
+    type?: VectorContentType
     userId?: string
     problemType?: string
     excludeIds?: string[]
@@ -195,7 +217,7 @@ export interface SimilaritySearchOptions {
   excludeIds?: string[]
   userId?: string
   problemType?: string
-  type?: "problem" | "solution" | "hint" | "feedback" | "onboarding" | "knowledge"
+  type?: VectorContentType
 }
 
 export interface RerankerOptions {

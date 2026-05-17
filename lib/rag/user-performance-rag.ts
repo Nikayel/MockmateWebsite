@@ -11,7 +11,6 @@
  */
 
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
-import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getHybridProvider } from "./embeddings/hybrid-provider"
 import { vectorDB } from "./vectordb"
 import { adminDb } from "@/lib/firebase-admin"
@@ -674,7 +673,7 @@ Learning pace: ${profile.learningPace}
       const results = await vectorDB.query(embedding, {
         topK: limit + 1,
         filter: {
-          type: "user-performance" as "problem" | "solution" | "hint" | "feedback" | "onboarding",
+          type: "user-performance",
           excludeIds: [`user-performance-${userId}`],
         },
         includeMetadata: true,
