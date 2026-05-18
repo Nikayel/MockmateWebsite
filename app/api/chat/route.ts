@@ -14,12 +14,8 @@ import {
   type TaskComplexity,
 } from "@/lib/ai-providers"
 import { trackAIChatServer } from "@/lib/analytics-server"
-import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
-import {
-  buildInterviewerLevelContext,
-  type InterviewLevel,
-} from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
+import { buildInterviewerLevelContext } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 // NEW: Phase-aware interview system with deterministic phase detection
 import {
   type InterviewPhase,
@@ -54,12 +50,27 @@ import {
   type TestResultItem,
   type UserContext,
 } from "@/lib/interview/chat-request-schema"
-import {
-  MAX_FILE_SIZE,
-  manageContextWindow,
-  manageWorkspaceContext,
-} from "@/lib/interview/context-window"
 import { buildRAGContext } from "@/lib/interview/chat-rag-context"
+import type { ClarifyingQuestion } from "@/lib/scenarios/types"
+import {
+  buildBugFixContext,
+  buildCompanyPromptContext,
+  buildComplexityContext,
+  buildConsoleContext,
+  buildCurrentCodeContext,
+  buildEdgeCaseContext,
+  buildPatternPromptContext,
+  buildProblemContext,
+  buildProviderHistory,
+  buildScenarioId,
+  buildSystemDesignPromptContext,
+  buildUserPersonalizationContext,
+  buildWorkspaceContextString,
+} from "@/lib/interview/chat/context-builders"
+
+type ConversationTrackerWithExtraction = ConversationTracker & {
+  lastExtractionAt?: number
+}
 
 export async function POST(request: NextRequest) {
   // Apply IP-based rate limiting (first layer - prevents abuse)
@@ -164,7 +175,8 @@ export async function POST(request: NextRequest) {
       message
     ) {
       const messageCount = Array.isArray(context) ? context.length : 0
-      const lastExtraction = (conversationTracker as any)?.lastExtractionAt || 0
+      const lastExtraction =
+        (conversationTracker as unknown as ConversationTrackerWithExtraction).lastExtractionAt || 0
 
       // Feature flag: Use extraction service or direct call
       if (getFlag("USE_EXTRACTION_SERVICE")) {
@@ -256,313 +268,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Build user context string for personalized responses
     const userInfo = userContext as UserContext
-    // Extract first name or last name from full_name or email
-    let userName = "there"
-    if (userInfo?.full_name) {
-      const nameParts = userInfo.full_name.trim().split(/\s+/)
-      // Use first name if available, otherwise use last name
-      userName = nameParts[0] || (nameParts.length > 1 ? nameParts[nameParts.length - 1] : "")
-    } else if (userInfo?.email) {
-      const emailName = userInfo.email.split("@")[0]
-      const nameParts = emailName.split(".")
-      if (nameParts.length > 0) {
-        userName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1)
-      }
-    }
-
-    const userContextString = userInfo
-      ? `
-CANDIDATE INFORMATION:
-- Name: ${userName} (use first name or last name only, never full name)
-- Email: ${userInfo.email || "Guest User"}
-- Subscription: ${userInfo.subscription_tier || "free"} tier
-- Sessions completed: ${userInfo.sessions_used || 0}
-- Previous topics: ${userInfo.previous_topics?.join(", ") || "None"}
-- Skill level: ${userInfo.skill_level || "Intermediate"}
-
-IMPORTANT: - Do NOT use their name in every response. Real interviewers rarely say the candidate's name mid-interview.
-- You may use their first name once at the very start (e.g. "Hey ${userName}, take your time reading...") or sparingly when wrapping up. 
-Otherwise, just ask questions naturally without naming them (e.g. "Walk me through your approach" not "X, walk me through your approach").
-`
-      : ""
+    const { userContextString, candidateLevel } = buildUserPersonalizationContext(userInfo)
 
     // Build level-specific interviewer context
     // This adapts questions and expectations based on candidate's experience level
-    const candidateLevel = (userInfo?.skill_level || "intermediate").toLowerCase() as InterviewLevel
     const levelContext = buildInterviewerLevelContext(candidateLevel)
 
     // Manage workspace context with sliding window
-    const managedWorkspace = manageWorkspaceContext(workspaceContext || [])
-    let workspaceContextStr = ""
-    if (managedWorkspace.length > 0) {
-      workspaceContextStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
-      managedWorkspace.forEach((file) => {
-        workspaceContextStr += `\n--- File: ${file.path} ---\n${file.content} \n`
-      })
-      workspaceContextStr += "\n=== END CODEBASE CONTEXT ===\n"
-    }
+    const workspaceContextStr = buildWorkspaceContextString(workspaceContext)
 
     // Add current code context (truncate if too long)
-    let currentCodeContext = ""
-    if (currentCode && currentCode.trim()) {
-      const truncatedCode =
-        currentCode.length > MAX_FILE_SIZE
-          ? currentCode.slice(0, MAX_FILE_SIZE) + "\n// ... [code truncated]"
-          : currentCode
-      currentCodeContext = `\n\n === CURRENT SOLUTION CODE ===\n${truncatedCode} \n === END CURRENT CODE ===\n`
-    }
+    const currentCodeContext = buildCurrentCodeContext(currentCode)
 
     // Define system prompts based on role with enhanced context awareness
-    const problemContext = scenarioTitle
-      ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ""} \n`
-      : ""
+    const problemContext = buildProblemContext(scenarioTitle, scenarioType)
 
     // Get company-specific interview style
-    const companyStyle = getCompanyStyle(scenarioCompany || "Generic")
+    const { companyStyle, companyContext, isGenericCompany } =
+      buildCompanyPromptContext(scenarioCompany)
 
     // Get pattern-specific metadata for DSA problems
-    const patternMeta = scenarioPattern ? getPatternMetadata(scenarioPattern as DSAPattern) : null
-
-    // Build company-specific context - handle Generic case (no specific company)
-    const isGenericCompany = !companyStyle.company || companyStyle.company === "Generic"
-    const companyContext = isGenericCompany
-      ? `
-INTERVIEW STYLE: ${companyStyle.style}
-YOU ARE: A professional technical interviewer conducting a coding interview.Do NOT mention any specific company name.
-
-FOCUS AREAS: ${companyStyle.focusAreas.join(", ")}
-EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(", ")}
-    PERSONALITY: ${companyStyle.interviewerPersonality}
-    `
-      : `
-    COMPANY: ${companyStyle.company}
-INTERVIEW STYLE: ${companyStyle.style}
-YOU ARE: A ${companyStyle.company} interviewer conducting a technical interview.
-Mention you're interviewing for ${companyStyle.company} in your first response.
-
-FOCUS AREAS: ${companyStyle.focusAreas.join(", ")}
-EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(", ")}
-    PERSONALITY: ${companyStyle.interviewerPersonality}
-    `
-
-    // Build pattern-specific context for DSA problems
-    const patternContext = patternMeta
-      ? `
-PROBLEM PATTERN: ${patternMeta.name}
-KEY TECHNIQUES: ${patternMeta.keyTechniques.join(", ")}
-EXPECTED COMPLEXITY: Time ${patternMeta.timeComplexityHints[0]}, Space ${patternMeta.spaceComplexityHints[0]}
-    PATTERN - SPECIFIC FOLLOW - UPS TO ASK:
-${patternMeta.interviewerFollowUps
-  .slice(0, 3)
-  .map((q) => `- ${q}`)
-  .join("\n")}
-    `
-      : ""
+    const { patternMeta, patternContext } = buildPatternPromptContext(scenarioPattern)
 
     // Build edge case context for interviewer to ask about specific scenarios
-    const edgeCaseContext =
-      edgeCases && Array.isArray(edgeCases) && edgeCases.length > 0
-        ? `
-EDGE CASES YOU MUST ASK ABOUT:
-These are specific edge cases for this problem.You MUST ask about at least ONE before they run tests:
-${edgeCases
-  .slice(0, 4)
-  .map(
-    (ec: { description: string; input: unknown }) =>
-      `- "${ec.description}": What happens with input ${JSON.stringify(ec.input)}?`
-  )
-  .join("\n")}
-
-WHEN TO ASK ABOUT EDGE CASES(BE PROACTIVE):
-    1. AFTER they explain their approach: "Before you code - what happens if the input is empty?"
-    2. AFTER they write code but BEFORE running tests: "Let's trace through an edge case - what if ${JSON.stringify(edgeCases[0]?.input)}?"
-    3. If they don't mention edge cases at all, YOU bring it up: "Have you considered what happens with ${edgeCases[0]?.description}?"
-
-HOW TO ASK(sound natural):
-    - "Quick sanity check - what does your code do if the input is ${JSON.stringify(edgeCases[0]?.input)}?"
-      - "Before you run tests, walk me through what happens with an empty array"
-      - "Edge case check: what if there's only one element?"
-
-DO NOT skip edge cases - real interviewers always ask about them.If they haven't mentioned any edge case handling, that's a gap you should probe.
-`
-        : ""
+    const edgeCaseContext = buildEdgeCaseContext(edgeCases)
 
     // Build console/test results context for interviewer awareness
     // TestResultItem and ConsoleLogItem interfaces defined at module level
     const testResultsArray = testResults
     const consoleLogsArray = consoleLogs
 
-    let consoleContext = ""
-    if (testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0) {
-      const passed = testResultsArray.filter((t) => t.passed === true).length
-      const total = testResultsArray.length
-      const allPassed = passed === total
-
-      consoleContext = `
-    CONSOLE & TEST RESULTS(IMPORTANT - BE AWARE OF THIS):
-Tests have been run: ${passed}/${total} passed ${allPassed ? "✓ ALL PASSING" : "✗ SOME FAILING"}
-
-${testResultsArray
-  .slice(0, 5)
-  .map(
-    (t, i) =>
-      `Test ${i + 1}: ${t.description || "Test case"} - ${t.passed ? "PASSED ✓" : "FAILED ✗"}${
-        !t.passed && t.error ? ` (Error: ${t.error})` : ""
-      }${!t.passed && t.expected !== undefined ? ` (Expected: ${JSON.stringify(t.expected)}, Got: ${JSON.stringify(t.actual)})` : ""}`
-  )
-  .join("\n")}
-
-${
-  allPassed
-    ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
-- DO NOT say "let's run the tests" - they already did and passed!
-- If complexity AND edge cases were already discussed: guide them to Submit
-  * Say: "Tests are passing. When you're ready, click Submit to wrap up the interview."
-- If complexity NOT discussed: ask ONE question about time complexity
-- If edge cases NOT discussed: ask ONE question about edge cases
-- After ONE follow-up question, guide them to Submit on your next turn
-- DO NOT keep asking endless questions - wrap up promptly`
-    : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
-- Acknowledge the failing tests
-- Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
-- Help them trace through the failing case`
-}
-    `
-    }
-
-    // Add console logs context if available
-    if (consoleLogsArray && Array.isArray(consoleLogsArray) && consoleLogsArray.length > 0) {
-      const recentLogs = consoleLogsArray.slice(-5)
-      consoleContext += `
-RECENT CONSOLE OUTPUT:
-${recentLogs.map((log) => `[${log.type || "log"}] ${log.message || ""}`).join("\n")}
-    `
-    }
+    const consoleContext = buildConsoleContext(testResultsArray, consoleLogsArray)
 
     // Build system design specific context with phase-based guidance
-    const isSystemDesign = scenarioType === "system-design"
-    const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
-
-    // System design interviews should follow 4 phases (~45 min total)
-    const getSystemDesignPhase = (minutes: number) => {
-      if (minutes < 10) return "requirements" // Phase 1: Requirements gathering
-      if (minutes < 20) return "high-level" // Phase 2: High-level design
-      if (minutes < 35) return "deep-dive" // Phase 3: Deep dive
-      return "wrap-up" // Phase 4: Bottlenecks & wrap-up
-    }
-
-    const systemDesignPhase = isSystemDesign ? getSystemDesignPhase(elapsedMinutes) : null
-
-    const systemDesignContext = isSystemDesign
-      ? `
-INTERVIEW TYPE: System Design(Architecture Discussion - NOT a coding interview)
-
-CURRENT PHASE: ${systemDesignPhase?.toUpperCase()} (${elapsedMinutes} min elapsed)
-
-PHASE GUIDANCE:
-${
-  systemDesignPhase === "requirements"
-    ? `
-REQUIREMENTS PHASE (0-10 min):
-- Ask clarifying questions about scope and scale
-- Help candidate define functional requirements (what the system must do)
-- Help candidate define non-functional requirements (latency, availability, scale)
-- Ask: "How many users?" "What's the expected traffic?" "What's more important: consistency or availability?"
-- DON'T jump into architecture yet - requirements first!
-`
-    : ""
-}
-${
-  systemDesignPhase === "high-level"
-    ? `
-HIGH-LEVEL DESIGN PHASE (10-20 min):
-- Guide candidate to draw the major components
-- Ask about API design: "What endpoints do we need?"
-- Ask about data model: "What entities do we need to store?"
-- Ask about communication: "How will components communicate?"
-- Encourage thinking out loud about architectural choices
-`
-    : ""
-}
-${
-  systemDesignPhase === "deep-dive"
-    ? `
-DEEP DIVE PHASE (20-35 min):
-- Pick 1-2 components to explore deeply
-- Ask about scaling: "What happens at 10x traffic?"
-- Ask about failure modes: "What if this component fails?"
-- Discuss trade-offs: "Why did you choose X over Y?"
-- Probe on specific algorithms or data structures for key components
-`
-    : ""
-}
-${
-  systemDesignPhase === "wrap-up"
-    ? `
-WRAP-UP PHASE (35-45 min):
-- Ask about single points of failure
-- Discuss monitoring and observability
-- Ask about security considerations
-- Summarize the design and discuss improvements
-- Ask: "What would you do differently with more time?"
-`
-    : ""
-}
-
-SYSTEM DESIGN EVALUATION CRITERIA:
-    - Requirements Gathering: Did they ask good clarifying questions ?
-      - Architecture : Did they propose a clear, logical system design ?
-        - Scalability : Did they address how to handle increased load ?
-          - Trade - offs : Did they discuss pros / cons of their choices ?
-            - Communication : Did they explain their thinking clearly ?
-
-              SYSTEM DESIGN SPECIFIC RULES:
-    - This is a DISCUSSION, not a coding exercise
-      - There is NO "correct answer" - evaluate reasoning and trade - offs
-        - Ask open - ended questions to understand their thinking
-          - Guide them through phases naturally based on elapsed time
-            - Focus on WHY they make decisions, not just WHAT they propose
-              - Encourage them to think about scale(millions of users, TB of data)
-                - Ask about failure scenarios and edge cases
-                  `
-      : ""
+    const { isSystemDesign, elapsedMinutes, systemDesignContext } = buildSystemDesignPromptContext(
+      scenarioType,
+      elapsedTime
+    )
 
     // Build bug fix specific context
-    const isBugFix = scenarioType === "bugfix"
-    const bugFixContext = isBugFix
-      ? `
-INTERVIEW TYPE: Bug Fix / Debugging Interview
-
-THIS IS A DEBUGGING EXERCISE - Focus on:
-    1. Understanding the bug: Ask them to explain what the bug is
-    2. Debugging approach: How are they finding the issue ?
-      3. Root cause analysis: Do they understand WHY it happens ?
-        4. Fix quality: Is the fix correct and complete ?
-          5. Prevention: How to prevent similar bugs in the future ?
-
-            DEBUGGING INTERVIEW BEST PRACTICES:
-    - Ask them to read through the code and explain what it does
-      - Ask: "What do you think is causing this behavior?"
-        - Ask: "How would you debug this in production?"
-          - If they struggle: Give hints about WHERE to look, not WHAT the bug is
-            - Ask about edge cases: "What if the input is empty? Null? Very large?"
-              - After the fix: "How would you write a test to catch this?"
-
-EVALUATION CRITERIA FOR BUG FIX:
-    - Bug Identification: Did they find the actual bug ?
-      - Debugging Process: Was their approach systematic or random ?
-        - Root Cause: Do they understand why the bug occurred ?
-          - Fix Quality: Is the fix correct, complete, and clean ?
-            - Testing Mindset: Did they consider edge cases and testing ?
-
-              DO NOT:
-    - Give away the bug location or fix too quickly
-      - Accept a fix without understanding the root cause
-        - Let them blindly try things without reasoning
-          `
-      : ""
+    const { isBugFix, bugFixContext } = buildBugFixContext(scenarioType)
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
@@ -642,24 +388,7 @@ EVALUATION CRITERIA FOR BUG FIX:
     const testingPhaseOverride = ""
 
     // Build complexity context - tells interviewer if solution is optimal
-    let complexityContext = ""
-    if (solutionComplexity) {
-      const { estimated, optimal, isOptimal } = solutionComplexity
-      if (isOptimal) {
-        complexityContext = `
-SOLUTION COMPLEXITY:
-    - Candidate's solution appears to be ${estimated} which matches the optimal ${optimal}
-      - DO NOT ask "can you optimize this?" - their solution is already optimal
-        - Instead: ask about trade - offs, edge cases, or alternative approaches
-          - Good questions: "Could you trade space for time?", "What edge cases might we be missing?", "What's another way to solve this?"`
-      } else {
-        complexityContext = `
-SOLUTION COMPLEXITY:
-    - Candidate's solution appears to be ${estimated}
-      - Optimal solution would be ${optimal}
-    - You CAN ask about optimization: "Could you do better than ${estimated}?" or "Is there a way to avoid the nested loop?"`
-      }
-    }
+    const complexityContext = buildComplexityContext(solutionComplexity)
 
     // =================================================================
     // TOOL EXECUTION: Pre-execute tools to give AI structured state
@@ -727,7 +456,12 @@ SOLUTION COMPLEXITY:
     // DRY: Use helper that derives context from scenario clarifying questions
     const fuzzyModeContext =
       realInterviewMode && hasFuzzyStatement
-        ? buildFuzzyModeContext(scenarioClarifyingQuestions as any, scenarioFuzzyStatement)
+        ? buildFuzzyModeContext(
+            Array.isArray(scenarioClarifyingQuestions)
+              ? (scenarioClarifyingQuestions as ClarifyingQuestion[])
+              : undefined,
+            scenarioFuzzyStatement
+          )
         : ""
 
     // Build interviewer prompt using consolidated function
@@ -815,12 +549,7 @@ Keep responses brief, actionable, and helpful.You're a tool they can use, but th
     let systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
     // Derive scenarioId from title for complexity lookup (e.g., "Two Sum" -> "dsa-two-sum")
-    const scenarioId = scenarioTitle
-      ? `dsa-${scenarioTitle
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "")}`
-      : undefined
+    const scenarioId = buildScenarioId(scenarioTitle)
 
     // Enhance both interviewer and partner roles with RAG context
     // Now includes DYNAMIC context based on the user's current message
@@ -884,24 +613,8 @@ GROUNDING RULES (prevent hallucination):
       }
     }
 
-    // Manage conversation history with sliding window
-    const managedContext = manageContextWindow(context || [])
-
     // Convert to provider-agnostic format
-    const history: Array<{ role: "user" | "model"; content: string }> = []
-    let foundFirstUser = false
-    managedContext.forEach((msg) => {
-      // Skip any model messages before the first user message
-      if (!foundFirstUser && msg.type !== "user") {
-        return
-      }
-      foundFirstUser = true
-
-      history.push({
-        role: msg.type === "user" ? "user" : "model",
-        content: msg.message,
-      })
-    })
+    const history = buildProviderHistory(context)
 
     // Build the full user message with context
     let fullUserMessage = ""
@@ -1320,7 +1033,7 @@ Generate a compliant response NOW:`
         codeWritten: currentCodeLen - starterLen,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     // End request tracking on error too
     if (rateLimitUserId !== "anonymous") {
       await endRequestTracking(rateLimitUserId).catch(() => {})
@@ -1328,8 +1041,9 @@ Generate a compliant response NOW:`
 
     logger.error("Chat API error", {
       error,
-      message: error?.message,
-      status: error?.status,
+      message: error instanceof Error ? error.message : undefined,
+      status:
+        typeof error === "object" && error !== null && "status" in error ? error.status : undefined,
       endpoint: "/api/chat",
     })
     // Return generic error message to avoid leaking internal details
