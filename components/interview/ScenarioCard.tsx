@@ -19,60 +19,52 @@ interface ScenarioCardProps {
 // Exercise type quick filters with descriptions
 const EXERCISE_TYPES = [
   {
-    id: 'dsa',
-    label: 'DSA',
+    id: "dsa",
+    label: "DSA",
     icon: Cpu,
-    lightBg: 'bg-sky-500/10',
-    lightText: 'text-sky-400'
   },
   {
-    id: 'bugfix',
-    label: 'Bug Fix',
+    id: "bugfix",
+    label: "Bug Fix",
     icon: Bug,
-    lightBg: 'bg-emerald-500/10',
-    lightText: 'text-emerald-400'
   },
   {
-    id: 'add-functionality',
-    label: 'Add Feature',
+    id: "add-functionality",
+    label: "Add Feature",
     icon: Wrench,
-    lightBg: 'bg-amber-500/10',
-    lightText: 'text-amber-400'
   },
   {
-    id: 'optimization',
-    label: 'Optimize',
+    id: "optimization",
+    label: "Optimize",
     icon: Zap,
-    lightBg: 'bg-violet-500/10',
-    lightText: 'text-violet-400'
   },
   {
-    id: 'security',
-    label: 'Security',
+    id: "security",
+    label: "Security",
     icon: Shield,
-    lightBg: 'bg-red-500/10',
-    lightText: 'text-red-400'
   },
   {
-    id: 'system-design',
-    label: 'System Design',
+    id: "system-design",
+    label: "System Design",
     icon: Layers,
-    lightBg: 'bg-indigo-500/10',
-    lightText: 'text-indigo-400'
   },
 ] as const
 
 const getDifficultyStyle = (difficulty: DifficultyLevel) => {
   switch (difficulty) {
-    case "easy": return "bg-emerald-500/10 text-emerald-400"
-    case "medium": return "bg-amber-500/10 text-amber-400"
-    case "hard": return "bg-red-500/10 text-red-400"
-    default: return "bg-zinc-500/10 text-zinc-400"
+    case "easy":
+      return "border-emerald-400/25 text-emerald-300"
+    case "medium":
+      return "border-amber-300/25 text-amber-200"
+    case "hard":
+      return "border-rose-300/25 text-rose-200"
+    default:
+      return "border-white/10 text-zinc-300"
   }
 }
 
 const getTypeConfig = (type: ScenarioType) => {
-  const config = EXERCISE_TYPES.find(t => t.id === type)
+  const config = EXERCISE_TYPES.find((t) => t.id === type)
   return config || EXERCISE_TYPES[0]
 }
 
@@ -82,61 +74,66 @@ export const ScenarioCard = memo(function ScenarioCard({
   isCompleted,
   usageLimit,
   onSelect,
-  onStart
+  onStart,
 }: ScenarioCardProps) {
   const typeConfig = getTypeConfig(scenario.type)
 
   return (
     <div
       onClick={() => onSelect(scenario)}
-      className={`
-        relative bg-zinc-900/50 border rounded-xl p-5 cursor-pointer transition-all
-        ${isSelected
-          ? 'border-white/30 ring-1 ring-white/20'
-          : 'border-zinc-800 hover:border-zinc-700'
-        }
-      `}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white/[0.045] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition-all duration-200 ${
+        isSelected
+          ? "border-white/30 bg-white/[0.07] ring-1 ring-white/20"
+          : "border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
+      } `}
     >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-70" />
+
       {/* Completed badge */}
       {isCompleted && (
         <div className="absolute top-3 right-3">
-          <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <Check className="w-3 h-3 text-emerald-500" />
+          <div className="flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/10">
+            <Check className="h-3 w-3 text-emerald-300" />
           </div>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeConfig.lightBg} ${typeConfig.lightText}`}>
+      <div className="mb-3 flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-1 text-xs font-medium text-zinc-200">
           <typeConfig.icon className="h-3 w-3" />
           {typeConfig.label}
         </span>
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getDifficultyStyle(scenario.difficulty)}`}>
+        <span
+          className={`rounded-full border bg-white/[0.035] px-2.5 py-1 text-xs font-medium capitalize ${getDifficultyStyle(scenario.difficulty)}`}
+        >
           {scenario.difficulty}
         </span>
       </div>
 
       {/* Title & Description */}
-      <h3 className="text-white font-medium mb-2 line-clamp-1">{scenario.title}</h3>
-      <p className="text-zinc-500 text-sm line-clamp-2 mb-4">{scenario.description}</p>
+      <h3 className="mb-2 line-clamp-1 font-medium tracking-normal text-white">{scenario.title}</h3>
+      <p className="mb-4 line-clamp-2 text-sm leading-6 text-zinc-400">{scenario.description}</p>
 
       {/* Meta */}
-      <div className="flex items-center justify-between text-xs text-zinc-500 mb-4">
+      <div className="mb-4 flex items-center justify-between text-xs text-zinc-500">
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
           {scenario.estimatedTime} min
         </div>
-        <div className="flex items-center gap-1 truncate max-w-[120px]">
-          {scenario.companies.slice(0, 2).join(', ')}
+        <div className="flex max-w-[120px] items-center gap-1 truncate">
+          {scenario.companies.slice(0, 2).join(", ")}
           {scenario.companies.length > 2 && ` +${scenario.companies.length - 2}`}
         </div>
       </div>
 
       {/* Tags */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="mb-4 flex flex-wrap gap-1.5">
         {scenario.tags.slice(0, 3).map((tag) => (
-          <span key={tag} className="px-2 py-0.5 bg-zinc-800 rounded text-[10px] text-zinc-400">
+          <span
+            key={tag}
+            className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-[10px] text-zinc-400"
+          >
             {tag}
           </span>
         ))}
@@ -145,11 +142,14 @@ export const ScenarioCard = memo(function ScenarioCard({
       {/* Actions */}
       <div className="space-y-2">
         {usageLimit && !usageLimit.allowed && scenario.type !== "dsa" && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-2">
-            <p className="text-amber-400 text-xs font-medium mb-1">Limit reached</p>
-            <p className="text-zinc-400 text-xs mb-2">Upgrade to Pro for unlimited access</p>
+          <div className="mb-2 rounded-xl border border-white/10 bg-white/[0.055] p-3">
+            <p className="mb-1 text-xs font-medium text-zinc-100">Limit reached</p>
+            <p className="mb-2 text-xs text-zinc-400">Upgrade to Pro for unlimited access</p>
             <Link href="/limit-reached">
-              <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-600 text-black text-xs h-7">
+              <Button
+                size="sm"
+                className="h-7 w-full bg-white text-xs text-zinc-950 hover:bg-zinc-200"
+              >
                 Upgrade
               </Button>
             </Link>
@@ -163,7 +163,7 @@ export const ScenarioCard = memo(function ScenarioCard({
               onStart(scenario)
             }}
             disabled={!!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")}
-            className="w-full bg-white hover:bg-zinc-200 text-zinc-900 font-medium disabled:opacity-50"
+            className="w-full rounded-xl bg-white font-medium text-zinc-950 hover:bg-zinc-200 disabled:opacity-50"
           >
             <Play className="mr-2 h-4 w-4" />
             Start Practice
@@ -175,20 +175,19 @@ export const ScenarioCard = memo(function ScenarioCard({
               onSelect(scenario)
             }}
             variant="outline"
-            className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            className="w-full rounded-xl border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.08] hover:text-white"
           >
             Select
           </Button>
         )}
 
         {usageLimit && usageLimit.allowed && scenario.type !== "dsa" && (
-          <p className="text-[10px] text-zinc-500 text-center">
-            {usageLimit.limit - usageLimit.used} session{usageLimit.limit - usageLimit.used !== 1 ? 's' : ''} remaining
+          <p className="text-center text-[10px] text-zinc-500">
+            {usageLimit.limit - usageLimit.used} session
+            {usageLimit.limit - usageLimit.used !== 1 ? "s" : ""} remaining
           </p>
         )}
-        {scenario.type === "dsa" && (
-          <p className="text-[10px] text-emerald-500 text-center">Free</p>
-        )}
+        {scenario.type === "dsa" && <p className="text-center text-[10px] text-zinc-500">Free</p>}
       </div>
     </div>
   )

@@ -48,73 +48,43 @@ const EXERCISE_TYPES = [
     label: "DSA",
     description: "Algorithms & data structures",
     icon: Cpu,
-    color: "bg-sky-500",
-    textColor: "text-white",
-    borderColor: "border-sky-500",
-    lightBg: "bg-sky-500/10",
-    lightText: "text-sky-400",
   },
   {
     id: "bugfix",
     label: "Bug Fix",
     description: "Debug existing code",
     icon: Bug,
-    color: "bg-emerald-500",
-    textColor: "text-white",
-    borderColor: "border-emerald-500",
-    lightBg: "bg-emerald-500/10",
-    lightText: "text-emerald-400",
   },
   {
     id: "add-functionality",
     label: "Add Feature",
     description: "Extend codebases",
     icon: Wrench,
-    color: "bg-amber-500",
-    textColor: "text-black",
-    borderColor: "border-amber-500",
-    lightBg: "bg-amber-500/10",
-    lightText: "text-amber-400",
   },
   {
     id: "optimization",
     label: "Optimize",
     description: "Improve performance",
     icon: Zap,
-    color: "bg-violet-500",
-    textColor: "text-white",
-    borderColor: "border-violet-500",
-    lightBg: "bg-violet-500/10",
-    lightText: "text-violet-400",
   },
   {
     id: "security",
     label: "Security",
     description: "Fix vulnerabilities",
     icon: Shield,
-    color: "bg-red-500",
-    textColor: "text-white",
-    borderColor: "border-red-500",
-    lightBg: "bg-red-500/10",
-    lightText: "text-red-400",
   },
   {
     id: "system-design",
     label: "System Design",
     description: "Architecture & scalability",
     icon: Layers,
-    color: "bg-indigo-500",
-    textColor: "text-white",
-    borderColor: "border-indigo-500",
-    lightBg: "bg-indigo-500/10",
-    lightText: "text-indigo-400",
   },
 ] as const
 
 const DIFFICULTIES = [
-  { id: "easy", label: "Easy", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
-  { id: "medium", label: "Medium", color: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
-  { id: "hard", label: "Hard", color: "bg-red-500/10 text-red-400 border-red-500/30" },
+  { id: "easy", label: "Easy", color: "border-emerald-300/25 text-emerald-200" },
+  { id: "medium", label: "Medium", color: "border-amber-300/25 text-amber-100" },
+  { id: "hard", label: "Hard", color: "border-rose-300/25 text-rose-100" },
 ] as const
 
 // Dynamically get all unique companies from scenarios
@@ -173,7 +143,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
 
   return (
-    <div className="mb-6 space-y-4">
+    <div className="mb-6 space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl">
       {/* Search + Quick Stats */}
       <ScenarioSearchBar
         searchQuery={searchQuery}
@@ -193,15 +163,19 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             <button
               key={type.id}
               onClick={() => onToggleType(type.id as ScenarioType)}
-              className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                 isActive
-                  ? `${type.color} ${type.textColor}`
-                  : `${type.lightBg} ${type.lightText} hover:opacity-80`
+                  ? "border-white/30 bg-white text-zinc-950 shadow-sm"
+                  : "border-white/10 bg-white/[0.04] text-zinc-300 hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
               } `}
+              aria-pressed={isActive}
+              title={type.description}
             >
               <Icon className="h-3.5 w-3.5" />
               {type.label}
-              <span className={`text-xs ${isActive ? "opacity-70" : "opacity-60"}`}>{count}</span>
+              <span className={`text-xs ${isActive ? "text-zinc-500" : "text-zinc-500"}`}>
+                {count}
+              </span>
               {isActive && <Check className="h-3 w-3" />}
             </button>
           )
@@ -220,11 +194,12 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                 <button
                   key={diff.id}
                   onClick={() => onToggleDifficulty(diff.id as DifficultyLevel)}
-                  className={`rounded-md border px-3 py-1 text-xs font-medium transition-all ${
+                  className={`rounded-full border bg-white/[0.03] px-3 py-1 text-xs font-medium transition-all ${
                     isActive
-                      ? diff.color + " border-current"
-                      : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                      ? diff.color + " bg-white/[0.07]"
+                      : "border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
                   } `}
+                  aria-pressed={isActive}
                 >
                   {diff.label}
                 </button>
@@ -237,10 +212,10 @@ export const ScenarioFilters = memo(function ScenarioFilters({
         <div className="relative">
           <button
             onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-all ${
+            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all ${
               filterCompanies.length > 0
-                ? "border-zinc-700 bg-zinc-800 text-white"
-                : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                ? "border-white/20 bg-white/[0.08] text-white"
+                : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-200"
             } `}
           >
             <Building2 className="h-3.5 w-3.5" />
@@ -253,26 +228,26 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {showCompanyDropdown && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowCompanyDropdown(false)} />
-              <div className="absolute top-full left-0 z-20 mt-2 max-h-80 w-56 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 py-2 shadow-xl">
+              <div className="absolute top-full left-0 z-20 mt-2 max-h-80 w-56 overflow-y-auto rounded-2xl border border-white/10 bg-zinc-950/95 py-2 shadow-2xl backdrop-blur-xl">
                 {COMPANIES.map((company) => {
                   const isActive = filterCompanies.includes(company as Company)
                   return (
                     <button
                       key={company}
                       onClick={() => onToggleCompany(company as Company)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-800"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
                     >
                       <span className={isActive ? "text-white" : "text-zinc-400"}>{company}</span>
-                      {isActive && <Check className="h-3.5 w-3.5 text-emerald-500" />}
+                      {isActive && <Check className="h-3.5 w-3.5 text-zinc-200" />}
                     </button>
                   )
                 })}
                 {filterCompanies.length > 0 && (
                   <>
-                    <div className="my-1 border-t border-zinc-800" />
+                    <div className="my-1 border-t border-white/10" />
                     <button
                       onClick={onClearCompanies}
-                      className="w-full px-3 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                      className="w-full px-3 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
                     >
                       Clear selection
                     </button>
@@ -286,7 +261,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 
       {/* Active Filters Summary */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/50 pt-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2">
           <span className="text-xs text-zinc-600">Active:</span>
           {filterType.map((t) => {
             const type = EXERCISE_TYPES.find((et) => et.id === t)
@@ -295,7 +270,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             return (
               <span
                 key={t}
-                className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${type.lightBg} ${type.lightText}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.055] px-2 py-1 text-xs text-zinc-300"
               >
                 <Icon className="h-3 w-3" />
                 {type.label}
@@ -308,12 +283,12 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {filterDifficulty.map((d) => (
             <span
               key={d}
-              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${
+              className={`inline-flex items-center gap-1.5 rounded-full border bg-white/[0.04] px-2 py-1 text-xs ${
                 d === "easy"
-                  ? "bg-emerald-500/10 text-emerald-400"
+                  ? "border-emerald-300/20 text-emerald-200"
                   : d === "medium"
-                    ? "bg-amber-500/10 text-amber-400"
-                    : "bg-red-500/10 text-red-400"
+                    ? "border-amber-300/20 text-amber-100"
+                    : "border-rose-300/20 text-rose-100"
               }`}
             >
               {d}
@@ -325,7 +300,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {filterCompanies.map((c) => (
             <span
               key={c}
-              className="inline-flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.055] px-2 py-1 text-xs text-zinc-300"
             >
               {c}
               <button onClick={() => onRemoveCompany(c)} className="hover:opacity-70">
@@ -334,7 +309,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             </span>
           ))}
           {searchQuery && (
-            <span className="inline-flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.055] px-2 py-1 text-xs text-zinc-300">
               "{searchQuery}"
               <button onClick={() => onSearchChange("")} className="hover:opacity-70">
                 <X className="h-3 w-3" />

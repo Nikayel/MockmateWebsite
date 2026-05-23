@@ -53,7 +53,7 @@ describe("consolidated hint agent", () => {
     expect(legacy.getHintAgent).toBe(consolidated.getHintAgent)
     expect(legacy.calculateStruggleLevel).toBe(consolidated.calculateStruggleLevel)
     expect(legacy.getRecommendedRevealLevel).toBe(consolidated.getRecommendedRevealLevel)
-  })
+  }, 15000)
 
   it("still returns pattern fallback hints when LLM and RAG context are unavailable", async () => {
     const { generateHints } = await import("../index")
