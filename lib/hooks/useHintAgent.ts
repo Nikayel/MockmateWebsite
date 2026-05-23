@@ -1,12 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import type {
-  GeneratedHint,
-  HintLevel,
-  StruggleMetrics,
-  HintTrigger,
-} from "@/lib/agents/hint-agent"
+import type { GeneratedHint, HintLevel, StruggleMetrics, HintTrigger } from "@/lib/agents/hints"
 import type {
   GenerateHintsPayload,
   GetNextHintPayload,

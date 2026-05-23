@@ -15,7 +15,7 @@ export {
   type HintGenerationRequest,
   type HintGenerationResponse,
   type StruggleMetrics,
-} from './hint-agent'
+} from "./hints"
 
 // Recommendation Agent
 export {
@@ -29,4 +29,4 @@ export {
   type ProblemScore,
   type RecommendationPriority,
   type RecommendationReason,
-} from './recommendation-agent'
+} from "./recommendation-agent"
