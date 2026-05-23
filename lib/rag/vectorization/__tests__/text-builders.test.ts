@@ -88,6 +88,15 @@ describe("vectorization text builders", () => {
       bugDescription: "Older requests can overwrite newer results.",
       expectedBehavior: "Only latest response updates state.",
       buggyCode: { javascript: "async function search(q) { return fetch(q) }" },
+      codebaseFiles: {
+        javascript: [
+          {
+            fileName: "search.test.js",
+            description: "Regression tests for rapid typing search behavior",
+            content: "expect(latestQuery).toBe('ab')",
+          },
+        ],
+      },
       hints: ["Track request identity."],
       testCases: [{ input: ["a", "ab"], expected: "ab", description: "edge rapid typing" }],
     } as unknown as BugFixScenario
@@ -96,6 +105,9 @@ describe("vectorization text builders", () => {
 
     expect(text).toContain("# Fix Search Race Condition")
     expect(text).toContain("## Buggy Code (javascript)")
+    expect(text).toContain("## Codebase Files")
+    expect(text).toContain("search.test.js")
+    expect(text).toContain("Regression tests for rapid typing search behavior")
     expect(text).toContain("Older requests can overwrite newer results.")
     expect(text).toContain("[EDGE CASE]")
   })

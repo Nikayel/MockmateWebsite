@@ -44,9 +44,6 @@ const scenarioLoaders: Record<string, () => Promise<Scenario[]>> = {
       (m) => m.binarySearchTreeScenarios as Scenario[]
     ),
 
-  // Bug fix scenarios
-  bugfix: () => import("./scenarios/bugfix").then((m) => m.bugFixScenarios as Scenario[]),
-
   // System design scenarios
   "system-design": () =>
     import("./scenarios/system-design").then((m) => m.systemDesignScenarios as Scenario[]),
@@ -77,7 +74,6 @@ type ScenarioCategory =
   | "intervals"
   | "math-geometry"
   | "binary-search-tree"
-  | "bugfix"
   | "system-design"
   | "realworld-bugfix"
   | "realworld-system-design"
@@ -146,7 +142,7 @@ export async function loadScenariosByType(type: ScenarioType): Promise<Scenario[
       "math-geometry",
       "binary-search-tree",
     ],
-    bugfix: ["bugfix", "realworld-bugfix"],
+    bugfix: ["realworld-bugfix"],
     "system-design": ["system-design", "realworld-system-design"],
     "add-functionality": ["add-functionality"],
     optimization: [], // Add categories if needed

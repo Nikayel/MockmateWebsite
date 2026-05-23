@@ -201,8 +201,8 @@ async function loadBugFixScenarios(): Promise<BugFixScenario[]> {
     return loadedModules.get("bugfix") as BugFixScenario[]
   }
 
-  const bugfixModule = await import("./bugfix")
-  const scenarios = bugfixModule.bugFixScenarios
+  const bugfixModule = await import("../scenarios-realworld")
+  const scenarios = bugfixModule.realWorldBugFixScenarios
   loadedModules.set("bugfix", scenarios)
   return scenarios
 }

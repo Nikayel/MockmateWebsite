@@ -31,8 +31,7 @@ import { triesScenarios } from "./scenarios/dsa/tries"
 import { bitManipulationScenarios } from "./scenarios/dsa/bit-manipulation"
 import { greedyScenarios } from "./scenarios/dsa/greedy"
 
-// Import modular bugfix and system-design scenarios
-import { bugFixScenarios } from "./scenarios/bugfix"
+// Import modular system-design scenarios
 import { systemDesignScenarios } from "./scenarios/system-design"
 
 // ============================================================================
@@ -78,9 +77,6 @@ export const scenarios: Scenario[] = [
   ...triesScenarios,
   ...bitManipulationScenarios,
   ...greedyScenarios,
-
-  // Bug Fix Scenarios
-  ...bugFixScenarios,
 
   // System Design Scenarios
   ...systemDesignScenarios,

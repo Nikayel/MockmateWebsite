@@ -7,6 +7,7 @@ export function bugFixToEmbeddingText(scenario: BugFixScenario): string {
   const languages = Object.keys(scenario.buggyCode)
   const primaryLang = languages.includes("python") ? "python" : languages[0]
   const buggyCodeSnippet = scenario.buggyCode[primaryLang] || ""
+  const codebaseFiles = scenario.codebaseFiles?.[primaryLang] || []
 
   const testCaseLines = scenario.testCases.map((tc, i) => {
     const isEdgeCase = tc.description?.toLowerCase().includes("edge")
@@ -37,6 +38,17 @@ export function bugFixToEmbeddingText(scenario: BugFixScenario): string {
     "```" + primaryLang,
     buggyCodeSnippet.substring(0, 1500),
     "```",
+    ``,
+    `## Codebase Files`,
+    ...(codebaseFiles.length > 0
+      ? codebaseFiles.flatMap((file) => [
+          `### ${file.fileName}`,
+          file.description,
+          "```" + primaryLang,
+          file.content.substring(0, 500),
+          "```",
+        ])
+      : ["No supporting codebase files provided."]),
     ``,
     `## Debugging Hints`,
     ...scenario.hints.map((hint) => `- ${hint}`),

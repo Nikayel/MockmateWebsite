@@ -5,14 +5,15 @@
  */
 
 import type { BugFixScenario } from "../../types"
-import { bugfixPaymentProcessorScenario } from "./bugfix-payment-processor"
+import { bugfixPythonTwoSumScenario } from "./bugfix-python-two-sum"
 import { bugfixRateLimiterScenario } from "./bugfix-rate-limiter"
-import { bugfixUserSessionScenario } from "./bugfix-user-session"
 
+// Keep this list to scenarios that are executable through the current
+// /api/execute contract: one editable entry file plus testCases.input that
+// maps directly to a callable function in that file.
 export const realWorldBugFixScenarios: BugFixScenario[] = [
-  bugfixPaymentProcessorScenario,
+  bugfixPythonTwoSumScenario,
   bugfixRateLimiterScenario,
-  bugfixUserSessionScenario,
 ]
 
 export default realWorldBugFixScenarios

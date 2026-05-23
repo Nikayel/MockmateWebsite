@@ -5,267 +5,181 @@ export const bugfixRateLimiterScenario: BugFixScenario = {
   title: "API Rate Limiter Race Condition",
   type: "bugfix",
   difficulty: "hard",
-  companies: ["Meta", "Google", "Netflix", "Amazon"],
-  description: "Fix a race condition in the distributed rate limiter causing request leaks",
-  tags: ["concurrency", "race-condition", "distributed-systems", "redis"],
+  companies: ["Cloudflare", "Stripe", "Amazon", "Meta"],
+  description: "Fix a race condition in a Redis-style API rate limiter",
+  tags: ["concurrency", "race-condition", "distributed-systems", "redis", "api-infrastructure"],
   estimatedTime: 50,
-  problemStatement: `Your company's API rate limiter is occasionally allowing more requests than the limit. In high-traffic scenarios, some requests slip through even when the limit should be exceeded.
+  problemStatement: `Your team owns a rate limiter that protects paid API endpoints. During traffic spikes, customers are occasionally getting more requests than their plan allows. Logs show several requests checking the same counter value before any of them records usage.
 
 **Your task:**
-1. Analyze the rate limiter implementation
-2. Identify the race condition causing request leaks
-3. Fix the bug to ensure accurate rate limiting
-4. Explain the concurrency issue and your fix
+1. Read the rate limiter and supporting codebase files
+2. Identify the check-then-write race condition
+3. Fix the limiter so burst/concurrent requests cannot exceed the limit
+4. Explain why the original implementation was unsafe in production
 
-**Context:** This rate limiter protects critical API endpoints from abuse. The bug is causing billing issues and potential service degradation.`,
+**Context:** In production this would be Redis-backed. This exercise uses a small in-memory Redis-style store so you can focus on the rate-limiting logic and the concurrency failure mode.`,
   buggyCode: {
     javascript: `// rate-limiter.js
-// BUG: Race condition allows more requests than limit
+// BUG: checkLimit and recordRequest are separate steps, so concurrent requests
+// can all pass the check before any request is recorded.
 
 class RateLimiter {
-  constructor(redisClient, options = {}) {
-    this.redis = redisClient;
+  constructor(store, options = {}) {
+    this.store = store;
     this.limit = options.limit || 100;
-    this.windowMs = options.windowMs || 60000; // 1 minute
+    this.windowMs = options.windowMs || 60000;
   }
 
-  async isAllowed(clientId) {
-    const key = \`ratelimit:\${clientId}\`;
-    const now = Date.now();
+  checkLimit(clientId, now = Date.now()) {
+    const key = this.keyFor(clientId);
     const windowStart = now - this.windowMs;
+    this.store.removeBefore(key, windowStart);
 
-    // Get current request count
-    const currentCount = await this.redis.zcount(key, windowStart, now);
+    return this.store.count(key) < this.limit;
+  }
 
-    if (currentCount >= this.limit) {
+  recordRequest(clientId, now = Date.now()) {
+    const key = this.keyFor(clientId);
+    this.store.add(key, now);
+    this.store.expire(key, this.windowMs);
+  }
+
+  isAllowed(clientId, now = Date.now()) {
+    if (!this.checkLimit(clientId, now)) {
       return {
         allowed: false,
         remaining: 0,
-        resetAt: await this.getResetTime(key)
+        resetAt: now + this.windowMs,
       };
     }
 
-    // Add current request
-    await this.redis.zadd(key, now, \`\${now}-\${Math.random()}\`);
-
-    // Remove old entries
-    await this.redis.zremrangebyscore(key, 0, windowStart);
-
-    // Set expiry
-    await this.redis.expire(key, Math.ceil(this.windowMs / 1000));
+    this.recordRequest(clientId, now);
 
     return {
       allowed: true,
-      remaining: this.limit - currentCount - 1,
-      resetAt: now + this.windowMs
+      remaining: Math.max(0, this.limit - this.store.count(this.keyFor(clientId))),
+      resetAt: now + this.windowMs,
     };
   }
 
-  async getResetTime(key) {
-    const ttl = await this.redis.ttl(key);
-    return Date.now() + (ttl * 1000);
-  }
-
-  async getRemainingRequests(clientId) {
-    const key = \`ratelimit:\${clientId}\`;
-    const now = Date.now();
-    const windowStart = now - this.windowMs;
-
-    const count = await this.redis.zcount(key, windowStart, now);
-    return Math.max(0, this.limit - count);
+  keyFor(clientId) {
+    return \`ratelimit:\${clientId}\`;
   }
 }
 
-module.exports = { RateLimiter };`,
-    python: `# rate_limiter.py
-# BUG: Race condition allows more requests than limit
+function simulateRateLimitBurst(clientId, concurrentRequests, limit) {
+  const store = new RedisSortedSetStore();
+  const limiter = new RateLimiter(store, { limit, windowMs: 60000 });
+  const now = 1700000000000;
 
-import time
-import random
+  // Simulates a burst where all workers check before any worker records.
+  const decisions = [];
+  for (let i = 0; i < concurrentRequests; i++) {
+    decisions.push(limiter.checkLimit(clientId, now));
+  }
 
-class RateLimiter:
-    def __init__(self, redis_client, limit=100, window_ms=60000):
-        self.redis = redis_client
-        self.limit = limit
-        self.window_ms = window_ms  # 1 minute
+  let allowedCount = 0;
+  for (const allowed of decisions) {
+    if (allowed) {
+      allowedCount++;
+      limiter.recordRequest(clientId, now);
+    }
+  }
 
-    async def is_allowed(self, client_id):
-        key = f"ratelimit:{client_id}"
-        now = int(time.time() * 1000)
-        window_start = now - self.window_ms
-
-        # Get current request count
-        current_count = await self.redis.zcount(key, window_start, now)
-
-        if current_count >= self.limit:
-            return {
-                'allowed': False,
-                'remaining': 0,
-                'reset_at': await self.get_reset_time(key)
-            }
-
-        # Add current request
-        await self.redis.zadd(key, {f"{now}-{random.random()}": now})
-
-        # Remove old entries
-        await self.redis.zremrangebyscore(key, 0, window_start)
-
-        # Set expiry
-        await self.redis.expire(key, self.window_ms // 1000)
-
-        return {
-            'allowed': True,
-            'remaining': self.limit - current_count - 1,
-            'reset_at': now + self.window_ms
-        }
-
-    async def get_reset_time(self, key):
-        ttl = await self.redis.ttl(key)
-        return int(time.time() * 1000) + (ttl * 1000)
-
-    async def get_remaining_requests(self, client_id):
-        key = f"ratelimit:{client_id}"
-        now = int(time.time() * 1000)
-        window_start = now - self.window_ms
-
-        count = await self.redis.zcount(key, window_start, now)
-        return max(0, self.limit - count)`,
+  return {
+    allowedCount,
+    storedCount: store.count(limiter.keyFor(clientId)),
+  };
+}`,
   },
   codebaseFiles: {
     javascript: [
       {
-        fileName: "rate-limiter-middleware.js",
-        content: `// rate-limiter-middleware.js
-// Express middleware using RateLimiter
+        fileName: "redis-sorted-set-store.js",
+        content: `// redis-sorted-set-store.js
+// Tiny in-memory stand-in for the Redis sorted set commands used by the limiter.
 
-const { RateLimiter } = require('./rate-limiter');
+class RedisSortedSetStore {
+  constructor() {
+    this.records = new Map();
+    this.expirations = new Map();
+  }
 
-function createRateLimitMiddleware(redisClient, options) {
-  const limiter = new RateLimiter(redisClient, options);
+  add(key, score) {
+    const existing = this.records.get(key) || [];
+    existing.push(score);
+    this.records.set(key, existing);
+  }
 
-  return async (req, res, next) => {
-    const clientId = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  count(key) {
+    return (this.records.get(key) || []).length;
+  }
 
-    try {
-      const result = await limiter.isAllowed(clientId);
+  removeBefore(key, minScore) {
+    const existing = this.records.get(key) || [];
+    this.records.set(
+      key,
+      existing.filter((score) => score >= minScore)
+    );
+  }
 
-      // Set rate limit headers
-      res.set({
-        'X-RateLimit-Limit': options.limit || 100,
-        'X-RateLimit-Remaining': result.remaining,
-        'X-RateLimit-Reset': result.resetAt
-      });
-
-      if (!result.allowed) {
-        return res.status(429).json({
-          error: 'Too Many Requests',
-          retryAfter: Math.ceil((result.resetAt - Date.now()) / 1000)
-        });
-      }
-
-      next();
-    } catch (error) {
-      console.error('Rate limiter error:', error);
-      // Fail open - allow request if rate limiter fails
-      next();
-    }
-  };
-}
-
-module.exports = { createRateLimitMiddleware };`,
-        description: "Express middleware that uses the RateLimiter",
+  expire(key, windowMs) {
+    this.expirations.set(key, windowMs);
+  }
+}`,
+        description: "In-memory Redis-style sorted set used by the rate limiter tests",
+      },
+      {
+        fileName: "rate-limit-middleware.js",
+        content: `// rate-limit-middleware.js
+// Express middleware shape used in production.
+//
+// The real app calls limiter.isAllowed(clientId) for each request and returns
+// HTTP 429 when allowed is false. The middleware is context only for this task;
+// the bug lives in rate-limiter.js.`,
+        description: "Production middleware context for how the limiter is called",
       },
       {
         fileName: "rate-limiter.test.js",
         content: `// rate-limiter.test.js
-// Tests for RateLimiter - including concurrency tests
-
-const { RateLimiter } = require('./rate-limiter');
-
-describe('RateLimiter', () => {
-  let limiter;
-  let mockRedis;
-
-  beforeEach(() => {
-    mockRedis = {
-      zcount: jest.fn().mockResolvedValue(0),
-      zadd: jest.fn().mockResolvedValue(1),
-      zremrangebyscore: jest.fn().mockResolvedValue(0),
-      expire: jest.fn().mockResolvedValue(1),
-      ttl: jest.fn().mockResolvedValue(60)
-    };
-    limiter = new RateLimiter(mockRedis, { limit: 5, windowMs: 60000 });
-  });
-
-  test('should allow requests under limit', async () => {
-    const result = await limiter.isAllowed('client1');
-    expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(4);
-  });
-
-  test('should block requests over limit', async () => {
-    mockRedis.zcount.mockResolvedValue(5);
-
-    const result = await limiter.isAllowed('client1');
-    expect(result.allowed).toBe(false);
-    expect(result.remaining).toBe(0);
-  });
-
-  test('should handle concurrent requests correctly', async () => {
-    // Simulate 10 concurrent requests with limit of 5
-    // BUG: This test may fail due to race condition
-    const limit = 5;
-    limiter = new RateLimiter(mockRedis, { limit, windowMs: 60000 });
-
-    let count = 0;
-    mockRedis.zcount.mockImplementation(() => Promise.resolve(count));
-    mockRedis.zadd.mockImplementation(() => {
-      count++;
-      return Promise.resolve(1);
-    });
-
-    // Fire 10 concurrent requests
-    const requests = Array(10).fill().map(() =>
-      limiter.isAllowed('client1')
-    );
-
-    const results = await Promise.all(requests);
-    const allowedCount = results.filter(r => r.allowed).length;
-
-    // Should only allow 5 requests
-    expect(allowedCount).toBeLessThanOrEqual(limit);
-  });
-});`,
-        description: "Tests for RateLimiter including concurrency test that may fail",
+// Important behavior:
+//
+// simulateRateLimitBurst("client-1", 1, 5)
+//   -> { allowedCount: 1, storedCount: 1 }
+//
+// simulateRateLimitBurst("client-1", 10, 5)
+//   -> { allowedCount: 5, storedCount: 5 }
+//
+// The second case fails when check and record are not atomic.`,
+        description: "Readable tests showing the burst/concurrency failure mode",
       },
     ],
-    python: [],
   },
   expectedBehavior:
-    "Rate limiter should accurately limit requests even under high concurrency. No more than the limit should be allowed within any window.",
+    "No more than the configured limit should be allowed in a window, even when many requests arrive at the same time.",
   bugDescription:
-    "There is a race condition between checking the count and adding the request. Multiple concurrent requests can all pass the check before any are added, leading to more requests than the limit being allowed.",
+    "The limiter performs a check-then-write sequence. In a concurrent burst, multiple workers can observe capacity before any worker records usage, so all of them proceed.",
   hints: [
-    "Think about what happens when two requests arrive at the exact same time",
-    "The check-then-act pattern is not atomic",
-    "Consider using Redis transactions or Lua scripts for atomicity",
-    'Look up "MULTI/EXEC" or Lua scripting in Redis for atomic operations',
+    "Focus on the gap between checkLimit and recordRequest.",
+    "A production Redis fix would make the check and increment happen in one atomic operation.",
+    "In this exercise, the burst simulation should not be able to collect more allowed decisions than the limit.",
+    "Think about moving the write/reservation into the same step as the decision.",
   ],
   testCases: [
     {
-      input: { clientId: "client1", requests: 1, limit: 5 },
-      expected: { allowed: true, remaining: 4 },
-      description: "Single request under limit should be allowed",
+      input: { clientId: "client-1", concurrentRequests: 1, limit: 5 },
+      expected: { allowedCount: 1, storedCount: 1 },
+      description: "Single request under limit should be allowed and recorded",
     },
     {
-      input: { clientId: "client1", requests: 6, limit: 5 },
-      expected: { allowed: false },
-      description: "Request over limit should be blocked",
+      input: { clientId: "client-1", concurrentRequests: 5, limit: 5 },
+      expected: { allowedCount: 5, storedCount: 5 },
+      description: "Exactly limit requests should be allowed",
     },
     {
-      input: { clientId: "client1", concurrentRequests: 10, limit: 5 },
-      expected: { allowedCount: 5 },
-      description: "Concurrent requests should respect limit exactly",
+      input: { clientId: "client-1", concurrentRequests: 10, limit: 5 },
+      expected: { allowedCount: 5, storedCount: 5 },
+      description: "Burst above the limit should cap allowed requests",
     },
   ],
 }
