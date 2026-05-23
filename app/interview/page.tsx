@@ -174,11 +174,56 @@ const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback
 // Supported languages for code execution
 // JavaScript and Python are fully supported; others are coming soon
 const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
+const EDITOR_LANGUAGES = [...SUPPORTED_LANGUAGES, "java", "cpp", "csharp", "go", "rust"] as const
 
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
+type EditorLanguage = (typeof EDITOR_LANGUAGES)[number]
+type WorkspaceContextFile = { path: string; content: string; description?: string }
 
 const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
   return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
+}
+
+const getBugfixScenarioLanguage = (
+  scenario: Scenario,
+  preferredLanguage: EditorLanguage
+): EditorLanguage => {
+  if (scenario.type !== "bugfix") {
+    return preferredLanguage
+  }
+
+  const buggyCode = (scenario as { buggyCode?: Partial<Record<SupportedLanguage, string>> })
+    .buggyCode
+
+  if (!buggyCode) {
+    return preferredLanguage
+  }
+
+  if (isLanguageSupported(preferredLanguage) && buggyCode[preferredLanguage]) {
+    return preferredLanguage
+  }
+
+  return SUPPORTED_LANGUAGES.find((language) => Boolean(buggyCode[language])) ?? preferredLanguage
+}
+
+const toWorkspaceContextFiles = (
+  codebaseFiles: Array<{ fileName: string; content: string; description?: string }>
+): WorkspaceContextFile[] =>
+  codebaseFiles.map((file) => ({
+    path: file.fileName,
+    content: file.content,
+    description: file.description,
+  }))
+
+const getWorkspaceFileRole = (path: string) => {
+  const normalizedPath = path.toLowerCase()
+  if (normalizedPath.includes("test") || normalizedPath.includes("spec")) {
+    return "test"
+  }
+  if (normalizedPath.endsWith(".md") || normalizedPath.includes("readme")) {
+    return "context"
+  }
+  return "support"
 }
 
 /**
@@ -279,27 +324,12 @@ function InterviewPageContent() {
   const streamingFeedback = useStreamingFeedback()
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(true) // Expanded by default for better UX
   const [code, setCode] = useState("")
-  const [selectedLanguage, setSelectedLanguage] = useState<
-    "javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust"
-  >(() => {
+  const [selectedLanguage, setSelectedLanguage] = useState<EditorLanguage>(() => {
     // Initialize from localStorage if available (client-side only)
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("mockmate_preferred_language")
-      if (
-        saved &&
-        ["javascript", "typescript", "python", "java", "cpp", "csharp", "go", "rust"].includes(
-          saved
-        )
-      ) {
-        return saved as
-          | "javascript"
-          | "typescript"
-          | "python"
-          | "java"
-          | "cpp"
-          | "csharp"
-          | "go"
-          | "rust"
+      if (saved && EDITOR_LANGUAGES.includes(saved as EditorLanguage)) {
+        return saved as EditorLanguage
       }
     }
     return "javascript"
@@ -431,9 +461,7 @@ function InterviewPageContent() {
   const [revealedHints, setRevealedHints] = useState<number>(0)
 
   // Workspace context
-  const [workspaceContext, setWorkspaceContext] = useState<
-    Array<{ path: string; content: string }>
-  >([])
+  const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContextFile[]>([])
   const lastCodeHashRef = useRef<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{
@@ -446,7 +474,7 @@ function InterviewPageContent() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
   // Code viewer dialog state
-  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null)
+  const [selectedFile, setSelectedFile] = useState<WorkspaceContextFile | null>(null)
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false)
 
   // Close confirmation dialog state
@@ -884,16 +912,16 @@ function InterviewPageContent() {
           // Initialize code based on scenario type
           let initialCode: string
           if (scenario.type === "bugfix") {
+            const scenarioLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
+            if (scenarioLanguage !== selectedLanguage) {
+              setSelectedLanguage(scenarioLanguage)
+            }
             initialCode =
-              (scenario as any).buggyCode?.[selectedLanguage] ||
-              `// Bug fix code not available for ${selectedLanguage}`
-            const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
+              (scenario as any).buggyCode?.[scenarioLanguage] ||
+              `// Bug fix code not available for ${scenarioLanguage}`
+            const codebaseFiles = (scenario as any).codebaseFiles?.[scenarioLanguage] || []
             if (codebaseFiles.length > 0) {
-              const contextFiles = codebaseFiles.map((file: any) => ({
-                path: file.fileName,
-                content: file.content,
-              }))
-              setWorkspaceContext(contextFiles)
+              setWorkspaceContext(toWorkspaceContextFiles(codebaseFiles))
             }
           } else if (scenario.type === "system-design") {
             // For system design, provide a design notes template
@@ -1148,9 +1176,13 @@ Let's continue!`
     if (selectedScenario && !isInterviewStarted && !code) {
       let initialCode: string
       if (selectedScenario.type === "bugfix") {
+        const scenarioLanguage = getBugfixScenarioLanguage(selectedScenario, selectedLanguage)
+        if (scenarioLanguage !== selectedLanguage) {
+          setSelectedLanguage(scenarioLanguage)
+        }
         initialCode =
-          (selectedScenario as any).buggyCode?.[selectedLanguage] ||
-          `// Bug fix code not available for ${selectedLanguage}`
+          (selectedScenario as any).buggyCode?.[scenarioLanguage] ||
+          `// Bug fix code not available for ${scenarioLanguage}`
       } else if (selectedScenario.type === "add-functionality") {
         initialCode =
           (selectedScenario as any).existingCode?.[selectedLanguage] ||
@@ -1174,6 +1206,11 @@ Let's continue!`
 
       // For bug fix scenarios, use buggyCode
       if (selectedScenario.type === "bugfix") {
+        const scenarioLanguage = getBugfixScenarioLanguage(selectedScenario, selectedLanguage)
+        if (scenarioLanguage !== selectedLanguage) {
+          setSelectedLanguage(scenarioLanguage)
+          return
+        }
         newCode =
           (selectedScenario as any).buggyCode?.[selectedLanguage] ||
           `// Bug fix code not available for ${selectedLanguage}`
@@ -1197,11 +1234,7 @@ Let's continue!`
       // ALWAYS update workspace context files when language changes
       // This ensures codebase files stay in sync with selected language
       if (codebaseFiles.length > 0) {
-        const contextFiles = codebaseFiles.map((file: any) => ({
-          path: file.fileName,
-          content: file.content,
-          description: file.description,
-        }))
+        const contextFiles = toWorkspaceContextFiles(codebaseFiles)
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
       } else if (
@@ -2578,21 +2611,25 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Initialize code based on scenario type
     let initialCode: string
+    let activeLanguage = selectedLanguage
     if (scenario.type === "bugfix") {
+      activeLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
+      if (activeLanguage !== selectedLanguage) {
+        setSelectedLanguage(activeLanguage)
+        toast.info(`Switched to ${activeLanguage} for this bugfix codebase`)
+      }
+
       // For bug fixes, load buggy code
       initialCode =
-        (scenario as any).buggyCode?.[selectedLanguage] ||
-        `// Bug fix code not available for ${selectedLanguage}`
+        (scenario as any).buggyCode?.[activeLanguage] ||
+        `// Bug fix code not available for ${activeLanguage}`
 
       // Auto-load codebase files into workspace context for bug fixes
-      const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
+      const codebaseFiles = (scenario as any).codebaseFiles?.[activeLanguage] || []
       if (codebaseFiles.length > 0) {
-        const contextFiles = codebaseFiles.map((file: any) => ({
-          path: file.fileName,
-          content: file.content,
-        }))
+        const contextFiles = toWorkspaceContextFiles(codebaseFiles)
         setWorkspaceContext(contextFiles)
-        toast.success(`Loaded ${contextFiles.length} codebase file(s) for context`)
+        toast.success(`Loaded ${contextFiles.length} codebase file(s) for review`)
       }
     } else if (scenario.type === "add-functionality") {
       // For Add Functionality scenarios, load existing code to extend
@@ -2603,11 +2640,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       // Auto-load codebase files into workspace context
       const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
       if (codebaseFiles.length > 0) {
-        const contextFiles = codebaseFiles.map((file: any) => ({
-          path: file.fileName,
-          content: file.content,
-          description: file.description,
-        }))
+        const contextFiles = toWorkspaceContextFiles(codebaseFiles)
         setWorkspaceContext(contextFiles)
         toast.success(
           `Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`
@@ -2668,7 +2701,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setStarterCode(initialCode)
 
     // Extract protected elements for code protection
-    const protectedElementsData = extractProtectedElements(initialCode, selectedLanguage)
+    const protectedElementsData = extractProtectedElements(initialCode, activeLanguage)
     setProtectedElements(protectedElementsData)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
@@ -2693,7 +2726,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       setChatMessages([
         {
           type: "ai",
-          message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+          message:
+            scenario.type === "bugfix"
+              ? `Hi! I'm your AI coding partner for ${scenario.title}. Share what you have checked and I can nudge you toward the next useful file, test, or hypothesis.`
+              : `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
         },
       ])
     } else {
@@ -4864,6 +4900,35 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                             />
                           </div>
 
+                          {selectedScenario.type === "bugfix" && (
+                            <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3">
+                              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-blue-300 uppercase">
+                                <span className="h-4 w-1 rounded-full bg-blue-300"></span>
+                                How to Work This Codebase
+                              </h3>
+                              <div className="space-y-2 text-sm leading-relaxed text-gray-300">
+                                {(selectedScenario as any).bugDescription && (
+                                  <p>
+                                    <span className="font-medium text-gray-100">Bug:</span>{" "}
+                                    {(selectedScenario as any).bugDescription}
+                                  </p>
+                                )}
+                                {(selectedScenario as any).expectedBehavior && (
+                                  <p>
+                                    <span className="font-medium text-gray-100">Goal:</span>{" "}
+                                    {(selectedScenario as any).expectedBehavior}
+                                  </p>
+                                )}
+                                <ol className="list-decimal space-y-1.5 pt-1 pl-4 text-xs text-gray-400">
+                                  <li>Read the README or context file first.</li>
+                                  <li>Open the test file to see the failing behavior.</li>
+                                  <li>Trace the supporting files, then make the smallest fix.</li>
+                                  <li>Run tests and explain the root cause to the interviewer.</li>
+                                </ol>
+                              </div>
+                            </div>
+                          )}
+
                           {/* AI Insights - Shown independently, right after description */}
                           {/* Only show hints when user has written meaningful code beyond starter code */}
                           {/* Use hintFetchStatus to prevent flickering - section stays visible after first fetch attempt */}
@@ -5174,14 +5239,21 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       {/* Upload Codebase Section - Only show for non-DSA scenarios */}
                       {selectedScenario && selectedScenario.type !== "dsa" && (
                         <div className="mt-3 border-t border-gray-700 pt-3">
-                          <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <h3 className="font-semibold text-white">Codebase Files</h3>
+                            {selectedScenario.type === "bugfix" && (
+                              <Badge className="border-blue-500/30 bg-blue-500/10 text-[10px] text-blue-300">
+                                review first
+                              </Badge>
+                            )}
+                          </div>
                           {/* Show warning for add-functionality when language has no files */}
                           {selectedScenario &&
                             selectedScenario.type === "add-functionality" &&
                             workspaceContext.length === 0 && (
                               <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
                                 <p className="text-xs text-yellow-300">
-                                  ⚠️ This scenario is optimized for{" "}
+                                  This scenario is optimized for{" "}
                                   <strong>JavaScript/TypeScript</strong>. Switch language for
                                   codebase files.
                                 </p>
@@ -5193,9 +5265,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                           workspaceContext.length > 0 ? (
                             <div className="mb-2">
                               <p className="mb-2 text-xs text-green-400">
-                                ✓ {workspaceContext.length} codebase file(s) loaded automatically
+                                {workspaceContext.length} file(s) loaded automatically. Open these
+                                before editing the primary file.
                               </p>
-                              <div className="max-h-32 space-y-1 overflow-y-auto">
+                              <div className="max-h-48 space-y-1.5 overflow-y-auto">
                                 {workspaceContext.map((file, idx) => (
                                   <button
                                     key={idx}
@@ -5203,11 +5276,23 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                       setSelectedFile(file)
                                       setIsCodeViewerOpen(true)
                                     }}
-                                    className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
+                                    className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2.5 py-2 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
                                   >
-                                    <div className="flex items-center gap-1 font-semibold text-blue-400">
-                                      <Code className="h-3 w-3" />
-                                      {file.path}
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1 font-semibold text-blue-400">
+                                          <Code className="h-3 w-3 flex-shrink-0" />
+                                          <span className="truncate">{file.path}</span>
+                                        </div>
+                                        {file.description && (
+                                          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-400">
+                                            {file.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <span className="rounded border border-gray-600 bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-400">
+                                        {getWorkspaceFileRole(file.path)}
+                                      </span>
                                     </div>
                                   </button>
                                 ))}
@@ -5484,7 +5569,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                             >
                               <div className="flex items-center gap-2">
                                 <Bot className="text-accent h-3 w-3" />
-                                <span className="text-[10px] text-gray-400">AI Assistant</span>
+                                <span className="text-[10px] text-gray-400">
+                                  {selectedScenario.type === "bugfix"
+                                    ? "AI Partner"
+                                    : "AI Assistant"}
+                                </span>
                                 <span className="text-[10px] text-gray-600">· optional</span>
                               </div>
                               <div className="flex items-center gap-2">
@@ -5503,7 +5592,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                               <div className="mb-2 flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
                                   <Bot className="text-accent h-3 w-3" />
-                                  <span className="text-[10px] text-gray-300">AI Assistant</span>
+                                  <span className="text-[10px] text-gray-300">
+                                    {selectedScenario.type === "bugfix"
+                                      ? "AI Partner"
+                                      : "AI Assistant"}
+                                  </span>
                                   <span className="rounded bg-gray-800 px-1 text-[9px] text-gray-600">
                                     optional
                                   </span>
@@ -5522,7 +5615,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                               <div className="mb-2 max-h-[120px] space-y-1 overflow-y-auto">
                                 {chatMessages.length === 0 ? (
                                   <p className="py-2 text-center text-[10px] text-gray-500">
-                                    Ask for hints, not solutions
+                                    {selectedScenario.type === "bugfix"
+                                      ? "Ask for a debugging nudge after you inspect the files"
+                                      : "Ask for hints, not solutions"}
                                   </p>
                                 ) : (
                                   chatMessages.slice(-4).map((msg, index) => (
@@ -5549,7 +5644,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                 <Input
                                   value={chatInput}
                                   onChange={(e) => setChatInput(e.target.value)}
-                                  placeholder="Quick question..."
+                                  placeholder={
+                                    selectedScenario.type === "bugfix"
+                                      ? "Ask for a debugging nudge..."
+                                      : "Quick question..."
+                                  }
                                   className="h-6 flex-1 border-gray-700 bg-gray-900 text-[10px] text-white placeholder:text-gray-600"
                                   onKeyPress={(e) =>
                                     e.key === "Enter" && !isLoadingChat && handleSendMessage(false)

@@ -93,7 +93,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 }`}
               >
                 <List className="h-4 w-4" />
-                All
+                All Practice
               </button>
             </div>
           </div>
