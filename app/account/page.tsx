@@ -47,6 +47,10 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES as DEFAULT_SMART_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences as SmartNotificationPreferences,
+} from "@/lib/types/notifications"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -91,6 +95,84 @@ export default function AccountPage() {
     max_daily_reviews: 10,
   })
   const [isSavingPracticeSettings, setIsSavingPracticeSettings] = useState(false)
+
+  const buildSmartNotificationPreferences = (
+    userId: string,
+    profilePrefs: NotificationPreferences,
+    existingPrefs?: Partial<SmartNotificationPreferences>
+  ): SmartNotificationPreferences => {
+    const now = new Date().toISOString()
+    const defaultTypePreferences = DEFAULT_SMART_NOTIFICATION_PREFERENCES.typePreferences
+    const typePreferences: SmartNotificationPreferences["typePreferences"] = {
+      ...DEFAULT_SMART_NOTIFICATION_PREFERENCES.typePreferences,
+      ...existingPrefs?.typePreferences,
+      welcome: {
+        ...defaultTypePreferences.welcome,
+        ...existingPrefs?.typePreferences?.welcome,
+        enabled: profilePrefs.welcome_email,
+        channels: existingPrefs?.typePreferences?.welcome?.channels ||
+          defaultTypePreferences.welcome?.channels || ["email", "in_app"],
+      },
+      spaced_repetition_review: {
+        ...defaultTypePreferences.spaced_repetition_review,
+        ...existingPrefs?.typePreferences?.spaced_repetition_review,
+        enabled: profilePrefs.spaced_repetition_reminders,
+        channels: existingPrefs?.typePreferences?.spaced_repetition_review?.channels ||
+          defaultTypePreferences.spaced_repetition_review?.channels || ["email", "in_app"],
+      },
+      interview_countdown: {
+        ...defaultTypePreferences.interview_countdown,
+        ...existingPrefs?.typePreferences?.interview_countdown,
+        enabled: profilePrefs.roadmap_reminders,
+        channels: existingPrefs?.typePreferences?.interview_countdown?.channels ||
+          defaultTypePreferences.interview_countdown?.channels || ["email", "in_app"],
+      },
+      daily_practice_reminder: {
+        ...defaultTypePreferences.daily_practice_reminder,
+        ...existingPrefs?.typePreferences?.daily_practice_reminder,
+        enabled: profilePrefs.roadmap_reminders,
+        channels: existingPrefs?.typePreferences?.daily_practice_reminder?.channels ||
+          defaultTypePreferences.daily_practice_reminder?.channels || ["in_app"],
+      },
+      roadmap_behind: {
+        ...defaultTypePreferences.roadmap_behind,
+        ...existingPrefs?.typePreferences?.roadmap_behind,
+        enabled: profilePrefs.roadmap_reminders,
+        channels: existingPrefs?.typePreferences?.roadmap_behind?.channels ||
+          defaultTypePreferences.roadmap_behind?.channels || ["in_app"],
+      },
+      milestone_celebration: {
+        ...defaultTypePreferences.milestone_celebration,
+        ...existingPrefs?.typePreferences?.milestone_celebration,
+        enabled: profilePrefs.milestone_celebrations,
+        channels: existingPrefs?.typePreferences?.milestone_celebration?.channels ||
+          defaultTypePreferences.milestone_celebration?.channels || ["in_app"],
+      },
+    }
+
+    return {
+      ...DEFAULT_SMART_NOTIFICATION_PREFERENCES,
+      ...existingPrefs,
+      userId,
+      enabled: existingPrefs?.enabled ?? true,
+      timezone:
+        profilePrefs.timezone ||
+        existingPrefs?.timezone ||
+        DEFAULT_SMART_NOTIFICATION_PREFERENCES.timezone,
+      channels: {
+        ...DEFAULT_SMART_NOTIFICATION_PREFERENCES.channels,
+        ...existingPrefs?.channels,
+        email: profilePrefs.email_notifications_enabled,
+      },
+      quietHours: {
+        ...DEFAULT_SMART_NOTIFICATION_PREFERENCES.quietHours,
+        ...existingPrefs?.quietHours,
+      },
+      typePreferences,
+      createdAt: existingPrefs?.createdAt || now,
+      updatedAt: now,
+    }
+  }
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -375,12 +457,25 @@ export default function AccountPage() {
     setIsSavingPrefs(true)
 
     try {
-      // Write directly to Firestore - no admin API needed
       const profileRef = doc(db, "profiles", firebaseUser.uid)
-      await updateDoc(profileRef, {
-        notification_preferences: newPrefs,
-        updated_at: new Date().toISOString(),
-      })
+      const smartPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
+      const smartPrefsSnap = await getDoc(smartPrefsRef)
+      const smartPrefs = buildSmartNotificationPreferences(
+        firebaseUser.uid,
+        newPrefs,
+        smartPrefsSnap.exists()
+          ? (smartPrefsSnap.data() as Partial<SmartNotificationPreferences>)
+          : undefined
+      )
+
+      await Promise.all([
+        updateDoc(profileRef, {
+          notification_preferences: newPrefs,
+          updated_at: new Date().toISOString(),
+        }),
+        setDoc(smartPrefsRef, smartPrefs, { merge: true }),
+      ])
+
       toast.success("Preferences updated")
     } catch (err) {
       console.error("Failed to update preferences:", err)
