@@ -1,9 +1,8 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { MagneticButton } from "@/components/ui/magnetic-button"
 import { TypewriterText } from "@/components/ui/rotating-text"
-import { Play, ArrowRight, Mic, Sparkles } from "lucide-react"
+import { Bot, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -38,7 +37,7 @@ const capabilities = [
 
 export function HeroSection() {
   return (
-    <section className="bg-background relative flex min-h-screen flex-col justify-center overflow-hidden">
+    <section className="relative flex min-h-[100svh] flex-col items-center overflow-hidden bg-[#131317] px-4 pt-[clamp(8rem,18vh,13rem)] pb-16 text-center font-[var(--font-geist)] md:px-16">
       {/* CSS Background - lightweight base */}
       <GridBackground />
 
@@ -46,175 +45,158 @@ export function HeroSection() {
       <SubtleParticles
         className="absolute inset-0 z-[1] opacity-40"
         particleCount={15}
-        primaryColor="#00d9ff"
-        secondaryColor="#00ff88"
+        primaryColor="#adc6ff"
+        secondaryColor="#60a5fa"
       />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-[620px] bg-[radial-gradient(circle_at_50%_-20%,rgba(173,198,255,0.12),rgba(19,19,23,0)_70%)]" />
 
       {/* Content */}
       <motion.div
-        className="relative z-10 container mx-auto px-4 pt-20 pb-12 lg:pt-24"
+        className="relative z-10 mx-auto w-full max-w-[1200px]"
         variants={staggerContainer}
         initial="initial"
         animate="animate"
       >
-        <div className="mx-auto max-w-6xl">
-          {/* Headline + Demo side by side */}
-          <div className="grid items-center gap-6 lg:grid-cols-5 lg:gap-8">
-            {/* Left: Headline (2 cols) */}
-            <div className="pt-4 text-center lg:col-span-2 lg:text-left">
-              <motion.div
-                variants={staggerItem}
-                className="bg-neural/10 border-neural/20 mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5"
-              >
-                <span className="text-neural text-xs font-medium">
-                  Practice the skill interviews actually test
-                </span>
-              </motion.div>
+        <motion.div variants={staggerItem} className="mx-auto flex max-w-4xl flex-col items-center">
+          <span className="mb-8 inline-flex rounded-full border border-white/10 bg-[#2a2a2e]/80 px-4 py-1.5 text-[12px] font-bold tracking-[0.1em] text-[#adc6ff] uppercase lg:mb-9">
+            #1 Technical Interview Simulator
+          </span>
 
-              <motion.h1
-                variants={staggerItem}
-                className="font-heading mb-4 text-4xl leading-[1.1] font-black tracking-tight sm:text-5xl lg:text-5xl"
-              >
-                <span className="text-foreground">Ace your next</span>
-                <br />
-                <span className="from-accent via-neural to-accent bg-gradient-to-r bg-clip-text text-transparent">
-                  tech interview
-                </span>
-              </motion.h1>
+          <motion.h1
+            variants={staggerItem}
+            className="mb-6 text-[clamp(3.25rem,8vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.055em] text-[#e9e8ef]"
+          >
+            Ace your next
+            <br />
+            <span className="text-[#adc6ff]">tech interview</span>
+          </motion.h1>
 
-              {/* Rotating capabilities - progressive disclosure */}
-              <motion.div
-                variants={staggerItem}
-                className="mb-4 flex h-8 items-center justify-center lg:justify-start"
-              >
-                <div className="flex items-center gap-2 text-base lg:text-lg">
-                  <Sparkles className="text-neural h-4 w-4 flex-shrink-0" />
-                  <TypewriterText
-                    texts={capabilities}
-                    typingSpeed={40}
-                    deletingSpeed={25}
-                    pauseDuration={2500}
-                    className="text-gray-300"
-                  />
-                </div>
-              </motion.div>
+          <motion.p
+            variants={staggerItem}
+            className="mx-auto mb-5 max-w-2xl text-base leading-7 font-medium text-[#c2c6d6] sm:text-lg md:text-xl md:leading-8"
+          >
+            Practice with AI that listens, reacts, and guides. Move beyond LeetCode and master the
+            art of technical communication.
+          </motion.p>
 
-              <motion.p
-                variants={staggerItem}
-                className="text-muted-foreground mb-4 text-sm leading-relaxed lg:text-base"
-              >
-                LeetCode tests if you can solve problems alone. Real interviews test if you can
-                think out loud under pressure. Practice with an AI interviewer that gives real
-                feedback—anytime, anywhere.
-              </motion.p>
+          <motion.div
+            variants={staggerItem}
+            className="mb-8 flex h-8 items-center justify-center text-sm font-semibold text-[#dfe4f2] sm:text-base"
+          >
+            <Sparkles className="mr-2 h-4 w-4 flex-shrink-0 text-[#adc6ff]" />
+            <TypewriterText
+              texts={capabilities}
+              typingSpeed={40}
+              deletingSpeed={25}
+              pauseDuration={2500}
+              className="text-[#dfe4f2]"
+            />
+          </motion.div>
 
-              {/* Single CTA - friction-free */}
-              <motion.div variants={staggerItem} className="mb-4">
-                <Link href="/interview">
-                  <MagneticButton
-                    size="lg"
-                    variant="primary"
-                    glowColor="accent"
-                    strength={0.4}
-                    className="w-full sm:w-auto"
-                  >
-                    <Play className="h-5 w-5" />
-                    Try Free - No Signup Required
-                    <ArrowRight className="h-5 w-5" />
-                  </MagneticButton>
-                </Link>
-              </motion.div>
+          <motion.div variants={staggerItem}>
+            <Link
+              href="/interview"
+              className="inline-flex rounded-[14px] bg-[#adc6ff] px-10 py-4 text-base font-extrabold text-[#001a42] shadow-[0_0_40px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#bfd0ff] hover:shadow-[0_0_46px_rgba(173,198,255,0.36)]"
+            >
+              Try Free
+            </Link>
+          </motion.div>
+        </motion.div>
 
-              <motion.p variants={staggerItem} className="text-muted-foreground/60 text-sm">
-                Complete one full interview with AI feedback. No account needed.
-              </motion.p>
+        <motion.div
+          variants={staggerItem}
+          className="mx-auto mt-[clamp(3rem,8vh,5rem)] w-full max-w-[1000px] px-2"
+        >
+          <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#1f1f23]/45 shadow-[0_30px_90px_-40px_rgba(96,165,250,0.45)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1 hover:border-[#adc6ff]/30">
+            <div className="flex h-10 items-center gap-2 border-b border-white/10 bg-[#2a2a2e]/45 px-4">
+              <div className="flex gap-1.5">
+                <div className="h-2.5 w-2.5 rounded-full bg-[#ffb4ab]/50" />
+                <div className="h-2.5 w-2.5 rounded-full bg-[#ffb786]/50" />
+                <div className="h-2.5 w-2.5 rounded-full bg-[#adc6ff]/50" />
+              </div>
+              <div className="mx-auto font-mono text-xs text-[#c2c6d6]/60">
+                Interview Session: Two Sum (Optimal)
+              </div>
             </div>
 
-            {/* Right: Live Demo (3 cols) - More prominent */}
-            <motion.div variants={staggerItem} className="lg:col-span-3">
-              <div className="relative">
-                {/* Glow */}
-                <div className="from-accent/15 to-neural/15 absolute -inset-3 rounded-2xl bg-gradient-to-r blur-xl" />
+            <div className="grid min-h-[360px] grid-cols-1 overflow-hidden text-left md:grid-cols-12">
+              <div className="overflow-hidden border-white/10 bg-[#1a1a1f] p-6 font-mono text-sm leading-6 text-[#c2c6d6] md:col-span-8 md:border-r md:p-8">
+                <pre className="whitespace-pre-wrap">
+                  <span className="text-[#adc6ff]">const</span>{" "}
+                  <span className="text-[#e4e1e7]">twoSum</span> = (nums, target) =&gt; {"{"}
+                  {"\n"}
+                  {"    "}
+                  <span className="text-[#adc6ff]">const</span> map ={" "}
+                  <span className="text-[#adc6ff]">new</span> Map();{"\n"}
+                  {"    "}
+                  <span className="text-[#ffb786]">
+                    {"// I'm thinking... if I use a hashmap here"}
+                  </span>
+                  {"\n"}
+                  {"    "}
+                  <span className="text-[#ffb786]">{"// I can look up values in O(1)"}</span>
+                  {"\n"}
+                  {"    "}
+                  <span className="text-[#adc6ff]">for</span> (
+                  <span className="text-[#adc6ff]">let</span> i = 0; i &lt; nums.length; i++) {"{"}
+                  {"\n"}
+                  {"        "}
+                  <span className="text-[#adc6ff]">const</span> complement = target - nums[i];
+                  {"\n"}
+                  {"        "}
+                  <span className="text-[#adc6ff]">if</span> (map.has(complement)) {"{"}
+                  {"\n"}
+                  {"            "}
+                  <span className="text-[#adc6ff]">return</span> [map.get(complement), i];{"\n"}
+                  {"        "}
+                  {"}"}
+                  {"\n"}
+                  {"        "}map.set(nums[i], i);{"\n"}
+                  {"    "}
+                  {"}"}
+                  {"\n"}
+                  {"}"};
+                </pre>
+              </div>
 
-                <div className="bg-card/95 border-border relative overflow-hidden rounded-xl border shadow-2xl backdrop-blur-sm">
-                  {/* Browser chrome */}
-                  <div className="border-border bg-secondary/60 flex items-center gap-2 border-b px-3 py-2">
-                    <div className="flex gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-full bg-red-500/50" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-yellow-500/50" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-green-500/50" />
-                    </div>
-                    <span className="text-muted-foreground ml-3 font-mono text-xs">
-                      codesparring.dev/interview
-                    </span>
-
-                    {/* Live indicator */}
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <span className="bg-neural h-1.5 w-1.5 animate-pulse rounded-full" />
-                      <span className="text-muted-foreground text-[10px] tracking-wider uppercase">
-                        Live
-                      </span>
-                    </div>
+              <div className="flex flex-col gap-6 bg-[#1b1b1f]/65 p-6 md:col-span-4 md:p-8">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#adc6ff]/30 bg-[#adc6ff]/20">
+                    <Bot className="h-4 w-4 text-[#adc6ff]" />
                   </div>
-
-                  {/* Interview conversation */}
-                  <div className="space-y-3 p-4">
-                    {/* You speaking (voice) */}
-                    <div className="flex justify-end gap-2.5">
-                      <div className="bg-accent/10 border-accent/20 max-w-[280px] rounded-lg rounded-tr-none border p-2.5">
-                        <div className="mb-1 flex items-center gap-1.5">
-                          <Mic className="text-accent h-2.5 w-2.5" />
-                          <span className="text-accent text-[9px] tracking-wider uppercase">
-                            You (speaking)
-                          </span>
-                        </div>
-                        <p className="text-foreground/80 text-xs">
-                          "So I'm thinking... if I use a hashmap here, I can look up values in O(1)
-                          instead of looping through again..."
-                        </p>
-                      </div>
-                      <div className="bg-secondary flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[10px]">
-                        You
-                      </div>
-                    </div>
-
-                    {/* AI responds */}
-                    <div className="flex gap-2.5">
-                      <div className="bg-accent/20 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full">
-                        <span className="text-accent text-[9px] font-bold">AI</span>
-                      </div>
-                      <div className="bg-secondary/60 max-w-[280px] rounded-lg rounded-tl-none p-2.5">
-                        <p className="text-foreground/80 text-xs">
-                          Exactly right. Walk me through what you'd store in the hashmap and how
-                          you'd handle the lookup.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Code + feedback */}
-                    <div className="bg-background/80 rounded-lg p-2.5 font-mono text-xs">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-muted-foreground">{"// your solution"}</span>
-                        <div className="flex gap-2">
-                          <span className="bg-neural/20 text-neural rounded px-1.5 py-0.5 text-[10px]">
-                            O(n)
-                          </span>
-                          <span className="bg-accent/20 text-accent rounded px-1.5 py-0.5 text-[10px]">
-                            HashMap
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-foreground/70">
-                        <span className="text-purple-400">const</span> map ={" "}
-                        <span className="text-neural">new Map</span>();
-                      </div>
-                    </div>
+                  <div className="text-sm font-bold text-[#e4e1e7]">AI Interviewer</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-[#1f1f23]/60 p-5 text-sm leading-6 text-[#c2c6d6]">
+                  "Exactly right. Walk me through what you'd store in the hashmap and how you'd
+                  handle the lookup."
+                </div>
+                <div className="mt-auto border-t border-white/10 pt-6">
+                  <div className="mb-3 flex items-center justify-between text-[10px] font-bold tracking-[0.14em] text-[#c2c6d6] uppercase">
+                    <span>Voice Activity</span>
+                    <span className="flex items-center gap-1 text-[#adc6ff]">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#adc6ff]" />
+                      Recording...
+                    </span>
+                  </div>
+                  <div className="flex h-8 items-center gap-1.5">
+                    {[16, 32, 24, 16, 28, 20].map((height, index) => (
+                      <div
+                        key={index}
+                        className="w-1 animate-bounce rounded-full bg-[#adc6ff]"
+                        style={{
+                          height,
+                          opacity: index === 0 || index === 5 ? 0.45 : index === 3 ? 0.65 : 1,
+                          animationDelay: `${index * 0.1}s`,
+                        }}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
 
       {/* Scroll indicator */}

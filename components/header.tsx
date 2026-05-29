@@ -1,13 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut, Map, Brain } from "lucide-react"
-import { Logo } from "@/components/Logo"
 import Link from "next/link"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
 import { NotificationBell } from "@/components/notification-bell"
+import { Button } from "@/components/ui/button"
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -33,18 +32,20 @@ export function Header() {
 
   return (
     <header
-      style={{ top: "var(--announcement-banner-height, 0px)" }}
-      className={`fixed right-0 left-0 z-50 w-full transition-all duration-500 ${
-        isScrolled ? "glass-minimal border-accent/10 border-b" : "bg-transparent"
-      }`}
+      style={{ top: "calc(var(--announcement-banner-height, 0px) + 24px)" }}
+      className="fixed right-0 left-0 z-50 w-full px-4 transition-all duration-500"
     >
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <Link href={user ? "/dashboard" : "/"} className="group flex items-center space-x-2">
-            <Logo size={32} className="text-accent transition-transform group-hover:scale-105" />
-            <span className="font-heading text-2xl font-bold tracking-tight">
-              <span className="text-white">Code</span>
-              <span className="text-accent">Sparring</span>
+      <div
+        className={`mx-auto max-w-5xl rounded-full border px-6 py-3 shadow-lg transition-all duration-500 md:px-7 ${
+          isScrolled
+            ? "border-white/12 bg-[#15151a]/90 shadow-black/30 backdrop-blur-xl"
+            : "border-white/10 bg-[#17171c]/80 shadow-black/20 backdrop-blur-xl"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-4 font-[var(--font-geist)]">
+          <Link href={user ? "/dashboard" : "/"} className="group flex items-center">
+            <span className="text-2xl font-extrabold tracking-[-0.04em] text-[#f1f2f7] transition-colors group-hover:text-white">
+              CodeSparring
             </span>
           </Link>
 
@@ -117,48 +118,39 @@ export function Header() {
             ) : (
               <>
                 <Link
-                  href="/interview-prep"
-                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                  href="/"
+                  className="cursor-pointer border-b-2 border-[#adc6ff] pb-1 text-[11px] font-bold tracking-[0.1em] text-[#adc6ff] uppercase transition-colors duration-300"
                 >
-                  Company Prep
-                </Link>
-                <Link
-                  href="/why-codesparring"
-                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
-                >
-                  How it works
+                  Platform
                 </Link>
                 <Link
                   href="/#features"
-                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                  className="cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white"
                 >
                   Features
                 </Link>
                 <Link
-                  href="/blog"
-                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                  href="/interview-prep"
+                  className="cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white"
                 >
-                  Blog
+                  Interviews
                 </Link>
                 <Link
                   href="/pricing"
-                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                  className="cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white"
                 >
                   Pricing
                 </Link>
                 <Link
-                  href="/careers"
-                  className="hover:text-accent cursor-pointer text-sm text-white/60 transition-colors duration-300"
+                  href="/login"
+                  className="ml-8 cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white lg:ml-16 xl:ml-28"
                 >
-                  Join us
+                  Login
                 </Link>
-                <Link href="/login">
-                  <Button
-                    size="sm"
-                    className="bg-accent/10 hover:bg-accent/20 text-accent border-0 transition-all duration-300"
-                  >
-                    Login
-                  </Button>
+                <Link href="/interview">
+                  <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-[11px] font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff]">
+                    Get Started
+                  </span>
                 </Link>
               </>
             )}

@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Work_Sans, Open_Sans } from "next/font/google"
+import { Geist, Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
 import { RateLimitProvider } from "@/lib/contexts/rate-limit-context"
@@ -28,6 +28,12 @@ const openSans = Open_Sans({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-open-sans",
+})
+
+const geist = Geist({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-geist",
 })
 
 const siteConfig = {
@@ -201,7 +207,7 @@ html {
         />
       </head>
       <body
-        className={`${workSans.variable} ${openSans.variable} antialiased`}
+        className={`${workSans.variable} ${openSans.variable} ${geist.variable} antialiased`}
         suppressHydrationWarning
       >
         {/* Skip link for keyboard accessibility - hidden until focused */}

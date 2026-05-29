@@ -53,3 +53,6 @@ next-env.d.ts
 !CONTRIBUTING.md
 !CHANGELOG.md
 !docs/*.md
+
+# Local generated docs
+/docs/ai-engineer-intern-interview-guide.html
