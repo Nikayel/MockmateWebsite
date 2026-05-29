@@ -4,7 +4,7 @@ import {
   getNextProblemRecommendation,
   type RecommendationRequest,
   type CatalogProblem,
-} from "@/lib/agents/recommendation-agent"
+} from "@/lib/agents/recommendations"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
