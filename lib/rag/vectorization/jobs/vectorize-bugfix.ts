@@ -10,6 +10,25 @@ const RATE_LIMIT_DELAY_MS = 100
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+const REMOVED_LEGACY_BUGFIX_SCENARIO_IDS = [
+  "bugfix-state-mutation",
+  "bugfix-react-state-race-condition",
+  "bugfix-ecommerce-cart-memory-leak",
+  "bugfix-react-hook-dependency",
+  "bugfix-memory-leak",
+  "bugfix-async-await",
+  "bugfix-promise-error-handling",
+  "bugfix-ai-api-retry-logic",
+  "bugfix-api-service-error-handling",
+  "bugfix-sql-injection",
+  "bugfix-n-plus-one-query",
+  "bugfix-batch-dimension-mismatch",
+  "bugfix-model-inference-memory-leak",
+  "bugfix-ml-prediction-pipeline",
+  "bugfix-data-preprocessing-race",
+  "bugfix-race-condition",
+]
+
 export async function vectorizeBugFixScenarios(
   embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
@@ -21,6 +40,8 @@ export async function vectorizeBugFixScenarios(
     onProgress?.("Loading Bug Fix scenarios", 0, 1, "Loading...")
     const scenarios = (await getScenariosByType("bugfix")) as BugFixScenario[]
     onProgress?.("Loading Bug Fix scenarios", 1, 1, `Loaded ${scenarios.length} scenarios`)
+
+    await vectorDB.delete(REMOVED_LEGACY_BUGFIX_SCENARIO_IDS.map((id) => `bugfix-${id}`))
 
     const batches = Math.ceil(scenarios.length / BATCH_SIZE)
 
