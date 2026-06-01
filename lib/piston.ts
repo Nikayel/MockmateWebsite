@@ -107,6 +107,11 @@ export interface PistonResponse {
   }
 }
 
+export interface PistonFile {
+  name?: string
+  content: string
+}
+
 // Retry configuration for handling Piston rate limits
 const MAX_RETRIES = 3
 const BASE_DELAY_MS = 500 // 500ms, 1s, 2s exponential backoff
@@ -141,6 +146,22 @@ export async function executeWithPiston(
   language: string,
   testInput: any
 ): Promise<PistonExecuteResult> {
+  // Wrap code to handle input/output
+  const wrappedCode = wrapCodeForExecution(code, language, testInput)
+  return executePistonFiles([{ content: wrappedCode }], language)
+}
+
+export async function executeFilesWithPiston(
+  files: PistonFile[],
+  language: string
+): Promise<PistonExecuteResult> {
+  return executePistonFiles(files, language)
+}
+
+async function executePistonFiles(
+  files: PistonFile[],
+  language: string
+): Promise<PistonExecuteResult> {
   const langConfig = LANGUAGE_CONFIG[language]
 
   if (!langConfig) {
@@ -151,8 +172,6 @@ export async function executeWithPiston(
     }
   }
 
-  // Wrap code to handle input/output
-  const wrappedCode = wrapCodeForExecution(code, language, testInput)
   const startTime = Date.now()
 
   // Retry loop for rate limit errors
@@ -168,7 +187,7 @@ export async function executeWithPiston(
         body: JSON.stringify({
           language: langConfig.language,
           version: langConfig.version,
-          files: [{ content: wrappedCode }],
+          files,
           stdin: "",
           run_timeout: 5000, // 5 second timeout for code execution
           compile_timeout: 5000,

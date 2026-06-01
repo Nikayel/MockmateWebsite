@@ -77,6 +77,31 @@ export interface BaseScenario {
   description: string
   tags: string[]
   estimatedTime: number // in minutes
+  executionMode?: "single-file" | "workspace"
+  workspace?: WorkspaceScenarioConfig
+}
+
+export type WorkspaceScenarioLanguage = "javascript" | "typescript" | "python"
+export type WorkspaceScenarioFileRole = "editable" | "readonly" | "test" | "docs"
+
+export interface WorkspaceScenarioFile {
+  path: string
+  content: string
+  role: WorkspaceScenarioFileRole
+  language: WorkspaceScenarioLanguage | "markdown" | "json" | "text"
+  description?: string
+  hidden?: boolean
+}
+
+export interface WorkspaceScenarioConfig {
+  language: WorkspaceScenarioLanguage
+  primaryFilePath: string
+  editableFilePaths: string[]
+  visibleTestPaths: string[]
+  hiddenTestPaths: string[]
+  testRunnerPath: string
+  files: WorkspaceScenarioFile[]
+  referenceFiles?: WorkspaceScenarioFile[]
 }
 
 /**

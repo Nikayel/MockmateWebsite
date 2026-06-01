@@ -13,6 +13,11 @@ import { trackCodeExecutionServer } from "@/lib/analytics-server"
 import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
 import { logger } from "@/lib/logger"
 import { validateResultEnhanced, Normalizers } from "@/lib/validators"
+import {
+  executeWorkspaceScenario,
+  isWorkspaceScenario,
+  normalizeWorkspaceEdits,
+} from "@/lib/workspace-execution"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = "force-dynamic"
@@ -43,6 +48,7 @@ interface ExecuteRequestBody {
   language?: string
   sessionId?: string
   userId?: string
+  workspaceFiles?: unknown
 }
 
 interface ExecutionResultItem {
@@ -284,18 +290,13 @@ export async function POST(request: NextRequest) {
       language = "javascript",
       sessionId,
       userId,
+      workspaceFiles,
     } = (await request.json()) as ExecuteRequestBody
 
     logger.info("Execute API called", { scenarioId, language, codeLength: code?.length })
 
-    if (!code) {
-      logger.warn("Execute API: Missing code", { scenarioId })
-      return NextResponse.json({ error: "Code is required" }, { status: 400 })
-    }
-
-    // Input validation: max code length to prevent DoS attacks
     const MAX_CODE_LENGTH = 100000 // 100KB limit
-    if (code.length > MAX_CODE_LENGTH) {
+    if (code && code.length > MAX_CODE_LENGTH) {
       logger.warn("Execute API: Code too large", { scenarioId, codeLength: code.length })
       return NextResponse.json(
         {
@@ -334,6 +335,49 @@ export async function POST(request: NextRequest) {
         },
         { status: 404 }
       )
+    }
+
+    if (isWorkspaceScenario(scenario)) {
+      const workspaceResult = await executeWorkspaceScenario({
+        scenario,
+        edits: normalizeWorkspaceEdits(workspaceFiles),
+      })
+      const executionTimeMs = Date.now() - startTime
+
+      if (sessionId) {
+        trackCodeExecutionServer({
+          sessionId,
+          userId,
+          language: scenario.workspace.language,
+          scenarioId,
+          scenarioType: scenario.type,
+          passed: workspaceResult.success,
+          totalTests: workspaceResult.summary.total,
+          passedTests: workspaceResult.summary.passed,
+          executionTimeMs,
+        }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+      }
+
+      if (rateLimitUserId !== "anonymous") {
+        await endRequestTracking(rateLimitUserId)
+      }
+
+      return NextResponse.json({
+        ...workspaceResult,
+        results: workspaceResult.results.map((result) => ({
+          description: `${result.suite}: ${result.name}`,
+          passed: result.passed,
+          input: result.suite,
+          expected: "pass",
+          actual: result.passed ? "pass" : "fail",
+          error: result.error,
+        })),
+      })
+    }
+
+    if (!code) {
+      logger.warn("Execute API: Missing code", { scenarioId })
+      return NextResponse.json({ error: "Code is required" }, { status: 400 })
     }
 
     // Get test cases from scenario (only DSA and some other types have testCases)
