@@ -21,6 +21,18 @@ export type HintTrigger =
   | "manual"
   | "code_change"
 
+export interface HintDiagnosis {
+  primaryNeed: HintCategory
+  confidence: number
+  reason: string
+  evidence: string[]
+  recommendedLevel: HintLevel
+  shouldUseRag: boolean
+  shouldUseUserHistory: boolean
+  shouldUsePatternKnowledge: boolean
+  shouldUseTestFailures: boolean
+}
+
 export interface GeneratedHint {
   id: string
   level: HintLevel
@@ -77,6 +89,7 @@ export interface HintGenerationResponse {
   struggleLevel: "none" | "mild" | "moderate" | "high"
   recommendedRevealLevel: HintLevel
   personalizationApplied: boolean
+  diagnosis?: HintDiagnosis
   metadata: {
     generationTimeMs: number
     ragContextUsed: boolean

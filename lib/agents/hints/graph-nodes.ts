@@ -3,6 +3,7 @@ import { getContextBuilder } from "@/lib/rag/context-builder"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
 import { calculateStruggleLevel, getRecommendedRevealLevel } from "./struggle-calculator"
+import { diagnoseHintNeed as diagnoseHintNeedWithLlm } from "./diagnosis"
 import { generateHintId } from "./code-analyzer"
 import { generateLLMHint } from "./llm-generator"
 import { generateGenericHint, generatePatternHints } from "./pattern-hints"
@@ -24,9 +25,23 @@ export async function prepareState(state: HintGraphStateType) {
   }
 }
 
+export async function diagnoseHintNeed(state: HintGraphStateType) {
+  const diagnosis = await diagnoseHintNeedWithLlm({
+    request: state.request,
+    struggleLevel: state.struggleLevel,
+    recommendedRevealLevel: state.recommendedRevealLevel,
+  })
+
+  return {
+    diagnosis,
+    recommendedRevealLevel: diagnosis.recommendedLevel,
+  }
+}
+
 export async function generateLlmHints(state: HintGraphStateType) {
-  const { request, recommendedRevealLevel, struggleLevel } = state
-  const category = request.trigger === "test_failed" ? "debugging" : "approach"
+  const { request, recommendedRevealLevel, struggleLevel, diagnosis } = state
+  const category =
+    diagnosis?.primaryNeed || (request.trigger === "test_failed" ? "debugging" : "approach")
 
   const levelsToGenerate: HintLevel[] = []
 
@@ -64,9 +79,9 @@ export async function generateLlmHints(state: HintGraphStateType) {
   }
 }
 export async function addPatternHints(state: HintGraphStateType) {
-  const { request, recommendedRevealLevel, llmUsed, hints } = state
+  const { request, recommendedRevealLevel, llmUsed, hints, diagnosis } = state
 
-  if (!request.problemPattern) {
+  if (!request.problemPattern || diagnosis?.shouldUsePatternKnowledge === false) {
     return {}
   }
 
@@ -110,7 +125,11 @@ export async function ensureAtLeastOneHint(state: HintGraphStateType) {
 }
 
 export async function addRagHint(state: HintGraphStateType) {
-  const { request } = state
+  const { request, diagnosis } = state
+
+  if (diagnosis?.shouldUseRag === false) {
+    return {}
+  }
 
   try {
     const contextBuilder = getContextBuilder()
@@ -152,7 +171,11 @@ export async function addRagHint(state: HintGraphStateType) {
 }
 
 export async function addUserHistoryHints(state: HintGraphStateType) {
-  const { request } = state
+  const { request, diagnosis } = state
+
+  if (diagnosis?.shouldUseUserHistory === false) {
+    return {}
+  }
 
   try {
     const performanceRAG = getUserPerformanceRAG()
@@ -213,9 +236,13 @@ export async function addUserHistoryHints(state: HintGraphStateType) {
   }
 }
 export async function addTestFailureHints(state: HintGraphStateType) {
-  const { request, recommendedRevealLevel } = state
+  const { request, recommendedRevealLevel, diagnosis } = state
 
-  if (!request.testResults || request.testResults.total === 0) {
+  if (
+    diagnosis?.shouldUseTestFailures === false ||
+    !request.testResults ||
+    request.testResults.total === 0
+  ) {
     return {}
   }
 
