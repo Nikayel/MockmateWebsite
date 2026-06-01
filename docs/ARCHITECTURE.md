@@ -12,24 +12,64 @@ Technical architecture overview for the CodeSparring platform.
 
 ## System Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              CODESPARRING                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────┐  │
-│  │   Frontend   │    │   Backend    │    │      External Services   │  │
-│  │  (Next.js)   │───▶│  (API Routes)│───▶│                          │  │
-│  └──────────────┘    └──────────────┘    │  • Google Gemini (AI)    │  │
-│         │                   │             │  • Firebase (Auth + DB)  │  │
-│         │                   │             │  • Stripe (Payments)     │  │
-│         ▼                   ▼             │  • Piston (Code Exec)    │  │
-│  ┌──────────────┐    ┌──────────────┐    │  • Deepgram (Voice)      │  │
-│  │    Vercel    │    │   Firestore  │    │  • Pinecone (Vectors)    │  │
-│  │   (Hosting)  │    │  (Database)  │    │  • Brevo (Email)         │  │
-│  └──────────────┘    └──────────────┘    └──────────────────────────┘  │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  subgraph users["Users"]
+    Candidate["Developer / candidate"]
+    Admin["Admin / support"]
+  end
+
+  subgraph client["Client"]
+    Web["Browser UI\nReact 19 + CodeMirror + Zustand"]
+  end
+
+  subgraph app["Vercel / Next.js 16"]
+    Router["App Router pages"]
+    API["Route Handlers\napp/api/*"]
+    Middleware["Auth, quota, rate limits"]
+  end
+
+  subgraph core["Core platform modules"]
+    Interview["Interview engine\nphases, prompts, tools, policies"]
+    Agents["AI agents\nhints + recommendations"]
+    RAG["RAG platform\ncontext builder, retrieval, embeddings"]
+    Learning["Learning system\nFSRS/SM-2, mastery, roadmaps"]
+    AdminOps["Admin + analytics"]
+  end
+
+  subgraph data["Persistent data"]
+    Firestore[("Firestore\nusers, sessions, metrics, billing")]
+    Vectors[("Pinecone or Firestore vectors")]
+  end
+
+  subgraph external["External services"]
+    Gemini["Google Gemini\nchat + embeddings"]
+    Piston["Piston\ncode execution"]
+    Deepgram["Deepgram\nvoice STT"]
+    Stripe["Stripe\nbilling"]
+    Brevo["Brevo\nemail"]
+  end
+
+  Candidate --> Web
+  Admin --> Web
+  Web --> Router
+  Web --> API
+  API --> Middleware
+  Middleware --> Interview
+  Middleware --> Agents
+  Middleware --> RAG
+  Middleware --> Learning
+  Middleware --> AdminOps
+
+  Interview --> Gemini
+  Agents --> Gemini
+  RAG --> Gemini
+  RAG --> Vectors
+  API --> Firestore
+  API --> Piston
+  API --> Deepgram
+  API --> Stripe
+  API --> Brevo
 ```
 
 ## Tech Stack
@@ -44,8 +84,9 @@ Technical architecture overview for the CodeSparring platform.
 | **State** | Zustand | 5.x | Client state management |
 | **Database** | Firebase Firestore | - | NoSQL document database |
 | **Auth** | Firebase Auth | - | OAuth 2.0 authentication |
-| **AI** | Google Gemini | 2.5 Flash | Chat & embeddings |
-| **Vectors** | Pinecone / Firestore | - | RAG vector storage |
+| **AI** | Google Gemini, optional DeepSeek/Claude | 2.5 Flash / Flash-Lite | Chat, hints, feedback |
+| **Embeddings** | Gemini / OpenAI / TF-IDF | `text-embedding-004` primary | RAG vectors |
+| **Vectors** | Pinecone / Firestore | - | RAG vector storage and semantic search |
 | **Payments** | Stripe | - | Subscription billing |
 | **Code Exec** | Piston | - | Sandboxed execution |
 | **Voice** | Deepgram | - | Speech-to-text |
@@ -96,6 +137,8 @@ MockmateWebsite/
 │   │   ├── sm2-algorithm.ts  # SM-2 scheduler
 │   │   └── mastery-calculator.ts
 │   ├── agents/               # AI agents
+│   │   ├── hints/            # LangGraph hint agent + diagnosis
+│   │   └── recommendations/  # Recommendation scoring agent
 │   ├── admin/                # Admin utilities
 │   │   ├── rbac.ts           # Role-based access
 │   │   ├── middleware.ts     # Admin auth
@@ -299,46 +342,64 @@ Retrieval-Augmented Generation (RAG) is implemented under **`lib/rag/`** and is 
 
 ### Layer diagram
 
-```
-                         ┌─────────────────────────────────────────┐
-                         │           Consumers                        │
-                         │  /api/chat  /api/rag  roadmap  hints     │
-                         └─────────────────────┬───────────────────┘
-                                               │
-                         ┌─────────────────────▼───────────────────┐
-                         │     Context builder & knowledge-base     │
-                         │  lib/rag/context-builder.ts              │
-                         │  lib/rag/knowledge-base/* (DSA, company, │
-                         │    complexity, debugging, behavior…)     │
-                         └─────────────────────┬───────────────────┘
-                                               │
-              ┌────────────────────────────────┼────────────────────────────┐
-              │                                │                            │
-              ▼                                ▼                            ▼
-   ┌──────────────────────┐      ┌────────────────────────┐   ┌──────────────────┐
-   │ Advanced retrieval    │      │ Dynamic chat context    │   │ User profile RAG  │
-   │ lib/rag/retrieval/    │      │ lib/rag/dynamic-chat-   │   │ lib/rag/enhanced-  │
-   │   advanced-retrieval  │      │   context.ts            │   │   user-profile.ts  │
-   └───────────┬──────────┘      └────────────┬────────────┘   └─────────┬─────────┘
-              │                                │                          │
-              └────────────────────┬───────────┴──────────────────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │  Vector query + filters       │
-                    │  lib/rag/index.ts (orchestrator)│
-                    │  similarity search, stores    │
-                    └───────────────┬───────────────┘
-                                   │
-              ┌────────────────────┴────────────────────┐
-              ▼                                         ▼
-   ┌─────────────────────────┐             ┌─────────────────────────┐
-   │   Embeddings             │             │   Vector database        │
-   │   lib/rag/embeddings/    │             │   lib/rag/vectordb/      │
-   │   hybrid-provider.ts     │             │   FirestoreVectorDB OR   │
-   │   Gemini (768D primary)  │             │   PineconeVectorDB       │
-   │   TF-IDF / OpenAI fallbacks│           │   (env: PINECONE_API_KEY) │
-   └─────────────────────────┘             └─────────────────────────┘
+```mermaid
+flowchart TB
+  subgraph consumers["RAG consumers"]
+    Chat["/api/chat\ninterviewer + partner"]
+    RagApi["/api/rag\nRAG actions"]
+    Hints["hint agent"]
+    Roadmap["roadmaps"]
+    Feedback["feedback generation"]
+  end
+
+  subgraph context["Context construction"]
+    Builder["RAGContextBuilder"]
+    StaticKB["knowledge-base\nDSA, company, complexity"]
+    DynamicCtx["dynamic chat context"]
+    UserProfile["enhanced user profile"]
+  end
+
+  subgraph retrieval["Retrieval"]
+    Advanced["AdvancedRetriever\nquery expansion, filters, reranking"]
+    Similarity["similarity services"]
+  end
+
+  subgraph embedding["Embedding layer"]
+    Hybrid["HybridEmbeddingProvider"]
+    GeminiEmb["Gemini text-embedding-004\n768 dimensions"]
+    OpenAIEmb["OpenAI fallback\n1536 dimensions"]
+    TFIDF["TF-IDF fallback\n256 dimensions"]
+    Cache["embedding cache"]
+  end
+
+  subgraph storage["Vector storage"]
+    Factory["vectorDB factory"]
+    Pinecone[("PineconeVectorDB\nwhen PINECONE_API_KEY is set")]
+    FirestoreVec[("FirestoreVectorDB\nfallback")]
+  end
+
+  Chat --> Builder
+  Hints --> Builder
+  Roadmap --> Builder
+  Feedback --> Builder
+  RagApi --> Advanced
+
+  Builder --> StaticKB
+  Builder --> DynamicCtx
+  Builder --> UserProfile
+  Builder --> Advanced
+
+  Advanced --> Hybrid
+  Similarity --> Hybrid
+  Hybrid --> Cache
+  Hybrid --> GeminiEmb
+  Hybrid --> OpenAIEmb
+  Hybrid --> TFIDF
+
+  Advanced --> Factory
+  Similarity --> Factory
+  Factory --> Pinecone
+  Factory --> FirestoreVec
 ```
 
 ### Embeddings (`lib/rag/embeddings/`)
@@ -362,6 +423,26 @@ Retrieval-Augmented Generation (RAG) is implemented under **`lib/rag/`** and is 
 
 Exports used across the app: `generateTextEmbedding`, `getSimilarProblems`, `getRelevantHints`, similarity search, storing solutions/sessions, recommendations, etc., all building on `vectorDB` + `HybridEmbeddingProvider`.
 
+### Vectorization and data processing
+
+```mermaid
+flowchart LR
+  Raw["Raw platform content\nscenarios, hints, company questions, pattern knowledge"]
+  Text["Text builders\nrich embedding documents"]
+  Sanitize["sanitize + prepare text"]
+  Embed["generate embeddings"]
+  Doc["VectorDocument\nid, vector, text, metadata"]
+  Store["vectorDB.upsert"]
+  Query["runtime query embedding"]
+  Results["nearest results + metadata"]
+  Prompt["RAG context in AI prompt"]
+
+  Raw --> Text --> Sanitize --> Embed --> Doc --> Store
+  Store --> Query --> Results --> Prompt
+```
+
+The vectorization pipeline lives under `lib/rag/vectorization/`. It turns structured product content into rich text first, then embeds that text and stores a `VectorDocument` in Pinecone or Firestore. Runtime retrieval follows the inverse pattern: embed the user/problem query, retrieve nearby vectors, enrich or rerank the results, then feed relevant text into the prompt.
+
 ### HTTP surface
 
 - **`POST /api/rag`** — Action-based JSON body (`action`: hints, similar problems, store solution, recommendations, …); some actions require auth (see `app/api/rag/route.ts`).
@@ -370,6 +451,37 @@ Exports used across the app: `generateTextEmbedding`, `getSimilarProblems`, `get
 ### Knowledge not in the vector index
 
 Static and curated content in **`lib/rag/knowledge-base/`** (e.g. DSA patterns, company interview norms) is merged with retrieved chunks so the model always gets **curated priors** plus **personalized retrieval**.
+
+---
+
+## Agent Architecture
+
+### Hint Agent
+
+The hint agent is implemented under **`lib/agents/hints/`**. It uses LangGraph as a constrained workflow, not as an unconstrained autonomous agent. The newest step is `diagnoseHintNeed`, which asks an LLM to classify what the user needs before the graph generates or enriches hints.
+
+```mermaid
+flowchart TD
+  Start([START]) --> Prepare["prepareState\ncalculate struggle + reveal level"]
+  Prepare --> Diagnose["diagnoseHintNeed\nLLM structured diagnosis"]
+  Diagnose --> LLMHints["generateLlmHints\nwrite hints for selected category"]
+  LLMHints --> Pattern["addPatternHints\nskip if diagnosis says no"]
+  Pattern --> Ensure["ensureAtLeastOneHint\nfallback safety"]
+  Ensure --> RAGHint["addRagHint\nskip if diagnosis says no"]
+  RAGHint --> History["addUserHistoryHints\nskip if diagnosis says no"]
+  History --> TestHints["addTestFailureHints\nskip if diagnosis says no"]
+  TestHints --> Finalize["finalizeHints\nsort, dedupe, cap"]
+  Finalize --> End([END])
+
+  Diagnose -.-> Need["primaryNeed:\nconceptual | approach | implementation | optimization | debugging"]
+  Diagnose -.-> Flags["source flags:\nuse RAG, user history, pattern knowledge, test failures"]
+```
+
+The diagnosis response is validated with Zod and has deterministic fallback behavior. If the LLM returns malformed JSON, unsupported fields, or low confidence, the agent falls back to rules derived from trigger, code presence, and test results. This keeps the workflow adaptive without letting the model invent arbitrary actions.
+
+### Recommendation Agent
+
+The recommendation agent under **`lib/agents/recommendations/`** is algorithmic rather than LLM-agentic. It scores eligible problems using profile, readiness, difficulty, pattern targets, and session goals, then returns ranked recommendations and a session plan.
 
 ---
 

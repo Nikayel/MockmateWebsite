@@ -188,7 +188,71 @@ flowchart TB
 
 ---
 
-## 6. Authentication (API requests)
+## 6. RAG vectorization and data processing
+
+```mermaid
+flowchart LR
+  subgraph sources["Content sources"]
+    DSA["DSA scenarios"]
+    SYS["System design scenarios"]
+    BUG["Bugfix scenarios"]
+    CO["Company questions"]
+    PK["Pattern knowledge"]
+    USER["User solutions / performance"]
+  end
+
+  subgraph processing["Processing"]
+    BUILD["Text builders\nrich embedding documents"]
+    CLEAN["Sanitize + prepare text"]
+    EMB["Embedding provider\nGemini primary"]
+    DOC["VectorDocument\nid + vector + text + metadata"]
+  end
+
+  subgraph vectorstore["Vector store"]
+    VDB["vectorDB factory"]
+    PC[("Pinecone namespaces\nmockmate_problem, mockmate_hint, etc.")]
+    FS[("Firestore vectors fallback")]
+  end
+
+  DSA --> BUILD
+  SYS --> BUILD
+  BUG --> BUILD
+  CO --> BUILD
+  PK --> BUILD
+  USER --> BUILD
+  BUILD --> CLEAN
+  CLEAN --> EMB
+  EMB --> DOC
+  DOC --> VDB
+  VDB --> PC
+  VDB --> FS
+```
+
+---
+
+## 7. Hint agent LangGraph flow
+
+```mermaid
+flowchart TD
+  START([START]) --> PREP["prepareState\ncalculate struggle level\ncalculate reveal level"]
+  PREP --> DIAG["diagnoseHintNeed\nLLM structured diagnosis"]
+  DIAG --> GEN["generateLlmHints\nwrite targeted hints"]
+  GEN --> PAT["addPatternHints\nif diagnosis allows"]
+  PAT --> ENSURE["ensureAtLeastOneHint\nfallback safety"]
+  ENSURE --> RAG["addRagHint\nif diagnosis allows"]
+  RAG --> HIST["addUserHistoryHints\nif diagnosis allows"]
+  HIST --> TEST["addTestFailureHints\nif diagnosis allows"]
+  TEST --> FINAL["finalizeHints\nsort dedupe cap"]
+  FINAL --> END([END])
+
+  DIAG -.-> NEED["primaryNeed\nconceptual / approach / implementation / optimization / debugging"]
+  DIAG -.-> SOURCE["source flags\nRAG / user history / pattern knowledge / test failures"]
+  DIAG -.-> LEVEL["recommendedLevel\n1-4"]
+```
+
+---
+
+## 8. Authentication (API requests)
 
 ```mermaid
 sequenceDiagram
@@ -205,7 +269,7 @@ sequenceDiagram
 
 ---
 
-## 7. Stripe subscription lifecycle
+## 9. Stripe subscription lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -228,7 +292,7 @@ sequenceDiagram
 
 ---
 
-## 8. Cron jobs (scheduled maintenance)
+## 10. Cron jobs (scheduled maintenance)
 
 ```mermaid
 flowchart LR
@@ -242,7 +306,7 @@ flowchart LR
 
 ---
 
-## 9. Admin request path (RBAC)
+## 11. Admin request path (RBAC)
 
 ```mermaid
 flowchart TD
@@ -256,7 +320,7 @@ flowchart TD
 
 ---
 
-## 10. Data stores — conceptual (not ERD)
+## 12. Data stores — conceptual (not ERD)
 
 ```mermaid
 flowchart LR
