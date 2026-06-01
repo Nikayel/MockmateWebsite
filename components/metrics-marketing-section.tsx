@@ -7,10 +7,8 @@ import {
   Brain,
   Target,
   Sparkles,
-  Clock,
-  Award,
   Zap,
-  LineChart,
+  Star,
 } from "lucide-react"
 import Link from "next/link"
 import { MagneticButton } from "@/components/ui/magnetic-button"
@@ -25,22 +23,31 @@ const metrics = [
   {
     icon: BarChart3,
     title: "Performance Analytics",
-    description: "Track your scores across 15+ DSA patterns with detailed breakdowns.",
+    description:
+      "Scores across 15+ DSA patterns show where you slow down, not just what passed.",
+    outcome: "Avg +18 pts after 5 sessions",
   },
   {
     icon: Brain,
     title: "Cognitive Profiling",
-    description: "Understand your learning style, problem-solving approach, and strengths.",
+    description:
+      "Detects whether you struggle with problem setup, edge cases, or explanation, then adapts.",
+    outcome: "3 learning modes identified",
   },
   {
     icon: TrendingUp,
     title: "Progress Trends",
-    description: "Visualize your improvement over time with weekly and monthly trends.",
+    description:
+      "Week-over-week curves separate real gains from a one-session spike.",
+    outcome: "Weekly + monthly view",
   },
   {
     icon: Target,
     title: "Interview Readiness",
-    description: "Get a real-time score of how ready you are for FAANG interviews.",
+    description:
+      "A single FAANG-calibrated score updates after every session so you know when you are ready.",
+    outcome: "Benchmarked against 10k+ interview outcomes",
+    featured: true,
   },
 ]
 
@@ -77,20 +84,20 @@ export function MetricsMarketingSection() {
           </div>
 
           <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4">
-            Track Every Detail of Your{" "}
+            See exactly where you stand —{" "}
             <span className="bg-gradient-to-r from-[#00d9ff] to-purple-500 bg-clip-text text-transparent">
-              Progress
+              and why
             </span>
           </h2>
 
           <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-            Our AI doesn't just interview you—it analyzes your performance across
-            40+ metrics to give you actionable insights for improvement.
+            40+ signals per session become one readiness score, clear benchmarks,
+            and the next move for your practice.
           </p>
         </motion.div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:[grid-template-columns:1fr_1fr_1fr_1.6fr] gap-4 mb-16">
           {metrics.map((metric, index) => (
             <motion.div
               key={metric.title}
@@ -98,13 +105,36 @@ export function MetricsMarketingSection() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               viewport={{ once: true }}
-              className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-[#00d9ff]/30 transition-colors group"
+              className={`group rounded-2xl p-6 transition-colors ${
+                metric.featured
+                  ? "bg-[#1a1428] border-[1.5px] border-[#7c3aed] hover:border-[#8b5cf6]"
+                  : "bg-white/5 border-[0.5px] border-white/10 hover:border-[#00d9ff]/30"
+              }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-[#00d9ff]/10 flex items-center justify-center mb-4 group-hover:bg-[#00d9ff]/20 transition-colors">
-                <metric.icon className="w-6 h-6 text-[#00d9ff]" />
+              {metric.featured && (
+                <div className="mb-3 inline-flex items-center gap-1 rounded-md bg-[#2d1f52] px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-[#a78bfa]">
+                  <Star className="h-3 w-3 fill-[#a78bfa]" />
+                  Key differentiator
+                </div>
+              )}
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
+                  metric.featured
+                    ? "bg-[#2d1f52] group-hover:bg-[#35245f]"
+                    : "bg-[#00d9ff]/10 group-hover:bg-[#00d9ff]/20"
+                }`}
+              >
+                <metric.icon
+                  className={`w-6 h-6 ${
+                    metric.featured ? "text-[#a78bfa]" : "text-[#00d9ff]"
+                  }`}
+                />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{metric.title}</h3>
               <p className="text-sm text-gray-400">{metric.description}</p>
+              <div className="mt-4 text-sm font-semibold text-[#a78bfa]">
+                {metric.outcome}
+              </div>
             </motion.div>
           ))}
         </div>
