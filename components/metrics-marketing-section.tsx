@@ -145,13 +145,13 @@ export function MetricsMarketingSection() {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           viewport={{ once: true }}
-          className="grid md:grid-cols-2 gap-8 items-center"
+          className="grid gap-6 lg:[grid-template-columns:1.2fr_1fr] items-stretch"
         >
           {/* Left: Dashboard Preview */}
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-[#00d9ff]/20 to-purple-500/20 rounded-3xl blur-xl" />
             <div className="relative p-1 rounded-3xl bg-gradient-to-r from-[#00d9ff]/50 to-purple-500/50">
-              <div className="rounded-[22px] bg-gray-900 p-6">
+              <div className="rounded-[22px] bg-gray-900 p-5 sm:p-6">
                 {/* Mock Dashboard */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
@@ -210,20 +210,32 @@ export function MetricsMarketingSection() {
                 {/* Pattern Bars */}
                 <div className="space-y-3">
                   {[
-                    { name: "Arrays", score: 92 },
-                    { name: "Trees", score: 75 },
-                    { name: "Graphs", score: 58 },
+                    { name: "Arrays", score: 92, benchmark: 76 },
+                    { name: "Trees", score: 75, benchmark: 74 },
+                    { name: "Graphs", score: 58, benchmark: 71 },
                   ].map((pattern) => (
                     <div key={pattern.name}>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-400">{pattern.name}</span>
                         <span className="text-white">{pattern.score}%</span>
                       </div>
-                      <div className="h-2 rounded-full bg-gray-700 overflow-hidden">
+                      <div className="relative pt-3">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-[#00d9ff] to-purple-500"
-                          style={{ width: `${pattern.score}%` }}
+                          className="absolute -top-0.5 -translate-x-1/2 text-[8px] font-semibold uppercase text-[#f59e0b]"
+                          style={{ left: `${pattern.benchmark}%` }}
+                        >
+                          FAANG avg
+                        </div>
+                        <div
+                          className="absolute top-2 h-[11px] w-[1.5px] -translate-x-1/2 rounded-full bg-[#f59e0b]"
+                          style={{ left: `${pattern.benchmark}%` }}
                         />
+                        <div className="h-2 rounded-full bg-gray-700 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#00d9ff] to-purple-500"
+                            style={{ width: `${pattern.score}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -233,16 +245,16 @@ export function MetricsMarketingSection() {
           </div>
 
           {/* Right: Feature List */}
-          <div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <h3 className="text-2xl font-bold text-white mb-4">
-              40+ Metrics Tracked Per Session
+              What gets tracked
             </h3>
             <p className="text-gray-400 mb-6">
-              Every session captures detailed interaction data that feeds into your
-              personalized learning profile and AI recommendations.
+              Every session feeds your profile, so recommendations come from
+              observed behavior instead of guesses.
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
               {trackingFeatures.map((feature) => (
                 <div
                   key={feature.label}
