@@ -42,17 +42,13 @@ export function AIAssistedSection() {
             <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4">
               Real Interview Scoring
             </h2>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-              Our AI interviewer evaluates you the same way {companies.join(', ')} interviewers do.
-              <span className="text-white"> AI usage is optional</span>—you&apos;re never penalized for not using it.
-            </p>
           </motion.div>
         </ScrollReveal>
 
-        {/* Grading visualization - horizontal bar style */}
+        {/* Grading visualization */}
         <ScrollReveal>
           <motion.div
-            className="max-w-3xl mx-auto mb-12"
+            className="max-w-5xl mx-auto mb-12"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
@@ -117,14 +113,6 @@ export function AIAssistedSection() {
               The goal: Can you <span className="text-white font-medium">solve problems</span>,{' '}
               <span className="text-white font-medium">explain your thinking</span>, and{' '}
               <span className="text-white font-medium">write clean code</span>?
-            </p>
-            <p className="text-gray-500 text-sm">
-              <span className="line-through">How often you use AI</span>
-              <span className="mx-2">·</span>
-              <span className="line-through">Typing speed</span>
-              <span className="mx-2">·</span>
-              <span className="line-through">Memorized syntax</span>
-              <span className="mx-3 text-gray-600">← These don&apos;t matter</span>
             </p>
           </motion.div>
         </ScrollReveal>
