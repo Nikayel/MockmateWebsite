@@ -8,6 +8,7 @@ import {
   addRagHint,
   addTestFailureHints,
   addUserHistoryHints,
+  diagnoseHintNeed,
   ensureAtLeastOneHint,
   finalizeHints,
   generateLlmHints,
@@ -16,6 +17,7 @@ import {
 
 const hintGraph = new StateGraph(HintGraphState)
   .addNode("prepareState", prepareState)
+  .addNode("diagnoseHintNeed", diagnoseHintNeed)
   .addNode("generateLlmHints", generateLlmHints)
   .addNode("addPatternHints", addPatternHints)
   .addNode("ensureAtLeastOneHint", ensureAtLeastOneHint)
@@ -24,7 +26,8 @@ const hintGraph = new StateGraph(HintGraphState)
   .addNode("addTestFailureHints", addTestFailureHints)
   .addNode("finalizeHints", finalizeHints)
   .addEdge(START, "prepareState")
-  .addEdge("prepareState", "generateLlmHints")
+  .addEdge("prepareState", "diagnoseHintNeed")
+  .addEdge("diagnoseHintNeed", "generateLlmHints")
   .addEdge("generateLlmHints", "addPatternHints")
   .addEdge("addPatternHints", "ensureAtLeastOneHint")
   .addEdge("ensureAtLeastOneHint", "addRagHint")
@@ -48,6 +51,7 @@ export async function runHintGraph(
     struggleLevel: result.struggleLevel,
     recommendedRevealLevel: result.recommendedRevealLevel,
     personalizationApplied: result.userHistoryUsed,
+    diagnosis: result.diagnosis,
     metadata: {
       generationTimeMs: Date.now() - startTime,
       ragContextUsed: result.ragContextUsed,

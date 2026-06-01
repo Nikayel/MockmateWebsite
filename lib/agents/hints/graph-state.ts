@@ -1,5 +1,5 @@
 import { Annotation } from "@langchain/langgraph"
-import type { GeneratedHint, HintGenerationRequest, HintLevel } from "./types"
+import type { GeneratedHint, HintDiagnosis, HintGenerationRequest, HintLevel } from "./types"
 export const HintGraphState = Annotation.Root({
   request: Annotation<HintGenerationRequest>(),
 
@@ -10,6 +10,10 @@ export const HintGraphState = Annotation.Root({
 
   struggleLevel: Annotation<"none" | "mild" | "moderate" | "high">(),
   recommendedRevealLevel: Annotation<HintLevel>(),
+  diagnosis: Annotation<HintDiagnosis | undefined>({
+    reducer: (_current, update) => update,
+    default: () => undefined,
+  }),
   llmUsed: Annotation<boolean>({
     reducer: (_current, update) => update,
     default: () => false,

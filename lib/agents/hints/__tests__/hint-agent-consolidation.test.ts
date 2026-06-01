@@ -5,6 +5,10 @@ vi.mock("../llm-generator", () => ({
   generateLLMHint: vi.fn(),
 }))
 
+vi.mock("@/lib/ai-providers", () => ({
+  generateAIResponse: vi.fn(),
+}))
+
 vi.mock("@/lib/rag/context-builder", () => ({
   getContextBuilder: vi.fn(() => ({
     buildHintContext: vi.fn(() => Promise.resolve({ retrievedDocs: [] })),
@@ -40,7 +44,23 @@ const baseRequest = {
 describe("consolidated hint agent", () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    const { generateAIResponse } = await import("@/lib/ai-providers")
     const { generateLLMHint } = await import("../llm-generator")
+    vi.mocked(generateAIResponse).mockResolvedValue({
+      text: JSON.stringify({
+        primaryNeed: "approach",
+        confidence: 0.8,
+        reason: "User has code started and needs the next algorithmic direction.",
+        evidence: ["Current code returns an empty result"],
+        recommendedLevel: 1,
+        shouldUseRag: true,
+        shouldUseUserHistory: true,
+        shouldUsePatternKnowledge: true,
+        shouldUseTestFailures: false,
+      }),
+      provider: "gemini-lite",
+      latencyMs: 1,
+    })
     vi.mocked(generateLLMHint).mockResolvedValue(null)
   })
 
@@ -65,6 +85,12 @@ describe("consolidated hint agent", () => {
     expect(response.metadata.patternKnowledgeUsed).toBe(true)
     expect(response.metadata.ragContextUsed).toBe(false)
     expect(response.metadata.userHistoryUsed).toBe(false)
+    expect(response.diagnosis).toEqual(
+      expect.objectContaining({
+        primaryNeed: "approach",
+        shouldUsePatternKnowledge: true,
+      })
+    )
     expect(response.hints).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -78,8 +104,25 @@ describe("consolidated hint agent", () => {
   })
 
   it("generates progressive LLM hints up to the recommended reveal level", async () => {
+    const { generateAIResponse } = await import("@/lib/ai-providers")
     const { generateLLMHint } = await import("../llm-generator")
     const { generateHints } = await import("../index")
+
+    vi.mocked(generateAIResponse).mockResolvedValue({
+      text: JSON.stringify({
+        primaryNeed: "debugging",
+        confidence: 0.9,
+        reason: "The user has failing tests and needs to trace the bug.",
+        evidence: ["Tests failed", "High struggle metrics"],
+        recommendedLevel: 3,
+        shouldUseRag: false,
+        shouldUseUserHistory: true,
+        shouldUsePatternKnowledge: false,
+        shouldUseTestFailures: true,
+      }),
+      provider: "gemini-lite",
+      latencyMs: 1,
+    })
 
     vi.mocked(generateLLMHint).mockImplementation(async ({ level, category }) => {
       const hint: GeneratedHint = {
@@ -115,6 +158,51 @@ describe("consolidated hint agent", () => {
       expect.arrayContaining(["llm-1", "llm-2", "llm-3", "llm-4"])
     )
     expect(response.hints.find((hint) => hint.id === "llm-3")?.category).toBe("debugging")
+    expect(response.diagnosis?.primaryNeed).toBe("debugging")
+  })
+
+  it("lets the diagnosis steer non-debug hint categories", async () => {
+    const { generateAIResponse } = await import("@/lib/ai-providers")
+    const { generateLLMHint } = await import("../llm-generator")
+    const { generateHints } = await import("../index")
+
+    vi.mocked(generateAIResponse).mockResolvedValue({
+      text: JSON.stringify({
+        primaryNeed: "implementation",
+        confidence: 0.86,
+        reason: "The user has chosen an approach but needs help coding it correctly.",
+        evidence: ["Code has a loop", "No failing tests yet"],
+        recommendedLevel: 3,
+        shouldUseRag: false,
+        shouldUseUserHistory: false,
+        shouldUsePatternKnowledge: false,
+        shouldUseTestFailures: false,
+      }),
+      provider: "gemini-lite",
+      latencyMs: 1,
+    })
+
+    vi.mocked(generateLLMHint).mockImplementation(async ({ level, category }) => ({
+      id: `llm-${level}`,
+      level,
+      category,
+      title: `LLM Hint ${level}`,
+      content: `Content for level ${level}`,
+      isBlurred: true,
+      source: "ai",
+      relevanceScore: 0.9,
+    }))
+
+    const response = await generateHints({
+      ...baseRequest,
+      trigger: "code_change",
+    })
+
+    expect(response.diagnosis?.primaryNeed).toBe("implementation")
+    expect(generateLLMHint).toHaveBeenCalledTimes(4)
+    expect(response.hints.find((hint) => hint.id === "llm-3")?.category).toBe("implementation")
+    expect(response.metadata.patternKnowledgeUsed).toBe(false)
+    expect(response.metadata.ragContextUsed).toBe(false)
   })
 
   it("keeps the singleton compatibility API delegating to the consolidated generator", async () => {
