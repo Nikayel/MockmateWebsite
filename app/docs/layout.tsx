@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Documentation - Getting Started Guide",
@@ -31,5 +32,5 @@ export default function DocsLayout({
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return <LenisProvider>{children}</LenisProvider>
 }

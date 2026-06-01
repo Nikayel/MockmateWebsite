@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Careers - Join Our Team",
@@ -32,5 +33,5 @@ export default function CareersLayout({
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return <LenisProvider>{children}</LenisProvider>
 }

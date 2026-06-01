@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { BlogThemeProvider } from "@/components/blog/BlogThemeProvider"
+import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Blog - Coding Interview Tips & DSA Patterns",
@@ -30,5 +31,9 @@ export default function BlogLayout({
 }: {
   children: React.ReactNode
 }) {
-  return <BlogThemeProvider>{children}</BlogThemeProvider>
+  return (
+    <LenisProvider>
+      <BlogThemeProvider>{children}</BlogThemeProvider>
+    </LenisProvider>
+  )
 }

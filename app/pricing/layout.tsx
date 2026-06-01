@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Pricing - AI Mock Interview Plans",
@@ -31,5 +32,5 @@ export default function PricingLayout({
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return <LenisProvider>{children}</LenisProvider>
 }
