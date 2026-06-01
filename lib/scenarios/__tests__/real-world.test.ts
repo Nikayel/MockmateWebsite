@@ -7,19 +7,16 @@ import realWorldScenarios, {
   realWorldSystemDesignScenarios,
 } from "../../scenarios-realworld"
 import { scenarios } from "../../scenarios"
+import { validateWorkspaceScenario, isWorkspaceScenario } from "../../workspace-execution"
 
 describe("real-world scenario modules", () => {
   const publicBugfixIds = [
-    "bugfix-python-two-sum",
-    "bugfix-rate-limiter",
-    "bugfix-type-coercion",
-    "bugfix-off-by-one-array",
-    "bugfix-floating-point",
-    "bugfix-null-check",
-    "bugfix-infinite-loop",
-    "bugfix-closure-loop",
-    "bugfix-deepcopy",
-    "bugfix-feature-engineering-nan",
+    "bugfix-search-race",
+    "bugfix-billing-webhook-idempotency",
+    "bugfix-api-rate-limiter-workspace",
+    "bugfix-comment-thread-merge",
+    "bugfix-event-aggregation-retries",
+    "bugfix-feature-pipeline-nan-workspace",
   ]
 
   it("keeps the legacy export order and IDs", () => {
@@ -62,18 +59,19 @@ describe("real-world scenario modules", () => {
     }
   })
 
-  it("keeps bugfix mini-codebases small and executable through current scenario shape", () => {
+  it("publishes only sophisticated workspace bugfix scenarios", () => {
     for (const scenario of realWorldBugFixScenarios) {
       const languages = Object.keys(scenario.buggyCode)
-      const primaryLanguage = languages[0]
-      const codebaseFiles = scenario.codebaseFiles[primaryLanguage] || []
-      const totalFiles = 1 + codebaseFiles.length
 
       expect(languages).toHaveLength(1)
-      expect(scenario.buggyCode[primaryLanguage]).toBeTruthy()
-      expect(totalFiles).toBeGreaterThanOrEqual(3)
-      expect(totalFiles).toBeLessThanOrEqual(5)
-      expect(codebaseFiles.some((file) => file.fileName.toLowerCase().includes("test"))).toBe(true)
+      expect(isWorkspaceScenario(scenario)).toBe(true)
+      if (!isWorkspaceScenario(scenario)) continue
+
+      expect(validateWorkspaceScenario(scenario)).toEqual([])
+      expect(scenario.workspace.files.some((file) => file.role === "docs")).toBe(true)
+      expect(scenario.workspace.editableFilePaths.length).toBeGreaterThanOrEqual(1)
+      expect(scenario.workspace.visibleTestPaths.length).toBeGreaterThanOrEqual(1)
+      expect(scenario.workspace.hiddenTestPaths.length).toBeGreaterThanOrEqual(1)
 
       for (const testCase of scenario.testCases) {
         expect(testCase.input).toBeTruthy()
@@ -83,16 +81,6 @@ describe("real-world scenario modules", () => {
         expect(() => JSON.stringify(testCase.expected)).not.toThrow()
       }
     }
-
-    const easyScenario = realWorldBugFixScenarios.find(
-      (scenario) => scenario.id === "bugfix-python-two-sum"
-    )
-    const rateLimiterScenario = realWorldBugFixScenarios.find(
-      (scenario) => scenario.id === "bugfix-rate-limiter"
-    )
-
-    expect(easyScenario?.buggyCode.python).toContain("def two_sum")
-    expect(rateLimiterScenario?.buggyCode.javascript).toContain("class RateLimiter")
   })
 
   it("does not keep the deleted legacy System A bugfix bank in the repo", () => {
