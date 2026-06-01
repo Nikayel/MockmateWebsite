@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "How It Works - Science-Backed Interview Prep",
@@ -33,5 +34,5 @@ export default function WhySkilonLayout({
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return <LenisProvider>{children}</LenisProvider>
 }
