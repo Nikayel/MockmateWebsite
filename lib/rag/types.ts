@@ -13,6 +13,7 @@ export const VECTOR_CONTENT_TYPES = [
   "company-question",
   "system-design",
   "bugfix",
+  "add-functionality",
   "pattern-knowledge",
   "user-performance",
 ] as const

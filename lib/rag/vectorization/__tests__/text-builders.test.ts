@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import type { BugFixScenario, DSAScenario, SystemDesignScenario } from "@/lib/scenarios/types"
+import type {
+  AddFunctionalityScenario,
+  BugFixScenario,
+  DSAScenario,
+  SystemDesignScenario,
+} from "@/lib/scenarios/types"
+import { addFunctionalityToEmbeddingText } from "../text-builders/add-functionality-text"
 import { bugFixToEmbeddingText } from "../text-builders/bugfix-text"
 import {
   companyToEmbeddingText,
@@ -110,6 +116,47 @@ describe("vectorization text builders", () => {
     expect(text).toContain("Regression tests for rapid typing search behavior")
     expect(text).toContain("Older requests can overwrite newer results.")
     expect(text).toContain("[EDGE CASE]")
+  })
+
+  it("builds add-functionality text with requirements and workspace files", () => {
+    const scenario = {
+      id: "add-feature-search",
+      title: "Add Search",
+      difficulty: "medium",
+      companies: ["Slack"],
+      estimatedTime: 45,
+      tags: ["search"],
+      problemStatement: "Add search to support tickets.",
+      featureRequirements: ["Filter by query"],
+      acceptanceCriteria: ["Returns ranked matches"],
+      existingCode: { python: "def search(): pass" },
+      hints: ["Keep ranking deterministic."],
+      workspace: {
+        language: "python",
+        primaryFilePath: "src/search.py",
+        editableFilePaths: ["src/search.py"],
+        visibleTestPaths: ["tests/test_search.py"],
+        hiddenTestPaths: ["tests/test_search_hidden.py"],
+        testRunnerPath: "tests/run.py",
+        files: [
+          {
+            path: "src/search.py",
+            role: "editable",
+            language: "python",
+            content: "def search(): pass",
+            description: "Search service",
+          },
+        ],
+      },
+    } as unknown as AddFunctionalityScenario
+
+    const text = addFunctionalityToEmbeddingText(scenario)
+
+    expect(text).toContain("# Add Search")
+    expect(text).toContain("## Feature Requirements")
+    expect(text).toContain("Role: editable")
+    expect(text).toContain("tests/test_search.py")
+    expect(text).toContain("tests/test_search_hidden.py")
   })
 
   it("builds company and must-know question text", () => {

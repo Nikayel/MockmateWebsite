@@ -27,6 +27,16 @@ const REMOVED_LEGACY_BUGFIX_SCENARIO_IDS = [
   "bugfix-ml-prediction-pipeline",
   "bugfix-data-preprocessing-race",
   "bugfix-race-condition",
+  "bugfix-python-two-sum",
+  "bugfix-rate-limiter",
+  "bugfix-type-coercion",
+  "bugfix-off-by-one-array",
+  "bugfix-floating-point",
+  "bugfix-null-check",
+  "bugfix-infinite-loop",
+  "bugfix-closure-loop",
+  "bugfix-deepcopy",
+  "bugfix-feature-engineering-nan",
 ]
 
 export async function vectorizeBugFixScenarios(

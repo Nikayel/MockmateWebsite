@@ -8,11 +8,13 @@ export interface VectorizationResult {
   totalPatternKnowledge: number
   totalSystemDesign: number
   totalBugFix: number
+  totalAddFunctionality: number
   vectorizedProblems: number
   vectorizedCompanies: number
   vectorizedPatternKnowledge: number
   vectorizedSystemDesign: number
   vectorizedBugFix: number
+  vectorizedAddFunctionality: number
   errors: string[]
   durationMs: number
 }

@@ -7,11 +7,13 @@ export interface VectorizationStatus {
   hasPatternKnowledge: boolean
   hasSystemDesign: boolean
   hasBugFix: boolean
+  hasAddFunctionality: boolean
   problemCount: number
   companyCount: number
   patternCount: number
   systemDesignCount: number
   bugFixCount: number
+  addFunctionalityCount: number
 }
 
 const EMPTY_STATUS: VectorizationStatus = {
@@ -20,11 +22,13 @@ const EMPTY_STATUS: VectorizationStatus = {
   hasPatternKnowledge: false,
   hasSystemDesign: false,
   hasBugFix: false,
+  hasAddFunctionality: false,
   problemCount: 0,
   companyCount: 0,
   patternCount: 0,
   systemDesignCount: 0,
   bugFixCount: 0,
+  addFunctionalityCount: 0,
 }
 
 export async function getVectorizationStatus(): Promise<VectorizationStatus> {
@@ -39,6 +43,7 @@ export async function getVectorizationStatus(): Promise<VectorizationStatus> {
       const patternCount = namespaces["mockmate_pattern-knowledge"] || 0
       const systemDesignCount = namespaces["mockmate_system-design"] || 0
       const bugFixCount = namespaces["mockmate_bugfix"] || 0
+      const addFunctionalityCount = namespaces["mockmate_add-functionality"] || 0
 
       return {
         hasProblems: problemCount > 0,
@@ -46,11 +51,13 @@ export async function getVectorizationStatus(): Promise<VectorizationStatus> {
         hasPatternKnowledge: patternCount > 0,
         hasSystemDesign: systemDesignCount > 0,
         hasBugFix: bugFixCount > 0,
+        hasAddFunctionality: addFunctionalityCount > 0,
         problemCount,
         companyCount,
         patternCount,
         systemDesignCount,
         bugFixCount,
+        addFunctionalityCount,
       }
     }
 
@@ -71,6 +78,9 @@ export async function getVectorizationStatus(): Promise<VectorizationStatus> {
     const patternCount = results.filter((r) => r.metadata?.type === "pattern-knowledge").length
     const systemDesignCount = results.filter((r) => r.metadata?.type === "system-design").length
     const bugFixCount = results.filter((r) => r.metadata?.type === "bugfix").length
+    const addFunctionalityCount = results.filter(
+      (r) => r.metadata?.type === "add-functionality"
+    ).length
 
     return {
       hasProblems: problemCount > 0,
@@ -78,11 +88,13 @@ export async function getVectorizationStatus(): Promise<VectorizationStatus> {
       hasPatternKnowledge: patternCount > 0,
       hasSystemDesign: systemDesignCount > 0,
       hasBugFix: bugFixCount > 0,
+      hasAddFunctionality: addFunctionalityCount > 0,
       problemCount,
       companyCount,
       patternCount,
       systemDesignCount,
       bugFixCount,
+      addFunctionalityCount,
     }
   } catch {
     return EMPTY_STATUS

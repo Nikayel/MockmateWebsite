@@ -9,6 +9,7 @@ export type {
 export { scenarioToEmbeddingText } from "./text-builders/dsa-text"
 export { systemDesignToEmbeddingText } from "./text-builders/system-design-text"
 export { bugFixToEmbeddingText } from "./text-builders/bugfix-text"
+export { addFunctionalityToEmbeddingText } from "./text-builders/add-functionality-text"
 export {
   companyToEmbeddingText,
   mustKnowQuestionToEmbeddingText,

@@ -8,6 +8,7 @@ export function bugFixToEmbeddingText(scenario: BugFixScenario): string {
   const primaryLang = languages.includes("python") ? "python" : languages[0]
   const buggyCodeSnippet = scenario.buggyCode[primaryLang] || ""
   const codebaseFiles = scenario.codebaseFiles?.[primaryLang] || []
+  const workspaceFiles = scenario.workspace?.files.filter((file) => !file.hidden) || []
 
   const testCaseLines = scenario.testCases.map((tc, i) => {
     const isEdgeCase = tc.description?.toLowerCase().includes("edge")
@@ -40,15 +41,34 @@ export function bugFixToEmbeddingText(scenario: BugFixScenario): string {
     "```",
     ``,
     `## Codebase Files`,
-    ...(codebaseFiles.length > 0
-      ? codebaseFiles.flatMap((file) => [
-          `### ${file.fileName}`,
-          file.description,
-          "```" + primaryLang,
-          file.content.substring(0, 500),
+    ...(workspaceFiles.length > 0
+      ? workspaceFiles.flatMap((file) => [
+          `### ${file.path}`,
+          `Role: ${file.role}`,
+          file.description ?? "",
+          "```" + file.language,
+          file.content.substring(0, 900),
           "```",
         ])
-      : ["No supporting codebase files provided."]),
+      : codebaseFiles.length > 0
+        ? codebaseFiles.flatMap((file) => [
+            `### ${file.fileName}`,
+            file.description,
+            "```" + primaryLang,
+            file.content.substring(0, 500),
+            "```",
+          ])
+        : ["No supporting codebase files provided."]),
+    ``,
+    `## Workspace Test Focus`,
+    ...(scenario.workspace
+      ? [
+          `Primary file: ${scenario.workspace.primaryFilePath}`,
+          `Editable files: ${scenario.workspace.editableFilePaths.join(", ")}`,
+          `Visible tests: ${scenario.workspace.visibleTestPaths.join(", ")}`,
+          `Hidden tests: ${scenario.workspace.hiddenTestPaths.join(", ")}`,
+        ]
+      : ["Single-file execution scenario."]),
     ``,
     `## Debugging Hints`,
     ...scenario.hints.map((hint) => `- ${hint}`),
