@@ -7,6 +7,7 @@ import { ComparisonSection } from "@/components/comparison-section"
 import { MetricsMarketingSection } from "@/components/metrics-marketing-section"
 import { Footer } from "@/components/footer"
 import { HomePageClient } from "@/components/home/HomePageClient"
+import { LenisProvider } from "@/components/providers/LenisProvider"
 import { HomepagePositioningFAQJsonLd } from "@/components/seo/JsonLd"
 
 /**
@@ -28,16 +29,18 @@ export default function HomePage() {
 
   // Marketing content - this is SSR'd and visible to crawlers
   const marketingContent = (
-    <main className="bg-background min-h-screen">
-      <Header />
-      <HeroSection />
-      <ProblemTeaser />
-      <AIAssistedSection />
-      <ComparisonSection />
-      <FeaturesSection />
-      <MetricsMarketingSection />
-      <Footer />
-    </main>
+    <LenisProvider>
+      <main className="bg-background min-h-screen">
+        <Header />
+        <HeroSection />
+        <ProblemTeaser />
+        <AIAssistedSection />
+        <ComparisonSection />
+        <FeaturesSection />
+        <MetricsMarketingSection />
+        <Footer />
+      </main>
+    </LenisProvider>
   )
 
   return (
