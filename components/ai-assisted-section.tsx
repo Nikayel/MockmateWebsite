@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import { ScrollReveal } from "@/lib/motion"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { ArrowRight, Zap } from "lucide-react"
+import { ArrowRight, Brain, Code2, MessageSquareText, Route, Zap } from "lucide-react"
 import Link from "next/link"
 
 /**
@@ -14,13 +14,47 @@ import Link from "next/link"
  */
 
 const criteria = [
-  { id: 'code-quality', label: 'Code Quality', percent: 30, color: '#00d9ff', hint: 'Tests pass, efficient, readable' },
-  { id: 'problem-solving', label: 'Problem-Solving', percent: 25, color: '#00ff88', hint: 'Approach, debugging, optimization' },
-  { id: 'understanding', label: 'Understanding', percent: 25, color: '#a78bfa', hint: 'Explain your code & complexity' },
-  { id: 'communication', label: 'Communication', percent: 20, color: '#fbbf24', hint: 'Share your thought process' },
-];
-
-const companies = ['Meta', 'Google', 'Amazon', 'Microsoft'];
+  {
+    id: "understanding",
+    label: "Understanding",
+    percent: 25,
+    color: "#a78bfa",
+    icon: Brain,
+    summary: "Show you know the problem before coding.",
+    instruction:
+      "Clarify requirements, name edge cases, explain your approach, and give time/space complexity in your own words.",
+  },
+  {
+    id: "problem-solving",
+    label: "Problem-Solving",
+    percent: 25,
+    color: "#00ff88",
+    icon: Route,
+    summary: "Work through the problem systematically.",
+    instruction:
+      "Break the task down, compare approaches, debug with evidence, and improve from brute force toward an efficient solution.",
+  },
+  {
+    id: "code-quality",
+    label: "Code Quality",
+    percent: 20,
+    color: "#00d9ff",
+    icon: Code2,
+    summary: "Write code that is correct and maintainable.",
+    instruction:
+      "Pass the tests, keep the algorithm efficient, use readable names, and structure the solution so another engineer can review it.",
+  },
+  {
+    id: "communication",
+    label: "Communication",
+    percent: 30,
+    color: "#fbbf24",
+    icon: MessageSquareText,
+    summary: "Make your thinking visible to the interviewer.",
+    instruction:
+      "Think out loud, answer follow-up questions directly, narrate tradeoffs, and explain fixes as you make them.",
+  },
+]
 
 export function AIAssistedSection() {
   return (
@@ -57,46 +91,51 @@ export function AIAssistedSection() {
               What you&apos;re evaluated on
             </p>
 
-            {/* Horizontal stacked bar */}
-            <div className="relative">
-              {/* The bar */}
-              <div className="flex h-3 rounded-full overflow-hidden bg-gray-900">
-                {criteria.map((item, idx) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {criteria.map((item, index) => {
+                const Icon = item.icon
+
+                return (
                   <motion.div
                     key={item.id}
-                    initial={{ width: 0 }}
-                    whileInView={{ width: `${item.percent}%` }}
+                    initial={{ opacity: 0, y: 16 }}
+                    whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: idx * 0.1, ease: "easeOut" }}
-                    className="relative group cursor-pointer"
-                    style={{ backgroundColor: item.color }}
+                    transition={{ duration: 0.45, delay: index * 0.08 }}
+                    tabIndex={0}
+                    className="group relative min-h-[230px] rounded-2xl border border-white/10 bg-white/[0.04] p-5 outline-none transition-all hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.07] focus-visible:-translate-y-1 focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/20"
                   >
-                    {/* Hover tooltip */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 whitespace-nowrap text-center">
-                        <div className="text-xs font-medium" style={{ color: item.color }}>
-                          {item.label}
-                        </div>
-                        <div className="text-[10px] text-gray-500">{item.hint}</div>
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <div
+                        className="flex h-11 w-11 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: `${item.color}1f` }}
+                      >
+                        <Icon className="h-5 w-5" style={{ color: item.color }} />
+                      </div>
+                      <div
+                        className="rounded-full border px-2.5 py-1 text-xs font-semibold"
+                        style={{ borderColor: `${item.color}66`, color: item.color }}
+                      >
+                        {item.percent}%
                       </div>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
 
-              {/* Labels below */}
-              <div className="flex mt-4">
-                {criteria.map((item) => (
-                  <div
-                    key={item.id}
-                    className="text-center"
-                    style={{ width: `${item.percent}%` }}
-                  >
-                    <div className="text-xs font-medium text-gray-400">{item.label}</div>
-                    <div className="text-[10px] text-gray-600">{item.percent}%</div>
-                  </div>
-                ))}
-              </div>
+                    <h3 className="text-lg font-semibold text-white">{item.label}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                      {item.summary}
+                    </p>
+
+                    <div className="absolute inset-x-4 bottom-4 translate-y-2 rounded-xl border border-white/10 bg-gray-950/95 p-4 opacity-0 shadow-2xl shadow-black/40 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                        How to score well
+                      </p>
+                      <p className="mt-2 text-sm leading-relaxed text-gray-200">
+                        {item.instruction}
+                      </p>
+                    </div>
+                  </motion.div>
+                )
+              })}
             </div>
           </motion.div>
         </ScrollReveal>
