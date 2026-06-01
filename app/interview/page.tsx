@@ -75,6 +75,7 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
+import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { isExecutionServiceError } from "@/lib/piston"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
@@ -178,7 +179,14 @@ const EDITOR_LANGUAGES = [...SUPPORTED_LANGUAGES, "java", "cpp", "csharp", "go",
 
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 type EditorLanguage = (typeof EDITOR_LANGUAGES)[number]
-type WorkspaceContextFile = { path: string; content: string; description?: string }
+type WorkspaceContextFile = {
+  path: string
+  content: string
+  description?: string
+  role?: WorkspaceScenarioFile["role"]
+  language?: WorkspaceScenarioFile["language"]
+  hidden?: boolean
+}
 
 const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
   return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
@@ -213,17 +221,39 @@ const toWorkspaceContextFiles = (
     path: file.fileName,
     content: file.content,
     description: file.description,
+    role: getWorkspaceFileRole(file.fileName),
   }))
 
-const getWorkspaceFileRole = (path: string) => {
+const isWorkspaceScenario = (
+  scenario: Scenario | null | undefined
+): scenario is Scenario & { workspace: NonNullable<Scenario["workspace"]> } => {
+  return scenario?.executionMode === "workspace" && Boolean(scenario.workspace)
+}
+
+const toWorkspaceScenarioFiles = (scenario: Scenario): WorkspaceContextFile[] => {
+  if (!isWorkspaceScenario(scenario)) return []
+
+  return scenario.workspace.files
+    .filter((file) => !file.hidden)
+    .map((file) => ({
+      path: file.path,
+      content: file.content,
+      description: file.description,
+      role: file.role,
+      language: file.language,
+      hidden: file.hidden,
+    }))
+}
+
+const getWorkspaceFileRole = (path: string): WorkspaceScenarioFile["role"] => {
   const normalizedPath = path.toLowerCase()
   if (normalizedPath.includes("test") || normalizedPath.includes("spec")) {
     return "test"
   }
   if (normalizedPath.endsWith(".md") || normalizedPath.includes("readme")) {
-    return "context"
+    return "docs"
   }
-  return "support"
+  return "readonly"
 }
 
 /**
@@ -462,6 +492,15 @@ function InterviewPageContent() {
 
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContextFile[]>([])
+  const [activeWorkspacePath, setActiveWorkspacePath] = useState<string | null>(null)
+  const activeWorkspaceFile =
+    activeWorkspacePath && isWorkspaceScenario(selectedScenario)
+      ? workspaceContext.find((file) => file.path === activeWorkspacePath) || null
+      : null
+  const isActiveWorkspaceFileEditable = activeWorkspaceFile?.role === "editable"
+  const editorLanguage = isWorkspaceScenario(selectedScenario)
+    ? activeWorkspaceFile?.language || selectedScenario.workspace.language
+    : selectedLanguage
   const lastCodeHashRef = useRef<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{
@@ -1175,7 +1214,18 @@ Let's continue!`
   useEffect(() => {
     if (selectedScenario && !isInterviewStarted && !code) {
       let initialCode: string
-      if (selectedScenario.type === "bugfix") {
+      if (isWorkspaceScenario(selectedScenario)) {
+        const contextFiles = toWorkspaceScenarioFiles(selectedScenario)
+        const primaryFile = contextFiles.find(
+          (file) => file.path === selectedScenario.workspace.primaryFilePath
+        )
+        if (selectedScenario.workspace.language !== selectedLanguage) {
+          setSelectedLanguage(selectedScenario.workspace.language)
+        }
+        setWorkspaceContext(contextFiles)
+        setActiveWorkspacePath(primaryFile?.path || selectedScenario.workspace.primaryFilePath)
+        initialCode = primaryFile?.content || ""
+      } else if (selectedScenario.type === "bugfix") {
         const scenarioLanguage = getBugfixScenarioLanguage(selectedScenario, selectedLanguage)
         if (scenarioLanguage !== selectedLanguage) {
           setSelectedLanguage(scenarioLanguage)
@@ -1203,6 +1253,14 @@ Let's continue!`
     if (isInterviewStarted && selectedScenario && !showFeedback) {
       let newCode: string
       let codebaseFiles: any[] = []
+
+      if (isWorkspaceScenario(selectedScenario)) {
+        if (selectedLanguage !== selectedScenario.workspace.language) {
+          setSelectedLanguage(selectedScenario.workspace.language)
+          toast.info(`Workspace scenarios run in ${selectedScenario.workspace.language}`)
+        }
+        return
+      }
 
       // For bug fix scenarios, use buggyCode
       if (selectedScenario.type === "bugfix") {
@@ -1243,6 +1301,7 @@ Let's continue!`
       ) {
         // Clear workspace context if no codebase files for this language
         setWorkspaceContext([])
+        setActiveWorkspacePath(null)
         toast.warning(
           `No codebase files available for ${selectedLanguage}. Consider using JavaScript or Python.`
         )
@@ -1750,6 +1809,15 @@ Let's continue!`
           setSelectedLanguage(localData.selectedLanguage || "javascript")
           setTestResults(localData.testResults || [])
           setWorkspaceContext(localData.workspaceContext || [])
+          if (localData.workspaceContext?.length) {
+            const restoredPrimary =
+              isWorkspaceScenario(selectedScenario) &&
+              localData.workspaceContext.find(
+                (file: WorkspaceContextFile) =>
+                  file.path === selectedScenario.workspace.primaryFilePath
+              )
+            setActiveWorkspacePath(restoredPrimary?.path || localData.workspaceContext[0].path)
+          }
           if (localData.elapsedTime) {
             setElapsedTime(localData.elapsedTime)
           }
@@ -2604,6 +2672,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setRevealedAIHintIndices(new Set())
     setHintFeedback(new Map())
     setWorkspaceContext([])
+    setActiveWorkspacePath(null)
     setComprehensiveFeedback("")
     setPerformanceScore(null)
     setTechnicalScore(null)
@@ -2612,7 +2681,20 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     // Initialize code based on scenario type
     let initialCode: string
     let activeLanguage = selectedLanguage
-    if (scenario.type === "bugfix") {
+    if (isWorkspaceScenario(scenario)) {
+      activeLanguage = scenario.workspace.language
+      if (activeLanguage !== selectedLanguage) {
+        setSelectedLanguage(activeLanguage)
+      }
+      const contextFiles = toWorkspaceScenarioFiles(scenario)
+      const primaryFile = contextFiles.find(
+        (file) => file.path === scenario.workspace.primaryFilePath
+      )
+      initialCode = primaryFile?.content || ""
+      setWorkspaceContext(contextFiles)
+      setActiveWorkspacePath(primaryFile?.path || scenario.workspace.primaryFilePath)
+      toast.success(`Loaded ${contextFiles.length} codebase file(s) for review`)
+    } else if (scenario.type === "bugfix") {
       activeLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
       if (activeLanguage !== selectedLanguage) {
         setSelectedLanguage(activeLanguage)
@@ -2900,6 +2982,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setRevealedAIHintIndices(new Set())
     setHintFeedback(new Map())
     setWorkspaceContext([])
+    setActiveWorkspacePath(null)
     setEfficiencyMetrics(null)
     setProtectedElements(null)
     setStarterCode("")
@@ -4127,7 +4210,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         body: JSON.stringify({
           code,
           scenarioId: selectedScenario.id,
-          language: selectedLanguage,
+          language: isWorkspaceScenario(selectedScenario)
+            ? selectedScenario.workspace.language
+            : selectedLanguage,
+          workspaceFiles: isWorkspaceScenario(selectedScenario)
+            ? workspaceContext
+                .filter((file) => file.role === "editable")
+                .map((file) => ({ path: file.path, content: file.content }))
+            : undefined,
         }),
       })
 
@@ -4294,7 +4384,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         body: JSON.stringify({
           code,
           scenarioId: selectedScenario.id,
-          language: selectedLanguage,
+          language: isWorkspaceScenario(selectedScenario)
+            ? selectedScenario.workspace.language
+            : selectedLanguage,
+          workspaceFiles: isWorkspaceScenario(selectedScenario)
+            ? workspaceContext
+                .filter((file) => file.role === "editable")
+                .map((file) => ({ path: file.path, content: file.content }))
+            : undefined,
         }),
       })
 
@@ -4589,6 +4686,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   <select
                     value={selectedLanguage}
                     onChange={(e) => {
+                      if (isWorkspaceScenario(selectedScenario)) {
+                        toast.info(
+                          `Workspace scenarios run in ${selectedScenario.workspace.language}`
+                        )
+                        return
+                      }
                       const newLang = e.target.value as typeof selectedLanguage
                       setSelectedLanguage(newLang)
                       // Persist language preference to localStorage
@@ -4601,6 +4704,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                         })
                       }
                     }}
+                    disabled={isWorkspaceScenario(selectedScenario)}
+                    title={
+                      isWorkspaceScenario(selectedScenario)
+                        ? `Workspace scenario language: ${selectedScenario.workspace.language}`
+                        : "Choose editor language"
+                    }
                     className="hidden rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-[#00d9ff] focus:outline-none sm:block"
                   >
                     <option value="javascript">JavaScript</option>
@@ -5253,9 +5362,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                             workspaceContext.length === 0 && (
                               <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
                                 <p className="text-xs text-yellow-300">
-                                  This scenario is optimized for{" "}
-                                  <strong>JavaScript/TypeScript</strong>. Switch language for
-                                  codebase files.
+                                  This scenario uses a prepared codebase workspace. Reload the
+                                  scenario if the files do not appear.
                                 </p>
                               </div>
                             )}
@@ -5269,14 +5377,23 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                 before editing the primary file.
                               </p>
                               <div className="max-h-48 space-y-1.5 overflow-y-auto">
-                                {workspaceContext.map((file, idx) => (
+                                {workspaceContext.map((file) => (
                                   <button
-                                    key={idx}
+                                    key={file.path}
                                     onClick={() => {
-                                      setSelectedFile(file)
-                                      setIsCodeViewerOpen(true)
+                                      if (isWorkspaceScenario(selectedScenario)) {
+                                        setActiveWorkspacePath(file.path)
+                                        setCode(file.content)
+                                      } else {
+                                        setSelectedFile(file)
+                                        setIsCodeViewerOpen(true)
+                                      }
                                     }}
-                                    className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2.5 py-2 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
+                                    className={`w-full cursor-pointer rounded border px-2.5 py-2 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50 ${
+                                      activeWorkspacePath === file.path
+                                        ? "border-blue-500 bg-blue-500/10"
+                                        : "border-gray-700 bg-gray-800/50"
+                                    }`}
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="min-w-0">
@@ -5291,7 +5408,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                         )}
                                       </div>
                                       <span className="rounded border border-gray-600 bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-400">
-                                        {getWorkspaceFileRole(file.path)}
+                                        {file.role || getWorkspaceFileRole(file.path)}
                                       </span>
                                     </div>
                                   </button>
@@ -5318,9 +5435,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                               </Button>
                               {workspaceContext.length > 0 && (
                                 <div className="mt-2 space-y-1">
-                                  {workspaceContext.map((file, idx) => (
+                                  {workspaceContext.map((file) => (
                                     <button
-                                      key={idx}
+                                      key={file.path}
                                       onClick={() => {
                                         setSelectedFile(file)
                                         setIsCodeViewerOpen(true)
@@ -5357,6 +5474,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                           <Code className="text-accent h-3 w-3" />
                           {selectedScenario?.type === "system-design" ? (
                             <span>Design Notes</span>
+                          ) : activeWorkspaceFile ? (
+                            <span className="truncate">{activeWorkspaceFile.path}</span>
                           ) : (
                             <span>
                               {selectedScenario?.title
@@ -5393,7 +5512,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                         <ErrorBoundary>
                           <CodeEditor
                             height="100%"
-                            language={selectedLanguage}
+                            language={editorLanguage}
                             value={code}
                             onChange={(newCode) => {
                               // Enforce code protection if enabled
@@ -5416,8 +5535,22 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                 }
                               }
                               setCode(newCode)
+                              if (activeWorkspacePath && isWorkspaceScenario(selectedScenario)) {
+                                setWorkspaceContext((files) =>
+                                  files.map((file) =>
+                                    file.path === activeWorkspacePath
+                                      ? { ...file, content: newCode }
+                                      : file
+                                  )
+                                )
+                              }
                             }}
-                            readOnly={!isInterviewStarted || showFeedback}
+                            readOnly={
+                              !isInterviewStarted ||
+                              showFeedback ||
+                              (isWorkspaceScenario(selectedScenario) &&
+                                !isActiveWorkspaceFileEditable)
+                            }
                           />
                         </ErrorBoundary>
                         {/* Start Interview Overlay - shown when scenario selected but not started */}
