@@ -1,56 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import nextDynamic from "next/dynamic"
+import { useShallow } from "zustand/react/shallow"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { useVoiceInput } from "@/lib/voice"
 import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, getDocs, query, where } from "firebase/firestore"
-import {
-  Code,
-  MessageSquare,
-  CheckCircle,
-  Clock,
-  User,
-  Bot,
-  Brain,
-  Sparkles,
-  Lightbulb,
-  Target,
-  Send,
-  PlayCircle,
-  ArrowRight,
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp,
-  HelpCircle,
-  Maximize2,
-  Minimize2,
-  Eye,
-  EyeOff,
-  Leaf,
-  ThumbsUp,
-  ThumbsDown,
-  HardDrive,
-} from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import {
@@ -75,7 +36,6 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
-import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { isExecutionServiceError } from "@/lib/piston"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
@@ -86,21 +46,33 @@ import {
   type ConversationTracker,
   createEmptyTracker,
   updateTrackerFromMessage,
-  detectInterviewPhase,
 } from "@/lib/interview/interview-phases"
 // Extracted utilities
 import {
   extractTopicsFromMessage,
-  extractUserAnsweredTopics,
   analyzeCodeEfficiency,
   analyzeComplexityWithLLM,
   type LLMComplexityResult,
 } from "@/lib/interview"
 // Local page components
 import { PostInterviewView, FeedbackLoadingState } from "./_components"
+import { InterviewDialogs } from "./_components/InterviewDialogs"
+import { ChatColumn } from "./_components/ChatColumn"
+import { EditorColumn } from "./_components/EditorColumn"
+import { ProblemColumn } from "./_components/ProblemColumn"
+import { FocusProblemPeek } from "./_components/FocusProblemPeek"
+import { InterviewTopBar } from "./_components/InterviewTopBar"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
+import { getInitialInterviewerMessage } from "./_utils/interview-copy"
+import { EDITOR_LANGUAGES, getBugfixScenarioLanguage, type EditorLanguage } from "./_utils/language"
+import {
+  isWorkspaceScenario,
+  toWorkspaceContextFiles,
+  toWorkspaceScenarioFiles,
+} from "./_utils/workspace"
+import type { WorkspaceContextFile } from "./_types"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -115,54 +87,6 @@ const ScenarioBrowser = nextDynamic(
   }
 )
 
-const VoiceModeToggle = nextDynamic(
-  () => import("@/components/interview").then((mod) => ({ default: mod.VoiceModeToggle })),
-  { ssr: false }
-)
-
-const CodeViewerSidePanel = nextDynamic(
-  () =>
-    import("@/components/CodeViewerSidePanel").then((mod) => ({
-      default: mod.CodeViewerSidePanel,
-    })),
-  { ssr: false }
-)
-
-const GradingCriteriaTooltip = nextDynamic(
-  () =>
-    import("@/components/GradingCriteria").then((mod) => ({ default: mod.GradingCriteriaTooltip })),
-  { ssr: false }
-)
-
-const CodeConsole = nextDynamic(
-  () => import("@/components/interview/CodeConsole").then((mod) => ({ default: mod.CodeConsole })),
-  { ssr: false }
-)
-
-const CompanyPicker = nextDynamic(
-  () => import("@/components/interview").then((mod) => ({ default: mod.CompanyPicker })),
-  { ssr: false }
-)
-
-const InterviewTimer = nextDynamic(
-  () => import("@/components/interview").then((mod) => ({ default: mod.InterviewTimer })),
-  { ssr: false }
-)
-
-// Dynamically import heavy components to reduce initial bundle size
-// CodeMirror 6 is used instead of Monaco for ~95% smaller bundle
-const CodeEditor = nextDynamic(
-  () => import("@/components/editor").then((mod) => mod.CodeMirrorEditor),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
-        <div className="text-sm text-gray-400">Loading editor...</div>
-      </div>
-    ),
-  }
-)
-
 const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback"), {
   ssr: false,
   loading: () => (
@@ -171,99 +95,6 @@ const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback
     </div>
   ),
 })
-
-// Supported languages for code execution
-// JavaScript and Python are fully supported; others are coming soon
-const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
-const EDITOR_LANGUAGES = [...SUPPORTED_LANGUAGES, "java", "cpp", "csharp", "go", "rust"] as const
-
-type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
-type EditorLanguage = (typeof EDITOR_LANGUAGES)[number]
-type WorkspaceContextFile = {
-  path: string
-  content: string
-  description?: string
-  role?: WorkspaceScenarioFile["role"]
-  language?: WorkspaceScenarioFile["language"]
-  hidden?: boolean
-}
-
-const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
-  return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
-}
-
-const getBugfixScenarioLanguage = (
-  scenario: Scenario,
-  preferredLanguage: EditorLanguage
-): EditorLanguage => {
-  if (scenario.type !== "bugfix") {
-    return preferredLanguage
-  }
-
-  const buggyCode = (scenario as { buggyCode?: Partial<Record<SupportedLanguage, string>> })
-    .buggyCode
-
-  if (!buggyCode) {
-    return preferredLanguage
-  }
-
-  if (isLanguageSupported(preferredLanguage) && buggyCode[preferredLanguage]) {
-    return preferredLanguage
-  }
-
-  return SUPPORTED_LANGUAGES.find((language) => Boolean(buggyCode[language])) ?? preferredLanguage
-}
-
-const toWorkspaceContextFiles = (
-  codebaseFiles: Array<{ fileName: string; content: string; description?: string }>
-): WorkspaceContextFile[] =>
-  codebaseFiles.map((file) => ({
-    path: file.fileName,
-    content: file.content,
-    description: file.description,
-    role: getWorkspaceFileRole(file.fileName),
-  }))
-
-const isWorkspaceScenario = (
-  scenario: Scenario | null | undefined
-): scenario is Scenario & { workspace: NonNullable<Scenario["workspace"]> } => {
-  return scenario?.executionMode === "workspace" && Boolean(scenario.workspace)
-}
-
-const toWorkspaceScenarioFiles = (scenario: Scenario): WorkspaceContextFile[] => {
-  if (!isWorkspaceScenario(scenario)) return []
-
-  return scenario.workspace.files
-    .filter((file) => !file.hidden)
-    .map((file) => ({
-      path: file.path,
-      content: file.content,
-      description: file.description,
-      role: file.role,
-      language: file.language,
-      hidden: file.hidden,
-    }))
-}
-
-const getWorkspaceFileRole = (path: string): WorkspaceScenarioFile["role"] => {
-  const normalizedPath = path.toLowerCase()
-  if (normalizedPath.includes("test") || normalizedPath.includes("spec")) {
-    return "test"
-  }
-  if (normalizedPath.endsWith(".md") || normalizedPath.includes("readme")) {
-    return "docs"
-  }
-  return "readonly"
-}
-
-/**
- * Generate the initial interviewer greeting message
- * Gives user space to read the problem and ask clarifying questions
- */
-const getInitialInterviewerMessage = (title: string, difficulty: string, problemType: string) =>
-  `Hey, I'm Sable, your interviewer for this session. Today we're working on **${title}**, a ${difficulty} ${problemType} problem.
-
-Take a moment to read through the problem on the left. Let me know if you have any questions about the requirements before we dive in.`
 
 interface ChatMessage {
   type: "user" | "ai"
@@ -303,7 +134,20 @@ function InterviewPageContent() {
     setShowCompanyPicker,
     realInterviewMode,
     strictTimeLimit,
-  } = useInterviewStore()
+  } = useInterviewStore(
+    useShallow((state) => ({
+      isLoadingChat: state.isLoadingChat,
+      isLoadingInterviewer: state.isLoadingInterviewer,
+      setIsLoadingChat: state.setIsLoadingChat,
+      setIsLoadingInterviewer: state.setIsLoadingInterviewer,
+      targetCompany: state.targetCompany,
+      setTargetCompany: state.setTargetCompany,
+      showCompanyPicker: state.showCompanyPicker,
+      setShowCompanyPicker: state.setShowCompanyPicker,
+      realInterviewMode: state.realInterviewMode,
+      strictTimeLimit: state.strictTimeLimit,
+    }))
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
@@ -4586,11 +4430,51 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+  const editorConsoleOutputs = useMemo(
+    () =>
+      consoleLogs.map((log) => ({
+        type: log.type as "log" | "error" | "warn" | "info",
+        message: log.message,
+        timestamp: log.timestamp,
+      })),
+    [consoleLogs]
+  )
+
+  const handleClearConsole = useCallback(() => {
+    setConsoleLogs([])
+    setTestResults([])
+    setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
+  }, [])
+
+  const handleEditorChange = useCallback(
+    (newCode: string) => {
+      // Enforce code protection if enabled
+      if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+        const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+        if (!validation.valid) {
+          toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+          return
+        }
+      }
+      setCode(newCode)
+      if (activeWorkspacePath && isWorkspaceScenario(selectedScenario)) {
+        setWorkspaceContext((files) =>
+          files.map((file) =>
+            file.path === activeWorkspacePath ? { ...file, content: newCode } : file
+          )
+        )
+      }
+    },
+    [
+      activeWorkspacePath,
+      isInterviewStarted,
+      protectedElements,
+      selectedLanguage,
+      selectedScenario,
+      showFeedback,
+      starterCode,
+    ]
+  )
 
   if (isLoading) {
     return (
@@ -4661,198 +4545,23 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             <div
               className={`mx-auto flex w-full flex-1 flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
             >
-              {/* Compact Top Bar - Cognitive Load Optimized
-                  Focus mode: fades to 30% opacity, reveals on hover */}
-              <div
-                className={`focus-header flex flex-shrink-0 items-center justify-between gap-2 pt-2 transition-all duration-300`}
-              >
-                {/* Left: Problem info */}
-                <div className="flex min-w-0 flex-1 items-center space-x-2">
-                  <h2 className="max-w-[200px] truncate text-sm font-semibold text-white sm:max-w-md">
-                    {selectedScenario?.title}
-                  </h2>
-                  <Badge
-                    className={`${
-                      selectedScenario?.difficulty === "easy"
-                        ? "bg-green-600/20 text-green-400"
-                        : selectedScenario?.difficulty === "medium"
-                          ? "bg-yellow-600/20 text-yellow-400"
-                          : "bg-red-600/20 text-red-400"
-                    } shrink-0 text-xs`}
-                  >
-                    {selectedScenario?.difficulty?.toUpperCase()}
-                  </Badge>
-                  {/* Language Selector - hidden on mobile */}
-                  <select
-                    value={selectedLanguage}
-                    onChange={(e) => {
-                      if (isWorkspaceScenario(selectedScenario)) {
-                        toast.info(
-                          `Workspace scenarios run in ${selectedScenario.workspace.language}`
-                        )
-                        return
-                      }
-                      const newLang = e.target.value as typeof selectedLanguage
-                      setSelectedLanguage(newLang)
-                      // Persist language preference to localStorage
-                      localStorage.setItem("mockmate_preferred_language", newLang)
-                      if (!isLanguageSupported(newLang)) {
-                        toast.warning(`${newLang.toUpperCase()} execution coming soon`, {
-                          description:
-                            "You can write code, but tests won't run. Use JavaScript or Python for full support.",
-                          duration: 5000,
-                        })
-                      }
-                    }}
-                    disabled={isWorkspaceScenario(selectedScenario)}
-                    title={
-                      isWorkspaceScenario(selectedScenario)
-                        ? `Workspace scenario language: ${selectedScenario.workspace.language}`
-                        : "Choose editor language"
-                    }
-                    className="hidden rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-[#00d9ff] focus:outline-none sm:block"
-                  >
-                    <option value="javascript">JavaScript</option>
-                    <option value="typescript">TypeScript</option>
-                    <option value="python">Python</option>
-                    <option value="java">Java (Coming Soon)</option>
-                    <option value="cpp">C++ (Coming Soon)</option>
-                    <option value="csharp">C# (Coming Soon)</option>
-                    <option value="go">Go (Coming Soon)</option>
-                    <option value="rust">Rust (Coming Soon)</option>
-                  </select>
-                </div>
-
-                {/* Center: Mobile Panel Switcher (visible only on mobile/tablet) */}
-                <div className="flex items-center gap-1 rounded-lg bg-gray-800/50 p-0.5 lg:hidden">
-                  <button
-                    onClick={() => setActivePanel("problem")}
-                    className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
-                      activePanel === "problem"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title="Problem"
-                  >
-                    <Target className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setActivePanel("editor")}
-                    className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
-                      activePanel === "editor"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title="Code Editor"
-                  >
-                    <Code className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setActivePanel("chat")}
-                    className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
-                      activePanel === "chat"
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title="Interview Chat"
-                  >
-                    <Brain className="h-3 w-3" />
-                  </button>
-                </div>
-
-                {/* Right: Actions - Research-backed controls for cognitive load reduction */}
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {/* Focus Mode Active Indicator */}
-                  {focusMode && (
-                    <div className="bg-accent/15 text-accent ring-accent/30 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 sm:flex">
-                      <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full" />
-                      <span className="hidden lg:inline">Focus Active</span>
-                      <span className="lg:hidden">Focus</span>
-                    </div>
-                  )}
-
-                  {/* Timer with hide toggle - WCAG 2.1: Let users manage time on their terms */}
-                  {isInterviewStarted && (
-                    <div className="bg-secondary/50 flex items-center overflow-hidden rounded-lg">
-                      {!hideTimer && (
-                        <div className="px-1 py-0.5">
-                          <InterviewTimer
-                            elapsedSeconds={elapsedTime}
-                            strictTimeLimit={strictTimeLimit}
-                            strictTimeReason={
-                              strictTimeLimit
-                                ? "Meta gives 45 minutes for 2 coding questions (~25 min each). They are strict about time."
-                                : undefined
-                            }
-                          />
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setHideTimer(!hideTimer)}
-                        className="hover:bg-secondary/80 px-1.5 py-1 transition-colors"
-                        title={hideTimer ? "Show timer" : "Hide timer (reduce time pressure)"}
-                      >
-                        {hideTimer ? (
-                          <EyeOff className="text-muted-foreground h-3 w-3" />
-                        ) : (
-                          <Eye className="text-muted-foreground h-3 w-3" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Calm Mode Toggle - Research: Muted colors reduce anxiety (Küller et al. 2006) */}
-                  <button
-                    onClick={() => setCalmMode(!calmMode)}
-                    className={`focus:ring-neural/50 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-200 focus:ring-2 focus:outline-none sm:flex ${
-                      calmMode
-                        ? "bg-neural/20 text-neural border-neural/40 shadow-neural/20 border shadow-sm"
-                        : "bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
-                    }`}
-                    title={calmMode ? "Exit Calm Mode" : "Calm Mode (muted colors for focus)"}
-                  >
-                    <Leaf className="h-3.5 w-3.5" />
-                    <span className="hidden lg:inline">{calmMode ? "Calm" : "Calm"}</span>
-                  </button>
-
-                  {/* Focus Mode Toggle - Desktop only
-                      Research: Distraction-free environments improve deep work
-                      Keyboard shortcut: Cmd/Ctrl+K, Z (VS Code style chord) */}
-                  <button
-                    onClick={() => {
-                      const newFocusMode = !focusMode
-                      setFocusMode(newFocusMode)
-                      // Auto-enable calm mode when entering focus
-                      if (newFocusMode && !calmMode) {
-                        setCalmMode(true)
-                      }
-                    }}
-                    className={`focus:ring-accent/50 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-200 focus:ring-2 focus:outline-none lg:flex ${
-                      focusMode
-                        ? "bg-accent/90 text-accent-foreground shadow-accent/25 ring-accent/50 shadow-md ring-1"
-                        : "bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
-                    }`}
-                    title={focusMode ? "Exit Focus Mode (Esc)" : "Focus Mode ⌘K Z"}
-                  >
-                    {focusMode ? (
-                      <Minimize2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    )}
-                    <span className="hidden xl:inline">{focusMode ? "Exit Focus" : "Focus"}</span>
-                  </button>
-
-                  <Button
-                    onClick={() => setShowCloseDialog(true)}
-                    variant="outline"
-                    size="sm"
-                    className="border-border text-muted-foreground hover:bg-secondary h-7 bg-transparent text-xs"
-                  >
-                    <ArrowLeft className="mr-1 h-3 w-3" />
-                    <span className="hidden sm:inline">Close</span>
-                  </Button>
-                </div>
-              </div>
+              <InterviewTopBar
+                selectedScenario={selectedScenario}
+                selectedLanguage={selectedLanguage}
+                onLanguageChange={setSelectedLanguage}
+                activePanel={activePanel}
+                onActivePanelChange={setActivePanel}
+                focusMode={focusMode}
+                onFocusModeChange={setFocusMode}
+                calmMode={calmMode}
+                onCalmModeChange={setCalmMode}
+                isInterviewStarted={isInterviewStarted}
+                hideTimer={hideTimer}
+                onHideTimerChange={setHideTimer}
+                elapsedTime={elapsedTime}
+                strictTimeLimit={strictTimeLimit}
+                onCloseClick={() => setShowCloseDialog(true)}
+              />
 
               {/* ═══════════════════════════════════════════════════════════════
                   MAIN INTERFACE - Cognitive Load Optimized
@@ -4873,1089 +4582,102 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]"
                   }`}
                 >
-                  {/* Focus Mode: Floating problem peek button
-                      Research: Quick reference reduces working memory load */}
-                  {focusMode && selectedScenario && (
-                    <button
-                      onClick={() => setShowProblemPeek(!showProblemPeek)}
-                      className={`focus-float-button focus:ring-accent/50 fixed top-20 left-4 z-50 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium shadow-xl transition-all duration-200 focus:ring-2 focus:outline-none ${
-                        showProblemPeek
-                          ? "bg-accent/90 text-accent-foreground shadow-accent/25"
-                          : "hover:border-accent/30 border border-gray-600/50 bg-gray-800/95 text-gray-200 backdrop-blur-md hover:bg-gray-700/95 hover:text-white"
-                      }`}
-                      title="Peek at problem description (quick reference)"
-                    >
-                      <Target className={`h-4 w-4 ${showProblemPeek ? "" : "text-accent"}`} />
-                      <span>{showProblemPeek ? "Hide Problem" : "Show Problem"}</span>
-                    </button>
+                  {focusMode && (
+                    <FocusProblemPeek
+                      scenario={selectedScenario}
+                      realInterviewMode={realInterviewMode}
+                      showProblemPeek={showProblemPeek}
+                      onShowProblemPeekChange={setShowProblemPeek}
+                    />
                   )}
+                  <ProblemColumn
+                    ctx={{
+                      activePanel,
+                      activeWorkspacePath,
+                      elapsedTime,
+                      fetchRAGHints,
+                      fileInputRef,
+                      focusMode,
+                      handleFileUpload,
+                      hintAgent,
+                      hintFeedback,
+                      hintFetchStatus,
+                      isInterviewStarted,
+                      ragHints,
+                      realInterviewMode,
+                      revealedAIHintIndices,
+                      revealedHintIndices,
+                      revealedHints,
+                      selectedScenario,
+                      setActiveWorkspacePath,
+                      setCode,
+                      setIsCodeViewerOpen,
+                      setRevealedAIHintIndices,
+                      setRevealedHintIndices,
+                      setSelectedFile,
+                      setShowOptimalApproach,
+                      showOptimalApproach,
+                      submitHintFeedback,
+                      workspaceContext,
+                    }}
+                  />
 
-                  {/* Focus Mode: Problem peek overlay
-                      Research: Floating panels allow reference without context switch */}
-                  {focusMode && showProblemPeek && selectedScenario && (
-                    <div className="focus-float-button border-accent/20 fixed top-32 left-4 z-40 max-h-[60vh] w-[420px] overflow-hidden rounded-2xl border bg-gray-900/98 shadow-2xl shadow-black/50 backdrop-blur-xl">
-                      <div className="flex items-center justify-between border-b border-gray-700 p-4">
-                        <div className="flex items-center gap-2">
-                          <Target className="text-accent h-4 w-4" />
-                          <span className="text-sm font-semibold text-white">
-                            {selectedScenario.title}
-                          </span>
-                        </div>
-                        <Badge
-                          className={`text-xs ${
-                            selectedScenario.difficulty === "easy"
-                              ? "bg-green-500/20 text-green-400"
-                              : selectedScenario.difficulty === "medium"
-                                ? "bg-yellow-500/20 text-yellow-400"
-                                : "bg-red-500/20 text-red-400"
-                          }`}
-                        >
-                          {selectedScenario.difficulty}
-                        </Badge>
-                      </div>
-                      <div className="max-h-[calc(60vh-60px)] overflow-y-auto p-4">
-                        <MarkdownRenderer
-                          content={
-                            realInterviewMode && (selectedScenario as any).fuzzyStatement
-                              ? (selectedScenario as any).fuzzyStatement
-                              : selectedScenario.problemStatement
-                          }
-                          className="text-sm leading-relaxed text-gray-200"
-                        />
-                        {selectedScenario.type === "dsa" &&
-                          selectedScenario.examples &&
-                          selectedScenario.examples.length > 0 && (
-                            <div className="mt-4 space-y-3">
-                              <h4 className="text-accent text-xs font-semibold tracking-wide uppercase">
-                                Examples
-                              </h4>
-                              {selectedScenario.examples.slice(0, 2).map((ex, idx) => (
-                                <div
-                                  key={idx}
-                                  className="rounded-lg bg-gray-800/50 p-3 font-mono text-xs"
-                                >
-                                  <div className="text-gray-400">
-                                    Input: <span className="text-blue-300">{ex.input}</span>
-                                  </div>
-                                  <div className="text-gray-400">
-                                    Output: <span className="text-green-300">{ex.output}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  )}
-                  {/* Left: Problem Description / File Upload
-                      - Hidden in focus mode (desktop)
-                      - Only visible when activePanel === 'problem' (mobile)
-                  */}
-                  <Card
-                    className={`glass-effect order-1 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
-                      focusMode
-                        ? "hidden" // Always hidden in focus mode - no responsive override
-                        : activePanel === "problem"
-                          ? "flex"
-                          : "hidden lg:flex"
-                    }`}
-                  >
-                    {/* IMPROVED: Enhanced header with title and difficulty badge */}
-                    <CardHeader className="flex-shrink-0 border-b border-gray-700/50 pb-3">
-                      <CardTitle className="flex items-center justify-between text-white">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <Target className="text-accent h-5 w-5 flex-shrink-0" />
-                          <span className="truncate text-base font-semibold">
-                            {selectedScenario?.title || "Problem"}
-                          </span>
-                        </div>
-                        {selectedScenario && (
-                          <Badge
-                            className={`ml-2 flex-shrink-0 text-xs ${
-                              selectedScenario.difficulty === "easy"
-                                ? "border-green-500/30 bg-green-500/20 text-green-400"
-                                : selectedScenario.difficulty === "medium"
-                                  ? "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
-                                  : "border-red-500/30 bg-red-500/20 text-red-400"
-                            }`}
-                          >
-                            {selectedScenario.difficulty}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    {/* IMPROVED: Better spacing and typography for readability */}
-                    <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
-                      {selectedScenario && (
-                        <>
-                          {/* IMPROVED: Description with larger font and visual hierarchy */}
-                          <div className="space-y-2">
-                            <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                              <span className="bg-accent h-4 w-1 rounded-full"></span>
-                              Description
-                              {realInterviewMode && (selectedScenario as any).fuzzyStatement && (
-                                <Badge className="border-purple-500/30 bg-purple-500/20 text-[10px] text-purple-300">
-                                  Real Interview Mode
-                                </Badge>
-                              )}
-                            </h3>
-                            <MarkdownRenderer
-                              content={
-                                realInterviewMode && (selectedScenario as any).fuzzyStatement
-                                  ? (selectedScenario as any).fuzzyStatement
-                                  : selectedScenario.problemStatement
-                              }
-                              className="text-[15px] leading-relaxed text-gray-200"
-                            />
-                          </div>
+                  <EditorColumn
+                    activePanel={activePanel}
+                    selectedScenario={selectedScenario}
+                    activeWorkspaceFile={activeWorkspaceFile}
+                    selectedLanguage={selectedLanguage}
+                    editorLanguage={editorLanguage}
+                    code={code}
+                    onCodeChange={handleEditorChange}
+                    isInterviewStarted={isInterviewStarted}
+                    showScenarioBrowser={showScenarioBrowser}
+                    showFeedback={showFeedback}
+                    showPostInterviewDiscussion={showPostInterviewDiscussion}
+                    isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
+                    onStartInterview={() => startInterview()}
+                    editorConsoleOutputs={editorConsoleOutputs}
+                    testResults={testResults}
+                    testSummary={testSummary}
+                    isRunningTests={isRunningTests}
+                    onClearConsole={handleClearConsole}
+                    onSubmitSystemDesign={submitSystemDesign}
+                    onRunCode={runCode}
+                    onSubmitCode={submitCode}
+                    onSelectedLanguageChange={setSelectedLanguage}
+                    isAIPartnerExpanded={isAIPartnerExpanded}
+                    onAIPartnerExpandedChange={setIsAIPartnerExpanded}
+                    chatMessages={chatMessages}
+                    chatEndRef={chatEndRef}
+                    chatInput={chatInput}
+                    onChatInputChange={setChatInput}
+                    isLoadingChat={isLoadingChat}
+                    onSendPartnerMessage={() => handleSendMessage(false)}
+                  />
 
-                          {selectedScenario.type === "bugfix" && (
-                            <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3">
-                              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-blue-300 uppercase">
-                                <span className="h-4 w-1 rounded-full bg-blue-300"></span>
-                                How to Work This Codebase
-                              </h3>
-                              <div className="space-y-2 text-sm leading-relaxed text-gray-300">
-                                {(selectedScenario as any).bugDescription && (
-                                  <p>
-                                    <span className="font-medium text-gray-100">Bug:</span>{" "}
-                                    {(selectedScenario as any).bugDescription}
-                                  </p>
-                                )}
-                                {(selectedScenario as any).expectedBehavior && (
-                                  <p>
-                                    <span className="font-medium text-gray-100">Goal:</span>{" "}
-                                    {(selectedScenario as any).expectedBehavior}
-                                  </p>
-                                )}
-                                <ol className="list-decimal space-y-1.5 pt-1 pl-4 text-xs text-gray-400">
-                                  <li>Read the README or context file first.</li>
-                                  <li>Open the test file to see the failing behavior.</li>
-                                  <li>Trace the supporting files, then make the smallest fix.</li>
-                                  <li>Run tests and explain the root cause to the interviewer.</li>
-                                </ol>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* AI Insights - Shown independently, right after description */}
-                          {/* Only show hints when user has written meaningful code beyond starter code */}
-                          {/* Use hintFetchStatus to prevent flickering - section stays visible after first fetch attempt */}
-                          {isInterviewStarted && hintFetchStatus !== "idle" && (
-                            <div className="space-y-2">
-                              <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
-                                <span className="h-4 w-1 rounded-full bg-purple-400"></span>
-                                <Sparkles className="h-4 w-4" />
-                                AI Insights
-                                {ragHints.length > 0 && (
-                                  <span className="text-xs font-normal text-gray-500">
-                                    ({revealedAIHintIndices.size}/{ragHints.length} revealed)
-                                  </span>
-                                )}
-                              </h3>
-                              {hintFetchStatus === "loading" ? (
-                                <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-gray-400">
-                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
-                                  Generating personalized hints...
-                                </div>
-                              ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
-                                <div className="rounded-lg border border-gray-600/30 bg-gray-800/30 p-3">
-                                  <p className="text-sm text-gray-400">
-                                    Hints will appear here as you code. Keep working on your
-                                    solution!
-                                  </p>
-                                  <button
-                                    onClick={fetchRAGHints}
-                                    className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 transition-colors hover:text-purple-300"
-                                  >
-                                    <Sparkles className="h-3 w-3" />
-                                    Try generating hints
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  {ragHints
-                                    .slice(
-                                      0,
-                                      Math.min(revealedAIHintIndices.size + 1, ragHints.length)
-                                    )
-                                    .map((hint, i) => {
-                                      const hintId = `hint-${selectedScenario?.id}-${i}`
-                                      const isRevealed = revealedAIHintIndices.has(i)
-                                      const feedback = hintFeedback.get(hintId)
-
-                                      return (
-                                        <div
-                                          key={`ai-hint-${i}`}
-                                          className={`rounded-lg border transition-all ${
-                                            isRevealed
-                                              ? "border-purple-500/30 bg-purple-500/10"
-                                              : "cursor-pointer border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10"
-                                          }`}
-                                        >
-                                          {isRevealed ? (
-                                            <div className="p-3">
-                                              <div className="flex items-start justify-between gap-2">
-                                                <p className="flex-1 text-sm leading-relaxed text-purple-100">
-                                                  <span className="font-medium text-purple-300">
-                                                    Level {hint.level}:
-                                                  </span>{" "}
-                                                  {hint.hint}
-                                                </p>
-                                                {/* Feedback buttons */}
-                                                <div className="flex flex-shrink-0 items-center gap-1">
-                                                  <button
-                                                    onClick={() => submitHintFeedback(i, "helpful")}
-                                                    className={`rounded p-1 transition-colors ${
-                                                      feedback === "helpful"
-                                                        ? "bg-green-500/30 text-green-400"
-                                                        : "text-gray-500 hover:bg-green-500/10 hover:text-green-400"
-                                                    }`}
-                                                    title="Helpful"
-                                                  >
-                                                    <ThumbsUp className="h-3.5 w-3.5" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() =>
-                                                      submitHintFeedback(i, "unhelpful")
-                                                    }
-                                                    className={`rounded p-1 transition-colors ${
-                                                      feedback === "unhelpful"
-                                                        ? "bg-red-500/30 text-red-400"
-                                                        : "text-gray-500 hover:bg-red-500/10 hover:text-red-400"
-                                                    }`}
-                                                    title="Not helpful"
-                                                  >
-                                                    <ThumbsDown className="h-3.5 w-3.5" />
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div
-                                              className="relative p-3"
-                                              onClick={() => {
-                                                if (hint.id) {
-                                                  hintAgent.revealHint(hint.id)
-                                                }
-                                                setRevealedAIHintIndices(
-                                                  (prev) => new Set([...prev, i])
-                                                )
-                                              }}
-                                            >
-                                              <p className="pointer-events-none text-sm leading-relaxed text-purple-200/20 blur-sm select-none">
-                                                <span className="font-medium">
-                                                  Level {hint.level}:
-                                                </span>{" "}
-                                                {hint.hint.substring(0, 60)}...
-                                              </p>
-                                              <div className="absolute inset-0 flex items-center justify-center">
-                                                <div className="flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs font-medium text-purple-300">
-                                                  <Eye className="h-3.5 w-3.5" />
-                                                  Click to reveal hint {i + 1}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )
-                                    })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* IMPROVED: Examples with better visual hierarchy */}
-                          {selectedScenario.type === "dsa" &&
-                            selectedScenario.examples &&
-                            selectedScenario.examples.length > 0 && (
-                              <div className="space-y-2">
-                                <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                                  <span className="bg-accent h-4 w-1 rounded-full"></span>
-                                  Examples
-                                </h3>
-                                <div className="space-y-3">
-                                  {selectedScenario.examples.slice(0, 2).map((ex, i) => (
-                                    <div
-                                      key={i}
-                                      className="rounded-lg border border-gray-700/50 bg-gray-800/70 p-3"
-                                    >
-                                      <div className="space-y-1.5 font-mono text-sm">
-                                        <div className="flex items-start gap-2">
-                                          <span className="min-w-[55px] font-medium text-gray-500">
-                                            Input:
-                                          </span>
-                                          <code className="break-all text-green-400">
-                                            {ex.input}
-                                          </code>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                          <span className="min-w-[55px] font-medium text-gray-500">
-                                            Output:
-                                          </span>
-                                          <code className="break-all text-blue-400">
-                                            {ex.output}
-                                          </code>
-                                        </div>
-                                      </div>
-                                      {ex.explanation && (
-                                        <div className="mt-2 border-t border-gray-700/50 pt-2 text-sm text-gray-400 italic">
-                                          {ex.explanation}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                          {/* IMPROVED: Constraints with better styling */}
-                          {selectedScenario.type === "dsa" &&
-                            selectedScenario.constraints &&
-                            selectedScenario.constraints.length > 0 && (
-                              <div className="space-y-2">
-                                <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                                  <span className="bg-accent h-4 w-1 rounded-full"></span>
-                                  Constraints
-                                </h3>
-                                <ul className="space-y-1.5 text-gray-300">
-                                  {selectedScenario.constraints.slice(0, 4).map((c, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-sm">
-                                      <span className="text-accent mt-0.5">•</span>
-                                      <code className="font-mono text-gray-300">{c}</code>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                          {/* Optimal Approach - Collapsible (DSA only) */}
-                          {selectedScenario.type === "dsa" &&
-                            (selectedScenario as any).optimalComplexity && (
-                              <div className="rounded-md border border-gray-600/60 bg-gray-800/40">
-                                <button
-                                  onClick={() => setShowOptimalApproach(!showOptimalApproach)}
-                                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-gray-700/30"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="bg-accent h-4 w-1 rounded-full"></span>
-                                    <span className="text-sm font-medium text-gray-200">
-                                      Target complexity
-                                    </span>
-                                  </div>
-                                  {showOptimalApproach ? (
-                                    <ChevronUp className="h-4 w-4 text-gray-400" />
-                                  ) : (
-                                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                                  )}
-                                </button>
-
-                                {showOptimalApproach && (
-                                  <div className="animate-in slide-in-from-top-2 px-3 pt-0.5 pb-3 duration-200">
-                                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-                                      <span className="flex items-center gap-1.5 text-gray-400">
-                                        <Clock className="h-3.5 w-3.5 text-gray-500" />
-                                        <code className="text-accent font-mono">
-                                          {(selectedScenario as any).optimalComplexity.time}
-                                        </code>
-                                      </span>
-                                      <span className="flex items-center gap-1.5 text-gray-400">
-                                        <HardDrive className="h-3.5 w-3.5 text-gray-500" />
-                                        <code className="text-accent font-mono">
-                                          {(selectedScenario as any).optimalComplexity.space}
-                                        </code>
-                                      </span>
-                                    </div>
-                                    <p className="mt-2 text-xs text-gray-500">
-                                      Aim for this before checking hints.
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                          {/* Legacy static hints are kept hidden during interviews so generated insights are the single hint surface. */}
-                          {!isInterviewStarted &&
-                            (selectedScenario as any).hints &&
-                            (selectedScenario as any).hints.length > 0 && (
-                              <div className="mt-3 border-t border-gray-700 pt-3">
-                                <div className="mb-2 flex items-center justify-between">
-                                  <h3 className="flex items-center space-x-1 text-xs font-semibold text-white">
-                                    <Lightbulb className="h-3 w-3 text-yellow-400" />
-                                    <span>
-                                      Hints ({revealedHintIndices.size}/{revealedHints} unlocked)
-                                    </span>
-                                  </h3>
-                                  {revealedHints < (selectedScenario as any).hints.length && (
-                                    <span className="text-xs text-gray-400">
-                                      Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
-                                    </span>
-                                  )}
-                                </div>
-                                {revealedHints > 0 ? (
-                                  <div className="space-y-2">
-                                    {(selectedScenario as any).hints
-                                      .slice(0, revealedHints)
-                                      .map((hint: string, i: number) => {
-                                        const isHintRevealed = revealedHintIndices.has(i)
-                                        return (
-                                          <div
-                                            key={i}
-                                            className={`cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 transition-all ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
-                                            onClick={() => {
-                                              if (!isHintRevealed) {
-                                                setRevealedHintIndices(
-                                                  (prev) => new Set([...prev, i])
-                                                )
-                                              }
-                                            }}
-                                          >
-                                            {isHintRevealed ? (
-                                              <p className="text-xs leading-relaxed text-yellow-200">
-                                                <span className="font-semibold">Hint {i + 1}:</span>{" "}
-                                                {hint}
-                                              </p>
-                                            ) : (
-                                              <div className="relative">
-                                                <p className="pointer-events-none text-xs leading-relaxed text-yellow-200/30 blur-sm select-none">
-                                                  <span className="font-semibold">
-                                                    Hint {i + 1}:
-                                                  </span>{" "}
-                                                  {hint.substring(0, 50)}...
-                                                </p>
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                  <div className="flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400">
-                                                    <HelpCircle className="h-3 w-3" />
-                                                    <span>Click to reveal Hint {i + 1}</span>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        )
-                                      })}
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-gray-400 italic">
-                                    Hints will unlock every 3 minutes as you work on the problem
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                        </>
-                      )}
-
-                      {/* Upload Codebase Section - Only show for non-DSA scenarios */}
-                      {selectedScenario && selectedScenario.type !== "dsa" && (
-                        <div className="mt-3 border-t border-gray-700 pt-3">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <h3 className="font-semibold text-white">Codebase Files</h3>
-                            {selectedScenario.type === "bugfix" && (
-                              <Badge className="border-blue-500/30 bg-blue-500/10 text-[10px] text-blue-300">
-                                review first
-                              </Badge>
-                            )}
-                          </div>
-                          {/* Show warning for add-functionality when language has no files */}
-                          {selectedScenario &&
-                            selectedScenario.type === "add-functionality" &&
-                            workspaceContext.length === 0 && (
-                              <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
-                                <p className="text-xs text-yellow-300">
-                                  This scenario uses a prepared codebase workspace. Reload the
-                                  scenario if the files do not appear.
-                                </p>
-                              </div>
-                            )}
-                          {selectedScenario &&
-                          (selectedScenario.type === "bugfix" ||
-                            selectedScenario.type === "add-functionality") &&
-                          workspaceContext.length > 0 ? (
-                            <div className="mb-2">
-                              <p className="mb-2 text-xs text-green-400">
-                                {workspaceContext.length} file(s) loaded automatically. Open these
-                                before editing the primary file.
-                              </p>
-                              <div className="max-h-48 space-y-1.5 overflow-y-auto">
-                                {workspaceContext.map((file) => (
-                                  <button
-                                    key={file.path}
-                                    onClick={() => {
-                                      if (isWorkspaceScenario(selectedScenario)) {
-                                        setActiveWorkspacePath(file.path)
-                                        setCode(file.content)
-                                      } else {
-                                        setSelectedFile(file)
-                                        setIsCodeViewerOpen(true)
-                                      }
-                                    }}
-                                    className={`w-full cursor-pointer rounded border px-2.5 py-2 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50 ${
-                                      activeWorkspacePath === file.path
-                                        ? "border-blue-500 bg-blue-500/10"
-                                        : "border-gray-700 bg-gray-800/50"
-                                    }`}
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-1 font-semibold text-blue-400">
-                                          <Code className="h-3 w-3 flex-shrink-0" />
-                                          <span className="truncate">{file.path}</span>
-                                        </div>
-                                        {file.description && (
-                                          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-400">
-                                            {file.description}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <span className="rounded border border-gray-600 bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-400">
-                                        {file.role || getWorkspaceFileRole(file.path)}
-                                      </span>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                multiple
-                                accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
-                                onChange={handleFileUpload}
-                                className="hidden"
-                              />
-                              <Button
-                                onClick={() => fileInputRef.current?.click()}
-                                variant="outline"
-                                className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
-                              >
-                                <Code className="mr-1 h-3 w-3" />
-                                Upload Files
-                              </Button>
-                              {workspaceContext.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                  {workspaceContext.map((file) => (
-                                    <button
-                                      key={file.path}
-                                      onClick={() => {
-                                        setSelectedFile(file)
-                                        setIsCodeViewerOpen(true)
-                                      }}
-                                      className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
-                                    >
-                                      <div className="flex items-center gap-1 truncate">
-                                        <Code className="h-3 w-3 flex-shrink-0" />
-                                        {file.path}
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Center: Code Editor with Terminal/Console
-                      - Expands to full width in focus mode
-                      - Only visible when activePanel === 'editor' (mobile)
-                  */}
-                  <Card
-                    className={`glass-effect order-2 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
-                      activePanel === "editor" ? "flex" : "hidden lg:flex"
-                    }`}
-                  >
-                    <CardHeader className="flex-shrink-0 px-6 pb-2">
-                      <CardTitle className="flex items-center justify-between text-xs text-white">
-                        <div className="flex items-center space-x-1">
-                          <Code className="text-accent h-3 w-3" />
-                          {selectedScenario?.type === "system-design" ? (
-                            <span>Design Notes</span>
-                          ) : activeWorkspaceFile ? (
-                            <span className="truncate">{activeWorkspaceFile.path}</span>
-                          ) : (
-                            <span>
-                              {selectedScenario?.title
-                                .toLowerCase()
-                                .replace(/\s+/g, "-")
-                                .slice(0, 20)}
-                              .
-                              {selectedLanguage === "javascript"
-                                ? "js"
-                                : selectedLanguage === "typescript"
-                                  ? "ts"
-                                  : "py"}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          {/* Grading criteria indicator */}
-                          <GradingCriteriaTooltip />
-                          {isInterviewStarted && (
-                            <div className="flex items-center space-x-1">
-                              <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
-                              <span className="text-accent text-xs">LIVE</span>
-                            </div>
-                          )}
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    {/* Code Editor - Using CodeMirror 6 for lightweight editing */}
-                    <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
-                      <div
-                        ref={editorContainerRef}
-                        className="relative min-h-0 flex-1 overflow-auto rounded border border-gray-700"
-                      >
-                        <ErrorBoundary>
-                          <CodeEditor
-                            height="100%"
-                            language={editorLanguage}
-                            value={code}
-                            onChange={(newCode) => {
-                              // Enforce code protection if enabled
-                              if (
-                                protectedElements &&
-                                starterCode &&
-                                isInterviewStarted &&
-                                !showFeedback
-                              ) {
-                                const validation = validateCodeProtection(
-                                  newCode,
-                                  protectedElements,
-                                  selectedLanguage
-                                )
-                                if (!validation.valid) {
-                                  toast.error(
-                                    `Cannot remove required code: ${validation.errors[0]}`
-                                  )
-                                  return
-                                }
-                              }
-                              setCode(newCode)
-                              if (activeWorkspacePath && isWorkspaceScenario(selectedScenario)) {
-                                setWorkspaceContext((files) =>
-                                  files.map((file) =>
-                                    file.path === activeWorkspacePath
-                                      ? { ...file, content: newCode }
-                                      : file
-                                  )
-                                )
-                              }
-                            }}
-                            readOnly={
-                              !isInterviewStarted ||
-                              showFeedback ||
-                              (isWorkspaceScenario(selectedScenario) &&
-                                !isActiveWorkspaceFileEditable)
-                            }
-                          />
-                        </ErrorBoundary>
-                        {/* Start Interview Overlay - shown when scenario selected but not started */}
-                        {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-                            <div className="max-w-md p-6 text-center">
-                              <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
-                                <PlayCircle className="text-accent h-8 w-8" />
-                              </div>
-                              <h3 className="mb-2 text-xl font-bold text-white">Ready to Start?</h3>
-                              <p className="mb-4 text-sm text-gray-400">
-                                Review the problem on the left, then start your interview when
-                                ready. The timer will begin once you start.
-                              </p>
-                              <Button
-                                onClick={() => startInterview()}
-                                className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-base font-semibold"
-                              >
-                                <PlayCircle className="mr-2 h-5 w-5" />
-                                Start Interview
-                              </Button>
-                              <p className="mt-3 text-xs text-gray-500">
-                                Estimated time: {selectedScenario.estimatedTime || 30} minutes
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Console Panel - IDE-like output display (hidden for system design) */}
-                      {isInterviewStarted && selectedScenario?.type !== "system-design" && (
-                        <CodeConsole
-                          outputs={consoleLogs.map((log) => ({
-                            type: log.type as "log" | "error" | "warn" | "info",
-                            message: log.message,
-                            timestamp: log.timestamp,
-                          }))}
-                          testResults={testResults}
-                          testSummary={testSummary}
-                          isRunning={isRunningTests}
-                          className="max-h-48 min-h-[120px]"
-                          onClear={() => {
-                            setConsoleLogs([])
-                            setTestResults([])
-                            setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
-                          }}
-                        />
-                      )}
-
-                      {/* Controls */}
-                      {selectedScenario?.type === "system-design" ? (
-                        /* Submit Design button for system design */
-                        <div className="flex flex-shrink-0 flex-col gap-2">
-                          <div className="text-right text-[10px] text-gray-400">
-                            Document your design decisions above, then submit when ready
-                          </div>
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              onClick={submitSystemDesign}
-                              disabled={showFeedback || showPostInterviewDiscussion}
-                              loading={isRunningTests}
-                              className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 text-xs font-semibold"
-                              aria-label={isRunningTests ? "Submitting design..." : "Submit Design"}
-                            >
-                              {!isRunningTests && (
-                                <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />
-                              )}
-                              {isRunningTests ? "Submitting..." : "Submit Design"}
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Run Tests and Submit buttons for coding problems */
-                        <div className="flex flex-shrink-0 items-center justify-end gap-2">
-                          {!isLanguageSupported(selectedLanguage) && (
-                            <span className="mr-1 text-[10px] text-yellow-400">
-                              Use JS/Python to run tests
-                            </span>
-                          )}
-                          <Button
-                            onClick={() => {
-                              if (!isLanguageSupported(selectedLanguage)) {
-                                toast.error(
-                                  `${selectedLanguage.toUpperCase()} execution not supported yet`,
-                                  {
-                                    description: "Switch to JavaScript or Python to run tests.",
-                                    duration: 6000,
-                                    action: {
-                                      label: "Use JavaScript",
-                                      onClick: () => setSelectedLanguage("javascript"),
-                                    },
-                                  }
-                                )
-                                return
-                              }
-                              runCode()
-                            }}
-                            disabled={showFeedback || isRunningTests}
-                            className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} h-7 text-xs text-white`}
-                            aria-label={isRunningTests ? "Running tests" : "Run tests"}
-                          >
-                            {!isRunningTests && (
-                              <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />
-                            )}
-                            {isRunningTests ? "Running..." : "Run Tests"}
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              if (!isLanguageSupported(selectedLanguage)) {
-                                toast.error(
-                                  `${selectedLanguage.toUpperCase()} execution not supported yet`,
-                                  {
-                                    description: "Switch to JavaScript or Python to submit.",
-                                    duration: 6000,
-                                    action: {
-                                      label: "Use JavaScript",
-                                      onClick: () => setSelectedLanguage("javascript"),
-                                    },
-                                  }
-                                )
-                                return
-                              }
-                              submitCode()
-                            }}
-                            disabled={showFeedback || isRunningTests}
-                            className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 text-xs font-semibold"
-                            aria-label="Submit code"
-                          >
-                            <Send className="mr-1 h-3 w-3" aria-hidden="true" />
-                            Submit
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* AI Coding Partner - Only show for interview types that allow AI assistance
-                          Real interview rules:
-                          - DSA: NO AI (pure problem-solving like Google/Meta traditional interviews)
-                          - Bug Fix: YES (Meta E5+ allows AI tools for debugging)
-                          - Add Functionality: YES (realistic production environment)
-                          - System Design: YES (discussion-based, AI collaboration acceptable)
-                      */}
-                      {selectedScenario && selectedScenario.type !== "dsa" && (
-                        <div className="flex-shrink-0 border-t border-gray-700 pt-2">
-                          {!isAIPartnerExpanded ? (
-                            /* Collapsed state - just a thin bar */
-                            <div
-                              className="flex cursor-pointer items-center justify-between rounded bg-gray-800/50 px-2 py-1.5 transition-colors hover:bg-gray-800"
-                              onClick={() => setIsAIPartnerExpanded(true)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <Bot className="text-accent h-3 w-3" />
-                                <span className="text-[10px] text-gray-400">
-                                  {selectedScenario.type === "bugfix"
-                                    ? "AI Partner"
-                                    : "AI Assistant"}
-                                </span>
-                                <span className="text-[10px] text-gray-600">· optional</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {chatMessages.length > 0 && (
-                                  <span className="text-[10px] text-gray-500">
-                                    {chatMessages.length} msg
-                                  </span>
-                                )}
-                                <ChevronUp className="h-3 w-3 text-gray-500" />
-                              </div>
-                            </div>
-                          ) : (
-                            /* Expanded state - compact chat */
-                            <div className="rounded bg-gray-800/30 p-2">
-                              {/* Header with collapse */}
-                              <div className="mb-2 flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  <Bot className="text-accent h-3 w-3" />
-                                  <span className="text-[10px] text-gray-300">
-                                    {selectedScenario.type === "bugfix"
-                                      ? "AI Partner"
-                                      : "AI Assistant"}
-                                  </span>
-                                  <span className="rounded bg-gray-800 px-1 text-[9px] text-gray-600">
-                                    optional
-                                  </span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setIsAIPartnerExpanded(false)}
-                                  className="h-5 w-5 p-0 text-gray-500 hover:text-white"
-                                >
-                                  <ChevronDown className="h-3 w-3" />
-                                </Button>
-                              </div>
-
-                              {/* Messages - max height 120px */}
-                              <div className="mb-2 max-h-[120px] space-y-1 overflow-y-auto">
-                                {chatMessages.length === 0 ? (
-                                  <p className="py-2 text-center text-[10px] text-gray-500">
-                                    {selectedScenario.type === "bugfix"
-                                      ? "Ask for a debugging nudge after you inspect the files"
-                                      : "Ask for hints, not solutions"}
-                                  </p>
-                                ) : (
-                                  chatMessages.slice(-4).map((msg, index) => (
-                                    <div
-                                      key={`inline-chat-${msg.type}-${index}`}
-                                      className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                                    >
-                                      <div
-                                        className={`max-w-[85%] rounded px-2 py-1 text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}
-                                      >
-                                        <MarkdownRenderer
-                                          content={msg.message}
-                                          className="text-[10px] break-words"
-                                        />
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                                <div ref={chatEndRef} />
-                              </div>
-
-                              {/* Input - single line */}
-                              <div className="flex gap-1">
-                                <Input
-                                  value={chatInput}
-                                  onChange={(e) => setChatInput(e.target.value)}
-                                  placeholder={
-                                    selectedScenario.type === "bugfix"
-                                      ? "Ask for a debugging nudge..."
-                                      : "Quick question..."
-                                  }
-                                  className="h-6 flex-1 border-gray-700 bg-gray-900 text-[10px] text-white placeholder:text-gray-600"
-                                  onKeyPress={(e) =>
-                                    e.key === "Enter" && !isLoadingChat && handleSendMessage(false)
-                                  }
-                                  disabled={isLoadingChat}
-                                />
-                                <Button
-                                  onClick={() => handleSendMessage(false)}
-                                  disabled={!chatInput.trim() || isLoadingChat}
-                                  className="bg-accent hover:bg-accent/80 h-6 w-6 p-0"
-                                >
-                                  {isLoadingChat ? (
-                                    <div className="h-2 w-2 animate-spin rounded-full border border-white/30 border-t-white" />
-                                  ) : (
-                                    <Send className="h-2.5 w-2.5" />
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-
-                  {/* Right: AI Interviewer Panel
-                      - Hidden in focus mode (desktop)
-                      - Only visible when activePanel === 'chat' (mobile)
-                  */}
-                  <Card
-                    className={`glass-effect order-3 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
-                      focusMode
-                        ? "hidden" // Always hidden in focus mode - no responsive override
-                        : activePanel === "chat"
-                          ? "flex"
-                          : "hidden lg:flex"
-                    }`}
-                  >
-                    <CardHeader className="flex-shrink-0 pb-2">
-                      <CardTitle className="flex items-center space-x-2 text-sm text-white">
-                        <div className="relative">
-                          <Brain className="text-accent animate-neural-pulse h-4 w-4" />
-                          <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
-                        </div>
-                        <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
-                          CodeSparring AI
-                        </span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
-                      <div className="mb-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
-                        {interviewerMessages.length === 0 ? (
-                          <div className="py-8 text-center text-gray-400">
-                            <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                            <p className="text-xs">Interview will begin when you start...</p>
-                          </div>
-                        ) : (
-                          <>
-                            {interviewerMessages.map((msg, index) => (
-                              <div
-                                key={`interviewer-${msg.type}-${index}`}
-                                className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                              >
-                                <div
-                                  className={`max-w-[90%] rounded-lg p-2 ${
-                                    msg.type === "user"
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-gray-800 text-gray-100"
-                                  }`}
-                                >
-                                  <div className="mb-1 flex items-center space-x-1">
-                                    {msg.type === "user" ? (
-                                      <User className="h-3 w-3" />
-                                    ) : (
-                                      <Brain className="text-accent animate-neural-pulse h-3 w-3" />
-                                    )}
-                                    <span className="text-xs opacity-75">
-                                      {msg.type === "user" ? "You" : "CodeSparring AI"}
-                                    </span>
-                                  </div>
-                                  <MarkdownRenderer
-                                    content={msg.message}
-                                    className="text-xs leading-relaxed"
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                            {/* Thinking indicator - shows when AI is processing */}
-                            {(isLoadingInterviewer || isGeneratingDiscussion) && (
-                              <div className="flex justify-start">
-                                <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
-                                  <div className="flex items-center space-x-2">
-                                    <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
-                                    <span className="text-xs">CodeSparring AI is thinking</span>
-                                    <span className="flex space-x-0.5">
-                                      <span
-                                        className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                                        style={{ animationDelay: "0ms" }}
-                                      />
-                                      <span
-                                        className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                                        style={{ animationDelay: "150ms" }}
-                                      />
-                                      <span
-                                        className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                                        style={{ animationDelay: "300ms" }}
-                                      />
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            <div ref={interviewerEndRef} />
-                          </>
-                        )}
-                      </div>
-                      {(isInterviewStarted || showPostInterviewDiscussion) && (
-                        <div className="flex flex-shrink-0 flex-col gap-2 border-t border-gray-700 pt-3">
-                          {/* Voice Mode Toggle with Send button */}
-                          <VoiceModeToggle
-                            isRecording={isRecordingInterviewer}
-                            onToggleRecording={() => toggleVoiceRecording(true)}
-                            onCancel={() => {
-                              interviewerVoice.cancelCountdown()
-                              interviewerVoice.stopRecording()
-                              interviewerVoice.resetTranscript()
-                              setInterviewerInput("")
-                            }}
-                            onSend={() => handleSendMessage(true)}
-                            onCancelCountdown={() => interviewerVoice.cancelCountdown()}
-                            countdownActive={interviewerVoice.countdownActive}
-                            autoSendDelayMs={500}
-                            isLoading={isLoadingInterviewer || isGeneratingDiscussion}
-                            transcript={interviewerInput}
-                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                            compact={true}
-                          />
-                          {/* Text input - only shown when NOT recording */}
-                          {!isRecordingInterviewer && (
-                            <div className="flex space-x-1">
-                              <Input
-                                value={interviewerInput}
-                                onChange={(e) => setInterviewerInput(e.target.value)}
-                                placeholder={
-                                  showPostInterviewDiscussion
-                                    ? "Type or use mic above..."
-                                    : "Type a question..."
-                                }
-                                className="bg-secondary border-border text-foreground placeholder-muted-foreground h-7 flex-1 text-xs"
-                                onKeyPress={(e) =>
-                                  e.key === "Enter" &&
-                                  !isLoadingInterviewer &&
-                                  handleSendMessage(true)
-                                }
-                                disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                                aria-label="Chat with interviewer"
-                              />
-                              <Button
-                                onClick={() => handleSendMessage(true)}
-                                className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 px-2"
-                                loading={isLoadingInterviewer || isGeneratingDiscussion}
-                                disabled={!interviewerInput.trim()}
-                                aria-label="Send message"
-                              >
-                                {!(isLoadingInterviewer || isGeneratingDiscussion) && (
-                                  <Send className="h-3 w-3" aria-hidden="true" />
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <ChatColumn
+                    focusMode={focusMode}
+                    activePanel={activePanel}
+                    interviewerMessages={interviewerMessages}
+                    isLoadingInterviewer={isLoadingInterviewer}
+                    isGeneratingDiscussion={isGeneratingDiscussion}
+                    interviewerEndRef={interviewerEndRef}
+                    isInterviewStarted={isInterviewStarted}
+                    showPostInterviewDiscussion={showPostInterviewDiscussion}
+                    isRecordingInterviewer={isRecordingInterviewer}
+                    onToggleRecording={() => toggleVoiceRecording(true)}
+                    onCancelRecording={() => {
+                      interviewerVoice.cancelCountdown()
+                      interviewerVoice.stopRecording()
+                      interviewerVoice.resetTranscript()
+                      setInterviewerInput("")
+                    }}
+                    onCancelCountdown={() => interviewerVoice.cancelCountdown()}
+                    onSendMessage={() => handleSendMessage(true)}
+                    countdownActive={interviewerVoice.countdownActive}
+                    interviewerInput={interviewerInput}
+                    onInterviewerInputChange={setInterviewerInput}
+                  />
                 </div>
               ) : showPostInterviewDiscussion ? (
                 <PostInterviewView
@@ -6056,71 +4778,27 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         />
       )}
 
-      {/* Code Viewer Side Panel */}
-      {isCodeViewerOpen && selectedFile && (
-        <CodeViewerSidePanel
-          key={selectedFile.path}
-          isOpen={true}
-          onClose={() => {
-            setIsCodeViewerOpen(false)
-            setSelectedFile(null)
-          }}
-          fileName={selectedFile.path}
-          content={selectedFile.content}
-        />
-      )}
-
-      {/* Company Picker Dialog (for freeball sessions or roadmap with fuzzy mode) */}
-      {selectedScenario && (
-        <CompanyPicker
-          open={showCompanyPicker}
-          onClose={() => {
-            setShowCompanyPicker(false)
-            setLockedCompanyForPicker(null)
-          }}
-          onSelect={(company, realInterviewMode, strictTimeLimit) => {
-            setShowCompanyPicker(false)
-            setLockedCompanyForPicker(null)
-            // Store real interview mode and strict time settings
-            useInterviewStore.getState().setRealInterviewMode(realInterviewMode)
-            useInterviewStore.getState().setStrictTimeLimit(strictTimeLimit)
-            // Restart the interview flow with the selected company
+      <InterviewDialogs
+        selectedFile={selectedFile}
+        isCodeViewerOpen={isCodeViewerOpen}
+        onCodeViewerOpenChange={setIsCodeViewerOpen}
+        onSelectedFileChange={setSelectedFile}
+        selectedScenario={selectedScenario}
+        showCompanyPicker={showCompanyPicker}
+        onCompanyPickerOpenChange={setShowCompanyPicker}
+        lockedCompanyForPicker={lockedCompanyForPicker}
+        onLockedCompanyChange={setLockedCompanyForPicker}
+        onCompanySelected={(company, realInterviewMode, strictTimeLimit) => {
+          useInterviewStore.getState().setRealInterviewMode(realInterviewMode)
+          useInterviewStore.getState().setStrictTimeLimit(strictTimeLimit)
+          if (selectedScenario) {
             startInterview(selectedScenario, company)
-          }}
-          scenarioCompanies={selectedScenario.companies || []}
-          hasFuzzyMode={!!(selectedScenario as any).fuzzyStatement}
-          lockedCompany={lockedCompanyForPicker}
-        />
-      )}
-
-      {/* Close Confirmation Dialog */}
-      <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-        <AlertDialogContent className="border-gray-700 bg-gray-900">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">
-              You want to close this interview?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-300">
-              If you close now, your progress will be saved but you'll exit the interview session.
-              You can always come back to continue later.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-gray-600 bg-gray-800 text-white hover:bg-gray-700">
-              Stay
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowCloseDialog(false)
-                resetInterview()
-              }}
-              className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
-            >
-              Close Interview
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          }
+        }}
+        showCloseDialog={showCloseDialog}
+        onShowCloseDialogChange={setShowCloseDialog}
+        onCloseInterview={resetInterview}
+      />
 
       {!isInterviewMode && <Footer />}
     </main>
