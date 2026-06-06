@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useMemo, useState, useEffect } from "react"
+import { useShallow } from "zustand/react/shallow"
 import {
   Target,
   Lightbulb,
@@ -155,7 +156,16 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
     workspaceContext,
     setWorkspaceContext,
     realInterviewMode,
-  } = useInterviewStore()
+  } = useInterviewStore(
+    useShallow((state) => ({
+      isInterviewStarted: state.isInterviewStarted,
+      elapsedTime: state.elapsedTime,
+      revealedHints: state.revealedHints,
+      workspaceContext: state.workspaceContext,
+      setWorkspaceContext: state.setWorkspaceContext,
+      realInterviewMode: state.realInterviewMode,
+    }))
+  )
 
   const hints = (scenario as any).hints || []
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useCallback, memo } from "react"
+import { useShallow } from "zustand/react/shallow"
 import { Code, PlayCircle, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -43,22 +44,40 @@ function InterviewEditorInner({
     isRunningTests,
     protectedElements,
     starterCode,
-  } = useInterviewStore()
+  } = useInterviewStore(
+    useShallow((state) => ({
+      code: state.code,
+      setCode: state.setCode,
+      selectedLanguage: state.selectedLanguage,
+      selectedScenario: state.selectedScenario,
+      isInterviewStarted: state.isInterviewStarted,
+      showFeedback: state.showFeedback,
+      testResults: state.testResults,
+      testSummary: state.testSummary,
+      efficiencyMetrics: state.efficiencyMetrics,
+      isRunningTests: state.isRunningTests,
+      protectedElements: state.protectedElements,
+      starterCode: state.starterCode,
+    }))
+  )
 
   // Handle code change with protection validation
-  const handleCodeChange = useCallback((newCode: string) => {
-    // Enforce code protection if enabled
-    if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
-      const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+  const handleCodeChange = useCallback(
+    (newCode: string) => {
+      // Enforce code protection if enabled
+      if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+        const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
 
-      if (!validation.valid) {
-        toast.error(`Cannot remove required code: ${validation.errors[0]}`)
-        return
+        if (!validation.valid) {
+          toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+          return
+        }
       }
-    }
 
-    setCode(newCode)
-  }, [protectedElements, starterCode, isInterviewStarted, showFeedback, selectedLanguage, setCode])
+      setCode(newCode)
+    },
+    [protectedElements, starterCode, isInterviewStarted, showFeedback, selectedLanguage, setCode]
+  )
 
   // Get file extension based on language
   const getFileExtension = (lang: Language) => {
@@ -76,9 +95,9 @@ function InterviewEditorInner({
   }
 
   return (
-    <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
-      <CardHeader className="pb-2 flex-shrink-0 px-6">
-        <CardTitle className="text-white flex items-center justify-between text-xs">
+    <Card className="glass-effect flex h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50">
+      <CardHeader className="flex-shrink-0 px-6 pb-2">
+        <CardTitle className="flex items-center justify-between text-xs text-white">
           <div className="flex items-center space-x-1">
             <Code className="h-3 w-3 text-[#00d9ff]" />
             <span>
@@ -88,18 +107,18 @@ function InterviewEditorInner({
           </div>
           {isInterviewStarted && (
             <div className="flex items-center space-x-1">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-green-400 text-xs">LIVE</span>
+              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500"></div>
+              <span className="text-xs text-green-400">LIVE</span>
             </div>
           )}
         </CardTitle>
       </CardHeader>
 
       {/* Code Editor */}
-      <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
         <div
           ref={editorContainerRef}
-          className="flex-1 min-h-0 rounded border border-gray-700 editor-wrapper"
+          className="editor-wrapper min-h-0 flex-1 rounded border border-gray-700"
           style={{ minHeight: "250px" }}
         >
           <MonacoEditor
@@ -113,16 +132,16 @@ function InterviewEditorInner({
 
         {/* Terminal/Console Output */}
         {testResults.length > 0 && (
-          <div className="flex-shrink-0 bg-black border border-gray-700 rounded flex flex-col max-h-48 min-h-[120px]">
+          <div className="flex max-h-48 min-h-[120px] flex-shrink-0 flex-col rounded border border-gray-700 bg-black">
             {/* Terminal Header */}
-            <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-1.5">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                  <div className="h-2.5 w-2.5 rounded-full bg-red-500"></div>
+                  <div className="h-2.5 w-2.5 rounded-full bg-yellow-500"></div>
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
                 </div>
-                <span className="text-gray-400 text-xs font-mono">Terminal</span>
+                <span className="font-mono text-xs text-gray-400">Terminal</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Badge
@@ -130,9 +149,9 @@ function InterviewEditorInner({
                     testSummary.passRate === 100
                       ? "bg-green-600"
                       : testSummary.passRate >= 60
-                      ? "bg-yellow-600"
-                      : "bg-red-600"
-                  } text-xs h-5`}
+                        ? "bg-yellow-600"
+                        : "bg-red-600"
+                  } h-5 text-xs`}
                 >
                   {testSummary.passed}/{testSummary.total} passed
                 </Badge>
@@ -140,11 +159,11 @@ function InterviewEditorInner({
                   <Badge
                     className={`${
                       efficiencyMetrics.efficiencyScore >= 80
-                        ? "bg-green-600/20 text-green-400 border-green-600"
+                        ? "border-green-600 bg-green-600/20 text-green-400"
                         : efficiencyMetrics.efficiencyScore >= 60
-                        ? "bg-yellow-600/20 text-yellow-400 border-yellow-600"
-                        : "bg-red-600/20 text-red-400 border-red-600"
-                    } text-xs h-5 border`}
+                          ? "border-yellow-600 bg-yellow-600/20 text-yellow-400"
+                          : "border-red-600 bg-red-600/20 text-red-400"
+                    } h-5 border text-xs`}
                   >
                     {efficiencyMetrics.efficiencyScore}% efficient
                   </Badge>
@@ -153,8 +172,8 @@ function InterviewEditorInner({
             </div>
 
             {/* Terminal Content */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
-              <div className="text-gray-400 mb-2">
+            <div className="flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs">
+              <div className="mb-2 text-gray-400">
                 <span className="text-[#00d9ff]">$</span> Running tests...
               </div>
 
@@ -175,7 +194,7 @@ function InterviewEditorInner({
                   </div>
 
                   {!result.passed && (
-                    <div className="ml-5 mt-1 space-y-0.5 text-gray-300">
+                    <div className="mt-1 ml-5 space-y-0.5 text-gray-300">
                       <div className="flex items-start space-x-2">
                         <span className="text-gray-500">Input:</span>
                         <span className="text-blue-300">{JSON.stringify(result.input)}</span>
@@ -189,9 +208,9 @@ function InterviewEditorInner({
                         <span className="text-red-300">{JSON.stringify(result.actual)}</span>
                       </div>
                       {result.error && (
-                        <div className="flex items-start space-x-2 mt-1">
-                          <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-400 mt-0.5" />
-                          <span className="text-red-300 break-all">{result.error}</span>
+                        <div className="mt-1 flex items-start space-x-2">
+                          <AlertCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-red-400" />
+                          <span className="break-all text-red-300">{result.error}</span>
                         </div>
                       )}
                     </div>
@@ -201,7 +220,7 @@ function InterviewEditorInner({
 
               {/* Efficiency Metrics */}
               {efficiencyMetrics && (
-                <div className="border-t border-gray-800 pt-2 mt-2 space-y-1">
+                <div className="mt-2 space-y-1 border-t border-gray-800 pt-2">
                   <div className="text-gray-400">Complexity Analysis:</div>
                   <div className="ml-2 space-y-0.5 text-gray-300">
                     <div>
@@ -217,7 +236,7 @@ function InterviewEditorInner({
                         {efficiencyMetrics.estimatedTimeComplexity}
                       </span>
                       {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
-                        <span className="text-gray-500 ml-1">
+                        <span className="ml-1 text-gray-500">
                           (optimal: {efficiencyMetrics.optimalTimeComplexity})
                         </span>
                       )}
@@ -235,7 +254,7 @@ function InterviewEditorInner({
                         {efficiencyMetrics.estimatedSpaceComplexity}
                       </span>
                       {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
-                        <span className="text-gray-500 ml-1">
+                        <span className="ml-1 text-gray-500">
                           (optimal: {efficiencyMetrics.optimalSpaceComplexity})
                         </span>
                       )}
@@ -243,7 +262,8 @@ function InterviewEditorInner({
                     <div>
                       <span className="text-gray-500">Code Quality:</span>
                       <span className="ml-2 text-gray-300">
-                        {efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode} LOC
+                        {efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode}{" "}
+                        LOC
                       </span>
                     </div>
                   </div>
@@ -254,16 +274,16 @@ function InterviewEditorInner({
         )}
 
         {/* Controls */}
-        <div className="flex items-center justify-end gap-2 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-end gap-2">
           <Button
             onClick={onRunTests}
             disabled={showFeedback || isRunningTests}
-            className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+            className="h-7 bg-green-600 text-xs text-white hover:bg-green-700"
             aria-label={isRunningTests ? "Running tests" : "Run tests"}
           >
             {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
             {isRunningTests && (
-              <div className="mr-1 h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="mr-1 h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             )}
             {isRunningTests ? "Running..." : "Run Tests"}
           </Button>

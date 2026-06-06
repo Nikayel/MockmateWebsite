@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import { Brain, User, MessageSquare, Send, Mic, Square, ChevronDown, ChevronUp } from "lucide-react"
+import { useShallow } from "zustand/react/shallow"
 import { FormattedText } from "@/components/ui/FormattedText"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -191,7 +192,15 @@ export function InterviewerChat({
     showPostInterviewDiscussion,
     isLoadingInterviewer,
     isGeneratingDiscussion,
-  } = useInterviewStore()
+  } = useInterviewStore(
+    useShallow((state) => ({
+      interviewerMessages: state.interviewerMessages,
+      isInterviewStarted: state.isInterviewStarted,
+      showPostInterviewDiscussion: state.showPostInterviewDiscussion,
+      isLoadingInterviewer: state.isLoadingInterviewer,
+      isGeneratingDiscussion: state.isGeneratingDiscussion,
+    }))
+  )
 
   // Smart auto-scroll with user scroll position tracking
   // Dependencies: messages, loading state, recording state (for STT updates)
@@ -437,7 +446,12 @@ export function AIChatPartner({
   inputValue,
   onInputChange,
 }: AIChatPartnerProps) {
-  const { chatMessages, isLoadingChat } = useInterviewStore()
+  const { chatMessages, isLoadingChat } = useInterviewStore(
+    useShallow((state) => ({
+      chatMessages: state.chatMessages,
+      isLoadingChat: state.isLoadingChat,
+    }))
+  )
 
   // Smart auto-scroll with user scroll position tracking
   const {

@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import { useShallow } from "zustand/react/shallow"
 import { useInterviewStore } from "@/lib/stores"
 import {
   filterScenarios,
@@ -18,7 +19,18 @@ export function useScenarioFilters() {
     setFilterCompanies,
     searchQuery,
     setSearchQuery,
-  } = useInterviewStore()
+  } = useInterviewStore(
+    useShallow((state) => ({
+      filterType: state.filterType,
+      setFilterType: state.setFilterType,
+      filterDifficulty: state.filterDifficulty,
+      setFilterDifficulty: state.setFilterDifficulty,
+      filterCompanies: state.filterCompanies,
+      setFilterCompanies: state.setFilterCompanies,
+      searchQuery: state.searchQuery,
+      setSearchQuery: state.setSearchQuery,
+    }))
+  )
 
   // Memoize filtered scenarios
   const filteredScenarios = useMemo(() => {

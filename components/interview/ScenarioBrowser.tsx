@@ -2,6 +2,7 @@
 
 import { useState, memo } from "react"
 import { Search, LayoutGrid, List, Target } from "lucide-react"
+import { useShallow } from "zustand/react/shallow"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 import type { Scenario } from "@/lib/scenarios"
 import { useScenarioFilters } from "@/lib/hooks"
@@ -26,7 +27,12 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   hasGuestBanner = false,
 }: ScenarioBrowserProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("patterns")
-  const { selectedScenario, setSelectedScenario } = useInterviewStore()
+  const { selectedScenario, setSelectedScenario } = useInterviewStore(
+    useShallow((state) => ({
+      selectedScenario: state.selectedScenario,
+      setSelectedScenario: state.setSelectedScenario,
+    }))
+  )
 
   const {
     filterType,
