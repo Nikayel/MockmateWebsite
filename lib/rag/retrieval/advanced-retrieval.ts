@@ -12,8 +12,14 @@
 import { getHybridProvider } from "../embeddings/hybrid-provider"
 import { vectorDB } from "../vectordb"
 import type { QueryResult, VectorContentType } from "../types"
+import { RETRIEVAL_CONFIG } from "../config"
+import { rankBM25 } from "./bm25"
+import { fetchLexicalCorpus } from "./lexical-corpus"
+import { getRAGMonitor } from "../monitoring"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type { CompanyId } from "@/lib/data/company-questions/types"
+
+export type RetrievalStrategy = "semantic" | "bm25" | "hybrid"
 
 /**
  * Advanced retrieval options
@@ -33,11 +39,13 @@ export interface AdvancedRetrievalOptions {
   excludeIds?: string[]
 
   // Advanced options
+  strategy?: RetrievalStrategy // Retrieval candidate strategy (default: config-driven hybrid)
   enableQueryExpansion?: boolean // Generate related queries
   enableHybridSearch?: boolean // Combine semantic + keyword
   enableReranking?: boolean // Apply advanced reranking
   enablePersonalization?: boolean // Personalize based on user
   contextDocuments?: string[] // Additional context for retrieval
+  feature?: "chat" | "hints" | "recommendations" | "roadmap" | "feedback" | "similarity" | "other"
 
   // Reranking weights
   rerankingWeights?: {
@@ -58,6 +66,10 @@ export interface EnhancedRetrievalResult {
   type: string
   baseScore: number // Original similarity score
   finalScore: number // After reranking
+  semanticScore?: number
+  bm25Score?: number
+  matchedSources?: Array<"semantic" | "bm25">
+  matchedTerms?: string[]
   metadata: Record<string, unknown>
   highlights?: string[] // Relevant snippets
   matchedQueries?: string[] // Which expanded queries matched
@@ -72,8 +84,22 @@ export interface RetrievalAnalytics {
   afterReranking: number
   queryExpansionUsed: boolean
   expansionQueries?: string[]
+  strategy: RetrievalStrategy
+  semanticCandidateCount: number
+  bm25CandidateCount: number
+  overlapCount: number
+  emptyResult: boolean
+  topScore?: number
   retrievalTimeMs: number
   rerankingTimeMs: number
+}
+
+type RetrievalCandidate = QueryResult & {
+  matchedQueries: string[]
+  semanticScore: number
+  bm25Score: number
+  matchedSources: Array<"semantic" | "bm25">
+  matchedTerms: string[]
 }
 
 /**
@@ -90,11 +116,17 @@ export class AdvancedRetriever {
     analytics: RetrievalAnalytics
   }> {
     const startTime = Date.now()
+    const strategy = this.resolveStrategy(options)
     const analytics: RetrievalAnalytics = {
       totalCandidates: 0,
       afterFiltering: 0,
       afterReranking: 0,
       queryExpansionUsed: options.enableQueryExpansion || false,
+      strategy,
+      semanticCandidateCount: 0,
+      bm25CandidateCount: 0,
+      overlapCount: 0,
+      emptyResult: false,
       retrievalTimeMs: 0,
       rerankingTimeMs: 0,
     }
@@ -107,36 +139,21 @@ export class AdvancedRetriever {
     analytics.expansionQueries = queries
 
     // Step 2: Retrieve candidates for each query
-    const allCandidates: Map<string, QueryResult & { matchedQueries: string[] }> = new Map()
+    const allCandidates: Map<string, RetrievalCandidate> = new Map()
 
-    for (const query of queries) {
-      const embedding = await this.embeddingProvider.generateEmbedding(query)
-
-      const results = await vectorDB.query(embedding, {
-        topK: Math.min((options.limit || 10) * 3, 100), // Get more for reranking
-        filter: {
-          type: options.types?.[0],
-          userId: options.userId,
-          minSimilarity: options.minSimilarity || 0.3,
-          excludeIds: options.excludeIds,
-        },
-        includeMetadata: true,
-      })
-
-      for (const result of results) {
-        const existing = allCandidates.get(result.id)
-        if (existing) {
-          // Combine scores for duplicate results (query expansion)
-          existing.score = Math.max(existing.score, result.score)
-          existing.matchedQueries.push(query)
-        } else {
-          allCandidates.set(result.id, {
-            ...result,
-            matchedQueries: [query],
-          })
-        }
-      }
+    if (strategy === "semantic" || strategy === "hybrid") {
+      const semanticCount = await this.retrieveSemanticCandidates(queries, options, allCandidates)
+      analytics.semanticCandidateCount = semanticCount
     }
+
+    if (strategy === "bm25" || strategy === "hybrid") {
+      const bm25Count = await this.retrieveBM25Candidates(queries, options, allCandidates)
+      analytics.bm25CandidateCount = bm25Count
+    }
+
+    analytics.overlapCount = Array.from(allCandidates.values()).filter(
+      (candidate) => candidate.matchedSources.length > 1
+    ).length
 
     analytics.totalCandidates = allCandidates.size
     const retrievalEndTime = Date.now()
@@ -192,6 +209,10 @@ export class AdvancedRetriever {
         type: (c.metadata?.type as string) || "",
         baseScore: c.score,
         finalScore: c.score,
+        semanticScore: c.semanticScore,
+        bm25Score: c.bm25Score,
+        matchedSources: c.matchedSources,
+        matchedTerms: c.matchedTerms,
         metadata: c.metadata || {},
         matchedQueries: c.matchedQueries,
       }))
@@ -202,11 +223,152 @@ export class AdvancedRetriever {
 
     // Step 5: Limit results
     const finalResults = enhancedResults.slice(0, options.limit || 10)
+    analytics.emptyResult = finalResults.length === 0
+    analytics.topScore = finalResults[0]?.finalScore
+
+    getRAGMonitor().recordRetrieval(
+      finalResults.length,
+      analytics.retrievalTimeMs,
+      analytics.rerankingTimeMs,
+      {
+        strategy,
+        semanticCandidateCount: analytics.semanticCandidateCount,
+        bm25CandidateCount: analytics.bm25CandidateCount,
+        overlapCount: analytics.overlapCount,
+        emptyResult: analytics.emptyResult,
+        topScore: analytics.topScore,
+        feature: options.feature || "other",
+      }
+    )
 
     return {
       results: finalResults,
       analytics,
     }
+  }
+
+  private resolveStrategy(options: AdvancedRetrievalOptions): RetrievalStrategy {
+    if (options.strategy) return options.strategy
+    if (options.enableHybridSearch === false) return "semantic"
+    return RETRIEVAL_CONFIG.hybridSearch.enabledByDefault ? "hybrid" : "semantic"
+  }
+
+  private getSemanticTopK(options: AdvancedRetrievalOptions): number {
+    const limit = options.limit || RETRIEVAL_CONFIG.defaults.limit
+    return Math.min(
+      limit * RETRIEVAL_CONFIG.hybridSearch.semanticCandidateMultiplier,
+      RETRIEVAL_CONFIG.hybridSearch.maxSemanticCandidates
+    )
+  }
+
+  private getBM25TopK(options: AdvancedRetrievalOptions): number {
+    const limit = options.limit || RETRIEVAL_CONFIG.defaults.limit
+    return Math.min(
+      limit * RETRIEVAL_CONFIG.hybridSearch.bm25CandidateMultiplier,
+      RETRIEVAL_CONFIG.hybridSearch.maxBM25Candidates
+    )
+  }
+
+  private mergeCandidate(
+    allCandidates: Map<string, RetrievalCandidate>,
+    result: QueryResult,
+    query: string,
+    source: "semantic" | "bm25",
+    matchedTerms: string[] = []
+  ): void {
+    const existing = allCandidates.get(result.id)
+    const score = result.score || 0
+
+    if (existing) {
+      existing.score = Math.max(existing.score, score)
+      existing.matchedQueries.push(query)
+      if (!existing.matchedSources.includes(source)) existing.matchedSources.push(source)
+      if (source === "semantic") existing.semanticScore = Math.max(existing.semanticScore, score)
+      if (source === "bm25") existing.bm25Score = Math.max(existing.bm25Score, score)
+      existing.matchedTerms = Array.from(new Set([...existing.matchedTerms, ...matchedTerms]))
+      existing.metadata = { ...existing.metadata, ...(result.metadata || {}) }
+      return
+    }
+
+    allCandidates.set(result.id, {
+      ...result,
+      score,
+      matchedQueries: [query],
+      semanticScore: source === "semantic" ? score : 0,
+      bm25Score: source === "bm25" ? score : 0,
+      matchedSources: [source],
+      matchedTerms,
+    })
+  }
+
+  private async retrieveSemanticCandidates(
+    queries: string[],
+    options: AdvancedRetrievalOptions,
+    allCandidates: Map<string, RetrievalCandidate>
+  ): Promise<number> {
+    let count = 0
+
+    for (const query of queries) {
+      const embedding = await this.embeddingProvider.generateEmbedding(query)
+
+      const results = await vectorDB.query(embedding, {
+        topK: this.getSemanticTopK(options),
+        filter: {
+          type: options.types?.[0],
+          userId: options.userId,
+          minSimilarity: options.minSimilarity || RETRIEVAL_CONFIG.defaults.minSimilarity,
+          excludeIds: options.excludeIds,
+        },
+        includeMetadata: true,
+      })
+
+      count += results.length
+      for (const result of results) {
+        this.mergeCandidate(allCandidates, result, query, "semantic")
+      }
+    }
+
+    return count
+  }
+
+  private async retrieveBM25Candidates(
+    queries: string[],
+    options: AdvancedRetrievalOptions,
+    allCandidates: Map<string, RetrievalCandidate>
+  ): Promise<number> {
+    const documents = await fetchLexicalCorpus({
+      types: options.types,
+      userId: options.userId,
+      excludeIds: options.excludeIds,
+    })
+
+    let count = 0
+    for (const query of queries) {
+      const results = rankBM25(query, documents, {
+        limit: this.getBM25TopK(options),
+      })
+
+      count += results.length
+      for (const result of results) {
+        this.mergeCandidate(
+          allCandidates,
+          {
+            id: result.document.id,
+            score: result.normalizedScore,
+            metadata: {
+              ...(result.document.metadata || {}),
+              text: result.document.text,
+              type: result.document.type || result.document.metadata?.type,
+            },
+          },
+          query,
+          "bm25",
+          result.matchedTerms
+        )
+      }
+    }
+
+    return count
   }
 
   /**
@@ -256,9 +418,10 @@ export class AdvancedRetriever {
    * Advanced reranking with multiple signals
    */
   private async rerank(
-    candidates: (QueryResult & { matchedQueries: string[] })[],
+    candidates: RetrievalCandidate[],
     options: AdvancedRetrievalOptions
   ): Promise<EnhancedRetrievalResult[]> {
+    const strategy = this.resolveStrategy(options)
     const weights = {
       similarity: 0.5,
       recency: 0.1,
@@ -267,33 +430,38 @@ export class AdvancedRetriever {
       userHistory: 0.1,
       ...options.rerankingWeights,
     }
+    const hybridWeights = RETRIEVAL_CONFIG.hybridSearch.weights
 
     const now = Date.now()
     const maxAge = 365 * 24 * 60 * 60 * 1000 // 1 year
 
     return candidates
       .map((candidate) => {
-        let finalScore = 0
+        let legacyScore = 0
+        let boostScore = 0
 
         // 1. Base similarity score
-        finalScore += candidate.score * weights.similarity
+        legacyScore += candidate.semanticScore * weights.similarity
 
         // 2. Recency boost
         const timestamp = candidate.metadata?.timestamp || candidate.metadata?.createdAt
         if (timestamp) {
           const age = now - new Date(timestamp as string).getTime()
           const recencyScore = Math.max(0, 1 - age / maxAge)
-          finalScore += recencyScore * weights.recency
+          legacyScore += recencyScore * weights.recency
+          boostScore += recencyScore * weights.recency
         }
 
         // 3. Relevance boost (based on matched queries)
         const queryMatchBoost = Math.min(1, candidate.matchedQueries.length / 3)
-        finalScore += queryMatchBoost * weights.relevance
+        legacyScore += queryMatchBoost * weights.relevance
+        boostScore += queryMatchBoost * weights.relevance
 
         // 4. Popularity/importance boost
         const importance = (candidate.metadata?.importance as number) || 5
         const popularityScore = importance / 10
-        finalScore += popularityScore * weights.popularity
+        legacyScore += popularityScore * weights.popularity
+        boostScore += popularityScore * weights.popularity
 
         // 5. User history match (if enabled)
         if (options.enablePersonalization && options.userId) {
@@ -301,7 +469,8 @@ export class AdvancedRetriever {
             candidate.metadata?.userId === options.userId ||
             candidate.metadata?.user_id === options.userId
           if (isUserContent) {
-            finalScore += weights.userHistory
+            legacyScore += weights.userHistory
+            boostScore += weights.userHistory
           }
         }
 
@@ -313,7 +482,9 @@ export class AdvancedRetriever {
               (candidate.metadata?.patterns as string[])?.includes(p)
           )
           if (matchedPatterns.length > 0) {
-            finalScore += 0.1 * (matchedPatterns.length / options.patterns.length)
+            const patternBoost = 0.1 * (matchedPatterns.length / options.patterns.length)
+            legacyScore += patternBoost
+            boostScore += patternBoost
           }
         }
 
@@ -325,8 +496,24 @@ export class AdvancedRetriever {
               (candidate.metadata?.companyIds as string[])?.includes(c)
           )
           if (matchedCompanies.length > 0) {
-            finalScore += 0.1 * (matchedCompanies.length / options.companies.length)
+            const companyBoost = 0.1 * (matchedCompanies.length / options.companies.length)
+            legacyScore += companyBoost
+            boostScore += companyBoost
           }
+        }
+
+        let finalScore: number
+        if (strategy === "hybrid") {
+          finalScore =
+            candidate.semanticScore * hybridWeights.semantic +
+            candidate.bm25Score * hybridWeights.bm25 +
+            Math.min(1, boostScore) * hybridWeights.boosts
+        } else if (strategy === "bm25") {
+          finalScore =
+            candidate.bm25Score * (hybridWeights.semantic + hybridWeights.bm25) +
+            Math.min(1, boostScore) * hybridWeights.boosts
+        } else {
+          finalScore = legacyScore
         }
 
         return {
@@ -339,6 +526,10 @@ export class AdvancedRetriever {
             "",
           baseScore: candidate.score,
           finalScore: Math.min(1, finalScore), // Cap at 1.0
+          semanticScore: candidate.semanticScore,
+          bm25Score: candidate.bm25Score,
+          matchedSources: candidate.matchedSources,
+          matchedTerms: candidate.matchedTerms,
           metadata: candidate.metadata || {},
           matchedQueries: candidate.matchedQueries,
         }

@@ -58,6 +58,12 @@ export interface RAGMetrics {
     avgResultCount: number
     avgRetrievalTimeMs: number
     avgRerankingTimeMs: number
+    emptyResultRate: number
+    avgSemanticCandidates: number
+    avgBM25Candidates: number
+    avgOverlapCount: number
+    byStrategy: Record<string, number>
+    byFeature: Record<string, number>
   }
 
   // Knowledge base metrics
@@ -119,7 +125,19 @@ export class RAGMonitor {
   private startTime: Date
   private metricsBuffer: {
     embeddings: { provider: string; latencyMs: number; timestamp: Date }[]
-    retrievals: { resultCount: number; retrievalMs: number; rerankMs: number; timestamp: Date }[]
+    retrievals: Array<{
+      resultCount: number
+      retrievalMs: number
+      rerankMs: number
+      timestamp: Date
+      strategy?: string
+      semanticCandidateCount?: number
+      bm25CandidateCount?: number
+      overlapCount?: number
+      emptyResult?: boolean
+      topScore?: number
+      feature?: string
+    }>
     errors: RAGError[]
   }
 
@@ -337,12 +355,26 @@ export class RAGMonitor {
   /**
    * Record retrieval operation
    */
-  recordRetrieval(resultCount: number, retrievalMs: number, rerankMs: number): void {
+  recordRetrieval(
+    resultCount: number,
+    retrievalMs: number,
+    rerankMs: number,
+    details: {
+      strategy?: string
+      semanticCandidateCount?: number
+      bm25CandidateCount?: number
+      overlapCount?: number
+      emptyResult?: boolean
+      topScore?: number
+      feature?: string
+    } = {}
+  ): void {
     this.metricsBuffer.retrievals.push({
       resultCount,
       retrievalMs,
       rerankMs,
       timestamp: new Date(),
+      ...details,
     })
 
     // Keep only last 1000 records
@@ -405,10 +437,22 @@ export class RAGMonitor {
     let totalResultCount = 0
     let totalRetrievalTime = 0
     let totalRerankTime = 0
+    let emptyResults = 0
+    let totalSemanticCandidates = 0
+    let totalBM25Candidates = 0
+    let totalOverlapCount = 0
+    const byStrategy: Record<string, number> = {}
+    const byFeature: Record<string, number> = {}
     for (const r of recentRetrievals) {
       totalResultCount += r.resultCount
       totalRetrievalTime += r.retrievalMs
       totalRerankTime += r.rerankMs
+      if (r.emptyResult) emptyResults++
+      totalSemanticCandidates += r.semanticCandidateCount || 0
+      totalBM25Candidates += r.bm25CandidateCount || 0
+      totalOverlapCount += r.overlapCount || 0
+      if (r.strategy) byStrategy[r.strategy] = (byStrategy[r.strategy] || 0) + 1
+      if (r.feature) byFeature[r.feature] = (byFeature[r.feature] || 0) + 1
     }
 
     // Get knowledge base stats
@@ -466,6 +510,15 @@ export class RAGMonitor {
           recentRetrievals.length > 0 ? totalRetrievalTime / recentRetrievals.length : 0,
         avgRerankingTimeMs:
           recentRetrievals.length > 0 ? totalRerankTime / recentRetrievals.length : 0,
+        emptyResultRate: recentRetrievals.length > 0 ? emptyResults / recentRetrievals.length : 0,
+        avgSemanticCandidates:
+          recentRetrievals.length > 0 ? totalSemanticCandidates / recentRetrievals.length : 0,
+        avgBM25Candidates:
+          recentRetrievals.length > 0 ? totalBM25Candidates / recentRetrievals.length : 0,
+        avgOverlapCount:
+          recentRetrievals.length > 0 ? totalOverlapCount / recentRetrievals.length : 0,
+        byStrategy,
+        byFeature,
       },
       knowledgeBase: kbStats,
       usageByFeature,
