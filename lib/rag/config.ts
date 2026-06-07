@@ -138,6 +138,24 @@ export const RETRIEVAL_CONFIG = {
   },
 
   /**
+   * Universal hybrid search settings.
+   * Semantic and BM25 retrieval run as parallel candidate generators, then rerank once.
+   */
+  hybridSearch: {
+    enabledByDefault: process.env.RAG_HYBRID_SEARCH_ENABLED !== "false",
+    semanticCandidateMultiplier: parseInt(process.env.RAG_SEMANTIC_CANDIDATE_MULTIPLIER || "4", 10),
+    bm25CandidateMultiplier: parseInt(process.env.RAG_BM25_CANDIDATE_MULTIPLIER || "4", 10),
+    maxSemanticCandidates: parseInt(process.env.RAG_MAX_SEMANTIC_CANDIDATES || "100", 10),
+    maxBM25Candidates: parseInt(process.env.RAG_MAX_BM25_CANDIDATES || "100", 10),
+    corpusFetchLimit: parseInt(process.env.RAG_BM25_CORPUS_FETCH_LIMIT || "500", 10),
+    weights: {
+      semantic: parseFloat(process.env.RAG_WEIGHT_SEMANTIC || "0.6"),
+      bm25: parseFloat(process.env.RAG_WEIGHT_BM25 || "0.25"),
+      boosts: parseFloat(process.env.RAG_WEIGHT_BOOSTS || "0.15"),
+    },
+  },
+
+  /**
    * Query expansion settings
    */
   queryExpansion: {
@@ -268,6 +286,14 @@ export function validateConfig(): string[] {
   const weightsSum = Object.values(RETRIEVAL_CONFIG.rerankingWeights).reduce((a, b) => a + b, 0)
   if (weightsSum < 0.9 || weightsSum > 1.1) {
     errors.push(`Reranking weights sum to ${weightsSum}, expected ~1.0`)
+  }
+
+  const hybridWeightsSum = Object.values(RETRIEVAL_CONFIG.hybridSearch.weights).reduce(
+    (a, b) => a + b,
+    0
+  )
+  if (hybridWeightsSum < 0.9 || hybridWeightsSum > 1.1) {
+    errors.push(`Hybrid search weights sum to ${hybridWeightsSum}, expected ~1.0`)
   }
 
   // Validate similarity thresholds are in valid range
