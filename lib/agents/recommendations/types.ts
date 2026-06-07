@@ -15,6 +15,7 @@ export type RecommendationReason =
 export interface ProblemScore {
   overall: number
   relevance: number
+  lexicalRelevance: number
   difficulty: number
   freshness: number
   patternValue: number

@@ -155,13 +155,33 @@ describe("recommendation agent", () => {
       })
     )
     expect(response.recommendations[0].score).toEqual({
-      overall: 89,
+      overall: 90,
       relevance: 110,
+      lexicalRelevance: 100,
       difficulty: 60,
       freshness: 100,
       patternValue: 90,
       progression: 80,
     })
+  })
+
+  it("uses lexical relevance for exact company and pattern matches without replacing profile fit", async () => {
+    const { scoreCatalogLexicalRelevance } = await import("../scoring")
+    const profile = createProfile()
+
+    const scores = scoreCatalogLexicalRelevance(
+      catalog,
+      {
+        userId: "user-1",
+        targetCompany: "Google",
+        targetPatterns: ["two-pointers"],
+        sessionGoal: "practice",
+      },
+      profile
+    )
+
+    expect(scores.get("valid-palindrome")).toBe(100)
+    expect(scores.get("contains-duplicate") || 0).toBeLessThan(scores.get("valid-palindrome") || 0)
   })
 
   it("falls back to a default profile when performance loading fails", async () => {

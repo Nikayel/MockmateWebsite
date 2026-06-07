@@ -1,5 +1,6 @@
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import type { UserPerformanceProfile } from "@/lib/rag/user-performance-rag"
+import { rankBM25, type BM25Document } from "@/lib/rag/retrieval/bm25"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type {
   CatalogProblem,
@@ -8,6 +9,55 @@ import type {
   RecommendationReason,
   RecommendationRequest,
 } from "./types"
+
+function catalogProblemToBM25Document(problem: CatalogProblem): BM25Document {
+  return {
+    id: problem.id,
+    text: problem.description || problem.title,
+    type: "problem",
+    metadata: {
+      title: problem.title,
+      pattern: problem.pattern,
+      difficulty: problem.difficulty,
+      company: problem.company,
+      frequency: problem.frequency,
+      tags: problem.tags,
+    },
+  }
+}
+
+export function buildRecommendationLexicalQuery(
+  request: RecommendationRequest,
+  profile?: UserPerformanceProfile
+): string {
+  const parts = [
+    request.targetCompany,
+    request.targetPatterns?.join(" "),
+    request.preferredDifficulty && request.preferredDifficulty !== "adaptive"
+      ? request.preferredDifficulty
+      : undefined,
+    request.sessionGoal,
+    profile?.weaknesses.join(" "),
+    profile?.focusAreas.join(" "),
+  ]
+
+  return parts.filter(Boolean).join(" ")
+}
+
+export function scoreCatalogLexicalRelevance(
+  catalog: CatalogProblem[],
+  request: RecommendationRequest,
+  profile?: UserPerformanceProfile
+): Map<string, number> {
+  const query = buildRecommendationLexicalQuery(request, profile)
+  if (!query) return new Map()
+
+  const results = rankBM25(query, catalog.map(catalogProblemToBM25Document))
+
+  return new Map(
+    results.map((result) => [result.document.id, Math.round(result.normalizedScore * 100)])
+  )
+}
 
 export function estimateProblemTime(difficulty: string, pattern: DSAPattern): number {
   const baseTime =
@@ -55,7 +105,8 @@ export function getAdaptiveDifficulty(
 export function scoreProblem(
   problem: CatalogProblem,
   profile: UserPerformanceProfile,
-  request: RecommendationRequest
+  request: RecommendationRequest,
+  lexicalRelevance = 0
 ): ProblemScore {
   let relevance = 50
   let difficulty = 50
@@ -121,16 +172,18 @@ export function scoreProblem(
   }
 
   const overall = Math.round(
-    relevance * 0.25 +
-      difficulty * 0.2 +
-      freshness * 0.15 +
-      patternValue * 0.25 +
-      progression * 0.15
+    relevance * 0.2 +
+      difficulty * 0.18 +
+      freshness * 0.14 +
+      patternValue * 0.23 +
+      progression * 0.15 +
+      lexicalRelevance * 0.1
   )
 
   return {
     overall,
     relevance,
+    lexicalRelevance,
     difficulty,
     freshness,
     patternValue,

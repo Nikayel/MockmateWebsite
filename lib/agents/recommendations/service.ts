@@ -3,7 +3,12 @@ import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { getRecommendationProfile, getUserLevel } from "./profile"
 import { calculateReadiness } from "./readiness"
 import { determineReason, getReasonText } from "./reasons"
-import { estimateProblemTime, getPriority, scoreProblem } from "./scoring"
+import {
+  estimateProblemTime,
+  getPriority,
+  scoreCatalogLexicalRelevance,
+  scoreProblem,
+} from "./scoring"
 import { buildSessionPlan } from "./session-plan"
 import type {
   CatalogProblem,
@@ -27,8 +32,10 @@ export async function generateRecommendations(
     )
   }
 
+  const lexicalScores = scoreCatalogLexicalRelevance(eligibleProblems, request, profile)
+
   const scoredProblems = eligibleProblems.map((problem) => {
-    const score = scoreProblem(problem, profile, request)
+    const score = scoreProblem(problem, profile, request, lexicalScores.get(problem.id) || 0)
     const reason = determineReason(problem, profile, request)
 
     return {
