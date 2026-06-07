@@ -87,6 +87,13 @@ interface RAGHealthData {
       totalQueries: number
       avgResultCount: number
       avgRetrievalTimeMs: number
+      avgRerankingTimeMs: number
+      emptyResultRate: number
+      avgSemanticCandidates: number
+      avgBM25Candidates: number
+      avgOverlapCount: number
+      byStrategy: Record<string, number>
+      byFeature: Record<string, number>
     }
     knowledgeBase: {
       totalDocuments: number
@@ -114,9 +121,17 @@ interface EvalResult {
   query: string
   category: string
   passed: boolean
-  expected: string
-  gotTopId: string
-  score?: number
+  relevantIds: string[]
+  retrievedIds: string[]
+  topId: string | null
+  topScore?: number
+  metrics: {
+    precisionAtK: Record<number, number>
+    recallAtK: Record<number, number>
+    hitAtK: Record<number, boolean>
+    mrr: number
+    firstRelevantRank: number | null
+  }
   error?: string
 }
 
@@ -127,6 +142,19 @@ interface EvalData {
     passed: number
     failed: number
     passRate: number
+    meanPrecisionAtK: Record<number, number>
+    meanRecallAtK: Record<number, number>
+    meanHitAtK: Record<number, number>
+    meanMrr: number
+    byCategory: Record<
+      string,
+      {
+        total: number
+        passed: number
+        passRate: number
+        meanMrr: number
+      }
+    >
     status: "good" | "ok" | "needs_attention"
   }
   timestamp: string
@@ -685,7 +713,7 @@ export default function RAGHealthPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <div className="rounded-lg bg-gray-800/50 p-4">
                   <p className="text-sm text-gray-400">Total Queries</p>
                   <p className="text-2xl font-bold text-white">
@@ -702,6 +730,38 @@ export default function RAGHealthPage() {
                   <p className="text-sm text-gray-400">Avg Retrieval Time</p>
                   <p className="text-2xl font-bold text-white">
                     {healthData.metrics.retrieval.avgRetrievalTimeMs.toFixed(0)}ms
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-800/50 p-4">
+                  <p className="text-sm text-gray-400">Empty Result Rate</p>
+                  <p className="text-2xl font-bold text-white">
+                    {(healthData.metrics.retrieval.emptyResultRate * 100).toFixed(1)}%
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-800/50 p-4">
+                  <p className="text-sm text-gray-400">Avg Semantic Candidates</p>
+                  <p className="text-2xl font-bold text-white">
+                    {healthData.metrics.retrieval.avgSemanticCandidates.toFixed(1)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-800/50 p-4">
+                  <p className="text-sm text-gray-400">Avg BM25 Candidates</p>
+                  <p className="text-2xl font-bold text-white">
+                    {healthData.metrics.retrieval.avgBM25Candidates.toFixed(1)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-800/50 p-4">
+                  <p className="text-sm text-gray-400">Avg Overlap</p>
+                  <p className="text-2xl font-bold text-white">
+                    {healthData.metrics.retrieval.avgOverlapCount.toFixed(1)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-800/50 p-4 md:col-span-2">
+                  <p className="text-sm text-gray-400">Strategies</p>
+                  <p className="text-sm text-white">
+                    {Object.entries(healthData.metrics.retrieval.byStrategy)
+                      .map(([strategy, count]) => `${strategy}: ${count}`)
+                      .join(" • ") || "No retrievals yet"}
                   </p>
                 </div>
               </div>
@@ -758,11 +818,29 @@ export default function RAGHealthPage() {
                   <p className="text-sm text-gray-400">
                     {evalData.summary.passed}/{evalData.summary.total} passed
                   </p>
+                  <p className="text-xs text-gray-500">
+                    MRR {evalData.summary.meanMrr.toFixed(2)} • P@5{" "}
+                    {((evalData.summary.meanPrecisionAtK[5] || 0) * 100).toFixed(0)}% • R@10{" "}
+                    {((evalData.summary.meanRecallAtK[10] || 0) * 100).toFixed(0)}%
+                  </p>
                 </div>
               </div>
             </div>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              {Object.entries(evalData.summary.byCategory).map(([category, stats]) => (
+                <div key={category} className="rounded-lg bg-gray-800/40 p-3">
+                  <p className="text-sm text-gray-400 capitalize">{category}</p>
+                  <p className="text-lg font-bold text-white">
+                    {stats.passed}/{stats.total}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Pass {stats.passRate.toFixed(0)}% • MRR {stats.meanMrr.toFixed(2)}
+                  </p>
+                </div>
+              ))}
+            </div>
             <div className="space-y-2">
               {evalData.results.map((result, idx) => (
                 <div
@@ -784,18 +862,25 @@ export default function RAGHealthPage() {
                           {result.category}
                         </Badge>
                         {!result.passed && (
-                          <span className="text-xs text-red-400">Expected: {result.expected}</span>
+                          <span className="text-xs text-red-400">
+                            Expected: {result.relevantIds.join(", ")}
+                          </span>
                         )}
                       </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        P@5 {((result.metrics.precisionAtK[5] || 0) * 100).toFixed(0)}% • R@10{" "}
+                        {((result.metrics.recallAtK[10] || 0) * 100).toFixed(0)}% • MRR{" "}
+                        {result.metrics.mrr.toFixed(2)}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <span className="font-mono text-xs text-gray-500">
-                      {result.gotTopId.slice(0, 30)}
+                      {(result.topId || "none").slice(0, 30)}
                     </span>
-                    {result.score !== undefined && (
+                    {result.topScore !== undefined && (
                       <p className="text-xs text-gray-500">
-                        Score: {(result.score * 100).toFixed(0)}%
+                        Score: {(result.topScore * 100).toFixed(0)}%
                       </p>
                     )}
                   </div>

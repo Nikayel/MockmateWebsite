@@ -17,15 +17,14 @@ import { vectorizeAllProblems, getVectorizationStatus } from "@/lib/rag/problem-
 import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
 import { getVectorDBProvider, isPineconeEnabled } from "@/lib/rag/vectordb"
 import { advancedRetrieve } from "@/lib/rag"
+import { QUICK_RAG_EVAL_CASES } from "@/lib/rag/evaluation/fixtures"
+import {
+  buildFailedRetrievalEvalResult,
+  buildRetrievalEvalResult,
+  summarizeRetrievalEval,
+} from "@/lib/rag/evaluation/metrics"
 
-// Quick eval test cases for the dashboard
-const QUICK_EVAL_CASES = [
-  { query: "two sum array", expect: "arrays", category: "dsa" },
-  { query: "sliding window substring", expect: "sliding", category: "dsa" },
-  { query: "binary search sorted", expect: "binary", category: "dsa" },
-  { query: "google interview tips", expect: "google", category: "company" },
-  { query: "amazon interview preparation", expect: "amazon", category: "company" },
-]
+const QUICK_EVAL_K_VALUES = [1, 3, 5, 10]
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,57 +73,46 @@ export async function GET(request: NextRequest) {
       case "quick-eval": {
         // Run quick evaluation
         const results = []
-        let passed = 0
 
-        for (const testCase of QUICK_EVAL_CASES) {
+        for (const testCase of QUICK_RAG_EVAL_CASES) {
           try {
             const retrieved = await advancedRetrieve({
               query: testCase.query,
-              limit: 3,
+              limit: Math.max(...QUICK_EVAL_K_VALUES),
+              strategy: "hybrid",
               enableQueryExpansion: true,
+              enableReranking: true,
+              feature: "other",
             })
 
-            const topIds = retrieved.map((r) => r.id.toLowerCase()).join(" ")
-            const topTexts = retrieved.map((r) => (r.text || "").toLowerCase()).join(" ")
-            const combined = topIds + " " + topTexts
-
-            const hasMatch = combined.includes(testCase.expect.toLowerCase())
-
-            if (hasMatch) passed++
-
-            results.push({
-              query: testCase.query,
-              category: testCase.category,
-              passed: hasMatch,
-              expected: testCase.expect,
-              gotTopId: retrieved[0]?.id || "none",
-              score: retrieved[0]?.finalScore || 0,
-            })
+            results.push(
+              buildRetrievalEvalResult(
+                testCase,
+                retrieved.map((result) => ({
+                  id: result.id,
+                  score: result.finalScore,
+                })),
+                QUICK_EVAL_K_VALUES
+              )
+            )
           } catch (error) {
-            results.push({
-              query: testCase.query,
-              category: testCase.category,
-              passed: false,
-              expected: testCase.expect,
-              gotTopId: "ERROR",
-              error: error instanceof Error ? error.message : "Unknown error",
-            })
+            results.push(
+              buildFailedRetrievalEvalResult(
+                testCase,
+                error instanceof Error ? error.message : "Unknown error",
+                QUICK_EVAL_K_VALUES
+              )
+            )
           }
         }
 
-        const passRate = (passed / QUICK_EVAL_CASES.length) * 100
+        const summary = summarizeRetrievalEval(results, QUICK_EVAL_K_VALUES)
 
         return NextResponse.json({
           success: true,
           data: {
             results,
-            summary: {
-              total: QUICK_EVAL_CASES.length,
-              passed,
-              failed: QUICK_EVAL_CASES.length - passed,
-              passRate,
-              status: passRate >= 80 ? "good" : passRate >= 60 ? "ok" : "needs_attention",
-            },
+            summary,
             timestamp: new Date().toISOString(),
           },
         })

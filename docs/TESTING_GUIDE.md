@@ -138,6 +138,24 @@ We use [Vitest](https://vitest.dev/) as our testing framework. It's:
 - Built-in TypeScript support
 - Great for Next.js projects
 
+### RAG Retrieval Evaluation
+
+RAG quality uses labeled retrieval fixtures, not arbitrary production queries. Run:
+
+```bash
+npx tsx scripts/eval-rag.ts
+```
+
+The script reports:
+
+- `Precision@K`: how many of the top K retrieved documents are labeled relevant.
+- `Recall@K`: how many labeled relevant documents appear in the top K.
+- `MRR`: how early the first relevant document appears.
+
+Operational retrieval telemetry, such as latency, strategy, candidate counts, overlap, and empty
+result rate, is visible in the admin RAG dashboard. Precision and recall are only computed for
+labeled eval cases because live user queries do not have ground-truth relevant IDs.
+
 ### Configuration
 
 **File**: `vitest.config.ts`
