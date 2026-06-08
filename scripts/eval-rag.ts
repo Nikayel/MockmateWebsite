@@ -27,6 +27,7 @@ async function evaluateCase(testCase: (typeof FULL_RAG_EVAL_CASES)[number]) {
     const results = await advancedRetrieve({
       query: testCase.query,
       limit: TOP_K,
+      types: testCase.types,
       strategy: "hybrid",
       enableQueryExpansion: true,
       enableReranking: true,

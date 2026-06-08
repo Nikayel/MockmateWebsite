@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
             const retrieved = await advancedRetrieve({
               query: testCase.query,
               limit: Math.max(...QUICK_EVAL_K_VALUES),
+              types: testCase.types,
               strategy: "hybrid",
               enableQueryExpansion: true,
               enableReranking: true,
