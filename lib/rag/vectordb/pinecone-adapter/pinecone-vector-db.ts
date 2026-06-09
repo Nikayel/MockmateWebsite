@@ -48,21 +48,32 @@ export class PineconeVectorDB implements VectorDB {
     }
 
     const index = await this.getIndex()
-    const docType = documents[0].metadata?.type || "general"
-    const namespace = `${NAMESPACE_PREFIX}${docType}`
-    const vectors = documents.map((doc) => ({
-      id: doc.id,
-      values: doc.vector,
-      metadata: flattenMetadata(doc),
-    }))
-
-    const batchSize = 100
-    for (let i = 0; i < vectors.length; i += batchSize) {
-      const batch = vectors.slice(i, i + batchSize)
-      await index.namespace(namespace).upsert(batch)
+    const documentsByType = new Map<string, VectorDocument[]>()
+    for (const doc of documents) {
+      const docType = doc.metadata?.type || "general"
+      const groupedDocuments = documentsByType.get(docType) || []
+      groupedDocuments.push(doc)
+      documentsByType.set(docType, groupedDocuments)
     }
 
-    console.log(`[Pinecone] Upserted ${documents.length} vectors to namespace: ${namespace}`)
+    const batchSize = 100
+    for (const [docType, typedDocuments] of documentsByType.entries()) {
+      const namespace = `${NAMESPACE_PREFIX}${docType}`
+      const vectors = typedDocuments.map((doc) => ({
+        id: doc.id,
+        values: doc.vector,
+        metadata: flattenMetadata(doc),
+      }))
+
+      for (let i = 0; i < vectors.length; i += batchSize) {
+        const batch = vectors.slice(i, i + batchSize)
+        await index.namespace(namespace).upsert(batch)
+      }
+    }
+
+    console.log(
+      `[Pinecone] Upserted ${documents.length} vectors across ${documentsByType.size} namespace(s)`
+    )
   }
 
   async query(vector: number[], options: QueryOptions = {}): Promise<QueryResult[]> {

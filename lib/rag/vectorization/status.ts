@@ -1,5 +1,7 @@
-import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
+import { adminDb } from "@/lib/firebase-admin"
+import { VECTOR_DB_CONFIG } from "@/lib/rag/config"
 import { vectorDB } from "@/lib/rag/vectordb"
+import type { VectorContentType } from "@/lib/rag/types"
 
 export interface VectorizationStatus {
   hasProblems: boolean
@@ -29,6 +31,16 @@ const EMPTY_STATUS: VectorizationStatus = {
   systemDesignCount: 0,
   bugFixCount: 0,
   addFunctionalityCount: 0,
+}
+
+async function countFirestoreVectorsByType(type: VectorContentType): Promise<number> {
+  const snapshot = await adminDb
+    .collection(VECTOR_DB_CONFIG.firestore.collectionName)
+    .where("type", "==", type)
+    .count()
+    .get()
+
+  return snapshot.data().count
 }
 
 export async function getVectorizationStatus(): Promise<VectorizationStatus> {
@@ -61,26 +73,25 @@ export async function getVectorizationStatus(): Promise<VectorizationStatus> {
       }
     }
 
-    const embeddingProvider = getHybridProvider()
-    const testEmbedding = await embeddingProvider.generateEmbedding(
-      "Two Sum array hash map system design URL shortener bug fix"
-    )
+    const [
+      problemCount,
+      companyVectorCount,
+      companyQuestionCount,
+      patternCount,
+      systemDesignCount,
+      bugFixCount,
+      addFunctionalityCount,
+    ] = await Promise.all([
+      countFirestoreVectorsByType("problem"),
+      countFirestoreVectorsByType("company"),
+      countFirestoreVectorsByType("company-question"),
+      countFirestoreVectorsByType("pattern-knowledge"),
+      countFirestoreVectorsByType("system-design"),
+      countFirestoreVectorsByType("bugfix"),
+      countFirestoreVectorsByType("add-functionality"),
+    ])
 
-    const results = await vectorDB.query(testEmbedding, {
-      topK: 200,
-      includeMetadata: true,
-    })
-
-    const problemCount = results.filter((r) => r.metadata?.type === "problem").length
-    const companyCount = results.filter(
-      (r) => r.metadata?.type === "company" || r.metadata?.type === "company-question"
-    ).length
-    const patternCount = results.filter((r) => r.metadata?.type === "pattern-knowledge").length
-    const systemDesignCount = results.filter((r) => r.metadata?.type === "system-design").length
-    const bugFixCount = results.filter((r) => r.metadata?.type === "bugfix").length
-    const addFunctionalityCount = results.filter(
-      (r) => r.metadata?.type === "add-functionality"
-    ).length
+    const companyCount = companyVectorCount + companyQuestionCount
 
     return {
       hasProblems: problemCount > 0,

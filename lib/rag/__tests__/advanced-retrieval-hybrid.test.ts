@@ -119,4 +119,58 @@ describe("AdvancedRetriever hybrid retrieval", () => {
     expect(analytics.strategy).toBe("semantic")
     expect(analytics.bm25CandidateCount).toBe(0)
   })
+
+  it("queries each requested semantic type instead of only the first type", async () => {
+    mocks.vectorQuery.mockImplementation(async (_embedding, options) => {
+      if (options.filter.type === "problem") {
+        return [
+          {
+            id: "problem-match",
+            score: 0.8,
+            metadata: { type: "problem", text: "Problem match" },
+          },
+        ]
+      }
+
+      if (options.filter.type === "hint") {
+        return [
+          {
+            id: "hint-match",
+            score: 0.7,
+            metadata: { type: "hint", text: "Hint match" },
+          },
+        ]
+      }
+
+      return []
+    })
+
+    const { AdvancedRetriever } = await import("../retrieval/advanced-retrieval")
+    const retriever = new AdvancedRetriever()
+
+    const { results, analytics } = await retriever.retrieve({
+      query: "hash map hint",
+      types: ["problem", "hint"],
+      limit: 5,
+      strategy: "semantic",
+    })
+
+    expect(mocks.vectorQuery).toHaveBeenCalledTimes(2)
+    expect(mocks.vectorQuery).toHaveBeenNthCalledWith(
+      1,
+      [1, 0, 0],
+      expect.objectContaining({
+        filter: expect.objectContaining({ type: "problem" }),
+      })
+    )
+    expect(mocks.vectorQuery).toHaveBeenNthCalledWith(
+      2,
+      [1, 0, 0],
+      expect.objectContaining({
+        filter: expect.objectContaining({ type: "hint" }),
+      })
+    )
+    expect(results.map((result) => result.id)).toEqual(["problem-match", "hint-match"])
+    expect(analytics.semanticCandidateCount).toBe(2)
+  })
 })

@@ -14,7 +14,7 @@
  */
 
 import type { EmbeddingProvider } from "../types"
-import { TFIDFEmbeddingProvider, generateTextEmbedding as generateTFIDFEmbedding } from "./provider"
+import { TFIDFEmbeddingProvider } from "./provider"
 import { OpenAIEmbeddingProvider, isOpenAIAvailable, OpenAIEmbeddingModel } from "./openai-provider"
 import { GeminiEmbeddingProvider, isGeminiAvailable, GeminiEmbeddingModel } from "./gemini-provider"
 import { embeddingCache } from "./cache"
@@ -254,15 +254,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
           break
       }
 
-      // When using Pinecone, never return 256D if the index expects 768D (avoids dimension mismatch)
-      const requiredDim = await getRequiredEmbeddingDimension()
-      if (requiredDim != null && embedding.length !== requiredDim) {
-        const msg =
-          embedding.length === 256 && requiredDim === 768
-            ? "Gemini embedding failed and TF-IDF fallback (256D) cannot be used with your Pinecone index (768D). Ensure GEMINI_API_KEY is set and Gemini is available."
-            : `Embedding dimension ${embedding.length} does not match Pinecone index dimension ${requiredDim}.`
-        throw new Error(`[HybridProvider] ${msg}`)
-      }
+      await this.validateRequiredDimension(embedding)
 
       // Cache the result
       if (this.cacheEnabled) {
@@ -286,11 +278,17 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
     // Try Gemini first (primary), then OpenAI (secondary)
     if (this.mode === "gemini-only" || this.mode === "gemini-with-fallback") {
       if (this.geminiProvider?.isConfigured()) {
+        let embeddings: number[][]
         try {
-          return await this.geminiProvider.generateEmbeddings(texts)
+          embeddings = await this.geminiProvider.generateEmbeddings(texts)
         } catch (error) {
           if (this.mode === "gemini-only") throw error
           console.warn("[HybridProvider] Batch Gemini failed, trying OpenAI:", error)
+          embeddings = []
+        }
+
+        if (embeddings.length > 0) {
+          return this.validateBatchDimensions(embeddings)
         }
       }
     }
@@ -300,9 +298,10 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
       this.mode === "openai-with-fallback" ||
       (this.mode === "gemini-with-fallback" && this.openaiProvider?.isConfigured())
     ) {
+      let embeddings: number[][] = []
       try {
         if (this.openaiProvider) {
-          return await this.openaiProvider.generateEmbeddings(texts)
+          embeddings = await this.openaiProvider.generateEmbeddings(texts)
         }
       } catch (error) {
         if (this.mode === "openai-only") throw error
@@ -311,10 +310,33 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
           error
         )
       }
+
+      if (embeddings.length > 0) {
+        return this.validateBatchDimensions(embeddings)
+      }
     }
 
     // Fall back to individual processing
     return Promise.all(texts.map((text) => this.generateEmbedding(text)))
+  }
+
+  private async validateRequiredDimension(embedding: number[]): Promise<void> {
+    // When using Pinecone, never return 256D if the index expects 768D (avoids dimension mismatch)
+    const requiredDim = await getRequiredEmbeddingDimension()
+    if (requiredDim != null && embedding.length !== requiredDim) {
+      const msg =
+        embedding.length === 256 && requiredDim === 768
+          ? "Gemini embedding failed and TF-IDF fallback (256D) cannot be used with your Pinecone index (768D). Ensure GEMINI_API_KEY is set and Gemini is available."
+          : `Embedding dimension ${embedding.length} does not match Pinecone index dimension ${requiredDim}.`
+      throw new Error(`[HybridProvider] ${msg}`)
+    }
+  }
+
+  private async validateBatchDimensions(embeddings: number[][]): Promise<number[][]> {
+    for (const embedding of embeddings) {
+      await this.validateRequiredDimension(embedding)
+    }
+    return embeddings
   }
 
   /**

@@ -310,21 +310,24 @@ export class AdvancedRetriever {
 
     for (const query of queries) {
       const embedding = await this.embeddingProvider.generateEmbedding(query)
+      const typesToQuery = options.types?.length ? options.types : [undefined]
 
-      const results = await vectorDB.query(embedding, {
-        topK: this.getSemanticTopK(options),
-        filter: {
-          type: options.types?.[0],
-          userId: options.userId,
-          minSimilarity: options.minSimilarity || RETRIEVAL_CONFIG.defaults.minSimilarity,
-          excludeIds: options.excludeIds,
-        },
-        includeMetadata: true,
-      })
+      for (const type of typesToQuery) {
+        const results = await vectorDB.query(embedding, {
+          topK: this.getSemanticTopK(options),
+          filter: {
+            type,
+            userId: options.userId,
+            minSimilarity: options.minSimilarity || RETRIEVAL_CONFIG.defaults.minSimilarity,
+            excludeIds: options.excludeIds,
+          },
+          includeMetadata: true,
+        })
 
-      count += results.length
-      for (const result of results) {
-        this.mergeCandidate(allCandidates, result, query, "semantic")
+        count += results.length
+        for (const result of results) {
+          this.mergeCandidate(allCandidates, result, query, "semantic")
+        }
       }
     }
 
