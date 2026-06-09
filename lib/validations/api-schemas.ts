@@ -7,6 +7,11 @@
 
 import { z } from "zod"
 import { NextResponse } from "next/server"
+import { ALL_COMPANIES } from "@/lib/data/company-questions"
+import type { CompanyId } from "@/lib/data/company-questions/types"
+import { DSA_PATTERNS } from "@/lib/types/dsa-patterns"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { VECTOR_CONTENT_TYPES, type VectorContentType } from "@/lib/rag/types"
 
 // ============================================
 // Common Schemas
@@ -138,72 +143,127 @@ export const PromoCodeSchema = z.object({
 // RAG API Schemas
 // ============================================
 
-export const RAGActionSchema = z.discriminatedUnion("action", [
+const DSAPatternSchema = z.custom<DSAPattern>((value) => {
+  return typeof value === "string" && Object.values(DSA_PATTERNS).includes(value as DSAPattern)
+}, "Invalid DSA pattern")
+
+const CompanyIdSchema = z.custom<CompanyId>((value) => {
+  return typeof value === "string" && ALL_COMPANIES.some((company) => company.id === value)
+}, "Invalid company")
+
+const VectorContentTypeSchema = z.custom<VectorContentType>((value) => {
+  return typeof value === "string" && VECTOR_CONTENT_TYPES.includes(value as VectorContentType)
+}, "Invalid vector content type")
+
+const RAGV2DifficultySchema = z.enum(["easy", "medium", "hard"])
+const RAGV2KnowledgeCategorySchema = z.enum([
+  "dsa-patterns",
+  "company-knowledge",
+  "interview-tips",
+  "notification-knowledge",
+  "debugging-knowledge",
+  "system-design-knowledge",
+])
+
+const RAGV2TestResultsSchema = z.object({
+  passed: z.number().int().min(0),
+  total: z.number().int().min(0),
+  failingTests: z.array(z.string().max(500)).max(20).optional(),
+})
+
+export const RAGV2ActionSchema = z.discriminatedUnion("action", [
   z.object({
-    action: z.literal("get-hints"),
-    problemText: z.string().min(1, "Problem text is required"),
-    problemTitle: z.string().optional(),
-    userCode: z.string().optional(),
-    difficulty: z.string().optional(),
-    problemType: z.string().optional(),
-    problemPattern: z.string().optional(),
-    userId: z.string().optional(),
-    limit: z.number().int().min(1).max(20).default(3),
+    action: z.literal("retrieve"),
+    query: z.string().min(1, "Query is required").max(5000, "Query too long"),
+    limit: z.number().int().min(1).max(50).optional(),
+    minSimilarity: z.number().min(0).max(1).optional(),
+    types: z.array(VectorContentTypeSchema).min(1).max(8).optional(),
+    patterns: z.array(DSAPatternSchema).min(1).max(10).optional(),
+    companies: z.array(CompanyIdSchema).min(1).max(10).optional(),
+    difficulty: z.array(RAGV2DifficultySchema).min(1).max(3).optional(),
+    enableQueryExpansion: z.boolean().optional(),
+    enableReranking: z.boolean().optional(),
   }),
   z.object({
-    action: z.literal("get-similar-problems"),
-    problemText: z.string().min(1, "Problem text is required"),
-    problemId: z.string().optional(),
-    difficulty: z.string().optional(),
-    limit: z.number().int().min(1).max(20).default(5),
+    action: z.literal("build-context"),
+    contextType: z.enum(["roadmap", "hint", "interview-prep", "feedback", "query"]),
+    targetCompany: CompanyIdSchema.optional(),
+    experienceLevel: z.enum(["intern", "beginner", "intermediate", "advanced"]).optional(),
+    daysRemaining: z.number().int().min(1).max(365).optional(),
+    patternFamiliarity: z
+      .array(
+        z.object({
+          pattern: DSAPatternSchema,
+          level: z.string().min(1).max(50),
+        })
+      )
+      .max(50)
+      .optional(),
+    hoursPerDay: z.number().min(0.25).max(24).optional(),
+    problemText: z.string().min(1).max(10000).optional(),
+    problemPattern: DSAPatternSchema.optional(),
+    userCode: z.string().max(50000).optional(),
+    patterns: z.array(DSAPatternSchema).min(1).max(20).optional(),
+    difficulty: z.enum(["easy", "medium", "hard", "mixed"]).optional(),
+    testResults: z
+      .object({ passed: z.number().int().min(0), total: z.number().int().min(0) })
+      .optional(),
+    query: z.string().min(1).max(5000).optional(),
   }),
   z.object({
-    action: z.literal("get-similar-solutions"),
-    userId: z.string().min(1, "User ID is required"),
-    problemText: z.string().min(1, "Problem text is required"),
-    limit: z.number().int().min(1).max(20).default(5),
-    problemType: z.string().optional(),
+    action: z.literal("get-pattern-knowledge"),
+    pattern: DSAPatternSchema.optional(),
+    patterns: z.array(DSAPatternSchema).min(1).max(20).optional(),
+    format: z.enum(["full", "document", "summary"]).optional(),
   }),
   z.object({
-    action: z.literal("get-recommendations"),
-    userId: z.string().min(1, "User ID is required"),
-    availableScenarios: z.array(
-      z.object({
-        id: z.string(),
-        type: z.string(),
-        difficulty: z.string(),
-        title: z.string(),
-      })
-    ),
+    action: z.literal("get-company-knowledge"),
+    company: CompanyIdSchema.optional(),
+    companies: z.array(CompanyIdSchema).min(1).max(20).optional(),
+    format: z.enum(["full", "document", "summary"]).optional(),
+  }),
+  z.object({ action: z.literal("get-user-performance") }),
+  z.object({ action: z.literal("get-recommendations") }),
+  z.object({ action: z.literal("get-enhanced-profile") }),
+  z.object({
+    action: z.literal("get-smart-recommendations"),
+    targetCompany: CompanyIdSchema.optional(),
+    availableMinutes: z.number().int().min(5).max(480).optional(),
+    sessionGoal: z.enum(["warmup", "practice", "challenge", "review", "interview-prep"]).optional(),
+    excludeIds: z.array(z.string().min(1).max(200)).max(100).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+    problems: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(200),
+          title: z.string().min(1).max(300),
+          pattern: DSAPatternSchema,
+          difficulty: RAGV2DifficultySchema,
+          company: CompanyIdSchema.optional(),
+          frequency: z.number().min(0).max(100).optional(),
+        })
+      )
+      .max(500)
+      .optional(),
+  }),
+  z.object({ action: z.literal("get-skill-insights") }),
+  z.object({
+    action: z.literal("analyze-code"),
+    code: z.string().min(1).max(50000),
+    pattern: DSAPatternSchema,
+    testResults: RAGV2TestResultsSchema.optional(),
   }),
   z.object({
-    action: z.literal("store-solution"),
-    userId: z.string().min(1, "User ID is required"),
-    problemId: z.string().min(1, "Problem ID is required"),
-    problemTitle: z.string().optional(),
-    solutionCode: z.string(),
-    language: z.string().default("javascript"),
-    passed: z.boolean(),
-    score: z.number().min(0).max(100),
-    problemType: z.string().optional(),
+    action: z.literal("generate-embedding"),
+    text: z.string().min(1).max(10000).optional(),
+    texts: z.array(z.string().min(1).max(10000)).min(1).max(20).optional(),
   }),
   z.object({
-    action: z.literal("get-learning-path"),
-    userId: z.string().min(1, "User ID is required"),
-    targetSkills: z.array(z.string()).optional(),
+    action: z.literal("seed-knowledge-base"),
+    force: z.boolean().optional(),
+    categories: z.array(RAGV2KnowledgeCategorySchema).min(1).max(6).optional(),
   }),
-  z.object({
-    action: z.literal("get-next-problems"),
-    userId: z.string().min(1, "User ID is required"),
-    currentProblemText: z.string().min(1, "Problem text is required"),
-    currentProblemId: z.string().optional(),
-  }),
-  z.object({
-    action: z.literal("store-onboarding"),
-    userId: z.string().min(1, "User ID is required"),
-    role: z.string().min(1, "Role is required"),
-    goal: z.string().min(1, "Goal is required"),
-  }),
+  z.object({ action: z.literal("health") }),
 ])
 
 // ============================================

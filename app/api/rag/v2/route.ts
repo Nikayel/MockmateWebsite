@@ -10,29 +10,48 @@
  * - Knowledge base management
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { verifyAuth } from '@/lib/auth-helpers'
-import { getAdvancedRetriever, type AdvancedRetrievalOptions } from '@/lib/rag/retrieval/advanced-retrieval'
-import { getContextBuilder } from '@/lib/rag/context-builder'
-import { getUserPerformanceRAG } from '@/lib/rag/user-performance-rag'
-import { getEnhancedProfileService } from '@/lib/rag/enhanced-user-profile'
-import { getSmartRecommendationService } from '@/lib/rag/smart-recommendations'
-import { getMisconceptionTracker, analyzeCode } from '@/lib/rag/misconception-detection'
-import { getHybridProvider } from '@/lib/rag/embeddings/hybrid-provider'
-import { seedKnowledgeBase, isKnowledgeBaseSeeded, getKnowledgeBaseSeeder } from '@/lib/rag/knowledge-base/seeder'
-import { getPatternKnowledge, patternKnowledgeToDocument } from '@/lib/rag/knowledge-base/dsa-knowledge'
-import { getCompanyInterviewKnowledge, companyKnowledgeToDocument } from '@/lib/rag/knowledge-base/company-knowledge'
-import { rateLimit } from '@/lib/rate-limit'
-import { withTimeout, validateRAGQuery, TimeoutError } from '@/lib/rag/utils'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
+import { NextRequest, NextResponse } from "next/server"
+import { verifyAuth } from "@/lib/auth-helpers"
+import { verifyAdminAccess } from "@/lib/admin/middleware"
+import {
+  getAdvancedRetriever,
+  type AdvancedRetrievalOptions,
+} from "@/lib/rag/retrieval/advanced-retrieval"
+import { getContextBuilder } from "@/lib/rag/context-builder"
+import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
+import { getEnhancedProfileService } from "@/lib/rag/enhanced-user-profile"
+import { getSmartRecommendationService } from "@/lib/rag/smart-recommendations"
+import { getMisconceptionTracker, analyzeCode } from "@/lib/rag/misconception-detection"
+import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
+import {
+  seedKnowledgeBase,
+  isKnowledgeBaseSeeded,
+  type KnowledgeCategory,
+} from "@/lib/rag/knowledge-base/seeder"
+import {
+  getPatternKnowledge,
+  patternKnowledgeToDocument,
+} from "@/lib/rag/knowledge-base/dsa-knowledge"
+import {
+  getCompanyInterviewKnowledge,
+  companyKnowledgeToDocument,
+} from "@/lib/rag/knowledge-base/company-knowledge"
+import { rateLimit } from "@/lib/rate-limit"
+import { withTimeout, validateRAGQuery, TimeoutError } from "@/lib/rag/utils"
+import {
+  RAGV2ActionSchema,
+  validateRequest,
+  validationErrorResponse,
+} from "@/lib/validations/api-schemas"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { CompanyId } from "@/lib/data/company-questions/types"
 
 // Rate limit: 30 requests per minute for RAG v2 operations
 const ragV2RateLimit = rateLimit({
   interval: 60 * 1000,
   uniqueTokenPerInterval: 500,
   maxRequests: 30,
-  prefix: 'rl:rag-v2'
+  prefix: "rl:rag-v2",
 })
 
 // Stricter limit for embedding generation (expensive operation)
@@ -40,7 +59,7 @@ const embeddingRateLimit = rateLimit({
   interval: 60 * 1000,
   uniqueTokenPerInterval: 500,
   maxRequests: 20,
-  prefix: 'rl:rag-embedding'
+  prefix: "rl:rag-embedding",
 })
 
 /**
@@ -65,95 +84,81 @@ const embeddingRateLimit = rateLimit({
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { action, ...params } = body
-
-    if (!action) {
-      return NextResponse.json(
-        { error: 'Action is required' },
-        { status: 400 }
-      )
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const body = await request.json()
+    const validation = validateRequest(RAGV2ActionSchema, body)
+    if (!validation.success) {
+      return validationErrorResponse(validation.error)
+    }
+
+    const { action } = validation.data
+    const userId = authResult.userId
+
     // Apply rate limiting based on action
-    const isEmbeddingAction = action === 'generate-embedding'
-    const rateLimitResponse = await (isEmbeddingAction ? embeddingRateLimit : ragV2RateLimit)(request)
+    const isEmbeddingAction = action === "generate-embedding"
+    const rateLimitResponse = await (isEmbeddingAction ? embeddingRateLimit : ragV2RateLimit)(
+      request
+    )
     if (rateLimitResponse) {
       return rateLimitResponse
     }
 
-    // Actions that require authentication
-    const authRequired = [
-      'get-user-performance',
-      'get-recommendations',
-      'get-enhanced-profile',
-      'get-smart-recommendations',
-      'get-skill-insights',
-      'analyze-code',
-      'build-context',
-      'seed-knowledge-base',
-    ]
-
-    let userId: string | undefined
-
-    if (authRequired.includes(action)) {
-      const authResult = await verifyAuth(request)
-      if (!authResult.authenticated || !authResult.userId) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      userId = authResult.userId
-    }
-
     switch (action) {
-      case 'retrieve':
-        return handleRetrieve(params)
+      case "retrieve":
+        return handleRetrieve(validation.data)
 
-      case 'build-context':
-        return handleBuildContext(params, userId!)
+      case "build-context":
+        return handleBuildContext(validation.data, userId)
 
-      case 'get-pattern-knowledge':
-        return handleGetPatternKnowledge(params)
+      case "get-pattern-knowledge":
+        return handleGetPatternKnowledge(validation.data)
 
-      case 'get-company-knowledge':
-        return handleGetCompanyKnowledge(params)
+      case "get-company-knowledge":
+        return handleGetCompanyKnowledge(validation.data)
 
-      case 'get-user-performance':
-        return handleGetUserPerformance(userId!)
+      case "get-user-performance":
+        return handleGetUserPerformance(userId)
 
-      case 'get-recommendations':
-        return handleGetRecommendations(userId!)
+      case "get-recommendations":
+        return handleGetRecommendations(userId)
 
-      case 'get-enhanced-profile':
-        return handleGetEnhancedProfile(userId!)
+      case "get-enhanced-profile":
+        return handleGetEnhancedProfile(userId)
 
-      case 'get-smart-recommendations':
-        return handleGetSmartRecommendations(userId!, params)
+      case "get-smart-recommendations":
+        return handleGetSmartRecommendations(userId, validation.data)
 
-      case 'get-skill-insights':
-        return handleGetSkillInsights(userId!)
+      case "get-skill-insights":
+        return handleGetSkillInsights(userId)
 
-      case 'analyze-code':
-        return handleAnalyzeCode(userId!, params)
+      case "analyze-code":
+        return handleAnalyzeCode(userId, validation.data)
 
-      case 'generate-embedding':
-        return handleGenerateEmbedding(params)
+      case "generate-embedding":
+        return handleGenerateEmbedding(validation.data)
 
-      case 'seed-knowledge-base':
-        return handleSeedKnowledgeBase(params, userId!)
+      case "seed-knowledge-base": {
+        const adminCheck = await verifyAdminAccess(request)
+        if (!adminCheck.authorized) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+        return handleSeedKnowledgeBase(validation.data)
+      }
 
-      case 'health':
+      case "health":
         return handleHealthCheck()
 
       default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}` },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error) {
-    console.error('[RAG API v2] Error:', error)
+    console.error("[RAG API v2] Error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'RAG operation failed' },
+      { error: error instanceof Error ? error.message : "RAG operation failed" },
       { status: 500 }
     )
   }
@@ -178,10 +183,7 @@ async function handleRetrieve(params: {
   // Validate query input
   const validation = validateRAGQuery(query)
   if (!validation.valid) {
-    return NextResponse.json(
-      { error: validation.error },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: validation.error }, { status: 400 })
   }
 
   const sanitizedQuery = validation.sanitized!
@@ -192,10 +194,10 @@ async function handleRetrieve(params: {
     query: sanitizedQuery,
     limit: Math.min(params.limit || 10, 50), // Cap at 50 results
     minSimilarity: params.minSimilarity || 0.3,
-    types: params.types as AdvancedRetrievalOptions['types'],
+    types: params.types as AdvancedRetrievalOptions["types"],
     patterns: params.patterns,
     companies: params.companies,
-    difficulty: params.difficulty as ('easy' | 'medium' | 'hard')[],
+    difficulty: params.difficulty as ("easy" | "medium" | "hard")[],
     enableQueryExpansion: params.enableQueryExpansion ?? true,
     enableReranking: params.enableReranking ?? true,
   }
@@ -205,7 +207,7 @@ async function handleRetrieve(params: {
     const { results, analytics } = await withTimeout(
       retriever.retrieve(options),
       30000,
-      'RAG retrieval'
+      "RAG retrieval"
     )
 
     return NextResponse.json({
@@ -218,7 +220,7 @@ async function handleRetrieve(params: {
   } catch (error) {
     if (error instanceof TimeoutError) {
       return NextResponse.json(
-        { error: 'Request timed out. Please try a simpler query.' },
+        { error: "Request timed out. Please try a simpler query." },
         { status: 504 }
       )
     }
@@ -229,49 +231,53 @@ async function handleRetrieve(params: {
 /**
  * Handle context building
  */
-async function handleBuildContext(params: {
-  contextType: 'roadmap' | 'hint' | 'interview-prep' | 'feedback' | 'query'
-  // Roadmap context params
-  targetCompany?: CompanyId
-  experienceLevel?: string
-  daysRemaining?: number
-  patternFamiliarity?: { pattern: DSAPattern; level: string }[]
-  hoursPerDay?: number
-  // Problem context params
-  problemText?: string
-  problemPattern?: DSAPattern
-  userCode?: string
-  // Interview prep params
-  patterns?: DSAPattern[]
-  difficulty?: string
-  // Feedback params
-  testResults?: { passed: number; total: number }
-  // Query params
-  query?: string
-}, userId: string) {
+async function handleBuildContext(
+  params: {
+    contextType: "roadmap" | "hint" | "interview-prep" | "feedback" | "query"
+    // Roadmap context params
+    targetCompany?: CompanyId
+    experienceLevel?: string
+    daysRemaining?: number
+    patternFamiliarity?: { pattern: DSAPattern; level: string }[]
+    hoursPerDay?: number
+    // Problem context params
+    problemText?: string
+    problemPattern?: DSAPattern
+    userCode?: string
+    // Interview prep params
+    patterns?: DSAPattern[]
+    difficulty?: string
+    // Feedback params
+    testResults?: { passed: number; total: number }
+    // Query params
+    query?: string
+  },
+  userId: string
+) {
   const { contextType } = params
 
   if (!contextType) {
-    return NextResponse.json(
-      { error: 'Context type is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "Context type is required" }, { status: 400 })
   }
 
   const contextBuilder = getContextBuilder()
   let context
 
   switch (contextType) {
-    case 'roadmap':
+    case "roadmap":
       if (!params.targetCompany) {
         return NextResponse.json(
-          { error: 'Target company is required for roadmap context' },
+          { error: "Target company is required for roadmap context" },
           { status: 400 }
         )
       }
       context = await contextBuilder.buildRoadmapContext({
         targetCompany: params.targetCompany,
-        experienceLevel: (params.experienceLevel || 'intermediate') as 'intern' | 'beginner' | 'intermediate' | 'advanced',
+        experienceLevel: (params.experienceLevel || "intermediate") as
+          | "intern"
+          | "beginner"
+          | "intermediate"
+          | "advanced",
         daysRemaining: params.daysRemaining || 30,
         patternFamiliarity: params.patternFamiliarity || [],
         hoursPerDay: params.hoursPerDay || 2,
@@ -279,10 +285,10 @@ async function handleBuildContext(params: {
       })
       break
 
-    case 'hint':
+    case "hint":
       if (!params.problemText) {
         return NextResponse.json(
-          { error: 'Problem text is required for hint context' },
+          { error: "Problem text is required for hint context" },
           { status: 400 }
         )
       }
@@ -294,25 +300,25 @@ async function handleBuildContext(params: {
       })
       break
 
-    case 'interview-prep':
+    case "interview-prep":
       if (!params.targetCompany || !params.patterns) {
         return NextResponse.json(
-          { error: 'Target company and patterns are required for interview prep context' },
+          { error: "Target company and patterns are required for interview prep context" },
           { status: 400 }
         )
       }
       context = await contextBuilder.buildInterviewPrepContext({
         company: params.targetCompany,
         patterns: params.patterns,
-        difficulty: (params.difficulty || 'mixed') as 'easy' | 'medium' | 'hard' | 'mixed',
+        difficulty: (params.difficulty || "mixed") as "easy" | "medium" | "hard" | "mixed",
         userId,
       })
       break
 
-    case 'feedback':
+    case "feedback":
       if (!params.problemText || !params.userCode || !params.testResults) {
         return NextResponse.json(
-          { error: 'Problem text, user code, and test results are required for feedback context' },
+          { error: "Problem text, user code, and test results are required for feedback context" },
           { status: 400 }
         )
       }
@@ -321,16 +327,13 @@ async function handleBuildContext(params: {
         userCode: params.userCode,
         testResults: params.testResults,
         pattern: params.problemPattern,
-        difficulty: params.difficulty as 'easy' | 'medium' | 'hard',
+        difficulty: params.difficulty as "easy" | "medium" | "hard",
       })
       break
 
-    case 'query':
+    case "query":
       if (!params.query) {
-        return NextResponse.json(
-          { error: 'Query is required for query context' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: "Query is required for query context" }, { status: 400 })
       }
       context = await contextBuilder.buildQueryContext(params.query, {
         patterns: params.patterns,
@@ -339,10 +342,7 @@ async function handleBuildContext(params: {
       break
 
     default:
-      return NextResponse.json(
-        { error: `Unknown context type: ${contextType}` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `Unknown context type: ${contextType}` }, { status: 400 })
   }
 
   return NextResponse.json({ context })
@@ -354,15 +354,12 @@ async function handleBuildContext(params: {
 async function handleGetPatternKnowledge(params: {
   pattern?: DSAPattern
   patterns?: DSAPattern[]
-  format?: 'full' | 'document' | 'summary'
+  format?: "full" | "document" | "summary"
 }) {
-  const { pattern, patterns: patternList, format = 'full' } = params
+  const { pattern, patterns: patternList, format = "full" } = params
 
   if (!pattern && !patternList) {
-    return NextResponse.json(
-      { error: 'Pattern or patterns array is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "Pattern or patterns array is required" }, { status: 400 })
   }
 
   const patternsToFetch = patternList || (pattern ? [pattern] : [])
@@ -371,12 +368,12 @@ async function handleGetPatternKnowledge(params: {
   for (const p of patternsToFetch) {
     const knowledge = getPatternKnowledge(p)
     if (knowledge) {
-      if (format === 'document') {
+      if (format === "document") {
         results.push({
           pattern: p,
           document: patternKnowledgeToDocument(knowledge),
         })
-      } else if (format === 'summary') {
+      } else if (format === "summary") {
         results.push({
           pattern: p,
           displayName: knowledge.displayName,
@@ -407,15 +404,12 @@ async function handleGetPatternKnowledge(params: {
 async function handleGetCompanyKnowledge(params: {
   company?: CompanyId
   companies?: CompanyId[]
-  format?: 'full' | 'document' | 'summary'
+  format?: "full" | "document" | "summary"
 }) {
-  const { company, companies: companyList, format = 'full' } = params
+  const { company, companies: companyList, format = "full" } = params
 
   if (!company && !companyList) {
-    return NextResponse.json(
-      { error: 'Company or companies array is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "Company or companies array is required" }, { status: 400 })
   }
 
   const companiesToFetch = companyList || (company ? [company] : [])
@@ -424,18 +418,18 @@ async function handleGetCompanyKnowledge(params: {
   for (const c of companiesToFetch) {
     const knowledge = getCompanyInterviewKnowledge(c)
     if (knowledge) {
-      if (format === 'document') {
+      if (format === "document") {
         results.push({
           company: c,
           document: companyKnowledgeToDocument(knowledge),
         })
-      } else if (format === 'summary') {
+      } else if (format === "summary") {
         results.push({
           company: c,
           companyName: knowledge.companyName,
           interviewStyle: knowledge.interviewStyle.description,
           pace: knowledge.interviewStyle.pace,
-          topPatterns: knowledge.topPatterns.slice(0, 5).map(p => p.pattern),
+          topPatterns: knowledge.topPatterns.slice(0, 5).map((p) => p.pattern),
         })
       } else {
         results.push({
@@ -485,17 +479,11 @@ async function handleGetRecommendations(userId: string) {
 /**
  * Handle generate embedding
  */
-async function handleGenerateEmbedding(params: {
-  text?: string
-  texts?: string[]
-}) {
+async function handleGenerateEmbedding(params: { text?: string; texts?: string[] }) {
   const { text, texts } = params
 
   if (!text && !texts) {
-    return NextResponse.json(
-      { error: 'Text or texts array is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "Text or texts array is required" }, { status: 400 })
   }
 
   const provider = getHybridProvider()
@@ -526,11 +514,8 @@ async function handleGenerateEmbedding(params: {
  */
 async function handleSeedKnowledgeBase(params: {
   force?: boolean
-  categories?: ('dsa-patterns' | 'company-knowledge' | 'interview-tips')[]
-}, userId: string) {
-  // In production, you'd want to check if user is admin
-  console.log(`[RAG API] Knowledge base seeding requested by user: ${userId}`)
-
+  categories?: KnowledgeCategory[]
+}) {
   const progress = await seedKnowledgeBase({
     force: params.force || false,
     categories: params.categories,
@@ -538,11 +523,12 @@ async function handleSeedKnowledgeBase(params: {
 
   return NextResponse.json({
     progress,
-    message: progress.status === 'completed'
-      ? `Successfully seeded ${progress.successfulDocuments} documents`
-      : progress.status === 'failed'
-        ? 'Seeding failed'
-        : 'Already seeded (use force=true to re-seed)',
+    message:
+      progress.status === "completed"
+        ? `Successfully seeded ${progress.successfulDocuments} documents`
+        : progress.status === "failed"
+          ? "Seeding failed"
+          : "Already seeded (use force=true to re-seed)",
   })
 }
 
@@ -564,7 +550,7 @@ async function handleHealthCheck() {
     const metrics = embeddingProvider.getMetrics()
 
     return NextResponse.json({
-      status: 'healthy',
+      status: "healthy",
       components: {
         embeddingProvider: {
           healthy: healthStatus.healthy,
@@ -579,17 +565,20 @@ async function handleHealthCheck() {
           totalEmbeddings: metrics.total,
           byProvider: metrics.byProvider,
           avgLatencyMs: Math.round(metrics.avgLatencyMs),
-          cacheHitRate: Math.round(metrics.cacheHitRate * 100) + '%',
+          cacheHitRate: Math.round(metrics.cacheHitRate * 100) + "%",
         },
       },
       responseTimeMs: Date.now() - startTime,
     })
   } catch (error) {
-    return NextResponse.json({
-      status: 'unhealthy',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      responseTimeMs: Date.now() - startTime,
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        status: "unhealthy",
+        error: error instanceof Error ? error.message : "Unknown error",
+        responseTimeMs: Date.now() - startTime,
+      },
+      { status: 500 }
+    )
   }
 }
 
@@ -603,66 +592,82 @@ async function handleGetEnhancedProfile(userId: string) {
   return NextResponse.json({
     profile,
     summary: {
-      level: profile.interviewReadiness.overall >= 70 ? 'advanced' :
-        profile.interviewReadiness.overall >= 40 ? 'intermediate' : 'beginner',
+      level:
+        profile.interviewReadiness.overall >= 70
+          ? "advanced"
+          : profile.interviewReadiness.overall >= 40
+            ? "intermediate"
+            : "beginner",
       interviewReadiness: profile.interviewReadiness.overall,
       topStrengths: profile.interviewReadiness.strongestAreas.slice(0, 3),
       criticalGaps: profile.interviewReadiness.criticalGaps.slice(0, 3),
-      activeInsights: profile.insights.filter(i => i.priority === 'high').length,
+      activeInsights: profile.insights.filter((i) => i.priority === "high").length,
       learningStyle: profile.cognitive.learningStyle.primary,
-      trend: profile.temporal.growth.accelerating ? 'accelerating' :
-        profile.temporal.growth.currentVelocity > 0 ? 'improving' : 'stable',
+      trend: profile.temporal.growth.accelerating
+        ? "accelerating"
+        : profile.temporal.growth.currentVelocity > 0
+          ? "improving"
+          : "stable",
     },
   })
+}
+
+function getScenarioPattern(scenario: unknown): DSAPattern {
+  if (scenario && typeof scenario === "object" && "pattern" in scenario) {
+    const pattern = (scenario as { pattern?: unknown }).pattern
+    if (typeof pattern === "string") return pattern as DSAPattern
+  }
+
+  return "arrays-hashing"
 }
 
 /**
  * Handle get smart recommendations with rich explanations
  */
-async function handleGetSmartRecommendations(userId: string, params: {
-  targetCompany?: CompanyId
-  availableMinutes?: number
-  sessionGoal?: 'warmup' | 'practice' | 'challenge' | 'review' | 'interview-prep'
-  excludeIds?: string[]
-  limit?: number
-  problems?: Array<{
-    id: string
-    title: string
-    pattern: DSAPattern
-    difficulty: 'easy' | 'medium' | 'hard'
-    company?: CompanyId
-    frequency?: number
-  }>
-}) {
+async function handleGetSmartRecommendations(
+  userId: string,
+  params: {
+    targetCompany?: CompanyId
+    availableMinutes?: number
+    sessionGoal?: "warmup" | "practice" | "challenge" | "review" | "interview-prep"
+    excludeIds?: string[]
+    limit?: number
+    problems?: Array<{
+      id: string
+      title: string
+      pattern: DSAPattern
+      difficulty: "easy" | "medium" | "hard"
+      company?: CompanyId
+      frequency?: number
+    }>
+  }
+) {
   const recommendationService = getSmartRecommendationService()
 
   // Auto-fetch problems from scenarios if not provided
   let problems = params.problems
   if (!problems || problems.length === 0) {
     try {
-      const { getScenariosByType } = await import('@/lib/scenarios/index')
-      const dsaScenarios = await getScenariosByType('dsa')
+      const { getScenariosByType } = await import("@/lib/scenarios/index")
+      const dsaScenarios = await getScenariosByType("dsa")
 
-      problems = dsaScenarios.map(scenario => ({
+      problems = dsaScenarios.map((scenario) => ({
         id: scenario.id,
         title: scenario.title,
-        pattern: (scenario as any).pattern as DSAPattern,
-        difficulty: scenario.difficulty as 'easy' | 'medium' | 'hard',
+        pattern: getScenarioPattern(scenario),
+        difficulty: scenario.difficulty as "easy" | "medium" | "hard",
         company: scenario.companies[0]?.toLowerCase() as CompanyId | undefined,
         frequency: 1, // Default frequency
       }))
     } catch (error) {
-      console.error('[RAG API] Failed to auto-fetch scenarios:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch problem pool' },
-        { status: 500 }
-      )
+      console.error("[RAG API] Failed to auto-fetch scenarios:", error)
+      return NextResponse.json({ error: "Failed to fetch problem pool" }, { status: 500 })
     }
   }
 
   if (problems.length === 0) {
     return NextResponse.json(
-      { error: 'No problems available for recommendations' },
+      { error: "No problems available for recommendations" },
       { status: 400 }
     )
   }
@@ -697,9 +702,13 @@ async function handleGetSkillInsights(userId: string) {
     overview: {
       interviewReadiness: profile.interviewReadiness.overall,
       totalConcepts: profile.knowledgeGraph.concepts.length,
-      masteredConcepts: profile.knowledgeGraph.concepts.filter(c => c.predictedMastery >= 70).length,
-      learningConcepts: profile.knowledgeGraph.concepts.filter(c => c.predictedMastery >= 40 && c.predictedMastery < 70).length,
-      needsWorkConcepts: profile.knowledgeGraph.concepts.filter(c => c.predictedMastery < 40).length,
+      masteredConcepts: profile.knowledgeGraph.concepts.filter((c) => c.predictedMastery >= 70)
+        .length,
+      learningConcepts: profile.knowledgeGraph.concepts.filter(
+        (c) => c.predictedMastery >= 40 && c.predictedMastery < 70
+      ).length,
+      needsWorkConcepts: profile.knowledgeGraph.concepts.filter((c) => c.predictedMastery < 40)
+        .length,
     },
 
     // Cognitive insights
@@ -722,26 +731,31 @@ async function handleGetSkillInsights(userId: string) {
 
     // Pattern mastery (for radar chart)
     patternMastery: profile.knowledgeGraph.concepts
-      .reduce((acc, c) => {
-        if (!acc.find(x => x.pattern === c.parentPattern)) {
-          const patternConcepts = profile.knowledgeGraph.concepts.filter(
-            x => x.parentPattern === c.parentPattern
-          )
-          const avgMastery = patternConcepts.reduce((sum, x) => sum + x.predictedMastery, 0) / patternConcepts.length
-          acc.push({
-            pattern: c.parentPattern,
-            mastery: Math.round(avgMastery),
-            practiceCount: patternConcepts.reduce((sum, x) => sum + x.practiceCount, 0),
-          })
-        }
-        return acc
-      }, [] as { pattern: DSAPattern; mastery: number; practiceCount: number }[])
+      .reduce(
+        (acc, c) => {
+          if (!acc.find((x) => x.pattern === c.parentPattern)) {
+            const patternConcepts = profile.knowledgeGraph.concepts.filter(
+              (x) => x.parentPattern === c.parentPattern
+            )
+            const avgMastery =
+              patternConcepts.reduce((sum, x) => sum + x.predictedMastery, 0) /
+              patternConcepts.length
+            acc.push({
+              pattern: c.parentPattern,
+              mastery: Math.round(avgMastery),
+              practiceCount: patternConcepts.reduce((sum, x) => sum + x.practiceCount, 0),
+            })
+          }
+          return acc
+        },
+        [] as { pattern: DSAPattern; mastery: number; practiceCount: number }[]
+      )
       .sort((a, b) => b.mastery - a.mastery),
 
     // Skills needing review
     skillDecay: profile.temporal.skillDecay
-      .filter(sd => sd.urgency !== 'none')
-      .map(sd => ({
+      .filter((sd) => sd.urgency !== "none")
+      .map((sd) => ({
         pattern: sd.pattern,
         daysSincePractice: sd.daysSincePractice,
         decayPercent: Math.round(sd.estimatedDecay),
@@ -749,7 +763,7 @@ async function handleGetSkillInsights(userId: string) {
       })),
 
     // Active misconceptions
-    misconceptions: misconceptions.map(m => ({
+    misconceptions: misconceptions.map((m) => ({
       id: m.id,
       pattern: m.pattern,
       type: m.misconceptionType,
@@ -759,9 +773,9 @@ async function handleGetSkillInsights(userId: string) {
     })),
 
     // Knowledge gaps
-    gaps: profile.knowledgeGraph.gaps.map(g => ({
+    gaps: profile.knowledgeGraph.gaps.map((g) => ({
       pattern: g.pattern,
-      missingPrereqs: g.missingPrerequisites.map(p => p.concept),
+      missingPrereqs: g.missingPrerequisites.map((p) => p.concept),
       impact: g.impact,
     })),
 
@@ -777,7 +791,7 @@ async function handleGetSkillInsights(userId: string) {
     retention: profile.temporal.retention,
 
     // Active insights (actionable items)
-    insights: profile.insights.map(i => ({
+    insights: profile.insights.map((i) => ({
       id: i.id,
       type: i.type,
       icon: i.icon,
@@ -802,22 +816,22 @@ async function handleGetSkillInsights(userId: string) {
 /**
  * Handle code analysis for misconceptions
  */
-async function handleAnalyzeCode(userId: string, params: {
-  code: string
-  pattern: DSAPattern
-  testResults?: {
-    passed: number
-    total: number
-    failingTests?: string[]
+async function handleAnalyzeCode(
+  userId: string,
+  params: {
+    code: string
+    pattern: DSAPattern
+    testResults?: {
+      passed: number
+      total: number
+      failingTests?: string[]
+    }
   }
-}) {
+) {
   const { code, pattern, testResults } = params
 
   if (!code || !pattern) {
-    return NextResponse.json(
-      { error: 'Code and pattern are required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "Code and pattern are required" }, { status: 400 })
   }
 
   // Analyze code for misconceptions
@@ -851,6 +865,11 @@ async function handleAnalyzeCode(userId: string, params: {
 /**
  * GET /api/rag/v2 - Quick health check
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authResult = await verifyAuth(request)
+  if (!authResult.authenticated || !authResult.userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   return handleHealthCheck()
 }
