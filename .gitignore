@@ -8,6 +8,8 @@ yarn.lock
 # OS / editor artifacts
 .DS_Store
 **/.DS_Store
+._*
+**/._*
 
 # next.js
 /.next/

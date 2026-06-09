@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { scenarios } from "@/lib/scenarios"
-import {
-  generateTextEmbedding,
-  storeTextEmbedding,
-  embedAndStoreHint,
-  type TextEmbedding,
-} from "@/lib/rag"
+import { generateTextEmbedding, storeTextEmbedding, type TextEmbedding } from "@/lib/rag"
 import { getUserIdFromRequest } from "@/lib/auth-server"
 import { logger } from "@/lib/logger"
+import { adminDb } from "@/lib/firebase-admin"
 
 // Admin user IDs - add your admin user IDs here
 const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",") || []
+
+type SeedScenarioTextSource = {
+  title: string
+  type?: string
+  difficulty?: string
+  problemStatement?: string
+  examples?: Array<{ input?: unknown; output?: unknown }>
+  constraints?: string[]
+  tags?: string[]
+  optimalComplexity?: {
+    time?: string
+    space?: string
+  }
+}
 
 async function isAdmin(userId: string): Promise<boolean> {
   // SECURITY: Only trust hardcoded admin list from environment variables
@@ -49,6 +59,7 @@ export async function POST(request: NextRequest) {
       processed: 0,
       problems: 0,
       hints: 0,
+      skipped: 0,
       errors: [] as string[],
     }
 
@@ -57,17 +68,28 @@ export async function POST(request: NextRequest) {
 
     for (const scenario of scenariosToProcess) {
       try {
+        const problemEmbeddingId = `problem-${scenario.id}`
+        if (!force) {
+          const existing = await adminDb.collection("text_embeddings").doc(problemEmbeddingId).get()
+          if (existing.exists) {
+            results.skipped++
+            continue
+          }
+        }
+
         // Build full problem text for embedding
         const problemText = buildProblemText(scenario)
         const vector = await generateTextEmbedding(problemText)
 
         // Store problem embedding
         const problemEmbedding: TextEmbedding = {
+          id: problemEmbeddingId,
           text: problemText,
           type: "problem",
           vector,
           metadata: {
             problemId: scenario.id,
+            problemTitle: scenario.title,
             difficulty: scenario.difficulty,
             tags: scenario.tags || [],
             timestamp: new Date().toISOString(),
@@ -82,16 +104,32 @@ export async function POST(request: NextRequest) {
           for (let i = 0; i < scenario.hints.length; i++) {
             const hint = scenario.hints[i]
             try {
-              await embedAndStoreHint(
-                scenario.id,
-                hint,
-                (i + 1) as 1 | 2 | 3 | 4, // Hint level (1, 2, 3...)
-                {
+              const hintLevel = (i + 1) as 1 | 2 | 3 | 4
+              const scenarioPattern = getScenarioPattern(scenario)
+              const hintText = buildHintText(scenario, hint, hintLevel, scenarioPattern)
+              const hintVector = await generateTextEmbedding(hintText)
+
+              await storeTextEmbedding({
+                id: `hint-${scenario.id}-${hintLevel}`,
+                text: hint,
+                type: "hint",
+                vector: hintVector,
+                metadata: {
+                  problemId: scenario.id,
                   problemTitle: scenario.title,
+                  hintLevel,
+                  category: "approach",
+                  pattern: scenarioPattern,
                   problemType: scenario.type,
-                  tags: scenario.tags || [],
-                }
-              )
+                  tags: [
+                    ...(scenario.tags || []),
+                    `level-${hintLevel}`,
+                    scenarioPattern,
+                    scenario.type || "dsa",
+                  ],
+                  timestamp: new Date().toISOString(),
+                },
+              })
               results.hints++
             } catch (hintError) {
               results.errors.push(`Hint error for ${scenario.id}: ${hintError}`)
@@ -115,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Seeded ${results.processed} scenarios with ${results.problems} problem embeddings and ${results.hints} hint embeddings`,
+      message: `Seeded ${results.processed} scenarios with ${results.problems} problem embeddings and ${results.hints} hint embeddings (${results.skipped} skipped)`,
       results,
     })
   } catch (error) {
@@ -130,7 +168,7 @@ export async function POST(request: NextRequest) {
 /**
  * Build full problem text for embedding
  */
-function buildProblemText(scenario: any): string {
+function buildProblemText(scenario: SeedScenarioTextSource): string {
   const parts = [
     `Problem: ${scenario.title}`,
     `Type: ${scenario.type}`,
@@ -145,7 +183,7 @@ function buildProblemText(scenario: any): string {
     parts.push(
       `Examples: ${scenario.examples
         .slice(0, 2)
-        .map((ex: any) => `Input: ${ex.input}, Output: ${ex.output}`)
+        .map((ex) => `Input: ${String(ex.input)}, Output: ${String(ex.output)}`)
         .join("; ")}`
     )
   }
@@ -165,6 +203,29 @@ function buildProblemText(scenario: any): string {
   }
 
   return parts.join("\n")
+}
+
+function getScenarioPattern(scenario: unknown): string {
+  if (!scenario || typeof scenario !== "object" || !("pattern" in scenario)) {
+    return "general"
+  }
+
+  const pattern = (scenario as { pattern?: unknown }).pattern
+  return typeof pattern === "string" ? pattern : "general"
+}
+
+function buildHintText(
+  scenario: Pick<SeedScenarioTextSource, "title">,
+  hint: string,
+  hintLevel: 1 | 2 | 3 | 4,
+  pattern: string
+): string {
+  return [
+    `Problem: ${scenario.title}`,
+    `Pattern: ${pattern}`,
+    `Hint Level ${hintLevel}: ${hint}`,
+    "Category: approach",
+  ].join("\n")
 }
 
 /**

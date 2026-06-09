@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const authenticatedUserId = authResult.userId
 
     const {
-      userId: requestUserId,
+      userId: _requestUserId,
       sessionId,
       scenarioId,
       scenarioTitle,
@@ -48,8 +48,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Build session metrics from the provided data
-    const testsPassed = testResults?.filter((t: any) => t.passed).length || 0
-    const testsTotal = testResults?.length || 0
+    const normalizedTestResults = Array.isArray(testResults) ? testResults : []
+    const testsPassed = normalizedTestResults.filter((t: { passed?: boolean }) => t.passed).length
+    const testsTotal = normalizedTestResults.length
 
     const sessionMetrics: Partial<SessionMetrics> = {
       timeSpentSeconds: timeSpent || 0,
@@ -90,8 +91,9 @@ export async function POST(request: NextRequest) {
       problemType: interactionMetrics?.problemType || "dsa",
 
       // Final scores
-      correctnessScore: scores?.correctness || (testsPassed / testsTotal) * 100,
-      overallScore: scores?.overall || 50,
+      correctnessScore:
+        scores?.correctness ?? (testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0),
+      overallScore: scores?.overall ?? 50,
     }
 
     // Vectorize session metrics
@@ -113,12 +115,12 @@ export async function POST(request: NextRequest) {
       timestamp: new Date(),
       vector: combinedVector,
       scores: {
-        correctness: scores?.correctness || 0,
-        efficiency: scores?.efficiency || 0,
-        codeQuality: scores?.codeQuality || 0,
-        reasoning: scores?.reasoningExplanation || 0,
-        collaboration: scores?.aiCollaboration || 0,
-        overall: scores?.overall || 0,
+        correctness: scores?.correctness ?? 0,
+        efficiency: scores?.efficiency ?? 0,
+        codeQuality: scores?.codeQuality ?? 0,
+        reasoning: scores?.reasoningExplanation ?? 0,
+        collaboration: scores?.aiCollaboration ?? 0,
+        overall: scores?.overall ?? 0,
       },
       metadata: {
         difficulty: sessionMetrics.problemDifficulty || "medium",
