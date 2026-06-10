@@ -58,3 +58,6 @@ next-env.d.ts
 
 # Local generated docs
 /docs/ai-engineer-intern-interview-guide.html
+
+# Ignore constitution files
+/constitution/

@@ -47,3 +47,31 @@ export type WorkspaceScenario = Scenario & {
   executionMode: "workspace"
   workspace: WorkspaceScenarioConfig
 }
+
+export interface DsaTestResult {
+  description: string
+  passed: boolean
+  input: any
+  expected: any
+  actual: any
+  error: string | null
+}
+
+export interface DsaExecutionResult {
+  success: boolean
+  results: DsaTestResult[]
+  consoleLogs: Array<{
+    type: "log" | "error" | "warn" | "info"
+    message: string
+    timestamp: number
+  }>
+  summary: {
+    total: number
+    passed: number
+    failed: number
+    passRate: number
+    serviceErrors: number
+    effectiveTotal: number
+  }
+  error: string | null
+}

@@ -17,19 +17,20 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 
 ## Engineering Principles
 
-### Maintainability
+### Maintainability & Code Cleanliness
 
-- Keep files focused and cohesive.
-- Split files when they become hard to scan or mix unrelated responsibilities.
-- Move reusable business logic into `lib/` services.
-- Keep `app/api/*/route.ts` handlers thin: parse, auth, validate, call service, return response.
-- Keep UI components readable and split complex behavior into hooks or smaller components.
+- **Focus & Cohesion**: Keep files and classes focused on a single responsibility. When a file mixes concerns or becomes hard to scan, split it by domain responsibility.
+- **Clean Interfaces**: Prefer small, pure functions with descriptive names, explicit inputs, and clear return types.
+- **Modularity**: Design decoupled modules with clear boundaries. Avoid hidden coupling between UI, API routes, Firestore documents, and AI prompts.
+- **Dead Code Elimination**: Proactively delete dead code when replacing behavior. Do not leave commented-out code blocks.
+- **Thin Handlers**: Keep route handlers (`app/api/*/route.ts`) thin. Handlers should only parse requests, authenticate/authorize, validate inputs, call service services, and return responses.
+- **Readable UI**: Keep React components presentational when possible; move mutations, fetching, and complex derived state into custom hooks or services.
 
-### DRY
+### DRY & Modularity
 
-- Do not duplicate business rules, auth checks, validation schemas, scoring formulas, entitlement logic, or Firestore document-shape assumptions.
-- Do not create an abstraction just because two lines look similar.
-- Extract shared helpers when the shared concept has a stable name and reduces real maintenance risk.
+- **No Business Logic Duplication**: Do not duplicate business rules, validation schemas, scoring formulas, auth checks, billing entitlement logic, or Firestore document-shape assumptions.
+- **Avoid Premature Abstraction**: Accept small local duplication when the abstraction would be harder to scan than the repeated code.
+- **Helper Extraction**: Only extract shared helpers when the shared concept is stable, has a clear domain name, and reduces real maintenance risk.
 
 ### File Size
 
