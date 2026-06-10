@@ -1,4 +1,55 @@
-export function buildJsWrapper(code: string, testCase: any, cleanCode: string): string {
+function isValidIdentifier(name: string): boolean {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)
+}
+
+function getFunctionCandidates(cleanCode: string): string[] {
+  const candidates: string[] = []
+
+  // 1. Classic function declarations: function name(...)
+  const funcDeclMatches = cleanCode.matchAll(/function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g)
+  for (const match of funcDeclMatches) {
+    candidates.push(match[1])
+  }
+
+  // 2. Arrow functions: const name = (...) =>
+  const arrowFuncMatches = cleanCode.matchAll(
+    /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:\([^)]*\)|[a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/g
+  )
+  for (const match of arrowFuncMatches) {
+    candidates.push(match[1])
+  }
+
+  // 3. Function expressions: const name = function(...)
+  const funcExprMatches = cleanCode.matchAll(
+    /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*function\s*\(/g
+  )
+  for (const match of funcExprMatches) {
+    candidates.push(match[1])
+  }
+
+  const helperClassNames = new Set([
+    "Node",
+    "ListNode",
+    "TreeNode",
+    "TrieNode",
+    "GraphNode",
+    "NestedInteger",
+    "eval",
+    "_buildTree",
+    "_treeToArray",
+    "_buildList",
+    "_listToArray",
+  ])
+
+  return Array.from(new Set(candidates)).filter((name) => !helperClassNames.has(name))
+}
+
+export function buildJsWrapper(
+  code: string,
+  testCase: any,
+  cleanCode: string,
+  scenarioId: string
+): string {
   const inputKeys = Object.keys(testCase.input)
   const inputValues = Object.values(testCase.input)
   const inputJson = JSON.stringify(inputValues)
@@ -13,7 +64,7 @@ export function buildJsWrapper(code: string, testCase: any, cleanCode: string): 
   let className: string | null = null
   if (isClassBased && testCase.input.operations && testCase.input.operations.length > 0) {
     const operationClassName = testCase.input.operations[0]
-    const specificClassMatch = cleanCode.match(new RegExp(`class\\s+${operationClassName}\\s*[{(]`))
+    const specificClassMatch = cleanCode.match(new RegExp(`class\\s+${operationClassName}\\b`))
     if (specificClassMatch) {
       className = operationClassName
     }
@@ -42,12 +93,17 @@ export function buildJsWrapper(code: string, testCase: any, cleanCode: string): 
     }
   }
 
-  const jsFuncMatch = cleanCode.match(
-    /(?:function\s+(\w+)|const\s+(\w+)\s*=|let\s+(\w+)\s*=|var\s+(\w+)\s*=)/
-  )
-  const jsFuncName = jsFuncMatch
-    ? jsFuncMatch[1] || jsFuncMatch[2] || jsFuncMatch[3] || jsFuncMatch[4]
-    : null
+  const candidates = getFunctionCandidates(cleanCode)
+  // Check candidates in reverse order (typically main entry point is defined at/near bottom, helpers at top)
+  const candidateChecks = candidates
+    .reverse()
+    .map((name) => `else if (typeof ${name} === 'function') _func = ${name};`)
+    .join("\n  ")
+
+  // Derive target camelCase name from scenario ID
+  const cleanId = scenarioId.replace(/^dsa-/, "")
+  const camelCasedId = cleanId.replace(/-([a-z])/g, (g) => g[1].toUpperCase())
+  const scenarioIdentifier = isValidIdentifier(camelCasedId) ? camelCasedId : null
 
   return `
 class TreeNode {
@@ -157,14 +213,69 @@ ${
 `
     : `
   let _func;
-  ${jsFuncName ? `if (typeof ${jsFuncName} === 'function') _func = ${jsFuncName};` : ""}
-  if (!_func && typeof solution === 'function') _func = solution;
-  if (!_func && typeof twoSum === 'function') _func = twoSum;
-  if (!_func && typeof main === 'function') _func = main;
-  if (!_func && typeof isSameTree === 'function') _func = isSameTree;
-  if (!_func && typeof invertTree === 'function') _func = invertTree;
-  if (!_func && typeof processAdjacentPairs === 'function') _func = processAdjacentPairs;
-  if (!_func && typeof getUserEmailFormatted === 'function') _func = getUserEmailFormatted;
+  let _instance;
+
+  // Support LeetCode class Solution style wrappers
+  if (typeof Solution === 'function') {
+    try {
+      _instance = new Solution();
+      if (typeof _instance.solution === 'function') {
+        _func = _instance.solution.bind(_instance);
+      }
+      ${scenarioIdentifier ? `else if (typeof _instance.${scenarioIdentifier} === 'function') _func = _instance.${scenarioIdentifier}.bind(_instance);` : ""}
+      else if (typeof _instance.twoSum === 'function') _func = _instance.twoSum.bind(_instance);
+      else if (typeof _instance.isAnagram === 'function') _func = _instance.isAnagram.bind(_instance);
+      else if (typeof _instance.groupAnagrams === 'function') _func = _instance.groupAnagrams.bind(_instance);
+      else if (typeof _instance.longestConsecutive === 'function') _func = _instance.longestConsecutive.bind(_instance);
+      else if (typeof _instance.firstMissingPositive === 'function') _func = _instance.firstMissingPositive.bind(_instance);
+      else if (typeof _instance.majorityElement === 'function') _func = _instance.majorityElement.bind(_instance);
+      else if (typeof _instance.nextPermutation === 'function') _func = _instance.nextPermutation.bind(_instance);
+      else if (typeof _instance.productExceptSelf === 'function') _func = _instance.productExceptSelf.bind(_instance);
+      else if (typeof _instance.rotate === 'function') _func = _instance.rotate.bind(_instance);
+      else if (typeof _instance.subarraySum === 'function') _func = _instance.subarraySum.bind(_instance);
+      else if (typeof _instance.topKFrequent === 'function') _func = _instance.topKFrequent.bind(_instance);
+      else if (typeof _instance.findDuplicates === 'function') _func = _instance.findDuplicates.bind(_instance);
+      else if (typeof _instance.main === 'function') _func = _instance.main.bind(_instance);
+      else if (typeof _instance.isSameTree === 'function') _func = _instance.isSameTree.bind(_instance);
+      else if (typeof _instance.invertTree === 'function') _func = _instance.invertTree.bind(_instance);
+      else if (typeof _instance.processAdjacentPairs === 'function') _func = _instance.processAdjacentPairs.bind(_instance);
+      else if (typeof _instance.getUserEmailFormatted === 'function') _func = _instance.getUserEmailFormatted.bind(_instance);
+      else {
+        const methods = Object.getOwnPropertyNames(Solution.prototype).filter(
+          m => m !== 'constructor' && typeof _instance[m] === 'function'
+        );
+        if (methods.length > 0) {
+          _func = _instance[methods[0]].bind(_instance);
+        }
+      }
+    } catch (e) {
+      // Ignore construction error and fallback to global functions
+    }
+  }
+
+  // Fallback to global functions/arrow functions/candidates
+  if (!_func) {
+    if (typeof solution === 'function') _func = solution;
+    ${scenarioIdentifier ? `else if (typeof ${scenarioIdentifier} === 'function') _func = ${scenarioIdentifier};` : ""}
+    else if (typeof twoSum === 'function') _func = twoSum;
+    else if (typeof isAnagram === 'function') _func = isAnagram;
+    else if (typeof groupAnagrams === 'function') _func = groupAnagrams;
+    else if (typeof longestConsecutive === 'function') _func = longestConsecutive;
+    else if (typeof firstMissingPositive === 'function') _func = firstMissingPositive;
+    else if (typeof majorityElement === 'function') _func = majorityElement;
+    else if (typeof nextPermutation === 'function') _func = nextPermutation;
+    else if (typeof productExceptSelf === 'function') _func = productExceptSelf;
+    else if (typeof rotate === 'function') _func = rotate;
+    else if (typeof subarraySum === 'function') _func = subarraySum;
+    else if (typeof topKFrequent === 'function') _func = topKFrequent;
+    else if (typeof findDuplicates === 'function') _func = findDuplicates;
+    else if (typeof main === 'function') _func = main;
+    else if (typeof isSameTree === 'function') _func = isSameTree;
+    else if (typeof invertTree === 'function') _func = invertTree;
+    else if (typeof processAdjacentPairs === 'function') _func = processAdjacentPairs;
+    else if (typeof getUserEmailFormatted === 'function') _func = getUserEmailFormatted;
+    ${candidateChecks ? `\n    ${candidateChecks}` : ""}
+  }
 
   if (!_func) {
     const funcNames = Object.keys(this).filter(k => typeof this[k] === 'function' && k !== 'eval' && k !== '_buildTree' && k !== '_treeToArray' && k !== '_buildList' && k !== '_listToArray');

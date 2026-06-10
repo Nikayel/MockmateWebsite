@@ -21,7 +21,7 @@ export async function executeJsClientSide(
 
     for (let i = 0; i < testCases.length; i++) {
       const testCase = testCases[i]
-      const wrappedCode = buildJsWrapper(jsCode, testCase, cleanCode)
+      const wrappedCode = buildJsWrapper(jsCode, testCase, cleanCode, scenarioId)
 
       const runResult = await runInWorker({ code: wrappedCode })
 

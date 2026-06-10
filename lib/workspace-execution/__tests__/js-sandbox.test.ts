@@ -3,6 +3,7 @@ import { stripComments } from "../js-sandbox/comments"
 import { executeJsClientSide } from "../js-sandbox/dsa-runner"
 import { executeWorkspaceScenarioJsClientSide } from "../js-sandbox/workspace-runner"
 import { runInWorker } from "../js-sandbox/worker-runner"
+import { buildJsWrapper } from "../js-sandbox/dsa-wrapper"
 import type { WorkspaceScenario } from "../types"
 
 // Mock runInWorker
@@ -150,5 +151,64 @@ describe("executeWorkspaceScenarioJsClientSide", () => {
     expect(result.results[0].passed).toBe(true)
     expect(result.consoleLogs).toHaveLength(1)
     expect(result.consoleLogs[0].message).toBe("running tests...")
+  })
+})
+
+describe("buildJsWrapper execution", () => {
+  it("handles standard functions with helper variables", () => {
+    const code = `
+      const memo = {};
+      function solve(nums, target) {
+        return nums[0] + nums[1] + target;
+      }
+    `
+    const testCase = {
+      input: { nums: [10, 20], target: 5 },
+      description: "helper vars test",
+    }
+    const cleanCode = stripComments(code, "javascript")
+    const wrapped = buildJsWrapper(code, testCase, cleanCode, "dsa-solve")
+
+    const fn = new Function(wrapped)
+    const result = fn()
+    expect(result).toBe(35)
+  })
+
+  it("handles arrow functions", () => {
+    const code = `
+      const mySolve = (nums, target) => {
+        return nums[0] * target;
+      };
+    `
+    const testCase = {
+      input: { nums: [6, 2], target: 5 },
+      description: "arrow func test",
+    }
+    const cleanCode = stripComments(code, "javascript")
+    const wrapped = buildJsWrapper(code, testCase, cleanCode, "dsa-my-solve")
+
+    const fn = new Function(wrapped)
+    const result = fn()
+    expect(result).toBe(30)
+  })
+
+  it("handles LeetCode class Solution style", () => {
+    const code = `
+      class Solution {
+        twoSum(nums, target) {
+          return nums[0] + nums[1];
+        }
+      }
+    `
+    const testCase = {
+      input: { nums: [10, 20], target: 30 },
+      description: "class Solution test",
+    }
+    const cleanCode = stripComments(code, "javascript")
+    const wrapped = buildJsWrapper(code, testCase, cleanCode, "dsa-two-sum")
+
+    const fn = new Function(wrapped)
+    const result = fn()
+    expect(result).toBe(30)
   })
 })
