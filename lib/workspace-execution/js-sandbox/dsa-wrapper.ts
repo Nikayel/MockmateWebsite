@@ -298,7 +298,14 @@ ${
     return arg;
   });
 
-  let _result = _func(..._processedInput);
+  let _result;
+  if (typeof encode === 'function' && typeof decode === 'function') {
+    _result = decode(encode(..._processedInput));
+  } else if (typeof Solution === 'function' && _instance && typeof _instance.encode === 'function' && typeof _instance.decode === 'function') {
+    _result = _instance.decode(_instance.encode(..._processedInput));
+  } else {
+    _result = _func(..._processedInput);
+  }
 
   const _hadTreeInput = _processedInput.some((arg, i) => {
     const key = (_inputKeys[i] || '').toLowerCase();

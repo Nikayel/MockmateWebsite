@@ -211,4 +211,27 @@ describe("buildJsWrapper execution", () => {
     const result = fn()
     expect(result).toBe(30)
   })
+
+  it("handles LeetCode class Solution encode and decode round-trip", () => {
+    const code = `
+      class Solution {
+        encode(strs) {
+          return strs.join("#");
+        }
+        decode(s) {
+          return s.split("#");
+        }
+      }
+    `
+    const testCase = {
+      input: { strs: ["hello", "world"] },
+      description: "encode/decode class test",
+    }
+    const cleanCode = stripComments(code, "javascript")
+    const wrapped = buildJsWrapper(code, testCase, cleanCode, "dsa-encode-decode-strings")
+
+    const fn = new Function(wrapped)
+    const result = fn()
+    expect(result).toEqual(["hello", "world"])
+  })
 })
