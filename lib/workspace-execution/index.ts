@@ -4,7 +4,7 @@ export {
   executeWorkspaceScenarioJsClientSide,
   runInWorker,
   stripComments,
-} from "./browser-js-runner"
+} from "./js-sandbox"
 export { overlayWorkspaceFiles, getVisibleWorkspaceFiles, getWorkspacePrimaryCode } from "./files"
 export { buildPistonWorkspaceFiles } from "./piston-builder"
 export { parseWorkspaceExecutionOutput } from "./result-parser"

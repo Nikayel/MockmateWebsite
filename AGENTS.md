@@ -32,10 +32,11 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 - **Avoid Premature Abstraction**: Accept small local duplication when the abstraction would be harder to scan than the repeated code.
 - **Helper Extraction**: Only extract shared helpers when the shared concept is stable, has a clear domain name, and reduces real maintenance risk.
 
-### File Size
+### File Size & Modular Grouping
 
 - Treat large logic-heavy files as a warning sign.
 - Split by responsibility: component, hook, service, schema, type, test, fixture.
+- **Dedicated Folders for Interconnected Logic**: When a feature consists of multiple interconnected logical pieces (e.g., transpiler, wrapper, runner, comment-stripper), do not keep them in one large file. Instead, split them into separate, small files (<150 lines) and group them inside a dedicated folder (e.g., `lib/workspace-execution/js-sandbox/`).
 - Large structured scenario/data files are acceptable when they are mostly content.
 - Avoid files that combine UI, API calls, scoring, validation, and persistence in one place.
 
