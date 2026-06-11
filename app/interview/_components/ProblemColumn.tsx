@@ -21,11 +21,9 @@ import { Badge } from "@/components/ui/badge"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import type { Scenario } from "@/lib/scenarios"
 import type { WorkspaceContextFile } from "../_types"
-import { getWorkspaceFileRole, isWorkspaceScenario } from "../_utils/workspace"
 
 interface ProblemColumnCtx {
   activePanel: "problem" | "editor" | "chat"
-  activeWorkspacePath: string | null
   elapsedTime: number
   fetchRAGHints: () => Promise<void>
   fileInputRef: RefObject<HTMLInputElement | null>
@@ -41,8 +39,6 @@ interface ProblemColumnCtx {
   revealedHintIndices: Set<number>
   revealedHints: number
   selectedScenario: Scenario | null
-  setActiveWorkspacePath: (path: string | null) => void
-  setCode: (code: string) => void
   setIsCodeViewerOpen: (open: boolean) => void
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
   setRevealedHintIndices: Dispatch<SetStateAction<Set<number>>>
@@ -60,7 +56,6 @@ interface ProblemColumnProps {
 export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnProps) {
   const {
     activePanel,
-    activeWorkspacePath,
     elapsedTime,
     fetchRAGHints,
     fileInputRef,
@@ -76,8 +71,6 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
     revealedHintIndices,
     revealedHints,
     selectedScenario,
-    setActiveWorkspacePath,
-    setCode,
     setIsCodeViewerOpen,
     setRevealedAIHintIndices,
     setRevealedHintIndices,
@@ -159,12 +152,6 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                     How to Work This Codebase
                   </h3>
                   <div className="space-y-2 text-sm leading-relaxed text-gray-300">
-                    {(selectedScenario as any).bugDescription && (
-                      <p>
-                        <span className="font-medium text-gray-100">Bug:</span>{" "}
-                        {(selectedScenario as any).bugDescription}
-                      </p>
-                    )}
                     {(selectedScenario as any).expectedBehavior && (
                       <p>
                         <span className="font-medium text-gray-100">Goal:</span>{" "}
@@ -173,8 +160,9 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                     )}
                     <ol className="list-decimal space-y-1.5 pt-1 pl-4 text-xs text-gray-400">
                       <li>Read the README or context file first.</li>
-                      <li>Open the test file to see the failing behavior.</li>
-                      <li>Trace the supporting files, then make the smallest fix.</li>
+                      <li>Open the visible test to reproduce the failing behavior.</li>
+                      <li>Trace the supporting files before editing.</li>
+                      <li>Make the smallest fix that preserves the public contract.</li>
                       <li>Run tests and explain the root cause to the interviewer.</li>
                     </ol>
                   </div>
@@ -491,48 +479,10 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 selectedScenario.type === "add-functionality") &&
               workspaceContext.length > 0 ? (
                 <div className="mb-2">
-                  <p className="mb-2 text-xs text-green-400">
-                    {workspaceContext.length} file(s) loaded automatically. Open these before
-                    editing the primary file.
+                  <p className="mb-2 text-xs text-blue-400">
+                    <Code className="mr-1 mb-0.5 inline-block h-3 w-3" />
+                    Your codebase files are available as tabs in the code editor.
                   </p>
-                  <div className="max-h-48 space-y-1.5 overflow-y-auto">
-                    {workspaceContext.map((file) => (
-                      <button
-                        key={file.path}
-                        onClick={() => {
-                          if (isWorkspaceScenario(selectedScenario)) {
-                            setActiveWorkspacePath(file.path)
-                            setCode(file.content)
-                          } else {
-                            setSelectedFile(file)
-                            setIsCodeViewerOpen(true)
-                          }
-                        }}
-                        className={`w-full cursor-pointer rounded border px-2.5 py-2 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50 ${
-                          activeWorkspacePath === file.path
-                            ? "border-blue-500 bg-blue-500/10"
-                            : "border-gray-700 bg-gray-800/50"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1 font-semibold text-blue-400">
-                              <Code className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate">{file.path}</span>
-                            </div>
-                            {file.description && (
-                              <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-400">
-                                {file.description}
-                              </p>
-                            )}
-                          </div>
-                          <span className="rounded border border-gray-600 bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-400">
-                            {file.role || getWorkspaceFileRole(file.path)}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               ) : (
                 <>

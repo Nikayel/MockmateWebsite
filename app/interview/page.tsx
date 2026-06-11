@@ -4593,7 +4593,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   <ProblemColumn
                     ctx={{
                       activePanel,
-                      activeWorkspacePath,
                       elapsedTime,
                       fetchRAGHints,
                       fileInputRef,
@@ -4609,8 +4608,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       revealedHintIndices,
                       revealedHints,
                       selectedScenario,
-                      setActiveWorkspacePath,
-                      setCode,
                       setIsCodeViewerOpen,
                       setRevealedAIHintIndices,
                       setRevealedHintIndices,
@@ -4653,6 +4650,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                     onChatInputChange={setChatInput}
                     isLoadingChat={isLoadingChat}
                     onSendPartnerMessage={() => handleSendMessage(false)}
+                    workspaceContext={workspaceContext}
+                    onFileSelect={(file) => {
+                      if (file.path !== activeWorkspacePath) {
+                        setActiveWorkspacePath(file.path)
+                        setCode(file.content || "")
+                      }
+                    }}
                   />
 
                   <ChatColumn

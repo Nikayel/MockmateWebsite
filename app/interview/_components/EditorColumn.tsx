@@ -1,7 +1,19 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { Bot, CheckCircle, ChevronDown, ChevronUp, Code, PlayCircle, Send } from "lucide-react"
+import {
+  BookOpen,
+  Bot,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Code,
+  FileCode,
+  FlaskConical,
+  Lock,
+  PlayCircle,
+  Send,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -56,6 +68,8 @@ interface EditorColumnProps {
   onChatInputChange: (value: string) => void
   isLoadingChat: boolean
   onSendPartnerMessage: () => void
+  workspaceContext?: WorkspaceContextFile[]
+  onFileSelect?: (file: WorkspaceContextFile) => void
 }
 
 export const EditorColumn = memo(function EditorColumn({
@@ -89,6 +103,8 @@ export const EditorColumn = memo(function EditorColumn({
   onChatInputChange,
   isLoadingChat,
   onSendPartnerMessage,
+  workspaceContext = [],
+  onFileSelect,
 }: EditorColumnProps) {
   const runWithLanguageGuard = (action: () => void, actionName: "run tests" | "submit") => {
     if (!isLanguageSupported(selectedLanguage)) {
@@ -114,35 +130,94 @@ export const EditorColumn = memo(function EditorColumn({
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
-      <CardHeader className="flex-shrink-0 px-6 pb-2">
-        <CardTitle className="flex items-center justify-between text-xs text-white">
-          <div className="flex items-center space-x-1">
-            <Code className="text-accent h-3 w-3" />
-            {selectedScenario?.type === "system-design" ? (
-              <span>Design Notes</span>
-            ) : activeWorkspaceFile ? (
-              <span className="truncate">{activeWorkspaceFile.path}</span>
-            ) : (
-              <span>
-                {selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.
-                {selectedLanguage === "javascript"
-                  ? "js"
-                  : selectedLanguage === "typescript"
-                    ? "ts"
-                    : "py"}
-              </span>
-            )}
+      <CardHeader className="flex-shrink-0 px-0 pt-0 pb-2">
+        {isWorkspaceScenario(selectedScenario) &&
+        workspaceContext &&
+        workspaceContext.length > 0 ? (
+          <div className="flex w-full items-center justify-between border-b border-gray-700 bg-gray-900/80 pr-4">
+            <div className="no-scrollbar flex flex-1 overflow-x-auto">
+              {workspaceContext.map((file) => {
+                const isActive = activeWorkspaceFile?.path === file.path
+                // Only show hidden files if they are the active file (though usually hidden files aren't in context, just to be safe)
+                if (file.hidden && !isActive) return null
+
+                let iconColor = "text-gray-400"
+                let RoleIcon = FileCode
+                let roleLabel = "Editable file"
+                if (file.role === "test") {
+                  iconColor = isActive ? "text-green-400" : "text-green-500/60"
+                  RoleIcon = FlaskConical
+                  roleLabel = "Test file"
+                } else if (file.role === "readonly") {
+                  iconColor = isActive ? "text-orange-400" : "text-orange-500/60"
+                  RoleIcon = Lock
+                  roleLabel = "Read-only file"
+                } else if (file.role === "editable") {
+                  iconColor = isActive ? "text-blue-400" : "text-blue-500/60"
+                } else if (file.role === "docs") {
+                  iconColor = isActive ? "text-purple-300" : "text-purple-400/60"
+                  RoleIcon = BookOpen
+                  roleLabel = "Documentation file"
+                }
+
+                return (
+                  <button
+                    key={file.path}
+                    onClick={() => onFileSelect && onFileSelect(file)}
+                    title={`${roleLabel}: ${file.path}`}
+                    aria-label={`Open ${roleLabel.toLowerCase()} ${file.path}`}
+                    className={`flex items-center gap-1.5 border-r border-gray-700 px-3 py-2 text-xs whitespace-nowrap transition-colors ${
+                      isActive
+                        ? "border-b-2 border-b-blue-500 bg-gray-800 text-white"
+                        : "border-b-2 border-b-transparent bg-gray-900/50 text-gray-400 hover:bg-gray-800/80 hover:text-gray-300"
+                    }`}
+                  >
+                    <RoleIcon className={`h-3.5 w-3.5 ${iconColor}`} />
+                    {file.path}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex items-center space-x-3 pl-4">
+              <GradingCriteriaTooltip />
+              {isInterviewStarted && (
+                <div className="flex items-center space-x-1">
+                  <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
+                  <span className="text-accent text-xs">LIVE</span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <GradingCriteriaTooltip />
-            {isInterviewStarted && (
+        ) : (
+          <div className="flex items-center justify-between px-6 pt-4">
+            <CardTitle className="flex w-full items-center justify-between text-xs text-white">
               <div className="flex items-center space-x-1">
-                <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
-                <span className="text-accent text-xs">LIVE</span>
+                <Code className="text-accent h-3 w-3" />
+                {selectedScenario?.type === "system-design" ? (
+                  <span>Design Notes</span>
+                ) : (
+                  <span>
+                    {selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.
+                    {selectedLanguage === "javascript"
+                      ? "js"
+                      : selectedLanguage === "typescript"
+                        ? "ts"
+                        : "py"}
+                  </span>
+                )}
               </div>
-            )}
+              <div className="flex items-center space-x-3">
+                <GradingCriteriaTooltip />
+                {isInterviewStarted && (
+                  <div className="flex items-center space-x-1">
+                    <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
+                    <span className="text-accent text-xs">LIVE</span>
+                  </div>
+                )}
+              </div>
+            </CardTitle>
           </div>
-        </CardTitle>
+        )}
       </CardHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
