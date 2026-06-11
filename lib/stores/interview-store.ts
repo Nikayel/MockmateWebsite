@@ -227,7 +227,7 @@ const initialState: InterviewState = {
   showScenarioBrowser: true,
 
   // Filters
-  filterType: [],
+  filterType: ["bugfix"],
   filterDifficulty: [],
   filterCompanies: [],
   searchQuery: "",

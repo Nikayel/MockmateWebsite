@@ -26,7 +26,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   completedProblems,
   hasGuestBanner = false,
 }: ScenarioBrowserProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("patterns")
+  const [viewMode, setViewMode] = useState<ViewMode>("list")
   const { selectedScenario, setSelectedScenario } = useInterviewStore(
     useShallow((state) => ({
       selectedScenario: state.selectedScenario,
@@ -62,10 +62,13 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
           {/* Compact Header */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              {/* <h1 className="text-2xl font-semibold text-white md:text-3xl">Practice Problems</h1>
-              <p className="mt-1 text-sm text-zinc-400">
-                Choose your challenge. Track your progress.
-              </p> */}
+              <h1 className="text-2xl font-semibold text-white md:text-3xl">
+                Practice Real Codebase Work
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-zinc-400">
+                Start with bug fixes and production-style codebase tasks, then use DSA drills when
+                you need targeted pattern reps.
+              </p>
             </div>
 
             {/* View Mode Toggle - Pill Style */}
@@ -79,7 +82,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 }`}
               >
                 <Target className="h-4 w-4" />
-                Roadmap
+                DSA Roadmap
               </button>
               <button
                 onClick={() => setViewMode("patterns")}
@@ -90,7 +93,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 }`}
               >
                 <LayoutGrid className="h-4 w-4" />
-                Patterns
+                DSA Patterns
               </button>
               <button
                 onClick={() => setViewMode("list")}
@@ -99,7 +102,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 }`}
               >
                 <List className="h-4 w-4" />
-                All Practice
+                Codebases
               </button>
             </div>
           </div>

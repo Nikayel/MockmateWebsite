@@ -44,15 +44,9 @@ interface ScenarioFiltersProps {
 // Exercise type quick filters with descriptions
 const EXERCISE_TYPES = [
   {
-    id: "dsa",
-    label: "DSA",
-    description: "Algorithms & data structures",
-    icon: Cpu,
-  },
-  {
     id: "bugfix",
     label: "Bug Fix",
-    description: "Debug existing code",
+    description: "Repair failing codebases",
     icon: Bug,
   },
   {
@@ -78,6 +72,12 @@ const EXERCISE_TYPES = [
     label: "System Design",
     description: "Architecture & scalability",
     icon: Layers,
+  },
+  {
+    id: "dsa",
+    label: "DSA Drill",
+    description: "Algorithms & data structures",
+    icon: Cpu,
   },
 ] as const
 

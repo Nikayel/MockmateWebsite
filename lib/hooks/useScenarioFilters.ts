@@ -9,6 +9,15 @@ import {
   type Company,
 } from "@/lib/scenarios"
 
+const SCENARIO_TYPE_PRIORITY: Record<ScenarioType, number> = {
+  bugfix: 0,
+  "add-functionality": 1,
+  "system-design": 2,
+  optimization: 3,
+  security: 4,
+  dsa: 5,
+}
+
 export function useScenarioFilters() {
   const {
     filterType,
@@ -39,6 +48,10 @@ export function useScenarioFilters() {
       difficulty: filterDifficulty.length > 0 ? filterDifficulty : undefined,
       companies: filterCompanies.length > 0 ? filterCompanies : undefined,
       searchQuery: searchQuery || undefined,
+    }).sort((a, b) => {
+      const typeDelta = SCENARIO_TYPE_PRIORITY[a.type] - SCENARIO_TYPE_PRIORITY[b.type]
+      if (typeDelta !== 0) return typeDelta
+      return b.estimatedTime - a.estimatedTime
     })
   }, [filterType, filterDifficulty, filterCompanies, searchQuery])
 
