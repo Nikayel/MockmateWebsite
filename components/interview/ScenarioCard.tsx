@@ -19,11 +19,6 @@ interface ScenarioCardProps {
 // Exercise type quick filters with descriptions
 const EXERCISE_TYPES = [
   {
-    id: "dsa",
-    label: "DSA",
-    icon: Cpu,
-  },
-  {
     id: "bugfix",
     label: "Bug Fix",
     icon: Bug,
@@ -47,6 +42,11 @@ const EXERCISE_TYPES = [
     id: "system-design",
     label: "System Design",
     icon: Layers,
+  },
+  {
+    id: "dsa",
+    label: "DSA Drill",
+    icon: Cpu,
   },
 ] as const
 
@@ -187,7 +187,15 @@ export const ScenarioCard = memo(function ScenarioCard({
             {usageLimit.limit - usageLimit.used !== 1 ? "s" : ""} remaining
           </p>
         )}
-        {scenario.type === "dsa" && <p className="text-center text-[10px] text-zinc-500">Free</p>}
+        {scenario.type === "bugfix" && (
+          <p className="text-center text-[10px] text-zinc-500">Real codebase</p>
+        )}
+        {scenario.type === "add-functionality" && (
+          <p className="text-center text-[10px] text-zinc-500">Feature codebase</p>
+        )}
+        {scenario.type === "dsa" && (
+          <p className="text-center text-[10px] text-zinc-500">Algorithm drill</p>
+        )}
       </div>
     </div>
   )
