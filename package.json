@@ -5,6 +5,7 @@
   "scripts": {
     "build": "next build",
     "build:analyze": "ANALYZE=true next build",
+    "predev": "node scripts/predev-exfat-guard.js",
     "dev": "next dev --turbopack",
     "dev:webpack": "next dev --webpack",
     "lint": "eslint .",
@@ -14,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "test": "vitest run",
+    "audit:bugfix": "tsx scripts/audit-bugfix-scenarios.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky"
@@ -118,6 +120,7 @@
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.17.0",
     "@next/bundle-analyzer": "^15.1.0",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "^19",

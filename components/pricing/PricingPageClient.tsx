@@ -87,7 +87,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                   20+ problems, unlimited practice
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-gray-500" />2 full interview scenarios
+                  <Check className="h-3.5 w-3.5 text-gray-500" />8 full interview sessions/month
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-3.5 w-3.5 text-gray-500" />

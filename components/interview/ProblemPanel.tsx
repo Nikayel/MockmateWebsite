@@ -505,23 +505,10 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
             <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
             {scenario.type === "bugfix" && workspaceContext.length > 0 ? (
               <div className="mb-2">
-                <p className="mb-2 text-xs text-green-400">
-                  ✓ {workspaceContext.length} codebase file(s) loaded automatically
+                <p className="mb-2 text-xs text-blue-400">
+                  <Code className="mr-1 mb-0.5 inline-block h-3 w-3" />
+                  Your codebase files are available as tabs in the code editor.
                 </p>
-                <div className="max-h-32 space-y-1 overflow-y-auto">
-                  {workspaceContext.map((file, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => onFileSelect(file)}
-                      className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
-                    >
-                      <div className="flex items-center gap-1 font-semibold text-blue-400">
-                        <Code className="h-3 w-3" />
-                        {file.path}
-                      </div>
-                    </button>
-                  ))}
-                </div>
               </div>
             ) : (
               <>
