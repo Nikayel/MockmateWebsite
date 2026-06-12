@@ -459,8 +459,8 @@ export async function generateAIResponse(
     }
   }
 
-  // 2. Check cache if not skipped
-  if (!skipCache) {
+  // 2. Check cache if not skipped (skip chat_message events since context changes constantly)
+  if (!skipCache && eventType !== "chat_message") {
     const cacheKey = generateCacheKey({
       type: eventType,
       systemPrompt,
@@ -605,8 +605,8 @@ export async function generateAIResponse(
           })
         }
 
-        // 5. Cache the response
-        if (!skipCache) {
+        // 5. Cache the response (skip chat_message events since context changes constantly)
+        if (!skipCache && eventType !== "chat_message") {
           const cacheKey = generateCacheKey({
             type: eventType,
             systemPrompt,
