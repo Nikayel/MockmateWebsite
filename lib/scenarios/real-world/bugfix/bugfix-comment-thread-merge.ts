@@ -167,9 +167,9 @@ def record_factory(suite):
     def record(name, fn):
         try:
             fn()
-            results.append({"suite": suite, "name": name, "passed": True, "error": None})
+            results.append({"suite": suite, "name": name, "passed": True, "error": None, "isHidden": "hidden" in suite.lower()})
         except Exception as exc:
-            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc()})
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc(), "isHidden": "hidden" in suite.lower()})
     return record
 
 test_comment_threads.run_tests(record_factory("visible comment threads"))

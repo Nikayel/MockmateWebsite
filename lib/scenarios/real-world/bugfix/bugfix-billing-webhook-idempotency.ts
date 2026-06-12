@@ -185,8 +185,8 @@ module.exports = { runTests }
 ]
 const results = []
 async function record(suite, name, fn) {
-  try { await fn(); results.push({ suite, name, passed: true, error: null }) }
-  catch (error) { results.push({ suite, name, passed: false, error: error.message }) }
+  try { await fn(); results.push({ suite, name, passed: true, error: null, isHidden: suite.toLowerCase().includes("hidden") }) }
+  catch (error) { results.push({ suite, name, passed: false, error: error.message, isHidden: suite.toLowerCase().includes("hidden") }) }
 }
 ;(async () => {
   for (const [suite, mod] of suites) await mod.runTests((name, fn) => record(suite, name, fn))

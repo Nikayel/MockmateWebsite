@@ -226,9 +226,9 @@ const results = []
 async function record(suite, name, fn) {
   try {
     await fn()
-    results.push({ suite, name, passed: true, error: null })
+    results.push({ suite, name, passed: true, error: null, isHidden: suite.toLowerCase().includes("hidden") })
   } catch (error) {
-    results.push({ suite, name, passed: false, error: error && error.message ? error.message : String(error) })
+    results.push({ suite, name, passed: false, error: error && error.message ? error.message : String(error), isHidden: suite.toLowerCase().includes("hidden") })
   }
 }
 

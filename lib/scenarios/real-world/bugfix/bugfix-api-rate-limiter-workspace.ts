@@ -195,7 +195,7 @@ module.exports = { runTests }
         hidden: true,
         content: `const suites = [["visible rate limiter", require("./rate-limiter.test")], ["hidden rate limiter", require("./rate-limiter.hidden.test")]]
 const results = []
-async function record(suite, name, fn) { try { await fn(); results.push({ suite, name, passed: true, error: null }) } catch (error) { results.push({ suite, name, passed: false, error: error.message }) } }
+async function record(suite, name, fn) { try { await fn(); results.push({ suite, name, passed: true, error: null, isHidden: suite.toLowerCase().includes("hidden") }) } catch (error) { results.push({ suite, name, passed: false, error: error.message, isHidden: suite.toLowerCase().includes("hidden") }) } }
 ;(async () => { for (const [suite, mod] of suites) await mod.runTests((name, fn) => record(suite, name, fn)); console.log("__WORKSPACE_TEST_RESULTS__:" + JSON.stringify(results)) })().catch((error) => { results.push({ suite: "runner", name: "execute workspace tests", passed: false, error: error.message }); console.log("__WORKSPACE_TEST_RESULTS__:" + JSON.stringify(results)); process.exitCode = 1 })
 `,
         description: "Hidden workspace runner",

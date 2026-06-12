@@ -7,6 +7,7 @@ import realWorldScenarios, {
   realWorldSystemDesignScenarios,
 } from "../../scenarios-realworld"
 import { scenarios } from "../../scenarios"
+import { validateBugfixScenarioQuality } from "../bugfix-quality"
 import { validateWorkspaceScenario, isWorkspaceScenario } from "../../workspace-execution"
 
 describe("real-world scenario modules", () => {
@@ -72,6 +73,7 @@ describe("real-world scenario modules", () => {
       expect(scenario.workspace.editableFilePaths.length).toBeGreaterThanOrEqual(1)
       expect(scenario.workspace.visibleTestPaths.length).toBeGreaterThanOrEqual(1)
       expect(scenario.workspace.hiddenTestPaths.length).toBeGreaterThanOrEqual(1)
+      expect(validateBugfixScenarioQuality(scenario)).toEqual([])
 
       for (const testCase of scenario.testCases) {
         expect(testCase.input).toBeTruthy()
