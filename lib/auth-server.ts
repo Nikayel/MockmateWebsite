@@ -32,13 +32,8 @@ export async function getUserIdFromRequest(request: NextRequest): Promise<string
     }
 
     try {
-      // Verify the ID token using Firebase Admin SDK
-      // This validates:
-      // - Token signature
-      // - Token expiration
-      // - Token issuer
-      // - Token audience
-      const decodedToken = await adminAuth.verifyIdToken(token, true)
+      // Verify the ID token locally using Firebase Admin SDK (without revocation check network hop)
+      const decodedToken = await adminAuth.verifyIdToken(token)
 
       // Return user ID from verified token
       return decodedToken.uid
