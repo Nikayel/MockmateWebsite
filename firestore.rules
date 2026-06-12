@@ -60,10 +60,12 @@ service cloud.firestore {
                     && request.resource.data.id == userId
                     && hasRequiredFields(['id', 'email', 'created_at']);
 
-      // Users can update their own profile (but not change id)
+      // Users can update their own profile (but not change id or subscription tier/status/stripe fields)
       allow update: if isOwner(userId)
                     && request.resource.data.id == userId
-                    && resource.data.id == userId;
+                    && resource.data.id == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['subscription_tier', 'subscription_status', 'stripe_customer_id', 'stripe_subscription_id']);
 
       // Users can delete their own profile
       allow delete: if isOwner(userId);
@@ -135,15 +137,32 @@ service cloud.firestore {
                   && documentExists()
                   && resource.data.user_id == request.auth.uid;
 
-      // Users can create their own quota records
+      // Users can create their own quota records if set to 0 sessions and 0 free opens
       allow create: if isAuthenticated()
-                    && request.resource.data.user_id == request.auth.uid;
+                    && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.sessions_used == 0
+                    && request.resource.data.free_opens_remaining == 0;
 
-      // Users can update their own quota records
+      // Users can only update their own quota via the exact state transitions of recordSessionStart
       allow update: if isAuthenticated()
                     && documentExists()
                     && resource.data.user_id == request.auth.uid
-                    && request.resource.data.user_id == request.auth.uid;
+                    && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.user_id == resource.data.user_id
+                    && request.resource.data.sessions_limit == resource.data.sessions_limit
+                    && request.resource.data.period_start == resource.data.period_start
+                    && request.resource.data.period_end == resource.data.period_end
+                    && (
+                      // Transition 1: Decrement free_opens_remaining by 1
+                      (request.resource.data.free_opens_remaining == resource.data.free_opens_remaining - 1
+                       && request.resource.data.sessions_used == resource.data.sessions_used)
+                      ||
+                      // Transition 2: Increment sessions_used by 1 and grant 10 free opens
+                      (request.resource.data.sessions_used == resource.data.sessions_used + 1
+                       && request.resource.data.free_opens_remaining == 10
+                       && resource.data.free_opens_remaining == 0
+                       && request.resource.data.sessions_used <= resource.data.sessions_limit)
+                    );
 
       // Users cannot delete quota records (immutable history)
       allow delete: if false;
