@@ -210,6 +210,15 @@ export interface DSAScenario extends BaseScenario {
 export interface BugFixScenario extends BaseScenario {
   type: "bugfix"
   problemStatement: string
+  userReport?: string
+  observedSymptoms?: string[]
+  reproductionSteps?: string[]
+  visibleLogs?: string[]
+  successCriteria?: string[]
+  debuggingSkills?: string[]
+  expectedTouchedFiles?: string[]
+  rootCauseRubric?: string[]
+  bugfixKind?: "real-codebase" | "micro-debugging"
   buggyCode: {
     [language: string]: string
   }
