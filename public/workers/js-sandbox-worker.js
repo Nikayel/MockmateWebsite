@@ -157,6 +157,7 @@ self.onmessage = async function (e) {
           throw new Error(`Module not found: ${path} (resolved as: ${resolved})`)
         }
 
+        // eslint-disable-next-line @next/next/no-assign-module-variable
         const module = { exports: {} }
         cache[resolved] = module
 

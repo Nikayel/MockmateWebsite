@@ -1,0 +1,179 @@
+function toSnakeCase(value: string): string {
+  return value
+    .replace(/^dsa-/, "")
+    .replace(/^bugfix-/, "")
+    .replace(/-/g, "_")
+}
+
+function getPythonFunctionCandidates(cleanCode: string): string[] {
+  const helperNames = new Set([
+    "build_tree",
+    "tree_to_array",
+    "build_list",
+    "list_to_array",
+    "__init__",
+  ])
+  const candidates = [...cleanCode.matchAll(/^\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm)].map(
+    (match) => match[1]
+  )
+
+  return Array.from(new Set(candidates)).filter((name) => !helperNames.has(name))
+}
+
+export function buildPythonWrapper(
+  code: string,
+  testCase: unknown,
+  cleanCode: string,
+  scenarioId: string
+): string {
+  const record = testCase && typeof testCase === "object" ? (testCase as { input?: unknown }) : {}
+  const input = record.input && typeof record.input === "object" ? record.input : {}
+  const inputRecord = input as Record<string, unknown>
+  const inputKeys = Object.keys(inputRecord)
+  const inputValues = Object.values(inputRecord)
+  const functionCandidates = getPythonFunctionCandidates(cleanCode)
+  const scenarioFunctionName = toSnakeCase(scenarioId)
+  const candidates = Array.from(
+    new Set([
+      "solution",
+      scenarioFunctionName,
+      "two_sum",
+      "is_anagram",
+      "group_anagrams",
+      "longest_consecutive",
+      "first_missing_positive",
+      "majority_element",
+      "next_permutation",
+      "product_except_self",
+      "rotate",
+      "subarray_sum",
+      "top_k_frequent",
+      "find_duplicates",
+      "main",
+      ...functionCandidates.reverse(),
+    ])
+  )
+
+  return `
+import json
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+def build_tree(values):
+    if not values or values[0] is None:
+        return None
+    root = TreeNode(values[0])
+    queue = [root]
+    index = 1
+    while queue and index < len(values):
+        node = queue.pop(0)
+        if index < len(values) and values[index] is not None:
+            node.left = TreeNode(values[index])
+            queue.append(node.left)
+        index += 1
+        if index < len(values) and values[index] is not None:
+            node.right = TreeNode(values[index])
+            queue.append(node.right)
+        index += 1
+    return root
+
+def tree_to_array(root):
+    if root is None:
+        return []
+    result = []
+    queue = [root]
+    while queue:
+        node = queue.pop(0)
+        if node is None:
+            result.append(None)
+        else:
+            result.append(node.val)
+            queue.append(node.left)
+            queue.append(node.right)
+    while result and result[-1] is None:
+        result.pop()
+    return result
+
+def build_list(values):
+    if not values:
+        return None
+    head = ListNode(values[0])
+    current = head
+    for value in values[1:]:
+        current.next = ListNode(value)
+        current = current.next
+    return head
+
+def list_to_array(head):
+    result = []
+    seen = set()
+    current = head
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        result.append(current.val)
+        current = current.next
+    return result
+
+${code}
+
+_input = ${JSON.stringify(inputValues)}
+_input_keys = ${JSON.stringify(inputKeys)}
+_tree_keywords = {"root", "tree", "node", "p", "q", "t1", "t2", "left", "right", "subroot"}
+_list_keywords = {"head", "list", "l1", "l2"}
+
+def _process_arg(value, key):
+    lowered = key.lower()
+    if isinstance(value, list):
+        if lowered in _tree_keywords:
+            return build_tree(value)
+        if lowered in _list_keywords:
+            return build_list(value)
+    return value
+
+_processed_input = [_process_arg(value, _input_keys[index] if index < len(_input_keys) else "") for index, value in enumerate(_input)]
+_result = None
+
+if "Solution" in globals():
+    _solution_instance = Solution()
+    _solution_methods = [name for name in ${JSON.stringify(candidates)} if hasattr(_solution_instance, name)]
+    if _solution_methods:
+        _result = getattr(_solution_instance, _solution_methods[0])(*_processed_input)
+    else:
+        _public_methods = [
+            name for name in dir(_solution_instance)
+            if not name.startswith("_") and callable(getattr(_solution_instance, name))
+        ]
+        if _public_methods:
+            _result = getattr(_solution_instance, _public_methods[0])(*_processed_input)
+        else:
+            raise Exception("No callable Solution method found")
+else:
+    _functions = [name for name in ${JSON.stringify(candidates)} if name in globals() and callable(globals()[name])]
+    if not _functions:
+        raise Exception("No callable function found")
+    _result = globals()[_functions[0]](*_processed_input)
+
+_had_tree_input = any(
+    isinstance(_input[index], list) and (_input_keys[index] if index < len(_input_keys) else "").lower() in _tree_keywords
+    for index in range(len(_input))
+)
+
+if isinstance(_result, TreeNode):
+    _result = tree_to_array(_result)
+elif isinstance(_result, ListNode):
+    _result = list_to_array(_result)
+elif _result is None and _had_tree_input:
+    _result = []
+
+_result
+`
+}

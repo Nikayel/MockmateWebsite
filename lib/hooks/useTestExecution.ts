@@ -13,6 +13,7 @@ import { Scenario } from "@/lib/scenarios"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import { isExecutionServiceError } from "@/lib/piston"
+import { executeScenarioInBrowser } from "@/lib/workspace-execution"
 
 export interface TestResult {
   description: string
@@ -21,6 +22,7 @@ export interface TestResult {
   expected: any
   actual: any
   error: string | null
+  isHidden?: boolean
 }
 
 export interface EfficiencyMetrics {
@@ -198,6 +200,58 @@ export function useTestExecution({
     setEfficiencyMetrics(metrics)
 
     try {
+      const browserResult = await executeScenarioInBrowser({
+        code,
+        scenario: selectedScenario,
+        language: selectedLanguage,
+      })
+
+      if (browserResult) {
+        if (browserResult.error) {
+          throw new Error(browserResult.error)
+        }
+
+        const data = browserResult
+
+        setTestResults(data.results as TestResult[])
+        setTestSummary(data.summary)
+
+        if (data.consoleLogs && data.consoleLogs.length > 0) {
+          setConsoleLogs(data.consoleLogs)
+        }
+
+        const errorResults = (data.results as TestResult[]).filter((result) => result.error)
+        const allFailed = data.summary.passRate === 0
+
+        if (allFailed && errorResults.length > 0) {
+          const firstError = errorResults[0].error
+          const isServiceDown = isExecutionServiceError(firstError)
+
+          if (isServiceDown) {
+            toast.error("Code execution unavailable", {
+              description:
+                "Our code runner is temporarily unavailable. Please try again in a few minutes.",
+              duration: 8000,
+            })
+          }
+          playSound?.("fail")
+          setIsRunning(false)
+          return
+        }
+
+        if (data.summary.passRate === 100) {
+          playSound?.("success")
+        } else if (data.summary.passRate >= 50) {
+          playSound?.("milestone")
+        } else {
+          playSound?.("fail")
+        }
+
+        onTestComplete?.(data.results as TestResult[], data.summary)
+        setIsRunning(false)
+        return
+      }
+
       const response = await fetch("/api/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

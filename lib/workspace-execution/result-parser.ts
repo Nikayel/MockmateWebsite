@@ -63,6 +63,7 @@ function isWorkspaceTestResult(value: unknown): value is WorkspaceTestResult {
     typeof record.suite === "string" &&
     typeof record.name === "string" &&
     typeof record.passed === "boolean" &&
-    (record.error === null || typeof record.error === "string")
+    (record.error === null || typeof record.error === "string") &&
+    (record.isHidden === undefined || typeof record.isHidden === "boolean")
   )
 }

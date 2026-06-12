@@ -5,6 +5,13 @@ export {
   runInWorker,
   stripComments,
 } from "./js-sandbox"
+export {
+  buildPythonWrapper,
+  executePythonClientSide,
+  executeWorkspaceScenarioPythonClientSide,
+  runPythonInWorker,
+} from "./python-sandbox"
+export { executeScenarioInBrowser } from "./browser-execution"
 export { overlayWorkspaceFiles, getVisibleWorkspaceFiles, getWorkspacePrimaryCode } from "./files"
 export { buildPistonWorkspaceFiles } from "./piston-builder"
 export { parseWorkspaceExecutionOutput } from "./result-parser"

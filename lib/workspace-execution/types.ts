@@ -22,6 +22,7 @@ export interface WorkspaceTestResult {
   name: string
   passed: boolean
   error: string | null
+  isHidden?: boolean
 }
 
 export interface WorkspaceExecutionResult {

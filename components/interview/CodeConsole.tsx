@@ -32,6 +32,7 @@ export interface TestResult {
   expected: any
   actual: any
   error: string | null
+  isHidden?: boolean
 }
 
 export interface TestSummary {
@@ -436,35 +437,46 @@ export function CodeConsole({
                 {/* Show details for failed tests */}
                 {!result.passed && (
                   <div className="mt-1 ml-5 space-y-0.5 text-[11px]">
-                    {/* Always show input for debugging */}
-                    {result.input && (
+                    {result.isHidden ? (
                       <div className="flex items-start gap-2">
-                        <span className="w-14 text-gray-500">Input:</span>
-                        <span className="break-all text-blue-300">
-                          {JSON.stringify(result.input)}
+                        <span className="text-gray-500 italic">
+                          This test case is hidden. The implementation failed to meet the required
+                          behavior.
                         </span>
-                      </div>
-                    )}
-                    {/* Show expected/got for wrong output, show error for code errors */}
-                    {result.error ? (
-                      <div className="flex items-start gap-2">
-                        <span className="w-14 text-gray-500">Error:</span>
-                        <span className="break-all text-red-300">{result.error}</span>
                       </div>
                     ) : (
                       <>
-                        <div className="flex items-start gap-2">
-                          <span className="w-14 text-gray-500">Expected:</span>
-                          <span className="break-all text-green-300">
-                            {JSON.stringify(result.expected)}
-                          </span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <span className="w-14 text-gray-500">Got:</span>
-                          <span className="break-all text-red-300">
-                            {JSON.stringify(result.actual)}
-                          </span>
-                        </div>
+                        {/* Always show input for debugging */}
+                        {result.input && (
+                          <div className="flex items-start gap-2">
+                            <span className="w-14 text-gray-500">Input:</span>
+                            <span className="break-all text-blue-300">
+                              {JSON.stringify(result.input)}
+                            </span>
+                          </div>
+                        )}
+                        {/* Show expected/got for wrong output, show error for code errors */}
+                        {result.error ? (
+                          <div className="flex items-start gap-2">
+                            <span className="w-14 text-gray-500">Error:</span>
+                            <span className="break-all text-red-300">{result.error}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start gap-2">
+                              <span className="w-14 text-gray-500">Expected:</span>
+                              <span className="break-all text-green-300">
+                                {JSON.stringify(result.expected)}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="w-14 text-gray-500">Got:</span>
+                              <span className="break-all text-red-300">
+                                {JSON.stringify(result.actual)}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </div>

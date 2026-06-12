@@ -8,6 +8,7 @@ import { useState, useCallback, useRef } from "react"
 import { User as FirebaseUser } from "firebase/auth"
 import { Scenario } from "@/lib/scenarios"
 import { isExecutionServiceError } from "@/lib/piston"
+import { executeScenarioInBrowser } from "@/lib/workspace-execution"
 
 export interface TestResult {
   description: string
@@ -84,6 +85,19 @@ export function useCodeExecution({
       setTestResults([])
 
       try {
+        const browserResult = await executeScenarioInBrowser({ code, scenario, language })
+
+        if (browserResult) {
+          if (browserResult.error) {
+            throw new Error(browserResult.error)
+          }
+
+          const results = browserResult.results as TestResult[]
+          setTestResults(results)
+          setTestSummary(browserResult.summary)
+          return results
+        }
+
         const token = await firebaseUser.getIdToken()
 
         const response = await fetch("/api/execute", {
