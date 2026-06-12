@@ -77,6 +77,152 @@ const WINDOW_SIZE_MS = 60 * 1000 // 1 minute
 const useDistributedRateLimiting =
   process.env.NODE_ENV === "production" || process.env.USE_DISTRIBUTED_RATE_LIMIT === "true"
 
+// Redis configuration for distributed rate limiting
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL || ""
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || ""
+const hasRedis = !!(redisUrl && redisToken)
+
+if (typeof window === "undefined" && hasRedis) {
+  logger.info("[Rate Limiter] Using Upstash Redis for distributed rate limiting")
+}
+
+/**
+ * Get rate limit state from Redis (distributed)
+ * Uses Sorted Set (ZSET) to store sliding window timestamps + token weight
+ * pipeline structure avoids round-trips
+ */
+async function getRedisRateLimitState(userId: string): Promise<{
+  requestCount: number
+  tokenCount: number
+  concurrent: number
+  oldestTimestamp: number | null
+}> {
+  const now = Date.now()
+  const windowStart = now - WINDOW_SIZE_MS
+  const zsetKey = `rate_limiter:zset:${userId}`
+  const concurrentKey = `rate_limiter:concurrent:${userId}`
+
+  try {
+    const response = await fetch(`${redisUrl}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${redisToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["ZREMRANGEBYSCORE", zsetKey, "-inf", `(${windowStart}`],
+        ["ZRANGEBYSCORE", zsetKey, windowStart.toString(), "+inf", "WITHSCORES"],
+        ["GET", concurrentKey],
+      ]),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Upstash Redis pipeline error: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const zrangeResult = (data[1]?.result || []) as (string | number)[]
+    const concurrentVal = parseInt(data[2]?.result || "0", 10)
+
+    let requestCount = 0
+    let tokenCount = 0
+    let oldestTimestamp: number | null = null
+
+    for (let i = 0; i < zrangeResult.length; i += 2) {
+      const member = zrangeResult[i] as string
+      const score = zrangeResult[i + 1] as number
+
+      if (oldestTimestamp === null) {
+        oldestTimestamp = score
+      }
+
+      requestCount++
+      const parts = member.split(":")
+      const tokens = parts.length > 1 ? parseInt(parts[1], 10) : 500
+      tokenCount += tokens
+    }
+
+    return {
+      requestCount,
+      tokenCount,
+      concurrent: Math.max(0, concurrentVal),
+      oldestTimestamp,
+    }
+  } catch (error) {
+    logger.error("Failed to get Redis rate limit state, falling back to Firestore", {
+      userId,
+      error,
+    })
+    if (useDistributedRateLimiting) {
+      return getDistributedRateLimitState(userId)
+    } else {
+      return {
+        requestCount: getRequestCount(userId),
+        tokenCount: getTokenCount(userId),
+        concurrent: concurrentRequests.get(userId) || 0,
+        oldestTimestamp: getOldestRequestTime(userId),
+      }
+    }
+  }
+}
+
+/**
+ * Record request start in Redis
+ */
+async function recordRedisRequestStart(userId: string, estimatedTokens: number): Promise<void> {
+  const now = Date.now()
+  const zsetKey = `rate_limiter:zset:${userId}`
+  const concurrentKey = `rate_limiter:concurrent:${userId}`
+  const member = `${now}:${estimatedTokens}`
+
+  try {
+    await fetch(`${redisUrl}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${redisToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["ZADD", zsetKey, now.toString(), member],
+        ["EXPIRE", zsetKey, (WINDOW_SIZE_MS / 1000 + 10).toFixed(0)],
+        ["INCR", concurrentKey],
+        ["EXPIRE", concurrentKey, (WINDOW_SIZE_MS / 1000 + 10).toFixed(0)],
+      ]),
+    })
+  } catch (error) {
+    logger.error("Failed to record Redis request start, falling back", { userId, error })
+    if (useDistributedRateLimiting) {
+      await recordDistributedRequestStart(userId, estimatedTokens)
+    } else {
+      recordRequestStart(userId, estimatedTokens)
+    }
+  }
+}
+
+/**
+ * Record request end in Redis
+ */
+async function recordRedisRequestEnd(userId: string): Promise<void> {
+  const concurrentKey = `rate_limiter:concurrent:${userId}`
+  try {
+    await fetch(`${redisUrl}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${redisToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([["DECR", concurrentKey]]),
+    })
+  } catch (error) {
+    logger.error("Failed to record Redis request end, falling back", { userId, error })
+    if (useDistributedRateLimiting) {
+      await recordDistributedRequestEnd(userId)
+    } else {
+      recordRequestEnd(userId)
+    }
+  }
+}
+
 /**
  * Get rate limit state from Firestore (distributed)
  */
@@ -198,15 +344,30 @@ export async function checkRateLimit(
   const limits = RATE_LIMITS[tier] || RATE_LIMITS.free
   const now = Date.now()
 
-  // Get rate limit state (distributed or in-memory)
-  const state = useDistributedRateLimiting
-    ? await getDistributedRateLimitState(userId)
-    : {
-        requestCount: getRequestCount(userId),
-        tokenCount: getTokenCount(userId),
-        concurrent: concurrentRequests.get(userId) || 0,
-        oldestTimestamp: getOldestRequestTime(userId),
-      }
+  // Get rate limit state (Redis, Firestore distributed, or in-memory)
+  const isProduction = process.env.NODE_ENV === "production"
+  if (isProduction && !hasRedis && !useDistributedRateLimiting) {
+    const errorMessage =
+      "SECURITY ERROR: No distributed rate limiting configured in production (Rate Limiter). " +
+      "Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured. " +
+      "Set ALLOW_INSECURE_RATE_LIMIT=true to override (NOT RECOMMENDED)."
+
+    if (process.env.ALLOW_INSECURE_RATE_LIMIT !== "true") {
+      logger.error(errorMessage)
+      throw new Error(errorMessage)
+    }
+  }
+
+  const state = hasRedis
+    ? await getRedisRateLimitState(userId)
+    : useDistributedRateLimiting
+      ? await getDistributedRateLimitState(userId)
+      : {
+          requestCount: getRequestCount(userId),
+          tokenCount: getTokenCount(userId),
+          concurrent: concurrentRequests.get(userId) || 0,
+          oldestTimestamp: getOldestRequestTime(userId),
+        }
 
   const buildUsage = (budgetPercent: number = 0) => ({
     requestsThisMinute: state.requestCount,
@@ -420,8 +581,10 @@ export async function withRateLimit<T>(
     return { rateLimited: true, error: rateCheck }
   }
 
-  // Use distributed or in-memory based on environment
-  if (useDistributedRateLimiting) {
+  // Use distributed (Redis/Firestore) or in-memory based on environment
+  if (hasRedis) {
+    await recordRedisRequestStart(userId, estimatedTokens)
+  } else if (useDistributedRateLimiting) {
     await recordDistributedRequestStart(userId, estimatedTokens)
   } else {
     recordRequestStart(userId, estimatedTokens)
@@ -431,7 +594,9 @@ export async function withRateLimit<T>(
     const result = await fn()
     return { result, rateLimited: false }
   } finally {
-    if (useDistributedRateLimiting) {
+    if (hasRedis) {
+      await recordRedisRequestEnd(userId)
+    } else if (useDistributedRateLimiting) {
       await recordDistributedRequestEnd(userId)
     } else {
       recordRequestEnd(userId)
@@ -446,7 +611,9 @@ export async function startRequestTracking(
   userId: string,
   estimatedTokens: number = 500
 ): Promise<void> {
-  if (useDistributedRateLimiting) {
+  if (hasRedis) {
+    await recordRedisRequestStart(userId, estimatedTokens)
+  } else if (useDistributedRateLimiting) {
     await recordDistributedRequestStart(userId, estimatedTokens)
   } else {
     recordRequestStart(userId, estimatedTokens)
@@ -457,7 +624,9 @@ export async function startRequestTracking(
  * Helper to end tracking a request (exported for direct use in API routes)
  */
 export async function endRequestTracking(userId: string): Promise<void> {
-  if (useDistributedRateLimiting) {
+  if (hasRedis) {
+    await recordRedisRequestEnd(userId)
+  } else if (useDistributedRateLimiting) {
     await recordDistributedRequestEnd(userId)
   } else {
     recordRequestEnd(userId)
