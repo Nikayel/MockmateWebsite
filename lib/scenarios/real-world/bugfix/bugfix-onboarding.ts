@@ -108,8 +108,17 @@ module.exports = { runTests };`,
     primaryFilePath: "src/cart.js",
     editableFilePaths: ["src/cart.js"],
     visibleTestPaths: ["tests/cart.test.js"],
+    hiddenTestPaths: ["tests/cart.hidden.test.js"],
     testRunnerPath: "tests/run-workspace-tests.js",
-    starterFiles: [
+    files: [
+      {
+        path: "README.md",
+        role: "docs",
+        language: "markdown",
+        content: `# Onboarding: Cart Discount
+Fix the off-by-one logic error in src/cart.js to ensure the discount applies when subtotal is greater than or equal to the threshold.`,
+        description: "Product and architecture notes",
+      },
       {
         path: "src/cart.js",
         role: "editable",

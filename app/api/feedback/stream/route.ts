@@ -280,7 +280,10 @@ export async function POST(request: NextRequest) {
       )
 
       if (bugfixScoreBreakdown) {
-        finalScores = mapBugfixScoreToFeedbackScores(bugfixScoreBreakdown)
+        finalScores = {
+          ...mapBugfixScoreToFeedbackScores(bugfixScoreBreakdown),
+          silentSolution: finalScores.silentSolution,
+        }
       }
 
       // Send refined scores

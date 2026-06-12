@@ -38,7 +38,12 @@ export async function executePythonClientSide(
         continue
       }
 
-      const validation = validateResultEnhanced(runResult.result, testCase, scenarioId, "python")
+      const validation = validateResultEnhanced(
+        runResult.result,
+        testCase as any,
+        scenarioId,
+        "python"
+      )
 
       results.push({
         description: testCase.description || `Test case ${index + 1}`,

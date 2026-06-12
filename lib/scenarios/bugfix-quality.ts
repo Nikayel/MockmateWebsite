@@ -19,8 +19,9 @@ export interface BugfixQualityIssue {
 export function withBugfixIncidentDefaults(scenario: BugFixScenario): BugFixScenario {
   const workspace = isWorkspaceScenario(scenario) ? scenario.workspace : null
   const visibleTestPaths = workspace?.visibleTestPaths || []
-  const docs =
-    workspace?.files.filter((file) => file.role === "docs").map((file) => file.path) || []
+  const docs = (workspace?.files || [])
+    .filter((file) => file.role === "docs")
+    .map((file) => file.path)
   const expectedTouchedFiles = workspace?.editableFilePaths || []
 
   return {

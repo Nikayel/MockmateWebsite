@@ -571,7 +571,7 @@ export async function updateInterviewSession(
     efficiencyScore?: number
     feedbackStatus?: FeedbackStatus // Track feedback generation state
     technicalScore?: number // Pre-calculated mastery/technical score from API (use this instead of recalculating)
-    bugfixEvidenceEvents?: Array<Record<string, unknown>>
+    bugfixEvidenceEvents?: Array<any>
     bugfixHypothesis?: string
     bugfixRootCause?: string
     bugfixPrevention?: string
@@ -801,7 +801,7 @@ export async function markSessionEvaluating(
     workspaceContext?: Array<Record<string, unknown>>
     activeWorkspacePath?: string | null
     consoleLogs?: Array<Record<string, unknown>>
-    bugfixEvidenceEvents?: Array<Record<string, unknown>>
+    bugfixEvidenceEvents?: Array<any>
     bugfixHypothesis?: string
     bugfixRootCause?: string
     bugfixPrevention?: string
@@ -867,7 +867,7 @@ export async function saveSessionState(
     workspaceContext?: Array<Record<string, unknown>>
     activeWorkspacePath?: string | null
     consoleLogs?: Array<Record<string, unknown>>
-    bugfixEvidenceEvents?: Array<Record<string, unknown>>
+    bugfixEvidenceEvents?: Array<any>
     bugfixHypothesis?: string
     bugfixRootCause?: string
     bugfixPrevention?: string

@@ -1063,13 +1063,13 @@ Let's continue!`
             }
             if (scenario.type === "bugfix") {
               setBugfixEvidenceEvents(
-                (savedState.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || []
+                (savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || []
               )
               setBugfixHypothesis(savedState.bugfixHypothesis || "")
               setBugfixRootCause(savedState.bugfixRootCause || "")
               setBugfixPrevention(savedState.bugfixPrevention || "")
               recordedBugfixEditPathsRef.current = new Set(
-                ((savedState.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
+                ((savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || [])
                   .filter((event) => event.type === "file_edited" && event.filePath)
                   .map((event) => event.filePath as string)
               )

@@ -18,6 +18,7 @@ describe("real-world scenario modules", () => {
     "bugfix-comment-thread-merge",
     "bugfix-event-aggregation-retries",
     "bugfix-feature-pipeline-nan-workspace",
+    "bugfix-onboarding",
   ]
 
   it("keeps the legacy export order and IDs", () => {
