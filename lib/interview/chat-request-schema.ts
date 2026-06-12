@@ -20,6 +20,11 @@ export const chatRequestSchema = z
         z.object({
           path: z.string(),
           content: z.string(),
+          role: z.string().optional(),
+          description: z.string().optional(),
+          hidden: z.boolean().optional(),
+          active: z.boolean().optional(),
+          edited: z.boolean().optional(),
         })
       )
       .optional(),

@@ -571,6 +571,10 @@ export async function updateInterviewSession(
     efficiencyScore?: number
     feedbackStatus?: FeedbackStatus // Track feedback generation state
     technicalScore?: number // Pre-calculated mastery/technical score from API (use this instead of recalculating)
+    bugfixEvidenceEvents?: Array<Record<string, unknown>>
+    bugfixHypothesis?: string
+    bugfixRootCause?: string
+    bugfixPrevention?: string
     scoreBreakdown?: {
       understanding?: number
       understandingScore?: number
@@ -733,6 +737,18 @@ export async function updateInterviewSession(
     if (additionalData.structuredFeedback) {
       updateData.structured_feedback = additionalData.structuredFeedback
     }
+    if (additionalData.bugfixEvidenceEvents) {
+      updateData.bugfix_evidence_events = additionalData.bugfixEvidenceEvents
+    }
+    if (additionalData.bugfixHypothesis) {
+      updateData.bugfix_hypothesis = additionalData.bugfixHypothesis
+    }
+    if (additionalData.bugfixRootCause) {
+      updateData.bugfix_root_cause = additionalData.bugfixRootCause
+    }
+    if (additionalData.bugfixPrevention) {
+      updateData.bugfix_prevention = additionalData.bugfixPrevention
+    }
     // Save complexity analysis (user-stated vs code-analyzed)
     if (additionalData.complexityAnalysis) {
       updateData.complexity_analysis = {
@@ -782,6 +798,13 @@ export async function markSessionEvaluating(
     interviewerMessages?: Array<{ type: string; message: string }>
     testResults?: Array<any>
     testSummary?: { total: number; passed: number; failed: number; passRate: number }
+    workspaceContext?: Array<Record<string, unknown>>
+    activeWorkspacePath?: string | null
+    consoleLogs?: Array<Record<string, unknown>>
+    bugfixEvidenceEvents?: Array<Record<string, unknown>>
+    bugfixHypothesis?: string
+    bugfixRootCause?: string
+    bugfixPrevention?: string
     isPostInterviewDiscussion?: boolean
   }
 ): Promise<void> {
@@ -806,6 +829,13 @@ export async function markSessionEvaluating(
             test_results: sanitizeTestResultsForFirestore(state.testResults.slice(-20)),
           }),
           ...(state.testSummary && { test_summary: state.testSummary }),
+          workspace_context: state.workspaceContext,
+          active_workspace_path: state.activeWorkspacePath,
+          console_logs: state.consoleLogs,
+          bugfix_evidence_events: state.bugfixEvidenceEvents,
+          bugfix_hypothesis: state.bugfixHypothesis,
+          bugfix_root_cause: state.bugfixRootCause,
+          bugfix_prevention: state.bugfixPrevention,
           is_post_interview_discussion: state.isPostInterviewDiscussion ?? true, // Default to true when marking evaluating
           saved_at: new Date().toISOString(),
         },
@@ -834,6 +864,13 @@ export async function saveSessionState(
     interviewerMessages?: Array<{ type: string; message: string }>
     testResults?: Array<any>
     testSummary?: { total: number; passed: number; failed: number; passRate: number }
+    workspaceContext?: Array<Record<string, unknown>>
+    activeWorkspacePath?: string | null
+    consoleLogs?: Array<Record<string, unknown>>
+    bugfixEvidenceEvents?: Array<Record<string, unknown>>
+    bugfixHypothesis?: string
+    bugfixRootCause?: string
+    bugfixPrevention?: string
     isPostInterviewDiscussion?: boolean
     realInterviewMode?: boolean
     strictTimeLimit?: number | null
@@ -854,6 +891,13 @@ export async function saveSessionState(
             ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
             : undefined,
           test_summary: state.testSummary,
+          workspace_context: state.workspaceContext,
+          active_workspace_path: state.activeWorkspacePath,
+          console_logs: state.consoleLogs,
+          bugfix_evidence_events: state.bugfixEvidenceEvents,
+          bugfix_hypothesis: state.bugfixHypothesis,
+          bugfix_root_cause: state.bugfixRootCause,
+          bugfix_prevention: state.bugfixPrevention,
           is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
           real_interview_mode: state.realInterviewMode,
           strict_time_limit: state.strictTimeLimit,
@@ -879,6 +923,13 @@ export async function getSessionState(sessionId: string): Promise<{
   interviewerMessages?: Array<{ type: string; message: string }>
   testResults?: Array<any>
   testSummary?: { total: number; passed: number; failed: number; passRate: number }
+  workspaceContext?: Array<Record<string, unknown>>
+  activeWorkspacePath?: string | null
+  consoleLogs?: Array<Record<string, unknown>>
+  bugfixEvidenceEvents?: Array<Record<string, unknown>>
+  bugfixHypothesis?: string
+  bugfixRootCause?: string
+  bugfixPrevention?: string
   isPostInterviewDiscussion?: boolean
   realInterviewMode?: boolean
   strictTimeLimit?: number | null
@@ -905,6 +956,13 @@ export async function getSessionState(sessionId: string): Promise<{
       interviewerMessages?: Array<{ type: string; message: string }>
       testResults?: Array<any>
       testSummary?: { total: number; passed: number; failed: number; passRate: number }
+      workspaceContext?: Array<Record<string, unknown>>
+      activeWorkspacePath?: string | null
+      consoleLogs?: Array<Record<string, unknown>>
+      bugfixEvidenceEvents?: Array<Record<string, unknown>>
+      bugfixHypothesis?: string
+      bugfixRootCause?: string
+      bugfixPrevention?: string
       isPostInterviewDiscussion?: boolean
       realInterviewMode?: boolean
       strictTimeLimit?: number | null
@@ -929,6 +987,13 @@ export async function getSessionState(sessionId: string): Promise<{
       result.interviewerMessages = data.session_state.interviewer_messages
       result.testResults = data.session_state.test_results
       result.testSummary = data.session_state.test_summary
+      result.workspaceContext = data.session_state.workspace_context
+      result.activeWorkspacePath = data.session_state.active_workspace_path
+      result.consoleLogs = data.session_state.console_logs
+      result.bugfixEvidenceEvents = data.session_state.bugfix_evidence_events
+      result.bugfixHypothesis = data.session_state.bugfix_hypothesis
+      result.bugfixRootCause = data.session_state.bugfix_root_cause
+      result.bugfixPrevention = data.session_state.bugfix_prevention
       result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
       result.realInterviewMode = data.session_state.real_interview_mode
       result.strictTimeLimit = data.session_state.strict_time_limit

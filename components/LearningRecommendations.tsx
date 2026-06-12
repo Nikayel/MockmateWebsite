@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,7 +28,7 @@ interface LearningStep {
 interface UserProfile {
   totalSessions: number
   averageScore: number
-  recentTrend: 'improving' | 'stable' | 'declining'
+  recentTrend: "improving" | "stable" | "declining"
 }
 
 interface LearningRecommendationsProps {
@@ -45,6 +46,7 @@ export function LearningRecommendations({
   performanceScore,
   onSelectProblem,
 }: LearningRecommendationsProps) {
+  const { firebaseUser } = useAuth()
   const [learningPath, setLearningPath] = useState<LearningStep[]>([])
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [message, setMessage] = useState<string>("")
@@ -53,15 +55,19 @@ export function LearningRecommendations({
 
   useEffect(() => {
     async function fetchRecommendations() {
-      if (!userId) return
+      if (!userId || !firebaseUser) return
 
       setLoading(true)
       setError(null)
 
       try {
+        const token = await firebaseUser.getIdToken()
         const response = await fetch("/api/rag", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             action: "get-learning-path",
             userId,
@@ -70,7 +76,8 @@ export function LearningRecommendations({
         })
 
         if (!response.ok) {
-          throw new Error("Failed to fetch recommendations")
+          const data = await response.json().catch(() => null)
+          throw new Error(data?.error || "Failed to fetch recommendations")
         }
 
         const data = await response.json()
@@ -86,13 +93,13 @@ export function LearningRecommendations({
     }
 
     fetchRecommendations()
-  }, [userId, currentProblemType])
+  }, [userId, currentProblemType, firebaseUser])
 
   const getTrendIcon = (trend?: string) => {
     switch (trend) {
-      case 'improving':
+      case "improving":
         return <TrendingUp className="h-4 w-4 text-green-500" />
-      case 'declining':
+      case "declining":
         return <TrendingDown className="h-4 w-4 text-red-500" />
       default:
         return <Minus className="h-4 w-4 text-gray-500" />
@@ -101,12 +108,12 @@ export function LearningRecommendations({
 
   const getTrendColor = (trend?: string) => {
     switch (trend) {
-      case 'improving':
-        return 'text-green-600 bg-green-50'
-      case 'declining':
-        return 'text-red-600 bg-red-50'
+      case "improving":
+        return "text-green-600 bg-green-50"
+      case "declining":
+        return "text-red-600 bg-red-50"
       default:
-        return 'text-gray-600 bg-gray-50'
+        return "text-gray-600 bg-gray-50"
     }
   }
 
@@ -151,14 +158,12 @@ export function LearningRecommendations({
           <Sparkles className="h-5 w-5 text-yellow-500" />
           Your Learning Path
         </CardTitle>
-        {message && (
-          <p className="text-sm text-muted-foreground">{message}</p>
-        )}
+        {message && <p className="text-muted-foreground text-sm">{message}</p>}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* User Profile Summary */}
         {profile && (
-          <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="bg-muted/50 flex items-center gap-4 rounded-lg p-4">
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Your Progress</span>
@@ -167,7 +172,7 @@ export function LearningRecommendations({
                   <span className="ml-1 capitalize">{profile.recentTrend}</span>
                 </Badge>
               </div>
-              <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+              <div className="text-muted-foreground mt-2 flex gap-4 text-sm">
                 <span>{profile.totalSessions} sessions completed</span>
                 <span>Avg score: {profile.averageScore}%</span>
               </div>
@@ -177,47 +182,63 @@ export function LearningRecommendations({
 
         {/* Current Session Performance */}
         {performanceScore !== undefined && (
-          <div className="flex items-center gap-4 p-4 border rounded-lg">
+          <div className="flex items-center gap-4 rounded-lg border p-4">
             <Target className="h-8 w-8 text-blue-500" />
             <div className="flex-1">
               <div className="text-sm font-medium">This Session</div>
               <div className="text-2xl font-bold">{performanceScore}%</div>
             </div>
-            <Badge variant={performanceScore >= 70 ? "default" : performanceScore >= 50 ? "secondary" : "destructive"}>
-              {performanceScore >= 70 ? "Great!" : performanceScore >= 50 ? "Good effort" : "Keep practicing"}
+            <Badge
+              variant={
+                performanceScore >= 70
+                  ? "default"
+                  : performanceScore >= 50
+                    ? "secondary"
+                    : "destructive"
+              }
+            >
+              {performanceScore >= 70
+                ? "Great!"
+                : performanceScore >= 50
+                  ? "Good effort"
+                  : "Keep practicing"}
             </Badge>
           </div>
         )}
 
         {/* Learning Steps */}
         <div className="space-y-3">
-          <h4 className="text-sm font-medium flex items-center gap-2">
+          <h4 className="flex items-center gap-2 text-sm font-medium">
             <Lightbulb className="h-4 w-4" />
             Recommended Next Steps
           </h4>
           {learningPath.map((step) => (
             <div
               key={step.step}
-              className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              className="hover:bg-muted/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
               onClick={() => {
                 // Extract problem type from focus text
                 const focusLower = step.focus.toLowerCase()
-                let problemType = 'dsa'
-                if (focusLower.includes('array') || focusLower.includes('string')) problemType = 'dsa'
-                else if (focusLower.includes('tree') || focusLower.includes('graph')) problemType = 'dsa'
-                else if (focusLower.includes('bug') || focusLower.includes('debug')) problemType = 'bugfix'
-                else if (focusLower.includes('design') || focusLower.includes('system')) problemType = 'system-design'
+                let problemType = "dsa"
+                if (focusLower.includes("array") || focusLower.includes("string"))
+                  problemType = "dsa"
+                else if (focusLower.includes("tree") || focusLower.includes("graph"))
+                  problemType = "dsa"
+                else if (focusLower.includes("bug") || focusLower.includes("debug"))
+                  problemType = "bugfix"
+                else if (focusLower.includes("design") || focusLower.includes("system"))
+                  problemType = "system-design"
 
-                onSelectProblem?.(problemType, 'medium')
+                onSelectProblem?.(problemType, "medium")
               }}
             >
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              <div className="bg-primary/10 text-primary flex h-6 w-6 items-center justify-center rounded-full text-sm font-medium">
                 {step.step}
               </div>
               <div className="flex-1">
-                <div className="font-medium text-sm">{step.focus}</div>
-                <div className="text-sm text-muted-foreground">{step.recommendation}</div>
-                <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                <div className="text-sm font-medium">{step.focus}</div>
+                <div className="text-muted-foreground text-sm">{step.recommendation}</div>
+                <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
                   <Badge variant="outline" className="text-xs">
                     ~{step.estimatedProblems} problems
                   </Badge>
@@ -228,7 +249,7 @@ export function LearningRecommendations({
                   )}
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="text-muted-foreground h-4 w-4" />
             </div>
           ))}
         </div>
@@ -239,7 +260,7 @@ export function LearningRecommendations({
             variant="outline"
             size="sm"
             className="flex-1"
-            onClick={() => onSelectProblem?.('dsa', 'easy')}
+            onClick={() => onSelectProblem?.("dsa", "easy")}
           >
             Practice Easy Problem
           </Button>
@@ -248,12 +269,13 @@ export function LearningRecommendations({
             size="sm"
             className="flex-1"
             onClick={() => {
-              const weakArea = profile?.recentTrend === 'declining'
-                ? 'dsa'
-                : learningPath[0]?.focus?.toLowerCase().includes('array')
-                ? 'dsa'
-                : 'dsa'
-              onSelectProblem?.(weakArea, 'medium')
+              const weakArea =
+                profile?.recentTrend === "declining"
+                  ? "dsa"
+                  : learningPath[0]?.focus?.toLowerCase().includes("array")
+                    ? "dsa"
+                    : "dsa"
+              onSelectProblem?.(weakArea, "medium")
             }}
           >
             Start Next Challenge
@@ -274,12 +296,14 @@ export function LearningRecommendationsCompact({
   userId: string
   onSelectProblem?: (problemType: string, difficulty: string) => void
 }) {
-  const [recommendations, setRecommendations] = useState<{
-    id: string
-    reason: string
-    priority: number
-    scenario?: { id: string; type: string; difficulty: string; title: string }
-  }[]>([])
+  const [recommendations, setRecommendations] = useState<
+    {
+      id: string
+      reason: string
+      priority: number
+      scenario?: { id: string; type: string; difficulty: string; title: string }
+    }[]
+  >([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -310,7 +334,7 @@ export function LearningRecommendationsCompact({
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium flex items-center gap-2">
+      <h4 className="flex items-center gap-2 text-sm font-medium">
         <Sparkles className="h-4 w-4 text-yellow-500" />
         Recommended
       </h4>
@@ -320,12 +344,14 @@ export function LearningRecommendationsCompact({
             key={rec.id}
             variant="ghost"
             size="sm"
-            className="w-full justify-start text-left h-auto py-2"
-            onClick={() => onSelectProblem?.(rec.scenario?.type || 'dsa', rec.scenario?.difficulty || 'medium')}
+            className="h-auto w-full justify-start py-2 text-left"
+            onClick={() =>
+              onSelectProblem?.(rec.scenario?.type || "dsa", rec.scenario?.difficulty || "medium")
+            }
           >
             <div className="flex-1 truncate">
-              <div className="text-xs truncate">{rec.scenario?.title || 'Practice Problem'}</div>
-              <div className="text-xs text-muted-foreground truncate">{rec.reason}</div>
+              <div className="truncate text-xs">{rec.scenario?.title || "Practice Problem"}</div>
+              <div className="text-muted-foreground truncate text-xs">{rec.reason}</div>
             </div>
           </Button>
         ))}

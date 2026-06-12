@@ -2,7 +2,7 @@
  * Quota Enforcement Middleware
  *
  * Ensures users stay within their subscription tier limits:
- * - Free: 2 sessions/month, $0.50 budget
+ * - Free: 8 sessions/month, $0.50 budget
  * - Pro: 35 sessions/month, $25 budget
  * - Enterprise: Unlimited sessions, $100 budget
  *

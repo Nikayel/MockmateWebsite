@@ -16,6 +16,7 @@ export type EditorLanguage = (typeof EDITOR_LANGUAGES)[number]
 export type WorkspaceContextFile = {
   path: string
   content: string
+  originalContent?: string
   description?: string
   role?: WorkspaceScenarioFile["role"]
   language?: WorkspaceScenarioFile["language"]

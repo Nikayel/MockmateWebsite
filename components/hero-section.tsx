@@ -65,7 +65,7 @@ export function HeroSection() {
 
           <motion.h1
             variants={staggerItem}
-            className="mb-6 text-[clamp(3.25rem,8vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.055em] text-[#e9e8ef]"
+            className="font-heading mb-6 text-[clamp(3.25rem,8vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.055em] text-[#e9e8ef]"
           >
             Ace your next
             <br />

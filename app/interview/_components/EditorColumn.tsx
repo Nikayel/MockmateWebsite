@@ -12,6 +12,7 @@ import {
   FlaskConical,
   Lock,
   PlayCircle,
+  RotateCcw,
   Send,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -60,6 +61,8 @@ interface EditorColumnProps {
   onRunCode: () => void
   onSubmitCode: () => void
   onSelectedLanguageChange: (language: EditorLanguage) => void
+  onResetActiveFile?: () => void
+  onResetWorkspace?: () => void
   isAIPartnerExpanded: boolean
   onAIPartnerExpandedChange: (expanded: boolean) => void
   chatMessages: MiniChatMessage[]
@@ -95,6 +98,8 @@ export const EditorColumn = memo(function EditorColumn({
   onRunCode,
   onSubmitCode,
   onSelectedLanguageChange,
+  onResetActiveFile,
+  onResetWorkspace,
   isAIPartnerExpanded,
   onAIPartnerExpandedChange,
   chatMessages,
@@ -174,11 +179,45 @@ export const EditorColumn = memo(function EditorColumn({
                   >
                     <RoleIcon className={`h-3.5 w-3.5 ${iconColor}`} />
                     {file.path}
+                    {file.role === "editable" &&
+                      file.originalContent !== undefined &&
+                      file.content !== file.originalContent && (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-yellow-300"
+                          title="Unsaved edit"
+                          aria-label="Unsaved edit"
+                        />
+                      )}
                   </button>
                 )
               })}
             </div>
-            <div className="flex items-center space-x-3 pl-4">
+            <div className="flex items-center gap-2 pl-4">
+              {activeWorkspaceFile?.role === "editable" && onResetActiveFile && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onResetActiveFile}
+                  className="h-7 border-gray-700 bg-gray-900 px-2 text-xs text-gray-300 hover:bg-gray-800"
+                  title="Reset active file"
+                  aria-label="Reset active file"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              )}
+              {onResetWorkspace && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onResetWorkspace}
+                  className="h-7 border-gray-700 bg-gray-900 px-2 text-xs text-gray-300 hover:bg-gray-800"
+                  title="Reset workspace"
+                  aria-label="Reset workspace"
+                >
+                  <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                  All
+                </Button>
+              )}
               <GradingCriteriaTooltip />
               {isInterviewStarted && (
                 <div className="flex items-center space-x-1">

@@ -3,6 +3,7 @@ import {
   MAX_FILE_SIZE,
   manageContextWindow,
   manageWorkspaceContext,
+  type WorkspaceContextItem,
 } from "@/lib/interview/context-window"
 import type {
   ConsoleLogItem,
@@ -76,7 +77,7 @@ Otherwise, just ask questions naturally without naming them (e.g. "Walk me throu
 }
 
 export function buildWorkspaceContextString(
-  workspaceContext: Array<{ path: string; content: string }> | undefined
+  workspaceContext: WorkspaceContextItem[] | undefined
 ): string {
   const managedWorkspace = manageWorkspaceContext(workspaceContext || [])
   if (managedWorkspace.length === 0) {
@@ -85,7 +86,15 @@ export function buildWorkspaceContextString(
 
   let workspaceContextStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
   managedWorkspace.forEach((file) => {
-    workspaceContextStr += `\n--- File: ${file.path} ---\n${file.content} \n`
+    const metadata = [
+      file.role ? `role=${file.role}` : null,
+      file.active ? "active=true" : null,
+      file.edited ? "edited=true" : null,
+      file.description ? `description=${file.description}` : null,
+    ]
+      .filter(Boolean)
+      .join("; ")
+    workspaceContextStr += `\n--- File: ${file.path}${metadata ? ` (${metadata})` : ""} ---\n${file.content} \n`
   })
   workspaceContextStr += "\n=== END CODEBASE CONTEXT ===\n"
   return workspaceContextStr
@@ -347,32 +356,38 @@ export function buildBugFixContext(scenarioType: string | undefined): {
     ? `
 INTERVIEW TYPE: Bug Fix / Debugging Interview
 
-THIS IS A DEBUGGING EXERCISE - Focus on:
-    1. Understanding the bug: Ask them to explain what the bug is
-    2. Debugging approach: How are they finding the issue ?
-      3. Root cause analysis: Do they understand WHY it happens ?
-        4. Fix quality: Is the fix correct and complete ?
-          5. Prevention: How to prevent similar bugs in the future ?
+BUGFIX PHASE MODEL:
+1. Reproduce: Have they inspected the incident report, visible tests, logs, or docs before editing?
+2. Inspect: Have they opened the relevant files and traced the behavior?
+3. Hypothesize: Have they stated a plausible root-cause hypothesis before or during the patch?
+4. Patch: Is the change minimal and limited to the expected editable area?
+5. Verify: Did they run tests and interpret failures without relying on hidden tests?
+6. Prevent: Can they explain a regression test, guardrail, or monitoring signal?
 
-            DEBUGGING INTERVIEW BEST PRACTICES:
-    - Ask them to read through the code and explain what it does
-      - Ask: "What do you think is causing this behavior?"
-        - Ask: "How would you debug this in production?"
-          - If they struggle: Give hints about WHERE to look, not WHAT the bug is
-            - Ask about edge cases: "What if the input is empty? Null? Very large?"
-              - After the fix: "How would you write a test to catch this?"
+DEBUGGING INTERVIEW BEST PRACTICES:
+- Ask for the hypothesis before accepting a fix.
+- Ask what evidence supports the hypothesis.
+- Ask why the patch is minimal.
+- Ask what test or guardrail would prevent the regression.
+- If they struggle, nudge toward the next file, log, or visible test to inspect.
+- Do not reveal the exact bug location, root cause, or final patch too early.
 
 EVALUATION CRITERIA FOR BUG FIX:
-    - Bug Identification: Did they find the actual bug ?
-      - Debugging Process: Was their approach systematic or random ?
-        - Root Cause: Do they understand why the bug occurred ?
-          - Fix Quality: Is the fix correct, complete, and clean ?
-            - Testing Mindset: Did they consider edge cases and testing ?
+- Reproduction discipline
+- Codebase navigation
+- Evidence gathering
+- Hypothesis quality
+- Root cause understanding
+- Minimal fix quality
+- Verification discipline
+- Regression prevention
+- AI collaboration quality
 
-              DO NOT:
-    - Give away the bug location or fix too quickly
-      - Accept a fix without understanding the root cause
-        - Let them blindly try things without reasoning
+DO NOT:
+- Treat this like a DSA exercise.
+- Ask for Big-O analysis unless it is directly relevant to the bug.
+- Give away the fix or root cause.
+- Accept random edits without asking for evidence.
           `
     : ""
 

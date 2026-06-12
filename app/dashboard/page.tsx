@@ -25,6 +25,7 @@ import {
   RefreshCw,
   TrendingUp,
   HelpCircle,
+  ShieldCheck,
 } from "lucide-react"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import Link from "next/link"
@@ -293,6 +294,27 @@ export default function DashboardPage() {
     }
   }
 
+  const bugfixSessions = completedSessions.filter((session) => session.type === "bugfix")
+  const latestBugfixSession = bugfixSessions[0]
+  const latestBugfixEvidence = latestBugfixSession?.bugfix_evidence_summary
+  const latestBugfixScore =
+    latestBugfixSession?.bugfix_score_breakdown?.overall ?? latestBugfixSession?.performance_score
+  const bugfixReadiness =
+    bugfixSessions.length > 0
+      ? Math.round(
+          bugfixSessions.reduce(
+            (sum, session) =>
+              sum + (session.bugfix_score_breakdown?.overall ?? session.performance_score ?? 0),
+            0
+          ) / bugfixSessions.length
+        )
+      : null
+  const shouldRecommendBugfixRamp =
+    latestBugfixEvidence &&
+    (!latestBugfixEvidence.reproducedBeforeEditing ||
+      (latestBugfixEvidence.inspectedFiles?.length || 0) < 2 ||
+      (latestBugfixEvidence.inspectedTestOrDocs?.length || 0) === 0)
+
   return (
     <main className="min-h-screen bg-zinc-950">
       <OnboardingModal
@@ -336,17 +358,7 @@ export default function DashboardPage() {
 
       <div className="pt-20 pb-12 sm:pt-24 sm:pb-16">
         <div className="container mx-auto max-w-6xl px-4">
-          {/* Header Row - Responsive */}
-          <div
-            className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between"
-            data-tour="welcome"
-          >
-            <div>
-              <h1 className="text-xl font-semibold text-white sm:text-2xl">
-                Welcome back{userName ? `, ${userName}` : ""}
-              </h1>
-              <p className="mt-1 text-sm text-zinc-500">Your interview prep overview</p>
-            </div>
+          <div className="mb-6 flex justify-end sm:mb-8" data-tour="welcome">
             <Link href="/interview" data-tour="start-practice-btn">
               <Button className="w-full bg-white font-medium text-zinc-900 hover:bg-zinc-200 sm:w-auto">
                 <Terminal className="mr-2 h-4 w-4" />
@@ -370,7 +382,7 @@ export default function DashboardPage() {
                 <span className="text-2xl font-light text-white sm:text-3xl">
                   {usage?.used || 0}
                 </span>
-                <span className="text-sm text-zinc-500">/ {usage?.limit || 2}</span>
+                <span className="text-sm text-zinc-500">/ {usage?.limit || 8}</span>
               </div>
               <Progress value={usagePercentage} className="mt-2 h-1 bg-zinc-800" />
               <p className="mt-1.5 text-[10px] text-zinc-600">
@@ -638,6 +650,101 @@ export default function DashboardPage() {
 
             {/* Metrics Overview - 2 cols on lg */}
             <div className="space-y-4 lg:col-span-2" data-tour="quick-start">
+              <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                    <span className="truncate text-sm font-medium text-zinc-300">
+                      Bugfix Readiness
+                    </span>
+                  </div>
+                  {bugfixReadiness !== null && (
+                    <span className={`text-xl font-light ${getScoreColor(bugfixReadiness)}`}>
+                      {bugfixReadiness}%
+                    </span>
+                  )}
+                </div>
+
+                {bugfixReadiness === null ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-zinc-400">
+                      Practice production incidents and build a separate debugging signal.
+                    </p>
+                    <Link href="/interview?practice=true&type=bugfix">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-full border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800"
+                      >
+                        <Terminal className="mr-1.5 h-3.5 w-3.5" />
+                        Start Bugfix
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-lg bg-zinc-950/60 p-2">
+                        <p className="text-zinc-500">Last Score</p>
+                        <p
+                          className={
+                            latestBugfixScore ? getScoreColor(latestBugfixScore) : "text-zinc-500"
+                          }
+                        >
+                          {latestBugfixScore ? `${Math.round(latestBugfixScore)}%` : "—"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-zinc-950/60 p-2">
+                        <p className="text-zinc-500">Files Opened</p>
+                        <p className="text-zinc-300">
+                          {latestBugfixEvidence?.inspectedFiles?.length || 0}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-zinc-950/60 p-2">
+                        <p className="text-zinc-500">Tests Run</p>
+                        <p className="text-zinc-300">
+                          {latestBugfixEvidence?.visibleTestsRun || 0}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-zinc-950/60 p-2">
+                        <p className="text-zinc-500">AI Shortcut</p>
+                        <p
+                          className={
+                            latestBugfixEvidence?.aiShortcutCount
+                              ? "text-amber-400"
+                              : "text-emerald-400"
+                          }
+                        >
+                          {latestBugfixEvidence?.aiShortcutCount || 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    {shouldRecommendBugfixRamp && (
+                      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
+                        <p className="text-xs font-medium text-emerald-300">
+                          Beginner Debugger track recommended
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-400">
+                          Focus on reproducing before editing and opening the visible test first.
+                        </p>
+                      </div>
+                    )}
+
+                    <Link href="/interview?practice=true&type=bugfix">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-full border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800"
+                      >
+                        <Terminal className="mr-1.5 h-3.5 w-3.5" />
+                        Practice Bugfix
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+
               <MetricsOverview />
             </div>
           </div>

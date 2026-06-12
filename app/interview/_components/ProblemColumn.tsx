@@ -18,12 +18,20 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import type { Scenario } from "@/lib/scenarios"
 import type { WorkspaceContextFile } from "../_types"
 
+type BugfixReflectionField = "hypothesis" | "rootCause" | "prevention"
+
 interface ProblemColumnCtx {
   activePanel: "problem" | "editor" | "chat"
+  bugfixReflection?: {
+    hypothesis: string
+    rootCause: string
+    prevention: string
+  }
   elapsedTime: number
   fetchRAGHints: () => Promise<void>
   fileInputRef: RefObject<HTMLInputElement | null>
@@ -40,6 +48,8 @@ interface ProblemColumnCtx {
   revealedHints: number
   selectedScenario: Scenario | null
   setIsCodeViewerOpen: (open: boolean) => void
+  onBugfixReflectionChange?: (field: BugfixReflectionField, value: string) => void
+  onBugfixReflectionCommit?: (field: BugfixReflectionField) => void
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
   setRevealedHintIndices: Dispatch<SetStateAction<Set<number>>>
   setSelectedFile: (file: WorkspaceContextFile | null) => void
@@ -56,6 +66,7 @@ interface ProblemColumnProps {
 export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnProps) {
   const {
     activePanel,
+    bugfixReflection,
     elapsedTime,
     fetchRAGHints,
     fileInputRef,
@@ -72,6 +83,8 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
     revealedHints,
     selectedScenario,
     setIsCodeViewerOpen,
+    onBugfixReflectionChange,
+    onBugfixReflectionCommit,
     setRevealedAIHintIndices,
     setRevealedHintIndices,
     setSelectedFile,
@@ -80,6 +93,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
     submitHintFeedback,
     workspaceContext,
   } = ctx
+  const isBugfix = selectedScenario?.type === "bugfix"
 
   return (
     <>
@@ -145,26 +159,120 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 />
               </div>
 
-              {selectedScenario.type === "bugfix" && (
+              {isBugfix && (
                 <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3">
                   <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-blue-300 uppercase">
                     <span className="h-4 w-1 rounded-full bg-blue-300"></span>
-                    How to Work This Codebase
+                    Incident Report
                   </h3>
                   <div className="space-y-2 text-sm leading-relaxed text-gray-300">
+                    {(selectedScenario as any).userReport && (
+                      <p className="text-gray-200">{(selectedScenario as any).userReport}</p>
+                    )}
                     {(selectedScenario as any).expectedBehavior && (
                       <p>
-                        <span className="font-medium text-gray-100">Goal:</span>{" "}
+                        <span className="font-medium text-gray-100">Expected:</span>{" "}
                         {(selectedScenario as any).expectedBehavior}
                       </p>
                     )}
-                    <ol className="list-decimal space-y-1.5 pt-1 pl-4 text-xs text-gray-400">
-                      <li>Read the README or context file first.</li>
-                      <li>Open the visible test to reproduce the failing behavior.</li>
-                      <li>Trace the supporting files before editing.</li>
-                      <li>Make the smallest fix that preserves the public contract.</li>
-                      <li>Run tests and explain the root cause to the interviewer.</li>
-                    </ol>
+                    {(selectedScenario as any).reproductionSteps?.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                          Repro Steps
+                        </p>
+                        <ol className="list-decimal space-y-1.5 pl-4 text-xs text-gray-400">
+                          {(selectedScenario as any).reproductionSteps.map(
+                            (step: string, index: number) => (
+                              <li key={`${step}-${index}`}>{step}</li>
+                            )
+                          )}
+                        </ol>
+                      </div>
+                    )}
+                    {(selectedScenario as any).visibleLogs?.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                          Visible Logs
+                        </p>
+                        <div className="space-y-1 rounded border border-gray-700/60 bg-gray-950/50 p-2 font-mono text-[11px] text-gray-300">
+                          {(selectedScenario as any).visibleLogs.map(
+                            (log: string, index: number) => (
+                              <p key={`${log}-${index}`}>{log}</p>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {(selectedScenario as any).successCriteria?.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                          Success Criteria
+                        </p>
+                        <ul className="space-y-1 pl-1 text-xs text-gray-400">
+                          {(selectedScenario as any).successCriteria.map(
+                            (criterion: string, index: number) => (
+                              <li key={`${criterion}-${index}`} className="flex gap-2">
+                                <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-blue-300" />
+                                <span>{criterion}</span>
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isBugfix && isInterviewStarted && bugfixReflection && (
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wide text-emerald-300 uppercase">
+                    <span className="h-4 w-1 rounded-full bg-emerald-300"></span>
+                    Debugging Notes
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-300">
+                        Hypothesis
+                      </label>
+                      <Textarea
+                        value={bugfixReflection.hypothesis}
+                        onChange={(event) =>
+                          onBugfixReflectionChange?.("hypothesis", event.target.value)
+                        }
+                        onBlur={() => onBugfixReflectionCommit?.("hypothesis")}
+                        className="min-h-[64px] border-gray-700 bg-gray-950/60 text-xs text-gray-100"
+                        placeholder="What do you think is causing the incident?"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-300">
+                        Root Cause
+                      </label>
+                      <Textarea
+                        value={bugfixReflection.rootCause}
+                        onChange={(event) =>
+                          onBugfixReflectionChange?.("rootCause", event.target.value)
+                        }
+                        onBlur={() => onBugfixReflectionCommit?.("rootCause")}
+                        className="min-h-[64px] border-gray-700 bg-gray-950/60 text-xs text-gray-100"
+                        placeholder="What failed, and why?"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-300">
+                        Prevention
+                      </label>
+                      <Textarea
+                        value={bugfixReflection.prevention}
+                        onChange={(event) =>
+                          onBugfixReflectionChange?.("prevention", event.target.value)
+                        }
+                        onBlur={() => onBugfixReflectionCommit?.("prevention")}
+                        className="min-h-[64px] border-gray-700 bg-gray-950/60 text-xs text-gray-100"
+                        placeholder="What test, guardrail, or monitoring would catch this next time?"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

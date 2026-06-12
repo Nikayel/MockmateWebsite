@@ -736,7 +736,7 @@ export function getSubscriptionCancellationEmailHtml(
       `
       <p>hey ${firstName},</p>
 
-      <p>your CodeSparring Pro subscription has ended. you're now on the free plan (5 sessions per month).</p>
+      <p>your CodeSparring Pro subscription has ended. you're now on the free plan (8 sessions per month).</p>
 
       <p>your progress and history are still here if you want to come back.</p>
 
@@ -786,7 +786,7 @@ export function getSubscriptionCancellationEmailText(
     return `
 hey ${firstName},
 
-your CodeSparring Pro subscription has ended. you're now on the free plan (5 sessions per month).
+your CodeSparring Pro subscription has ended. you're now on the free plan (8 sessions per month).
 
 your progress and history are still here if you want to come back.
 

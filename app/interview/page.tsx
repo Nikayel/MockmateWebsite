@@ -38,6 +38,7 @@ import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { isExecutionServiceError } from "@/lib/piston"
+import { executeScenarioInBrowser } from "@/lib/workspace-execution"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
 import { toast } from "sonner"
 // Interview phase tracking
@@ -73,6 +74,7 @@ import {
   toWorkspaceScenarioFiles,
 } from "./_utils/workspace"
 import type { WorkspaceContextFile } from "./_types"
+import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -337,6 +339,20 @@ function InterviewPageContent() {
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContextFile[]>([])
   const [activeWorkspacePath, setActiveWorkspacePath] = useState<string | null>(null)
+  const [bugfixEvidenceEvents, setBugfixEvidenceEvents] = useState<BugfixEvidenceEvent[]>([])
+  const [bugfixHypothesis, setBugfixHypothesis] = useState("")
+  const [bugfixRootCause, setBugfixRootCause] = useState("")
+  const [bugfixPrevention, setBugfixPrevention] = useState("")
+  const recordedBugfixEditPathsRef = useRef<Set<string>>(new Set())
+  const chatWorkspaceContext = useMemo(
+    () =>
+      workspaceContext.map((file) => ({
+        ...file,
+        active: file.path === activeWorkspacePath,
+        edited: file.originalContent !== undefined && file.content !== file.originalContent,
+      })),
+    [activeWorkspacePath, workspaceContext]
+  )
   const activeWorkspaceFile =
     activeWorkspacePath && isWorkspaceScenario(selectedScenario)
       ? workspaceContext.find((file) => file.path === activeWorkspacePath) || null
@@ -355,6 +371,110 @@ function InterviewPageContent() {
   const [cachedUserProfile, setCachedUserProfile] = useState<Profile | null>(null)
   const userProfileRequestRef = useRef<Promise<Profile | null> | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
+  const getBugfixExpectedTouchedFiles = useCallback(
+    (scenario: Scenario | null = selectedScenario): string[] => {
+      if (!scenario || scenario.type !== "bugfix") return []
+      if (scenario.expectedTouchedFiles?.length) return scenario.expectedTouchedFiles
+      if (isWorkspaceScenario(scenario)) return scenario.workspace.editableFilePaths
+      return []
+    },
+    [selectedScenario]
+  )
+
+  const recordBugfixEvidence = useCallback(
+    (event: Omit<BugfixEvidenceEvent, "timestamp"> & { timestamp?: number }) => {
+      if (selectedScenario?.type !== "bugfix") return
+
+      const metadata = currentSessionId
+        ? { ...(event.metadata || {}), sessionId: currentSessionId }
+        : event.metadata
+
+      setBugfixEvidenceEvents((events) => [
+        ...events,
+        createBugfixEvidenceEvent({ ...event, metadata }),
+      ])
+    },
+    [currentSessionId, selectedScenario?.type]
+  )
+
+  const buildBugfixEvidencePayload = useCallback((): BugfixEvidenceEvent[] => {
+    if (selectedScenario?.type !== "bugfix") return []
+
+    const events = [...bugfixEvidenceEvents]
+    const now = Date.now()
+    const hasHypothesisEvent = events.some((event) => event.type === "hypothesis_created")
+    const hasPreventionEvent = events.some((event) => event.type === "prevention_explained")
+
+    if (bugfixHypothesis.trim() && !hasHypothesisEvent) {
+      events.push(
+        createBugfixEvidenceEvent({
+          type: "hypothesis_created",
+          text: bugfixHypothesis.trim(),
+          timestamp: now,
+        })
+      )
+    }
+
+    if (bugfixPrevention.trim() && !hasPreventionEvent) {
+      events.push(
+        createBugfixEvidenceEvent({
+          type: "prevention_explained",
+          text: bugfixPrevention.trim(),
+          timestamp: now + 1,
+        })
+      )
+    }
+
+    if (bugfixRootCause.trim()) {
+      events.push(
+        createBugfixEvidenceEvent({
+          type: "submission_created",
+          text: bugfixRootCause.trim(),
+          timestamp: now + 2,
+        })
+      )
+    }
+
+    return events
+  }, [bugfixEvidenceEvents, bugfixHypothesis, bugfixPrevention, bugfixRootCause, selectedScenario])
+
+  const resetBugfixSessionState = useCallback(() => {
+    setBugfixEvidenceEvents([])
+    setBugfixHypothesis("")
+    setBugfixRootCause("")
+    setBugfixPrevention("")
+    recordedBugfixEditPathsRef.current = new Set()
+  }, [])
+
+  const classifyBugfixAIHelpKind = useCallback(
+    (message: string): NonNullable<BugfixEvidenceEvent["aiHelpKind"]> => {
+      const lower = message.toLowerCase()
+
+      if (
+        /exact|solution|solve|fix it|write the code|give me code|patch this|tell me the fix/.test(
+          lower
+        )
+      ) {
+        return "exact-fix"
+      }
+
+      if (/copy|paste|implement for me|full code/.test(lower)) {
+        return "solution-like"
+      }
+
+      if (/log|error|stack trace|failing|failure|console|test output/.test(lower)) {
+        return "log-interpretation"
+      }
+
+      if (/hypothesis|root cause|cause|why|theory|is it because/.test(lower)) {
+        return "hypothesis-check"
+      }
+
+      return "next-file"
+    },
+    []
+  )
 
   // Code viewer dialog state
   const [selectedFile, setSelectedFile] = useState<WorkspaceContextFile | null>(null)
@@ -794,7 +914,28 @@ function InterviewPageContent() {
 
           // Initialize code based on scenario type
           let initialCode: string
-          if (scenario.type === "bugfix") {
+          if (isWorkspaceScenario(scenario)) {
+            const scenarioLanguage = scenario.workspace.language
+            if (scenarioLanguage !== selectedLanguage) {
+              setSelectedLanguage(scenarioLanguage)
+            }
+            const contextFiles =
+              hasExistingProgress && savedState?.workspaceContext?.length
+                ? (savedState.workspaceContext as WorkspaceContextFile[])
+                : toWorkspaceScenarioFiles(scenario)
+            const activePath =
+              savedState?.activeWorkspacePath ||
+              scenario.workspace.primaryFilePath ||
+              contextFiles[0]?.path
+            const activeFile =
+              contextFiles.find((file) => file.path === activePath) ||
+              contextFiles.find((file) => file.path === scenario.workspace.primaryFilePath) ||
+              contextFiles[0]
+
+            initialCode = activeFile?.content || ""
+            setWorkspaceContext(contextFiles)
+            setActiveWorkspacePath(activeFile?.path || scenario.workspace.primaryFilePath)
+          } else if (scenario.type === "bugfix") {
             const scenarioLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
             if (scenarioLanguage !== selectedLanguage) {
               setSelectedLanguage(scenarioLanguage)
@@ -914,6 +1055,25 @@ Let's continue!`
             if (savedState?.testResults && savedState.testResults.length > 0) {
               setTestResults(savedState.testResults)
             }
+            if (savedState?.testSummary) {
+              setTestSummary(savedState.testSummary)
+            }
+            if (savedState?.consoleLogs) {
+              setConsoleLogs(savedState.consoleLogs as typeof consoleLogs)
+            }
+            if (scenario.type === "bugfix") {
+              setBugfixEvidenceEvents(
+                (savedState.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || []
+              )
+              setBugfixHypothesis(savedState.bugfixHypothesis || "")
+              setBugfixRootCause(savedState.bugfixRootCause || "")
+              setBugfixPrevention(savedState.bugfixPrevention || "")
+              recordedBugfixEditPathsRef.current = new Set(
+                ((savedState.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
+                  .filter((event) => event.type === "file_edited" && event.filePath)
+                  .map((event) => event.filePath as string)
+              )
+            }
 
             // If resuming post-interview discussion, show that view directly
             if (isPostInterviewResume && savedState?.isPostInterviewDiscussion) {
@@ -934,6 +1094,14 @@ Let's continue!`
               scenario.difficulty,
               problemType
             )
+
+            if (scenario.type === "bugfix") {
+              resetBugfixSessionState()
+              setBugfixEvidenceEvents([
+                createBugfixEvidenceEvent({ type: "session_started", timestamp: Date.now() }),
+                createBugfixEvidenceEvent({ type: "incident_read", timestamp: Date.now() + 1 }),
+              ])
+            }
 
             setInterviewerMessages([{ type: "ai", message: initialMessage }])
             if (!isDSAScenario) {
@@ -1376,6 +1544,12 @@ Let's continue!`
           testResults,
           testSummary,
           workspaceContext,
+          activeWorkspacePath,
+          consoleLogs,
+          bugfixEvidenceEvents,
+          bugfixHypothesis,
+          bugfixRootCause,
+          bugfixPrevention,
           isPostInterviewDiscussion: showPostInterviewDiscussion,
           timestamp: Date.now(),
         }
@@ -1395,6 +1569,13 @@ Let's continue!`
               interviewerMessages,
               testResults,
               testSummary,
+              workspaceContext,
+              activeWorkspacePath,
+              consoleLogs,
+              bugfixEvidenceEvents,
+              bugfixHypothesis,
+              bugfixRootCause,
+              bugfixPrevention,
               isPostInterviewDiscussion: showPostInterviewDiscussion,
               realInterviewMode,
               strictTimeLimit,
@@ -1421,6 +1602,13 @@ Let's continue!`
                   interviewerMessages: interviewerMessages.slice(-20),
                   testResults: testResults.slice(-10),
                   testSummary,
+                  workspaceContext,
+                  activeWorkspacePath,
+                  consoleLogs,
+                  bugfixEvidenceEvents,
+                  bugfixHypothesis,
+                  bugfixRootCause,
+                  bugfixPrevention,
                   isPostInterviewDiscussion: showPostInterviewDiscussion,
                   realInterviewMode,
                   strictTimeLimit,
@@ -1452,6 +1640,12 @@ Let's continue!`
     testResults,
     testSummary,
     workspaceContext,
+    activeWorkspacePath,
+    consoleLogs,
+    bugfixEvidenceEvents,
+    bugfixHypothesis,
+    bugfixRootCause,
+    bugfixPrevention,
     currentSessionId,
     showPostInterviewDiscussion,
   ])
@@ -1603,6 +1797,13 @@ Let's continue!`
                     elapsedTime: data.session.session_state.elapsed_time,
                     testResults: data.session.session_state.test_results,
                     testSummary: data.session.session_state.test_summary,
+                    workspaceContext: data.session.session_state.workspace_context,
+                    activeWorkspacePath: data.session.session_state.active_workspace_path,
+                    consoleLogs: data.session.session_state.console_logs,
+                    bugfixEvidenceEvents: data.session.session_state.bugfix_evidence_events,
+                    bugfixHypothesis: data.session.session_state.bugfix_hypothesis,
+                    bugfixRootCause: data.session.session_state.bugfix_root_cause,
+                    bugfixPrevention: data.session.session_state.bugfix_prevention,
                     isPostInterviewDiscussion:
                       data.session.session_state.is_post_interview_discussion,
                     savedAt: data.session.session_state.saved_at,
@@ -1626,6 +1827,22 @@ Let's continue!`
           setInterviewerMessages((remoteData.interviewerMessages as ChatMessage[]) || [])
           setSelectedLanguage((remoteData.language as typeof selectedLanguage) || "javascript")
           setTestResults(remoteData.testResults || [])
+          setWorkspaceContext(remoteData.workspaceContext || [])
+          if (remoteData.workspaceContext?.length) {
+            setActiveWorkspacePath(
+              remoteData.activeWorkspacePath || remoteData.workspaceContext[0].path
+            )
+          }
+          setConsoleLogs(remoteData.consoleLogs || [])
+          setBugfixEvidenceEvents((remoteData.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
+          setBugfixHypothesis(remoteData.bugfixHypothesis || "")
+          setBugfixRootCause(remoteData.bugfixRootCause || "")
+          setBugfixPrevention(remoteData.bugfixPrevention || "")
+          recordedBugfixEditPathsRef.current = new Set(
+            ((remoteData.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
+              .filter((event) => event.type === "file_edited" && event.filePath)
+              .map((event) => event.filePath as string)
+          )
           if (remoteData.elapsedTime) {
             setElapsedTime(remoteData.elapsedTime)
           }
@@ -1660,8 +1877,24 @@ Let's continue!`
                 (file: WorkspaceContextFile) =>
                   file.path === selectedScenario.workspace.primaryFilePath
               )
-            setActiveWorkspacePath(restoredPrimary?.path || localData.workspaceContext[0].path)
+            setActiveWorkspacePath(
+              localData.activeWorkspacePath ||
+                restoredPrimary?.path ||
+                localData.workspaceContext[0].path
+            )
           }
+          setConsoleLogs(localData.consoleLogs || [])
+          setBugfixEvidenceEvents(localData.bugfixEvidenceEvents || [])
+          setBugfixHypothesis(localData.bugfixHypothesis || "")
+          setBugfixRootCause(localData.bugfixRootCause || "")
+          setBugfixPrevention(localData.bugfixPrevention || "")
+          recordedBugfixEditPathsRef.current = new Set(
+            (localData.bugfixEvidenceEvents || [])
+              .filter(
+                (event: BugfixEvidenceEvent) => event.type === "file_edited" && event.filePath
+              )
+              .map((event: BugfixEvidenceEvent) => event.filePath as string)
+          )
           if (localData.elapsedTime) {
             setElapsedTime(localData.elapsedTime)
           }
@@ -1728,7 +1961,7 @@ Let's continue!`
                 skill_level: experienceLevel, // From roadmap or default
               }
             : { skill_level: experienceLevel },
-          workspaceContext: workspaceContext,
+          workspaceContext: chatWorkspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
@@ -1869,7 +2102,7 @@ Interviews are conversations, not just coding exercises.`
                 skill_level: experienceLevel,
               }
             : { skill_level: experienceLevel },
-          workspaceContext: workspaceContext,
+          workspaceContext: chatWorkspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
@@ -2244,7 +2477,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                 skill_level: experienceLevel,
               }
             : { skill_level: experienceLevel },
-          workspaceContext: workspaceContext,
+          workspaceContext: chatWorkspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
@@ -2517,6 +2750,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setHintFeedback(new Map())
     setWorkspaceContext([])
     setActiveWorkspacePath(null)
+    resetBugfixSessionState()
     setComprehensiveFeedback("")
     setPerformanceScore(null)
     setTechnicalScore(null)
@@ -2525,6 +2759,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     // Initialize code based on scenario type
     let initialCode: string
     let activeLanguage = selectedLanguage
+    let initialBugfixFileEvent: BugfixEvidenceEvent | null = null
     if (isWorkspaceScenario(scenario)) {
       activeLanguage = scenario.workspace.language
       if (activeLanguage !== selectedLanguage) {
@@ -2537,6 +2772,17 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       initialCode = primaryFile?.content || ""
       setWorkspaceContext(contextFiles)
       setActiveWorkspacePath(primaryFile?.path || scenario.workspace.primaryFilePath)
+      if (scenario.type === "bugfix" && primaryFile) {
+        initialBugfixFileEvent = createBugfixEvidenceEvent({
+          type:
+            primaryFile.role === "test" || primaryFile.role === "docs"
+              ? "test_or_doc_opened"
+              : "file_opened",
+          filePath: primaryFile.path,
+          fileRole: primaryFile.role,
+          timestamp: Date.now() + 2,
+        })
+      }
       toast.success(`Loaded ${contextFiles.length} codebase file(s) for review`)
     } else if (scenario.type === "bugfix") {
       activeLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
@@ -2625,6 +2871,21 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
     setCode(initialCode)
     setStarterCode(initialCode)
+
+    if (scenario.type === "bugfix") {
+      const startedAt = Date.now()
+      setBugfixEvidenceEvents([
+        createBugfixEvidenceEvent({
+          type: "session_started",
+          timestamp: startedAt,
+        }),
+        createBugfixEvidenceEvent({
+          type: "incident_read",
+          timestamp: startedAt + 1,
+        }),
+        ...(initialBugfixFileEvent ? [initialBugfixFileEvent] : []),
+      ])
+    }
 
     // Extract protected elements for code protection
     const protectedElementsData = extractProtectedElements(initialCode, activeLanguage)
@@ -2827,12 +3088,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setHintFeedback(new Map())
     setWorkspaceContext([])
     setActiveWorkspacePath(null)
+    resetBugfixSessionState()
     setEfficiencyMetrics(null)
     setProtectedElements(null)
     setStarterCode("")
   }
 
   const proceedToFinalFeedback = async () => {
+    const bugfixEvidencePayload = buildBugfixEvidencePayload()
+    const bugfixExpectedTouchedFiles = getBugfixExpectedTouchedFiles()
+
     setShowPostInterviewDiscussion(false)
     setIsGeneratingFeedback(true)
     setShowFeedback(true)
@@ -2850,6 +3115,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           testResults,
           testSummary,
           isPostInterviewDiscussion: true,
+          workspaceContext,
+          activeWorkspacePath,
+          consoleLogs,
+          bugfixEvidenceEvents: bugfixEvidencePayload,
+          bugfixHypothesis,
+          bugfixRootCause,
+          bugfixPrevention,
         })
       } catch (markError) {
         console.error("Failed to mark session as evaluating:", markError)
@@ -2987,6 +3259,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             // For mastery score calculation in persist endpoint
             hintsUsed: hintsUsedCount,
             elapsedTimeSeconds: elapsedTime,
+            bugfixEvidenceEvents: bugfixEvidencePayload,
+            bugfixExpectedTouchedFiles,
+            bugfixHypothesis,
+            bugfixRootCause,
+            bugfixPrevention,
           }
 
           // Start streaming feedback - scores come first, then rich feedback
@@ -3050,6 +3327,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             efficiencyScore: efficiencyData?.efficiencyScore,
             // Mark as processing - persist endpoint will update to "complete"
             feedbackStatus: "processing",
+            bugfixEvidenceEvents: bugfixEvidencePayload,
+            bugfixHypothesis,
+            bugfixRootCause,
+            bugfixPrevention,
           })
 
           trackSessionCompletion({
@@ -3377,6 +3658,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         updateTrackerOnMessage(userMessage, "user")
       }
 
+      if (!isInterviewer && selectedScenario?.type === "bugfix") {
+        recordBugfixEvidence({
+          type: "ai_help_requested",
+          aiHelpKind: classifyBugfixAIHelpKind(userMessage),
+          text: userMessage.slice(0, 240),
+        })
+      }
+
       // Track user message for scoring (fire-and-forget)
       if (currentSessionId && firebaseUser) {
         firebaseUser
@@ -3451,7 +3740,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   skill_level: experienceLevel,
                 }
               : { skill_level: experienceLevel },
-            workspaceContext: workspaceContext,
+            workspaceContext: chatWorkspaceContext,
             currentCode: code,
             scenarioTitle: selectedScenario?.title,
             scenarioType: selectedScenario?.type,
@@ -4036,6 +4325,46 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
   }
 
+  const executeCurrentScenario = async () => {
+    if (!selectedScenario) {
+      return { ok: false, status: 400, data: { error: "No scenario selected" } }
+    }
+
+    const workspaceFiles = isWorkspaceScenario(selectedScenario)
+      ? workspaceContext
+          .filter((file) => file.role === "editable")
+          .map((file) => ({ path: file.path, content: file.content }))
+      : undefined
+
+    const browserResult = await executeScenarioInBrowser({
+      code,
+      scenario: selectedScenario,
+      language: isWorkspaceScenario(selectedScenario)
+        ? selectedScenario.workspace.language
+        : selectedLanguage,
+      workspaceFiles,
+    })
+
+    if (browserResult) {
+      return { ok: !browserResult.error, status: 200, data: browserResult }
+    }
+
+    const response = await fetch("/api/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        scenarioId: selectedScenario.id,
+        language: isWorkspaceScenario(selectedScenario)
+          ? selectedScenario.workspace.language
+          : selectedLanguage,
+        workspaceFiles,
+      }),
+    })
+
+    return { ok: response.ok, status: response.status, data: await response.json() }
+  }
+
   const runCode = async () => {
     if (!selectedScenario) return
 
@@ -4048,28 +4377,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setEfficiencyMetrics(metrics)
 
     try {
-      const response = await fetch("/api/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code,
-          scenarioId: selectedScenario.id,
-          language: isWorkspaceScenario(selectedScenario)
-            ? selectedScenario.workspace.language
-            : selectedLanguage,
-          workspaceFiles: isWorkspaceScenario(selectedScenario)
-            ? workspaceContext
-                .filter((file) => file.role === "editable")
-                .map((file) => ({ path: file.path, content: file.content }))
-            : undefined,
-        }),
-      })
-
-      const data = await response.json()
+      const execution = await executeCurrentScenario()
+      const data = execution.data
 
       // Handle API errors (scenario not found, execution timeout, etc.)
-      if (!response.ok || data.error) {
-        const errorMessage = data.error || `Server error (${response.status})`
+      if (!execution.ok || data.error) {
+        const errorMessage = data.error || `Server error (${execution.status})`
         const isServiceDown = isExecutionServiceError(errorMessage)
 
         setConsoleLogs([
@@ -4128,6 +4441,19 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
+        updateTrackerOnTestsRun()
+        if (selectedScenario.type === "bugfix") {
+          recordBugfixEvidence({
+            type: "test_run",
+            testSummary: data.summary,
+          })
+          if (data.summary.failed > 0) {
+            recordBugfixEvidence({
+              type: "visible_failure_seen",
+              testSummary: data.summary,
+            })
+          }
+        }
 
         syncHintAgentWithTestOutcome(data.summary, data.results)
 
@@ -4222,28 +4548,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setEfficiencyMetrics(metrics)
 
     try {
-      const response = await fetch("/api/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code,
-          scenarioId: selectedScenario.id,
-          language: isWorkspaceScenario(selectedScenario)
-            ? selectedScenario.workspace.language
-            : selectedLanguage,
-          workspaceFiles: isWorkspaceScenario(selectedScenario)
-            ? workspaceContext
-                .filter((file) => file.role === "editable")
-                .map((file) => ({ path: file.path, content: file.content }))
-            : undefined,
-        }),
-      })
-
-      const data = await response.json()
+      const execution = await executeCurrentScenario()
+      const data = execution.data
 
       // Handle API errors (scenario not found, execution timeout, etc.)
-      if (!response.ok || data.error) {
-        const errorMessage = data.error || `Server error (${response.status})`
+      if (!execution.ok || data.error) {
+        const errorMessage = data.error || `Server error (${execution.status})`
         const isServiceDown = isExecutionServiceError(errorMessage)
 
         setConsoleLogs([
@@ -4302,6 +4612,25 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
+        updateTrackerOnTestsRun()
+        if (selectedScenario.type === "bugfix") {
+          recordBugfixEvidence({
+            type: "test_run",
+            testSummary: data.summary,
+          })
+          if (data.summary.failed > 0) {
+            recordBugfixEvidence({
+              type: "visible_failure_seen",
+              testSummary: data.summary,
+            })
+          }
+          if (data.summary.failed === 0) {
+            recordBugfixEvidence({
+              type: "hidden_result_received",
+              testSummary: data.summary,
+            })
+          }
+        }
 
         syncHintAgentWithTestOutcome(data.summary, data.results)
 
@@ -4385,6 +4714,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   typeof r.actual === "object" ? JSON.stringify(r.actual) : String(r.actual ?? ""),
               })),
               testSummary: data.summary,
+              workspaceContext,
+              activeWorkspacePath,
+              consoleLogs,
+              bugfixEvidenceEvents: buildBugfixEvidencePayload(),
+              bugfixHypothesis,
+              bugfixRootCause,
+              bugfixPrevention,
               isPostInterviewDiscussion: true,
               realInterviewMode,
               strictTimeLimit,
@@ -4446,6 +4782,69 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
   }, [])
 
+  const handleBugfixReflectionChange = useCallback(
+    (field: "hypothesis" | "rootCause" | "prevention", value: string) => {
+      if (field === "hypothesis") setBugfixHypothesis(value)
+      if (field === "rootCause") setBugfixRootCause(value)
+      if (field === "prevention") setBugfixPrevention(value)
+    },
+    []
+  )
+
+  const handleBugfixReflectionCommit = useCallback(
+    (field: "hypothesis" | "rootCause" | "prevention") => {
+      if (selectedScenario?.type !== "bugfix") return
+
+      if (field === "hypothesis" && bugfixHypothesis.trim()) {
+        recordBugfixEvidence({
+          type: "hypothesis_created",
+          text: bugfixHypothesis.trim(),
+        })
+      }
+
+      if (field === "prevention" && bugfixPrevention.trim()) {
+        recordBugfixEvidence({
+          type: "prevention_explained",
+          text: bugfixPrevention.trim(),
+        })
+      }
+    },
+    [bugfixHypothesis, bugfixPrevention, recordBugfixEvidence, selectedScenario?.type]
+  )
+
+  const resetActiveWorkspaceFile = useCallback(() => {
+    if (!activeWorkspacePath || !isWorkspaceScenario(selectedScenario)) return
+
+    const file = workspaceContext.find((candidate) => candidate.path === activeWorkspacePath)
+    if (!file || file.role !== "editable" || file.originalContent === undefined) return
+
+    setWorkspaceContext((files) =>
+      files.map((candidate) =>
+        candidate.path === activeWorkspacePath
+          ? { ...candidate, content: candidate.originalContent || "" }
+          : candidate
+      )
+    )
+    setCode(file.originalContent)
+  }, [activeWorkspacePath, selectedScenario, workspaceContext])
+
+  const resetEditableWorkspaceFiles = useCallback(() => {
+    if (!isWorkspaceScenario(selectedScenario)) return
+
+    setWorkspaceContext((files) =>
+      files.map((file) =>
+        file.role === "editable" && file.originalContent !== undefined
+          ? { ...file, content: file.originalContent }
+          : file
+      )
+    )
+
+    const activeFile = workspaceContext.find((file) => file.path === activeWorkspacePath)
+    if (activeFile?.role === "editable" && activeFile.originalContent !== undefined) {
+      setCode(activeFile.originalContent)
+    }
+  }, [activeWorkspacePath, selectedScenario, workspaceContext])
+
   const handleEditorChange = useCallback(
     (newCode: string) => {
       // Enforce code protection if enabled
@@ -4454,6 +4853,19 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         if (!validation.valid) {
           toast.error(`Cannot remove required code: ${validation.errors[0]}`)
           return
+        }
+      }
+      updateTrackerOnCodeChange(newCode)
+      if (selectedScenario?.type === "bugfix") {
+        const filePath = activeWorkspacePath || "solution"
+        const activeRole = activeWorkspaceFile?.role || "editable"
+        if (!recordedBugfixEditPathsRef.current.has(filePath)) {
+          recordedBugfixEditPathsRef.current.add(filePath)
+          recordBugfixEvidence({
+            type: "file_edited",
+            filePath,
+            fileRole: activeRole,
+          })
         }
       }
       setCode(newCode)
@@ -4467,12 +4879,15 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     },
     [
       activeWorkspacePath,
+      activeWorkspaceFile?.role,
       isInterviewStarted,
       protectedElements,
+      recordBugfixEvidence,
       selectedLanguage,
       selectedScenario,
       showFeedback,
       starterCode,
+      updateTrackerOnCodeChange,
     ]
   )
 
@@ -4593,6 +5008,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   <ProblemColumn
                     ctx={{
                       activePanel,
+                      bugfixReflection: {
+                        hypothesis: bugfixHypothesis,
+                        rootCause: bugfixRootCause,
+                        prevention: bugfixPrevention,
+                      },
                       elapsedTime,
                       fetchRAGHints,
                       fileInputRef,
@@ -4609,6 +5029,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       revealedHints,
                       selectedScenario,
                       setIsCodeViewerOpen,
+                      onBugfixReflectionChange: handleBugfixReflectionChange,
+                      onBugfixReflectionCommit: handleBugfixReflectionCommit,
                       setRevealedAIHintIndices,
                       setRevealedHintIndices,
                       setSelectedFile,
@@ -4642,6 +5064,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                     onRunCode={runCode}
                     onSubmitCode={submitCode}
                     onSelectedLanguageChange={setSelectedLanguage}
+                    onResetActiveFile={resetActiveWorkspaceFile}
+                    onResetWorkspace={resetEditableWorkspaceFiles}
                     isAIPartnerExpanded={isAIPartnerExpanded}
                     onAIPartnerExpandedChange={setIsAIPartnerExpanded}
                     chatMessages={chatMessages}
@@ -4655,6 +5079,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       if (file.path !== activeWorkspacePath) {
                         setActiveWorkspacePath(file.path)
                         setCode(file.content || "")
+                      }
+                      if (selectedScenario?.type === "bugfix") {
+                        recordBugfixEvidence({
+                          type:
+                            file.role === "test" || file.role === "docs"
+                              ? "test_or_doc_opened"
+                              : "file_opened",
+                          filePath: file.path,
+                          fileRole: file.role,
+                        })
                       }
                     }}
                   />

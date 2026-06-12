@@ -65,6 +65,7 @@ describe("interview page helpers", () => {
       {
         path: "src/index.ts",
         content: "export {}",
+        originalContent: "export {}",
         description: "Entry point",
         role: "readonly",
       },

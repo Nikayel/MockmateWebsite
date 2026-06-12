@@ -510,7 +510,18 @@ Your role:
           - Suggest optimizations in bullet points or brief notes
             - Answer questions about algorithms and data structures with summarized explanations
               - Reference their codebase when relevant
-                - Be helpful but not overly verbose
+        - Be helpful but not overly verbose
+
+${
+  isBugFix
+    ? `BUGFIX PARTNER RULES:
+- Suggest the next file, visible test, doc, or log to inspect before suggesting a code change.
+- Explain failing output and help the candidate validate their hypothesis.
+- Give nudges before solutions; do not reveal the exact patch unless the candidate explicitly asks after showing investigation evidence.
+- Ask what evidence supports their hypothesis and what regression test would prevent this.
+- If they ask for the full fix too early, redirect to a smaller inspection step.`
+    : ""
+}
 
 HOW TO HELP(Collaborative Partner Approach):
     - Give hints and suggestions, not full solutions(unless they're really stuck after multiple attempts)
@@ -934,7 +945,20 @@ Generate a compliant response NOW:`
       }
 
       // Run validation with up to 2 retries for critical violations
-      const gateResult = await validateWithRetry(validationContext, regenerate, 2)
+      const gateResult = await validateWithRetry(
+        validationContext,
+        regenerate,
+        async (system, user) => {
+          const result = await generateAIResponse(system, user, [], {
+            complexity: "simple",
+            userId,
+            sessionId,
+            eventType: "chat_message",
+          })
+          return { text: result.text }
+        },
+        2
+      )
 
       // Update response if regenerated
       if (gateResult.retries > 0) {
@@ -944,37 +968,6 @@ Generate a compliant response NOW:`
           retries: gateResult.retries,
           remainingViolations: gateResult.violations.map((v) => v.rule),
         })
-      }
-
-      // Semantic validation for CLARIFICATION phase only
-      // Regex is fragile - use LLM to catch "asking for approach" that regex misses
-      // Only run for clarification phase to minimize latency impact
-      const hasCriticalViolations = gateResult.violations.some((v) => v.severity === "critical")
-      if (currentPhase === "clarification" && !hasCriticalViolations) {
-        const { validateSemanticRules } = await import("@/lib/interview/response-validation")
-        const semanticResult = await validateSemanticRules(
-          aiResponse.text,
-          async (system, user) => {
-            const result = await generateAIResponse(system, user, [], {
-              complexity: "simple",
-              userId,
-              sessionId,
-              eventType: "chat_message", // Reuse existing event type
-            })
-            return { text: result.text }
-          }
-        )
-
-        if (semanticResult.violated && semanticResult.rule === "no-approach-in-clarification") {
-          logger.info("[Semantic] Clarification phase violation detected", {
-            sessionId,
-            evidence: semanticResult.evidence,
-          })
-          // Regenerate with specific hint
-          const hint =
-            "CLARIFICATION PHASE: Do NOT ask about approach/thinking/plan. Say: 'Take your time. Any questions about the problem?'"
-          aiResponse.text = await regenerate(hint)
-        }
       }
 
       // Log any remaining violations (warnings that didn't trigger regeneration)

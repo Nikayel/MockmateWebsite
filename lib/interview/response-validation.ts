@@ -171,6 +171,7 @@ export async function validateInterviewerResponseAsync(
 export async function validateWithRetry(
   ctx: ValidationContext,
   regenerate: (hint: string) => Promise<string>,
+  generateAI: (system: string, user: string) => Promise<{ text: string }>,
   maxRetries: number = 2
 ): Promise<{ response: string; violations: ResponseViolation[]; retries: number }> {
   let currentResponse = ctx.response
@@ -178,10 +179,13 @@ export async function validateWithRetry(
   let retries = 0
 
   for (let i = 0; i <= maxRetries; i++) {
-    const validation = validateInterviewerResponse({
-      ...ctx,
-      response: currentResponse,
-    })
+    const validation = await validateInterviewerResponseAsync(
+      {
+        ...ctx,
+        response: currentResponse,
+      },
+      generateAI
+    )
 
     if (validation.isValid) {
       return { response: currentResponse, violations: [], retries }

@@ -13,6 +13,7 @@ export const toWorkspaceContextFiles = (
   codebaseFiles.map((file) => ({
     path: file.fileName,
     content: file.content,
+    originalContent: file.content,
     description: file.description,
     role: getWorkspaceFileRole(file.fileName),
   }))
@@ -31,6 +32,7 @@ export const toWorkspaceScenarioFiles = (scenario: Scenario): WorkspaceContextFi
     .map((file) => ({
       path: file.path,
       content: file.content,
+      originalContent: file.content,
       description: file.description,
       role: file.role,
       language: file.language,

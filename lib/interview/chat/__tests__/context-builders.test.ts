@@ -7,6 +7,7 @@ import {
   buildScenarioId,
   buildSystemDesignPromptContext,
   buildUserPersonalizationContext,
+  buildWorkspaceContextString,
   getSystemDesignPhase,
 } from "../context-builders"
 
@@ -73,6 +74,20 @@ describe("chat context builders", () => {
     expect(result).toContain("1/1 passed")
     expect(result).toContain("ALL PASSING")
     expect(result).toContain('DO NOT say "let\'s run the tests"')
+  })
+
+  it("builds role-aware workspace context without hidden files", () => {
+    const result = buildWorkspaceContextString([
+      { path: "hidden.test.js", content: "secret", hidden: true, role: "test" },
+      { path: "src/readonly.js", content: "support", role: "readonly" },
+      { path: "src/active.js", content: "candidate edit", role: "editable", active: true },
+    ])
+
+    expect(result).toContain("src/active.js")
+    expect(result).toContain("role=editable")
+    expect(result).toContain("active=true")
+    expect(result).not.toContain("hidden.test.js")
+    expect(result.indexOf("src/active.js")).toBeLessThan(result.indexOf("src/readonly.js"))
   })
 
   it("computes system design phases from elapsed minutes", () => {

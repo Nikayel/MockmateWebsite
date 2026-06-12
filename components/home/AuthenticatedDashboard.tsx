@@ -165,7 +165,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
               </CardHeader>
               <CardContent>
                 <div className="mb-2 text-3xl font-bold text-white">
-                  {usage?.used || 0} / {usage?.limit || 2}
+                  {usage?.used || 0} / {usage?.limit || 8}
                   <span className="ml-2 text-sm font-normal text-gray-400">used</span>
                 </div>
                 <Progress
@@ -277,7 +277,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                   <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4">
                     <p className="mb-2 font-medium text-yellow-400">Monthly Limit Reached</p>
                     <p className="mb-4 text-sm text-gray-300">
-                      You've used all {usage?.limit || 2} free sessions this month. Upgrade to Pro
+                      You've used all {usage?.limit || 8} free sessions this month. Upgrade to Pro
                       for unlimited practice!
                     </p>
                     <Link href="/upgrade">

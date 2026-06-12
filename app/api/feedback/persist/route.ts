@@ -22,6 +22,7 @@ import {
   type MasteryScoreInput,
 } from "@/lib/spaced-repetition/mastery-score"
 import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
+import type { BugfixEvidenceSummary, BugfixScoreBreakdown } from "@/lib/bugfix/types"
 
 // Vercel Hobby plan has 10 second timeout for serverless functions
 // We skip AI calls here to stay within limits - silent notes should be
@@ -68,6 +69,9 @@ interface PersistRequest {
     correct?: string
     context?: string
   }>
+  bugfixEvidenceSummary?: BugfixEvidenceSummary
+  bugfixScoreBreakdown?: BugfixScoreBreakdown
+  bugfixPostSessionReport?: Record<string, unknown>
 
   // Optional context (no longer used for AI generation, kept for logging)
   conversationTranscript?: Array<{
@@ -100,6 +104,9 @@ export async function POST(request: NextRequest) {
       scenarioId,
       scenarioPattern,
       silentNotes: providedSilentNotes,
+      bugfixEvidenceSummary,
+      bugfixScoreBreakdown,
+      bugfixPostSessionReport,
       conversationTranscript,
       efficiencyMetrics,
     } = body
@@ -214,6 +221,12 @@ export async function POST(request: NextRequest) {
 
       // Silent notes (things interviewer noticed but didn't correct)
       silent_notes: silentNotes,
+
+      ...(scenarioType === "bugfix" && {
+        bugfix_evidence_summary: bugfixEvidenceSummary || null,
+        bugfix_score_breakdown: bugfixScoreBreakdown || null,
+        bugfix_post_session_report: bugfixPostSessionReport || null,
+      }),
 
       // Mastery breakdown (for analytics/debugging)
       mastery_breakdown: {

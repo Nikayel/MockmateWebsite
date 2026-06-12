@@ -129,6 +129,34 @@ export interface InterviewSession {
     codeQualityScore?: number
     communicationScore?: number
   }
+  bugfix_evidence_summary?: {
+    reproducedBeforeEditing?: boolean
+    inspectedFiles?: string[]
+    inspectedTestOrDocs?: string[]
+    editedFiles?: string[]
+    overEditedFiles?: string[]
+    hypothesisCount?: number
+    visibleTestsRun?: number
+    finalPassRate?: number
+    preventionExplained?: boolean
+    rootCauseExplained?: boolean
+    aiShortcutCount?: number
+    aiPartnerUseCount?: number
+  }
+  bugfix_score_breakdown?: {
+    overall?: number
+    reproductionDiscipline?: number
+    codebaseNavigation?: number
+    evidenceGathering?: number
+    hypothesisQuality?: number
+    minimalFixQuality?: number
+    verificationDiscipline?: number
+    overEditControl?: number
+    rootCauseUnderstanding?: number
+    regressionPrevention?: number
+    aiCollaborationQuality?: number
+    communication?: number
+  }
   // Constitutional AI critique metadata (only present if adjustments were made)
   constitutional_ai_critique?: {
     scoreCritique?: {

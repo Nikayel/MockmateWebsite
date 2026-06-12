@@ -7,6 +7,16 @@ export const MAX_MESSAGE_LENGTH = 4000
 export const MAX_WORKSPACE_FILES = 5
 export const MAX_FILE_SIZE = 10000
 
+export interface WorkspaceContextItem {
+  path: string
+  content: string
+  role?: string
+  description?: string
+  hidden?: boolean
+  active?: boolean
+  edited?: boolean
+}
+
 /**
  * Sliding window for conversation history.
  * Keeps most recent messages, summarizes old ones if needed.
@@ -49,14 +59,37 @@ export function manageContextWindow(
  * Limit workspace context before adding it to the model prompt.
  */
 export function manageWorkspaceContext(
-  workspaceContext: Array<{ path: string; content: string }>,
+  workspaceContext: WorkspaceContextItem[],
   maxFiles: number = MAX_WORKSPACE_FILES,
   maxFileSize: number = MAX_FILE_SIZE
-): Array<{ path: string; content: string }> {
+): WorkspaceContextItem[] {
   if (!workspaceContext || !Array.isArray(workspaceContext)) return []
 
-  return workspaceContext.slice(0, maxFiles).map((file) => ({
-    path: file.path,
-    content: truncateFileContent(file.content, maxFileSize),
-  }))
+  const rolePriority: Record<string, number> = {
+    editable: 30,
+    test: 20,
+    docs: 15,
+    readonly: 10,
+  }
+
+  return workspaceContext
+    .filter((file) => !file.hidden)
+    .map((file, index) => ({ file, index }))
+    .sort((a, b) => {
+      const aPriority =
+        (a.file.active ? 100 : 0) +
+        (a.file.edited ? 50 : 0) +
+        (rolePriority[a.file.role || ""] || 0)
+      const bPriority =
+        (b.file.active ? 100 : 0) +
+        (b.file.edited ? 50 : 0) +
+        (rolePriority[b.file.role || ""] || 0)
+
+      return bPriority - aPriority || a.index - b.index
+    })
+    .slice(0, maxFiles)
+    .map(({ file }) => ({
+      ...file,
+      content: truncateFileContent(file.content, maxFileSize),
+    }))
 }

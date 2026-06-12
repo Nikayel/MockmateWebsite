@@ -1,17 +1,42 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut, Map, Brain } from "lucide-react"
+import {
+  Menu,
+  X,
+  User,
+  LayoutDashboard,
+  Clock,
+  Terminal,
+  LogOut,
+  Map,
+  Brain,
+  ChevronDown,
+} from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
 import { NotificationBell } from "@/components/notification-bell"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+type MarketingTab = "platform" | "features" | "interviews" | "pricing"
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [hash, setHash] = useState("")
   const { user, initialized } = useAuth()
+  const pathname = usePathname()
+  const userDisplayName = user?.user_metadata?.full_name || user?.email || "Account"
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,6 +45,33 @@ export function Header() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  // Track the URL hash so "Features" lights up when viewing /#features,
+  // and "Platform" only when on the bare home route.
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash)
+    syncHash()
+    window.addEventListener("hashchange", syncHash)
+    return () => window.removeEventListener("hashchange", syncHash)
+  }, [pathname])
+
+  const activeTab: MarketingTab | null =
+    pathname === "/"
+      ? hash === "#features"
+        ? "features"
+        : "platform"
+      : pathname.startsWith("/interview-prep")
+        ? "interviews"
+        : pathname.startsWith("/pricing")
+          ? "pricing"
+          : null
+
+  const tabClass = (tab: MarketingTab) =>
+    `cursor-pointer pb-1 text-[11px] font-bold tracking-[0.1em] uppercase transition-colors duration-300 border-b-2 ${
+      activeTab === tab
+        ? "border-[#adc6ff] text-[#adc6ff]"
+        : "border-transparent text-[#c2c6d6] hover:text-white hover:border-white/30"
+    }`
 
   const handleSignOut = async () => {
     try {
@@ -36,21 +88,38 @@ export function Header() {
       className="fixed right-0 left-0 z-50 w-full px-4 transition-all duration-500"
     >
       <div
-        className={`mx-auto max-w-5xl rounded-full border px-6 py-3 shadow-lg transition-all duration-500 md:px-7 ${
+        className={`mx-auto rounded-full border px-6 py-3 shadow-lg transition-all duration-500 md:px-7 ${
+          user ? "max-w-7xl" : "max-w-5xl"
+        } ${
           isScrolled
             ? "border-white/12 bg-[#15151a]/90 shadow-black/30 backdrop-blur-xl"
             : "border-white/10 bg-[#17171c]/80 shadow-black/20 backdrop-blur-xl"
         }`}
       >
         <div className="flex items-center justify-between gap-4 font-[var(--font-geist)]">
-          <Link href={user ? "/dashboard" : "/"} className="group flex items-center">
+          <Link
+            href={user ? "/dashboard" : "/"}
+            className="group flex items-center"
+            onClick={() => {
+              // For logged-out users already on the home route, scroll back to
+              // the hero (Next.js won't re-navigate to the same path, and a
+              // lingering #features hash would otherwise keep us scrolled down).
+              if (!user && pathname === "/") {
+                if (window.location.hash) {
+                  history.replaceState(null, "", "/")
+                  setHash("")
+                }
+                window.scrollTo({ top: 0, behavior: "smooth" })
+              }
+            }}
+          >
             <span className="text-2xl font-extrabold tracking-[-0.04em] text-[#f1f2f7] transition-colors group-hover:text-white">
               CodeSparring
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden items-center space-x-6 md:flex">
+          <nav className={`hidden items-center md:flex ${user ? "space-x-5" : "space-x-6"}`}>
             {!initialized ? (
               <div className="flex h-10 items-center">
                 <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-white opacity-50"></div>
@@ -92,53 +161,60 @@ export function Header() {
                   <Brain className="h-4 w-4" />
                   <span>Review</span>
                 </Link>
-                <Link
-                  href="/account"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <User className="h-4 w-4" />
-                  <span>Account</span>
-                </Link>
                 <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
                   <NotificationBell />
-                  <span className="text-sm text-gray-400">
-                    {user.user_metadata?.full_name || user.email}
-                  </span>
-                  <Button
-                    onClick={handleSignOut}
-                    variant="outline"
-                    size="sm"
-                    className="border-accent/50 text-accent hover:bg-accent bg-transparent transition-all duration-300 hover:text-black"
-                  >
-                    <LogOut className="mr-1 h-4 w-4" />
-                    Sign Out
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:text-accent max-w-[210px] gap-2 rounded-full px-3 text-white/90 hover:bg-white/10"
+                      >
+                        <User className="h-4 w-4" />
+                        <span className="max-w-[140px] truncate">{userDisplayName}</span>
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-56 border-white/10 bg-[#17171c] text-white shadow-xl shadow-black/30"
+                    >
+                      <DropdownMenuLabel className="font-normal">
+                        <span className="block text-xs text-white/50">Signed in as</span>
+                        <span className="block truncate text-sm text-white/90">
+                          {userDisplayName}
+                        </span>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuItem asChild className="cursor-pointer focus:bg-white/10">
+                        <Link href="/account" className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Account
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={handleSignOut}
+                        className="cursor-pointer gap-2 text-[#adc6ff] focus:bg-[#adc6ff] focus:text-[#001a42]"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </>
             ) : (
               <>
-                <Link
-                  href="/"
-                  className="cursor-pointer border-b-2 border-[#adc6ff] pb-1 text-[11px] font-bold tracking-[0.1em] text-[#adc6ff] uppercase transition-colors duration-300"
-                >
+                <Link href="/" className={tabClass("platform")}>
                   Platform
                 </Link>
-                <Link
-                  href="/#features"
-                  className="cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white"
-                >
+                <Link href="/#features" className={tabClass("features")}>
                   Features
                 </Link>
-                <Link
-                  href="/interview-prep"
-                  className="cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white"
-                >
+                <Link href="/interview-prep" className={tabClass("interviews")}>
                   Interviews
                 </Link>
-                <Link
-                  href="/pricing"
-                  className="cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white"
-                >
+                <Link href="/pricing" className={tabClass("pricing")}>
                   Pricing
                 </Link>
                 <Link
@@ -224,9 +300,7 @@ export function Header() {
                     <span>Account</span>
                   </Link>
                   <div className="border-t border-white/10 pt-4">
-                    <p className="mb-2 text-sm text-gray-400">
-                      {user.user_metadata?.full_name || user.email}
-                    </p>
+                    <p className="mb-2 text-sm text-gray-400">{userDisplayName}</p>
                     <Button
                       onClick={() => {
                         handleSignOut()

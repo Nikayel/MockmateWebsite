@@ -33,6 +33,14 @@ import {
   buildEvidenceSummary,
 } from "@/lib/feedback/edge-utils"
 import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-analysis-edge"
+import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
+import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
+import { calculateBugfixEvidenceScore } from "@/lib/bugfix/scoring"
+import type {
+  BugfixEvidenceEvent,
+  BugfixEvidenceSummary,
+  BugfixScoreBreakdown,
+} from "@/lib/bugfix/types"
 
 // CRITICAL: Edge runtime for no timeout on streaming
 export const runtime = "edge"
@@ -73,6 +81,10 @@ export async function POST(request: NextRequest) {
         efficiencyMetrics,
         submittedFromPhase,
         testsRanBeforeSubmit,
+        bugfixEvidenceEvents,
+        bugfixExpectedTouchedFiles,
+        bugfixRootCause,
+        bugfixPrevention,
       } = body
 
       // ========================================
@@ -142,6 +154,20 @@ export async function POST(request: NextRequest) {
       const preScreen = preScreenConversation(conversationTranscript)
       const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
       const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
+      const bugfixEvidenceSummary: BugfixEvidenceSummary | null =
+        scenarioType === "bugfix" && Array.isArray(bugfixEvidenceEvents)
+          ? summarizeBugfixEvidence({
+              events: bugfixEvidenceEvents as BugfixEvidenceEvent[],
+              expectedTouchedFiles: Array.isArray(bugfixExpectedTouchedFiles)
+                ? bugfixExpectedTouchedFiles
+                : [],
+            })
+          : null
+      const bugfixScoreBreakdown: BugfixScoreBreakdown | null = bugfixEvidenceSummary
+        ? calculateBugfixEvidenceScore(bugfixEvidenceSummary, {
+            difficulty: scenarioDifficulty || "medium",
+          })
+        : null
 
       // Prepare transcript
       const transcriptMessages =
@@ -246,12 +272,16 @@ export async function POST(request: NextRequest) {
         validatedScores.understanding = Math.max(30, validatedScores.understanding - 25)
       }
 
-      const finalScores = applyScoreFloors(
+      let finalScores = applyScoreFloors(
         validatedScores,
         passRate,
         efficiencyMetrics?.efficiencyScore,
         aiValidation
       )
+
+      if (bugfixScoreBreakdown) {
+        finalScores = mapBugfixScoreToFeedbackScores(bugfixScoreBreakdown)
+      }
 
       // Send refined scores
       await sendEvent("refined_scores", {
@@ -278,6 +308,10 @@ export async function POST(request: NextRequest) {
         finalScores: finalScores as unknown as Record<string, number>,
         aiValidation: aiValidation as unknown as Record<string, unknown>,
         extractedEvidence,
+        bugfixEvidenceSummary,
+        bugfixScoreBreakdown,
+        bugfixRootCause,
+        bugfixPrevention,
         silentNotes: finalSilentNotes,
         code,
         language,
@@ -312,6 +346,17 @@ export async function POST(request: NextRequest) {
         fixNext: sections.fixNext || [],
         actionPlan: sections.actionPlan || [],
         silentNotes: finalSilentNotes,
+        bugfixEvidenceSummary,
+        bugfixScoreBreakdown,
+        bugfixPostSessionReport:
+          bugfixEvidenceSummary && bugfixScoreBreakdown
+            ? buildBugfixPostSessionReport({
+                evidence: bugfixEvidenceSummary,
+                score: bugfixScoreBreakdown,
+                rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
+                preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
+              })
+            : undefined,
         scores: {
           understanding: finalScores.understanding,
           problemSolving: finalScores.problemSolving,
@@ -368,6 +413,19 @@ FORMAT:
 `
   }
 
+  if (scenarioType === "bugfix") {
+    return `You are a senior debugging interviewer. Be direct, evidence-based, and specific.
+${baseRules}
+
+FORMAT:
+**TL;DR** – One sentence.
+**Debugging Score Snapshot** (use PRE-CALCULATED SCORES)
+**What Worked** – 2-3 specific strengths with evidence from files, tests, or notes
+**Fix Next** – 2-3 concrete debugging process improvements
+**Action Plan** – 3 concrete next debugging habits
+`
+  }
+
   return `You are a senior technical interviewer. Be honest about gaps but recognize achievements.
 ${baseRules}
 
@@ -387,6 +445,10 @@ function buildPrompt(data: {
   finalScores: Record<string, number>
   aiValidation: Record<string, unknown>
   extractedEvidence?: unknown
+  bugfixEvidenceSummary?: BugfixEvidenceSummary | null
+  bugfixScoreBreakdown?: BugfixScoreBreakdown | null
+  bugfixRootCause?: unknown
+  bugfixPrevention?: unknown
   silentNotes: unknown[]
   code: string
   language: string
@@ -401,6 +463,10 @@ function buildPrompt(data: {
     finalScores,
     aiValidation,
     extractedEvidence,
+    bugfixEvidenceSummary,
+    bugfixScoreBreakdown,
+    bugfixRootCause,
+    bugfixPrevention,
     silentNotes,
     code,
     language,
@@ -415,6 +481,15 @@ function buildPrompt(data: {
   const silentNotesContext = buildSilentNotesContext(
     silentNotes as Parameters<typeof buildSilentNotesContext>[0]
   )
+  const bugfixEvidenceContext =
+    scenarioType === "bugfix" && bugfixEvidenceSummary && bugfixScoreBreakdown
+      ? buildBugfixEvidenceContext({
+          summary: bugfixEvidenceSummary,
+          score: bugfixScoreBreakdown,
+          rootCause: typeof bugfixRootCause === "string" ? bugfixRootCause : "",
+          prevention: typeof bugfixPrevention === "string" ? bugfixPrevention : "",
+        })
+      : ""
 
   return `Generate specific, actionable interview feedback.
 
@@ -429,7 +504,12 @@ ${
 - Architecture: ${finalScores.problemSolving}/100
 - Scalability: ${finalScores.codeQuality}/100
 - Communication: ${finalScores.communication}/100`
-    : `- Understanding: ${finalScores.understanding}/100
+    : scenarioType === "bugfix"
+      ? `- Investigation: ${finalScores.understanding}/100
+- Debugging Process: ${finalScores.problemSolving}/100
+- Fix Quality: ${finalScores.codeQuality}/100
+- Communication: ${finalScores.communication}/100`
+      : `- Understanding: ${finalScores.understanding}/100
 - Problem-Solving: ${finalScores.problemSolving}/100
 - Code Quality: ${finalScores.codeQuality}/100
 - Communication: ${finalScores.communication}/100`
@@ -441,6 +521,7 @@ COMMUNICATION:
 - Complexity discussed: ${(aiValidation as Record<string, unknown>).complexityDiscussed ? "YES" : "NO"}
 
 ${evidenceSummary ? `EVIDENCE FROM CONVERSATION:\n${evidenceSummary}\n` : ""}
+${bugfixEvidenceContext}
 ${silentNotesContext}
 
 CODE (${language || "javascript"}):
@@ -460,4 +541,68 @@ COMPLEXITY:
 
 CRITICAL: Be SPECIFIC. Reference actual code patterns, conversation quotes, or test failures.
 Do NOT give generic advice. Make it clear you analyzed THIS session.`
+}
+
+function averageScores(values: number[]): number {
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+function mapBugfixScoreToFeedbackScores(score: BugfixScoreBreakdown) {
+  return {
+    understanding: averageScores([
+      score.reproductionDiscipline,
+      score.evidenceGathering,
+      score.hypothesisQuality,
+      score.rootCauseUnderstanding,
+    ]),
+    problemSolving: averageScores([
+      score.codebaseNavigation,
+      score.verificationDiscipline,
+      score.aiCollaborationQuality,
+    ]),
+    codeQuality: averageScores([
+      score.minimalFixQuality,
+      score.overEditControl,
+      score.regressionPrevention,
+    ]),
+    communication: score.communication,
+    overall: score.overall,
+  }
+}
+
+function buildBugfixEvidenceContext(params: {
+  summary: BugfixEvidenceSummary
+  score: BugfixScoreBreakdown
+  rootCause: string
+  prevention: string
+}): string {
+  const { summary, score, rootCause, prevention } = params
+
+  return `
+BUGFIX SESSION EVIDENCE:
+- Reproduced before editing: ${summary.reproducedBeforeEditing ? "YES" : "NO"}
+- Files inspected: ${summary.inspectedFiles.join(", ") || "none recorded"}
+- Tests/docs inspected: ${summary.inspectedTestOrDocs.join(", ") || "none recorded"}
+- Edited files: ${summary.editedFiles.join(", ") || "none recorded"}
+- Over-edited files: ${summary.overEditedFiles.join(", ") || "none"}
+- Visible test runs: ${summary.visibleTestsRun}
+- Final pass rate: ${Math.round(summary.finalPassRate)}%
+- Hypotheses captured: ${summary.hypothesisCount}
+- Root cause captured: ${rootCause.trim() || "not captured"}
+- Prevention idea captured: ${prevention.trim() || "not captured"}
+- AI partner uses: ${summary.aiPartnerUseCount}
+- AI shortcut requests: ${summary.aiShortcutCount}
+
+BUGFIX SCORE BREAKDOWN:
+- Reproduction Discipline: ${score.reproductionDiscipline}/100
+- Codebase Navigation: ${score.codebaseNavigation}/100
+- Evidence Gathering: ${score.evidenceGathering}/100
+- Hypothesis Quality: ${score.hypothesisQuality}/100
+- Minimal Fix Quality: ${score.minimalFixQuality}/100
+- Verification Discipline: ${score.verificationDiscipline}/100
+- Over-Edit Control: ${score.overEditControl}/100
+- Root Cause Understanding: ${score.rootCauseUnderstanding}/100
+- Regression Prevention: ${score.regressionPrevention}/100
+- AI Collaboration Quality: ${score.aiCollaborationQuality}/100
+`
 }

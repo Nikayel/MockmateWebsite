@@ -46,6 +46,9 @@ export interface StreamingFeedback {
   fixNext: string[]
   actionPlan: string[]
   silentNotes?: SilentNote[]
+  bugfixEvidenceSummary?: unknown
+  bugfixScoreBreakdown?: unknown
+  bugfixPostSessionReport?: unknown
   scores: StreamingScores
 }
 
@@ -105,6 +108,11 @@ export interface StreamingFeedbackRequest {
   efficiencyMetrics?: unknown
   submittedFromPhase?: string
   testsRanBeforeSubmit?: boolean
+  bugfixEvidenceEvents?: unknown[]
+  bugfixExpectedTouchedFiles?: string[]
+  bugfixHypothesis?: string
+  bugfixRootCause?: string
+  bugfixPrevention?: string
   // For mastery score calculation
   hintsUsed?: number
   elapsedTimeSeconds?: number
@@ -161,6 +169,9 @@ export function useStreamingFeedback() {
             },
             // Include generated silent notes from streaming (takes precedence)
             silentNotes: feedback.silentNotes || request.silentNotes || [],
+            bugfixEvidenceSummary: feedback.bugfixEvidenceSummary,
+            bugfixScoreBreakdown: feedback.bugfixScoreBreakdown,
+            bugfixPostSessionReport: feedback.bugfixPostSessionReport,
             testsPassed: request.testsPassed,
             testsTotal: request.testsTotal,
             timeSpentMinutes: Math.round((request.elapsedTimeSeconds || 1800) / 60),
