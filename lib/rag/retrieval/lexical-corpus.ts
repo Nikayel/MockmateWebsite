@@ -82,11 +82,17 @@ export async function fetchLexicalCorpus(
   options: LexicalCorpusOptions = {}
 ): Promise<BM25Document[]> {
   const limit = options.limit || RETRIEVAL_CONFIG.hybridSearch.corpusFetchLimit
-  let query: FirebaseFirestore.Query = adminDb.collection("text_embeddings").limit(limit)
+  let query: FirebaseFirestore.Query = adminDb.collection("text_embeddings")
 
   if (options.types?.length === 1) {
     query = query.where("type", "==", options.types[0])
   }
+
+  if (options.userId) {
+    query = query.where("metadata.userId", "==", options.userId)
+  }
+
+  query = query.limit(limit)
 
   const snapshot = await query.get()
   const documents: BM25Document[] = []
