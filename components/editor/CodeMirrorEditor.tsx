@@ -38,9 +38,21 @@ export interface CodeMirrorEditorProps {
 
 // Language indentation settings
 const languageIndentMap: Record<string, number> = {
-  python: 4, py: 4,
-  javascript: 2, typescript: 2, js: 2, jsx: 2, ts: 2, tsx: 2,
-  java: 4, cpp: 4, c: 4, csharp: 4, rust: 4, go: 4, rs: 4,
+  python: 4,
+  py: 4,
+  javascript: 2,
+  typescript: 2,
+  js: 2,
+  jsx: 2,
+  ts: 2,
+  tsx: 2,
+  java: 4,
+  cpp: 4,
+  c: 4,
+  csharp: 4,
+  rust: 4,
+  go: 4,
+  rs: 4,
 }
 
 const getIndentSize = (language: string): number => {
@@ -50,10 +62,10 @@ const getIndentSize = (language: string): number => {
 // Synchronous JavaScript extension (bundled with core - always available)
 const getJsExtension = (language: string): Extension | null => {
   const lang = language.toLowerCase()
-  if (['javascript', 'js', 'jsx'].includes(lang)) {
+  if (["javascript", "js", "jsx"].includes(lang)) {
     return javascript({ jsx: true, typescript: false })
   }
-  if (['typescript', 'ts', 'tsx'].includes(lang)) {
+  if (["typescript", "ts", "tsx"].includes(lang)) {
     return javascript({ jsx: true, typescript: true })
   }
   return null
@@ -239,175 +251,214 @@ const lightTheme = EditorView.theme({
 const customTheme = customDarkTheme
 
 // Base extensions for the editor
-const baseExtensions: Extension[] = [
-  EditorView.lineWrapping,
-]
+const baseExtensions: Extension[] = [EditorView.lineWrapping]
 
-function CodeMirrorEditorComponent({
-  value,
-  onChange,
-  language,
-  height = "100%",
-  readOnly = false,
-  theme = "dark",
-  className = "",
-  calmMode = false,
-}: CodeMirrorEditorProps) {
-  const editorRef = React.useRef<ReactCodeMirrorRef>(null)
-
-  // State for lazy-loaded language extension
-  const [loadedLangExt, setLoadedLangExt] = useState<Extension | null>(null)
-  const [langLoading, setLangLoading] = useState(false)
-
-  // Detect calm mode from DOM if not explicitly passed
-  const [isCalm, setIsCalm] = useState(calmMode)
-
-  // Lazy load language extension when language changes
-  useEffect(() => {
-    const lang = language.toLowerCase()
-
-    // Check if it's a JS/TS language (bundled, no lazy load needed)
-    const jsExt = getJsExtension(lang)
-    if (jsExt) {
-      setLoadedLangExt(jsExt)
-      return
-    }
-
-    // Check if we have a loader for this language
-    const loader = languageLoaders[lang]
-    if (loader) {
-      setLangLoading(true)
-      loader()
-        .then((ext) => {
-          setLoadedLangExt(ext)
-        })
-        .catch((err) => {
-          console.warn(`Failed to load language extension for ${lang}:`, err)
-          setLoadedLangExt(null)
-        })
-        .finally(() => setLangLoading(false))
-    } else {
-      // Unknown language, no extension
-      setLoadedLangExt(null)
-    }
-  }, [language])
-
-  useEffect(() => {
-    // Check if calm class is on document
-    const checkCalmMode = () => {
-      const hasCalmClass = document.documentElement.classList.contains('calm') ||
-        document.body.classList.contains('calm')
-      setIsCalm(calmMode || hasCalmClass)
-    }
-
-    checkCalmMode()
-
-    // Watch for class changes
-    const observer = new MutationObserver(checkCalmMode)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
-
-    return () => observer.disconnect()
-  }, [calmMode])
-
-  // Normalize theme to dark/light
-  const isDarkTheme = theme === "dark" || theme === "vs-dark" || theme === "hc-black" || !theme
-
-  // Get indentation size for the language
-  const indentSize = getIndentSize(language)
-
-  // Memoize extensions to prevent unnecessary re-renders
-  const extensions = useMemo(() => {
-    const exts: Extension[] = [...baseExtensions]
-
-    // Add loaded language extension
-    if (loadedLangExt) {
-      exts.push(loadedLangExt)
-    }
-
-    // Add indentUnit extension for proper auto-indentation
-    // This creates the correct number of spaces when pressing Enter
-    exts.push(indentUnit.of(" ".repeat(indentSize)))
-
-    // Add keymap for better indentation handling
-    exts.push(keymap.of([
-      // Enter key: insert newline with proper indentation
-      { key: "Enter", run: insertNewlineAndIndent },
-      // Tab: indent more
-      { key: "Tab", run: indentMore },
-      // Shift-Tab: indent less
-      { key: "Shift-Tab", run: indentLess },
-    ]))
-
-    // Add appropriate theme based on mode
-    if (isDarkTheme) {
-      if (isCalm) {
-        // Use calm theme for reduced visual stress
-        exts.push(calmDarkTheme, oneDark)
-      } else {
-        // Use standard calmer dark theme
-        exts.push(customDarkTheme, oneDark)
-      }
-    } else {
-      exts.push(lightTheme)
-    }
-
-    return exts
-  }, [loadedLangExt, indentSize, isDarkTheme, isCalm])
-
-  // Handle value changes
-  const handleChange = useCallback((val: string) => {
-    if (onChange) {
-      onChange(val)
-    }
-  }, [onChange])
-
-  // Convert height to CSS string
-  const cssHeight = typeof height === "number" ? `${height}px` : height
-
-  return (
-    <div
-      style={{
-        height: cssHeight,
-        width: "100%",
-      }}
-      className={className}
-    >
-      <CodeMirror
-        ref={editorRef}
-        value={value}
-        height="100%"
-        theme={isDarkTheme ? "dark" : "light"}
-        extensions={extensions}
-        onChange={handleChange}
-        readOnly={readOnly}
-        editable={!readOnly}
-        basicSetup={{
-          lineNumbers: true,
-          highlightActiveLineGutter: !readOnly,
-          highlightActiveLine: !readOnly,
-          foldGutter: false,
-          dropCursor: true,
-          allowMultipleSelections: true,
-          indentOnInput: true,
-          bracketMatching: true,
-          closeBrackets: true,
-          autocompletion: false,
-          rectangularSelection: true,
-          crosshairCursor: false,
-          highlightSelectionMatches: true,
-          closeBracketsKeymap: true,
-          searchKeymap: true,
-          foldKeymap: false,
-          completionKeymap: false,
-          lintKeymap: false,
-          // Use language-aware tabSize (Python=4, JS/TS=2, etc.)
-          tabSize: indentSize,
-        }}
-      />
-    </div>
-  )
+export interface CodeMirrorEditorRef {
+  view: EditorView | undefined
+  gotoLine: (lineNum: number) => void
 }
+
+const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirrorEditorProps>(
+  (
+    {
+      value,
+      onChange,
+      language,
+      height = "100%",
+      readOnly = false,
+      theme = "dark",
+      className = "",
+      calmMode = false,
+    }: CodeMirrorEditorProps,
+    ref
+  ) => {
+    const editorRef = React.useRef<ReactCodeMirrorRef>(null)
+
+    React.useImperativeHandle(ref, () => ({
+      get view() {
+        return editorRef.current?.view
+      },
+      gotoLine: (lineNum: number) => {
+        const view = editorRef.current?.view
+        if (view) {
+          try {
+            const doc = view.state.doc
+            const clampedLine = Math.max(1, Math.min(lineNum, doc.lines))
+            const line = doc.line(clampedLine)
+            view.dispatch({
+              selection: { anchor: line.from, head: line.from },
+              effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+            })
+            view.focus()
+          } catch (e) {
+            console.warn("Failed to scroll to line:", e)
+          }
+        }
+      },
+    }))
+
+    // State for lazy-loaded language extension
+    const [loadedLangExt, setLoadedLangExt] = useState<Extension | null>(null)
+    const [langLoading, setLangLoading] = useState(false)
+
+    // Detect calm mode from DOM if not explicitly passed
+    const [isCalm, setIsCalm] = useState(calmMode)
+
+    // Lazy load language extension when language changes
+    useEffect(() => {
+      const lang = language.toLowerCase()
+
+      // Check if it's a JS/TS language (bundled, no lazy load needed)
+      const jsExt = getJsExtension(lang)
+      if (jsExt) {
+        setLoadedLangExt(jsExt)
+        return
+      }
+
+      // Check if we have a loader for this language
+      const loader = languageLoaders[lang]
+      if (loader) {
+        setLangLoading(true)
+        loader()
+          .then((ext) => {
+            setLoadedLangExt(ext)
+          })
+          .catch((err) => {
+            console.warn(`Failed to load language extension for ${lang}:`, err)
+            setLoadedLangExt(null)
+          })
+          .finally(() => setLangLoading(false))
+      } else {
+        // Unknown language, no extension
+        setLoadedLangExt(null)
+      }
+    }, [language])
+
+    useEffect(() => {
+      // Check if calm class is on document
+      const checkCalmMode = () => {
+        const hasCalmClass =
+          document.documentElement.classList.contains("calm") ||
+          document.body.classList.contains("calm")
+        setIsCalm(calmMode || hasCalmClass)
+      }
+
+      checkCalmMode()
+
+      // Watch for class changes
+      const observer = new MutationObserver(checkCalmMode)
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
+      observer.observe(document.body, { attributes: true, attributeFilter: ["class"] })
+
+      return () => observer.disconnect()
+    }, [calmMode])
+
+    // Normalize theme to dark/light
+    const isDarkTheme = theme === "dark" || theme === "vs-dark" || theme === "hc-black" || !theme
+
+    // Get indentation size for the language
+    const indentSize = getIndentSize(language)
+
+    // Memoize extensions to prevent unnecessary re-renders
+    const extensions = useMemo(() => {
+      const exts: Extension[] = [...baseExtensions]
+
+      // Add loaded language extension
+      if (loadedLangExt) {
+        exts.push(loadedLangExt)
+      }
+
+      // Add indentUnit extension for proper auto-indentation
+      // This creates the correct number of spaces when pressing Enter
+      exts.push(indentUnit.of(" ".repeat(indentSize)))
+
+      // Add keymap for better indentation handling
+      exts.push(
+        keymap.of([
+          // Enter key: insert newline with proper indentation
+          { key: "Enter", run: insertNewlineAndIndent },
+          // Tab: indent more
+          { key: "Tab", run: indentMore },
+          // Shift-Tab: indent less
+          { key: "Shift-Tab", run: indentLess },
+        ])
+      )
+
+      // Add appropriate theme based on mode
+      if (isDarkTheme) {
+        if (isCalm) {
+          // Use calm theme for reduced visual stress
+          exts.push(calmDarkTheme, oneDark)
+        } else {
+          // Use standard calmer dark theme
+          exts.push(customDarkTheme, oneDark)
+        }
+      } else {
+        exts.push(lightTheme)
+      }
+
+      return exts
+    }, [loadedLangExt, indentSize, isDarkTheme, isCalm])
+
+    // Handle value changes
+    const handleChange = useCallback(
+      (val: string) => {
+        if (onChange) {
+          onChange(val)
+        }
+      },
+      [onChange]
+    )
+
+    // Convert height to CSS string
+    const cssHeight = typeof height === "number" ? `${height}px` : height
+
+    return (
+      <div
+        style={{
+          height: cssHeight,
+          width: "100%",
+        }}
+        className={className}
+      >
+        <CodeMirror
+          ref={editorRef}
+          value={value}
+          height="100%"
+          theme={isDarkTheme ? "dark" : "light"}
+          extensions={extensions}
+          onChange={handleChange}
+          readOnly={readOnly}
+          editable={!readOnly}
+          basicSetup={{
+            lineNumbers: true,
+            highlightActiveLineGutter: !readOnly,
+            highlightActiveLine: !readOnly,
+            foldGutter: false,
+            dropCursor: true,
+            allowMultipleSelections: true,
+            indentOnInput: true,
+            bracketMatching: true,
+            closeBrackets: true,
+            autocompletion: false,
+            rectangularSelection: true,
+            crosshairCursor: false,
+            highlightSelectionMatches: true,
+            closeBracketsKeymap: true,
+            searchKeymap: true,
+            foldKeymap: false,
+            completionKeymap: false,
+            lintKeymap: false,
+            // Use language-aware tabSize (Python=4, JS/TS=2, etc.)
+            tabSize: indentSize,
+          }}
+        />
+      </div>
+    )
+  }
+)
+
+CodeMirrorEditorComponent.displayName = "CodeMirrorEditor"
 
 // Export memoized component
 export const CodeMirrorEditor = memo(CodeMirrorEditorComponent)
@@ -432,10 +483,12 @@ export class CodeMirrorErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="flex items-center justify-center h-full bg-gray-900 text-red-400">
-          Editor failed to load
-        </div>
+      return (
+        this.props.fallback || (
+          <div className="flex h-full items-center justify-center bg-gray-900 text-red-400">
+            Editor failed to load
+          </div>
+        )
       )
     }
     return this.props.children
