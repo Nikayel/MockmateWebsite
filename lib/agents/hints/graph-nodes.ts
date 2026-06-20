@@ -5,7 +5,7 @@ import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
 import { calculateStruggleLevel, getRecommendedRevealLevel } from "./struggle-calculator"
 import { diagnoseHintNeed as diagnoseHintNeedWithLlm } from "./diagnosis"
 import { generateHintId } from "./code-analyzer"
-import { generateLLMHint } from "./llm-generator"
+import { generateLLMHintsForLevels } from "./llm-generator"
 import { generateGenericHint, generatePatternHints } from "./pattern-hints"
 import type { GeneratedHint, HintLevel } from "./types"
 import type { HintGraphStateType } from "./graph-state"
@@ -49,33 +49,29 @@ export async function generateLlmHints(state: HintGraphStateType) {
     levelsToGenerate.push(level as HintLevel)
   }
 
-  const hints = await Promise.all(
-    levelsToGenerate.map((level) =>
-      generateLLMHint({
-        problemTitle: request.problemTitle,
-        problemText: request.problemText,
-        problemPattern: request.problemPattern,
-        difficulty: request.difficulty,
-        userCode: request.userCode,
-        language: request.language,
-        level,
-        category: level <= 2 ? "conceptual" : category,
-        trigger: request.trigger || "manual",
-        struggleLevel,
-        userId: request.userId,
-        existingHints: request.existingHints,
-        testFailures: request.testResults?.failingTests,
-        optimalComplexity: request.optimalComplexity,
-        constraints: request.constraints,
-      }).catch(() => null)
-    )
-  )
-
-  const validHints = hints.filter((hint): hint is GeneratedHint => hint !== null)
+  const hints = await generateLLMHintsForLevels({
+    problemTitle: request.problemTitle,
+    problemText: request.problemText,
+    problemPattern: request.problemPattern,
+    difficulty: request.difficulty,
+    userCode: request.userCode,
+    language: request.language,
+    levels: levelsToGenerate.map((level) => ({
+      level,
+      category: level <= 2 ? "conceptual" : category,
+    })),
+    trigger: request.trigger || "manual",
+    struggleLevel,
+    userId: request.userId,
+    existingHints: request.existingHints,
+    testFailures: request.testResults?.failingTests,
+    optimalComplexity: request.optimalComplexity,
+    constraints: request.constraints,
+  }).catch(() => [])
 
   return {
-    hints: validHints,
-    llmUsed: validHints.length > 0,
+    hints,
+    llmUsed: hints.length > 0,
   }
 }
 export async function addPatternHints(state: HintGraphStateType) {
