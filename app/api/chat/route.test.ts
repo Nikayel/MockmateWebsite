@@ -160,6 +160,63 @@ describe("/api/chat route", () => {
     expect(generateAIResponse).not.toHaveBeenCalled()
   })
 
+  it("continues proactive interviewer checks after enough silence", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        isProactive: true,
+        currentCode: "let i = 0",
+        timeSinceLastMessage: 120,
+        scenarioTitle: "Two Sum",
+        scenarioType: "dsa",
+        sessionId: "session-1",
+        userId: "user-1",
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.data).toEqual(
+      expect.objectContaining({
+        reply: "Mocked assistant reply",
+        provider: "gemini-lite",
+      })
+    )
+    expect(generateAIResponse).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(generateAIResponse).mock.calls[0][1]).toContain("[NATURAL CHECK-IN]")
+  })
+
+  it("continues proactive interviewer checks after substantial code", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        isProactive: true,
+        currentCode:
+          "function twoSum(nums, target) { const seen = new Map(); for (let i = 0; i < nums.length; i++) { const need = target - nums[i]; } }",
+        timeSinceLastMessage: 10,
+        scenarioTitle: "Two Sum",
+        scenarioType: "dsa",
+        sessionId: "session-1",
+        userId: "user-1",
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.data).toEqual(
+      expect.objectContaining({
+        reply: "Mocked assistant reply",
+        provider: "gemini-lite",
+      })
+    )
+    expect(generateAIResponse).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(generateAIResponse).mock.calls[0][1]).toContain("[NATURAL CHECK-IN]")
+  })
+
   it("stays silent after the interviewer already ended the session", async () => {
     const { generateAIResponse } = await setupMocks()
     const { POST } = await import("./route")

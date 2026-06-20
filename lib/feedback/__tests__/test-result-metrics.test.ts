@@ -33,4 +33,33 @@ describe("calculateFeedbackTestMetrics", () => {
       serviceErrorCount: 0,
     })
   })
+
+  it("does not classify normal assertion failures as service errors", () => {
+    const metrics = calculateFeedbackTestMetrics([
+      {
+        description: "wrong output",
+        passed: false,
+        error: "Expected [0,1] but received []",
+        actual: "[]",
+      },
+    ])
+
+    expect(metrics.testsPassed).toBe(0)
+    expect(metrics.testsTotal).toBe(1)
+    expect(metrics.serviceErrorCount).toBe(0)
+  })
+
+  it("keeps null actual values valid when there is no execution error", () => {
+    const metrics = calculateFeedbackTestMetrics([
+      {
+        description: "valid null output",
+        passed: true,
+        actual: "null",
+      },
+    ])
+
+    expect(metrics.testsPassed).toBe(1)
+    expect(metrics.testsTotal).toBe(1)
+    expect(metrics.serviceErrorCount).toBe(0)
+  })
 })
