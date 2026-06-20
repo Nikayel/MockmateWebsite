@@ -8,8 +8,9 @@
  *
  * Uses sliding window algorithm for smooth rate limiting.
  *
- * IMPORTANT: This module now uses distributed storage (Firestore) in production
- * to ensure rate limits work correctly across serverless instances.
+ * IMPORTANT: Production should use Upstash Redis for distributed rate limiting.
+ * If Redis is unavailable, this module fails open to in-memory tracking and
+ * logs loudly rather than creating Firestore transaction hot spots.
  */
 
 import { adminDb } from "./firebase-admin"
@@ -73,9 +74,11 @@ const concurrentRequests = new Map<string, number>()
 
 const WINDOW_SIZE_MS = 60 * 1000 // 1 minute
 
-// Check if we should use distributed (Firestore) rate limiting
+const isProduction = process.env.NODE_ENV === "production"
+
+// Firestore distributed rate limiting is intentionally disabled in production.
 const useDistributedRateLimiting =
-  process.env.NODE_ENV === "production" || process.env.USE_DISTRIBUTED_RATE_LIMIT === "true"
+  !isProduction && process.env.USE_DISTRIBUTED_RATE_LIMIT === "true"
 
 // Redis configuration for distributed rate limiting
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL || ""
@@ -84,6 +87,30 @@ const hasRedis = !!(redisUrl && redisToken)
 
 if (typeof window === "undefined" && hasRedis) {
   logger.info("[Rate Limiter] Using Upstash Redis for distributed rate limiting")
+}
+
+if (typeof window === "undefined" && isProduction && !hasRedis) {
+  logger.error(
+    "[Rate Limiter] Production Redis is not configured; failing open with in-memory tracking"
+  )
+}
+
+function getInMemoryRateLimitState(userId: string): {
+  requestCount: number
+  tokenCount: number
+  concurrent: number
+  oldestTimestamp: number | null
+} {
+  return {
+    requestCount: getRequestCount(userId),
+    tokenCount: getTokenCount(userId),
+    concurrent: concurrentRequests.get(userId) || 0,
+    oldestTimestamp: getOldestRequestTime(userId),
+  }
+}
+
+function shouldFallbackToFirestore(): boolean {
+  return useDistributedRateLimiting
 }
 
 /**
@@ -149,20 +176,15 @@ async function getRedisRateLimitState(userId: string): Promise<{
       oldestTimestamp,
     }
   } catch (error) {
-    logger.error("Failed to get Redis rate limit state, falling back to Firestore", {
+    logger.error("Failed to get Redis rate limit state, falling back", {
       userId,
       error,
+      fallback: shouldFallbackToFirestore() ? "firestore" : "memory",
     })
-    if (useDistributedRateLimiting) {
+    if (shouldFallbackToFirestore()) {
       return getDistributedRateLimitState(userId)
-    } else {
-      return {
-        requestCount: getRequestCount(userId),
-        tokenCount: getTokenCount(userId),
-        concurrent: concurrentRequests.get(userId) || 0,
-        oldestTimestamp: getOldestRequestTime(userId),
-      }
     }
+    return getInMemoryRateLimitState(userId)
   }
 }
 
@@ -176,7 +198,7 @@ async function recordRedisRequestStart(userId: string, estimatedTokens: number):
   const member = `${now}:${estimatedTokens}`
 
   try {
-    await fetch(`${redisUrl}`, {
+    const response = await fetch(`${redisUrl}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${redisToken}`,
@@ -189,9 +211,12 @@ async function recordRedisRequestStart(userId: string, estimatedTokens: number):
         ["EXPIRE", concurrentKey, (WINDOW_SIZE_MS / 1000 + 10).toFixed(0)],
       ]),
     })
+    if (!response.ok) {
+      throw new Error(`Upstash Redis pipeline error: ${response.statusText}`)
+    }
   } catch (error) {
     logger.error("Failed to record Redis request start, falling back", { userId, error })
-    if (useDistributedRateLimiting) {
+    if (shouldFallbackToFirestore()) {
       await recordDistributedRequestStart(userId, estimatedTokens)
     } else {
       recordRequestStart(userId, estimatedTokens)
@@ -205,7 +230,7 @@ async function recordRedisRequestStart(userId: string, estimatedTokens: number):
 async function recordRedisRequestEnd(userId: string): Promise<void> {
   const concurrentKey = `rate_limiter:concurrent:${userId}`
   try {
-    await fetch(`${redisUrl}`, {
+    const response = await fetch(`${redisUrl}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${redisToken}`,
@@ -213,9 +238,12 @@ async function recordRedisRequestEnd(userId: string): Promise<void> {
       },
       body: JSON.stringify([["DECR", concurrentKey]]),
     })
+    if (!response.ok) {
+      throw new Error(`Upstash Redis pipeline error: ${response.statusText}`)
+    }
   } catch (error) {
     logger.error("Failed to record Redis request end, falling back", { userId, error })
-    if (useDistributedRateLimiting) {
+    if (shouldFallbackToFirestore()) {
       await recordDistributedRequestEnd(userId)
     } else {
       recordRequestEnd(userId)
@@ -331,7 +359,8 @@ async function recordDistributedRequestEnd(userId: string): Promise<void> {
 
 /**
  * Check if a request is allowed under rate limits
- * Uses distributed storage (Firestore) in production for correct cross-instance enforcement
+ * Uses Redis in production when configured. Firestore distributed mode is limited
+ * to non-production explicit testing because it uses per-user transactions.
  */
 export async function checkRateLimit(
   userId: string,
@@ -345,29 +374,17 @@ export async function checkRateLimit(
   const now = Date.now()
 
   // Get rate limit state (Redis, Firestore distributed, or in-memory)
-  const isProduction = process.env.NODE_ENV === "production"
-  if (isProduction && !hasRedis && !useDistributedRateLimiting) {
-    const errorMessage =
-      "SECURITY ERROR: No distributed rate limiting configured in production (Rate Limiter). " +
-      "Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured. " +
-      "Set ALLOW_INSECURE_RATE_LIMIT=true to override (NOT RECOMMENDED)."
-
-    if (process.env.ALLOW_INSECURE_RATE_LIMIT !== "true") {
-      logger.error(errorMessage)
-      throw new Error(errorMessage)
-    }
+  if (isProduction && !hasRedis) {
+    logger.error("[Rate Limiter] Production Redis unavailable; using in-memory fail-open state", {
+      userId,
+    })
   }
 
   const state = hasRedis
     ? await getRedisRateLimitState(userId)
     : useDistributedRateLimiting
       ? await getDistributedRateLimitState(userId)
-      : {
-          requestCount: getRequestCount(userId),
-          tokenCount: getTokenCount(userId),
-          concurrent: concurrentRequests.get(userId) || 0,
-          oldestTimestamp: getOldestRequestTime(userId),
-        }
+      : getInMemoryRateLimitState(userId)
 
   const buildUsage = (budgetPercent: number = 0) => ({
     requestsThisMinute: state.requestCount,
