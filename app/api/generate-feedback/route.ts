@@ -40,6 +40,7 @@ import {
   buildSilentNotesContext,
   formatSilentNotesForFeedback,
 } from "@/lib/feedback"
+import { calculateFeedbackTestMetrics } from "@/lib/feedback/test-result-metrics"
 // Import structured extraction for grounded feedback
 import {
   extractConversationEvidence,
@@ -149,25 +150,8 @@ export async function POST(request: NextRequest) {
     // Calculate test metrics - EXCLUDE service errors from both passed and total counts
     // Service errors (e.g., "Code execution service is busy") should not count as failed tests
     // because they represent infrastructure issues, not code problems
-    const validTests =
-      testResults?.filter(
-        (t: any) =>
-          !t.error?.includes("service is busy") &&
-          !t.error?.includes("timed out") &&
-          !t.error?.includes("Service unavailable") &&
-          t.actual !== "null" // null actual value with error indicates service failure
-      ) || []
-    const serviceErrorTests =
-      testResults?.filter(
-        (t: any) =>
-          t.error?.includes("service is busy") ||
-          t.error?.includes("timed out") ||
-          t.error?.includes("Service unavailable") ||
-          (t.error && t.actual === "null")
-      ) || []
-    const testsPassed = validTests.filter((t: any) => t.passed).length
-    const testsTotal = validTests.length
-    const serviceErrorCount = serviceErrorTests.length
+    const { testsPassed, testsTotal, serviceErrorCount, serviceErrorTests } =
+      calculateFeedbackTestMetrics(testResults)
 
     // Log if we filtered out service errors
     if (serviceErrorCount > 0) {
@@ -176,7 +160,7 @@ export async function POST(request: NextRequest) {
         originalTotal: testResults?.length || 0,
         validTotal: testsTotal,
         serviceErrors: serviceErrorCount,
-        serviceErrorDetails: serviceErrorTests.map((t: any) => ({
+        serviceErrorDetails: serviceErrorTests.map((t) => ({
           description: t.description,
           error: t.error?.substring(0, 100),
         })),
