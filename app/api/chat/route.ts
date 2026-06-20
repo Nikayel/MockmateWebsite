@@ -72,6 +72,70 @@ type ConversationTrackerWithExtraction = ConversationTracker & {
   lastExtractionAt?: number
 }
 
+type ConversationExtractionJob = {
+  sessionId?: string
+  recentMessages: Array<{ role: string; content: string }>
+  currentTracker: ConversationTracker
+  messageCount: number
+  lastExtractionAt: number
+  currentMessage: string
+  optimalComplexityContext?: {
+    optimalTimeComplexity: string
+    optimalSpaceComplexity: string
+  }
+}
+
+function runConversationExtractionAfterResponse(job: ConversationExtractionJob | null): void {
+  if (!job) return
+
+  void (async () => {
+    try {
+      if (getFlag("USE_EXTRACTION_SERVICE")) {
+        const result = await extractionService({
+          messages: job.recentMessages,
+          currentTracker: job.currentTracker,
+          messageCount: job.messageCount,
+          lastExtractionAt: job.lastExtractionAt,
+          currentMessage: job.currentMessage,
+          optimalComplexity: job.optimalComplexityContext,
+        })
+
+        if (result.didRun) {
+          logger.info("[Chat API] Completed post-response extraction service job", {
+            sessionId: job.sessionId,
+            confidence: result.confidence,
+            silentNotesCount: result.tracker.silentNotes?.length || 0,
+          })
+        }
+        return
+      }
+
+      if (!shouldRunExtraction(job.messageCount, job.lastExtractionAt, job.currentMessage)) {
+        return
+      }
+
+      const extractionUpdates = await extractConversationState(
+        job.recentMessages,
+        job.currentTracker,
+        job.optimalComplexityContext
+      )
+
+      if (Object.keys(extractionUpdates).length > 0) {
+        logger.info("[Chat API] Completed post-response LLM extraction job", {
+          sessionId: job.sessionId,
+          extractionUpdates,
+          silentNotesCount: extractionUpdates.silentNotes?.length || 0,
+        })
+      }
+    } catch (extractionError) {
+      logger.warn("[Chat API] Post-response extraction failed", {
+        sessionId: job.sessionId,
+        error: extractionError,
+      })
+    }
+  })()
+}
+
 export async function POST(request: NextRequest) {
   // Apply IP-based rate limiting (first layer - prevents abuse)
   const rateLimitResponse = await chatRateLimit(request)
@@ -163,108 +227,46 @@ export async function POST(request: NextRequest) {
 
     // Note: Size validation is now handled by Zod schema (message: 10KB, currentCode: 100KB)
 
-    // LLM-based conversation extraction for more accurate tracking
-    // Only run for interviewer mode and when key signals detected
-    let enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
+    // LLM-based conversation extraction is prepared here but runs after the
+    // response is generated so chat latency does not wait on a secondary LLM call.
+    const enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
     const ENABLE_LLM_EXTRACTION = true
-    if (
-      ENABLE_LLM_EXTRACTION &&
-      role === "interviewer" &&
-      conversationTracker &&
-      context &&
-      message
-    ) {
-      const messageCount = Array.isArray(context) ? context.length : 0
-      const lastExtraction =
-        (conversationTracker as unknown as ConversationTrackerWithExtraction).lastExtractionAt || 0
-
-      // Feature flag: Use extraction service or direct call
-      if (getFlag("USE_EXTRACTION_SERVICE")) {
-        try {
-          // Convert context to extraction format
-          const recentMessages = (context as Array<{ type: string; message: string }>)
-            .slice(-10)
-            .map((m) => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-            }))
-
-          // Build optimal complexity context for real-time validation
-          const optimalComplexityContext = solutionComplexity
-            ? {
-                optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
-                optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
-              }
-            : undefined
-
-          const result = await extractionService({
-            messages: recentMessages,
-            currentTracker: conversationTracker as unknown as ConversationTracker,
-            messageCount,
-            lastExtractionAt: lastExtraction,
-            currentMessage: message,
-            optimalComplexity: optimalComplexityContext,
-          })
-
-          if (result.didRun) {
-            enhancedTracker = result.tracker
-            logger.info("[Chat API] Enhanced tracker with extraction service", {
-              confidence: result.confidence,
-              silentNotesCount: result.tracker.silentNotes?.length || 0,
-            })
-          }
-        } catch (extractionError) {
-          logger.warn("[Chat API] Extraction service failed, using original tracker", {
-            error: extractionError,
-          })
-        }
-      } else {
-        // Original code path
-        if (shouldRunExtraction(messageCount, lastExtraction, message)) {
-          try {
-            // Convert context to extraction format
-            const recentMessages = (context as Array<{ type: string; message: string }>)
+    const extractionJob: ConversationExtractionJob | null =
+      ENABLE_LLM_EXTRACTION && role === "interviewer" && conversationTracker && context && message
+        ? {
+            sessionId,
+            recentMessages: (context as Array<{ type: string; message: string }>)
               .slice(-10)
               .map((m) => ({
                 role: m.type === "user" ? "candidate" : "interviewer",
                 content: m.message,
-              }))
-
-            // Build optimal complexity context for real-time validation
-            // This allows the extraction to detect when user claims wrong complexity
-            const optimalComplexityContext = solutionComplexity
+              })),
+            currentTracker: conversationTracker as unknown as ConversationTracker,
+            messageCount: Array.isArray(context) ? context.length : 0,
+            lastExtractionAt:
+              (conversationTracker as unknown as ConversationTrackerWithExtraction)
+                .lastExtractionAt || 0,
+            currentMessage: message,
+            optimalComplexityContext: solutionComplexity
               ? {
                   optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
                   optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
                 }
-              : undefined
-
-            // Run async extraction (non-blocking for response, enhances future requests)
-            // Now also validates complexity claims and adds silent notes for mistakes
-            const extractionUpdates = await extractConversationState(
-              recentMessages,
-              conversationTracker as unknown as ConversationTracker,
-              optimalComplexityContext
-            )
-
-            // Merge extraction results with existing tracker
-            if (Object.keys(extractionUpdates).length > 0) {
-              enhancedTracker = {
-                ...(conversationTracker as unknown as ConversationTracker),
-                ...extractionUpdates,
-              }
-              logger.info("[Chat API] Enhanced tracker with LLM extraction", {
-                extractionUpdates,
-                silentNotesCount: extractionUpdates.silentNotes?.length || 0,
-              })
-            }
-          } catch (extractionError) {
-            // Extraction failed, continue with original tracker
-            logger.warn("[Chat API] LLM extraction failed, using regex-based tracker", {
-              error: extractionError,
-            })
+              : undefined,
           }
-        }
+        : null
+
+    if (extractionJob) {
+      if (getFlag("USE_EXTRACTION_SERVICE")) {
+        logger.debug("[Chat API] Deferred extraction service until after response", { sessionId })
+      } else if (
+        shouldRunExtraction(
+          extractionJob.messageCount,
+          extractionJob.lastExtractionAt,
+          extractionJob.currentMessage
+        )
+      ) {
+        logger.debug("[Chat API] Deferred LLM extraction until after response", { sessionId })
       }
     }
 
@@ -1006,6 +1008,8 @@ Generate a compliant response NOW:`
         })
       })
     }
+
+    runConversationExtractionAfterResponse(extractionJob)
 
     // End request tracking for tier-based rate limiting
     if (rateLimitUserId !== "anonymous") {
