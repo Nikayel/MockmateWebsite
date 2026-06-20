@@ -113,6 +113,8 @@ export interface StreamingFeedbackRequest {
   bugfixHypothesis?: string
   bugfixRootCause?: string
   bugfixPrevention?: string
+  bugfixRootCauseRubric?: string[]
+  bugfixGroundTruth?: string
   // For mastery score calculation
   hintsUsed?: number
   elapsedTimeSeconds?: number

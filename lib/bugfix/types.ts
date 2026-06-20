@@ -75,6 +75,9 @@ export interface BugfixEvidenceSummary {
   rootCauseExplained: boolean
   aiShortcutCount: number
   aiPartnerUseCount: number
+  hypothesisText: string
+  rootCauseText: string
+  preventionText: string
 }
 
 export interface BugfixScoreBreakdown {

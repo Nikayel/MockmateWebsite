@@ -62,6 +62,7 @@ function formatNotificationRecipient(user) {
     ],
   },
   expectedBehavior: "The formatter should handle null users and missing fields without throwing.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The code dereferences user.email, user.firstName, and user.lastName without checking whether they exist.",
   hints: [

@@ -36,6 +36,7 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
+import type { BugFixScenario } from "@/lib/scenarios/types"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { isExecutionServiceError } from "@/lib/piston"
 import { executeScenarioInBrowser } from "@/lib/workspace-execution"
@@ -74,7 +75,13 @@ import {
   toWorkspaceScenarioFiles,
 } from "./_utils/workspace"
 import type { WorkspaceContextFile } from "./_types"
-import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
+import {
+  createBugfixEvidenceEvent,
+  summarizeBugfixEvidence,
+  calculateBugfixEvidenceScore,
+  type BugfixEvidenceEvent,
+} from "@/lib/bugfix"
+import { calculateUserScore } from "@/lib/scoring"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -606,8 +613,11 @@ function InterviewPageContent() {
         })
       } else {
         toast.error("Feedback generation failed", {
-          description: "Something went wrong. Please try ending the session again.",
+          description: "Applying automated fallback scoring.",
         })
+        if (lastFeedbackRequestRef.current) {
+          applyFallbackFeedback(lastFeedbackRequestRef.current)
+        }
       }
     }
 
@@ -676,7 +686,97 @@ function InterviewPageContent() {
   const [protectedElements, setProtectedElements] = useState<ReturnType<
     typeof extractProtectedElements
   > | null>(null)
-  const [starterCode, setStarterCode] = useState<string>("")
+  const [starterCode, setStarterCode] = useState("")
+
+  // Track the last feedback request for fallback scoring if streaming fails
+  const lastFeedbackRequestRef = useRef<any>(null)
+
+  const applyFallbackFeedback = useCallback(
+    async (request: any) => {
+      try {
+        const isBugfix = request.scenarioType === "bugfix"
+        let mappedBreakdown: any
+        let performanceScore: number
+
+        if (isBugfix) {
+          const evidenceSummary = summarizeBugfixEvidence({
+            events: request.bugfixEvidenceEvents || [],
+            expectedTouchedFiles: request.bugfixExpectedTouchedFiles || [],
+          })
+          const bugfixScores = calculateBugfixEvidenceScore(evidenceSummary)
+          performanceScore = bugfixScores.overall
+          mappedBreakdown = {
+            understandingScore: bugfixScores.rootCauseUnderstanding,
+            problemSolvingScore: bugfixScores.evidenceGathering,
+            codeQualityScore: bugfixScores.minimalFixQuality,
+            communicationScore: bugfixScores.communication,
+          }
+        } else {
+          const interactionMetrics: any = {
+            hintsUsed: request.hintsUsed || 0,
+            timeSpent: request.elapsedTimeSeconds || 0,
+            testCasesPassed: request.testsPassed || 0,
+            testCasesTotal: request.testsTotal || 0,
+            problemDifficulty: request.scenarioDifficulty || "medium",
+            problemType: request.scenarioType || "dsa",
+          }
+
+          const dsaScores = calculateUserScore(interactionMetrics)
+          performanceScore = dsaScores.overallScore
+          mappedBreakdown = {
+            understandingScore: dsaScores.understandingScore,
+            problemSolvingScore: dsaScores.problemSolvingScore,
+            codeQualityScore: dsaScores.codeQualityScore,
+            communicationScore: dsaScores.communicationScore,
+          }
+        }
+
+        setScoreBreakdown(mappedBreakdown)
+        setPerformanceScore(performanceScore)
+
+        const fallbackText =
+          "Automated scoring applied. Detailed AI feedback is unavailable due to a service error."
+        setComprehensiveFeedback(fallbackText)
+
+        if (currentSessionId) {
+          await fetch("/api/feedback/persist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: request.sessionId,
+              userId: request.userId,
+              scores: {
+                understanding: mappedBreakdown.understandingScore,
+                problemSolving: mappedBreakdown.problemSolvingScore,
+                codeQuality: mappedBreakdown.codeQualityScore,
+                communication: mappedBreakdown.communicationScore,
+                overall: performanceScore,
+              },
+              feedback: {
+                raw: fallbackText,
+                tldr: "Service Error",
+                whatWorked: [],
+                fixNext: [],
+                actionPlan: [],
+              },
+              testsPassed: request.testsPassed,
+              testsTotal: request.testsTotal,
+              timeSpentMinutes: Math.round((request.elapsedTimeSeconds || 0) / 60),
+              hintsUsed: request.hintsUsed || 0,
+              difficulty: request.scenarioDifficulty || "medium",
+              scenarioType: request.scenarioType || "dsa",
+              scenarioTitle: request.scenarioTitle || "Unknown",
+              scenarioId: request.scenarioId,
+              scenarioPattern: request.scenarioPattern,
+            }),
+          })
+        }
+      } catch (e) {
+        console.error("Fallback logic failed", e)
+      }
+    },
+    [currentSessionId]
+  )
 
   // Roadmap tracking
   const isFromRoadmap = searchParams?.get("roadmap") === "true"
@@ -3264,10 +3364,19 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             bugfixHypothesis,
             bugfixRootCause,
             bugfixPrevention,
+            bugfixRootCauseRubric:
+              selectedScenario?.type === "bugfix"
+                ? (selectedScenario as BugFixScenario).rootCauseRubric
+                : [],
+            bugfixGroundTruth:
+              selectedScenario?.type === "bugfix"
+                ? (selectedScenario as BugFixScenario).bugDescription
+                : "",
           }
 
           // Start streaming feedback - scores come first, then rich feedback
           // The useEffect above handles updating state as events stream in
+          lastFeedbackRequestRef.current = feedbackRequest
           streamingFeedback.startStreaming(feedbackRequest)
 
           // Set initial values while streaming
@@ -3281,29 +3390,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
-          const passRate = testSummary.passRate
-          const fallbackScores = {
-            understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
-            problemSolving: Math.round(passRate),
-            codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
-            communication: 50,
+          toast.error("Feedback generation failed", {
+            description: "Applying automated fallback scoring.",
+          })
+          if (lastFeedbackRequestRef.current) {
+            applyFallbackFeedback(lastFeedbackRequestRef.current)
           }
-          scoreBreakdownData = fallbackScores
-          calculatedPerformanceScore = Math.round(
-            fallbackScores.understanding * 0.25 +
-              fallbackScores.problemSolving * 0.25 +
-              fallbackScores.codeQuality * 0.3 +
-              fallbackScores.communication * 0.2
-          )
-          setScoreBreakdown({
-            understandingScore: fallbackScores.understanding,
-            problemSolvingScore: fallbackScores.problemSolving,
-            codeQualityScore: fallbackScores.codeQuality,
-            communicationScore: fallbackScores.communication,
-          })
-          toast.warning("Feedback generation delayed", {
-            description: "Using basic feedback. Full analysis may be available shortly.",
-          })
         }
       }
 
@@ -4948,17 +5040,17 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       {/* Interview Interface */}
       {!showScenarioBrowser && (
         <section
-          className={`flex flex-col bg-gradient-to-b from-gray-900 to-black pt-2 pb-2 ${
+          className={`flex flex-col bg-gradient-to-b from-gray-900 to-black pt-1.5 pb-1.5 ${
             isResultView
               ? "min-h-screen overflow-x-hidden overflow-y-auto"
               : "h-screen overflow-hidden"
           }`}
         >
           <div
-            className={`container mx-auto flex flex-1 flex-col px-2 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
+            className={`flex w-full flex-1 flex-col px-2 lg:px-3 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
           >
             <div
-              className={`mx-auto flex w-full flex-1 flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
+              className={`flex w-full flex-1 flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
             >
               <InterviewTopBar
                 selectedScenario={selectedScenario}
@@ -4994,7 +5086,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden transition-all duration-300 sm:gap-2 ${
                     focusMode
                       ? "grid-cols-1" // Focus mode: editor only
-                      : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]"
+                      : "grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_240px] xl:grid-cols-[280px_minmax(0,1fr)_260px] 2xl:grid-cols-[320px_minmax(0,1fr)_280px]"
                   }`}
                 >
                   {focusMode && (

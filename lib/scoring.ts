@@ -454,28 +454,3 @@ export function createDefaultMetrics(
 // - technical-score: Code-only scoring (excludes communication)
 // - score-persistence: Atomic Firestore operations
 // Note: Mastery scoring for spaced repetition is in lib/spaced-repetition/mastery-score.ts
-
-export {
-  // Types
-  type SessionScores,
-  type UserScoreStats,
-  type UserAverages,
-  type MasteryLevel,
-  type MasteryStatistics,
-  type ScorePersistenceInput,
-  SCORE_WEIGHTS,
-
-  // Technical Score (code-only, excludes communication)
-  calculateTechnicalScore,
-  calculateTechnicalScoreFromComponents,
-  getTechnicalScoreContribution,
-
-  // Score Persistence (atomic Firestore operations)
-  persistSessionScores,
-  isSessionAlreadyCompleted,
-  getExistingSessionScores,
-  getUserScoreStats,
-  getMasteryStatistics,
-  getMasteredProblems,
-  updateProblemMasteryLevel,
-} from "./scoring/index"

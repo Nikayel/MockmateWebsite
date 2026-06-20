@@ -85,6 +85,7 @@ function buildCustomerFeatures(rows) {
   },
   expectedBehavior:
     "Feature generation should return cloned rows with finite numeric features and a compact validation summary.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The pipeline mutates input rows and performs direct division/log transforms that can produce NaN or Infinity.",
   hints: [

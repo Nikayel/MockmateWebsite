@@ -105,7 +105,7 @@ export interface InterviewSession {
   technical_score?: number // Code-focused score (= mastery score, excludes communication)
   mastery_score?: number // Same as technical_score, for backwards compatibility
   feedback?: string
-  feedback_status?: "pending" | "complete" | "failed" // Track feedback generation state
+  feedback_status?: "pending" | "processing" | "complete" | "failed" // Track feedback generation state
   structured_feedback?: {
     tldr?: string
     whatWorked?: string[]

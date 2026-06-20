@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminAuth } from "@/lib/firebase-admin"
-import { getMasteredProblems } from "@/lib/scoring"
+import { getMasteredProblems } from "@/lib/scoring/index"
 import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {

@@ -35,6 +35,10 @@ export function bugFixToEmbeddingText(scenario: BugFixScenario): string {
     `## Expected Behavior`,
     scenario.expectedBehavior,
     ``,
+    ...(scenario.groundTruth ? [`## Ground Truth Fix`, scenario.groundTruth, ``] : []),
+    ...(scenario.rootCauseRubric && scenario.rootCauseRubric.length > 0
+      ? [`## Evaluation Rubric`, ...scenario.rootCauseRubric.map((r) => `- ${r}`), ``]
+      : []),
     `## Buggy Code (${primaryLang})`,
     "```" + primaryLang,
     buggyCodeSnippet.substring(0, 1500),
@@ -61,6 +65,9 @@ export function bugFixToEmbeddingText(scenario: BugFixScenario): string {
         : ["No supporting codebase files provided."]),
     ``,
     `## Workspace Test Focus`,
+    ...(scenario.expectedTouchedFiles && scenario.expectedTouchedFiles.length > 0
+      ? [`Expected Edited Files: ${scenario.expectedTouchedFiles.join(", ")}`]
+      : []),
     ...(scenario.workspace
       ? [
           `Primary file: ${scenario.workspace.primaryFilePath}`,

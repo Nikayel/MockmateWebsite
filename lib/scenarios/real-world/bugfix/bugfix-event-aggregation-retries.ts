@@ -68,6 +68,7 @@ Fix aggregation so retry duplicates do not change totals while legitimate distin
       description: "Workspace tests cover duplicate delivery IDs",
     },
   ],
+  expectedTouchedFiles: ["src/event_aggregation.py"],
   workspace: {
     language: "python",
     primaryFilePath: "src/event_aggregation.py",

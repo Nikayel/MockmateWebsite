@@ -50,11 +50,11 @@ export const ChatColumn = memo(function ChatColumn({
 
   return (
     <Card
-      className={`glass-effect order-3 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
+      className={`glass-effect order-3 h-full flex-col gap-0 overflow-hidden border-gray-700 bg-gray-900/50 py-0 ${
         focusMode ? "hidden" : activePanel === "chat" ? "flex" : "hidden lg:flex"
       }`}
     >
-      <CardHeader className="flex-shrink-0 pb-2">
+      <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
         <CardTitle className="flex items-center space-x-2 text-sm text-white">
           <div className="relative">
             <Brain className="text-accent animate-neural-pulse h-4 w-4" />

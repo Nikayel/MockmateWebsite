@@ -67,6 +67,7 @@ def two_sum(nums, target):
   },
   expectedBehavior:
     "two_sum should return the indices of two different numbers that add up to target, or [] when no pair exists.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The function stores target as the hash-map key instead of storing the current number. Future complement lookups cannot find the values already seen.",
   hints: [

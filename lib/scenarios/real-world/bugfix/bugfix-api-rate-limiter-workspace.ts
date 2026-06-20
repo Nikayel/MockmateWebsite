@@ -93,6 +93,7 @@ Fix the limiter workflow so burst simulations cannot exceed the limit.`,
       description: "Workspace tests cover burst limit enforcement",
     },
   ],
+  expectedTouchedFiles: ["src/rate-limiter.js"],
   workspace: {
     language: "javascript",
     primaryFilePath: "src/rate-limiter.js",

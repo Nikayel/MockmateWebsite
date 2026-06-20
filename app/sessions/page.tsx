@@ -171,12 +171,14 @@ export default function SessionsPage() {
                     !isPostInterviewDiscussion &&
                     session.scenario_id &&
                     scenarioExists
-                  // Check if feedback is still being generated
                   const isFeedbackPending =
                     session.feedback_status === "pending" ||
+                    session.feedback_status === "processing" ||
                     (session.completed_at &&
                       !session.feedback &&
-                      session.feedback_status !== "failed")
+                      session.feedback_status !== "failed" &&
+                      session.feedback_status !== "complete")
+                  const isFeedbackFailed = session.feedback_status === "failed"
                   const hasFeedback =
                     session.feedback &&
                     session.completed_at &&
@@ -231,6 +233,11 @@ export default function SessionsPage() {
                           {isFeedbackPending && !isInProgress && (
                             <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
                               Generating Feedback...
+                            </span>
+                          )}
+                          {isFeedbackFailed && !isInProgress && (
+                            <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-400">
+                              Feedback Failed
                             </span>
                           )}
                           {hasFeedback && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
@@ -307,6 +314,17 @@ export default function SessionsPage() {
                             >
                               <FileText className="mr-1.5 h-3 w-3" />
                               Details
+                              <ChevronRight className="ml-1 h-3 w-3" />
+                            </Button>
+                          </Link>
+                        ) : isFeedbackFailed ? (
+                          <Link href={`/sessions/${session.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                            >
+                              View Results
                               <ChevronRight className="ml-1 h-3 w-3" />
                             </Button>
                           </Link>

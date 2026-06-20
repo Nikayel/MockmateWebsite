@@ -79,6 +79,7 @@ Fix the feature conversion while preserving known defaults and feature ordering.
       description: "Workspace tests cover missing and non-finite values",
     },
   ],
+  expectedTouchedFiles: ["src/feature_pipeline.py"],
   workspace: {
     language: "python",
     primaryFilePath: "src/feature_pipeline.py",

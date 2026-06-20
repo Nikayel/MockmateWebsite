@@ -78,6 +78,7 @@ Fix the entitlement update path so duplicate events are idempotent and older eve
       description: "Workspace tests cover duplicate and stale webhook events",
     },
   ],
+  expectedTouchedFiles: ["src/entitlements.js"],
   workspace: {
     language: "javascript",
     primaryFilePath: "src/entitlements.js",

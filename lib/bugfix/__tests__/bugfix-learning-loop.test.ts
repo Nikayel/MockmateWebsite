@@ -86,7 +86,14 @@ describe("bugfix evidence learning loop", () => {
       ],
     })
 
-    const score = calculateBugfixEvidenceScore(evidence)
+    const score = calculateBugfixEvidenceScore(evidence, {
+      semanticOverrides: {
+        hypothesisQuality: 90,
+        rootCauseAccuracy: 90,
+        preventionQuality: 90,
+        communicationScore: 85,
+      },
+    })
     const profile = buildBugfixReadinessProfile({ score, weaknessTags: ["async-race"] })
     const report = buildBugfixPostSessionReport({ evidence, score })
 

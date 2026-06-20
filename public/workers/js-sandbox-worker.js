@@ -5,6 +5,11 @@ self.onmessage = async function (e) {
   // Track captured logs
   const logs = []
 
+  let resolveResults
+  const resultsPromise = new Promise((resolve) => {
+    resolveResults = resolve
+  })
+
   // Capture console functions inside the worker
   const originalLog = console.log
   const originalWarn = console.warn
@@ -12,12 +17,18 @@ self.onmessage = async function (e) {
   const originalInfo = console.info
 
   console.log = function (...args) {
+    const message = args
+      .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+      .join(" ")
     logs.push({
       type: "log",
-      message: args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "),
+      message: message,
       timestamp: Date.now(),
     })
     originalLog.apply(console, args)
+    if (resolveResults && message.startsWith("__WORKSPACE_TEST_RESULTS__:")) {
+      resolveResults()
+    }
   }
   console.warn = function (...args) {
     logs.push({
@@ -180,6 +191,13 @@ self.onmessage = async function (e) {
 
       const resolvedEntry = entrypoint.replace(/^\.\//, "")
       result = requireModule(resolvedEntry)
+
+      // Wait for the test runner to finish and log results
+      // Set a fallback timeout of 4.5s so we don't hang forever if the runner crashes
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Test execution timed out")), 4500)
+      )
+      await Promise.race([resultsPromise, timeoutPromise])
     } else {
       // Single-file Mode
       const executionFn = new Function(code)

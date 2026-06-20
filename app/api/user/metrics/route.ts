@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import { getUserStats, getRecentSessions, getPerformanceTrends } from "@/lib/session-metrics"
 import { getUserUsageSummary } from "@/lib/usage-tracking"
-import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring"
+import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring/index"
 import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 import { logger } from "@/lib/logger"
 

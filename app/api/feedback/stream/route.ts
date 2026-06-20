@@ -36,6 +36,7 @@ import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-anal
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import { calculateBugfixEvidenceScore } from "@/lib/bugfix/scoring"
+import { scoreBugfixSemantics, BUGFIX_SEMANTIC_NEUTRAL } from "@/lib/bugfix/semantic-scorer"
 import type {
   BugfixEvidenceEvent,
   BugfixEvidenceSummary,
@@ -85,6 +86,8 @@ export async function POST(request: NextRequest) {
         bugfixExpectedTouchedFiles,
         bugfixRootCause,
         bugfixPrevention,
+        bugfixRootCauseRubric,
+        bugfixGroundTruth,
       } = body
 
       // ========================================
@@ -163,7 +166,7 @@ export async function POST(request: NextRequest) {
                 : [],
             })
           : null
-      const bugfixScoreBreakdown: BugfixScoreBreakdown | null = bugfixEvidenceSummary
+      const bugfixScoreBreakdownPreSemantic: BugfixScoreBreakdown | null = bugfixEvidenceSummary
         ? calculateBugfixEvidenceScore(bugfixEvidenceSummary, {
             difficulty: scenarioDifficulty || "medium",
           })
@@ -197,36 +200,50 @@ export async function POST(request: NextRequest) {
         scenarioType: scenarioType || "dsa",
       }
 
-      const [aiValidation, extractedEvidence, silentNotesAnalysis] = await Promise.all([
-        shouldValidateWithAI
-          ? validateConversationEdge(
-              transcriptMessages,
-              code,
-              efficiencyMetrics
-                ? {
-                    time: efficiencyMetrics.estimatedTimeComplexity,
-                    space: efficiencyMetrics.estimatedSpaceComplexity,
-                  }
-                : null
-            ).catch(() => getDefaultValidation())
-          : Promise.resolve(getDefaultValidation()),
-        transcriptMessages.length > 0
-          ? extractConversationEvidenceEdge(transcriptMessages, problemContext).catch(() => null)
-          : Promise.resolve(null),
-        // Generate silent notes if we don't have existing ones and have transcript
-        !existingSilentNotes?.length && transcriptMessages.length >= 2
-          ? analyzeTranscriptForMistakesEdge(
-              transcriptMessages.map((m) => ({
-                role: m.role,
-                content: m.content,
-              })),
-              problemContext
-            ).catch((err) => {
-              console.warn("[Streaming Feedback] Silent notes analysis failed:", err)
-              return { silentNotes: [], analysisMetadata: null }
-            })
-          : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
-      ])
+      const [aiValidation, extractedEvidence, silentNotesAnalysis, bugfixSemanticScores] =
+        await Promise.all([
+          shouldValidateWithAI
+            ? validateConversationEdge(
+                transcriptMessages,
+                code,
+                efficiencyMetrics
+                  ? {
+                      time: efficiencyMetrics.estimatedTimeComplexity,
+                      space: efficiencyMetrics.estimatedSpaceComplexity,
+                    }
+                  : null
+              ).catch(() => getDefaultValidation())
+            : Promise.resolve(getDefaultValidation()),
+          transcriptMessages.length > 0
+            ? extractConversationEvidenceEdge(transcriptMessages, problemContext).catch(() => null)
+            : Promise.resolve(null),
+          // Generate silent notes if we don't have existing ones and have transcript
+          !existingSilentNotes?.length && transcriptMessages.length >= 2
+            ? analyzeTranscriptForMistakesEdge(
+                transcriptMessages.map((m) => ({
+                  role: m.role,
+                  content: m.content,
+                })),
+                problemContext
+              ).catch((err) => {
+                console.warn("[Streaming Feedback] Silent notes analysis failed:", err)
+                return { silentNotes: [], analysisMetadata: null }
+              })
+            : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
+          scenarioType === "bugfix" && bugfixEvidenceSummary && bugfixScoreBreakdownPreSemantic
+            ? scoreBugfixSemantics({
+                deterministicSubScores: bugfixScoreBreakdownPreSemantic,
+                evidenceSummary: bugfixEvidenceSummary,
+                rootCauseRubric: Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : [],
+                bugDescription: typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : "",
+                conversationExcerpt: transcriptMessages
+                  .slice(-10)
+                  .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                  .join("\n\n")
+                  .slice(0, 2000),
+              }).catch(() => BUGFIX_SEMANTIC_NEUTRAL)
+            : Promise.resolve(BUGFIX_SEMANTIC_NEUTRAL),
+        ])
 
       // Use generated silent notes or existing ones
       const finalSilentNotes = silentNotesAnalysis.silentNotes || existingSilentNotes || []
@@ -258,6 +275,13 @@ export async function POST(request: NextRequest) {
       // PHASE 3: Calculate Final Scores
       // ========================================
       // Note: extractedEvidence is already merged into aiValidation above
+      const bugfixScoreBreakdown: BugfixScoreBreakdown | null = bugfixEvidenceSummary
+        ? calculateBugfixEvidenceScore(bugfixEvidenceSummary, {
+            difficulty: scenarioDifficulty || "medium",
+            semanticOverrides: bugfixSemanticScores,
+          })
+        : null
+
       const validatedScores = calculateValidatedScores(
         passRate,
         efficiencyMetrics,
@@ -313,8 +337,10 @@ export async function POST(request: NextRequest) {
         extractedEvidence,
         bugfixEvidenceSummary,
         bugfixScoreBreakdown,
+        bugfixSemanticScores,
         bugfixRootCause,
         bugfixPrevention,
+        bugfixRootCauseRubric: Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : [],
         silentNotes: finalSilentNotes,
         code,
         language,
@@ -450,8 +476,10 @@ function buildPrompt(data: {
   extractedEvidence?: unknown
   bugfixEvidenceSummary?: BugfixEvidenceSummary | null
   bugfixScoreBreakdown?: BugfixScoreBreakdown | null
+  bugfixSemanticScores?: Record<string, unknown> | null
   bugfixRootCause?: unknown
   bugfixPrevention?: unknown
+  bugfixRootCauseRubric?: string[]
   silentNotes: unknown[]
   code: string
   language: string
@@ -468,8 +496,10 @@ function buildPrompt(data: {
     extractedEvidence,
     bugfixEvidenceSummary,
     bugfixScoreBreakdown,
+    bugfixSemanticScores,
     bugfixRootCause,
     bugfixPrevention,
+    bugfixRootCauseRubric,
     silentNotes,
     code,
     language,
@@ -491,6 +521,8 @@ function buildPrompt(data: {
           score: bugfixScoreBreakdown,
           rootCause: typeof bugfixRootCause === "string" ? bugfixRootCause : "",
           prevention: typeof bugfixPrevention === "string" ? bugfixPrevention : "",
+          rubric: bugfixRootCauseRubric || [],
+          semanticRationale: (bugfixSemanticScores?.scoringRationale as string) || "",
         })
       : ""
 
@@ -554,19 +586,19 @@ function mapBugfixScoreToFeedbackScores(score: BugfixScoreBreakdown) {
   return {
     understanding: averageScores([
       score.reproductionDiscipline,
+      score.codebaseNavigation,
       score.evidenceGathering,
       score.hypothesisQuality,
-      score.rootCauseUnderstanding,
     ]),
     problemSolving: averageScores([
-      score.codebaseNavigation,
-      score.verificationDiscipline,
-      score.aiCollaborationQuality,
+      score.rootCauseUnderstanding,
+      score.regressionPrevention,
+      score.hypothesisQuality,
     ]),
     codeQuality: averageScores([
+      score.verificationDiscipline,
       score.minimalFixQuality,
       score.overEditControl,
-      score.regressionPrevention,
     ]),
     communication: score.communication,
     overall: score.overall,
@@ -578,8 +610,10 @@ function buildBugfixEvidenceContext(params: {
   score: BugfixScoreBreakdown
   rootCause: string
   prevention: string
+  rubric: string[]
+  semanticRationale: string
 }): string {
-  const { summary, score, rootCause, prevention } = params
+  const { summary, score, rootCause, prevention, rubric, semanticRationale } = params
 
   return `
 BUGFIX SESSION EVIDENCE:
@@ -595,6 +629,14 @@ BUGFIX SESSION EVIDENCE:
 - Prevention idea captured: ${prevention.trim() || "not captured"}
 - AI partner uses: ${summary.aiPartnerUseCount}
 - AI shortcut requests: ${summary.aiShortcutCount}
+
+ROOT CAUSE RUBRIC (expected criteria):
+${rubric.map((r, i) => `  ${i + 1}. ${r}`).join("\n")}
+
+CANDIDATE ROOT CAUSE: "${rootCause}"
+CANDIDATE PREVENTION: "${prevention}"
+
+SEMANTIC SCORING RATIONALE: "${semanticRationale}"
 
 BUGFIX SCORE BREAKDOWN:
 - Reproduction Discipline: ${score.reproductionDiscipline}/100

@@ -67,6 +67,7 @@ function createInvoiceSummary(prices, taxRate, paymentAmount) {
   },
   expectedBehavior:
     "Invoice money fields should be numeric values rounded to exactly the nearest cent.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The invoice worker performs raw floating point arithmetic and returns unrounded values.",
   hints: [

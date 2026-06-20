@@ -74,6 +74,7 @@ Find and fix the merge bug without changing the public function signature.`,
       description: "Workspace tests cover index zero thread updates",
     },
   ],
+  expectedTouchedFiles: ["src/comment_threads.py"],
   workspace: {
     language: "python",
     primaryFilePath: "src/comment_threads.py",

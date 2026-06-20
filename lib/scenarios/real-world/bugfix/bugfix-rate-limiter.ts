@@ -157,6 +157,7 @@ class RedisSortedSetStore {
   },
   expectedBehavior:
     "No more than the configured limit should be allowed in a window, even when many requests arrive at the same time.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The limiter performs a check-then-write sequence. In a concurrent burst, multiple workers can observe capacity before any worker records usage, so all of them proceed.",
   hints: [

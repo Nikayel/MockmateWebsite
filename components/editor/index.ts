@@ -3,9 +3,9 @@ export {
   CodeMirrorEditor,
   CodeMirrorErrorBoundary,
   EDITOR_OPTIONS,
-  cleanupOrphanedModels
+  cleanupOrphanedModels,
 } from "./CodeMirrorEditor"
-export type { CodeMirrorEditorProps } from "./CodeMirrorEditor"
+export type { CodeMirrorEditorProps, CodeMirrorEditorRef } from "./CodeMirrorEditor"
 
 // Backwards compatibility aliases
 export { CodeMirrorEditor as MonacoEditor } from "./CodeMirrorEditor"

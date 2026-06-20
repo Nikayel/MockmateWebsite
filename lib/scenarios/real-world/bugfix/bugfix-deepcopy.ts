@@ -76,6 +76,7 @@ function previewAccountSettings(account, patch) {
   },
   expectedBehavior:
     "Previewing settings should update the returned copy without mutating nested fields on the original account.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The top-level spread leaves preferences and notifications shared between original and updated accounts.",
   hints: [

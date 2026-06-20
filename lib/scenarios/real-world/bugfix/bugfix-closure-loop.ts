@@ -66,6 +66,7 @@ function runAnalyticsHandlers(eventNames) {
   },
   expectedBehavior:
     "Each generated handler should return the index and event name from the iteration that created it.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "All handlers capture the same function-scoped var i, which has the final loop value after the loop exits.",
   hints: [

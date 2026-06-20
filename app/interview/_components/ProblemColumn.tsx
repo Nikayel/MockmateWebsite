@@ -102,7 +102,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       - Only visible when activePanel === 'problem' (mobile)
                   */}
       <Card
-        className={`glass-effect order-1 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
+        className={`glass-effect order-1 h-full flex-col gap-0 overflow-hidden border-gray-700 bg-gray-900/50 py-0 ${
           focusMode
             ? "hidden" // Always hidden in focus mode - no responsive override
             : activePanel === "problem"
@@ -111,7 +111,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
         }`}
       >
         {/* IMPROVED: Enhanced header with title and difficulty badge */}
-        <CardHeader className="flex-shrink-0 border-b border-gray-700/50 pb-3">
+        <CardHeader className="flex-shrink-0 border-b border-gray-700/50 px-4 pt-3 pb-2">
           <CardTitle className="flex items-center justify-between text-white">
             <div className="flex min-w-0 items-center gap-2">
               <Target className="text-accent h-5 w-5 flex-shrink-0" />
@@ -135,7 +135,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
           </CardTitle>
         </CardHeader>
         {/* IMPROVED: Better spacing and typography for readability */}
-        <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
           {selectedScenario && (
             <>
               {/* IMPROVED: Description with larger font and visual hierarchy */}

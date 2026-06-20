@@ -95,6 +95,7 @@ module.exports = { createSearchState }
       description: "Workspace tests cover stale response ordering",
     },
   ],
+  expectedTouchedFiles: ["src/search-controller.js"],
   workspace: {
     language: "javascript",
     primaryFilePath: "src/search-controller.js",

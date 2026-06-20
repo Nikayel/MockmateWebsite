@@ -63,6 +63,7 @@ function buildRetrySchedule(maxRetries) {
   },
   expectedBehavior:
     "The scheduler should return a finite descending sequence from maxRetries to zero.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The loop increments remaining while the condition requires remaining to eventually become negative.",
   hints: [

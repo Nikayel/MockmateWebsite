@@ -245,17 +245,17 @@ export function ScoreDisplay({
       : problemType === "bugfix"
         ? [
             {
-              name: "Bug Found",
+              name: "Investigation",
               score: scores.understanding,
               weight: "35%",
-              icon: Bug,
+              icon: Search,
               colorClass: "text-sky-400",
             },
             {
               name: "Root Cause",
               score: scores.problemSolving,
               weight: "25%",
-              icon: Search,
+              icon: Bug,
               colorClass: "text-emerald-400",
             },
             {

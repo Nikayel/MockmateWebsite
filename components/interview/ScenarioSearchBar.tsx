@@ -27,7 +27,7 @@ export const ScenarioSearchBar = memo(function ScenarioSearchBar({
           placeholder="Search problems..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full rounded-2xl border border-white/10 bg-black/20 py-2.5 pr-4 pl-10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-colors placeholder:text-zinc-500 focus:border-white/25 focus:ring-1 focus:ring-white/15 focus:outline-none"
+          className="w-full rounded-full border border-white/5 bg-white/[0.04] py-2.5 pr-4 pl-10 text-sm text-white transition-all placeholder:text-zinc-500 focus:border-white/20 focus:bg-white/[0.07] focus:ring-1 focus:ring-white/10 focus:outline-none"
         />
         {searchQuery && (
           <button

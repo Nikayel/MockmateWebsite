@@ -20,7 +20,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
-import { CodeMirrorEditor } from "@/components/editor"
+import { CodeMirrorEditor, type CodeMirrorEditorRef } from "@/components/editor"
 import {
   CodeConsole,
   type ConsoleOutput,
@@ -73,6 +73,8 @@ interface EditorColumnProps {
   onSendPartnerMessage: () => void
   workspaceContext?: WorkspaceContextFile[]
   onFileSelect?: (file: WorkspaceContextFile) => void
+  editorRef?: RefObject<CodeMirrorEditorRef | null>
+  onGoToLine?: (lineNum: number) => void
 }
 
 export const EditorColumn = memo(function EditorColumn({
@@ -110,6 +112,8 @@ export const EditorColumn = memo(function EditorColumn({
   onSendPartnerMessage,
   workspaceContext = [],
   onFileSelect,
+  editorRef,
+  onGoToLine,
 }: EditorColumnProps) {
   const runWithLanguageGuard = (action: () => void, actionName: "run tests" | "submit") => {
     if (!isLanguageSupported(selectedLanguage)) {
@@ -131,7 +135,7 @@ export const EditorColumn = memo(function EditorColumn({
 
   return (
     <Card
-      className={`glass-effect order-2 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
+      className={`editor-panel-card glass-effect order-2 h-full flex-col gap-0 overflow-hidden border-gray-700 bg-gray-900/50 py-0 ${
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
@@ -140,7 +144,7 @@ export const EditorColumn = memo(function EditorColumn({
         workspaceContext &&
         workspaceContext.length > 0 ? (
           <div className="flex w-full items-center justify-between border-b border-gray-700 bg-gray-900/80 pr-4">
-            <div className="no-scrollbar flex flex-1 overflow-x-auto">
+            <div className="workspace-tabs-container no-scrollbar flex flex-1 overflow-x-auto">
               {workspaceContext.map((file) => {
                 const isActive = activeWorkspaceFile?.path === file.path
                 // Only show hidden files if they are the active file (though usually hidden files aren't in context, just to be safe)
@@ -171,14 +175,14 @@ export const EditorColumn = memo(function EditorColumn({
                     onClick={() => onFileSelect && onFileSelect(file)}
                     title={`${roleLabel}: ${file.path}`}
                     aria-label={`Open ${roleLabel.toLowerCase()} ${file.path}`}
-                    className={`flex items-center gap-1.5 border-r border-gray-700 px-3 py-2 text-xs whitespace-nowrap transition-colors ${
+                    className={`workspace-tab-button flex items-center gap-1.5 border-r border-gray-700 px-3 py-2 text-xs whitespace-nowrap transition-colors ${
                       isActive
                         ? "border-b-2 border-b-blue-500 bg-gray-800 text-white"
                         : "border-b-2 border-b-transparent bg-gray-900/50 text-gray-400 hover:bg-gray-800/80 hover:text-gray-300"
                     }`}
                   >
                     <RoleIcon className={`h-3.5 w-3.5 ${iconColor}`} />
-                    {file.path}
+                    <span className="workspace-tab-filename">{file.path}</span>
                     {file.role === "editable" &&
                       file.originalContent !== undefined &&
                       file.content !== file.originalContent && (
@@ -228,7 +232,7 @@ export const EditorColumn = memo(function EditorColumn({
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between px-6 pt-4">
+          <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <CardTitle className="flex w-full items-center justify-between text-xs text-white">
               <div className="flex items-center space-x-1">
                 <Code className="text-accent h-3 w-3" />
@@ -263,6 +267,7 @@ export const EditorColumn = memo(function EditorColumn({
         <div className="relative min-h-0 flex-1 overflow-auto rounded border border-gray-700">
           <ErrorBoundary>
             <CodeMirrorEditor
+              ref={editorRef}
               height="100%"
               language={editorLanguage}
               value={code}
@@ -308,6 +313,7 @@ export const EditorColumn = memo(function EditorColumn({
             isRunning={isRunningTests}
             className="max-h-48 min-h-[120px]"
             onClear={onClearConsole}
+            onGoToLine={onGoToLine}
           />
         )}
 

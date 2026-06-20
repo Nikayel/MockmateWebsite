@@ -71,6 +71,7 @@ function calculateCheckoutTotal(cartItems, taxRate) {
   },
   expectedBehavior:
     "Checkout totals should always be numbers, with subtotal, tax, and total rounded to cents.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The calculation trusts form values and allows JavaScript coercion to mix strings and numbers.",
   hints: [

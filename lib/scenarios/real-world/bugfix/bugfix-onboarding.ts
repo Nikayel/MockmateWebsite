@@ -103,6 +103,7 @@ module.exports = { runTests };`,
       description: "Workspace tests cover the discount logic",
     },
   ],
+  expectedTouchedFiles: ["src/cart.js"],
   workspace: {
     language: "javascript",
     primaryFilePath: "src/cart.js",

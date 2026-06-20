@@ -231,6 +231,7 @@ export interface BugFixScenario extends BaseScenario {
   }
   expectedBehavior: string
   bugDescription: string
+  groundTruth?: string
   hints: string[]
   testCases: {
     input: any

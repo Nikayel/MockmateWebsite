@@ -56,29 +56,29 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const topPadding = hasGuestBanner ? "pt-28" : "pt-20"
 
   return (
-    <section className={`${topPadding} bg-zinc-950 pb-12`}>
-      <div className="container mx-auto px-4">
+    <section className={`${topPadding} relative overflow-hidden bg-zinc-950 pb-12`}>
+      {/* Ambient background glows for premium visual design */}
+      <div className="from-accent/10 pointer-events-none absolute top-0 left-1/4 z-0 h-[500px] w-[500px] rounded-full bg-gradient-to-r to-purple-500/10 opacity-40 blur-[120px]" />
+      <div className="pointer-events-none absolute right-1/4 bottom-10 z-0 h-[400px] w-[400px] rounded-full bg-gradient-to-r from-blue-500/10 to-emerald-500/10 opacity-30 blur-[100px]" />
+
+      <div className="relative z-10 container mx-auto px-4">
         <div className="mx-auto max-w-7xl">
-          {/* Compact Header */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Sleek Minimal Header */}
+          <div className="mb-8 flex flex-col gap-4 border-b border-white/[0.06] pb-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-white md:text-3xl">
-                Practice Real Codebase Work
+              <h1 className="bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent md:text-3xl">
+                Practice Arena
               </h1>
-              <p className="mt-1 max-w-2xl text-sm text-zinc-400">
-                Start with bug fixes and production-style codebase tasks, then use DSA drills when
-                you need targeted pattern reps.
-              </p>
             </div>
 
-            {/* View Mode Toggle - Pill Style */}
-            <div className="inline-flex self-start rounded-full border border-zinc-800 bg-zinc-900 p-1 sm:self-auto">
+            {/* View Mode Toggle - Apple Pill Style */}
+            <div className="inline-flex self-start rounded-full border border-white/[0.06] bg-zinc-900/60 p-1 shadow-inner shadow-black/25 backdrop-blur-md sm:self-auto">
               <button
                 onClick={() => setViewMode("roadmap")}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   viewMode === "roadmap"
-                    ? "bg-white text-zinc-900"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-white text-zinc-950 shadow-md"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 <Target className="h-4 w-4" />
@@ -86,10 +86,10 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               </button>
               <button
                 onClick={() => setViewMode("patterns")}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   viewMode === "patterns"
-                    ? "bg-white text-zinc-900"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-white text-zinc-950 shadow-md"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 <LayoutGrid className="h-4 w-4" />
@@ -97,8 +97,10 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                  viewMode === "list" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                  viewMode === "list"
+                    ? "bg-white text-zinc-950 shadow-md"
+                    : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
                 <List className="h-4 w-4" />

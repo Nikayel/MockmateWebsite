@@ -23,6 +23,9 @@ export function summarizeBugfixEvidence(params: {
   const inspectedTestOrDocs = new Set<string>()
   const editedFiles = new Set<string>()
   let finalPassRate = 0
+  let hypothesisText = ""
+  let rootCauseText = ""
+  let preventionText = ""
 
   for (const event of sortedEvents) {
     if (event.type === "file_opened" && event.filePath) {
@@ -37,6 +40,15 @@ export function summarizeBugfixEvidence(params: {
     }
     if (event.type === "test_run" && event.testSummary) {
       finalPassRate = event.testSummary.passRate
+    }
+    if (event.type === "hypothesis_created" && !hypothesisText) {
+      hypothesisText = event.text?.trim() ?? ""
+    }
+    if (event.type === "prevention_explained") {
+      preventionText = event.text?.trim() ?? ""
+    }
+    if (event.type === "submission_created") {
+      rootCauseText = event.text?.trim() ?? ""
     }
   }
 
@@ -76,5 +88,8 @@ export function summarizeBugfixEvidence(params: {
     ),
     aiShortcutCount,
     aiPartnerUseCount,
+    hypothesisText,
+    rootCauseText,
+    preventionText,
   }
 }

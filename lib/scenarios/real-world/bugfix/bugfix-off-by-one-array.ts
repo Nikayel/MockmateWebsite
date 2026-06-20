@@ -76,6 +76,7 @@ function analyzeSensorTrend(readings, alertThreshold) {
   },
   expectedBehavior:
     "The processor should return one percentage change per adjacent pair without reading beyond the array.",
+  expectedTouchedFiles: ["solution"],
   bugDescription:
     "The loop condition allows i to equal readings.length, so readings[i] and readings[i + 1] become undefined.",
   hints: [

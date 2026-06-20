@@ -51,6 +51,7 @@ interface CodeConsoleProps {
   onClear?: () => void
   language?: "python" | "javascript" | "typescript"
   userCodeLineCount?: number // Total lines in user's code for validation
+  onGoToLine?: (lineNum: number) => void
 }
 
 /**
@@ -115,8 +116,20 @@ function parseErrorLineNumber(
 // Detect error type from message
 function getErrorType(
   error: string
-): "syntax" | "runtime" | "type" | "logic" | "timeout" | "unknown" {
+): "syntax" | "runtime" | "type" | "logic" | "timeout" | "security" | "unknown" {
   const lowerError = error.toLowerCase()
+
+  // Security / Execution Environment Errors
+  if (
+    lowerError.includes("content security policy") ||
+    lowerError.includes("content-security-policy") ||
+    lowerError.includes("unsafe-eval") ||
+    lowerError.includes("failed to spawn web worker") ||
+    lowerError.includes("web worker") ||
+    lowerError.includes("worker error")
+  ) {
+    return "security"
+  }
 
   // Syntax/Parse errors
   if (
@@ -208,6 +221,7 @@ function formatErrorMessage(
     runtime: "🔴 Runtime Error",
     timeout: "⏱️ Timeout/Recursion Error",
     logic: "🟡 Logic Error",
+    security: "🔒 Execution Environment Error",
     unknown: "❌ Error",
   }
 
@@ -217,6 +231,8 @@ function formatErrorMessage(
     runtime: "Check for null/undefined values, invalid indices, or missing variables.",
     timeout: "Your code may have an infinite loop or too deep recursion. Add base cases.",
     logic: "Your solution runs but produces incorrect output. Review your algorithm.",
+    security:
+      "An execution environment or security policy issue occurred. Please contact support or try reloading the page.",
     unknown: "Review your code for potential issues.",
   }
 

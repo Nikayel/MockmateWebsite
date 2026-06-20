@@ -53,13 +53,13 @@ const EXERCISE_TYPES = [
 const getDifficultyStyle = (difficulty: DifficultyLevel) => {
   switch (difficulty) {
     case "easy":
-      return "border-emerald-400/25 text-emerald-300"
+      return "border-transparent bg-emerald-500/10 text-emerald-300"
     case "medium":
-      return "border-amber-300/25 text-amber-200"
+      return "border-transparent bg-amber-500/10 text-amber-200"
     case "hard":
-      return "border-rose-300/25 text-rose-200"
+      return "border-transparent bg-rose-500/10 text-rose-300"
     default:
-      return "border-white/10 text-zinc-300"
+      return "border-transparent bg-white/5 text-zinc-300"
   }
 }
 
@@ -81,12 +81,23 @@ export const ScenarioCard = memo(function ScenarioCard({
   return (
     <div
       onClick={() => onSelect(scenario)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white/[0.045] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition-all duration-200 ${
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white/[0.03] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-300 ${
         isSelected
-          ? "border-white/30 bg-white/[0.07] ring-1 ring-white/20"
-          : "border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
+          ? "border-white/25 bg-white/[0.06] shadow-[0_20px_50px_rgba(0,0,0,0.4)]"
+          : "border-white/[0.06] hover:-translate-y-1 hover:border-white/15 hover:bg-white/[0.055] hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
       } `}
     >
+      {/* Ambient difficulty-themed backlight glow */}
+      <div
+        className={`pointer-events-none absolute -top-16 -right-16 h-36 w-36 rounded-full opacity-10 blur-[70px] transition-opacity duration-300 group-hover:opacity-20 ${
+          scenario.difficulty === "easy"
+            ? "bg-emerald-500"
+            : scenario.difficulty === "medium"
+              ? "bg-amber-500"
+              : "bg-rose-500"
+        }`}
+      />
+
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-70" />
 
       {/* Completed badge */}
@@ -100,12 +111,12 @@ export const ScenarioCard = memo(function ScenarioCard({
 
       {/* Header */}
       <div className="mb-3 flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-1 text-xs font-medium text-zinc-200">
+        <span className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs font-medium text-zinc-300">
           <typeConfig.icon className="h-3 w-3" />
           {typeConfig.label}
         </span>
         <span
-          className={`rounded-full border bg-white/[0.035] px-2.5 py-1 text-xs font-medium capitalize ${getDifficultyStyle(scenario.difficulty)}`}
+          className={`rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${getDifficultyStyle(scenario.difficulty)}`}
         >
           {scenario.difficulty}
         </span>
@@ -132,7 +143,7 @@ export const ScenarioCard = memo(function ScenarioCard({
         {scenario.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
-            className="rounded-full border border-white/10 bg-black/15 px-2 py-0.5 text-[10px] text-zinc-400"
+            className="rounded-full border-transparent bg-white/[0.03] px-2 py-0.5 text-[10px] text-zinc-400"
           >
             {tag}
           </span>
@@ -163,7 +174,7 @@ export const ScenarioCard = memo(function ScenarioCard({
               onStart(scenario)
             }}
             disabled={!!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")}
-            className="w-full rounded-xl bg-white font-medium text-zinc-950 hover:bg-zinc-200 disabled:opacity-50"
+            className="w-full rounded-full bg-white font-semibold text-zinc-950 transition-all duration-200 hover:bg-zinc-200 disabled:opacity-50"
           >
             <Play className="mr-2 h-4 w-4" />
             Start Practice
@@ -175,7 +186,7 @@ export const ScenarioCard = memo(function ScenarioCard({
               onSelect(scenario)
             }}
             variant="outline"
-            className="w-full rounded-xl border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.08] hover:text-white"
+            className="w-full rounded-full border border-white/[0.08] bg-white/[0.02] text-zinc-300 transition-all duration-200 hover:bg-white/[0.08] hover:text-white"
           >
             Select
           </Button>

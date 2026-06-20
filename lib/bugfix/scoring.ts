@@ -28,6 +28,12 @@ export function calculateBugfixEvidenceScore(
   options: {
     difficulty?: "easy" | "medium" | "hard"
     communicationScore?: number
+    semanticOverrides?: {
+      hypothesisQuality?: number
+      rootCauseAccuracy?: number
+      preventionQuality?: number
+      communicationScore?: number
+    }
   } = {}
 ): BugfixScoreBreakdown {
   const expectedTouched = evidence.expectedTouchedFiles.length
@@ -35,7 +41,7 @@ export function calculateBugfixEvidenceScore(
     evidence.expectedTouchedFiles.includes(path)
   ).length
   const difficulty = options.difficulty || "medium"
-  const seniorBias = difficulty === "hard" ? 10 : 0
+  const overrides = options.semanticOverrides ?? {}
 
   const breakdown: Omit<BugfixScoreBreakdown, "overall"> = {
     reproductionDiscipline: evidence.reproducedBeforeEditing ? 100 : 35,
@@ -44,7 +50,7 @@ export function calculateBugfixEvidenceScore(
       evidence.inspectedTestOrDocs.length + evidence.visibleTestsRun,
       2
     ),
-    hypothesisQuality: clampScore(evidence.hypothesisCount > 0 ? 80 + seniorBias : 20),
+    hypothesisQuality: overrides.hypothesisQuality ?? (evidence.hypothesisText ? 50 : 0),
     minimalFixQuality:
       expectedTouched === 0
         ? 70
@@ -55,14 +61,12 @@ export function calculateBugfixEvidenceScore(
       evidence.finalPassRate * 0.7 + evidence.visibleTestsRun * 15
     ),
     overEditControl: clampScore(100 - evidence.overEditedFiles.length * 35),
-    rootCauseUnderstanding: evidence.rootCauseExplained ? 90 : 25,
-    regressionPrevention: evidence.preventionExplained ? 90 : difficulty === "hard" ? 15 : 35,
+    rootCauseUnderstanding: overrides.rootCauseAccuracy ?? (evidence.rootCauseText ? 50 : 0),
+    regressionPrevention: overrides.preventionQuality ?? (evidence.preventionText ? 50 : 0),
     aiCollaborationQuality: clampScore(
       70 + evidence.aiPartnerUseCount * 10 - evidence.aiShortcutCount * 35
     ),
-    communication: clampScore(
-      options.communicationScore ?? (evidence.rootCauseExplained ? 75 : 40)
-    ),
+    communication: overrides.communicationScore ?? 50,
   }
 
   const overall = Object.entries(DEFAULT_WEIGHTS).reduce((sum, [key, weight]) => {
