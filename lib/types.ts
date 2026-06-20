@@ -412,6 +412,12 @@ export interface ProblemMasteryRecord {
   review_count: number
   next_review_at: string
 
+  // FSRS State
+  fsrs_difficulty?: number
+  fsrs_stability?: number
+  fsrs_state?: string
+  fsrs_lapses?: number
+
   // Performance History
   last_score: number
   average_score: number
