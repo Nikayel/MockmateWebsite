@@ -67,6 +67,10 @@ import {
   buildUserPersonalizationContext,
   buildWorkspaceContextString,
 } from "@/lib/interview/chat/context-builders"
+import {
+  buildEndedConversationResponse,
+  buildProactiveSkipResponse,
+} from "@/lib/interview/chat/response-flow"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
   lastExtractionAt?: number
@@ -641,13 +645,16 @@ GROUNDING RULES (prevent hallucination):
       const timeSilentSeconds = timeSinceLastMessage || 0
       const shouldTimeBasedCheckIn = timeSilentSeconds >= 120 // 2 minutes of silence
 
-      if (!hasSubstantialCode && !shouldTimeBasedCheckIn) {
+      const proactiveSkipResponse = buildProactiveSkipResponse({
+        role,
+        isProactive,
+        currentCode,
+        timeSinceLastMessage,
+      })
+
+      if (proactiveSkipResponse) {
         // Don't interrupt if they haven't written much AND haven't been silent too long
-        return NextResponse.json({
-          reply: null,
-          skipped: true,
-          reason: "Not enough code to comment on yet and not silent long enough",
-        })
+        return NextResponse.json(proactiveSkipResponse)
       }
 
       // If silent for too long but no code, ask about their thinking
@@ -795,24 +802,11 @@ EXAMPLE FOR FAILED TESTS:
 Keep it conversational and real - like you're actually debriefing someone after an interview.`
     } else {
       // Check if AI already said goodbye in a recent message (interview is over)
-      const recentMessages = context?.slice(-4) || []
-      const aiAlreadySaidGoodbye = recentMessages.some(
-        (msg: { message: string; type?: string }) =>
-          msg.type !== "user" &&
-          (msg.message?.toLowerCase().includes("good luck with your") ||
-            msg.message?.toLowerCase().includes("best of luck") ||
-            (msg.message?.toLowerCase().includes("take care") &&
-              msg.message?.toLowerCase().includes("interview")))
-      )
+      const endedConversationResponse = buildEndedConversationResponse({ role, context })
 
-      if (aiAlreadySaidGoodbye && role === "interviewer") {
+      if (endedConversationResponse) {
         // Interview is OVER - don't respond to any more messages
-        return NextResponse.json({
-          reply: null,
-          conversationEnded: true,
-          endMessage:
-            "The interview session has ended. Click 'See Full Interview Score' to see your score breakdown and detailed analysis.",
-        })
+        return NextResponse.json(endedConversationResponse)
       }
 
       // Regular message - let the AI naturally handle conversation flow
