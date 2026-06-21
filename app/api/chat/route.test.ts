@@ -104,6 +104,7 @@ async function setupMocks() {
     generateAIResponse,
     trackAIChatServer,
     buildRAGContext,
+    startRequestTracking,
     endRequestTracking,
   }
 }
@@ -114,7 +115,7 @@ describe("/api/chat route", () => {
   })
 
   it("returns 400 for invalid request bodies", async () => {
-    await setupMocks()
+    const { endRequestTracking } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(createRequest({ role: "narrator", message: "hello" }))
@@ -125,10 +126,11 @@ describe("/api/chat route", () => {
         error: "Invalid request body",
       })
     )
+    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
   })
 
   it("requires a message unless the request is proactive", async () => {
-    const { generateAIResponse } = await setupMocks()
+    const { generateAIResponse, endRequestTracking } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(createRequest({ role: "partner" }))
@@ -136,10 +138,11 @@ describe("/api/chat route", () => {
     expect(response.status).toBe(400)
     expect(response.data).toEqual({ error: "Message is required" })
     expect(generateAIResponse).not.toHaveBeenCalled()
+    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
   })
 
   it("skips proactive interviewer checks when there is little code and little silence", async () => {
-    const { generateAIResponse } = await setupMocks()
+    const { generateAIResponse, endRequestTracking } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(
@@ -158,10 +161,11 @@ describe("/api/chat route", () => {
       reason: "Not enough code to comment on yet and not silent long enough",
     })
     expect(generateAIResponse).not.toHaveBeenCalled()
+    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
   })
 
   it("continues proactive interviewer checks after enough silence", async () => {
-    const { generateAIResponse } = await setupMocks()
+    const { generateAIResponse, endRequestTracking } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(
@@ -218,7 +222,7 @@ describe("/api/chat route", () => {
   })
 
   it("stays silent after the interviewer already ended the session", async () => {
-    const { generateAIResponse } = await setupMocks()
+    const { generateAIResponse, endRequestTracking } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(
@@ -237,6 +241,7 @@ describe("/api/chat route", () => {
         "The interview session has ended. Click 'See Full Interview Score' to see your score breakdown and detailed analysis.",
     })
     expect(generateAIResponse).not.toHaveBeenCalled()
+    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
   })
 
   it("returns the provider response and debug phase metadata for a normal partner message", async () => {
@@ -285,6 +290,29 @@ describe("/api/chat route", () => {
         provider: "gemini-lite",
       })
     )
+    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+  })
+
+  it("ends request tracking when AI generation fails", async () => {
+    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { POST } = await import("./route")
+
+    vi.mocked(generateAIResponse).mockRejectedValueOnce(new Error("AI down"))
+
+    const response = await POST(
+      createRequest({
+        role: "partner",
+        message: "Can you explain my bug?",
+        currentCode: "function twoSum(nums, target) { return [] }",
+        scenarioTitle: "Two Sum",
+        scenarioType: "dsa",
+        sessionId: "session-1",
+        userId: "user-1",
+      })
+    )
+
+    expect(response.status).toBe(500)
+    expect(response.data).toEqual({ error: "Failed to process chat message. Please try again." })
     expect(endRequestTracking).toHaveBeenCalledWith("user-1")
   })
 })

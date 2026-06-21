@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
   // Apply tier-based rate limiting (second layer - per-user limits)
   const tier = (quotaResult.tier || "free") as RateLimitTier
   const rateLimitUserId = quotaResult.userId || "anonymous"
+  let trackingStarted = false
 
   if (rateLimitUserId !== "anonymous") {
     const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 1000) // ~1000 tokens per chat
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
     }
     // Track request start for concurrent limiting
     await startRequestTracking(rateLimitUserId, 1000)
+    trackingStarted = true
   }
 
   const startTime = Date.now()
@@ -825,11 +827,6 @@ Generate a compliant response NOW:`
 
     runConversationExtractionAfterResponse(extractionJob)
 
-    // End request tracking for tier-based rate limiting
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId)
-    }
-
     return NextResponse.json({
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
@@ -845,11 +842,6 @@ Generate a compliant response NOW:`
       },
     })
   } catch (error: unknown) {
-    // End request tracking on error too
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId).catch(() => {})
-    }
-
     logger.error("Chat API error", {
       error,
       message: error instanceof Error ? error.message : undefined,
@@ -864,5 +856,9 @@ Generate a compliant response NOW:`
       },
       { status: 500 }
     )
+  } finally {
+    if (trackingStarted) {
+      await endRequestTracking(rateLimitUserId).catch(() => {})
+    }
   }
 }
