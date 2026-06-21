@@ -44,12 +44,7 @@ import {
 } from "@/lib/interview/interviewer-policy"
 import { buildInterviewerPrompt } from "@/lib/interview/interviewer-prompts"
 import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
-import {
-  chatRequestSchema,
-  type ConsoleLogItem,
-  type TestResultItem,
-  type UserContext,
-} from "@/lib/interview/chat-request-schema"
+import { chatRequestSchema, type UserContext } from "@/lib/interview/chat-request-schema"
 import { buildRAGContext } from "@/lib/interview/chat-rag-context"
 import type { ClarifyingQuestion } from "@/lib/scenarios/types"
 import {
@@ -71,6 +66,7 @@ import {
   buildEndedConversationResponse,
   buildProactiveSkipResponse,
 } from "@/lib/interview/chat/response-flow"
+import { buildChatRequestContext } from "@/lib/interview/chat/request-context"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
   lastExtractionAt?: number
@@ -186,43 +182,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Extract validated data with type assertions for complex types
-    const validatedData = parseResult.data
-    const message = validatedData.message
-    const context = validatedData.context
-    const role = validatedData.role
-    const userContext = validatedData.userContext as UserContext | undefined
-    const workspaceContext = validatedData.workspaceContext
-    const currentCode = validatedData.currentCode
-    const isProactive = validatedData.isProactive
-    const scenarioTitle = validatedData.scenarioTitle
-    const scenarioType = validatedData.scenarioType
-    const scenarioPattern = validatedData.scenarioPattern
-    const scenarioCompany = validatedData.scenarioCompany
-    const elapsedTime = validatedData.elapsedTime
-    const sessionId = validatedData.sessionId
-    const userId = validatedData.userId
-    const partnerMessagesCount = validatedData.partnerMessagesCount
-    const lastPartnerExchange = validatedData.lastPartnerExchange
-    const recentNudgeTopics = validatedData.recentNudgeTopics
-    const userAnsweredTopics = validatedData.userAnsweredTopics
-    const timeSinceLastMessage = validatedData.timeSinceLastMessage
-    const isWrapUp = validatedData.isWrapUp
-    const edgeCases = validatedData.edgeCases as
-      | Array<{ description: string; input: unknown }>
-      | undefined
-    const testResults = validatedData.testResults as TestResultItem[] | undefined
-    const consoleLogs = validatedData.consoleLogs as ConsoleLogItem[] | undefined
-    const conversationTracker = validatedData.conversationTracker
-    const hasSubmitted = validatedData.hasSubmitted
-    const solutionComplexity = validatedData.solutionComplexity as
-      | { estimated?: string; optimal?: string; optimalSpace?: string; isOptimal?: boolean }
-      | undefined
-    const realInterviewMode = validatedData.realInterviewMode
-    const hasFuzzyStatement = validatedData.hasFuzzyStatement
-    const scenarioClarifyingQuestions = validatedData.scenarioClarifyingQuestions
-    const scenarioFuzzyStatement = validatedData.scenarioFuzzyStatement
-    const starterCodeLength = validatedData.starterCodeLength
+    const requestContext = buildChatRequestContext(parseResult.data)
+    const {
+      message,
+      context,
+      role,
+      userContext,
+      workspaceContext,
+      currentCode,
+      isProactive,
+      scenarioTitle,
+      scenarioType,
+      scenarioPattern,
+      scenarioCompany,
+      elapsedTime,
+      sessionId,
+      userId,
+      partnerMessagesCount,
+      lastPartnerExchange,
+      recentNudgeTopics,
+      userAnsweredTopics,
+      timeSinceLastMessage,
+      isWrapUp,
+      edgeCases,
+      testResults,
+      consoleLogs,
+      conversationTracker,
+      hasSubmitted,
+      solutionComplexity,
+      realInterviewMode,
+      hasFuzzyStatement,
+      scenarioClarifyingQuestions,
+      scenarioFuzzyStatement,
+      starterCodeLength,
+      messageCount,
+      testsHaveRun,
+      currentCodeLength,
+    } = requestContext
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -318,11 +314,9 @@ export async function POST(request: NextRequest) {
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
-    const testsHaveRunNow =
-      testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
-    const messageCount = Array.isArray(context) ? context.length : 0
-    const currentCodeLen = currentCode?.length || 0
-    const starterLen = starterCodeLength || 0
+    const testsHaveRunNow = testsHaveRun
+    const currentCodeLen = currentCodeLength
+    const starterLen = starterCodeLength
 
     const phaseContext: PhaseDetectionContext = {
       hasSubmitted: hasSubmitted || false,
