@@ -55,6 +55,7 @@ import {
   generateClarifyingQuestionsFeedback,
   type ClarifyingQuestionsCheckResult,
 } from "@/lib/interview/clarifying-questions-checker"
+import { validateFeedbackRequestBody } from "@/lib/feedback/request-schema"
 
 export async function POST(request: NextRequest) {
   // Apply IP-based rate limiting (first layer)
@@ -84,6 +85,20 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
+    const validation = validateFeedbackRequestBody(await request.json())
+
+    if (!validation.success) {
+      if (validation.logContext?.codeLength) {
+        logger.warn("[Feedback API] Code too large", validation.logContext)
+      } else if (validation.logContext?.transcriptLength) {
+        logger.warn("[Feedback API] Transcript too large", validation.logContext)
+      } else if (validation.error === "Invalid request body") {
+        logger.warn("[Feedback API] Invalid request body", validation.logContext)
+      }
+
+      return NextResponse.json({ error: validation.error }, { status: validation.status })
+    }
+
     const {
       code,
       scenarioTitle,
@@ -106,41 +121,7 @@ export async function POST(request: NextRequest) {
       // Real Interview Mode (fuzzy problem statements)
       scenarioClarifyingQuestions, // Clarifying questions from scenario
       realInterviewMode, // Whether Real Interview Mode was active
-    } = await request.json()
-
-    if (!code || !scenarioTitle) {
-      return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
-    }
-
-    // Input validation: reject oversized code to prevent abuse
-    const MAX_CODE_LENGTH = 100000 // 100KB limit
-    if (code.length > MAX_CODE_LENGTH) {
-      logger.warn("[Feedback API] Code too large", { codeLength: code.length })
-      return NextResponse.json(
-        {
-          error: `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`,
-        },
-        { status: 400 }
-      )
-    }
-
-    // Input validation: reject oversized conversation transcript
-    const MAX_TRANSCRIPT_LENGTH = 200000 // 200KB limit
-    if (
-      conversationTranscript &&
-      typeof conversationTranscript === "string" &&
-      conversationTranscript.length > MAX_TRANSCRIPT_LENGTH
-    ) {
-      logger.warn("[Feedback API] Transcript too large", {
-        transcriptLength: conversationTranscript.length,
-      })
-      return NextResponse.json(
-        {
-          error: `Conversation transcript exceeds maximum length`,
-        },
-        { status: 400 }
-      )
-    }
+    } = validation.data
 
     // Calculate collaboration message count
     const collaborationMessages =
@@ -456,7 +437,7 @@ CODE EFFICIENCY ANALYSIS:
     // Create promise for AI validation
     const aiValidationPromise = shouldValidateWithAI
       ? validateConversationWithAI(
-          conversationTranscript,
+          conversationTranscript || [],
           code,
           efficiencyMetrics
             ? {
@@ -651,11 +632,12 @@ CODE EFFICIENCY ANALYSIS:
       }
 
       // 4. Heavy hint dependency (5+ hints)
-      if (tracker?.hintsGiven >= 5) {
+      const hintsGiven = tracker?.hintsGiven || 0
+      if (hintsGiven >= 5) {
         phaseAnalysis.penalties.push({
           phase: "hints",
           penalty: 15,
-          reason: `Used ${tracker.hintsGiven} hints - solution may not be independently derived`,
+          reason: `Used ${hintsGiven} hints - solution may not be independently derived`,
         })
         // Apply to understanding and problem-solving
         validatedScores.understanding = Math.max(30, validatedScores.understanding - 10)
