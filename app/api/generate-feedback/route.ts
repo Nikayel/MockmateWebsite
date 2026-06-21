@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
   // Apply tier-based rate limiting (second layer)
   const tier = (quotaResult.tier || "free") as RateLimitTier
   const rateLimitUserId = quotaResult.userId || "anonymous"
+  let trackingStarted = false
 
   if (rateLimitUserId !== "anonymous") {
     const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 2000) // Feedback uses ~2000 tokens
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
       return buildRateLimitResponse(tierRateCheck)
     }
     await startRequestTracking(rateLimitUserId, 2000)
+    trackingStarted = true
   }
 
   const startTime = Date.now()
@@ -1184,11 +1186,6 @@ CRITICAL INSTRUCTIONS:
       })
     }
 
-    // End request tracking
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId)
-    }
-
     return NextResponse.json({
       feedback: finalFeedback,
       performanceScore: scores.overall,
@@ -1256,15 +1253,14 @@ CRITICAL INSTRUCTIONS:
       latencyMs: aiResponse.latencyMs,
     })
   } catch (error) {
-    // End request tracking on error
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId).catch(() => {})
-    }
-
     logger.error("Feedback generation error", { error, endpoint: "/api/generate-feedback" })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },
       { status: 500 }
     )
+  } finally {
+    if (trackingStarted) {
+      await endRequestTracking(rateLimitUserId).catch(() => {})
+    }
   }
 }
