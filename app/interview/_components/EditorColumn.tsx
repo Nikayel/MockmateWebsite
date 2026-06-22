@@ -143,7 +143,10 @@ export const EditorColumn = memo(function EditorColumn({
         {isWorkspaceScenario(selectedScenario) &&
         workspaceContext &&
         workspaceContext.length > 0 ? (
-          <div className="flex w-full items-center justify-between border-b border-gray-700 bg-gray-900/80 pr-4">
+          <div
+            className="flex w-full items-center justify-between border-b border-gray-700 bg-gray-900/80 pr-4"
+            data-bugfix-tour={selectedScenario?.type === "bugfix" ? "workspace-files" : undefined}
+          >
             <div className="workspace-tabs-container no-scrollbar flex flex-1 overflow-x-auto">
               {workspaceContext.map((file) => {
                 const isActive = activeWorkspaceFile?.path === file.path
@@ -345,6 +348,7 @@ export const EditorColumn = memo(function EditorColumn({
               disabled={showFeedback || isRunningTests}
               className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} h-7 text-xs text-white`}
               aria-label={isRunningTests ? "Running tests" : "Run tests"}
+              data-bugfix-tour={selectedScenario?.type === "bugfix" ? "run-tests" : undefined}
             >
               {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
               {isRunningTests ? "Running..." : "Run Tests"}
@@ -364,9 +368,11 @@ export const EditorColumn = memo(function EditorColumn({
         {selectedScenario && selectedScenario.type !== "dsa" && (
           <div className="flex-shrink-0 border-t border-gray-700 pt-2">
             {!isAIPartnerExpanded ? (
-              <div
-                className="flex cursor-pointer items-center justify-between rounded bg-gray-800/50 px-2 py-1.5 transition-colors hover:bg-gray-800"
+              <button
+                type="button"
+                className="focus:ring-accent/60 flex w-full cursor-pointer items-center justify-between rounded bg-gray-800/50 px-2 py-1.5 text-left transition-colors hover:bg-gray-800 focus:ring-2 focus:outline-none"
                 onClick={() => onAIPartnerExpandedChange(true)}
+                data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
               >
                 <div className="flex items-center gap-2">
                   <Bot className="text-accent h-3 w-3" />
@@ -381,9 +387,12 @@ export const EditorColumn = memo(function EditorColumn({
                   )}
                   <ChevronUp className="h-3 w-3 text-gray-500" />
                 </div>
-              </div>
+              </button>
             ) : (
-              <div className="rounded bg-gray-800/30 p-2">
+              <div
+                className="rounded bg-gray-800/30 p-2"
+                data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
+              >
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Bot className="text-accent h-3 w-3" />

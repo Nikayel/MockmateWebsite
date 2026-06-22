@@ -64,6 +64,7 @@ import { EditorColumn } from "./_components/EditorColumn"
 import { ProblemColumn } from "./_components/ProblemColumn"
 import { FocusProblemPeek } from "./_components/FocusProblemPeek"
 import { InterviewTopBar } from "./_components/InterviewTopBar"
+import { BugfixOnboardingTour } from "./_components/BugfixOnboardingTour"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
@@ -525,6 +526,11 @@ function InterviewPageContent() {
 
     return userProfileRequestRef.current
   }, [cachedUserProfile, user])
+
+  useEffect(() => {
+    if (selectedScenario?.type !== "bugfix" || !user || cachedUserProfile) return
+    void getCachedUserProfile()
+  }, [cachedUserProfile, getCachedUserProfile, selectedScenario?.type, user])
 
   // Calm mode - muted colors for anxiety reduction (research-backed)
   // Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
@@ -3836,6 +3842,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             currentCode: code,
             scenarioTitle: selectedScenario?.title,
             scenarioType: selectedScenario?.type,
+            bugfixReflection:
+              selectedScenario?.type === "bugfix"
+                ? {
+                    hypothesis: bugfixHypothesis,
+                    rootCause: bugfixRootCause,
+                    prevention: bugfixPrevention,
+                  }
+                : undefined,
             scenarioCompany: targetCompany, // Target company for RAG context
             isProactive: false,
             isPostInterview: showPostInterviewDiscussion,
@@ -4894,6 +4908,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         })
       }
 
+      if (field === "rootCause" && bugfixRootCause.trim()) {
+        recordBugfixEvidence({
+          type: "submission_created",
+          text: bugfixRootCause.trim(),
+        })
+      }
+
       if (field === "prevention" && bugfixPrevention.trim()) {
         recordBugfixEvidence({
           type: "prevention_explained",
@@ -4901,7 +4922,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         })
       }
     },
-    [bugfixHypothesis, bugfixPrevention, recordBugfixEvidence, selectedScenario?.type]
+    [
+      bugfixHypothesis,
+      bugfixPrevention,
+      bugfixRootCause,
+      recordBugfixEvidence,
+      selectedScenario?.type,
+    ]
   )
 
   const resetActiveWorkspaceFile = useCallback(() => {
@@ -5002,6 +5029,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
   return (
     <main className="min-h-screen bg-black">
+      <h1 className="sr-only">Mock Interview Environment</h1>
       {!isInterviewMode && <Header />}
 
       {/* Guest Mode Banner - Sticky below header */}
@@ -5067,6 +5095,17 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                 onHideTimerChange={setHideTimer}
                 elapsedTime={elapsedTime}
                 strictTimeLimit={strictTimeLimit}
+                onReplayBugfixTour={
+                  selectedScenario?.type === "bugfix" &&
+                  isInterviewStarted &&
+                  workspaceContext.length > 0
+                    ? () => {
+                        if (typeof window !== "undefined") {
+                          window.dispatchEvent(new Event("codesparring:bugfix-tour-replay"))
+                        }
+                      }
+                    : undefined
+                }
                 onCloseClick={() => setShowCloseDialog(true)}
               />
 
@@ -5207,6 +5246,24 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                     countdownActive={interviewerVoice.countdownActive}
                     interviewerInput={interviewerInput}
                     onInterviewerInputChange={setInterviewerInput}
+                  />
+                  <BugfixOnboardingTour
+                    activePanel={activePanel}
+                    enabled={
+                      selectedScenario?.type === "bugfix" &&
+                      isInterviewStarted &&
+                      workspaceContext.length > 0 &&
+                      !showFeedback &&
+                      !showPostInterviewDiscussion
+                    }
+                    hypothesis={bugfixHypothesis}
+                    isAIPartnerExpanded={isAIPartnerExpanded}
+                    onAIPartnerExpandedChange={setIsAIPartnerExpanded}
+                    onActivePanelChange={setActivePanel}
+                    scenarioId={selectedScenario?.id}
+                    testResultsCount={testResults.length}
+                    userId={user?.id}
+                    userProfile={cachedUserProfile}
                   />
                 </div>
               ) : showPostInterviewDiscussion ? (

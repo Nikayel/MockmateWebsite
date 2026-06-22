@@ -7,6 +7,7 @@ import {
   Code,
   Eye,
   EyeOff,
+  HelpCircle,
   Leaf,
   Maximize2,
   Minimize2,
@@ -36,6 +37,7 @@ interface InterviewTopBarProps {
   onHideTimerChange: (hidden: boolean) => void
   elapsedTime: number
   strictTimeLimit: number | null
+  onReplayBugfixTour?: () => void
   onCloseClick: () => void
 }
 
@@ -54,6 +56,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   onHideTimerChange,
   elapsedTime,
   strictTimeLimit,
+  onReplayBugfixTour,
   onCloseClick,
 }: InterviewTopBarProps) {
   const handleLanguageChange = (newLang: EditorLanguage) => {
@@ -192,6 +195,18 @@ export const InterviewTopBar = memo(function InterviewTopBar({
               )}
             </button>
           </div>
+        )}
+
+        {selectedScenario?.type === "bugfix" && onReplayBugfixTour && (
+          <button
+            onClick={onReplayBugfixTour}
+            className="bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-200 focus:ring-2 focus:ring-cyan-300/50 focus:outline-none"
+            title="Replay bugfix tour"
+            aria-label="Replay bugfix tour"
+          >
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden xl:inline">Help</span>
+          </button>
         )}
 
         <button

@@ -10,6 +10,7 @@ import {
   HardDrive,
   HelpCircle,
   Lightbulb,
+  Save,
   Sparkles,
   Target,
   ThumbsDown,
@@ -160,7 +161,10 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
               </div>
 
               {isBugfix && (
-                <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3">
+                <div
+                  className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3"
+                  data-bugfix-tour="incident-report"
+                >
                   <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-blue-300 uppercase">
                     <span className="h-4 w-1 rounded-full bg-blue-300"></span>
                     Incident Report
@@ -232,10 +236,30 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                   </h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-300">
-                        Hypothesis
-                      </label>
+                      <div
+                        className="mb-1 flex items-center justify-between gap-2"
+                        data-bugfix-tour="hypothesis"
+                      >
+                        <label
+                          htmlFor="bugfix-hypothesis"
+                          className="block text-xs font-medium text-gray-300"
+                        >
+                          Hypothesis
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!bugfixReflection.hypothesis.trim()}
+                          onClick={() => onBugfixReflectionCommit?.("hypothesis")}
+                          className="h-7 border-emerald-500/30 px-2 text-[11px] text-emerald-200 hover:bg-emerald-500/10"
+                        >
+                          <Save className="mr-1 h-3 w-3" />
+                          Save hypothesis
+                        </Button>
+                      </div>
                       <Textarea
+                        id="bugfix-hypothesis"
                         value={bugfixReflection.hypothesis}
                         onChange={(event) =>
                           onBugfixReflectionChange?.("hypothesis", event.target.value)
@@ -246,10 +270,27 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-300">
-                        Root Cause
-                      </label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label
+                          htmlFor="bugfix-root-cause"
+                          className="block text-xs font-medium text-gray-300"
+                        >
+                          Root Cause
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!bugfixReflection.rootCause.trim()}
+                          onClick={() => onBugfixReflectionCommit?.("rootCause")}
+                          className="h-7 border-emerald-500/30 px-2 text-[11px] text-emerald-200 hover:bg-emerald-500/10"
+                        >
+                          <Save className="mr-1 h-3 w-3" />
+                          Save root cause
+                        </Button>
+                      </div>
                       <Textarea
+                        id="bugfix-root-cause"
                         value={bugfixReflection.rootCause}
                         onChange={(event) =>
                           onBugfixReflectionChange?.("rootCause", event.target.value)
@@ -260,10 +301,27 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-300">
-                        Prevention
-                      </label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label
+                          htmlFor="bugfix-prevention"
+                          className="block text-xs font-medium text-gray-300"
+                        >
+                          Prevention
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!bugfixReflection.prevention.trim()}
+                          onClick={() => onBugfixReflectionCommit?.("prevention")}
+                          className="h-7 border-emerald-500/30 px-2 text-[11px] text-emerald-200 hover:bg-emerald-500/10"
+                        >
+                          <Save className="mr-1 h-3 w-3" />
+                          Save prevention
+                        </Button>
+                      </div>
                       <Textarea
+                        id="bugfix-prevention"
                         value={bugfixReflection.prevention}
                         onChange={(event) =>
                           onBugfixReflectionChange?.("prevention", event.target.value)
@@ -365,8 +423,9 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                   </div>
                                 </div>
                               ) : (
-                                <div
-                                  className="relative p-3"
+                                <button
+                                  type="button"
+                                  className="relative w-full p-3 text-left focus:ring-2 focus:ring-purple-400 focus:outline-none"
                                   onClick={() => {
                                     if (hint.id) {
                                       hintAgent.revealHint(hint.id)
@@ -384,7 +443,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                       Click to reveal hint {i + 1}
                                     </div>
                                   </div>
-                                </div>
+                                </button>
                               )}
                             </div>
                           )
@@ -519,9 +578,10 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                           .map((hint: string, i: number) => {
                             const isHintRevealed = revealedHintIndices.has(i)
                             return (
-                              <div
+                              <button
+                                type="button"
                                 key={i}
-                                className={`cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 transition-all ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
+                                className={`w-full cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 text-left transition-all focus:ring-2 focus:ring-yellow-400 focus:outline-none ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
                                 onClick={() => {
                                   if (!isHintRevealed) {
                                     setRevealedHintIndices((prev) => new Set([...prev, i]))
@@ -546,7 +606,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                     </div>
                                   </div>
                                 )}
-                              </div>
+                              </button>
                             )
                           })}
                       </div>

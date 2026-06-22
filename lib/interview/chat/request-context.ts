@@ -30,6 +30,7 @@ export interface ChatRequestContext {
   isProactive?: boolean
   scenarioTitle?: string
   scenarioType?: string
+  bugfixReflection?: ChatRequestData["bugfixReflection"]
   scenarioPattern?: string
   scenarioCompany?: string | null
   elapsedTime?: number
@@ -72,6 +73,7 @@ export function buildChatRequestContext(validatedData: ChatRequestData): ChatReq
     isProactive: validatedData.isProactive,
     scenarioTitle: validatedData.scenarioTitle,
     scenarioType: validatedData.scenarioType,
+    bugfixReflection: validatedData.bugfixReflection,
     scenarioPattern: validatedData.scenarioPattern,
     scenarioCompany: validatedData.scenarioCompany,
     elapsedTime: validatedData.elapsedTime,

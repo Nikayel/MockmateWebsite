@@ -56,6 +56,11 @@ export async function GET(request: NextRequest) {
       goal: profile.goal,
       onboarding_completed: profile.onboarding_completed,
       tour_completed: profile.tour_completed,
+      bugfix_tour_completed: profile.bugfix_tour_completed,
+      bugfix_tour_skipped: profile.bugfix_tour_skipped,
+      bugfix_tour_completed_at: profile.bugfix_tour_completed_at,
+      bugfix_tour_skipped_at: profile.bugfix_tour_skipped_at,
+      bugfix_tour_version: profile.bugfix_tour_version,
       created_at: profile.created_at,
     })
   } catch (error) {
