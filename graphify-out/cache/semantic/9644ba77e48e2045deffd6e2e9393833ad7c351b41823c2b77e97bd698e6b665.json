@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "agents_md_codesparring",
+      "label": "CodeSparring Project (AGENTS.md)",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "agents_md_codesparring",
+      "target": "concept_codesparring_platform",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "AGENTS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "agents_md_codesparring",
+      "target": "claude_md_codesparring",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "AGENTS.md",
+      "source_location": null,
+      "weight": 0.9
+    }
+  ],
+  "hyperedges": []
+}

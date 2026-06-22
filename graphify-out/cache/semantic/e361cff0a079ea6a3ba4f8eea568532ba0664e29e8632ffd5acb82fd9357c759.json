@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "id": "blog_google_30_day",
+      "label": "Blog: Google Interview 30-Day Prep Plan",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-12-28",
+      "author": "Nikayel Ali Jamal",
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "blog_google_30_day",
+      "target": "concept_codesparring_platform",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

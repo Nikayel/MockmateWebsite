@@ -1,0 +1,100 @@
+{
+  "nodes": [
+    {
+      "id": "data_retention_doc",
+      "label": "Data Retention and Archival Strategy",
+      "file_type": "document",
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_bigquery",
+      "label": "BigQuery Data Archival",
+      "file_type": "concept",
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "firestore_rate_limits",
+      "label": "Firestore rate_limits Collection",
+      "file_type": "concept",
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "data_retention_doc",
+      "target": "firestore_usage_events",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": "High-Volume Collections",
+      "weight": 1.0
+    },
+    {
+      "source": "data_retention_doc",
+      "target": "firestore_email_logs",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": "High-Volume Collections",
+      "weight": 1.0
+    },
+    {
+      "source": "data_retention_doc",
+      "target": "firestore_algorithm_research_events",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": "High-Volume Collections",
+      "weight": 1.0
+    },
+    {
+      "source": "data_retention_doc",
+      "target": "firestore_rate_limits",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": "High-Volume Collections",
+      "weight": 1.0
+    },
+    {
+      "source": "data_retention_doc",
+      "target": "concept_bigquery",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": "BigQuery Export",
+      "weight": 1.0
+    },
+    {
+      "source": "data_retention_doc",
+      "target": "app_api_cron_dir",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/data-retention-strategy.md",
+      "source_location": "Archival Cron Job",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

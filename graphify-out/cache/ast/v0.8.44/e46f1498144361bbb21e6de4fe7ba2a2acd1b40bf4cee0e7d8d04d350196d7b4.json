@@ -1,0 +1,237 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_vercel_json",
+      "label": "vercel.json",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L1"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_buildcommand",
+      "label": "buildCommand",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L2"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_devcommand",
+      "label": "devCommand",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L3"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_installcommand",
+      "label": "installCommand",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L4"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_functions",
+      "label": "functions",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L5"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_functions_app_api_ts",
+      "label": "app/api/**/*.ts",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L6"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_app_api_ts_maxduration",
+      "label": "maxDuration",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L7"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_functions_app_api_execute_route_ts",
+      "label": "app/api/execute/route.ts",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L9"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_app_api_execute_route_ts_maxduration",
+      "label": "maxDuration",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L10"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_functions_app_api_chat_route_ts",
+      "label": "app/api/chat/route.ts",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L12"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_app_api_chat_route_ts_maxduration",
+      "label": "maxDuration",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L13"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_functions_app_api_generate_feedback_route_ts",
+      "label": "app/api/generate-feedback/route.ts",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L15"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_app_api_generate_feedback_route_ts_maxduration",
+      "label": "maxDuration",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L16"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_functions_app_api_cron_email_notifications_route_ts",
+      "label": "app/api/cron/email-notifications/route.ts",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L18"
+    },
+    {
+      "id": "mockmatewebsitet7_vercel_app_api_cron_email_notifications_route_ts_maxduration",
+      "label": "maxDuration",
+      "file_type": "code",
+      "source_file": "vercel.json",
+      "source_location": "L19"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_vercel_json",
+      "target": "mockmatewebsitet7_vercel_buildcommand",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_vercel_json",
+      "target": "mockmatewebsitet7_vercel_devcommand",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_vercel_json",
+      "target": "mockmatewebsitet7_vercel_installcommand",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_vercel_json",
+      "target": "mockmatewebsitet7_vercel_functions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions",
+      "target": "mockmatewebsitet7_vercel_functions_app_api_ts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions_app_api_ts",
+      "target": "mockmatewebsitet7_vercel_app_api_ts_maxduration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions",
+      "target": "mockmatewebsitet7_vercel_functions_app_api_execute_route_ts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions_app_api_execute_route_ts",
+      "target": "mockmatewebsitet7_vercel_app_api_execute_route_ts_maxduration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions",
+      "target": "mockmatewebsitet7_vercel_functions_app_api_chat_route_ts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions_app_api_chat_route_ts",
+      "target": "mockmatewebsitet7_vercel_app_api_chat_route_ts_maxduration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions",
+      "target": "mockmatewebsitet7_vercel_functions_app_api_generate_feedback_route_ts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions_app_api_generate_feedback_route_ts",
+      "target": "mockmatewebsitet7_vercel_app_api_generate_feedback_route_ts_maxduration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions",
+      "target": "mockmatewebsitet7_vercel_functions_app_api_cron_email_notifications_route_ts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_vercel_functions_app_api_cron_email_notifications_route_ts",
+      "target": "mockmatewebsitet7_vercel_app_api_cron_email_notifications_route_ts_maxduration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "vercel.json",
+      "source_location": "L19",
+      "weight": 1.0
+    }
+  ]
+}

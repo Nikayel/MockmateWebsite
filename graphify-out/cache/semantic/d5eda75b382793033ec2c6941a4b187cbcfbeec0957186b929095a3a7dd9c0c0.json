@@ -1,0 +1,149 @@
+{
+  "nodes": [
+    {
+      "id": "docs_backend_md",
+      "label": "CodeSparring Backend",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_brevo",
+      "label": "Brevo Transactional Email",
+      "file_type": "concept",
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_backend_md",
+      "target": "docs_architecture_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "docs_api_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "docs_firebase_structure_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_google_gemini",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_firestore",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_pinecone",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_stripe",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_piston",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_deepgram",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_firebase_auth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_brevo",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_md",
+      "target": "concept_vercel",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/BACKEND.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "blog_faang_vs_top_tech",
+      "label": "Blog: FAANG vs Top Tech vs Growth Companies Interview Comparison",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2026-01-05",
+      "author": "Nikayel Ali Jamal",
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "blog_faang_vs_top_tech",
+      "target": "concept_codesparring_platform",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech",
+      "target": "blog_amazon_lp",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

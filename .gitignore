@@ -45,6 +45,7 @@ next-env.d.ts
 
 # Local assistant planning notes
 /PLAN.md
+/immediate_fixes.md
 
 # Extension directory (cloned repo for context, not part of website build)
 /extension/
@@ -61,3 +62,6 @@ next-env.d.ts
 
 # Ignore constitution files
 /constitution/
+
+# Future Sprints
+/future-sprints/

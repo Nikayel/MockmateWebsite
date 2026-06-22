@@ -1,0 +1,173 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_scripts_generate_problems_py",
+      "label": "generate-problems.py",
+      "file_type": "code",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "scripts_generate_problems_generate_js_starter_code",
+      "label": "generate_js_starter_code()",
+      "file_type": "code",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L867"
+    },
+    {
+      "id": "scripts_generate_problems_generate_problem_from_template",
+      "label": "generate_problem_from_template()",
+      "file_type": "code",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L886"
+    },
+    {
+      "id": "scripts_generate_problems_rationale_868",
+      "label": "Generate JavaScript starter code based on problem type",
+      "file_type": "rationale",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L868"
+    },
+    {
+      "id": "scripts_generate_problems_rationale_887",
+      "label": "Convert template to full TypeScript scenario format",
+      "file_type": "rationale",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L887"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_scripts_generate_problems_py",
+      "target": "json",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_scripts_generate_problems_py",
+      "target": "re",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_scripts_generate_problems_py",
+      "target": "scripts_generate_problems_generate_js_starter_code",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L867",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_scripts_generate_problems_py",
+      "target": "scripts_generate_problems_generate_problem_from_template",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L886",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_generate_problems_generate_problem_from_template",
+      "target": "scripts_generate_problems_generate_js_starter_code",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L904",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_generate_problems_rationale_868",
+      "target": "scripts_generate_problems_generate_js_starter_code",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L868",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_generate_problems_rationale_887",
+      "target": "scripts_generate_problems_generate_problem_from_template",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/generate-problems.py",
+      "source_location": "L887",
+      "weight": 1.0
+    }
+  ],
+  "raw_calls": [
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "replace",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L888",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "replace",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L888",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "join",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L891",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "get",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L893",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "join",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L899",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "join",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L902",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "dumps",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L914",
+      "receiver": null
+    },
+    {
+      "caller_nid": "scripts_generate_problems_generate_problem_from_template",
+      "callee": "dumps",
+      "is_member_call": true,
+      "source_file": "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py",
+      "source_location": "L916",
+      "receiver": null
+    }
+  ]
+}
