@@ -80,7 +80,15 @@ export const ScenarioCard = memo(function ScenarioCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(scenario)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onSelect(scenario)
+        }
+      }}
       className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white/[0.03] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-300 ${
         isSelected
           ? "border-white/25 bg-white/[0.06] shadow-[0_20px_50px_rgba(0,0,0,0.4)]"

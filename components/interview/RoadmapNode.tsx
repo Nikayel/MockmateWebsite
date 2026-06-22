@@ -17,38 +17,48 @@ import type { NodeStats } from "@/lib/hooks/useDSARoadmap"
 // Node positions for the tree layout - organized as a proper skill tree
 export const NODE_POSITIONS: Record<string, { x: number; y: number; tier: number }> = {
   // Tier 1 - Foundation (top center)
-  'arrays-hashing': { x: 50, y: 5, tier: 1 },
+  "arrays-hashing": { x: 50, y: 5, tier: 1 },
 
   // Tier 2 - Core (branches from foundation)
-  'two-pointers': { x: 20, y: 18, tier: 2 },
-  'stack': { x: 40, y: 18, tier: 2 },
-  'binary-search': { x: 60, y: 18, tier: 2 },
-  'sliding-window': { x: 10, y: 30, tier: 2 },
-  'linked-list': { x: 30, y: 30, tier: 2 },
+  "two-pointers": { x: 20, y: 18, tier: 2 },
+  stack: { x: 40, y: 18, tier: 2 },
+  "binary-search": { x: 60, y: 18, tier: 2 },
+  "sliding-window": { x: 10, y: 30, tier: 2 },
+  "linked-list": { x: 30, y: 30, tier: 2 },
 
   // Tier 3 - Advanced (deeper branches)
-  'trees': { x: 35, y: 42, tier: 3 },
-  'heap': { x: 65, y: 42, tier: 3 },
-  'trie': { x: 20, y: 54, tier: 3 },
-  'backtracking': { x: 45, y: 54, tier: 3 },
-  'graphs': { x: 70, y: 54, tier: 3 },
+  trees: { x: 35, y: 42, tier: 3 },
+  heap: { x: 65, y: 42, tier: 3 },
+  trie: { x: 20, y: 54, tier: 3 },
+  backtracking: { x: 45, y: 54, tier: 3 },
+  graphs: { x: 70, y: 54, tier: 3 },
 
   // Tier 4 - Expert (specialized branches)
-  'dp-1d': { x: 35, y: 66, tier: 4 },
-  'dp-2d': { x: 25, y: 78, tier: 4 },
-  'dp-tree': { x: 45, y: 78, tier: 4 },
-  'greedy': { x: 55, y: 66, tier: 4 },
-  'intervals': { x: 65, y: 78, tier: 4 },
-  'bit-manipulation': { x: 80, y: 30, tier: 4 },
-  'math-geometry': { x: 90, y: 18, tier: 4 },
-  'matrix': { x: 15, y: 90, tier: 4 },
+  "dp-1d": { x: 35, y: 66, tier: 4 },
+  "dp-2d": { x: 25, y: 78, tier: 4 },
+  "dp-tree": { x: 45, y: 78, tier: 4 },
+  greedy: { x: 55, y: 66, tier: 4 },
+  intervals: { x: 65, y: 78, tier: 4 },
+  "bit-manipulation": { x: 80, y: 30, tier: 4 },
+  "math-geometry": { x: 90, y: 18, tier: 4 },
+  matrix: { x: 15, y: 90, tier: 4 },
 }
 
 // Simplified: single style for unlocked nodes (reduces cognitive load from 4 tier colors to 1)
 const NODE_STYLE = {
-  unlocked: { bg: "from-zinc-700/50 to-zinc-800/50", border: "border-zinc-600", text: "text-white", glow: "shadow-zinc-500/10" },
+  unlocked: {
+    bg: "from-zinc-700/50 to-zinc-800/50",
+    border: "border-zinc-600",
+    text: "text-white",
+    glow: "shadow-zinc-500/10",
+  },
   locked: { bg: "bg-zinc-900/50", border: "border-zinc-800", text: "text-zinc-500" },
-  mastered: { bg: "from-emerald-900/30 to-emerald-950/30", border: "border-emerald-500/50", text: "text-emerald-400", glow: "shadow-emerald-500/20" },
+  mastered: {
+    bg: "from-emerald-900/30 to-emerald-950/30",
+    border: "border-emerald-500/50",
+    text: "text-emerald-400",
+    glow: "shadow-emerald-500/20",
+  },
 }
 
 interface RoadmapNodeProps {
@@ -91,7 +101,7 @@ export function RoadmapNode({
 
   return (
     <div
-      className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
+      className="absolute z-10 -translate-x-1/2 -translate-y-1/2 transform"
       style={{
         left: `${pos.x}%`,
         top: `${pos.y}%`,
@@ -99,67 +109,63 @@ export function RoadmapNode({
     >
       {/* Simplified Node Card */}
       <div
+        role="button"
+        tabIndex={0}
         onClick={onNodeClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            onNodeClick()
+          }
+        }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`
-          relative transition-all duration-200 cursor-pointer
-          ${isHovered && isUnlocked ? 'scale-105 z-20' : 'z-10'}
-          ${!isUnlocked ? 'opacity-40 cursor-not-allowed' : ''}
-        `}
+        className={`relative cursor-pointer transition-all duration-200 ${isHovered && isUnlocked ? "z-20 scale-105" : "z-10"} ${!isUnlocked ? "cursor-not-allowed opacity-40" : ""} `}
       >
         <Card
-          className={`
-            relative overflow-hidden w-32 transition-all duration-200
-            bg-gradient-to-br ${style.bg} ${style.border} border
-            ${isUnlocked && !isMastered ? 'hover:border-zinc-500' : ''}
-            ${isMastered ? 'ring-1 ring-emerald-500/40' : ''}
-          `}
+          className={`relative w-32 overflow-hidden bg-gradient-to-br transition-all duration-200 ${style.bg} ${style.border} border ${isUnlocked && !isMastered ? "hover:border-zinc-500" : ""} ${isMastered ? "ring-1 ring-emerald-500/40" : ""} `}
         >
           {/* Mastered checkmark */}
           {isMastered && (
-            <div className="absolute -top-1 -right-1 bg-emerald-500 rounded-full p-0.5">
+            <div className="absolute -top-1 -right-1 rounded-full bg-emerald-500 p-0.5">
               <Check className="h-2.5 w-2.5 text-black" />
             </div>
           )}
 
           {/* Lock icon for locked nodes */}
           {!isUnlocked && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg z-20">
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/50">
               <Lock className="h-4 w-4 text-zinc-600" />
             </div>
           )}
 
           <CardContent className="p-2.5">
             {/* Node name - larger, clearer */}
-            <h3 className={`font-medium text-sm leading-tight mb-2 ${style.text}`}>
-              {node.name}
-            </h3>
+            <h3 className={`mb-2 text-sm leading-tight font-medium ${style.text}`}>{node.name}</h3>
 
             {/* Simple progress: just the count */}
-            <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
-              <span>{stats?.completed || 0}/{stats?.total || 0}</span>
+            <div className="mb-1 flex items-center justify-between text-xs text-zinc-400">
+              <span>
+                {stats?.completed || 0}/{stats?.total || 0}
+              </span>
             </div>
-            <Progress
-              value={stats?.progress || 0}
-              className="h-1 bg-zinc-800"
-            />
+            <Progress value={stats?.progress || 0} className="h-1 bg-zinc-800" />
           </CardContent>
         </Card>
 
         {/* Prerequisites tooltip - only on hover for locked nodes */}
         {isHovered && !isUnlocked && prerequisites.length > 0 && (
-          <div className="absolute left-1/2 transform -translate-x-1/2 top-full mt-1.5 z-50 w-40">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-2 shadow-xl text-xs">
-              <div className="text-zinc-400 mb-1">Complete first:</div>
+          <div className="absolute top-full left-1/2 z-50 mt-1.5 w-40 -translate-x-1/2 transform">
+            <div className="rounded-lg border border-zinc-700 bg-zinc-800 p-2 text-xs shadow-xl">
+              <div className="mb-1 text-zinc-400">Complete first:</div>
               <div className="flex flex-wrap gap-1">
-                {prerequisites.map(p => (
+                {prerequisites.map((p) => (
                   <span
                     key={p.id}
-                    className={`text-xs px-1.5 py-0.5 rounded ${
+                    className={`rounded px-1.5 py-0.5 text-xs ${
                       nodeStats[p.id]?.isComplete
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-zinc-700 text-zinc-400'
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : "bg-zinc-700 text-zinc-400"
                     }`}
                   >
                     {p.name}

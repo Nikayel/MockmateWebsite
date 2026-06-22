@@ -220,6 +220,8 @@ export const FeedbackSections = memo(function FeedbackSections({
                       <Tooltip delayDuration={300}>
                         <TooltipTrigger asChild>
                           <span
+                            role="button"
+                            tabIndex={0}
                             className={`cursor-pointer transition-colors hover:text-emerald-300 ${
                               isExpanded ? "" : "line-clamp-2"
                             }`}
@@ -235,6 +237,23 @@ export const FeedbackSections = memo(function FeedbackSections({
                                   }
                                   return newSet
                                 })
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                if (isTruncated) {
+                                  setExpandedItems((prev) => {
+                                    const newSet = new Set(prev)
+                                    const key = i + 100
+                                    if (isExpanded) {
+                                      newSet.delete(key)
+                                    } else {
+                                      newSet.add(key)
+                                    }
+                                    return newSet
+                                  })
+                                }
                               }
                             }}
                           >
@@ -281,6 +300,8 @@ export const FeedbackSections = memo(function FeedbackSections({
                       <Tooltip delayDuration={300}>
                         <TooltipTrigger asChild>
                           <span
+                            role="button"
+                            tabIndex={0}
                             className={`cursor-pointer transition-colors hover:text-amber-300 ${
                               isExpanded ? "" : "line-clamp-2"
                             }`}
@@ -295,6 +316,22 @@ export const FeedbackSections = memo(function FeedbackSections({
                                   }
                                   return newSet
                                 })
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                if (isTruncated) {
+                                  setExpandedItems((prev) => {
+                                    const newSet = new Set(prev)
+                                    if (isExpanded) {
+                                      newSet.delete(i)
+                                    } else {
+                                      newSet.add(i)
+                                    }
+                                    return newSet
+                                  })
+                                }
                               }
                             }}
                           >

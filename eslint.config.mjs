@@ -12,8 +12,8 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  // Extend Next.js recommended configs
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // Extend Next.js recommended configs and jsx-a11y
+  ...compat.extends("next/core-web-vitals", "next/typescript", "plugin:jsx-a11y/recommended"),
 
   // Custom rules
   {

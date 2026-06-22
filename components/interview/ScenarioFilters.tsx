@@ -204,6 +204,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 
             {showCompanyDropdown && (
               <>
+                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
                 <div className="fixed inset-0 z-10" onClick={() => setShowCompanyDropdown(false)} />
                 <div className="absolute top-full right-0 z-20 mt-2 max-h-80 w-56 overflow-y-auto rounded-2xl border border-white/[0.06] bg-zinc-950/90 py-2 shadow-2xl backdrop-blur-xl">
                   {COMPANIES.map((company) => {
