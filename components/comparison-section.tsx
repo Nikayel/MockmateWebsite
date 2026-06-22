@@ -1,10 +1,9 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+import React, { useRef, useState, useEffect } from "react"
 import { motion, useInView, useSpring, useTransform } from "framer-motion"
 import { Check, X, ArrowRight } from "lucide-react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
 
 /**
  * Comparison Section - Professional Redesign
@@ -22,10 +21,12 @@ function AnimatedPrice({
   value,
   delay = 0,
   className = "",
+  style,
 }: {
   value: number
   delay?: number
   className?: string
+  style?: React.CSSProperties
 }) {
   const ref = useRef<HTMLSpanElement>(null)
   const isInView = useInView(ref, { once: true, amount: 0.5 })
@@ -46,7 +47,7 @@ function AnimatedPrice({
   }, [isInView, value, spring, delay])
 
   return (
-    <span ref={ref} className={className}>
+    <span ref={ref} className={className} style={style}>
       ${displayValue}
     </span>
   )
@@ -59,35 +60,49 @@ function FeatureRow({
   human,
   codesparring,
   index,
+  fontBody,
 }: {
   feature: string
   leetcode: boolean | string
   human: boolean | string
   codesparring: boolean
   index: number
+  fontBody: string
 }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, amount: 0.5 })
 
   const renderValue = (value: boolean | string, highlight = false) => {
     if (typeof value === "string") {
-      return <span className="text-xs text-zinc-500">{value}</span>
+      return (
+        <span style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}>{value}</span>
+      )
     }
     if (value) {
-      return <Check className={`h-4 w-4 ${highlight ? "text-emerald-400" : "text-zinc-500"}`} />
+      return <Check className="h-4 w-4" style={{ color: highlight ? "#0066cc" : "#7a7a7a" }} />
     }
-    return <X className="h-4 w-4 text-zinc-700" />
+    return <X className="h-4 w-4" style={{ color: "#e0e0e0" }} />
   }
 
   return (
     <motion.div
       ref={ref}
-      className="grid grid-cols-[1fr_72px_72px_72px] items-center gap-2 border-b border-zinc-800/30 py-3 last:border-0 sm:grid-cols-[1fr_88px_88px_88px]"
+      className="grid grid-cols-[1fr_72px_72px_72px] items-center gap-2 py-3 last:border-0 sm:grid-cols-[1fr_88px_88px_88px]"
+      style={{ borderBottom: "1px solid #f0f0f0" }}
       initial={{ opacity: 0 }}
       animate={isInView ? { opacity: 1 } : {}}
       transition={{ delay: index * 0.05, duration: 0.3 }}
     >
-      <span className="text-sm text-zinc-300">{feature}</span>
+      <span
+        style={{
+          fontFamily: fontBody,
+          fontSize: "14px",
+          color: "#1d1d1f",
+          letterSpacing: "-0.224px",
+        }}
+      >
+        {feature}
+      </span>
       <div className="flex justify-center">{renderValue(leetcode)}</div>
       <div className="flex justify-center">{renderValue(human)}</div>
       <div className="flex justify-center">{renderValue(codesparring, true)}</div>
@@ -118,8 +133,14 @@ export function ComparisonSection() {
     { feature: "Unlimited practice sessions", leetcode: true, human: false, codesparring: true },
   ]
 
+  // Shared font stacks from Design.md — resolved via CSS variables set in globals.css
+  const fontHeading = "var(--font-work-sans), system-ui, -apple-system, sans-serif"
+  const fontBody = "var(--font-open-sans), system-ui, -apple-system, sans-serif"
+
   return (
-    <section ref={sectionRef} className="bg-zinc-950 py-20 lg:py-28">
+    // Dark tile (#272729) — fixed dark surface, not theme-reactive by design.
+    // This section deliberately sits outside the light/dark theme as a full-bleed dark tile.
+    <section ref={sectionRef} className="py-20 lg:py-28" style={{ backgroundColor: "#272729" }}>
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-4xl">
           {/* Header */}
@@ -129,96 +150,221 @@ export function ComparisonSection() {
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="font-heading text-2xl font-semibold text-white sm:text-3xl lg:text-4xl">
+            <h2
+              className="font-semibold text-white"
+              style={{
+                fontFamily: fontHeading,
+                fontSize: "34px",
+                letterSpacing: "-0.374px",
+                lineHeight: 1.47,
+              }}
+            >
               What interview prep costs
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-zinc-500">
-              5+ mock interviews significantly improve pass rates. Here's what that investment looks
-              like.
+            <p
+              className="mx-auto mt-3 max-w-lg"
+              style={{
+                fontFamily: fontBody,
+                fontSize: "17px",
+                lineHeight: 1.47,
+                letterSpacing: "-0.374px",
+                color: "#cccccc",
+              }}
+            >
+              5+ mock interviews significantly improve pass rates. Here&apos;s what that investment
+              looks like.
             </p>
           </motion.div>
 
-          {/* Price Cards */}
-          <div className="mb-10 grid gap-4 sm:grid-cols-2">
+          {/* Price Cards — white canvas on dark tile, hairline border, 18px radius */}
+          <div className="mb-10 grid gap-6 sm:grid-cols-2">
             {/* Human Mocks */}
             <motion.div
-              className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-5"
+              className="rounded-[18px] p-6"
+              style={{ backgroundColor: "#ffffff", border: "1px solid #e0e0e0" }}
               initial={{ opacity: 0, y: 16 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.1, duration: 0.5 }}
             >
-              <div className="mb-4">
-                <span className="text-xs font-medium tracking-wider text-zinc-500 uppercase">
+              <div className="mb-5">
+                <span
+                  className="font-semibold uppercase"
+                  style={{
+                    fontFamily: fontBody,
+                    fontSize: "14px",
+                    letterSpacing: "0.08em",
+                    color: "#7a7a7a",
+                  }}
+                >
                   Human Mock Interviews
                 </span>
-                <p className="mt-0.5 text-[11px] text-zinc-600">Interviewing.io, Pramp Pro, etc.</p>
+                <p
+                  style={{
+                    fontFamily: fontBody,
+                    fontSize: "12px",
+                    letterSpacing: "-0.12px",
+                    color: "#7a7a7a",
+                    marginTop: "2px",
+                  }}
+                >
+                  Interviewing.io, Pramp Pro, etc.
+                </p>
               </div>
 
               <div className="flex items-baseline gap-2">
                 <AnimatedPrice
-                  value={750}
+                  value={747}
                   delay={300}
-                  className="text-3xl font-light text-zinc-400"
+                  className="font-light"
+                  style={{
+                    fontFamily: fontHeading,
+                    fontSize: "40px",
+                    color: "#1d1d1f",
+                    lineHeight: 1.1,
+                  }}
                 />
-                <span className="text-zinc-600">–</span>
+                <span style={{ fontFamily: fontBody, color: "#7a7a7a" }}>–</span>
                 <AnimatedPrice
-                  value={1125}
+                  value={1119}
                   delay={500}
-                  className="text-3xl font-light text-zinc-400"
+                  className="font-light"
+                  style={{
+                    fontFamily: fontHeading,
+                    fontSize: "40px",
+                    color: "#1d1d1f",
+                    lineHeight: 1.1,
+                  }}
                 />
               </div>
 
-              <p className="mt-2 text-[11px] text-zinc-600">$150–225 per session × 5 sessions</p>
+              <p
+                style={{
+                  fontFamily: fontBody,
+                  fontSize: "12px",
+                  color: "#7a7a7a",
+                  marginTop: "6px",
+                  letterSpacing: "-0.12px",
+                }}
+              >
+                $150–225 per session × 5 sessions
+              </p>
 
-              <div className="mt-4 space-y-1.5 border-t border-zinc-800/50 pt-4">
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
-                  <Check className="h-3 w-3 text-zinc-600" />
+              <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
+                <div
+                  className="flex items-center gap-2"
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1d1d1f" }}
+                >
+                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#7a7a7a" }} />
                   Real human feedback
                 </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
-                  <X className="h-3 w-3 text-zinc-700" />
+                <div
+                  className="flex items-center gap-2"
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#7a7a7a" }}
+                >
+                  <X className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#7a7a7a" }} />
                   Requires scheduling in advance
                 </div>
               </div>
             </motion.div>
 
-            {/* CodeSparring */}
+            {/* CodeSparring — Action Blue border to signal selection */}
             <motion.div
-              className="rounded-xl border border-zinc-700/50 bg-zinc-900/70 p-5"
+              className="rounded-[18px] p-6"
+              style={{ backgroundColor: "#ffffff", border: "2px solid #0066cc" }}
               initial={{ opacity: 0, y: 16 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.2, duration: 0.5 }}
             >
-              <div className="mb-4">
-                <span className="text-xs font-medium tracking-wider text-white uppercase">
+              <div className="mb-5">
+                <span
+                  className="font-semibold uppercase"
+                  style={{
+                    fontFamily: fontBody,
+                    fontSize: "14px",
+                    letterSpacing: "0.08em",
+                    color: "#0066cc",
+                  }}
+                >
                   CodeSparring
                 </span>
-                <p className="mt-0.5 text-[11px] text-zinc-500">Unlimited AI mock interviews</p>
+                <p
+                  style={{
+                    fontFamily: fontBody,
+                    fontSize: "12px",
+                    letterSpacing: "-0.12px",
+                    color: "#7a7a7a",
+                    marginTop: "2px",
+                  }}
+                >
+                  Unlimited AI mock interviews
+                </p>
               </div>
 
               <div className="flex items-baseline gap-1">
-                <AnimatedPrice value={25} delay={700} className="text-3xl font-light text-white" />
-                <span className="text-sm text-zinc-500">/month</span>
+                <AnimatedPrice
+                  value={24}
+                  delay={700}
+                  className="font-light"
+                  style={{
+                    fontFamily: fontHeading,
+                    fontSize: "40px",
+                    color: "#1d1d1f",
+                    lineHeight: 1.1,
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: fontBody,
+                    fontSize: "17px",
+                    color: "#7a7a7a",
+                    letterSpacing: "-0.374px",
+                  }}
+                >
+                  /month
+                </span>
               </div>
 
-              <p className="mt-2 text-[11px] text-zinc-500">Cancel anytime</p>
+              <p
+                style={{
+                  fontFamily: fontBody,
+                  fontSize: "12px",
+                  color: "#7a7a7a",
+                  marginTop: "6px",
+                  letterSpacing: "-0.12px",
+                }}
+              >
+                Cancel anytime
+              </p>
 
-              <div className="mt-4 space-y-1.5 border-t border-zinc-800/50 pt-4">
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
-                  <Check className="h-3 w-3 text-emerald-400" />
+              <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
+                <div
+                  className="flex items-center gap-2"
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1d1d1f" }}
+                >
+                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#0066cc" }} />
                   AI adapts to your skill level
                 </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-400">
-                  <Check className="h-3 w-3 text-emerald-400" />
+                <div
+                  className="flex items-center gap-2"
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1d1d1f" }}
+                >
+                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#0066cc" }} />
                   Practice at 2am before your 9am interview
                 </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Value Statement */}
+          {/* Value statement — tagline: 21px/600 assertive on dark tile */}
           <motion.p
-            className="mb-10 text-center text-sm text-zinc-500"
+            className="mb-10 text-center font-semibold"
+            style={{
+              fontFamily: fontHeading,
+              fontSize: "21px",
+              lineHeight: 1.19,
+              letterSpacing: "0.231px",
+              color: "#cccccc",
+            }}
             initial={{ opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
             transition={{ delay: 0.4, duration: 0.5 }}
@@ -226,41 +372,72 @@ export function ComparisonSection() {
             One month costs less than a single human mock session.
           </motion.p>
 
-          {/* Feature Comparison */}
+          {/* Feature Comparison — white canvas card */}
           <motion.div
-            className="mb-10 rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-4 sm:p-6"
+            className="mb-10 rounded-[18px] p-4 sm:p-6"
+            style={{ backgroundColor: "#ffffff", border: "1px solid #e0e0e0" }}
             initial={{ opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.3, duration: 0.5 }}
           >
-            {/* Table Header */}
-            <div className="mb-1 grid grid-cols-[1fr_72px_72px_72px] items-end gap-2 border-b border-zinc-800/50 pb-3 sm:grid-cols-[1fr_88px_88px_88px]">
-              <span className="text-xs font-medium tracking-wider text-zinc-500 uppercase">
+            <div
+              className="mb-1 grid grid-cols-[1fr_72px_72px_72px] items-end gap-2 pb-3 sm:grid-cols-[1fr_88px_88px_88px]"
+              style={{ borderBottom: "1px solid #e0e0e0" }}
+            >
+              <span
+                className="font-semibold uppercase"
+                style={{
+                  fontFamily: fontBody,
+                  fontSize: "12px",
+                  letterSpacing: "0.08em",
+                  color: "#7a7a7a",
+                }}
+              >
                 Feature
               </span>
               <div className="text-center">
-                <span className="block text-xs text-zinc-500">LeetCode</span>
-                <span className="text-[10px] text-zinc-600">$35/mo</span>
+                <span
+                  className="block"
+                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}
+                >
+                  LeetCode
+                </span>
+                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#7a7a7a" }}>
+                  $35/mo
+                </span>
               </div>
               <div className="text-center">
-                <span className="block text-xs text-zinc-500">Human</span>
-                <span className="text-[10px] text-zinc-600">$150+</span>
+                <span
+                  className="block"
+                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}
+                >
+                  Human
+                </span>
+                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#7a7a7a" }}>
+                  $150+
+                </span>
               </div>
               <div className="text-center">
-                <span className="block text-xs text-white">Ours</span>
-                <span className="text-[10px] text-zinc-500">$25/mo</span>
+                <span
+                  className="block font-semibold"
+                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#0066cc" }}
+                >
+                  Ours
+                </span>
+                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#0066cc" }}>
+                  $24/mo
+                </span>
               </div>
             </div>
 
-            {/* Rows */}
             <div>
               {features.map((row, index) => (
-                <FeatureRow key={row.feature} {...row} index={index} />
+                <FeatureRow key={row.feature} {...row} index={index} fontBody={fontBody} />
               ))}
             </div>
           </motion.div>
 
-          {/* CTA */}
+          {/* CTA — button-primary: Action Blue pill */}
           <motion.div
             className="text-center"
             initial={{ opacity: 0 }}
@@ -268,12 +445,36 @@ export function ComparisonSection() {
             transition={{ delay: 0.5, duration: 0.5 }}
           >
             <Link href="/interview">
-              <Button size="lg" className="bg-white font-medium text-zinc-900 hover:bg-zinc-200">
+              <button
+                className="inline-flex items-center font-medium transition-transform active:scale-95"
+                style={{
+                  fontFamily: fontBody,
+                  backgroundColor: "#0066cc",
+                  color: "#ffffff",
+                  borderRadius: "9999px",
+                  padding: "11px 28px",
+                  fontSize: "17px",
+                  letterSpacing: "-0.374px",
+                  lineHeight: 1.47,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
                 Try your first mock free
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              </button>
             </Link>
-            <p className="mt-3 text-xs text-zinc-600">No credit card required</p>
+            <p
+              className="mt-3"
+              style={{
+                fontFamily: fontBody,
+                fontSize: "12px",
+                color: "#cccccc",
+                letterSpacing: "-0.12px",
+              }}
+            >
+              No credit card required
+            </p>
           </motion.div>
         </div>
       </div>

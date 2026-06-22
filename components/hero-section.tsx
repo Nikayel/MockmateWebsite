@@ -67,17 +67,17 @@ export function HeroSection() {
             variants={staggerItem}
             className="font-heading mb-6 text-[clamp(3.25rem,8vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.055em] text-[#e9e8ef]"
           >
-            Ace your next
+            CodeSparring: AI
             <br />
-            <span className="text-[#adc6ff]">tech interview</span>
+            <span className="text-[#adc6ff]">Technical Interview Practice</span>
           </motion.h1>
 
           <motion.p
             variants={staggerItem}
             className="mx-auto mb-5 max-w-2xl text-base leading-7 font-medium text-[#c2c6d6] sm:text-lg md:text-xl md:leading-8"
           >
-            Practice with AI that listens, reacts, and guides. Move beyond LeetCode and master the
-            art of technical communication.
+            Practice technical interviews with an AI interviewer that scores your code,
+            communication, and problem-solving.
           </motion.p>
 
           <motion.div

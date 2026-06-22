@@ -1,0 +1,95 @@
+import { Metadata } from "next"
+import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
+
+export const metadata: Metadata = {
+  title: "New Grad Coding Interview Practice | CodeSparring",
+  description:
+    "Practice entry-level and new grad software engineering interviews. Master DSA, LeetCode style questions, and behavioral rounds for your first tech job.",
+}
+
+export default function NewGradInterviewPracticePage() {
+  const contentSections = [
+    {
+      heading: "Breaking into Tech as a New Grad",
+      content: (
+        <>
+          <p>
+            The entry-level job market is incredibly competitive. As a university student or recent
+            bootcamp grad, your resume might get you an online assessment (OA) or a phone screen,
+            but your interview performance is what lands you the offer.
+          </p>
+          <p>
+            New grad interviews heavily index on Data Structures and Algorithms (DSA) because
+            companies don't expect you to have deep architectural experience. They want to see how
+            you think, how quickly you learn, and how well you communicate.
+          </p>
+        </>
+      ),
+    },
+    {
+      heading: "From LeetCode to Real Interviews",
+      content: (
+        <>
+          <p>
+            Many new grads make the mistake of silently grinding LeetCode and assuming they are
+            ready. But in a real interview, if you don't talk, you fail.
+          </p>
+          <p>
+            Our AI interviewer simulator forces you to practice the skills that actually matter:
+          </p>
+          <ul className="mt-4 list-disc space-y-2 pl-6">
+            <li>Asking clarifying questions before writing a single line of code.</li>
+            <li>Explaining your brute-force approach before attempting an optimized solution.</li>
+            <li>Talking through your time and space complexity (Big O).</li>
+            <li>Handling hints gracefully when you inevitably get stuck.</li>
+          </ul>
+        </>
+      ),
+    },
+    {
+      heading: "Build Confidence and Cure Interview Anxiety",
+      content: (
+        <>
+          <p>
+            Interview anxiety is the #1 reason qualified new grads fail technical screens. The only
+            way to cure it is through exposure and practice.
+          </p>
+          <p>
+            CodeSparring provides a zero-judgment environment. You can stumble, freeze up, and make
+            mistakes with our AI interviewer, and get actionable, empathetic feedback on how to
+            improve before you face a real hiring manager.
+          </p>
+        </>
+      ),
+    },
+  ]
+
+  const faqs = [
+    {
+      question: "What languages should I use for a new grad interview?",
+      answer:
+        "Use the language you are most comfortable with! Python, Java, and C++ are the most common for DSA rounds, but JavaScript/TypeScript are also widely accepted. CodeSparring supports all major languages.",
+    },
+    {
+      question: "Do new grads get asked system design questions?",
+      answer:
+        "Rarely, but it's becoming more common for competitive roles (like FAANG). Usually, it's a simplified version focusing on APIs or database schemas rather than large-scale distributed systems.",
+    },
+    {
+      question: "How much should I practice?",
+      answer:
+        "We recommend focusing on mastering the core 15 DSA patterns rather than doing hundreds of random problems. Doing 1 mock interview a day for 2 weeks will dramatically improve your communication skills.",
+    },
+  ]
+
+  return (
+    <LandingPageTemplate
+      title="New Grad Coding Interview Practice"
+      subtitle="Land Your First Tech Job"
+      heroDescription="Transition from grinding LeetCode to passing real interviews. Practice talking through algorithms, handling hints, and writing clean code with our AI interviewer."
+      primaryKeyword="new grad coding interview"
+      contentSections={contentSections}
+      faqs={faqs}
+    />
+  )
+}

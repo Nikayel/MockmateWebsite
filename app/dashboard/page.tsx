@@ -358,6 +358,7 @@ export default function DashboardPage() {
 
       <div className="pt-20 pb-12 sm:pt-24 sm:pb-16">
         <div className="container mx-auto max-w-6xl px-4">
+          <h1 className="sr-only">Dashboard</h1>
           <div className="mb-6 flex justify-end sm:mb-8" data-tour="welcome">
             <Link href="/interview" data-tour="start-practice-btn">
               <Button className="w-full bg-white font-medium text-zinc-900 hover:bg-zinc-200 sm:w-auto">
