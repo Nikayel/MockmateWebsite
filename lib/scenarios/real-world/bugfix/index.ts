@@ -13,6 +13,7 @@ import { bugfixEventAggregationRetriesScenario } from "./bugfix-event-aggregatio
 import { bugfixFeaturePipelineNanWorkspaceScenario } from "./bugfix-feature-pipeline-nan-workspace"
 import { bugfixSearchRaceScenario } from "./bugfix-search-race"
 import { bugfixOnboardingScenario } from "./bugfix-onboarding"
+import { bugfixTemperatureAlertRegressionScenario } from "./bugfix-temperature-alert-regression"
 
 export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixSearchRaceScenario,
@@ -21,6 +22,7 @@ export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixCommentThreadMergeScenario,
   bugfixEventAggregationRetriesScenario,
   bugfixFeaturePipelineNanWorkspaceScenario,
+  bugfixTemperatureAlertRegressionScenario,
   bugfixOnboardingScenario,
 ].map(withBugfixIncidentDefaults)
 

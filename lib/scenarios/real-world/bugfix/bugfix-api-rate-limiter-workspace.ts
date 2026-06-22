@@ -59,7 +59,7 @@ export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
   description: "Fix a rate limiter that allows concurrent bursts past plan limits",
   tags: ["backend", "rate-limiting", "concurrency", "api-infrastructure", "real-codebase"],
   estimatedTime: 50,
-  problemStatement: `The API gateway sometimes allows more requests than a customer plan permits during traffic spikes. The store is a small in-memory stand-in for Redis sorted sets, but the production issue is the same: the decision and reservation must happen as one step.
+  problemStatement: `The API gateway sometimes allows more requests than a customer plan permits during traffic spikes. The store is a small in-memory stand-in for Redis sorted sets, and the visible tests reproduce the same burst behavior support is seeing in production.
 
 Fix the limiter workflow so burst simulations cannot exceed the limit.`,
   buggyCode: { javascript: starter },
