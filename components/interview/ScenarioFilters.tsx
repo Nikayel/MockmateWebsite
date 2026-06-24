@@ -39,6 +39,9 @@ interface ScenarioFiltersProps {
   onToggleCompany: (company: Company) => void
   onRemoveCompany: (company: Company) => void
   onClearCompanies: () => void
+
+  /** Restrict which type pills are shown (per tab). Empty array hides the row. */
+  availableTypes?: ScenarioType[]
 }
 
 // Exercise type quick filters with descriptions
@@ -123,6 +126,12 @@ const COMPANIES = [
   ...ALL_COMPANIES.filter((c) => !PRIORITY_COMPANIES.includes(c)),
 ] as Company[]
 
+// Number of scenarios per company, for the company dropdown counts.
+const COMPANY_COUNTS = scenarios.reduce<Record<string, number>>((acc, s) => {
+  for (const company of s.companies) acc[company] = (acc[company] ?? 0) + 1
+  return acc
+}, {})
+
 export const ScenarioFilters = memo(function ScenarioFilters({
   searchQuery,
   onSearchChange,
@@ -139,8 +148,18 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   onToggleCompany,
   onRemoveCompany,
   onClearCompanies,
+  availableTypes,
 }: ScenarioFiltersProps) {
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
+  const [companyQuery, setCompanyQuery] = useState("")
+
+  const visibleTypes = availableTypes
+    ? EXERCISE_TYPES.filter((t) => availableTypes.includes(t.id as ScenarioType))
+    : EXERCISE_TYPES
+
+  const visibleCompanies = companyQuery
+    ? COMPANIES.filter((c) => c.toLowerCase().includes(companyQuery.toLowerCase()))
+    : COMPANIES
 
   return (
     <div className="mb-6 space-y-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4 shadow-2xl backdrop-blur-2xl">
@@ -205,20 +224,42 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             {showCompanyDropdown && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowCompanyDropdown(false)} />
-                <div className="absolute top-full right-0 z-20 mt-2 max-h-80 w-56 overflow-y-auto rounded-2xl border border-white/[0.06] bg-zinc-950/90 py-2 shadow-2xl backdrop-blur-xl">
-                  {COMPANIES.map((company) => {
-                    const isActive = filterCompanies.includes(company as Company)
-                    return (
-                      <button
-                        key={company}
-                        onClick={() => onToggleCompany(company as Company)}
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
-                      >
-                        <span className={isActive ? "text-white" : "text-zinc-400"}>{company}</span>
-                        {isActive && <Check className="h-3.5 w-3.5 text-zinc-200" />}
-                      </button>
-                    )
-                  })}
+                <div className="absolute top-full right-0 z-20 mt-2 flex max-h-80 w-60 flex-col rounded-2xl border border-white/[0.06] bg-zinc-950/90 shadow-2xl backdrop-blur-xl">
+                  <div className="border-b border-white/[0.06] p-2">
+                    <input
+                      autoFocus
+                      value={companyQuery}
+                      onChange={(e) => setCompanyQuery(e.target.value)}
+                      placeholder="Search companies"
+                      aria-label="Search companies"
+                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-white/15 focus:outline-none"
+                    />
+                  </div>
+                  <div className="overflow-y-auto py-1">
+                    {visibleCompanies.length === 0 && (
+                      <p className="px-3 py-2 text-sm text-zinc-600">No matches</p>
+                    )}
+                    {visibleCompanies.map((company) => {
+                      const isActive = filterCompanies.includes(company as Company)
+                      return (
+                        <button
+                          key={company}
+                          onClick={() => onToggleCompany(company as Company)}
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
+                        >
+                          <span className={isActive ? "text-white" : "text-zinc-400"}>
+                            {company}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-600">
+                              {COMPANY_COUNTS[company] ?? 0}
+                            </span>
+                            {isActive && <Check className="h-3.5 w-3.5 text-zinc-200" />}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
                   {filterCompanies.length > 0 && (
                     <>
                       <div className="my-1 border-t border-white/10" />
@@ -238,33 +279,35 @@ export const ScenarioFilters = memo(function ScenarioFilters({
       </div>
 
       {/* Type Filter - Horizontal Pills (Second Row) */}
-      <div className="flex flex-wrap gap-2 pt-1">
-        {EXERCISE_TYPES.map((type) => {
-          const Icon = type.icon
-          const isActive = filterType.includes(type.id as ScenarioType)
-          const count = scenarios.filter((s) => s.type === type.id).length
-          return (
-            <button
-              key={type.id}
-              onClick={() => onToggleType(type.id as ScenarioType)}
-              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
-                isActive
-                  ? "border-transparent bg-white text-zinc-950 shadow-sm"
-                  : "border-transparent bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
-              } `}
-              aria-pressed={isActive}
-              title={type.description}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {type.label}
-              <span className={`text-xs ${isActive ? "text-zinc-500" : "text-zinc-500"}`}>
-                {count}
-              </span>
-              {isActive && <Check className="h-3 w-3" />}
-            </button>
-          )
-        })}
-      </div>
+      {visibleTypes.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {visibleTypes.map((type) => {
+            const Icon = type.icon
+            const isActive = filterType.includes(type.id as ScenarioType)
+            const count = scenarios.filter((s) => s.type === type.id).length
+            return (
+              <button
+                key={type.id}
+                onClick={() => onToggleType(type.id as ScenarioType)}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? "border-transparent bg-white text-zinc-950 shadow-sm"
+                    : "border-transparent bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                } `}
+                aria-pressed={isActive}
+                title={type.description}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {type.label}
+                <span className={`text-xs ${isActive ? "text-zinc-500" : "text-zinc-500"}`}>
+                  {count}
+                </span>
+                {isActive && <Check className="h-3 w-3" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Active Filters Summary */}
       {hasActiveFilters && (

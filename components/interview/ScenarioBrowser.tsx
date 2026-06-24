@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, memo } from "react"
-import { Search, LayoutGrid, List, Target } from "lucide-react"
+import { Search, Bug, Cpu, Target, LayoutGrid, List } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
-import type { Scenario } from "@/lib/scenarios"
+import type { Scenario, ScenarioType } from "@/lib/scenarios"
 import { useScenarioFilters } from "@/lib/hooks"
 import { PatternBrowser } from "./PatternBrowser"
 import { DSARoadmap } from "./DSARoadmap"
@@ -18,7 +18,17 @@ interface ScenarioBrowserProps {
   hasGuestBanner?: boolean
 }
 
-type ViewMode = "roadmap" | "patterns" | "list"
+type MainTab = "debugging" | "dsa"
+type DsaView = "roadmap" | "patterns" | "all"
+
+// Non-DSA "codebase" exercise types surfaced under the Debugging tab.
+const DEBUGGING_TYPES: ScenarioType[] = [
+  "bugfix",
+  "add-functionality",
+  "optimization",
+  "security",
+  "system-design",
+]
 
 export const ScenarioBrowser = memo(function ScenarioBrowser({
   onStartInterview,
@@ -26,7 +36,8 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   completedProblems,
   hasGuestBanner = false,
 }: ScenarioBrowserProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [mainTab, setMainTab] = useState<MainTab>("debugging")
+  const [dsaView, setDsaView] = useState<DsaView>("roadmap")
   const { selectedScenario, setSelectedScenario } = useInterviewStore(
     useShallow((state) => ({
       selectedScenario: state.selectedScenario,
@@ -52,86 +63,110 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     clearCompanyFilters,
   } = useScenarioFilters()
 
+  // Switching the top-level context resets filters so they don't leak across tabs.
+  const switchMainTab = (tab: MainTab) => {
+    if (tab === mainTab) return
+    clearAllFilters()
+    setMainTab(tab)
+  }
+
   // Dynamic padding: more when guest banner is shown (header 64px + banner ~40px)
   const topPadding = hasGuestBanner ? "pt-28" : "pt-20"
 
+  const debuggingScenarios = filteredScenarios.filter((s) => s.type !== "dsa")
+  const dsaScenarios = filteredScenarios.filter((s) => s.type === "dsa")
+
+  const renderGrid = (list: Scenario[]) =>
+    list.length === 0 ? (
+      <div className="py-16 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
+          <Search className="h-6 w-6 text-zinc-600" />
+        </div>
+        <p className="mb-2 text-zinc-400">No problems match your filters</p>
+        {hasActiveFilters && (
+          <button
+            onClick={clearAllFilters}
+            className="text-sm text-zinc-500 transition-colors hover:text-white"
+          >
+            Clear all filters
+          </button>
+        )}
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {list.map((scenario) => (
+          <ScenarioCard
+            key={scenario.id}
+            scenario={scenario}
+            isSelected={selectedScenario?.id === scenario.id}
+            isCompleted={completedProblems.includes(scenario.id)}
+            usageLimit={usageLimit}
+            onSelect={setSelectedScenario}
+            onStart={onStartInterview}
+          />
+        ))}
+      </div>
+    )
+
   return (
     <section className={`${topPadding} relative overflow-hidden bg-zinc-950 pb-12`}>
-      {/* Ambient background glows for premium visual design */}
-      <div className="from-accent/10 pointer-events-none absolute top-0 left-1/4 z-0 h-[500px] w-[500px] rounded-full bg-gradient-to-r to-purple-500/10 opacity-40 blur-[120px]" />
-      <div className="pointer-events-none absolute right-1/4 bottom-10 z-0 h-[400px] w-[400px] rounded-full bg-gradient-to-r from-blue-500/10 to-emerald-500/10 opacity-30 blur-[100px]" />
+      {/* Single subtle page-level accent — no per-section rainbow glows */}
+      <div className="from-accent/5 pointer-events-none absolute top-0 left-1/2 z-0 h-[420px] w-[640px] -translate-x-1/2 rounded-full bg-gradient-to-b to-transparent opacity-40 blur-[120px]" />
 
       <div className="relative z-10 container mx-auto px-4">
         <div className="mx-auto max-w-7xl">
-          {/* Sleek Minimal Header */}
-          <div className="mb-8 flex flex-col gap-4 border-b border-white/[0.06] pb-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-2xl font-bold tracking-tight text-transparent md:text-3xl">
-                Practice Arena
-              </h1>
-            </div>
-
-            {/* View Mode Toggle - Apple Pill Style */}
-            <div className="inline-flex self-start rounded-full border border-white/[0.06] bg-zinc-900/60 p-1 shadow-inner shadow-black/25 backdrop-blur-md sm:self-auto">
-              <button
-                onClick={() => setViewMode("roadmap")}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                  viewMode === "roadmap"
-                    ? "bg-white text-zinc-950 shadow-md"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                <Target className="h-4 w-4" />
-                DSA Roadmap
-              </button>
-              <button
-                onClick={() => setViewMode("patterns")}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                  viewMode === "patterns"
-                    ? "bg-white text-zinc-950 shadow-md"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                <LayoutGrid className="h-4 w-4" />
-                DSA Patterns
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                  viewMode === "list"
-                    ? "bg-white text-zinc-950 shadow-md"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                <List className="h-4 w-4" />
-                Codebases
-              </button>
-            </div>
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+              Practice Arena
+            </h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              Debug real codebases or drill algorithm patterns.
+            </p>
           </div>
 
-          {/* Roadmap View */}
-          {viewMode === "roadmap" && (
-            <DSARoadmap onStartInterview={onStartInterview} completedProblems={completedProblems} />
-          )}
+          {/* Primary split: Debugging vs DSA */}
+          <div
+            role="tablist"
+            aria-label="Practice category"
+            className="mb-6 inline-flex rounded-full border border-white/[0.07] bg-white/[0.02] p-1"
+          >
+            <button
+              role="tab"
+              aria-selected={mainTab === "debugging"}
+              onClick={() => switchMainTab("debugging")}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                mainTab === "debugging"
+                  ? "bg-white text-zinc-950"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <Bug className="h-4 w-4" />
+              Debugging
+            </button>
+            <button
+              role="tab"
+              aria-selected={mainTab === "dsa"}
+              onClick={() => switchMainTab("dsa")}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                mainTab === "dsa" ? "bg-white text-zinc-950" : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <Cpu className="h-4 w-4" />
+              DSA
+            </button>
+          </div>
 
-          {/* Pattern View */}
-          {viewMode === "patterns" && (
-            <PatternBrowser
-              onStartInterview={onStartInterview}
-              completedProblems={completedProblems}
-            />
-          )}
-
-          {/* List View */}
-          {viewMode === "list" && (
+          {/* Debugging tab — first-class browse surface for real-codebase work */}
+          {mainTab === "debugging" && (
             <>
-              {/* Unified Filter Bar */}
               <ScenarioFilters
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
-                resultsCount={filteredScenarios.length}
+                resultsCount={debuggingScenarios.length}
                 hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearAllFilters}
+                availableTypes={DEBUGGING_TYPES}
                 filterType={filterType}
                 onToggleType={toggleTypeFilter}
                 onRemoveType={removeTypeFilter}
@@ -143,35 +178,71 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 onRemoveCompany={removeCompanyFilter}
                 onClearCompanies={clearCompanyFilters}
               />
+              {renderGrid(debuggingScenarios)}
+            </>
+          )}
 
-              {/* Scenarios Grid */}
-              {filteredScenarios.length === 0 ? (
-                <div className="py-16 text-center">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                    <Search className="h-6 w-6 text-zinc-600" />
-                  </div>
-                  <p className="mb-2 text-zinc-400">No problems match your filters</p>
+          {/* DSA tab — Roadmap / Patterns / All sub-views */}
+          {mainTab === "dsa" && (
+            <>
+              <div className="mb-6 inline-flex rounded-full border border-white/[0.06] bg-white/[0.02] p-1">
+                {(
+                  [
+                    { id: "roadmap", label: "Roadmap", icon: Target },
+                    { id: "patterns", label: "Patterns", icon: LayoutGrid },
+                    { id: "all", label: "All problems", icon: List },
+                  ] as const
+                ).map(({ id, label, icon: Icon }) => (
                   <button
-                    onClick={clearAllFilters}
-                    className="text-sm text-zinc-500 transition-colors hover:text-white"
+                    key={id}
+                    onClick={() => setDsaView(id)}
+                    aria-pressed={dsaView === id}
+                    className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                      dsaView === id
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
                   >
-                    Clear all filters
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
                   </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredScenarios.map((scenario) => (
-                    <ScenarioCard
-                      key={scenario.id}
-                      scenario={scenario}
-                      isSelected={selectedScenario?.id === scenario.id}
-                      isCompleted={completedProblems.includes(scenario.id)}
-                      usageLimit={usageLimit}
-                      onSelect={setSelectedScenario}
-                      onStart={onStartInterview}
-                    />
-                  ))}
-                </div>
+                ))}
+              </div>
+
+              {dsaView === "roadmap" && (
+                <DSARoadmap
+                  onStartInterview={onStartInterview}
+                  completedProblems={completedProblems}
+                />
+              )}
+              {dsaView === "patterns" && (
+                <PatternBrowser
+                  onStartInterview={onStartInterview}
+                  completedProblems={completedProblems}
+                />
+              )}
+              {dsaView === "all" && (
+                <>
+                  <ScenarioFilters
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    resultsCount={dsaScenarios.length}
+                    hasActiveFilters={hasActiveFilters}
+                    onClearFilters={clearAllFilters}
+                    availableTypes={[]}
+                    filterType={filterType}
+                    onToggleType={toggleTypeFilter}
+                    onRemoveType={removeTypeFilter}
+                    filterDifficulty={filterDifficulty}
+                    onToggleDifficulty={toggleDifficultyFilter}
+                    onRemoveDifficulty={removeDifficultyFilter}
+                    filterCompanies={filterCompanies}
+                    onToggleCompany={toggleCompanyFilter}
+                    onRemoveCompany={removeCompanyFilter}
+                    onClearCompanies={clearCompanyFilters}
+                  />
+                  {renderGrid(dsaScenarios)}
+                </>
               )}
             </>
           )}
