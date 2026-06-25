@@ -665,6 +665,13 @@
   font-feature-settings: "tnum" 1;
 }
 
+/* Fade the right edge of the tab strip so it's discoverable that more files
+   exist when the tabs overflow horizontally (the scrollbar is hidden). */
+.workspace-tabs-container {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+}
+
 /* Filenames truncate instead of overflowing the tab strip on small laptops. */
 .workspace-tab-button {
   max-width: 220px;

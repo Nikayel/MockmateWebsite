@@ -300,8 +300,8 @@ export const EditorColumn = memo(function EditorColumn({
             />
           </ErrorBoundary>
           {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-              <div className="max-w-md p-6 text-center">
+            <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
+              <div className="max-h-full max-w-md p-2 text-center sm:p-6">
                 <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
                   <PlayCircle className="text-accent h-8 w-8" />
                 </div>
@@ -331,7 +331,7 @@ export const EditorColumn = memo(function EditorColumn({
             testResults={testResults}
             testSummary={testSummary}
             isRunning={isRunningTests}
-            className="max-h-48 min-h-[120px]"
+            className="max-h-[32vh] min-h-[140px]"
             onClear={onClearConsole}
             onGoToLine={onGoToLine}
           />
