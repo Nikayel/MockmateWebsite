@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C: color reduction (ProblemColumn.tsx, Codebase Files section)
+
+- changed: Demoted the off-palette `blue` hue in the Codebase Files section to the gray scale. The "Your codebase files are available as tabs…" hint went `text-blue-400` → `text-gray-400` (secondary informational text), and the file-list button hover went `hover:text-blue-400` → `hover:text-gray-200` (secondary/interactive chrome). Blue is not in the target palette (cyan/amber/emerald/red + gray), so this removes a foreign accent from the bugfix/add-functionality workspace path without adding any new hue. Color only — no behaviour/layout/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on ProblemColumn.tsx · `pnpm build` → PASS
+- a11y: gray-400 (#a1a1aa) on the dark panel meets AA for this small informational text; gray-200 hover gives a clear, higher-contrast interactive state (previously blue-400). No focus/keyboard change.
+- needs_human_review: false (token swap in secondary chrome; hierarchy and layout unchanged)
+- not-done-this-iteration (one component/section per spec): blue still remains in the DSA Examples Input/Output (`text-green-400`/`text-blue-400`), and the difficulty badge uses green/yellow/red — but difficulty-color logic is duplicated inline across 10+ files (no shared helper), so it needs its own dedicated cross-cutting refactor, not a single-component loop iteration.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target B: left-panel width (app/interview/page.tsx)
 
 - changed: Widened the pinned left (problem) column of the 3-column workspace grid from `260px / 280px / 320px` to `320px / 360px / 400px` at `lg / xl / 2xl` (page.tsx:5128), so the now-dominant Description plus Incident Report, repro steps, and logs have room to read on one line instead of wrapping tightly. Center editor stays `minmax(0,1fr)` and the right (chat) column is unchanged at `240 / 260 / 280px`. Layout sizing only — no behaviour/logic/copy change.

@@ -660,7 +660,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 selectedScenario.type === "add-functionality") &&
               workspaceContext.length > 0 ? (
                 <div className="mb-2">
-                  <p className="mb-2 text-xs text-blue-400">
+                  <p className="mb-2 text-xs text-gray-400">
                     <Code className="mr-1 mb-0.5 inline-block h-3 w-3" />
                     Your codebase files are available as tabs in the code editor.
                   </p>
@@ -692,7 +692,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                             setSelectedFile(file)
                             setIsCodeViewerOpen(true)
                           }}
-                          className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
+                          className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-gray-200"
                         >
                           <div className="flex items-center gap-1 truncate">
                             <Code className="h-3 w-3 flex-shrink-0" />
