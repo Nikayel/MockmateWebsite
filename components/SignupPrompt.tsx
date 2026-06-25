@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Github, CheckCircle, X, Brain, Calendar, Trophy, ArrowRight } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { getGuestId, markFreeTrialUsed } from "@/lib/guest-session"
+import { trackEvent } from "@/lib/analytics"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
 
@@ -27,6 +28,11 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
   const [isLoading, setIsLoading] = useState(false)
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
 
+  // Activation funnel: record that a guest saw the post-trial signup prompt.
+  useEffect(() => {
+    trackEvent("signup_prompt_shown", { sessionId, score })
+  }, [sessionId, score])
+
   const getScoreColor = () => {
     if (score >= 80) return "text-green-400"
     if (score >= 60) return "text-blue-400"
@@ -43,6 +49,7 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
     try {
       setIsLoading(true)
       setAuthProvider(provider)
+      trackEvent("signup_prompt_click", { provider, sessionId, score })
 
       const guestId = getGuestId()
       if (guestId) {

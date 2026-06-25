@@ -6,7 +6,7 @@
 
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { Check, CheckCircle } from "lucide-react"
 import { getProPricing } from "@/lib/config"
+import { trackUpgradeFlow, trackPurchase } from "@/lib/analytics"
 import { Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -37,6 +38,14 @@ function UpgradePageContent() {
   }, [])
 
   const isProUser = profile?.subscription_tier === "pro"
+
+  // Fire a single view_pricing funnel event once the page is interactive.
+  const viewPricingTracked = useRef(false)
+  useEffect(() => {
+    if (!mounted || !initialized || viewPricingTracked.current) return
+    viewPricingTracked.current = true
+    trackUpgradeFlow({ userId: user?.id ?? "anonymous", step: "view_pricing" })
+  }, [mounted, initialized, user?.id])
 
   useEffect(() => {
     if (authLoading || !initialized) return
@@ -85,6 +94,19 @@ function UpgradePageContent() {
                           ...syncData.profile,
                         }) as Profile
                     )
+
+                    // Conversion: confirmed Pro after Stripe checkout. Derive the
+                    // transaction value from the synced plan so GA4 revenue is accurate.
+                    const purchasedYearly = syncData.profile?.subscription_type === "yearly"
+                    trackUpgradeFlow({ userId: currentUserId, step: "complete_checkout" })
+                    trackPurchase({
+                      userId: currentUserId,
+                      tier: "pro",
+                      value: purchasedYearly ? proPricing.yearly.price : proPricing.monthly.price,
+                      currency: "USD",
+                      platform: "website",
+                    })
+
                     toast.success("You're now a Pro member!")
                   } else {
                     await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -153,6 +175,7 @@ function UpgradePageContent() {
     }
 
     setLoading(planType)
+    trackUpgradeFlow({ userId: user.id, step: "start_checkout", tier: planType })
     try {
       const idToken = await firebaseUser.getIdToken()
 
