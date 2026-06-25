@@ -18,8 +18,17 @@ In a Claude Code session on this repo:
 /loop 20m Follow docs/loops/bugfix-realism-loop.md for exactly one iteration.
 ```
 
-Swap in `ux-voice-loop.md` or `ui-conformance-loop.md`. Run one loop at a time so commits
-stay reviewable. `/loop` defaults to 10m if you omit the interval.
+Swap in any loop below. Run one loop at a time so commits stay reviewable. `/loop` defaults to
+10m if you omit the interval.
+
+### Available loops
+
+| File | What it improves |
+|---|---|
+| `bugfix-realism-loop.md` | Makes BugFix scenarios feel like a real on-call shift; makes realism enforceable via `pnpm audit:bugfix`. |
+| `ux-voice-loop.md` | Converges scattered copy on one developer voice; creates `VOICE.md`; fixes brand drift. |
+| `ui-conformance-loop.md` | Token conformance, a11y baseline, and all interaction states across components. |
+| `interview-workspace-ux-loop.md` | Fixes the interview workspace's information hierarchy, left-panel width, and color overload (research-grounded). |
 
 ## The shared contract (every loop obeys this)
 
