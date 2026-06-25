@@ -6,13 +6,13 @@
 
 **Status:** in progress
 **Current phase:** Phase 0
-**Last updated by loop:** Phase 0 — `lib/labs/types.ts` shipped
+**Last updated by loop:** Phase 0 — `caseLabRuns` Firestore shape documented
 
 ---
 
 ## Phase 0 — Scaffolding & types (spec §9, §12)
 - [x] `lib/labs/types.ts` — `CaseLab`, `CaseLabMilestone`, `MilestoneKind` (buildScenarioType = bugfix|add-functionality|system-design, never DSA)
-- [ ] Firestore `caseLabRuns` shape documented in `docs/FIREBASE_STRUCTURE.md`
+- [x] Firestore `caseLabRuns` shape documented in `docs/FIREBASE_STRUCTURE.md`
 - [ ] `lib/stores/case-lab-store.ts` — milestone + answers state
 
 ## Phase 1 — Shell & milestone rail, no AI (spec §6, P1/P3)
@@ -60,3 +60,4 @@
 
 ## Iteration notes (loop appends one line per increment)
 - Phase 0: `lib/labs/types.ts` — full Case Labs type module (CaseLab/CaseLabMilestone/MilestoneKind, per-milestone answer shapes, resumable `CaseLabRun`). Reuses `DifficultyLevel`, `WorkspaceScenarioLanguage`, and `InterviewSession.structured_feedback` to stay DRY. typecheck + lint clean.
+- Phase 0: documented `caseLabRuns` collection in `docs/FIREBASE_STRUCTURE.md` (annotated shape mirroring `CaseLabRun`, noted as the source-of-truth contract to keep in sync). Docs-only, no code change.

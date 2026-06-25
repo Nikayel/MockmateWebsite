@@ -74,6 +74,49 @@ Firestore Database
 
 ---
 
+### `caseLabRuns` - Case Lab Runs (resumable)
+
+One document per user attempt at a Case Lab (the multi-milestone
+Clarify → Decompose → Design → Build → Review flow). Resumable: the loop reads
+`currentMilestone` + `answers` to restore where the user left off. Shape is the
+contract defined by `CaseLabRun` in `lib/labs/types.ts` — keep them in sync.
+
+```typescript
+{
+  id: string,                    // Auto-generated run ID
+  userId: string,                // Firebase Auth UID
+  caseLabId: string,             // CaseLab.id (e.g. "palantir-911-dispatch")
+  mode: "practice" | "onsite",   // Onsite injects a Build curveball
+  status: "in_progress" | "completed" | "abandoned",
+  currentMilestone: "clarify" | "decompose" | "design" | "build" | "review",
+
+  startedAt: string,             // ISO timestamp
+  updatedAt: string,             // ISO timestamp
+  completedAt?: string,          // ISO timestamp (if completed)
+
+  // Per-milestone user inputs (see lib/labs/types.ts for full shapes)
+  answers: {
+    clarify?: { dimension: string, question: string, assumption: string }[],
+    decompose?: { workflow: string[], entities: {...}[], stateMachine?: {...} },
+    design?: { api: {...}, tradeoffs: {...}[], fallback: string },
+    build?: { touchedFiles: string[], code: string, language: string, testResults: {...}[] },
+    review?: { selfScores: {...}, aiFeedback?: {...} },  // aiFeedback reuses
+                                                         // InterviewSession.structured_feedback
+  },
+
+  // Per-milestone progress (soft-gated; "active" = current)
+  milestoneStatus: {
+    clarify: "locked" | "active" | "done",
+    decompose: "locked" | "active" | "done",
+    design: "locked" | "active" | "done",
+    build: "locked" | "active" | "done",
+    review: "locked" | "active" | "done",
+  },
+}
+```
+
+---
+
 ### `analytics_events` - Custom Events
 
 ```typescript
