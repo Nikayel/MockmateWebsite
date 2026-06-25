@@ -43,6 +43,8 @@ export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
   difficulty: "medium",
   companies: ["Veeva", "Databricks", "Uber", "Google"],
   description: "Fix feature vector generation after a schema change introduces missing values",
+  userReport:
+    "Model scoring job started rejecting batches with non-finite vector errors after last week's data schema migration. Around 12% of inference requests are failing — the data team added nullable fields the feature builder doesn't handle.",
   tags: ["python", "ml", "data-pipeline", "validation", "real-codebase"],
   estimatedTime: 45,
   problemStatement: `A model scoring job started rejecting batches after a data schema migration. Some rows now contain missing strings, nulls, and NaN-like values. The feature builder should produce finite numeric vectors for downstream inference.

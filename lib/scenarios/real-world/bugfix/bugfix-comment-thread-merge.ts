@@ -38,6 +38,8 @@ export const bugfixCommentThreadMergeScenario: BugFixScenario = {
   difficulty: "medium",
   companies: ["Google", "Notion", "Dropbox", "Microsoft"],
   description: "Fix a document-comment sync bug that duplicates the first thread",
+  userReport:
+    "Users report the first comment thread appears twice in the editor after a page refresh. Later threads sync correctly. Reproducible on any document with at least one existing root thread.",
   tags: ["python", "backend", "sync", "off-by-one", "real-codebase"],
   estimatedTime: 40,
   problemStatement: `A collaborative editor syncs comment threads from the server into local state. Users report that the first root thread sometimes appears twice after refresh, while later threads merge correctly.

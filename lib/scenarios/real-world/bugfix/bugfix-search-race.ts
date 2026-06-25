@@ -47,6 +47,8 @@ export const bugfixSearchRaceScenario: BugFixScenario = {
   difficulty: "medium",
   companies: ["Airbnb", "Meta", "LinkedIn", "Startup"],
   description: "Fix stale async search responses overwriting newer UI results",
+  userReport:
+    "Customer-support dashboard shows stale search results when users type quickly — an older response is overwriting results from a more recent query.",
   tags: ["async", "frontend", "race-condition", "state-management", "real-codebase"],
   estimatedTime: 45,
   problemStatement: `A customer-support dashboard shows stale search results when users type quickly. The app sends one request per query. If an older request resolves after a newer one, the old results can overwrite the UI.

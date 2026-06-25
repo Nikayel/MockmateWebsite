@@ -32,6 +32,8 @@ export const bugfixEventAggregationRetriesScenario: BugFixScenario = {
   difficulty: "medium",
   companies: ["Databricks", "Snowflake", "LinkedIn", "Uber"],
   description: "Fix analytics aggregation that double-counts retried delivery events",
+  userReport:
+    "Analytics team flagged inflated event counts in the customer report dashboard after last month's queue migration to at-least-once delivery. One account shows roughly 40% more click events than the raw event log supports.",
   tags: ["python", "data", "analytics", "idempotency", "real-codebase"],
   estimatedTime: 45,
   problemStatement: `A customer analytics report is inflated after a queue migration. The event source is now at-least-once delivery, so the aggregator may receive duplicate events and out-of-order batches.

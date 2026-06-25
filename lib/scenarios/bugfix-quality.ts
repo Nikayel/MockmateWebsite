@@ -11,6 +11,20 @@ const REQUIRED_INCIDENT_FIELDS = [
   "rootCauseRubric",
 ] as const
 
+const USERREPORT_ANTI_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  {
+    pattern: /The candidate should investigate/i,
+    label: "meta-commentary — write as an incident ticket or Slack message instead",
+  },
+  {
+    pattern: /without being handed the root cause/i,
+    label: "meta-commentary — write as an incident ticket or Slack message instead",
+  },
+  { pattern: /!{2,}/, label: "theatrical exclamation marks" },
+  { pattern: /\byou('ve| have) been paged\b/i, label: "theatrical paging language" },
+  { pattern: /\b(your mission|your task is)\b/i, label: "theatrical task framing" },
+]
+
 const CANDIDATE_LEAK_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\b(BUG|FIXME)\s*:/i, label: "explicit bug marker" },
   { pattern: /\bthe bug is\b/i, label: "direct bug diagnosis" },
@@ -92,6 +106,15 @@ export function validateBugfixScenarioQuality(scenario: BugFixScenario): BugfixQ
     }
     if (value === undefined) {
       issues.push({ field, message: "Incident metadata field is required." })
+    }
+  }
+
+  for (const antiPattern of USERREPORT_ANTI_PATTERNS) {
+    if (antiPattern.pattern.test(scenario.userReport || "")) {
+      issues.push({
+        field: "userReport",
+        message: `userReport includes ${antiPattern.label}.`,
+      })
     }
   }
 

@@ -42,6 +42,8 @@ export const bugfixBillingWebhookIdempotencyScenario: BugFixScenario = {
   difficulty: "hard",
   companies: ["Stripe", "Shopify", "Square", "Amazon"],
   description: "Fix duplicate and out-of-order subscription webhook handling",
+  userReport:
+    "Billing team reports paid accounts received duplicate monthly credits after a webhook replay last Tuesday. A separate batch was downgraded despite a later upgrade event already being applied.",
   tags: ["backend", "billing", "webhooks", "idempotency", "real-codebase"],
   estimatedTime: 55,
   problemStatement: `Paid users occasionally receive duplicate monthly credits or get downgraded after a delayed webhook arrives. The billing worker processes subscription events from a payment provider, but delivery is at-least-once and not guaranteed to be ordered.

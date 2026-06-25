@@ -57,6 +57,8 @@ export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
   difficulty: "hard",
   companies: ["Cloudflare", "Stripe", "Amazon", "Meta"],
   description: "Fix a rate limiter that allows concurrent bursts past plan limits",
+  userReport:
+    "Customer success flagged two accounts that exceeded their plan API quota during traffic spikes this week. The rate limiter is supposed to cap per-minute requests but concurrent bursts are slipping through.",
   tags: ["backend", "rate-limiting", "concurrency", "api-infrastructure", "real-codebase"],
   estimatedTime: 50,
   problemStatement: `The API gateway sometimes allows more requests than a customer plan permits during traffic spikes. The store is a small in-memory stand-in for Redis sorted sets, and the visible tests reproduce the same burst behavior support is seeing in production.
