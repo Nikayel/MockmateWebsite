@@ -60,24 +60,24 @@ export function HeroSection() {
       >
         <motion.div variants={staggerItem} className="mx-auto flex max-w-4xl flex-col items-center">
           <span className="mb-8 inline-flex rounded-full border border-white/10 bg-[#2a2a2e]/80 px-4 py-1.5 text-[12px] font-bold tracking-[0.1em] text-[#adc6ff] uppercase lg:mb-9">
-            #1 Technical Interview Simulator
+            AI Mock Interviews + Spaced Repetition
           </span>
 
           <motion.h1
             variants={staggerItem}
             className="font-heading mb-6 text-[clamp(3.25rem,8vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.055em] text-[#e9e8ef]"
           >
-            CodeSparring: AI
+            Don't just practice.
             <br />
-            <span className="text-[#adc6ff]">Technical Interview Practice</span>
+            <span className="text-[#adc6ff]">Actually get better.</span>
           </motion.h1>
 
           <motion.p
             variants={staggerItem}
             className="mx-auto mb-5 max-w-2xl text-base leading-7 font-medium text-[#c2c6d6] sm:text-lg md:text-xl md:leading-8"
           >
-            Practice technical interviews with an AI interviewer that scores your code,
-            communication, and problem-solving.
+            Realistic AI mock interviews with real code execution and voice — plus spaced
+            repetition that makes it stick, so you walk into the real thing ready.
           </motion.p>
 
           <motion.div
@@ -94,14 +94,30 @@ export function HeroSection() {
             />
           </motion.div>
 
-          <motion.div variants={staggerItem}>
+          <motion.div
+            variants={staggerItem}
+            className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
+          >
             <Link
               href="/interview"
               className="inline-flex rounded-[14px] bg-[#adc6ff] px-10 py-4 text-base font-extrabold text-[#001a42] shadow-[0_0_40px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#bfd0ff] hover:shadow-[0_0_46px_rgba(173,198,255,0.36)]"
             >
-              Try Free
+              Start free — 8 sessions
+            </Link>
+            <Link
+              href="/why-codesparring"
+              className="inline-flex rounded-[14px] border border-white/15 px-8 py-4 text-base font-bold text-[#dfe4f2] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#adc6ff]/40 hover:bg-white/5"
+            >
+              See how it works
             </Link>
           </motion.div>
+
+          <motion.p
+            variants={staggerItem}
+            className="mt-5 text-[13px] font-medium text-[#c2c6d6]/70"
+          >
+            No credit card required · 200+ real scenarios · 15 DSA patterns
+          </motion.p>
         </motion.div>
 
         <motion.div
