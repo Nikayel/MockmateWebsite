@@ -5,8 +5,8 @@
 > Spec detail lives in `CASE_LABS.md` (§ references below). Keep notes terse.
 
 **Status:** in progress
-**Current phase:** Phase 2
-**Last updated by loop:** Phase 2 — run persistence service + API route (server half)
+**Current phase:** Phase 3
+**Last updated by loop:** Phase 2 complete — run save/resume wired (client + server)
 
 ---
 
@@ -25,7 +25,7 @@
 - [x] `ClarifyStation` (ghost example + progressive disclosure)
 - [x] `DecomposeStation` (workflow / entities / state machine)
 - [x] `DesignStation` (API contract + tradeoff table)
-- [~] Answers persist to the Run; save/resume across reload (server half done — service + API route + tests; client store wiring next)
+- [x] Answers persist to the Run; save/resume across reload
 
 ## Phase 3 — Build & Review (spec §7.4–7.5)
 - [ ] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor)
@@ -70,3 +70,4 @@
 - Phase 2: `components/labs/stations/DecomposeStation.tsx` — three progressive-disclosure panels (legacy workflow ordered steps, core entities name+role, state machine with states + from/on/to transitions), add/remove rows, persists to the run via `setDecompose` (state machine omitted until non-empty). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.
 - Phase 2: `components/labs/stations/DesignStation.tsx` — API contract (named endpoint + input/output `{name,type}` field lists), tradeoff table (Decision/Option A/Option B/Choice/Why per row), and a ranking/fallback textarea; persists via `setDesign`. Extracted shared `station-kit.tsx` (`CollapsiblePanel`, `RemoveRowButton`) and refactored DecomposeStation onto it (DRY). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.
 - Phase 2 (server half of persistence): `lib/labs/case-lab-runs.ts` — `caseLabRuns` Firestore service (`getCaseLabRun`, `getActiveCaseLabRun` for resume, `upsertCaseLabRun`) with a Zod input schema; ownership enforced from auth (never the body), `startedAt` preserved on update, `completedAt` omitted-when-undefined, active-run lookup avoids a composite index. Thin `app/api/labs/runs/route.ts` (GET by runId/caseLabId, PUT upsert; 401/403/400/500). Added `lib/labs/__tests__/case-lab-runs.test.ts` (6 schema-validation tests, all pass). Client store wiring (load on mount + debounced save) is the next increment. typecheck + lint + tests clean; graph updated.
+- Phase 2 (complete): client persistence — `lib/labs/case-lab-runs-client.ts` (token-attached fetch wrappers, degrade to null when signed out/failed) + `components/labs/useCaseLabRunSync.ts` (loads the in-progress run once per lab for resume; debounced 1s autosave on answer/status/nav changes; adopts a server-assigned id without clobbering in-flight edits; soft error on failure). typecheck + lint clean; graph updated.
