@@ -15,6 +15,7 @@ import type { MilestoneKind } from "@/lib/labs/types"
 import { MilestoneNav } from "./MilestoneNav"
 import { ClarifyStation } from "./stations/ClarifyStation"
 import { DecomposeStation } from "./stations/DecomposeStation"
+import { DesignStation } from "./stations/DesignStation"
 
 /** Placeholder station — replaced by real stations in Phases 2–3. */
 function StationStub({ kind }: { kind: MilestoneKind }) {
@@ -64,6 +65,8 @@ function renderStation(kind: MilestoneKind) {
       return <ClarifyStation />
     case "decompose":
       return <DecomposeStation />
+    case "design":
+      return <DesignStation />
     default:
       return <StationStub kind={kind} />
   }

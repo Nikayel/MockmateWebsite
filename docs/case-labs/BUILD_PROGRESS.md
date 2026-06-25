@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 2
-**Last updated by loop:** Phase 2 — `DecomposeStation` shipped
+**Last updated by loop:** Phase 2 — `DesignStation` shipped
 
 ---
 
@@ -24,7 +24,7 @@
 ## Phase 2 — Form stations (spec §7.1–7.3, P2)
 - [x] `ClarifyStation` (ghost example + progressive disclosure)
 - [x] `DecomposeStation` (workflow / entities / state machine)
-- [ ] `DesignStation` (API contract + tradeoff table)
+- [x] `DesignStation` (API contract + tradeoff table)
 - [ ] Answers persist to the Run; save/resume across reload
 
 ## Phase 3 — Build & Review (spec §7.4–7.5)
@@ -68,3 +68,4 @@
 - Phase 1 (complete): soft navigation — added `goToNextMilestone`/`goToPreviousMilestone` to the store (clamped via `MILESTONE_ORDER`) and `components/labs/MilestoneNav.tsx` (Back/Next, disabled at ends), wired as the StationSwitcher footer. No hard gating (P1). typecheck + lint clean; graph updated.
 - Phase 2: `components/labs/stations/ClarifyStation.tsx` — 5 guided dimensions (Question + Assumption each) as progressive-disclosure collapsibles (one open at a time); first row shows a ghost example as placeholder (P2, no blank wall); per-dimension answered dot; persists to the run via `setClarify`; soft "3+ recommended" hint. Wired into `StationSwitcher` (clarify → real station, rest → stub). typecheck + lint clean; graph updated.
 - Phase 2: `components/labs/stations/DecomposeStation.tsx` — three progressive-disclosure panels (legacy workflow ordered steps, core entities name+role, state machine with states + from/on/to transitions), add/remove rows, persists to the run via `setDecompose` (state machine omitted until non-empty). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.
+- Phase 2: `components/labs/stations/DesignStation.tsx` — API contract (named endpoint + input/output `{name,type}` field lists), tradeoff table (Decision/Option A/Option B/Choice/Why per row), and a ranking/fallback textarea; persists via `setDesign`. Extracted shared `station-kit.tsx` (`CollapsiblePanel`, `RemoveRowButton`) and refactored DecomposeStation onto it (DRY). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.

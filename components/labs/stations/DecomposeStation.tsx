@@ -12,13 +12,12 @@
  */
 
 import { useState } from "react"
-import { ChevronDown, Plus, X } from "lucide-react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { DecomposeAnswer, DecomposeEntity, StateTransition } from "@/lib/labs/types"
+import { CollapsiblePanel, RemoveRowButton } from "./station-kit"
 
 type PanelId = "workflow" | "entities" | "state"
 
@@ -54,51 +53,6 @@ function deriveAnswer(form: DecomposeForm): DecomposeAnswer {
   }
 }
 
-function PanelShell({
-  title,
-  hint,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string
-  hint: string
-  open: boolean
-  onToggle: (open: boolean) => void
-  children: React.ReactNode
-}) {
-  return (
-    <Collapsible open={open} onOpenChange={onToggle} className="border-border rounded-lg border">
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left">
-        <span className="text-foreground text-sm font-medium">{title}</span>
-        <ChevronDown
-          className={cn("text-muted-foreground h-4 w-4 transition-transform", open && "rotate-180")}
-          aria-hidden
-        />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-3 px-3 pb-3">
-        <p className="text-muted-foreground text-xs">{hint}</p>
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
-
-function RemoveButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={onClick}
-      aria-label={label}
-      className="text-muted-foreground shrink-0"
-    >
-      <X className="h-4 w-4" aria-hidden />
-    </Button>
-  )
-}
-
 export function DecomposeStation() {
   const run = useCaseLabStore((s) => s.activeRun)
   const setDecompose = useCaseLabStore((s) => s.setDecompose)
@@ -125,7 +79,7 @@ export function DecomposeStation() {
       </header>
 
       {/* 1. Legacy workflow */}
-      <PanelShell
+      <CollapsiblePanel
         title="Legacy workflow"
         hint="The ordered steps the system goes through today."
         open={openPanel === "workflow"}
@@ -147,7 +101,7 @@ export function DecomposeStation() {
                 placeholder="e.g. Call received and triaged"
               />
               {form.workflow.length > 1 && (
-                <RemoveButton
+                <RemoveRowButton
                   label={`Remove step ${i + 1}`}
                   onClick={() =>
                     apply({
@@ -170,10 +124,10 @@ export function DecomposeStation() {
           <Plus className="h-4 w-4" aria-hidden />
           Add step
         </Button>
-      </PanelShell>
+      </CollapsiblePanel>
 
       {/* 2. Core entities */}
-      <PanelShell
+      <CollapsiblePanel
         title="Core entities"
         hint="The nouns in the system — each with a one-line role."
         open={openPanel === "entities"}
@@ -202,7 +156,7 @@ export function DecomposeStation() {
                 placeholder="Role (e.g. a unit that can be dispatched)"
               />
               {form.entities.length > 1 && (
-                <RemoveButton
+                <RemoveRowButton
                   label={`Remove entity ${i + 1}`}
                   onClick={() =>
                     apply({
@@ -225,10 +179,10 @@ export function DecomposeStation() {
           <Plus className="h-4 w-4" aria-hidden />
           Add entity
         </Button>
-      </PanelShell>
+      </CollapsiblePanel>
 
       {/* 3. State transitions */}
-      <PanelShell
+      <CollapsiblePanel
         title="State transitions"
         hint="Pick one key entity and map how it moves between states."
         open={openPanel === "state"}
@@ -256,7 +210,7 @@ export function DecomposeStation() {
                 placeholder="e.g. pending"
               />
               {form.smStates.length > 1 && (
-                <RemoveButton
+                <RemoveRowButton
                   label={`Remove state ${i + 1}`}
                   onClick={() =>
                     apply({
@@ -311,7 +265,7 @@ export function DecomposeStation() {
                 }}
                 placeholder="to"
               />
-              <RemoveButton
+              <RemoveRowButton
                 label={`Remove transition ${i + 1}`}
                 onClick={() =>
                   apply({
@@ -338,7 +292,7 @@ export function DecomposeStation() {
             Add transition
           </Button>
         </div>
-      </PanelShell>
+      </CollapsiblePanel>
     </section>
   )
 }
