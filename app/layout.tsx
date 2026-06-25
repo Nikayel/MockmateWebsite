@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Geist, Work_Sans, Open_Sans } from "next/font/google"
+import { Geist, Geist_Mono, Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
 import { RateLimitProvider } from "@/lib/contexts/rate-limit-context"
@@ -34,6 +34,14 @@ const geist = Geist({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-geist",
+})
+
+// Geist Mono — used for the code workspace chrome (file tabs, filenames,
+// console) so the bug-fix surface reads like a real IDE, not a web template.
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-geist-mono",
 })
 
 const siteConfig = {
@@ -207,7 +215,7 @@ html {
         />
       </head>
       <body
-        className={`${workSans.variable} ${openSans.variable} ${geist.variable} antialiased`}
+        className={`${workSans.variable} ${openSans.variable} ${geist.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
         {/* Skip link for keyboard accessibility - hidden until focused */}
