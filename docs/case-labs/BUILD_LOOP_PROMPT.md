@@ -18,12 +18,13 @@ git clone https://github.com/Nikayel/workbook-palantir-decomp.git ../workbook-pa
 > rm -rf ../workbook-palantir-decomp
 > ```
 
-Then open Claude Code in `MockmateWebsite` and start the loop (10-minute cadence; it auto-resumes
-across iterations and will stop itself when done):
+Then open Claude Code in `MockmateWebsite` and start the loop (runs back-to-back; self-paces at ~60s between iterations, stops itself when done):
 
 ```
-/loop 10m <paste THE LOOP BODY below>
+/loop Read docs/case-labs/BUILD_LOOP_PROMPT.md and follow its "THE LOOP BODY" section — do exactly ONE committed increment this iteration, then stop.
 ```
+
+> **Why no interval prefix?** `/loop 10m` means *wait 10 minutes between tasks* — pure idle time. Without a prefix, Claude self-paces at the minimum (~60s gap) so iterations run nearly back-to-back.
 
 > Authorship: the loop commits using your laptop's existing git identity. It is instructed **not** to add
 > any "Co-Authored-By" / AI-attribution trailer and **not** to mention Claude in commit messages — so every
@@ -44,7 +45,7 @@ EVERY ITERATION, DO THIS:
 4. VERIFY: run `pnpm typecheck` and `pnpm lint` (and `pnpm test` if logic changed). Fix until clean. If you changed code, run `graphify update .`.
 5. COMMIT IMMEDIATELY (see COMMIT RULES). One commit per increment — commit very frequently.
 6. UPDATE the ledger: check off the task, add a one-line note. Commit the ledger update too (can be same commit as the work).
-7. If ALL phases are complete and the Definition of Done is met: write "CASE LABS BUILD COMPLETE" in the ledger, do a final commit, and END THE LOOP (do not schedule another iteration). Otherwise, end the turn — the next iteration continues.
+7. If ALL phases are complete and the Definition of Done is met: write "CASE LABS BUILD COMPLETE" in the ledger, do a final commit, END THE LOOP (do not schedule another iteration), and tell the user to run `rm -rf ../workbook-palantir-decomp`. Otherwise, schedule the next iteration immediately using ScheduleWakeup with delaySeconds=60 (minimum — run back-to-back, no idle waiting).
 
 COMMIT RULES (important — commits must look authored by the human, not an AI):
 - Use the repo's existing local git identity. Do NOT pass --author. Do NOT change git config.
@@ -84,8 +85,9 @@ Begin this iteration now: orient via the ledger, pick the next task, implement, 
 
 ## Notes for you (the human)
 
-- **It self-resumes.** State lives in `docs/case-labs/BUILD_PROGRESS.md` + git history, so each loop iteration knows where to pick up even if context was compacted.
-- **It self-terminates.** When the Definition of Done is met, it writes "CASE LABS BUILD COMPLETE" and stops scheduling.
-- **Commits are yours.** No AI trailers, no Claude mentions — they use your laptop's git identity. (Double-check `git config user.name`/`user.email` are you before starting.)
-- **Watch the first iteration.** Make sure it reads the ingredient repo and starts Phase 0 (types), not Phase 4 (porting). If it drifts toward "copying," stop it and point it back at the core rule.
-- **One lab first.** It's scoped to 911 Dispatch only. The other labs and the `curriculum_creator_playbook` engine are separate follow-on runs.
+- **Runs back-to-back.** No interval prefix = dynamic mode. Claude schedules the next wakeup at 60s (minimum) immediately after each commit, so it's nearly continuous — no 10-minute idle gaps.
+- **It self-resumes.** State lives in `docs/case-labs/BUILD_PROGRESS.md` + git history, so each iteration knows where to pick up even after context compaction.
+- **It self-terminates.** When the Definition of Done is met it writes "CASE LABS BUILD COMPLETE", stops scheduling, and tells you to delete the ingredient repo.
+- **Commits are yours.** No AI trailers, no Claude mentions — uses your laptop's git identity. Double-check `git config user.name`/`user.email` are yours before starting.
+- **Watch the first iteration.** Confirm it reads the ingredient repo and starts Phase 0 (types), not Phase 4 (porting). If it drifts toward copying, stop it and point it at the core rule.
+- **One lab first.** Scoped to 911 Dispatch only. Other labs are a separate follow-on run.
