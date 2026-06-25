@@ -8,9 +8,22 @@
 
 ## 1. What Case Labs is (in one line)
 
-**Case Labs turns a real-world, company-flavored engineering problem into a guided, milestone-driven build** — the user clarifies ambiguity, decomposes the system, designs the contract, writes the code, and reviews their work, with an AI interviewer as a constant companion through every step.
+**Case Labs turns a real-world, company-flavored engineering problem into a guided, milestone-driven build** — the user clarifies ambiguity, decomposes the system, designs the contract, **works inside a real (messy) codebase**, and reviews their work, with an AI interviewer as a constant companion through every step.
 
-It is the deep, "this feels like a real onsite" format that sits above the everyday DSA practice loop.
+It is the deep, "this feels like a real SWE/internship onsite" format that sits above the everyday DSA practice loop.
+
+### Critical scope decision: Case Labs are codebase work, NOT DSA
+
+DSA does **not** belong in a Case Lab, and the workbook arc would be redundant around it. Your daily practice loop + spaced repetition already train DSA perfectly, and a LeetCode problem statement **is** its own spec — there is no ambiguity to clarify, no system to decompose. Wrapping a workbook around "implement two-sum" adds friction without value.
+
+SWE and internship interviews (Palantir FDSE, Stripe, Linear, etc.) are **codebase-drop** problems: you are dropped into a partial, messy system and asked to find what's broken, extend it, or redesign a piece. The Clarify → Decompose → Design → Build → Review arc only earns its keep when the thing you build into has **existing context to read and reason about**. So the **Build** milestone embeds a multi-file codebase task (your existing `bugfix` / `add-functionality` scenarios + `workspace-execution`), never a blank DSA editor. The earlier milestones are literally *why* the codebase task makes sense — the user decomposed and designed that system themselves first.
+
+| Format | Build milestone | Skill trained | Use case |
+|---|---|---|---|
+| Daily DSA practice | Blank editor, one algorithm | Pattern recall, coding speed | Daily gym |
+| **Case Labs** | **Multi-file codebase drop** (extend / fix / redesign) | Decomposition, systems thinking, reading real code | SWE/internship onsite prep |
+
+The two formats do not overlap.
 
 ### The mental model we are selling
 
@@ -49,7 +62,7 @@ Use these terms consistently in code, UI copy, and analytics.
 
 ## 4. Design principles
 
-These are the non-negotiables. The biggest product risk is that this format reads as **paperwork / homework**. Every principle below exists to prevent that.
+These are the non-negotiables. The biggest product risk is that this format reads as **paperwork / homework**. Every principle below exists to prevent that. The research backing these principles — and the visual-hierarchy and wizard-vs-disclosure tradeoffs — is in **§16 (Appendix A)**.
 
 ### P1 — Open, not boxed-in
 Default to **freedom with a nudge**, not mandatory gates. The user can move between milestones, jump ahead to code, or skip a stage. The AI *notices* and the Review reflects it — but the platform never says "you may not proceed." (Strict sequential unlock is reserved for **Onsite Mode**, an opt-in intensity.)
@@ -161,12 +174,12 @@ Each milestone defines: **purpose**, **what the station shows**, **user inputs**
 - **AI behavior:** Pushes on every "Choice" cell — "Why A over B here? What breaks at scale?"
 - **Completion:** API + ≥1 tradeoff with a justified choice. Soft.
 
-### 7.4 Build
-- **Purpose:** Implement against tests.
-- **Station:** The **existing code editor + test runner** (`EditorColumn` + `/api/execute` + Piston). Starter code and tests come from the Case Lab definition, exactly like a DSA scenario.
-- **Inputs:** `build: { code, language, testResults }` (reuses interview-store fields)
-- **AI behavior:** Existing coding-phase interviewer behavior. **Onsite mode:** inject a curveball partway through.
-- **Completion:** Tests passing (or user marks done). This milestone can hard-require nothing — partial credit is fine.
+### 7.4 Build — the codebase drop
+- **Purpose:** Work inside the real system the user just designed — extend it, fix it, or redesign a piece. **Not** a from-scratch algorithm.
+- **Station:** The **existing multi-file workspace editor + test runner** (`workspace-execution` + `/api/execute` + Piston), the same surface that powers `bugfix` / `add-functionality` scenarios. The codebase is a partial implementation of the system from the Clarify/Decompose/Design milestones, with editable files + read-only reference files and visible logs/repro steps.
+- **Inputs:** `build: { touchedFiles, code, language, testResults }` (reuses workspace + interview-store fields)
+- **AI behavior:** Existing coding-phase interviewer behavior, now able to reference the user's own Design decisions ("you said you'd rank by ETA — does your code actually do that?"). **Onsite mode:** inject a curveball partway through.
+- **Completion:** Tests passing and/or expected files touched (or user marks done). Partial credit is fine.
 
 ### 7.5 Review
 - **Purpose:** Close the loop and convert effort into a score + next step.
@@ -214,8 +227,10 @@ export interface CaseLab {
   whyThisCompany: string;     // P6 framing copy
   skills: string[];           // for browse filtering
   milestones: CaseLabMilestone[];
-  // Build milestone reuses the existing scenario shape:
-  buildScenarioId: string;    // points at a DSAScenario/BugFixScenario etc.
+  // Build milestone reuses an existing CODEBASE scenario — never DSA.
+  // Must point at a BugFixScenario or AddFunctionalityScenario (multi-file).
+  buildScenarioId: string;
+  buildScenarioType: "bugfix" | "add-functionality" | "system-design";
 }
 ```
 
@@ -251,7 +266,7 @@ Reuse `InterviewSession.structured_feedback` shape for the Review output so the 
 | Session shell (3-col) | `app/interview/page.tsx`, `_components/*` | Milestone rail; station switcher in center |
 | AI interviewer chat | `/api/chat`, `lib/interview/chat/*`, phase engine | Make chat **milestone-aware** (pass `currentMilestone`) |
 | Phase detection | `lib/interview/interview-phases/*` | Map milestones → existing phases (clarify→understanding, design→approach, build→implementation) |
-| Code editor + tests | `EditorColumn`, `/api/execute`, `lib/piston.ts` | Nothing — Build station embeds it as-is |
+| Multi-file codebase editor + tests | `workspace-execution`, `/api/execute`, `lib/piston.ts` | Nothing — Build station embeds the codebase-drop surface as-is |
 | Feedback & scoring | `lib/feedback/*`, `/api/generate-feedback` | Feed multi-milestone transcript in; reuse output shape |
 | Mastery / spaced rep | `lib/spaced-repetition/*` | Each completed lab updates mastery like a problem |
 | Roadmap placement | `lib/roadmap/*` | Add Case Labs as roadmap milestones |
@@ -283,7 +298,7 @@ Phased so an engineer can ship incrementally and demo at each phase.
 ### Phase 0 — Scaffolding & types
 - [ ] Create `lib/labs/types.ts` (`CaseLab`, `CaseLabMilestone`, `MilestoneKind`).
 - [ ] Define Firestore `caseLabRuns` shape; document it in `docs/FIREBASE_STRUCTURE.md`.
-- [ ] Author **one** seed Case Lab (Palantir "911 Dispatch") reusing an existing build scenario as `buildScenarioId`.
+- [ ] Author **one** seed Case Lab (Palantir "911 Dispatch") whose `buildScenarioId` points at a **multi-file `bugfix`/`add-functionality` scenario** (never DSA).
 - [ ] Add `case-lab-store.ts` (or extend `interview-store`) for milestone + answers state.
 
 ### Phase 1 — The shell & rail (no AI yet)
@@ -299,7 +314,7 @@ Phased so an engineer can ship incrementally and demo at each phase.
 - [ ] Persist all answers to the Run; save/resume works across reloads.
 
 ### Phase 3 — Build & Review (reuse existing engines)
-- [ ] Embed `EditorColumn` + `/api/execute` as the **Build** station.
+- [ ] Embed the **multi-file workspace editor** (`workspace-execution`) + `/api/execute` as the **Build** station — the codebase-drop surface, not the DSA editor.
 - [ ] `ReviewStation` → call existing feedback pipeline; render `structured_feedback`.
 - [ ] On complete: update mastery + write Run as `completed`.
 
@@ -324,7 +339,7 @@ Phased so an engineer can ship incrementally and demo at each phase.
 1. **Surface:** dedicated `/labs` browse page reusing the `/interview` session shell (recommended) vs a mode flag inside `/interview`.
 2. **Gating default:** soft/open with Onsite as opt-in strict (recommended) vs always-mandatory structure.
 3. **Store:** extend `interview-store` vs a separate `case-lab-store` (recommended for separation of concerns).
-4. **Build scenario coupling:** reuse existing scenario IDs (recommended for v1) vs author bespoke build tasks per lab.
+4. ~~Build scenario coupling~~ **RESOLVED:** Build always embeds a multi-file `bugfix`/`add-functionality` codebase scenario, never DSA (see §1). Open sub-question: reuse existing codebase scenario IDs for v1 (recommended) vs author bespoke ones per lab.
 5. **Voice mode:** include the existing `VoiceModeToggle` in Case Labs v1, or defer?
 
 ---
@@ -340,4 +355,89 @@ Phased so an engineer can ship incrementally and demo at each phase.
 
 ## 15. North star
 
-A user opens a Case Lab two weeks before a Palantir onsite, immediately understands **why this company interviews this way**, moves calmly through five milestones that each tell them **where they are and what's next**, never faces a blank wall, talks to an AI interviewer the whole time, and walks out with a score and a clear "do this next." It should feel **open and guided** — never like filling out a form.
+A user opens a Case Lab two weeks before a Palantir onsite, immediately understands **why this company interviews this way**, moves calmly through five milestones that each tell them **where they are and what's next**, never faces a blank wall, talks to an AI interviewer the whole time, drops into a **real codebase they designed themselves**, and walks out with a score and a clear "do this next." It should feel **open and guided** — never like filling out a form.
+
+---
+
+## 16. Appendix A — UX research & design rationale
+
+This section backs the design principles (§4) and screen architecture (§6) with external UX research, and resolves the core layout tradeoff.
+
+### 16.1 The core tradeoff: wizard vs. progressive disclosure → use BOTH
+
+The literature frames this as a binary, but the right answer for Case Labs is a **hybrid**, and the two techniques operate at different scales:
+
+| Technique | Best for | Where we use it |
+|---|---|---|
+| **Multi-step wizard** (distinct steps, progress shown) | Lengthy, intricate, multi-stage processes; first-time users; "increase perceived ability — each step looks easy" | **The milestone journey** (Clarify→Decompose→Design→Build→Review) — the macro structure |
+| **Progressive disclosure** (reveal fields as needed on one surface) | Reducing overwhelm within a step; showing only what's needed *now* | **Inside each station** — one form section expands at a time, not six empty fields at once |
+
+NN/G's guidance — *"keep steps short (ideally 1–3 fields per step), show progress indicators, and allow easy back navigation without data loss"* — maps directly onto our milestone rail + per-station progressive forms. NN/G also reports progressive disclosure can **reduce cognitive load by up to ~55%**, which is the entire bet of P2.
+
+**Decision:** Case Labs is a wizard at the milestone level and progressive-disclosure at the station level. This is exactly the "wizard for lengthy/intricate processes" recommendation, with disclosure preventing the per-step forms from becoming walls.
+
+### 16.2 NN/G's four cognitive-load principles → mapped to Case Labs
+
+NN/G's four principles for reducing cognitive load in multi-step flows map cleanly onto our design:
+
+| NN/G principle | What it means | Where Case Labs delivers it |
+|---|---|---|
+| **Structure** | Break the process into clear stages | The 5 milestones; one station active at a time (P2) |
+| **Transparency** | Always show progress and what remains | Milestone rail answers "where am I / what's next" (P3) |
+| **Clarity** | Each step's ask is unambiguous | Per-milestone purpose line + ghost example (P2/P3) |
+| **Support** | Help the user when stuck | AI interviewer as constant spine; "want help starting?" nudge (P4) |
+
+### 16.3 Visual hierarchy — concrete rules for the three zones
+
+NN/G: *"visual hierarchy controls the delivery of information... it lets users know where to focus."* Translate that into hard rules so the screen never overwhelms:
+
+- **One primary focus at a time.** The active **station** (center) is the visual hero — highest contrast, most space, the only zone with active inputs. The rail and chat are secondary/supporting and must stay visually quieter (muted, lower contrast, less motion).
+- **The rail is an orientation device, not a workspace.** It should read at a glance: current milestone high-contrast + accent; completed = checked + de-emphasized; upcoming = muted with a one-line "what you'll do." Never let it compete with the station for attention.
+- **Predictable placement (anti-overwhelm).** Rail always left, station always center, AI always right — across every milestone. *"Put things in predictable places"* is how we prevent the morphing center from feeling like the screen is jumping around.
+- **Progress is persistent and ambient.** Visibility-of-system-status: the rail's progress is always on screen so users never have to remember their place. Completion lands a checkmark + one-line verdict (P5) as a small, satisfying state change — not a modal that interrupts.
+- **Reduce clutter aggressively.** *"Eliminate any UI component that doesn't have a justifiable purpose."* In a station, collapse everything except the section in focus. In Build, the codebase file tree is the secondary element; the active file is primary.
+
+### 16.4 Mobile / small-screen note
+Wizards beat single long pages on small screens (single pages force excessive scrolling). The milestone rail should **collapse to a horizontal progress strip** on narrow viewports, and the three zones become tabs (Station / AI / Files) rather than columns.
+
+### 16.5 Sources
+- [Few Guesses, More Success: 4 Principles to Reduce Cognitive Load in Forms — NN/G](https://www.nngroup.com/articles/4-principles-reduce-cognitive-load/)
+- [Visual Hierarchy in UX: Definition — NN/G](https://www.nngroup.com/articles/visual-hierarchy-ux-definition/)
+- [3 Strategies for Managing Visual Complexity — NN/G](https://www.nngroup.com/videos/managing-visual-complexity/)
+- [What Is Progressive Disclosure in UX? — UXPin](https://www.uxpin.com/studio/blog/what-is-progressive-disclosure/)
+- [What is Progressive Disclosure? — Interaction Design Foundation](https://ixdf.org/literature/topics/progressive-disclosure)
+- [Wizard UI Pattern: When to Use It and How to Get It Right — Eleken](https://www.eleken.co/blog-posts/wizard-ui-pattern-explained)
+- [Beyond the Progress Bar: The Art of Stepper UI Design — Lollypop](https://lollypop.design/blog/2026/february/beyond-the-progress-bar-the-art-of-stepper-ui-design/)
+- [Multi-Step Forms vs Single-Step Forms — IvyForms](https://ivyforms.com/blog/multi-step-forms-single-step-forms/)
+
+---
+
+## 17. Appendix B — Curriculum sourcing & the open-source workbook
+
+**The question:** can we use the `workbook-palantir-decomp` GitHub repo as curriculum source material for Case Labs?
+
+**Short answer: yes — it's your own repository** (same owner, `Nikayel`), so you already hold the copyright and can use the content however you want in CodeSparring. The repo is the natural curriculum backbone for Case Labs. A few practical notes:
+
+### 17.1 Licensing reality
+- The repo currently has **no `LICENSE` file**, which for a public repo means default *"all rights reserved"* to **you, the owner**. That restricts *others* from reusing it — it does **not** restrict you. You can ingest it into CodeSparring freely.
+- The README's *"feel free to fork / submit PRs"* line is an informal invitation, not a formal license. If you ever want outside contributors or to make the reuse terms explicit, add a real license (e.g. MIT for permissive, or keep it closed). **For pulling it into your own commercial platform, do nothing — you already have the rights.**
+
+### 17.2 What maps cleanly from the repo → Case Labs
+
+| Repo asset | Case Labs use |
+|---|---|
+| `labs/lab_0X_*` scenarios (911 dispatch, fraud, supply chain…) | One Case Lab each — the scenario + company framing |
+| `templates/blank_*` (decomposition, API design, tradeoff, state machine) | The **station forms** for Clarify / Decompose / Design milestones |
+| `labs/*/workbook.md` structure (clarify→decompose→design→code→review) | Validates the 5-milestone arc — it's the same flow |
+| `labs/*/starter.py` + `tests.py` | **Caveat below** — needs reshaping into codebase-drop tasks |
+| Self-grade rubric (50-pt, 5 dimensions) | The Review milestone rubric |
+| `curriculum_creator_playbook/` | The v2 auto-generation engine (out of scope for v1, but the roadmap) |
+
+### 17.3 One adaptation required (ties back to §1)
+The repo's Build artifacts are mostly **single-file `starter.py` + `tests.py`** — i.e. closer to DSA-style "implement from scratch." Per the core scope decision (§1), Case Labs Build milestones must be **multi-file codebase drops**. So when porting a lab, the Build step needs reshaping: instead of an empty `starter.py`, ship a **partial multi-file implementation of that system** with a bug to fix or a feature to add, wired into your `bugfix`/`add-functionality` scenario format. The Clarify/Decompose/Design/Review content ports almost directly; the Build content is the part you re-author.
+
+### 17.4 Recommended ingestion path
+1. Treat the repo as a **content source of truth**, not a runtime dependency — copy/adapt content into your scenario format rather than importing the repo.
+2. Port **one** lab end-to-end first (911 Dispatch) to validate the pipeline, including reshaping its Build into a codebase drop.
+3. Add a `LICENSE` to the source repo only if you want to clarify external reuse — not required for your own use.
+4. Long-term, the `curriculum_creator_playbook` is your engine for generating new labs per company/role (v2).
