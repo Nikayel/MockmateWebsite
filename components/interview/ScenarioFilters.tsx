@@ -343,7 +343,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
       {/* Active Filters Summary */}
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-          <span className="text-xs text-zinc-600">Active:</span>
+          <span className="text-xs text-zinc-400">Active:</span>
           {filterType.map((t) => {
             const type = EXERCISE_TYPES.find((et) => et.id === t)
             if (!type) return null
@@ -355,8 +355,12 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               >
                 <Icon className="h-3 w-3" />
                 {type.label}
-                <button onClick={() => onRemoveType(t)} className="hover:opacity-70">
-                  <X className="h-3 w-3" />
+                <button
+                  onClick={() => onRemoveType(t)}
+                  aria-label={`Remove ${type.label} filter`}
+                  className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
             )
@@ -373,8 +377,12 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               }`}
             >
               {d}
-              <button onClick={() => onRemoveDifficulty(d)} className="hover:opacity-70">
-                <X className="h-3 w-3" />
+              <button
+                onClick={() => onRemoveDifficulty(d)}
+                aria-label={`Remove ${d} difficulty filter`}
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           ))}
@@ -384,16 +392,24 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300"
             >
               {c}
-              <button onClick={() => onRemoveCompany(c)} className="hover:opacity-70">
-                <X className="h-3 w-3" />
+              <button
+                onClick={() => onRemoveCompany(c)}
+                aria-label={`Remove ${c} filter`}
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           ))}
           {searchQuery && (
             <span className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300">
               "{searchQuery}"
-              <button onClick={() => onSearchChange("")} className="hover:opacity-70">
-                <X className="h-3 w-3" />
+              <button
+                onClick={() => onSearchChange("")}
+                aria-label="Clear search filter"
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           )}
