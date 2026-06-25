@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C: EditorColumn file-tab role colors (off-palette blue + yellow)
+
+- changed: EditorColumn color-codes file tabs by role. The roles already on-palette were left alone (test=emerald, readonly=amber, editable=cyan). Fixed the two off-palette ones: (1) the `docs` role used blue (icon `text-blue-300/400`, active border `border-b-blue-400`, badge `border-blue-400/25 bg-blue-400/10 text-blue-200`) → demoted to gray (`text-gray-200/400`, `border-b-gray-400`, `border-gray-500/30 bg-gray-500/10 text-gray-300`); docs are reference/"everything else" so gray is the correct role per the table, and stays clearly distinct from the colored functional roles. (2) the unsaved-edit indicator dot moved from `bg-yellow-300` to `bg-amber-300` — an "unsaved changes" attention signal maps to amber (the warning role). EditorColumn now has zero off-palette hues. Color only — no behaviour/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on EditorColumn.tsx · `pnpm build` → PASS
+- a11y: gray docs icon/badge keep clear active-vs-inactive contrast (gray-200 active / gray-400 inactive, mirroring the other roles' active/inactive pattern); the amber unsaved dot retains its `title`/`aria-label="Unsaved edit"` so the state is not color-only. No focus/keyboard change.
+- needs_human_review: false (on-palette role recolor; tab semantics and layout unchanged)
+- note (commit attribution): per user feedback, commits from this point omit the Co-Authored-By Claude trailer and are attributed to the user only.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C: off-palette example colors in FocusProblemPeek.tsx (new component)
 
 - changed: Rotated to a different workspace component now that ProblemColumn is clean. FocusProblemPeek (the focus-mode problem peek) rendered DSA example values in off-palette `text-blue-300` (Input) and `text-green-300` (Output); demoted both to `text-gray-200` — the same fix already shipped for ProblemColumn's examples (round 3), so the two components now render examples identically and on-palette. The "Input:"/"Output:" labels (gray-400) still carry the meaning and stay distinct from the gray-200 values. Color only — no behaviour/copy change. Left the difficulty badge (L49–51, green/yellow) untouched: same cross-cutting pattern across 10+ files.

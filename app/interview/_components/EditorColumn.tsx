@@ -176,9 +176,9 @@ export const EditorColumn = memo(function EditorColumn({
                 } else if (file.role === "editable") {
                   iconColor = isActive ? "text-cyan-300" : "text-cyan-400/70"
                 } else if (file.role === "docs") {
-                  iconColor = isActive ? "text-blue-300" : "text-blue-400/70"
-                  activeBorderClass = "border-b-blue-400"
-                  roleBadgeClass = "border-blue-400/25 bg-blue-400/10 text-blue-200"
+                  iconColor = isActive ? "text-gray-200" : "text-gray-400"
+                  activeBorderClass = "border-b-gray-400"
+                  roleBadgeClass = "border-gray-500/30 bg-gray-500/10 text-gray-300"
                   RoleIcon = BookOpen
                   roleLabel = "Docs"
                   roleDescription = "Documentation file"
@@ -207,7 +207,7 @@ export const EditorColumn = memo(function EditorColumn({
                       file.originalContent !== undefined &&
                       file.content !== file.originalContent && (
                         <span
-                          className="h-1.5 w-1.5 rounded-full bg-yellow-300"
+                          className="h-1.5 w-1.5 rounded-full bg-amber-300"
                           title="Unsaved edit"
                           aria-label="Unsaved edit"
                         />
