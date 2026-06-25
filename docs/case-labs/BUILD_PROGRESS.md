@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 3
-**Last updated by loop:** Phase 2 complete — run save/resume wired (client + server)
+**Last updated by loop:** Phase 3 — Build station editor scaffold shipped
 
 ---
 
@@ -28,7 +28,7 @@
 - [x] Answers persist to the Run; save/resume across reload
 
 ## Phase 3 — Build & Review (spec §7.4–7.5)
-- [ ] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor)
+- [~] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor) — editor scaffold done (loads build scenario, multi-file tabs, editable/readonly roles, persists edits); `/api/execute` run-tests wiring next
 - [ ] `ReviewStation` → existing feedback pipeline → render `structured_feedback`
 - [ ] On complete: update mastery + mark Run `completed`
 
@@ -71,3 +71,4 @@
 - Phase 2: `components/labs/stations/DesignStation.tsx` — API contract (named endpoint + input/output `{name,type}` field lists), tradeoff table (Decision/Option A/Option B/Choice/Why per row), and a ranking/fallback textarea; persists via `setDesign`. Extracted shared `station-kit.tsx` (`CollapsiblePanel`, `RemoveRowButton`) and refactored DecomposeStation onto it (DRY). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.
 - Phase 2 (server half of persistence): `lib/labs/case-lab-runs.ts` — `caseLabRuns` Firestore service (`getCaseLabRun`, `getActiveCaseLabRun` for resume, `upsertCaseLabRun`) with a Zod input schema; ownership enforced from auth (never the body), `startedAt` preserved on update, `completedAt` omitted-when-undefined, active-run lookup avoids a composite index. Thin `app/api/labs/runs/route.ts` (GET by runId/caseLabId, PUT upsert; 401/403/400/500). Added `lib/labs/__tests__/case-lab-runs.test.ts` (6 schema-validation tests, all pass). Client store wiring (load on mount + debounced save) is the next increment. typecheck + lint + tests clean; graph updated.
 - Phase 2 (complete): client persistence — `lib/labs/case-lab-runs-client.ts` (token-attached fetch wrappers, degrade to null when signed out/failed) + `components/labs/useCaseLabRunSync.ts` (loads the in-progress run once per lab for resume; debounced 1s autosave on answer/status/nav changes; adopts a server-assigned id without clobbering in-flight edits; soft error on failure). typecheck + lint clean; graph updated.
+- Phase 3 (Build scaffold): `components/labs/stations/BuildStation.tsx` — loads the lab's `buildScenarioId` via `getScenarioById`, renders the multi-file workspace (file tabs with lock icons for read-only, reused `CodeMirrorEditor` + error boundary), persists edits via `setBuild` (touchedFiles diffed vs originals, primary-file code). Handles no-scenario / not-found / non-workspace empty states. Wired into `StationSwitcher`. NOTE: persists primary-file code for now (multi-file content persistence + `/api/execute` run-tests are the next increment). typecheck + lint clean; graph updated.

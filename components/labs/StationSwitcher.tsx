@@ -16,6 +16,7 @@ import { MilestoneNav } from "./MilestoneNav"
 import { ClarifyStation } from "./stations/ClarifyStation"
 import { DecomposeStation } from "./stations/DecomposeStation"
 import { DesignStation } from "./stations/DesignStation"
+import { BuildStation } from "./stations/BuildStation"
 
 /** Placeholder station — replaced by real stations in Phases 2–3. */
 function StationStub({ kind }: { kind: MilestoneKind }) {
@@ -67,6 +68,8 @@ function renderStation(kind: MilestoneKind) {
       return <DecomposeStation />
     case "design":
       return <DesignStation />
+    case "build":
+      return <BuildStation />
     default:
       return <StationStub kind={kind} />
   }
