@@ -12,6 +12,13 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C (round 4): collapse Investigation Notes per-field rainbow (ProblemColumn.tsx)
+
+- changed: Collapsed the three-hue "rainbow" in the Investigation Notes form — the spec's explicitly-named target ("cyan, amber, emerald... all as meaningful accents at once… collapse that"). The field labels Hypothesis (`text-amber-200`), Root Cause (`text-cyan-200`), and Prevention (`text-emerald-200`) all → `text-gray-400`, and their three matching Save buttons (`border-amber-400/30 text-amber-100`, `border-cyan-400/30 text-cyan-100`, `border-emerald-400/30 text-emerald-100`) → a single neutral `border-gray-600 text-gray-200 hover:bg-gray-700/40` (matching the existing "Upload Files" outline button). The section's cyan header ("Investigation Notes") is kept as the section identity. Net: 6 accent spots → gray; the section now reads as secondary form chrome under one cyan identity, per the 60-30-10 discipline. Color only — no behaviour, logic, or copy change; field semantics unchanged (labels still read Hypothesis/Root Cause/Prevention).
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on ProblemColumn.tsx · `pnpm build` → PASS
+- a11y: gray-400 labels and gray-200 button text on the dark `bg-gray-950/35` box meet AA; the neutral outline buttons retain a clear disabled/enabled + hover state. No focus/keyboard change (only color tokens swapped).
+- needs_human_review: true — this removes what may have been intentional stage-coding (hypothesis→root-cause→prevention), so it deserves a human eye on a screenshot to confirm the de-rainbowed form still reads well and nothing relied on those colors as a wayfinding cue.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C (round 3): demote off-palette green/blue in DSA Examples (ProblemColumn.tsx)
 
 - changed: Demoted the DSA Example values from off-palette hues to gray — input `text-green-400` → `text-gray-200`, output `text-blue-400` → `text-gray-200`. Green and blue are not in the workspace palette (cyan/amber/emerald/red + gray); they were decorative coloring on code values whose meaning is already carried by the "Input:"/"Output:" labels (gray-500). The values stay clearly distinct from the labels (gray-200 vs gray-500) while the example box recedes to tertiary detail per the hierarchy spec. Removes the last off-palette green/blue from the DSA path. Color only — no behaviour/copy change. (Left intentionally: the difficulty badge green/red at L145 is a cross-cutting pattern duplicated across 10+ files; the thumbs-up "helpful" green at L419 is a legitimate positive feedback signal.)

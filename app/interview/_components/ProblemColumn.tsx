@@ -257,7 +257,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       >
                         <label
                           htmlFor="bugfix-hypothesis"
-                          className="block text-xs font-semibold tracking-wide text-amber-200 uppercase"
+                          className="block text-xs font-semibold tracking-wide text-gray-400 uppercase"
                         >
                           Hypothesis
                         </label>
@@ -267,7 +267,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                           variant="outline"
                           disabled={!bugfixReflection.hypothesis.trim()}
                           onClick={() => onBugfixReflectionCommit?.("hypothesis")}
-                          className="h-8 border-amber-400/30 px-2 text-xs text-amber-100 hover:bg-amber-500/10"
+                          className="h-8 border-gray-600 px-2 text-xs text-gray-200 hover:bg-gray-700/40"
                         >
                           <Save className="mr-1 h-3 w-3" />
                           Save hypothesis
@@ -288,7 +288,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <label
                           htmlFor="bugfix-root-cause"
-                          className="block text-xs font-semibold tracking-wide text-cyan-200 uppercase"
+                          className="block text-xs font-semibold tracking-wide text-gray-400 uppercase"
                         >
                           Root Cause
                         </label>
@@ -298,7 +298,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                           variant="outline"
                           disabled={!bugfixReflection.rootCause.trim()}
                           onClick={() => onBugfixReflectionCommit?.("rootCause")}
-                          className="h-8 border-cyan-400/30 px-2 text-xs text-cyan-100 hover:bg-cyan-500/10"
+                          className="h-8 border-gray-600 px-2 text-xs text-gray-200 hover:bg-gray-700/40"
                         >
                           <Save className="mr-1 h-3 w-3" />
                           Save root cause
@@ -319,7 +319,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <label
                           htmlFor="bugfix-prevention"
-                          className="block text-xs font-semibold tracking-wide text-emerald-200 uppercase"
+                          className="block text-xs font-semibold tracking-wide text-gray-400 uppercase"
                         >
                           Prevention
                         </label>
@@ -329,7 +329,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                           variant="outline"
                           disabled={!bugfixReflection.prevention.trim()}
                           onClick={() => onBugfixReflectionCommit?.("prevention")}
-                          className="h-8 border-emerald-400/30 px-2 text-xs text-emerald-100 hover:bg-emerald-500/10"
+                          className="h-8 border-gray-600 px-2 text-xs text-gray-200 hover:bg-gray-700/40"
                         >
                           <Save className="mr-1 h-3 w-3" />
                           Save prevention
