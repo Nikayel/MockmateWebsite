@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Play, RefreshCw, Target, TrendingUp, Building2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatPatternLabel } from "@/lib/pattern-labels"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
 type RecommendationType =
   | "review"
@@ -41,11 +42,6 @@ const typeLabels: Record<RecommendationType, { label: string; color: string }> =
   strengthen_pattern: { label: "Pattern", color: "text-rose-400" },
 }
 
-const difficultyStyles = {
-  easy: "text-emerald-400",
-  medium: "text-amber-400",
-  hard: "text-rose-400",
-}
 
 function RecommendationRow({ rec }: { rec: Recommendation }) {
   const typeInfo = typeLabels[rec.type]
@@ -59,7 +55,7 @@ function RecommendationRow({ rec }: { rec: Recommendation }) {
         <div className="mb-1 flex items-center gap-2">
           <span className={`text-xs font-medium ${typeInfo.color}`}>{typeInfo.label}</span>
           <span className="text-gray-600">·</span>
-          <span className={`text-xs ${difficultyStyles[rec.difficulty]}`}>{rec.difficulty}</span>
+          <span className={`text-xs ${difficultyColorClass(rec.difficulty, "text")}`}>{rec.difficulty}</span>
         </div>
         <div className="truncate font-medium text-white">{rec.title}</div>
         <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">

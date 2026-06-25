@@ -4,8 +4,9 @@ import { memo } from "react"
 import Link from "next/link"
 import { Play, Check, Clock, Cpu, Bug, Wrench, Zap, Shield, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Scenario, ScenarioType, DifficultyLevel } from "@/lib/scenarios"
+import type { Scenario, ScenarioType } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getScenarioCardContext } from "./scenario-card-meta"
 
 interface ScenarioCardProps {
@@ -24,14 +25,6 @@ const TYPE_ICONS: Record<ScenarioType, typeof Bug> = {
   security: Shield,
   "system-design": Layers,
   dsa: Cpu,
-}
-
-// Difficulty is the ONE element allowed to carry hue — a small dot + label,
-// not a full glowing badge. Keeps the palette restrained (neutrals + 1 accent).
-const DIFFICULTY_DOT: Record<DifficultyLevel, string> = {
-  easy: "bg-emerald-400",
-  medium: "bg-amber-400",
-  hard: "bg-rose-400",
 }
 
 export const ScenarioCard = memo(function ScenarioCard({
@@ -74,7 +67,9 @@ export const ScenarioCard = memo(function ScenarioCard({
             {typeLabel}
           </span>
           <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400 capitalize">
-            <span className={`h-1.5 w-1.5 rounded-full ${DIFFICULTY_DOT[scenario.difficulty]}`} />
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${difficultyColorClass(scenario.difficulty, "dot")}`}
+            />
             {scenario.difficulty}
           </span>
         </div>

@@ -6,6 +6,7 @@ import { Clock, Play, AlertTriangle, Check, SkipForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DueItem } from "@/lib/hooks"
 import { formatPatternLabel } from "@/lib/pattern-labels"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
 interface ReviewCardProps {
   item: DueItem
@@ -18,11 +19,6 @@ interface ReviewCardProps {
   isUpcoming?: boolean
 }
 
-const difficultyStyles = {
-  easy: "text-emerald-400",
-  medium: "text-amber-400",
-  hard: "text-rose-400",
-}
 
 /**
  * Get algorithm-aware reasoning for why review is scheduled at this time.
@@ -343,7 +339,7 @@ export function ReviewCard({
               )}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm">
-              <span className={difficultyStyles[item.difficulty]}>{item.difficulty}</span>
+              <span className={difficultyColorClass(item.difficulty, "text")}>{item.difficulty}</span>
               <span className="text-gray-500">{formatPatternLabel(item.pattern)}</span>
               <span className="text-gray-600">{item.estimated_minutes}m</span>
               {item.last_score > 0 && (

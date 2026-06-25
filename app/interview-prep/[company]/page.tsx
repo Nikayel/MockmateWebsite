@@ -139,7 +139,7 @@ export default async function CompanyPrepPage({
               <span>·</span>
               <span>{company.topPatterns.length} patterns</span>
               <span>·</span>
-              <span className={company.difficultyDistribution.hard >= 30 ? "text-rose-400" : "text-amber-400"}>
+              <span className={company.difficultyDistribution.hard >= 30 ? "text-red-400" : "text-amber-400"}>
                 {company.difficultyDistribution.hard}% hard
               </span>
             </div>

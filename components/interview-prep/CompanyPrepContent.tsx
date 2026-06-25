@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Lock, Users, Clock, Crown } from "lucide-react"
 import Link from "next/link"
 import type { CompanyQuestionData } from "@/lib/data/company-questions/types"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
 interface CompanyPrepContentProps {
   company: CompanyQuestionData
@@ -128,10 +129,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs">
-                  <span className={
-                    pattern.typicalDifficulty === "easy" ? "text-emerald-400" :
-                    pattern.typicalDifficulty === "medium" ? "text-amber-400" : "text-rose-400"
-                  }>
+                  <span className={difficultyColorClass(pattern.typicalDifficulty, "text")}>
                     {pattern.typicalDifficulty}
                   </span>
                   <span className="text-zinc-500">{pattern.frequency}%</span>

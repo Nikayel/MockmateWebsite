@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { PATTERN_ROADMAP, PATTERN_METADATA } from "@/lib/types/dsa-patterns"
 import type { Scenario } from "@/lib/scenarios"
 import type { NodeStats } from "@/lib/hooks/useDSARoadmap"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { NODE_POSITIONS } from "./RoadmapNode"
 
 // Keep tier labels for modal only (progressive disclosure)
@@ -95,7 +96,7 @@ export function RoadmapModal({
                     <span className="text-amber-400">{difficultyCount.medium} medium</span>
                   )}
                   {difficultyCount.hard > 0 && (
-                    <span className="text-rose-400">{difficultyCount.hard} hard</span>
+                    <span className="text-red-400">{difficultyCount.hard} hard</span>
                   )}
                 </div>
               </div>
@@ -168,11 +169,7 @@ export function RoadmapModal({
               })
               .map((scenario) => {
                 const isCompleted = completedProblems.includes(scenario.id)
-                const diffColor = {
-                  easy: 'text-emerald-400',
-                  medium: 'text-amber-400',
-                  hard: 'text-rose-400'
-                }[scenario.difficulty]
+                const diffColor = difficultyColorClass(scenario.difficulty, "text")
 
                 return (
                   <div

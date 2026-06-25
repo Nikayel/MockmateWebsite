@@ -87,7 +87,7 @@ const EXERCISE_TYPES = [
 const DIFFICULTIES = [
   { id: "easy", label: "Easy", color: "border-emerald-300/25 text-emerald-200" },
   { id: "medium", label: "Medium", color: "border-amber-300/25 text-amber-100" },
-  { id: "hard", label: "Hard", color: "border-rose-300/25 text-rose-100" },
+  { id: "hard", label: "Hard", color: "border-red-300/25 text-red-100" },
 ] as const
 
 // Dynamically get all unique companies from scenarios
@@ -240,7 +240,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                     onClick={() => onToggleDifficulty(diff.id as DifficultyLevel)}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 ${
                       isActive
-                        ? `${diff.id === "easy" ? "border-transparent bg-emerald-500/20 text-emerald-300" : diff.id === "medium" ? "border-transparent bg-amber-500/20 text-amber-200" : "border-transparent bg-rose-500/20 text-rose-300"} font-semibold`
+                        ? `${diff.id === "easy" ? "border-transparent bg-emerald-500/20 text-emerald-300" : diff.id === "medium" ? "border-transparent bg-amber-500/20 text-amber-200" : "border-transparent bg-red-500/20 text-red-300"} font-semibold`
                         : "border-transparent bg-white/[0.025] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
                     } `}
                     aria-pressed={isActive}
@@ -415,7 +415,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   ? "bg-emerald-500/10 text-emerald-300"
                   : d === "medium"
                     ? "bg-amber-500/10 text-amber-200"
-                    : "bg-rose-500/10 text-rose-300"
+                    : "bg-red-500/10 text-red-300"
               }`}
             >
               {d}
