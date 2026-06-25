@@ -8,9 +8,11 @@
  * Decompose / Design / Build / Review stations without changing this contract.
  */
 
+import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
 import type { MilestoneKind } from "@/lib/labs/types"
+import { MilestoneNav } from "./MilestoneNav"
 
 /** Placeholder station — replaced by real stations in Phases 2–3. */
 function StationStub({ kind }: { kind: MilestoneKind }) {
@@ -46,8 +48,11 @@ export function StationSwitcher({ className }: { className?: string }) {
   }
 
   return (
-    <div className={className}>
-      <StationStub kind={current} />
+    <div className={cn("flex h-full flex-col gap-3", className)}>
+      <div className="min-h-0 flex-1">
+        <StationStub kind={current} />
+      </div>
+      <MilestoneNav />
     </div>
   )
 }

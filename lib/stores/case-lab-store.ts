@@ -49,6 +49,8 @@ interface CaseLabState {
 
   // Navigation (soft — P1)
   goToMilestone: (kind: MilestoneKind) => void
+  goToNextMilestone: () => void
+  goToPreviousMilestone: () => void
   markMilestoneDone: (kind: MilestoneKind) => void
   setMode: (mode: CaseLabMode) => void
   completeRun: () => void
@@ -107,6 +109,20 @@ export const useCaseLabStore = create<CaseLabState>()(
             }),
           }
         }),
+
+      goToNextMilestone: () => {
+        const current = get().getCurrentMilestone()
+        if (!current) return
+        const next = MILESTONE_ORDER[MILESTONE_ORDER.indexOf(current) + 1]
+        if (next) get().goToMilestone(next)
+      },
+
+      goToPreviousMilestone: () => {
+        const current = get().getCurrentMilestone()
+        if (!current) return
+        const prev = MILESTONE_ORDER[MILESTONE_ORDER.indexOf(current) - 1]
+        if (prev) get().goToMilestone(prev)
+      },
 
       markMilestoneDone: (kind) =>
         set((state) => {
