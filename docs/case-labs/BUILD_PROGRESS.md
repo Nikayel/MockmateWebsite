@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 2
-**Last updated by loop:** Phase 2 — `DesignStation` shipped
+**Last updated by loop:** Phase 2 — run persistence service + API route (server half)
 
 ---
 
@@ -25,7 +25,7 @@
 - [x] `ClarifyStation` (ghost example + progressive disclosure)
 - [x] `DecomposeStation` (workflow / entities / state machine)
 - [x] `DesignStation` (API contract + tradeoff table)
-- [ ] Answers persist to the Run; save/resume across reload
+- [~] Answers persist to the Run; save/resume across reload (server half done — service + API route + tests; client store wiring next)
 
 ## Phase 3 — Build & Review (spec §7.4–7.5)
 - [ ] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor)
@@ -69,3 +69,4 @@
 - Phase 2: `components/labs/stations/ClarifyStation.tsx` — 5 guided dimensions (Question + Assumption each) as progressive-disclosure collapsibles (one open at a time); first row shows a ghost example as placeholder (P2, no blank wall); per-dimension answered dot; persists to the run via `setClarify`; soft "3+ recommended" hint. Wired into `StationSwitcher` (clarify → real station, rest → stub). typecheck + lint clean; graph updated.
 - Phase 2: `components/labs/stations/DecomposeStation.tsx` — three progressive-disclosure panels (legacy workflow ordered steps, core entities name+role, state machine with states + from/on/to transitions), add/remove rows, persists to the run via `setDecompose` (state machine omitted until non-empty). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.
 - Phase 2: `components/labs/stations/DesignStation.tsx` — API contract (named endpoint + input/output `{name,type}` field lists), tradeoff table (Decision/Option A/Option B/Choice/Why per row), and a ranking/fallback textarea; persists via `setDesign`. Extracted shared `station-kit.tsx` (`CollapsiblePanel`, `RemoveRowButton`) and refactored DecomposeStation onto it (DRY). Wired into `StationSwitcher`. typecheck + lint clean; graph updated.
+- Phase 2 (server half of persistence): `lib/labs/case-lab-runs.ts` — `caseLabRuns` Firestore service (`getCaseLabRun`, `getActiveCaseLabRun` for resume, `upsertCaseLabRun`) with a Zod input schema; ownership enforced from auth (never the body), `startedAt` preserved on update, `completedAt` omitted-when-undefined, active-run lookup avoids a composite index. Thin `app/api/labs/runs/route.ts` (GET by runId/caseLabId, PUT upsert; 401/403/400/500). Added `lib/labs/__tests__/case-lab-runs.test.ts` (6 schema-validation tests, all pass). Client store wiring (load on mount + debounced save) is the next increment. typecheck + lint + tests clean; graph updated.
