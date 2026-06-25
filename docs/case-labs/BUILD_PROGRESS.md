@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 1
-**Last updated by loop:** Phase 0 complete — `case-lab-store.ts` shipped
+**Last updated by loop:** Phase 1 — `MilestoneRail` shipped
 
 ---
 
@@ -16,7 +16,7 @@
 - [x] `lib/stores/case-lab-store.ts` — milestone + answers state
 
 ## Phase 1 — Shell & milestone rail, no AI (spec §6, P1/P3)
-- [ ] `MilestoneRail` (where-am-I / what's-next / why)
+- [x] `MilestoneRail` (where-am-I / what's-next / why)
 - [ ] `StationSwitcher` + stub stations
 - [ ] 3-column layout reusing the `/interview` shell; center morphs per milestone
 - [ ] Soft navigation between milestones
@@ -62,3 +62,4 @@
 - Phase 0: `lib/labs/types.ts` — full Case Labs type module (CaseLab/CaseLabMilestone/MilestoneKind, per-milestone answer shapes, resumable `CaseLabRun`). Reuses `DifficultyLevel`, `WorkspaceScenarioLanguage`, and `InterviewSession.structured_feedback` to stay DRY. typecheck + lint clean.
 - Phase 0: documented `caseLabRuns` collection in `docs/FIREBASE_STRUCTURE.md` (annotated shape mirroring `CaseLabRun`, noted as the source-of-truth contract to keep in sync). Docs-only, no code change.
 - Phase 0 (complete): `lib/stores/case-lab-store.ts` — zustand store (devtools, no persist → Run loads fresh from Firebase like roadmap-store to avoid cross-user leaks). Soft navigation, per-milestone answer setters, progress/complete helpers, `MILESTONE_ORDER`, selector hooks. Firebase save/resume wiring deferred to a later phase. typecheck + lint clean; graph updated.
+- Phase 1: `components/labs/MilestoneRail.tsx` — vertical stepper on `progress` + `collapsible`, reads the store, soft navigation via `goToMilestone`. P3 baked in (active highlight, ✓ done markers, "Next: …" label, per-row purpose line). Falls back to default milestone labels when no lab is loaded; collapsible on small screens, always-open on lg. typecheck + lint clean; graph updated.
