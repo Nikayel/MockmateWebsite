@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 3
-**Last updated by loop:** Phase 3 — `ReviewStation` (recap + self-grade + feedback render)
+**Last updated by loop:** Phase 3 — case-lab feedback pipeline (service + endpoint)
 
 ---
 
@@ -74,3 +74,4 @@
 - Phase 3 (Build scaffold): `components/labs/stations/BuildStation.tsx` — loads the lab's `buildScenarioId` via `getScenarioById`, renders the multi-file workspace (file tabs with lock icons for read-only, reused `CodeMirrorEditor` + error boundary), persists edits via `setBuild` (touchedFiles diffed vs originals, primary-file code). Handles no-scenario / not-found / non-workspace empty states. Wired into `StationSwitcher`. NOTE: persists primary-file code for now (multi-file content persistence + `/api/execute` run-tests are the next increment). typecheck + lint clean; graph updated.
 - Phase 3 (Build complete): wired "Run tests" in BuildStation → POST `/api/execute` with `{scenarioId, language, workspaceFiles:[{path,content}]}` (editable files only), maps the response `results` to `BuildTestResult[]`, persists via `setBuild`, and renders a pass/fail panel with `n/m passing` + per-test check/X + error messages. Attaches the auth token when present; loading + error states handled. typecheck + lint clean; graph updated.
 - Phase 3 (Review UI): `components/labs/stations/ReviewStation.tsx` — read-only recap of all milestones (clarify/decompose/design/build with test pass count), 1–5 self-grade rubric across the 5 `CaseLabRubricDimension`s persisting via `setReview`, renders `structured_feedback` (tldr/whatWorked/fixNext/actionPlan) when present, and a "Complete lab" button → `completeRun`. Now all 5 stations are real, so `StationSwitcher` dropped the stub (exhaustive switch). Fixed BuildStation's stale doc-comment. typecheck + lint clean; graph updated.
+- Phase 3 (feedback pipeline, server): `lib/labs/case-lab-feedback.ts` — pure `buildCaseLabFeedbackPrompt` (summarizes every milestone) + `parseCaseLabFeedback` (tolerant JSON extraction → `structured_feedback` shape, raw fallback) + `generateCaseLabFeedback` (routes through `generateFeedbackResponse` so rate-limit/cache/cost-tracking apply). `app/api/labs/feedback/route.ts` (POST {runId}: auth, load, generate, persist aiFeedback + mark completed). Added `case-lab-feedback.test.ts` (6 tests, pass). ReviewStation will call this on "Complete"; mastery update still pending. typecheck + lint + tests clean; graph updated.
