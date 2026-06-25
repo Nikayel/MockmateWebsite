@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 1
-**Last updated by loop:** Phase 1 — `StationSwitcher` + stub stations shipped
+**Last updated by loop:** Phase 1 — `CaseLabShell` 3-column layout shipped
 
 ---
 
@@ -18,7 +18,7 @@
 ## Phase 1 — Shell & milestone rail, no AI (spec §6, P1/P3)
 - [x] `MilestoneRail` (where-am-I / what's-next / why)
 - [x] `StationSwitcher` + stub stations
-- [ ] 3-column layout reusing the `/interview` shell; center morphs per milestone
+- [x] 3-column layout reusing the `/interview` shell; center morphs per milestone
 - [ ] Soft navigation between milestones
 
 ## Phase 2 — Form stations (spec §7.1–7.3, P2)
@@ -64,3 +64,4 @@
 - Phase 0 (complete): `lib/stores/case-lab-store.ts` — zustand store (devtools, no persist → Run loads fresh from Firebase like roadmap-store to avoid cross-user leaks). Soft navigation, per-milestone answer setters, progress/complete helpers, `MILESTONE_ORDER`, selector hooks. Firebase save/resume wiring deferred to a later phase. typecheck + lint clean; graph updated.
 - Phase 1: `components/labs/MilestoneRail.tsx` — vertical stepper on `progress` + `collapsible`, reads the store, soft navigation via `goToMilestone`. P3 baked in (active highlight, ✓ done markers, "Next: …" label, per-row purpose line). Falls back to default milestone labels when no lab is loaded; collapsible on small screens, always-open on lg. typecheck + lint clean; graph updated.
 - Phase 1: `components/labs/StationSwitcher.tsx` — center column that morphs per `currentMilestone` (P2), with a stub station + empty state ("start a lab to begin"). Extracted shared `lib/labs/milestones.ts` (`DEFAULT_MILESTONE_META`) so the rail and switcher share one source of milestone copy (DRY); rail now imports it. Real stations replace stubs in Phases 2–3. typecheck + lint clean; graph updated.
+- Phase 1: `components/labs/CaseLabShell.tsx` — 3-column layout reusing the `/interview` grid (`lg:grid-cols-[320px_minmax(0,1fr)_240px]` …): rail | StationSwitcher | chat. Right column takes a `chatSlot` prop (defaults to a placeholder) so Phase 5 drops in the real `InterviewerChat` without changing the shell. typecheck + lint clean; graph updated.
