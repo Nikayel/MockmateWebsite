@@ -25,6 +25,15 @@ SWE and internship interviews (Palantir FDSE, Stripe, Linear, etc.) are **codeba
 
 The two formats do not overlap.
 
+### Market validation (2026 research) — three commitments this locks in
+
+External research (2025-2026 hiring signal) strongly validates the format and sharpens three product commitments. Sources in §16.6.
+
+- **The format matches where elite hiring is actually going.** Palantir's real loop has a named **"Decomposition round"** (vague real-world problem, no scope, break into testable subproblems) and a **"Learning/Re-engineering round"** (orient inside a 200-500 line *messy codebase*) — a 1:1 match to this spec. Meta/Google added AI-assisted **"code comprehension"** rounds (analyze + debug an existing codebase). System design is now ~30% of hiring decisions, judged on "scope ambiguous requirements, articulate tradeoffs, handle pushback" — verbatim what the milestones train.
+- **Commitment 1 — complement, never replacement.** LeetCode is *not* dead; Google/Meta doubled down on harder DSA. Position Case Labs as the **premium complement** to the daily DSA loop, not a replacement. (Already reflected in §1.)
+- **Commitment 2 — depth-first launch on ONE company (Palantir).** Real-world labs are company/role specific and expensive to author. Ship **one excellent Palantir lab** before any breadth. Palantir is the ideal launch because its real loop *is* this format.
+- **Commitment 3 — the lab-generation engine is core, not "v2 nice-to-have."** Per-lab authoring cost is the real business risk. The `curriculum_creator_playbook` (auto-generating labs per company/role) is what makes unit economics survivable — treat it as a first-class roadmap item (see §14).
+
 ### The mental model we are selling
 
 The user is **not** "solving a problem." They are **designing and building a system**, one milestone at a time. That reframe — construction over a sequence of stations — is the entire product. Every UI and copy decision should reinforce it.
@@ -348,8 +357,9 @@ Phased so an engineer can ship incrementally and demo at each phase.
 
 - User-authored / community Case Labs.
 - Multi-user / pair sessions.
-- Auto-generation of new labs from a company name (the `curriculum_creator_playbook` direction — great v2).
 - Per-milestone spaced repetition (v1: the whole lab is the unit of mastery).
+
+> **Note (post-research):** Auto-generation of labs via the `curriculum_creator_playbook` is **out of v1 build scope but explicitly NOT a "someday" item** — it is the core lever on per-lab authoring cost (Commitment 3, §1). Stub the lab-content schema in v1 so the generator has a target to emit into, and prioritize the engine immediately after the first Palantir lab proves the format.
 
 ---
 
@@ -409,6 +419,24 @@ Wizards beat single long pages on small screens (single pages force excessive sc
 - [Wizard UI Pattern: When to Use It and How to Get It Right — Eleken](https://www.eleken.co/blog-posts/wizard-ui-pattern-explained)
 - [Beyond the Progress Bar: The Art of Stepper UI Design — Lollypop](https://lollypop.design/blog/2026/february/beyond-the-progress-bar-the-art-of-stepper-ui-design/)
 - [Multi-Step Forms vs Single-Step Forms — IvyForms](https://ivyforms.com/blog/multi-step-forms-single-step-forms/)
+
+### 16.6 Market-research sources (demand & format-trend validation)
+- [Will AI Replace LeetCode Interviews? — SpaceComplexity](https://spacecomplexity.ai/blog/will-ai-replace-coding-interviews) (Google/Meta AI-assisted rounds; LeetCode hardened not abandoned)
+- [Is LeetCode Dead? How AI Startups Are Changing Technical Interviews — Recruiting from Scratch](https://www.recruitingfromscratch.com/blog/is-leetcode-dead-how-ai-startups-are-changing-technical-interviews) (62% of AI-native startups dropped/reduced LeetCode; code-comprehension rounds)
+- [LeetCode is Dead: How to Test Candidates in 2026 — DistantJob](https://distantjob.com/blog/leetcode-is-dead/) (system design ~30% of hiring decisions; scope/tradeoffs/pushback as the signal)
+- [My 2025 Palantir Interview Process — LinkJob](https://www.linkjob.ai/interview-questions/palantir-interview-process-questions/) (Decomposition round + Learning/Re-engineering 200-500 line codebase round)
+- [Palantir Software Engineer Interview Guide — Prepfully](https://prepfully.com/interview-guides/palantir-software-engineer)
+- [Best Coding Interview Prep Platforms 2026 — Scrimba](https://scrimba.com/articles/best-coding-interview-prep-platforms-2026/) (the real-world/codebase-navigation gap; "clone Kubernetes" as the only workaround)
+- [LeetCode Alternatives — CodeSignal](https://codesignal.com/blog/leetcode-alternatives-best-options-for-hiring-interview-prep/) (closest competitor: simulates real dev work)
+- [Interview Preparation Tool Market — Verified Market Reports](https://www.verifiedmarketreports.com/product/interview-preparation-tool-market/) ($1.2-2.5B market, subscription-dominant)
+- [Interview Coaching Service Market — OpenPR](https://www.openpr.com/news/4535258/interview-coaching-service-market-size-propelled-by-11-2-cagr) (~11% CAGR)
+- [Is LeetCode Enough to Pass SWE Interviews in 2026? — Beyz](https://beyz.ai/blog/is-leetcode-enough-to-pass-swe-interviews-2026) (internship/new-grad practical shift)
+
+### 16.7 Adversarial counter-points (read before over-committing)
+- **LeetCode is not dead.** Google/Meta doubled down on harder DSA to fight AI cheating → Case Labs is a complement, not a replacement. Keep the DSA loop primary.
+- **Content cost / standardization is the real risk.** Real-world labs are company- and role-specific ("infra at Stripe tests idempotency; frontend at Vercel tests INP") and expensive to author/maintain → depth-first launch + the generation engine (Commitments 2 & 3).
+- **Candidate fairness critiques of real-world/take-home tasks** (unstandardized, biased, time-consuming) apply to *real interviews* — for a *prep product* they are the moat (you make the un-preppable preppable with a rubric the real interview never gives).
+- **What would kill it:** interviews *homogenizing* (back to pure DSA, or forward to pure unstructured AI-pairing). Evidence shows the opposite — formats are **splintering/diversifying**, which favors a structured prep layer. Low risk on a 5-10yr horizon.
 
 ---
 
