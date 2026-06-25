@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "blog_personalized_roadmap",
+      "label": "Blog: How CodeSparring Creates Your Personalized Roadmap",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2026-01-05",
+      "author": "Nikayel Ali Jamal",
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "blog_personalized_roadmap",
+      "target": "concept_codesparring_platform",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "blog_personalized_roadmap",
+      "target": "concept_spaced_repetition",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "blog_personalized_roadmap",
+      "target": "blog_spaced_repetition",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

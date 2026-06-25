@@ -1,0 +1,462 @@
+{
+  "/Volumes/T7 Shield/MockmateWebsiteT7/.husky/_/husky.sh": {
+    "size": 160,
+    "mtime_ns": 1780343003750000000,
+    "hash": "6db0aa99aece6ebd17bbc27c5e5287a462fb39cc4a2ca3a82a6277c166bdb3a0"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/components.json": {
+    "size": 427,
+    "mtime_ns": 1763159550000000000,
+    "hash": "4c6f4c3b2c6a2117de2866624505b4a43aefda7a2a8c33c726dba85e3ae354d0"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/data/raw-complexity-data.json": {
+    "size": 54432,
+    "mtime_ns": 1768338773000000000,
+    "hash": "73da5ee549326f72f4695ca4337e1ddc54fb81aa2946d756b95842ca433e09ec"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/firebase.json": {
+    "size": 98,
+    "mtime_ns": 1766252825000000000,
+    "hash": "32341fa71c03fb4d76a7a94c10e6d44a820a91819e1450496ed4bdf39ffa4b93"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/firestore.indexes.json": {
+    "size": 13488,
+    "mtime_ns": 1781915214070000000,
+    "hash": "3258ce698b297b7fe5c0d102ae353311682a90364766fcf4694a25bca97f2224"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/package.json": {
+    "size": 5119,
+    "mtime_ns": 1781915214570000000,
+    "hash": "9571a6199fcf42bc8a03e58c3e3e7a25f48c50da02376a4c4f9d8cd4499e393d"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/patch_runners.py": {
+    "size": 2047,
+    "mtime_ns": 1781915214570000000,
+    "hash": "fcf42a8472b2866fa197fcbbbc062c39e4a2d8d3ea233436b405d99b0c7564b8"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/scripts/generate-problems.py": {
+    "size": 45443,
+    "mtime_ns": 1767294488000000000,
+    "hash": "e77315c838ef67243e78cc85a2c81f2bc2307965a86d4f24dd14f498d7b3e5dc"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/tsconfig.json": {
+    "size": 727,
+    "mtime_ns": 1768367453000000000,
+    "hash": "5b68e52047692f1d63cba4b17d0aaa233292295d61f044d587e3763488f48482"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/vercel.json": {
+    "size": 468,
+    "mtime_ns": 1769816362000000000,
+    "hash": "e46f1498144361bbb21e6de4fe7ba2a2acd1b40bf4cee0e7d8d04d350196d7b4"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/.github/workflows/ci.yml": {
+    "size": 2071,
+    "mtime_ns": 1768498637000000000,
+    "hash": "22014b56395647f74b0060642c69f3d5feec994b1efc3b074fb5b307483ff5ee"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/.github/workflows/repo-visualizer.yml": {
+    "size": 548,
+    "mtime_ns": 1781915419840000000,
+    "hash": "325bf754c48a98cce5074adaa11b396d969f7df3164fbc63c988ca7943858462"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/AGENTS.md": {
+    "size": 5554,
+    "mtime_ns": 1781915213840000000,
+    "hash": "9644ba77e48e2045deffd6e2e9393833ad7c351b41823c2b77e97bd698e6b665"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/CHANGELOG.md": {
+    "size": 5115,
+    "mtime_ns": 1763602721000000000,
+    "hash": "4ad1e9b8d2a1f2348ec2c9b1c280a2df165cc0458895d965ed7dbb6898000171"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/CLAUDE.md": {
+    "size": 4440,
+    "mtime_ns": 1778171371000000000,
+    "hash": "652fbb824c90b82c901b2b014cf10ac5680ad82a4ee919d3d767ac96ff88f348"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/CONTRIBUTING.md": {
+    "size": 12581,
+    "mtime_ns": 1767654653000000000,
+    "hash": "c86ddab43029d288e916d4365fbd2b375423291493148a1b6e1110e3f2ecdf1e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/README.md": {
+    "size": 12585,
+    "mtime_ns": 1780286818820000000,
+    "hash": "c0a7142137f42333e0f76db80c810d2e500806c9107640f703135106c3b1894a"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/SECURITY.md": {
+    "size": 7722,
+    "mtime_ns": 1767654653000000000,
+    "hash": "6a6237609c6ce7b0eb44d2d90e38b0f9ca0be06810806ee09b9a48b5e16ce470"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/15-dsa-patterns.mdx": {
+    "size": 4450,
+    "mtime_ns": 1767544828000000000,
+    "hash": "f43f7a06b4b84f56b48121e85ac0fe9f028d4eee348f0cbd349177c27e4e16e7"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/amazon-leadership-principles-interview-guide.mdx": {
+    "size": 12434,
+    "mtime_ns": 1767544828000000000,
+    "hash": "dc1fa809caac25b02c4925932db1f721954d78d7ddcb467674689714c41d4a91"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/coding-interview-anxiety-how-to-stay-calm.mdx": {
+    "size": 9262,
+    "mtime_ns": 1767544828000000000,
+    "hash": "5e99a1e9d5a6e5f8dddf483f787d56c9fe60299d2acdfc115acff4baddf15979"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/dsa-for-interns-new-grads-2025.mdx": {
+    "size": 11289,
+    "mtime_ns": 1767544828000000000,
+    "hash": "89bf20497df2c58127bec871b8abe59fa35cbe9894e2314fa7221762998b48ce"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/faang-interview-what-big-tech-looks-for.mdx": {
+    "size": 6459,
+    "mtime_ns": 1767544828000000000,
+    "hash": "8add1cbf362371012322dcc1e7ebe1f60f392a7ee30b3aa72b7a0e01575dbebd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/faang-vs-top-tech-interview-comparison.mdx": {
+    "size": 9716,
+    "mtime_ns": 1767657967000000000,
+    "hash": "79c82ab0111cd4e15fb8929114e1e2c8a2b13c36f1c60c60748e211e5cd841db"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/first-software-engineer-interview-complete-guide.mdx": {
+    "size": 10833,
+    "mtime_ns": 1767544828000000000,
+    "hash": "b8c4cb5e696975b580774eab09e49de403995c515fde691204552250e1834229"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/free-mock-interview-practice-online.mdx": {
+    "size": 4747,
+    "mtime_ns": 1767544828000000000,
+    "hash": "ec629dc86ca00c257afaf97f37be4b34a1589a8331039e683f7a79c6ddac5f06"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/google-interview-30-day-prep-plan.mdx": {
+    "size": 8837,
+    "mtime_ns": 1767544828000000000,
+    "hash": "e361cff0a079ea6a3ba4f8eea568532ba0664e29e8632ffd5acb82fd9357c759"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/how-codesparring-creates-your-personalized-roadmap.mdx": {
+    "size": 8281,
+    "mtime_ns": 1767657967000000000,
+    "hash": "b0a6577ab307a4d860f97bc28f666d73bf6a3d015650b400dcc98f0b81bfb037"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/leetcode-vs-codesparring.mdx": {
+    "size": 3370,
+    "mtime_ns": 1767544828000000000,
+    "hash": "b58ea1e845ddf8341264d328aa18168733dad02b8cbaf76ae09fbffd69c7de66"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/spaced-repetition-for-coding-interviews.mdx": {
+    "size": 6490,
+    "mtime_ns": 1767544828000000000,
+    "hash": "ae72122ce3d377c56919c2b7b6dd8f731495a1163c7f86c0b054cfa655575bec"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/two-sum-5-solutions.mdx": {
+    "size": 3124,
+    "mtime_ns": 1767544828000000000,
+    "hash": "68ff4282e5c6a897ced58bff37ec2fd0850a2722626b5e5efb4583b8e3f4e853"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/content/blog/why-you-forget-leetcode-problems.mdx": {
+    "size": 7519,
+    "mtime_ns": 1767544828000000000,
+    "hash": "38dce7db3b24c14e7df284b36409d53424b337ff8204736692f34809d3b387a2"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/API.md": {
+    "size": 13098,
+    "mtime_ns": 1767654653000000000,
+    "hash": "58568058e76c6a870a7801a70840ba04a882778b9453e812211d14d3958b06ce"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/ARCHITECTURE.md": {
+    "size": 33532,
+    "mtime_ns": 1780286659660000000,
+    "hash": "174c27890645fabddb0a7c51505a61d65d4a73215174b7d13c20e826a78bdcc1"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/BACKEND.md": {
+    "size": 6968,
+    "mtime_ns": 1775443850000000000,
+    "hash": "d5eda75b382793033ec2c6941a4b187cbcfbeec0957186b929095a3a7dd9c0c0"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/FIREBASE_STRUCTURE.md": {
+    "size": 7119,
+    "mtime_ns": 1767544828000000000,
+    "hash": "0fd765d0af4c46dc03977d721a91efc837583c0ffcee138bd3cad9e2bc551c44"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/ONBOARDING.md": {
+    "size": 11991,
+    "mtime_ns": 1770760330000000000,
+    "hash": "365d2af80b0685c296b25887c8289ffa730e23876525c1bb8b30f7cf074402f4"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/PLATFORM-ARCHITECTURE-MERMAID.md": {
+    "size": 8681,
+    "mtime_ns": 1780286682220000000,
+    "hash": "29213bffb50a3a5e784d11496ce837302e5909de1ce0c13e93d29d643ea93efd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/PLATFORM-ARCHITECTURE.md": {
+    "size": 6385,
+    "mtime_ns": 1780286721800000000,
+    "hash": "bc413592a0842dc003d5114f52fa45991c04e1ac98e8cf2658528ee774915c97"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/PRD.md": {
+    "size": 8192,
+    "mtime_ns": 1775443865000000000,
+    "hash": "401ee4d2abda36bdf1e5a67d7237c88ef49ceb43a599ded14170e1d853ff214d"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/TESTING_GUIDE.md": {
+    "size": 26770,
+    "mtime_ns": 1780849940340000000,
+    "hash": "934c5e38f8e79e7fd157da09d4da66420fcdb95921fdd97d2c38381e4f4f92c0"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/data-retention-strategy.md": {
+    "size": 5684,
+    "mtime_ns": 1769535046000000000,
+    "hash": "f9e1f76f0913705f06d13e935be414feb4fd3e9d1254ffcbe5b01d505a20193a"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/database-erd.md": {
+    "size": 13087,
+    "mtime_ns": 1769535219000000000,
+    "hash": "f09566d9671508998a994c0a513b7b85ef5375f880fc0394921d3a98d7548158"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/google1d1b7fa326b7310f.html": {
+    "size": 56,
+    "mtime_ns": 1767308762000000000,
+    "hash": "72e5e3944a84798b89611c463286cae180e6d937b6a3a8496cf23e36bcca11bb"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/llms.txt": {
+    "size": 4877,
+    "mtime_ns": 1768180081000000000,
+    "hash": "0d41f29680525d3e2fdf6fc26a2052d504e0100af2fd680a4c3f0a34929db02a"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/robots.txt": {
+    "size": 1321,
+    "mtime_ns": 1767657967000000000,
+    "hash": "ca2b3bb2ac291783ef4132681b4a29f1e969b4671e43edebf60673f122c41e9b"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/AssetsLogo/LogoMonochromeBW.png": {
+    "size": 3450968,
+    "mtime_ns": 1766760257000000000,
+    "hash": "8eb6cba92ffcf4a01e59bae969a5fae3a8d7bc342bb537799f6a6f4deb4351a5"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/AssetsLogo/LogoWithName.png": {
+    "size": 3549627,
+    "mtime_ns": 1766760072000000000,
+    "hash": "531d0dabba68d66b2e01ef46f1448855ab22b7922f8fdbb4db754116a688aded"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/AssetsLogo/LogoWithoutName.png": {
+    "size": 3762859,
+    "mtime_ns": 1766760196000000000,
+    "hash": "e96e296d66f846656db173476f059a47725d1828cb2567ab8b92639832094f9e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/app/icon.svg": {
+    "size": 462,
+    "mtime_ns": 1765732085000000000,
+    "hash": "49b0c7da8f4282262c0f928c836cdbe19228bb991eb9cf8af9dd5d03342e6f2c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/abstract-geometric-pattern.png": {
+    "size": 745088,
+    "mtime_ns": 1763159550000000000,
+    "hash": "9f266e58ec0e6a637e4734358cbb7cda15bad7c0c418d1b7d8af2310a6eaaa95"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/airbnb.svg": {
+    "size": 524,
+    "mtime_ns": 1766599284000000000,
+    "hash": "a111a00695924ddb215ba884afb4b986d1a35bff9e3796e7731ac886db992e2c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/amazon.svg": {
+    "size": 645,
+    "mtime_ns": 1766599284000000000,
+    "hash": "96dcbf0d97879c3e437358922af6c1885da71befe3e8d206e14750da562bf290"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/apple.svg": {
+    "size": 493,
+    "mtime_ns": 1766599284000000000,
+    "hash": "a457ead2a0b3d588440752925d1200b6865f69ce55cee5f1cc3ca6a71d725386"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/atlassian.svg": {
+    "size": 563,
+    "mtime_ns": 1768497738000000000,
+    "hash": "ba7c90a319eeee63cfa971333aa0397d8a8d6ca644b8e9752ae442d74ca195c7"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/bloomberg.svg": {
+    "size": 370,
+    "mtime_ns": 1766599284000000000,
+    "hash": "6b5f83c719f703cc9464b3a74448af3aad88ce0ae53814107d24133e17bc8460"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/coinbase.svg": {
+    "size": 231,
+    "mtime_ns": 1766599284000000000,
+    "hash": "aa031bd0b3dda580af7cb38e8c9287557b5bf697e9de588149e4e18d4234e772"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/databricks.svg": {
+    "size": 287,
+    "mtime_ns": 1766599284000000000,
+    "hash": "8391994535e5926bb6ff756e574c26b70758b6681bd0ca06c022e9c216269073"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/doordash.svg": {
+    "size": 293,
+    "mtime_ns": 1767925704000000000,
+    "hash": "668c7363efd2a6c6680ead24f12a9c2eb184f94c02e52c70d1e64ad36179501e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/figma.svg": {
+    "size": 354,
+    "mtime_ns": 1767925704000000000,
+    "hash": "17417da8bd8486792ed3e33f573b0284c103d3387b8e7e324c78477204c74c64"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/goldman-sachs.svg": {
+    "size": 336,
+    "mtime_ns": 1766599284000000000,
+    "hash": "92a00ace86000f5c680752887925533582b7881b4e79ed1a71e0ca1668cf4c35"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/google.svg": {
+    "size": 706,
+    "mtime_ns": 1766599284000000000,
+    "hash": "652019538da07b0fca66c5063a21f416992f8e7604d1aa84528f80b4d6d46460"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/instacart.svg": {
+    "size": 553,
+    "mtime_ns": 1767925704000000000,
+    "hash": "9f612f904435b5e4cf3f9568b528a85422d3503e0cab9a104dd71ef5f0614509"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/jane-street.svg": {
+    "size": 279,
+    "mtime_ns": 1766599284000000000,
+    "hash": "83583e80123330459ff09530765293dd79dd5ea4c9cd0930014eccc78c96f749"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/linkedin.svg": {
+    "size": 380,
+    "mtime_ns": 1766599284000000000,
+    "hash": "cd6c3f3b35bcaaade67b72ed76fede6644606a78c09d01f9848e31904476c5be"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/lyft.svg": {
+    "size": 331,
+    "mtime_ns": 1766599284000000000,
+    "hash": "4a8c13f24315e0d29966b94b2df053990429afefa319a9bd7b4d25daff521dee"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/meta.svg": {
+    "size": 899,
+    "mtime_ns": 1767925704000000000,
+    "hash": "fa1546b5d4cb9b76e88fdeb9ab8c3aea10551e87a660ea6dc6d20d415cb4a0de"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/microsoft.svg": {
+    "size": 312,
+    "mtime_ns": 1766599284000000000,
+    "hash": "4daca1bcafcb1034a273f98874bc1859fb0c746cebb7db788f5baa6334b95be7"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/netflix.svg": {
+    "size": 183,
+    "mtime_ns": 1766599284000000000,
+    "hash": "f595cd5ed6c11a65fe02aa4536c46e596a50d0d0b2dc1b0eb77aa0b947b61001"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/nvidia.svg": {
+    "size": 781,
+    "mtime_ns": 1768497741000000000,
+    "hash": "29416ac20ecacb7ba68945c202b914ebbe94eede149de0f9dfb97b86f828d692"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/oracle.svg": {
+    "size": 261,
+    "mtime_ns": 1768497746000000000,
+    "hash": "aebb66ec4908fc5da690fdfde15e7535d744ad12dd6f6f118ed42306bd753de7"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/palantir.svg": {
+    "size": 261,
+    "mtime_ns": 1766599284000000000,
+    "hash": "79891293b731d30b984c907c9f331549f9cca8543b5ef1295f0a9c3960fb2085"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/pinterest.svg": {
+    "size": 598,
+    "mtime_ns": 1768497749000000000,
+    "hash": "77b02d3aab34fd465d5d47e9ee3cce17a8677f9900887d0aade43cf2ab40bda7"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/reddit.svg": {
+    "size": 817,
+    "mtime_ns": 1768497750000000000,
+    "hash": "f284a5c46bf2ce9aca886719ca79224e881932af4626f06edcb4a4d69bc07aa4"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/robinhood.svg": {
+    "size": 263,
+    "mtime_ns": 1767931163000000000,
+    "hash": "6c6ee7f6cf5423b852cf0f677a0f14a2388e98734926f97608a4004906cb1648"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/roblox.svg": {
+    "size": 172,
+    "mtime_ns": 1768497751000000000,
+    "hash": "6e6be15c73180a425b2cc2c2ac97222379c34796c1fd610c4d1ecae511e63903"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/salesforce.svg": {
+    "size": 397,
+    "mtime_ns": 1768497752000000000,
+    "hash": "c731ad94577b8b368c16d55cc1e77c89871e7e50a4e11aa532b5b6c30485b51c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/shopify.svg": {
+    "size": 885,
+    "mtime_ns": 1766599284000000000,
+    "hash": "15d144654da3af25b2b4d2ed86fe38703f53a39d38207af4ad1908c5cd7f93a5"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/snap.svg": {
+    "size": 668,
+    "mtime_ns": 1768497753000000000,
+    "hash": "b5349e449b5649990bee28a99138ca03c994586f825e8999110a2c185d0fc01b"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/snowflake.svg": {
+    "size": 558,
+    "mtime_ns": 1766599284000000000,
+    "hash": "3eb35d637581f68f3e704a85000d1b9f64fb565933b5b070daedb3c1d0b88b9b"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/spotify.svg": {
+    "size": 659,
+    "mtime_ns": 1768497754000000000,
+    "hash": "e3e7866689a5bc54a5a3f9bb1548d2c250f6afa86fe35dd2f0afe136cbd2f668"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/square.svg": {
+    "size": 247,
+    "mtime_ns": 1767925704000000000,
+    "hash": "fcdc128cc54a7aaccb3c6aff014958990c686c2e4d08fbc5f63044847fb24d8c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/stripe.svg": {
+    "size": 406,
+    "mtime_ns": 1766599284000000000,
+    "hash": "121be7a10012243b2fb49ddb3c1137726d27cbd8898289b7872079d89986e4d0"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/tiktok.svg": {
+    "size": 1368,
+    "mtime_ns": 1768497755000000000,
+    "hash": "df868474f906ebec80511e986156aa42e28c839d5ef820afdb4cc9f23a84d474"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/twitch.svg": {
+    "size": 237,
+    "mtime_ns": 1768497756000000000,
+    "hash": "2fac2445a511fc91997a5999065282430a425a97626d05fe104b51b80afd921e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/twitter.svg": {
+    "size": 292,
+    "mtime_ns": 1766599284000000000,
+    "hash": "17e30b67a524d2d13242259453c05cb46ac7b3845dc73ee31b301ed77d30469c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/uber.svg": {
+    "size": 322,
+    "mtime_ns": 1766599284000000000,
+    "hash": "4dddaaa7f5f91f2a2536a97314d38362e1def6d18032343781cb4b63a43ff36b"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/veeva.svg": {
+    "size": 179,
+    "mtime_ns": 1767931147000000000,
+    "hash": "d48012bbd852ee48daa81020d426640d4f03e08e5c680dadd58c1130d9f172e6"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/company-logos/ziprecruiter.svg": {
+    "size": 209,
+    "mtime_ns": 1768938497000000000,
+    "hash": "280257d923374d4b12ccfe2749574633df2ee5c60ae647dc9fd456e784997a52"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/icon-codesparring.svg": {
+    "size": 859,
+    "mtime_ns": 1766859668000000000,
+    "hash": "95a9290a3d0c0c49f4a345d633a0d84f4e4937354036e4ec08dea94e763a5153"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/logo-codesparring.svg": {
+    "size": 1031,
+    "mtime_ns": 1766859668000000000,
+    "hash": "5d6a128baf581d5ed228e667953703f1188ccca5fd2f0900b6b59cb23e2aa1bd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/public/vscode-extension-mockup.png": {
+    "size": 600529,
+    "mtime_ns": 1763159550000000000,
+    "hash": "1dcf47067a53e3505c28f97f468be85058927f814c59a0ecc451451905ac5cdd"
+  }
+}

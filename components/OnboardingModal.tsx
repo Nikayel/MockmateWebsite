@@ -35,10 +35,10 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
   // Accessibility: Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden'
+      document.body.style.overflow = "hidden"
     }
     return () => {
-      document.body.style.overflow = ''
+      document.body.style.overflow = ""
     }
   }, [isOpen])
 
@@ -64,7 +64,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
       })
 
       onComplete(takeTour)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to save onboarding data:", error)
       onComplete(takeTour)
     } finally {
@@ -105,9 +105,8 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/90 p-4 backdrop-blur-sm"
         role="presentation"
-        aria-hidden="true"
       >
         <motion.div
           ref={containerRef}
@@ -115,7 +114,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-xl bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden my-auto"
+          className="my-auto w-full max-w-xl overflow-hidden rounded-2xl border border-gray-800 bg-gray-900"
           role="dialog"
           aria-modal="true"
           aria-labelledby="onboarding-title"
@@ -131,7 +130,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
             aria-label={`Step ${step + 1} of ${totalSteps}: ${stepTitles[step]}`}
           >
             <motion.div
-              className="h-full bg-[#00d9ff]"
+              className="h-full bg-cyan-300"
               initial={{ width: 0 }}
               animate={{ width: `${((step + 1) / totalSteps) * 100}%` }}
               transition={{ duration: 0.3 }}

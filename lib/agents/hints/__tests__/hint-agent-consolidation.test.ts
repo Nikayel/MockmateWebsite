@@ -3,6 +3,7 @@ import type { GeneratedHint } from "../types"
 
 vi.mock("../llm-generator", () => ({
   generateLLMHint: vi.fn(),
+  generateLLMHintsForLevels: vi.fn(),
 }))
 
 vi.mock("@/lib/ai-providers", () => ({
@@ -45,7 +46,7 @@ describe("consolidated hint agent", () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     const { generateAIResponse } = await import("@/lib/ai-providers")
-    const { generateLLMHint } = await import("../llm-generator")
+    const { generateLLMHint, generateLLMHintsForLevels } = await import("../llm-generator")
     vi.mocked(generateAIResponse).mockResolvedValue({
       text: JSON.stringify({
         primaryNeed: "approach",
@@ -62,6 +63,7 @@ describe("consolidated hint agent", () => {
       latencyMs: 1,
     })
     vi.mocked(generateLLMHint).mockResolvedValue(null)
+    vi.mocked(generateLLMHintsForLevels).mockResolvedValue([])
   })
 
   it("keeps the legacy hint-agent import as a facade over the consolidated module", async () => {
@@ -105,7 +107,7 @@ describe("consolidated hint agent", () => {
 
   it("generates progressive LLM hints up to the recommended reveal level", async () => {
     const { generateAIResponse } = await import("@/lib/ai-providers")
-    const { generateLLMHint } = await import("../llm-generator")
+    const { generateLLMHintsForLevels } = await import("../llm-generator")
     const { generateHints } = await import("../index")
 
     vi.mocked(generateAIResponse).mockResolvedValue({
@@ -124,20 +126,22 @@ describe("consolidated hint agent", () => {
       latencyMs: 1,
     })
 
-    vi.mocked(generateLLMHint).mockImplementation(async ({ level, category }) => {
-      const hint: GeneratedHint = {
-        id: `llm-${level}`,
-        level,
-        category,
-        title: `LLM Hint ${level}`,
-        content: `Content for level ${level}`,
-        isBlurred: true,
-        source: "ai",
-        relevanceScore: 0.9,
-      }
+    vi.mocked(generateLLMHintsForLevels).mockImplementation(async ({ levels }) =>
+      levels.map(({ level, category }) => {
+        const hint: GeneratedHint = {
+          id: `llm-${level}`,
+          level,
+          category,
+          title: `LLM Hint ${level}`,
+          content: `Content for level ${level}`,
+          isBlurred: true,
+          source: "ai",
+          relevanceScore: 0.9,
+        }
 
-      return hint
-    })
+        return hint
+      })
+    )
 
     const response = await generateHints({
       ...baseRequest,
@@ -153,7 +157,17 @@ describe("consolidated hint agent", () => {
 
     expect(response.struggleLevel).toBe("high")
     expect(response.recommendedRevealLevel).toBe(3)
-    expect(generateLLMHint).toHaveBeenCalledTimes(4)
+    expect(generateLLMHintsForLevels).toHaveBeenCalledTimes(1)
+    expect(generateLLMHintsForLevels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        levels: [
+          { level: 1, category: "conceptual" },
+          { level: 2, category: "conceptual" },
+          { level: 3, category: "debugging" },
+          { level: 4, category: "debugging" },
+        ],
+      })
+    )
     expect(response.hints.map((hint) => hint.id)).toEqual(
       expect.arrayContaining(["llm-1", "llm-2", "llm-3", "llm-4"])
     )
@@ -163,7 +177,7 @@ describe("consolidated hint agent", () => {
 
   it("lets the diagnosis steer non-debug hint categories", async () => {
     const { generateAIResponse } = await import("@/lib/ai-providers")
-    const { generateLLMHint } = await import("../llm-generator")
+    const { generateLLMHintsForLevels } = await import("../llm-generator")
     const { generateHints } = await import("../index")
 
     vi.mocked(generateAIResponse).mockResolvedValue({
@@ -182,16 +196,18 @@ describe("consolidated hint agent", () => {
       latencyMs: 1,
     })
 
-    vi.mocked(generateLLMHint).mockImplementation(async ({ level, category }) => ({
-      id: `llm-${level}`,
-      level,
-      category,
-      title: `LLM Hint ${level}`,
-      content: `Content for level ${level}`,
-      isBlurred: true,
-      source: "ai",
-      relevanceScore: 0.9,
-    }))
+    vi.mocked(generateLLMHintsForLevels).mockImplementation(async ({ levels }) =>
+      levels.map(({ level, category }) => ({
+        id: `llm-${level}`,
+        level,
+        category,
+        title: `LLM Hint ${level}`,
+        content: `Content for level ${level}`,
+        isBlurred: true,
+        source: "ai",
+        relevanceScore: 0.9,
+      }))
+    )
 
     const response = await generateHints({
       ...baseRequest,
@@ -199,7 +215,17 @@ describe("consolidated hint agent", () => {
     })
 
     expect(response.diagnosis?.primaryNeed).toBe("implementation")
-    expect(generateLLMHint).toHaveBeenCalledTimes(4)
+    expect(generateLLMHintsForLevels).toHaveBeenCalledTimes(1)
+    expect(generateLLMHintsForLevels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        levels: [
+          { level: 1, category: "conceptual" },
+          { level: 2, category: "conceptual" },
+          { level: 3, category: "implementation" },
+          { level: 4, category: "implementation" },
+        ],
+      })
+    )
     expect(response.hints.find((hint) => hint.id === "llm-3")?.category).toBe("implementation")
     expect(response.metadata.patternKnowledgeUsed).toBe(false)
     expect(response.metadata.ragContextUsed).toBe(false)

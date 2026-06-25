@@ -38,6 +38,11 @@ export interface Profile {
   tour_completed?: boolean
   tour_skipped?: boolean
   tour_completed_at?: string
+  bugfix_tour_completed?: boolean
+  bugfix_tour_skipped?: boolean
+  bugfix_tour_completed_at?: string
+  bugfix_tour_skipped_at?: string
+  bugfix_tour_version?: "bugfix-tour-v1"
   // Email notification preferences
   notification_preferences?: NotificationPreferences
   last_email_sent_at?: string
@@ -411,6 +416,12 @@ export interface ProblemMasteryRecord {
   interval_days: number
   review_count: number
   next_review_at: string
+
+  // FSRS State
+  fsrs_difficulty?: number
+  fsrs_stability?: number
+  fsrs_state?: string
+  fsrs_lapses?: number
 
   // Performance History
   last_score: number

@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "vscode_extension_mockup_png",
+      "label": "VS Code Extension Mockup Screenshot",
+      "file_type": "image",
+      "source_file": "public/vscode-extension-mockup.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "vscode_extension_mockup_png",
+      "target": "onboarding_doc",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.6,
+      "source_file": "public/vscode-extension-mockup.png",
+      "source_location": null,
+      "weight": 0.5
+    },
+    {
+      "source": "vscode_extension_mockup_png",
+      "target": "concept_nextjs",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "public/vscode-extension-mockup.png",
+      "source_location": null,
+      "weight": 0.5
+    }
+  ],
+  "hyperedges": []
+}

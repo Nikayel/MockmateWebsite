@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "id": "logo_with_name",
+      "label": "CodeSparring Logo With Name (Blue/Orange)",
+      "file_type": "image",
+      "source_file": "AssetsLogo/LogoWithName.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "logo_with_name",
+      "target": "concept_codesparring_platform",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "AssetsLogo/LogoWithName.png",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

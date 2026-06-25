@@ -11,6 +11,20 @@ const REQUIRED_INCIDENT_FIELDS = [
   "rootCauseRubric",
 ] as const
 
+const CANDIDATE_LEAK_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /\b(BUG|FIXME)\s*:/i, label: "explicit bug marker" },
+  { pattern: /\bthe bug is\b/i, label: "direct bug diagnosis" },
+  { pattern: /\broot cause is\b/i, label: "direct root-cause diagnosis" },
+  { pattern: /\bchange the comparison operator\b/i, label: "patch instruction" },
+  { pattern: /\bwrong key\b/i, label: "patch instruction" },
+  { pattern: /\buse math\.isfinite\b/i, label: "patch instruction" },
+  { pattern: /\buse the event id as (the )?idempotency key\b/i, label: "patch instruction" },
+  {
+    pattern: /\bdecision and reservation must happen as one step\b/i,
+    label: "patch instruction",
+  },
+]
+
 export interface BugfixQualityIssue {
   field: string
   message: string
@@ -122,11 +136,33 @@ export function validateBugfixScenarioQuality(scenario: BugFixScenario): BugfixQ
   }
 
   const rootCauseText = scenario.bugDescription.trim().toLowerCase()
-  if (rootCauseText && scenario.problemStatement.toLowerCase().includes(rootCauseText)) {
-    issues.push({
-      field: "problemStatement",
-      message: "First-screen problem text must not reveal the exact root cause.",
-    })
+  const candidateVisibleTexts = [
+    { field: "problemStatement", text: scenario.problemStatement },
+    ...workspace.files
+      .filter((file) => !file.hidden)
+      .map((file) => ({
+        field: `workspace.files.${file.path}`,
+        text: file.content,
+      })),
+  ]
+
+  for (const { field, text } of candidateVisibleTexts) {
+    const normalizedText = text.toLowerCase()
+    if (rootCauseText && normalizedText.includes(rootCauseText)) {
+      issues.push({
+        field,
+        message: "Candidate-visible content must not reveal the exact root cause.",
+      })
+    }
+
+    for (const leakPattern of CANDIDATE_LEAK_PATTERNS) {
+      if (leakPattern.pattern.test(text)) {
+        issues.push({
+          field,
+          message: `Candidate-visible content includes ${leakPattern.label}.`,
+        })
+      }
+    }
   }
 
   return issues

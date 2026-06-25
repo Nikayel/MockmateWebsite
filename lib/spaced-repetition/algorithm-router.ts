@@ -90,6 +90,52 @@ export interface ReviewOutput {
 // Algorithm Assignment
 // ============================================
 
+function normalizeFSRSState(value: unknown): "new" | "learning" | "review" | "relearning" {
+  if (value === "new" || value === 0) return "new"
+  if (value === "learning" || value === 1) return "learning"
+  if (value === "review" || value === 2) return "review"
+  if (value === "relearning" || value === 3) return "relearning"
+
+  if (typeof value === "string") {
+    const normalized = value.toLowerCase()
+    if (normalized === "new") return "new"
+    if (normalized === "learning") return "learning"
+    if (normalized === "review") return "review"
+    if (normalized === "relearning") return "relearning"
+  }
+
+  return "review"
+}
+
+function reconstructFSRSCardFromFields(data: {
+  interval_days: number
+  next_review_at: string
+  review_count: number
+  mastery_level: SpacedRepetitionMasteryLevel
+  fsrs_difficulty?: number
+  fsrs_stability?: number
+  fsrs_lapses?: number
+  last_reviewed_at?: string
+}): FSRSCard {
+  const lastReview = data.last_reviewed_at ? new Date(data.last_reviewed_at) : null
+  const nextReview = new Date(data.next_review_at)
+
+  return {
+    difficulty: data.fsrs_difficulty || 5,
+    stability: data.fsrs_stability || data.interval_days || 1,
+    state:
+      data.review_count === 0 ? "new" : data.mastery_level === "learning" ? "learning" : "review",
+    lastReview,
+    nextReview,
+    reps: data.review_count,
+    lapses: data.fsrs_lapses || 0,
+    elapsedDays: lastReview
+      ? Math.floor((Date.now() - lastReview.getTime()) / (1000 * 60 * 60 * 24))
+      : 0,
+    scheduledDays: data.interval_days,
+  }
+}
+
 /**
  * Get user's assigned algorithm, or assign one if not set
  * Uses 50/50 random assignment for A/B testing
@@ -323,39 +369,39 @@ export function reconstructState(
     }
   } else {
     // Reconstruct FSRS card from stored data
-    const lastReview = data.last_reviewed_at ? new Date(data.last_reviewed_at) : null
-    const nextReview = new Date(data.next_review_at)
-
     let fsrsCard: FSRSCard
 
     if (data.fsrs_state) {
-      // Parse JSON and reconstruct Date objects (JSON.parse loses Date types)
-      const parsed = JSON.parse(data.fsrs_state)
-      fsrsCard = {
-        ...parsed,
-        lastReview: parsed.lastReview ? new Date(parsed.lastReview) : null,
-        nextReview: new Date(parsed.nextReview),
+      try {
+        // Parse JSON and reconstruct Date objects (JSON.parse loses Date types).
+        // Supports both the app's legacy FSRSCard shape and raw ts-fsrs card fields.
+        const parsed = JSON.parse(data.fsrs_state)
+        fsrsCard = {
+          difficulty: parsed.difficulty ?? data.fsrs_difficulty ?? 5,
+          stability: parsed.stability ?? data.fsrs_stability ?? data.interval_days ?? 1,
+          state: normalizeFSRSState(parsed.state),
+          lastReview: parsed.lastReview
+            ? new Date(parsed.lastReview)
+            : parsed.last_review
+              ? new Date(parsed.last_review)
+              : data.last_reviewed_at
+                ? new Date(data.last_reviewed_at)
+                : null,
+          nextReview: parsed.nextReview
+            ? new Date(parsed.nextReview)
+            : parsed.due
+              ? new Date(parsed.due)
+              : new Date(data.next_review_at),
+          reps: parsed.reps ?? data.review_count,
+          lapses: parsed.lapses ?? data.fsrs_lapses ?? 0,
+          elapsedDays: parsed.elapsedDays ?? parsed.elapsed_days ?? 0,
+          scheduledDays: parsed.scheduledDays ?? parsed.scheduled_days ?? data.interval_days,
+        }
+      } catch {
+        fsrsCard = reconstructFSRSCardFromFields(data)
       }
     } else {
-      // Build from individual fields
-      fsrsCard = {
-        difficulty: data.fsrs_difficulty || 5,
-        stability: data.fsrs_stability || data.interval_days || 1,
-        state:
-          data.review_count === 0
-            ? "new"
-            : data.mastery_level === "learning"
-              ? "learning"
-              : "review",
-        lastReview,
-        nextReview,
-        reps: data.review_count,
-        lapses: data.fsrs_lapses || 0,
-        elapsedDays: lastReview
-          ? Math.floor((Date.now() - lastReview.getTime()) / (1000 * 60 * 60 * 24))
-          : 0,
-        scheduledDays: data.interval_days,
-      }
+      fsrsCard = reconstructFSRSCardFromFields(data)
     }
 
     return {

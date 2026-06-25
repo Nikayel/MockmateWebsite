@@ -13,16 +13,19 @@
  * - Single user cost spike
  */
 
-import { adminDb } from './firebase-admin'
-import { FieldValue } from 'firebase-admin/firestore'
-import { logger } from './logger'
+import { adminDb } from "./firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
+import { logger } from "./logger"
 
 // Query limits to prevent Firestore cost explosion
 const QUERY_LIMITS = {
-  hourlyEvents: 5000,      // Max events to read for hourly check
-  userHourlyEvents: 1000,  // Max events per user per hour
-  weeklyEvents: 10000,     // Max events for 7-day average calculation
+  hourlyEvents: 5000, // Max events to read for hourly check
+  userHourlyEvents: 1000, // Max events per user per hour
+  weeklyEvents: 10000, // Max events for 7-day average calculation
 } as const
+
+const COST_AVERAGES_CONFIG_DOC = "cost_averages"
+const COST_AVERAGES_STALE_MS = 2 * 60 * 60 * 1000 // 2 hours
 
 // In-memory cache for average hourly cost (expensive to calculate)
 let cachedAverageHourlyCost: { value: number; expiresAt: number } | null = null
@@ -30,8 +33,13 @@ const AVERAGE_COST_CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
 export interface CostAnomaly {
   id?: string
-  type: 'high_single_request' | 'hourly_spike' | 'daily_budget_exceeded' | 'user_cost_spike' | 'unusual_pattern'
-  severity: 'warning' | 'critical'
+  type:
+    | "high_single_request"
+    | "hourly_spike"
+    | "daily_budget_exceeded"
+    | "user_cost_spike"
+    | "unusual_pattern"
+  severity: "warning" | "critical"
   description: string
   cost: number
   threshold: number
@@ -57,12 +65,20 @@ export interface CostAnomalyConfig {
   spikeMultiplier: number // Alert if cost is X times the average
 }
 
+export interface CostAverages {
+  averageHourlyCost: number
+  totalCost: number
+  eventCount: number
+  windowHours: number
+  calculatedAt: string
+}
+
 // Default thresholds
 const DEFAULT_CONFIG: CostAnomalyConfig = {
-  singleRequestThreshold: 1.00, // $1 per request is suspicious
-  hourlyBudget: 50.00, // $50/hour max
-  dailyBudget: 500.00, // $500/day max
-  userHourlyThreshold: 5.00, // $5/hour per user max
+  singleRequestThreshold: 1.0, // $1 per request is suspicious
+  hourlyBudget: 50.0, // $50/hour max
+  dailyBudget: 500.0, // $500/day max
+  userHourlyThreshold: 5.0, // $5/hour per user max
   spikeMultiplier: 3, // 3x normal is a spike
 }
 
@@ -83,9 +99,9 @@ export async function checkRequestCostAnomaly(params: {
 
   // Check 1: Single request cost too high
   if (cost > config.singleRequestThreshold) {
-    const anomaly: Omit<CostAnomaly, 'id' | 'timestamp'> = {
-      type: 'high_single_request',
-      severity: cost > config.singleRequestThreshold * 5 ? 'critical' : 'warning',
+    const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
+      type: "high_single_request",
+      severity: cost > config.singleRequestThreshold * 5 ? "critical" : "warning",
       description: `Single request cost $${cost.toFixed(4)} exceeds threshold of $${config.singleRequestThreshold.toFixed(2)}`,
       cost,
       threshold: config.singleRequestThreshold,
@@ -112,9 +128,9 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
 
     // Get costs from last hour (with limit to prevent cost explosion)
     const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('createdAt', '>=', hourAgo)
-      .orderBy('createdAt', 'desc')
+      .collection("usage_events")
+      .where("createdAt", ">=", hourAgo)
+      .orderBy("createdAt", "desc")
       .limit(QUERY_LIMITS.hourlyEvents)
       .get()
 
@@ -124,9 +140,9 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
     }
 
     if (hourlyCost > config.hourlyBudget) {
-      const anomaly: Omit<CostAnomaly, 'id' | 'timestamp'> = {
-        type: 'hourly_spike',
-        severity: hourlyCost > config.hourlyBudget * 2 ? 'critical' : 'warning',
+      const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
+        type: "hourly_spike",
+        severity: hourlyCost > config.hourlyBudget * 2 ? "critical" : "warning",
         description: `Hourly cost $${hourlyCost.toFixed(2)} exceeds budget of $${config.hourlyBudget.toFixed(2)}`,
         cost: hourlyCost,
         threshold: config.hourlyBudget,
@@ -141,9 +157,9 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
     // Also check for spikes compared to average
     const avgHourlyCost = await getAverageHourlyCost()
     if (avgHourlyCost > 0 && hourlyCost > avgHourlyCost * config.spikeMultiplier) {
-      const anomaly: Omit<CostAnomaly, 'id' | 'timestamp'> = {
-        type: 'hourly_spike',
-        severity: 'warning',
+      const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
+        type: "hourly_spike",
+        severity: "warning",
         description: `Hourly cost $${hourlyCost.toFixed(2)} is ${(hourlyCost / avgHourlyCost).toFixed(1)}x the average ($${avgHourlyCost.toFixed(2)})`,
         cost: hourlyCost,
         threshold: avgHourlyCost * config.spikeMultiplier,
@@ -155,7 +171,7 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
       return { ...anomaly, timestamp: new Date() }
     }
   } catch (error) {
-    logger.error('Failed to check hourly cost anomaly', { error })
+    logger.error("Failed to check hourly cost anomaly", { error })
   }
 
   return null
@@ -173,10 +189,10 @@ export async function checkUserCostAnomaly(userId: string): Promise<CostAnomaly 
 
     // Limit per-user query to prevent abuse or runaway reads
     const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('userId', '==', userId)
-      .where('createdAt', '>=', hourAgo)
-      .orderBy('createdAt', 'desc')
+      .collection("usage_events")
+      .where("userId", "==", userId)
+      .where("createdAt", ">=", hourAgo)
+      .orderBy("createdAt", "desc")
       .limit(QUERY_LIMITS.userHourlyEvents)
       .get()
 
@@ -186,9 +202,9 @@ export async function checkUserCostAnomaly(userId: string): Promise<CostAnomaly 
     }
 
     if (userHourlyCost > config.userHourlyThreshold) {
-      const anomaly: Omit<CostAnomaly, 'id' | 'timestamp'> = {
-        type: 'user_cost_spike',
-        severity: userHourlyCost > config.userHourlyThreshold * 3 ? 'critical' : 'warning',
+      const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
+        type: "user_cost_spike",
+        severity: userHourlyCost > config.userHourlyThreshold * 3 ? "critical" : "warning",
         description: `User ${userId} hourly cost $${userHourlyCost.toFixed(2)} exceeds threshold of $${config.userHourlyThreshold.toFixed(2)}`,
         cost: userHourlyCost,
         threshold: config.userHourlyThreshold,
@@ -200,7 +216,7 @@ export async function checkUserCostAnomaly(userId: string): Promise<CostAnomaly 
       return { ...anomaly, timestamp: new Date() }
     }
   } catch (error) {
-    logger.error('Failed to check user cost anomaly', { error, userId })
+    logger.error("Failed to check user cost anomaly", { error, userId })
   }
 
   return null
@@ -209,15 +225,15 @@ export async function checkUserCostAnomaly(userId: string): Promise<CostAnomaly 
 /**
  * Record an anomaly
  */
-async function recordAnomaly(anomaly: Omit<CostAnomaly, 'id' | 'timestamp'>): Promise<string> {
+async function recordAnomaly(anomaly: Omit<CostAnomaly, "id" | "timestamp">): Promise<string> {
   try {
     // Check for duplicate recent anomalies (same type, within 5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
 
     const recentSnapshot = await adminDb
-      .collection('cost_anomalies')
-      .where('type', '==', anomaly.type)
-      .where('timestamp', '>=', fiveMinutesAgo)
+      .collection("cost_anomalies")
+      .where("type", "==", anomaly.type)
+      .where("timestamp", ">=", fiveMinutesAgo)
       .limit(1)
       .get()
 
@@ -232,20 +248,20 @@ async function recordAnomaly(anomaly: Omit<CostAnomaly, 'id' | 'timestamp'>): Pr
       return existingDoc.id
     }
 
-    const docRef = await adminDb.collection('cost_anomalies').add({
+    const docRef = await adminDb.collection("cost_anomalies").add({
       ...anomaly,
       timestamp: FieldValue.serverTimestamp(),
     })
 
     // Log critical anomalies
-    if (anomaly.severity === 'critical') {
-      logger.error('CRITICAL COST ANOMALY DETECTED', {
+    if (anomaly.severity === "critical") {
+      logger.error("CRITICAL COST ANOMALY DETECTED", {
         type: anomaly.type,
         cost: anomaly.cost,
         description: anomaly.description,
       })
     } else {
-      logger.warn('Cost anomaly detected', {
+      logger.warn("Cost anomaly detected", {
         type: anomaly.type,
         cost: anomaly.cost,
       })
@@ -253,7 +269,7 @@ async function recordAnomaly(anomaly: Omit<CostAnomaly, 'id' | 'timestamp'>): Pr
 
     return docRef.id
   } catch (error) {
-    logger.error('Failed to record cost anomaly', { error, type: anomaly.type })
+    logger.error("Failed to record cost anomaly", { error, type: anomaly.type })
     throw error
   }
 }
@@ -262,61 +278,106 @@ async function recordAnomaly(anomaly: Omit<CostAnomaly, 'id' | 'timestamp'>): Pr
  * Get average hourly cost (last 7 days)
  * Uses in-memory caching to avoid expensive repeated queries
  */
-async function getAverageHourlyCost(): Promise<number> {
+export async function aggregateCostAverages(now: Date = new Date()): Promise<CostAverages> {
+  const sevenDaysAgo = new Date(now)
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+  const eventsSnapshot = await adminDb
+    .collection("usage_events")
+    .where("createdAt", ">=", sevenDaysAgo)
+    .orderBy("createdAt", "desc")
+    .limit(QUERY_LIMITS.weeklyEvents)
+    .get()
+
+  let totalCost = 0
+  for (const doc of eventsSnapshot.docs) {
+    totalCost += doc.data().cost || 0
+  }
+
+  let windowHours = 168
+  if (eventsSnapshot.size >= QUERY_LIMITS.weeklyEvents && eventsSnapshot.size > 0) {
+    const oldestSampled = eventsSnapshot.docs[eventsSnapshot.size - 1].data().createdAt?.toDate?.()
+    const newestSampled = eventsSnapshot.docs[0].data().createdAt?.toDate?.()
+    if (oldestSampled && newestSampled) {
+      windowHours = Math.max(
+        1,
+        (newestSampled.getTime() - oldestSampled.getTime()) / (1000 * 60 * 60)
+      )
+    }
+  }
+
+  const averageHourlyCost = windowHours > 0 ? totalCost / windowHours : 0
+  const averages: CostAverages = {
+    averageHourlyCost,
+    totalCost,
+    eventCount: eventsSnapshot.size,
+    windowHours,
+    calculatedAt: now.toISOString(),
+  }
+
+  await adminDb
+    .collection("config")
+    .doc(COST_AVERAGES_CONFIG_DOC)
+    .set(
+      {
+        ...averages,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    )
+
+  cachedAverageHourlyCost = {
+    value: averageHourlyCost,
+    expiresAt: Date.now() + AVERAGE_COST_CACHE_TTL_MS,
+  }
+
+  logger.info("Cost averages aggregated", {
+    averageHourlyCost,
+    eventCount: eventsSnapshot.size,
+    windowHours,
+  })
+
+  return averages
+}
+
+export async function getAverageHourlyCost(): Promise<number> {
   // Check cache first
   if (cachedAverageHourlyCost && Date.now() < cachedAverageHourlyCost.expiresAt) {
     return cachedAverageHourlyCost.value
   }
 
   try {
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-    // Limit query to prevent cost explosion on large datasets
-    // Sample recent events and extrapolate if needed
-    const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('createdAt', '>=', sevenDaysAgo)
-      .orderBy('createdAt', 'desc')
-      .limit(QUERY_LIMITS.weeklyEvents)
-      .get()
-
-    let totalCost = 0
-    for (const doc of eventsSnapshot.docs) {
-      totalCost += doc.data().cost || 0
+    const averagesDoc = await adminDb.collection("config").doc(COST_AVERAGES_CONFIG_DOC).get()
+    if (!averagesDoc.exists) {
+      logger.warn("Cost averages document is missing; returning safe average of 0")
+      return 0
     }
 
-    // If we hit the limit, we have more events - extrapolate based on time coverage
-    let avgHourlyCost: number
-    if (eventsSnapshot.size >= QUERY_LIMITS.weeklyEvents && eventsSnapshot.size > 0) {
-      // Estimate: we only sampled recent events, extrapolate for full period
-      const oldestSampled = eventsSnapshot.docs[eventsSnapshot.size - 1].data().createdAt?.toDate()
-      const newestSampled = eventsSnapshot.docs[0].data().createdAt?.toDate()
-      if (oldestSampled && newestSampled) {
-        const sampledHours = (newestSampled.getTime() - oldestSampled.getTime()) / (1000 * 60 * 60)
-        avgHourlyCost = sampledHours > 0 ? totalCost / sampledHours : 0
-      } else {
-        avgHourlyCost = totalCost / 168 // Fallback to 7 days
-      }
-      logger.debug('Average hourly cost calculated from sample', {
-        sampledEvents: eventsSnapshot.size,
-        avgHourlyCost
+    const data = averagesDoc.data() as Partial<CostAverages> | undefined
+    const calculatedAt = data?.calculatedAt ? new Date(data.calculatedAt) : null
+    const isStale =
+      !calculatedAt ||
+      Number.isNaN(calculatedAt.getTime()) ||
+      Date.now() - calculatedAt.getTime() > COST_AVERAGES_STALE_MS
+
+    if (isStale) {
+      logger.warn("Cost averages document is stale; returning safe cached value", {
+        calculatedAt: data?.calculatedAt,
       })
-    } else {
-      // 7 days * 24 hours = 168 hours
-      avgHourlyCost = totalCost / 168
+      return cachedAverageHourlyCost?.value || 0
     }
 
-    // Cache the result
+    const averageHourlyCost =
+      typeof data?.averageHourlyCost === "number" ? data.averageHourlyCost : 0
     cachedAverageHourlyCost = {
-      value: avgHourlyCost,
+      value: averageHourlyCost,
       expiresAt: Date.now() + AVERAGE_COST_CACHE_TTL_MS,
     }
 
-    return avgHourlyCost
+    return averageHourlyCost
   } catch (error) {
-    logger.error('Failed to get average hourly cost', { error })
-    return 0
+    logger.error("Failed to get average hourly cost", { error })
+    return cachedAverageHourlyCost?.value || 0
   }
 }
 
@@ -325,13 +386,13 @@ async function getAverageHourlyCost(): Promise<number> {
  */
 async function getAnomalyConfig(): Promise<CostAnomalyConfig> {
   try {
-    const configDoc = await adminDb.collection('config').doc('cost_anomaly').get()
+    const configDoc = await adminDb.collection("config").doc("cost_anomaly").get()
 
     if (configDoc.exists) {
       return { ...DEFAULT_CONFIG, ...configDoc.data() } as CostAnomalyConfig
     }
   } catch (error) {
-    logger.error('Failed to get anomaly config, using defaults', { error })
+    logger.error("Failed to get anomaly config, using defaults", { error })
   }
 
   return DEFAULT_CONFIG
@@ -341,10 +402,10 @@ async function getAnomalyConfig(): Promise<CostAnomalyConfig> {
  * Update anomaly config
  */
 export async function updateAnomalyConfig(config: Partial<CostAnomalyConfig>): Promise<void> {
-  await adminDb.collection('config').doc('cost_anomaly').set(
-    { ...config, updatedAt: FieldValue.serverTimestamp() },
-    { merge: true }
-  )
+  await adminDb
+    .collection("config")
+    .doc("cost_anomaly")
+    .set({ ...config, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
 }
 
 /**
@@ -353,18 +414,18 @@ export async function updateAnomalyConfig(config: Partial<CostAnomalyConfig>): P
 export async function getRecentAnomalies(limit: number = 50): Promise<CostAnomaly[]> {
   try {
     const snapshot = await adminDb
-      .collection('cost_anomalies')
-      .orderBy('timestamp', 'desc')
+      .collection("cost_anomalies")
+      .orderBy("timestamp", "desc")
       .limit(limit)
       .get()
 
-    return snapshot.docs.map(doc => ({
+    return snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
       timestamp: doc.data().timestamp?.toDate() || new Date(),
     })) as CostAnomaly[]
   } catch (error) {
-    logger.error('Failed to get recent anomalies', { error })
+    logger.error("Failed to get recent anomalies", { error })
     return []
   }
 }
@@ -373,7 +434,7 @@ export async function getRecentAnomalies(limit: number = 50): Promise<CostAnomal
  * Acknowledge an anomaly
  */
 export async function acknowledgeAnomaly(anomalyId: string, acknowledgedBy: string): Promise<void> {
-  await adminDb.collection('cost_anomalies').doc(anomalyId).update({
+  await adminDb.collection("cost_anomalies").doc(anomalyId).update({
     acknowledged: true,
     acknowledgedBy,
     acknowledgedAt: FieldValue.serverTimestamp(),
@@ -405,8 +466,8 @@ export async function getAnomalyStats(): Promise<{
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
 
     const snapshot = await adminDb
-      .collection('cost_anomalies')
-      .orderBy('timestamp', 'desc')
+      .collection("cost_anomalies")
+      .orderBy("timestamp", "desc")
       .limit(500)
       .get()
 
@@ -417,7 +478,7 @@ export async function getAnomalyStats(): Promise<{
       if (!data.acknowledged) stats.unacknowledged++
 
       stats.byType[data.type] = (stats.byType[data.type] || 0) + 1
-      stats.bySeverity[data.severity as 'warning' | 'critical']++
+      stats.bySeverity[data.severity as "warning" | "critical"]++
 
       const timestamp = data.timestamp?.toDate() || new Date()
       if (timestamp >= twentyFourHoursAgo) {
@@ -430,7 +491,7 @@ export async function getAnomalyStats(): Promise<{
       }
     }
   } catch (error) {
-    logger.error('Failed to get anomaly stats', { error })
+    logger.error("Failed to get anomaly stats", { error })
   }
 
   return stats

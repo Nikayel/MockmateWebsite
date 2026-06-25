@@ -9,6 +9,8 @@ import { getProPricing } from "@/lib/config"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { Feature } from "@/components/ui/feature-with-image-comparison"
+import { ComparisonSection } from "@/components/comparison-section"
 
 interface PricingPageClientProps {
   faqs: { question: string; answer: string }[]
@@ -144,27 +146,11 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
         </div>
       </section>
 
-      {/* Comparison Stats - Compact */}
-      <section className="bg-background border-t border-white/5 py-8">
-        <div className="container mx-auto px-4">
-          <div className="mx-auto max-w-2xl">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-accent text-2xl font-bold">$0.63</div>
-                <div className="text-xs text-gray-500">per day (yearly)</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">350+</div>
-                <div className="text-xs text-gray-500">problems/month</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-400">29%</div>
-                <div className="text-xs text-gray-500">cheaper than LeetCode</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Visual Platform Comparison */}
+      <Feature />
+
+      {/* Cost & Feature Comparison Section */}
+      <ComparisonSection />
 
       {/* FAQ Section */}
       <section className="bg-background border-t border-white/5 py-12">

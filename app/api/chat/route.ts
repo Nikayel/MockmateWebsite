@@ -44,12 +44,7 @@ import {
 } from "@/lib/interview/interviewer-policy"
 import { buildInterviewerPrompt } from "@/lib/interview/interviewer-prompts"
 import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
-import {
-  chatRequestSchema,
-  type ConsoleLogItem,
-  type TestResultItem,
-  type UserContext,
-} from "@/lib/interview/chat-request-schema"
+import { chatRequestSchema, type UserContext } from "@/lib/interview/chat-request-schema"
 import { buildRAGContext } from "@/lib/interview/chat-rag-context"
 import type { ClarifyingQuestion } from "@/lib/scenarios/types"
 import {
@@ -67,9 +62,75 @@ import {
   buildUserPersonalizationContext,
   buildWorkspaceContextString,
 } from "@/lib/interview/chat/context-builders"
+import { buildChatRequestContext } from "@/lib/interview/chat/request-context"
+import { buildChatPromptFlow } from "@/lib/interview/chat/prompt-flow"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
   lastExtractionAt?: number
+}
+
+type ConversationExtractionJob = {
+  sessionId?: string
+  recentMessages: Array<{ role: string; content: string }>
+  currentTracker: ConversationTracker
+  messageCount: number
+  lastExtractionAt: number
+  currentMessage: string
+  optimalComplexityContext?: {
+    optimalTimeComplexity: string
+    optimalSpaceComplexity: string
+  }
+}
+
+function runConversationExtractionAfterResponse(job: ConversationExtractionJob | null): void {
+  if (!job) return
+
+  void (async () => {
+    try {
+      if (getFlag("USE_EXTRACTION_SERVICE")) {
+        const result = await extractionService({
+          messages: job.recentMessages,
+          currentTracker: job.currentTracker,
+          messageCount: job.messageCount,
+          lastExtractionAt: job.lastExtractionAt,
+          currentMessage: job.currentMessage,
+          optimalComplexity: job.optimalComplexityContext,
+        })
+
+        if (result.didRun) {
+          logger.info("[Chat API] Completed post-response extraction service job", {
+            sessionId: job.sessionId,
+            confidence: result.confidence,
+            silentNotesCount: result.tracker.silentNotes?.length || 0,
+          })
+        }
+        return
+      }
+
+      if (!shouldRunExtraction(job.messageCount, job.lastExtractionAt, job.currentMessage)) {
+        return
+      }
+
+      const extractionUpdates = await extractConversationState(
+        job.recentMessages,
+        job.currentTracker,
+        job.optimalComplexityContext
+      )
+
+      if (Object.keys(extractionUpdates).length > 0) {
+        logger.info("[Chat API] Completed post-response LLM extraction job", {
+          sessionId: job.sessionId,
+          extractionUpdates,
+          silentNotesCount: extractionUpdates.silentNotes?.length || 0,
+        })
+      }
+    } catch (extractionError) {
+      logger.warn("[Chat API] Post-response extraction failed", {
+        sessionId: job.sessionId,
+        error: extractionError,
+      })
+    }
+  })()
 }
 
 export async function POST(request: NextRequest) {
@@ -88,6 +149,7 @@ export async function POST(request: NextRequest) {
   // Apply tier-based rate limiting (second layer - per-user limits)
   const tier = (quotaResult.tier || "free") as RateLimitTier
   const rateLimitUserId = quotaResult.userId || "anonymous"
+  let trackingStarted = false
 
   if (rateLimitUserId !== "anonymous") {
     const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 1000) // ~1000 tokens per chat
@@ -96,6 +158,7 @@ export async function POST(request: NextRequest) {
     }
     // Track request start for concurrent limiting
     await startRequestTracking(rateLimitUserId, 1000)
+    trackingStarted = true
   }
 
   const startTime = Date.now()
@@ -118,43 +181,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Extract validated data with type assertions for complex types
-    const validatedData = parseResult.data
-    const message = validatedData.message
-    const context = validatedData.context
-    const role = validatedData.role
-    const userContext = validatedData.userContext as UserContext | undefined
-    const workspaceContext = validatedData.workspaceContext
-    const currentCode = validatedData.currentCode
-    const isProactive = validatedData.isProactive
-    const scenarioTitle = validatedData.scenarioTitle
-    const scenarioType = validatedData.scenarioType
-    const scenarioPattern = validatedData.scenarioPattern
-    const scenarioCompany = validatedData.scenarioCompany
-    const elapsedTime = validatedData.elapsedTime
-    const sessionId = validatedData.sessionId
-    const userId = validatedData.userId
-    const partnerMessagesCount = validatedData.partnerMessagesCount
-    const lastPartnerExchange = validatedData.lastPartnerExchange
-    const recentNudgeTopics = validatedData.recentNudgeTopics
-    const userAnsweredTopics = validatedData.userAnsweredTopics
-    const timeSinceLastMessage = validatedData.timeSinceLastMessage
-    const isWrapUp = validatedData.isWrapUp
-    const edgeCases = validatedData.edgeCases as
-      | Array<{ description: string; input: unknown }>
-      | undefined
-    const testResults = validatedData.testResults as TestResultItem[] | undefined
-    const consoleLogs = validatedData.consoleLogs as ConsoleLogItem[] | undefined
-    const conversationTracker = validatedData.conversationTracker
-    const hasSubmitted = validatedData.hasSubmitted
-    const solutionComplexity = validatedData.solutionComplexity as
-      | { estimated?: string; optimal?: string; optimalSpace?: string; isOptimal?: boolean }
-      | undefined
-    const realInterviewMode = validatedData.realInterviewMode
-    const hasFuzzyStatement = validatedData.hasFuzzyStatement
-    const scenarioClarifyingQuestions = validatedData.scenarioClarifyingQuestions
-    const scenarioFuzzyStatement = validatedData.scenarioFuzzyStatement
-    const starterCodeLength = validatedData.starterCodeLength
+    const requestContext = buildChatRequestContext(parseResult.data)
+    const {
+      message,
+      context,
+      role,
+      userContext,
+      workspaceContext,
+      currentCode,
+      isProactive,
+      scenarioTitle,
+      scenarioType,
+      scenarioPattern,
+      scenarioCompany,
+      elapsedTime,
+      sessionId,
+      userId,
+      partnerMessagesCount,
+      lastPartnerExchange,
+      recentNudgeTopics,
+      userAnsweredTopics,
+      timeSinceLastMessage,
+      isWrapUp,
+      edgeCases,
+      testResults,
+      consoleLogs,
+      conversationTracker,
+      hasSubmitted,
+      solutionComplexity,
+      realInterviewMode,
+      hasFuzzyStatement,
+      scenarioClarifyingQuestions,
+      scenarioFuzzyStatement,
+      starterCodeLength,
+      messageCount,
+      testsHaveRun,
+      currentCodeLength,
+    } = requestContext
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -163,108 +226,46 @@ export async function POST(request: NextRequest) {
 
     // Note: Size validation is now handled by Zod schema (message: 10KB, currentCode: 100KB)
 
-    // LLM-based conversation extraction for more accurate tracking
-    // Only run for interviewer mode and when key signals detected
-    let enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
+    // LLM-based conversation extraction is prepared here but runs after the
+    // response is generated so chat latency does not wait on a secondary LLM call.
+    const enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
     const ENABLE_LLM_EXTRACTION = true
-    if (
-      ENABLE_LLM_EXTRACTION &&
-      role === "interviewer" &&
-      conversationTracker &&
-      context &&
-      message
-    ) {
-      const messageCount = Array.isArray(context) ? context.length : 0
-      const lastExtraction =
-        (conversationTracker as unknown as ConversationTrackerWithExtraction).lastExtractionAt || 0
-
-      // Feature flag: Use extraction service or direct call
-      if (getFlag("USE_EXTRACTION_SERVICE")) {
-        try {
-          // Convert context to extraction format
-          const recentMessages = (context as Array<{ type: string; message: string }>)
-            .slice(-10)
-            .map((m) => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-            }))
-
-          // Build optimal complexity context for real-time validation
-          const optimalComplexityContext = solutionComplexity
-            ? {
-                optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
-                optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
-              }
-            : undefined
-
-          const result = await extractionService({
-            messages: recentMessages,
-            currentTracker: conversationTracker as unknown as ConversationTracker,
-            messageCount,
-            lastExtractionAt: lastExtraction,
-            currentMessage: message,
-            optimalComplexity: optimalComplexityContext,
-          })
-
-          if (result.didRun) {
-            enhancedTracker = result.tracker
-            logger.info("[Chat API] Enhanced tracker with extraction service", {
-              confidence: result.confidence,
-              silentNotesCount: result.tracker.silentNotes?.length || 0,
-            })
-          }
-        } catch (extractionError) {
-          logger.warn("[Chat API] Extraction service failed, using original tracker", {
-            error: extractionError,
-          })
-        }
-      } else {
-        // Original code path
-        if (shouldRunExtraction(messageCount, lastExtraction, message)) {
-          try {
-            // Convert context to extraction format
-            const recentMessages = (context as Array<{ type: string; message: string }>)
+    const extractionJob: ConversationExtractionJob | null =
+      ENABLE_LLM_EXTRACTION && role === "interviewer" && conversationTracker && context && message
+        ? {
+            sessionId,
+            recentMessages: (context as Array<{ type: string; message: string }>)
               .slice(-10)
               .map((m) => ({
                 role: m.type === "user" ? "candidate" : "interviewer",
                 content: m.message,
-              }))
-
-            // Build optimal complexity context for real-time validation
-            // This allows the extraction to detect when user claims wrong complexity
-            const optimalComplexityContext = solutionComplexity
+              })),
+            currentTracker: conversationTracker as unknown as ConversationTracker,
+            messageCount: Array.isArray(context) ? context.length : 0,
+            lastExtractionAt:
+              (conversationTracker as unknown as ConversationTrackerWithExtraction)
+                .lastExtractionAt || 0,
+            currentMessage: message,
+            optimalComplexityContext: solutionComplexity
               ? {
                   optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
                   optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
                 }
-              : undefined
-
-            // Run async extraction (non-blocking for response, enhances future requests)
-            // Now also validates complexity claims and adds silent notes for mistakes
-            const extractionUpdates = await extractConversationState(
-              recentMessages,
-              conversationTracker as unknown as ConversationTracker,
-              optimalComplexityContext
-            )
-
-            // Merge extraction results with existing tracker
-            if (Object.keys(extractionUpdates).length > 0) {
-              enhancedTracker = {
-                ...(conversationTracker as unknown as ConversationTracker),
-                ...extractionUpdates,
-              }
-              logger.info("[Chat API] Enhanced tracker with LLM extraction", {
-                extractionUpdates,
-                silentNotesCount: extractionUpdates.silentNotes?.length || 0,
-              })
-            }
-          } catch (extractionError) {
-            // Extraction failed, continue with original tracker
-            logger.warn("[Chat API] LLM extraction failed, using regex-based tracker", {
-              error: extractionError,
-            })
+              : undefined,
           }
-        }
+        : null
+
+    if (extractionJob) {
+      if (getFlag("USE_EXTRACTION_SERVICE")) {
+        logger.debug("[Chat API] Deferred extraction service until after response", { sessionId })
+      } else if (
+        shouldRunExtraction(
+          extractionJob.messageCount,
+          extractionJob.lastExtractionAt,
+          extractionJob.currentMessage
+        )
+      ) {
+        logger.debug("[Chat API] Deferred LLM extraction until after response", { sessionId })
       }
     }
 
@@ -312,11 +313,9 @@ export async function POST(request: NextRequest) {
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
-    const testsHaveRunNow =
-      testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
-    const messageCount = Array.isArray(context) ? context.length : 0
-    const currentCodeLen = currentCode?.length || 0
-    const starterLen = starterCodeLength || 0
+    const testsHaveRunNow = testsHaveRun
+    const currentCodeLen = currentCodeLength
+    const starterLen = starterCodeLength
 
     const phaseContext: PhaseDetectionContext = {
       hasSubmitted: hasSubmitted || false,
@@ -627,211 +626,30 @@ GROUNDING RULES (prevent hallucination):
     // Convert to provider-agnostic format
     const history = buildProviderHistory(context)
 
-    // Build the full user message with context
-    let fullUserMessage = ""
+    const promptFlow = buildChatPromptFlow({
+      role,
+      message,
+      context,
+      isProactive,
+      isWrapUp,
+      currentCode,
+      currentCodeContext,
+      workspaceContextStr,
+      timeSinceLastMessage,
+      scenarioPattern,
+      partnerMessagesCount,
+      lastPartnerExchange,
+      recentNudgeTopics,
+      userAnsweredTopics,
+      testResults,
+      elapsedMinutes,
+    })
 
-    if (isProactive && role === "interviewer") {
-      // Smart proactive engagement - jump in like a real interviewer
-      const hasSubstantialCode = currentCode && currentCode.trim().length > 100
-
-      // TIME-BASED TRIGGER: Check in after 2+ minutes of silence
-      // Real interviewers don't wait forever for code - they check in on thinking
-      const timeSilentSeconds = timeSinceLastMessage || 0
-      const shouldTimeBasedCheckIn = timeSilentSeconds >= 120 // 2 minutes of silence
-
-      if (!hasSubstantialCode && !shouldTimeBasedCheckIn) {
-        // Don't interrupt if they haven't written much AND haven't been silent too long
-        return NextResponse.json({
-          reply: null,
-          skipped: true,
-          reason: "Not enough code to comment on yet and not silent long enough",
-        })
-      }
-
-      // If silent for too long but no code, ask about their thinking
-      if (shouldTimeBasedCheckIn && !hasSubstantialCode) {
-        fullUserMessage = `[TIME-BASED CHECK-IN] The candidate has been quiet for ${Math.floor(timeSilentSeconds / 60)} minutes without writing substantial code.
-
-Act like a real interviewer who notices someone is quiet:
-- "How are you thinking about this problem?"
-- "What's going through your mind?"
-- "Would it help to talk through your approach?"
-- "Are you stuck on something specific?"
-
-Pick ONE natural response (under 20 words). Don't be pushy - they might be thinking.`
-        // Continue to generate response below
-      }
-
-      // Determine the best proactive response based on context
-      const proactivePrompts = [
-        "Walk me through what you're doing here.",
-        "What's your approach for this?",
-        "Can you explain your thought process?",
-        "What's the time complexity of this approach?",
-        "Have you considered any edge cases?",
-        "What happens with an empty input?",
-        "Interesting approach - what led you to this?",
-        "Let's trace through an example together.",
-      ]
-
-      // Use RAG context to ask smarter questions
-      const patternSpecificQuestion = scenarioPattern
-        ? `Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`
-        : ""
-
-      // AI Partner usage awareness - alert interviewer if candidate is heavily using AI
-      const aiPartnerContext =
-        partnerMessagesCount && partnerMessagesCount > 0
-          ? `
-AI PARTNER USAGE ALERT:
-- Candidate has used AI Partner ${partnerMessagesCount} times this session
-${lastPartnerExchange ? `- Last AI interaction: "${lastPartnerExchange.slice(0, 200)}..."` : ""}
-${partnerMessagesCount >= 5 ? `- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions` : ""}
-${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand it vs. blindly copied it` : ""}
-`
-          : ""
-
-      // Nudge topic tracking to avoid repetitive questions
-      const nudgeAvoidance =
-        recentNudgeTopics && recentNudgeTopics.length > 0
-          ? `
-AVOID REPEATING THESE TOPICS (already asked about):
-${recentNudgeTopics
-  .slice(-3)
-  .map((t: string) => `- ${t}`)
-  .join("\n")}
-If they're still stuck on these, give a CONCRETE hint instead of asking again.
-`
-          : ""
-
-      // User-answered topics tracking - DON'T re-ask what they already answered
-      const userAnsweredContext =
-        userAnsweredTopics && userAnsweredTopics.length > 0
-          ? `
-CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
-${userAnsweredTopics
-  .slice(-5)
-  .map((t: string) => `- ${t}`)
-  .join("\n")}
-If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.
-`
-          : ""
-
-      // Keep proactive message SHORT and natural - like a real interviewer jumping in
-      fullUserMessage = `[NATURAL CHECK-IN] The candidate has been working on code. Act like a real interviewer who just noticed something interesting or wants to understand their thinking.
-
-${currentCodeContext}
-${aiPartnerContext}
-${patternSpecificQuestion}
-${nudgeAvoidance}
-${userAnsweredContext}
-
-Options for how to engage:
-${proactivePrompts
-  .slice(0, 3)
-  .map((p) => `- "${p}"`)
-  .join("\n")}
-
-Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`
-    } else if (isWrapUp && role === "interviewer") {
-      // WRAP-UP: Interview is ending, provide detailed retrospective debrief
-      const passedTests = testResults?.filter((t) => t.passed).length || 0
-      const totalTests = testResults?.length || 0
-      const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0
-      const allTestsPassed = passedTests === totalTests && totalTests > 0
-
-      fullUserMessage = `[INTERVIEW DEBRIEF] The candidate is ending the session. Give them a real debrief like after an actual interview.
-
-FINAL STATE:
-${currentCodeContext}
-
-TEST RESULTS: ${passedTests}/${totalTests} tests passed (${Math.round(passRate)}%)
-${allTestsPassed ? "STATUS: PASSED" : "STATUS: DID NOT PASS"}
-
-${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : "No AI Partner usage"}
-Time spent: ${elapsedMinutes || "unknown"} minutes
-
-YOUR DEBRIEF SHOULD INCLUDE:
-
-1. VERDICT (be honest):
-${
-  allTestsPassed
-    ? `- Tests passed, so acknowledge that
-   - But still give constructive feedback - passing isn't everything`
-    : `- Tests didn't pass - be direct but kind
-   - Point out what went wrong without being harsh
-   - Encourage them: "This is a common pattern - worth practicing"`
-}
-
-2. WHAT THEY DID WELL (be specific):
-   - Reference actual things from the conversation
-   - "Your initial approach with the hash map was spot on"
-   - "Good that you asked about edge cases upfront"
-   - Don't make things up - only mention things they actually did
-
-3. WHAT TO IMPROVE (be actionable):
-   - "You spent too long without talking - think out loud more"
-   - "Consider edge cases earlier in your process"
-   - "Your brute force was fine, but look into [pattern] for optimization"
-   - Give them something concrete to work on
-
-4. HIRING SIGNAL (be real):
-${
-  allTestsPassed
-    ? `- "If this were a real interview, I'd lean towards a hire recommendation. Your communication was solid and you got to a working solution."
-   - OR "Tests passed, but the process was rough. In a real interview, I'd be on the fence - work on [specific thing]."`
-    : `- "In a real interview, this wouldn't be a pass. But here's the good news: [pattern] problems are very learnable."
-   - Be kind but honest about what it would take`
-}
-
-EXAMPLE GOOD DEBRIEF:
-"Alright, let's wrap up. Tests are passing - nice work. You showed good instincts going for a hash map right away, and I liked that you traced through the example before coding. Two things to work on: you didn't mention edge cases until I asked, and that initial confusion about what to store as keys vs values cost you a few minutes. In a real interview, that'd be a positive signal overall - you communicated well and got to O(n). Good work on this one."
-
-EXAMPLE FOR FAILED TESTS:
-"Let's debrief. So the tests didn't pass, but let's talk about what happened. You had the right intuition about needing to track seen elements, but got tangled up in the implementation. The two-pointer approach you tried wouldn't work here because the array isn't sorted - that's the key insight. This is a classic hash map pattern, and honestly it trips up a lot of people. I'd spend some time on the 'Two Sum' type problems - once this pattern clicks, you'll recognize it instantly. Keep at it."
-
-Keep it conversational and real - like you're actually debriefing someone after an interview.`
-    } else {
-      // Check if AI already said goodbye in a recent message (interview is over)
-      const recentMessages = context?.slice(-4) || []
-      const aiAlreadySaidGoodbye = recentMessages.some(
-        (msg: { message: string; type?: string }) =>
-          msg.type !== "user" &&
-          (msg.message?.toLowerCase().includes("good luck with your") ||
-            msg.message?.toLowerCase().includes("best of luck") ||
-            (msg.message?.toLowerCase().includes("take care") &&
-              msg.message?.toLowerCase().includes("interview")))
-      )
-
-      if (aiAlreadySaidGoodbye && role === "interviewer") {
-        // Interview is OVER - don't respond to any more messages
-        return NextResponse.json({
-          reply: null,
-          conversationEnded: true,
-          endMessage:
-            "The interview session has ended. Click 'See Full Interview Score' to see your score breakdown and detailed analysis.",
-        })
-      }
-
-      // Regular message - let the AI naturally handle conversation flow
-      // The AI will determine if this is a farewell based on full context
-      fullUserMessage = message || ""
-      if (workspaceContextStr || currentCodeContext) {
-        fullUserMessage += workspaceContextStr + currentCodeContext
-      }
-
-      // For interviewer role, add user-answered topics context to prevent re-asking
-      if (role === "interviewer" && userAnsweredTopics && userAnsweredTopics.length > 0) {
-        fullUserMessage += `
-
-[CONTEXT - CANDIDATE HAS ALREADY ANSWERED]:
-${userAnsweredTopics
-  .slice(-5)
-  .map((t: string) => `- ${t}`)
-  .join("\n")}
-Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-ask.`
-      }
+    if (promptFlow.earlyResponse) {
+      return NextResponse.json(promptFlow.earlyResponse)
     }
+
+    const fullUserMessage = promptFlow.fullUserMessage
 
     // Determine task complexity for provider selection
     const complexity: TaskComplexity = role == "interviewer" ? "dialogue" : "code"
@@ -1007,10 +825,7 @@ Generate a compliant response NOW:`
       })
     }
 
-    // End request tracking for tier-based rate limiting
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId)
-    }
+    runConversationExtractionAfterResponse(extractionJob)
 
     return NextResponse.json({
       reply: aiResponse.text,
@@ -1027,11 +842,6 @@ Generate a compliant response NOW:`
       },
     })
   } catch (error: unknown) {
-    // End request tracking on error too
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId).catch(() => {})
-    }
-
     logger.error("Chat API error", {
       error,
       message: error instanceof Error ? error.message : undefined,
@@ -1046,5 +856,9 @@ Generate a compliant response NOW:`
       },
       { status: 500 }
     )
+  } finally {
+    if (trackingStarted) {
+      await endRequestTracking(rateLimitUserId).catch(() => {})
+    }
   }
 }

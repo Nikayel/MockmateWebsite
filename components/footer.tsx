@@ -17,8 +17,9 @@ export function Footer() {
               </span>
             </div>
             <p className="text-sm text-gray-400">
-              AI-powered platform for coding interview practice. Master technical interviews with
-              realistic simulations and personalized feedback.
+              CodeSparring.dev is the premier AI technical interview practice platform. Master your
+              next software engineering interview with realistic coding, system design, and bug-fix
+              simulations.
             </p>
             <div className="flex space-x-4">
               <Github className="h-5 w-5 cursor-pointer text-gray-400 transition-colors hover:text-white" />

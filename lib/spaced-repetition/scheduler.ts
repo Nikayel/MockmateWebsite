@@ -76,6 +76,12 @@ export interface ProblemMastery {
   review_count: number
   next_review_at: string // ISO date
 
+  // FSRS State
+  fsrs_difficulty?: number
+  fsrs_stability?: number
+  fsrs_state?: string
+  fsrs_lapses?: number
+
   // Performance History
   last_score: number
   average_score: number
@@ -674,6 +680,10 @@ export async function initializeProblemMasteryFromSession(
     hints_used_total: sessionData.hints_used || 0,
     mastery_level: reviewResult.mastery_level as MasteryLevel,
     confidence: reviewResult.confidence,
+    fsrs_difficulty: storageData.fsrs_difficulty as number | undefined,
+    fsrs_stability: storageData.fsrs_stability as number | undefined,
+    fsrs_state: storageData.fsrs_state as string | undefined,
+    fsrs_lapses: storageData.fsrs_lapses as number | undefined,
   }
 
   await masteryRef.set(newMastery)

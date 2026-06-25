@@ -50,9 +50,9 @@ export const ScenarioCard = memo(function ScenarioCard({
 
   return (
     <div
-      onClick={() => onSelect(scenario)}
       role="button"
       tabIndex={0}
+      onClick={() => onSelect(scenario)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()

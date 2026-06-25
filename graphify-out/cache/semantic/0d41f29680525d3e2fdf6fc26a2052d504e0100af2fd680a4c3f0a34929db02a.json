@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "llms_txt",
+      "label": "CodeSparring LLMs.txt AI Discovery File",
+      "file_type": "document",
+      "source_file": "public/llms.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "llms_txt",
+      "target": "concept_fsrs",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": "public/llms.txt",
+      "source_location": "Key Features",
+      "weight": 0.8
+    },
+    {
+      "source": "llms_txt",
+      "target": "concept_deepgram",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "public/llms.txt",
+      "source_location": "Key Features",
+      "weight": 0.6
+    }
+  ],
+  "hyperedges": []
+}

@@ -38,9 +38,9 @@ const geist = Geist({
 
 const siteConfig = {
   name: "CodeSparring",
-  tagline: "Train the Skill Interviews Actually Test",
+  tagline: "AI Technical Interview Practice for Coding, System Design, and Real-World Rounds",
   description:
-    "LeetCode tests problem-solving. Real interviews test performance under pressure. Practice with an AI interviewer that gives real feedback on how you communicate and think out loud—24/7, no scheduling.",
+    "Practice technical interviews with an AI interviewer. CodeSparring helps engineers prepare for coding, system design, bug-fix, and real-world interview rounds with feedback, hints, and performance tracking.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
   // OG images are now dynamically generated via app/opengraph-image.tsx
 }
@@ -60,7 +60,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   // Core metadata
   title: {
-    default: `${siteConfig.name} - ${siteConfig.tagline}`,
+    default: `${siteConfig.name} | ${siteConfig.tagline}`,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
@@ -131,7 +131,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: siteConfig.url,
     siteName: siteConfig.name,
-    title: `${siteConfig.name} - ${siteConfig.tagline}`,
+    title: `${siteConfig.name} | ${siteConfig.tagline}`,
     description: siteConfig.description,
   },
 
@@ -139,7 +139,7 @@ export const metadata: Metadata = {
   // Images are auto-generated via app/twitter-image.tsx
   twitter: {
     card: "summary_large_image",
-    title: `${siteConfig.name} - ${siteConfig.tagline}`,
+    title: `${siteConfig.name} | ${siteConfig.tagline}`,
     description: siteConfig.description,
     creator: "@codesparring",
   },

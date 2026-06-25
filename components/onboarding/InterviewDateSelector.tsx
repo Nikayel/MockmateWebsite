@@ -70,14 +70,14 @@ export function InterviewDateSelector({
       className="p-8"
     >
       <div className="mb-6">
-        <p className="text-sm text-[#00d9ff] font-medium mb-1">Step 2 of 4</p>
-        <h2 className="text-xl font-bold text-white">What's your goal?</h2>
-        <p className="text-sm text-gray-400 mt-1">
-          We'll tailor recommendations based on your target.
+        <p className="mb-1 text-sm font-medium text-cyan-300">Step 2 of 4</p>
+        <h2 className="text-xl font-bold text-white">Choose the target signal</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          We&apos;ll shape recommendations around the interview you are preparing for.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4" role="radiogroup" aria-label="Goal selection">
+      <div className="mb-4 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Goal selection">
         {goals.map((goal) => {
           const Icon = goal.icon
           const isSelected = selectedGoal === goal.id
@@ -88,14 +88,14 @@ export function InterviewDateSelector({
               role="radio"
               aria-checked={isSelected}
               aria-label={`${goal.label}: ${goal.description}`}
-              className={`p-4 rounded-xl border text-left transition-all ${
+              className={`rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                 isSelected
-                  ? "border-[#00d9ff] bg-[#00d9ff]/10"
-                  : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
+                  ? "border-cyan-300 bg-cyan-300/10"
+                  : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
               }`}
             >
               <Icon
-                className={`h-5 w-5 mb-2 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`}
+                className={`mb-2 h-5 w-5 ${isSelected ? "text-cyan-300" : "text-gray-400"}`}
                 aria-hidden="true"
               />
               <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
@@ -113,15 +113,15 @@ export function InterviewDateSelector({
           animate={{ opacity: 1, height: "auto" }}
           className="mb-4"
         >
-          <p className="text-sm text-gray-400 mb-2">Target company (optional)</p>
+          <p className="mb-2 text-sm text-gray-400">Target company (optional)</p>
           <div className="flex flex-wrap gap-2">
             {targetCompanies.map((company) => (
               <button
                 key={company}
                 onClick={() => handleCompanyClick(company)}
-                className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+                className={`rounded-md px-3 py-1.5 text-sm transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                   targetCompany === company
-                    ? "bg-[#00d9ff] text-black"
+                    ? "bg-cyan-300 text-gray-950"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                 }`}
               >
@@ -132,14 +132,15 @@ export function InterviewDateSelector({
         </motion.div>
       )}
 
-      <div className="flex justify-between mt-6">
+      <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center">
         <Button variant="ghost" onClick={onBack} className="text-gray-400">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
+        <span className="text-sm text-gray-500">Goal</span>
         <Button
           onClick={onNext}
           disabled={!canProceed}
-          className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black disabled:opacity-50"
+          className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200 disabled:opacity-50"
         >
           Continue <ArrowRight className="ml-1 h-4 w-4" />
         </Button>

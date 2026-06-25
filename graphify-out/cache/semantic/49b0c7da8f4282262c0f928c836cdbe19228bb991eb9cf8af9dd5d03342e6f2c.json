@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "id": "app_icon_svg",
+      "label": "App Icon SVG",
+      "file_type": "image",
+      "source_file": "app/icon.svg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "app_icon_svg",
+      "target": "concept_codesparring_platform",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "app/icon.svg",
+      "source_location": null,
+      "weight": 0.8
+    }
+  ],
+  "hyperedges": []
+}

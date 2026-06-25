@@ -4,13 +4,14 @@ import { memo, type Dispatch, type RefObject, type SetStateAction } from "react"
 import {
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   Clock,
   Code,
   Eye,
   HardDrive,
   HelpCircle,
   Lightbulb,
-  Sparkles,
+  Save,
   Target,
   ThumbsDown,
   ThumbsUp,
@@ -24,6 +25,20 @@ import type { Scenario } from "@/lib/scenarios"
 import type { WorkspaceContextFile } from "../_types"
 
 type BugfixReflectionField = "hypothesis" | "rootCause" | "prevention"
+
+type ScenarioPanelDetails = Scenario & {
+  expectedBehavior?: string
+  fuzzyStatement?: string
+  hints?: string[]
+  optimalComplexity?: {
+    space: string
+    time: string
+  }
+  reproductionSteps?: string[]
+  successCriteria?: string[]
+  userReport?: string
+  visibleLogs?: string[]
+}
 
 interface ProblemColumnCtx {
   activePanel: "problem" | "editor" | "chat"
@@ -94,6 +109,10 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
     workspaceContext,
   } = ctx
   const isBugfix = selectedScenario?.type === "bugfix"
+  const scenarioDetails = selectedScenario as ScenarioPanelDetails | null
+  const reproductionSteps = scenarioDetails?.reproductionSteps ?? []
+  const successCriteria = scenarioDetails?.successCriteria ?? []
+  const visibleLogs = scenarioDetails?.visibleLogs ?? []
 
   return (
     <>
@@ -143,16 +162,16 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
                   <span className="bg-accent h-4 w-1 rounded-full"></span>
                   Description
-                  {realInterviewMode && (selectedScenario as any).fuzzyStatement && (
-                    <Badge className="border-purple-500/30 bg-purple-500/20 text-[10px] text-purple-300">
+                  {realInterviewMode && scenarioDetails?.fuzzyStatement && (
+                    <Badge className="border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-200">
                       Real Interview Mode
                     </Badge>
                   )}
                 </h3>
                 <MarkdownRenderer
                   content={
-                    realInterviewMode && (selectedScenario as any).fuzzyStatement
-                      ? (selectedScenario as any).fuzzyStatement
+                    realInterviewMode && scenarioDetails?.fuzzyStatement
+                      ? scenarioDetails.fuzzyStatement
                       : selectedScenario.problemStatement
                   }
                   className="text-[15px] leading-relaxed text-gray-200"
@@ -160,63 +179,61 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
               </div>
 
               {isBugfix && (
-                <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3">
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-blue-300 uppercase">
-                    <span className="h-4 w-1 rounded-full bg-blue-300"></span>
+                <div
+                  className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-3"
+                  data-bugfix-tour="incident-report"
+                >
+                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-amber-200 uppercase">
+                    <span className="h-4 w-1 rounded-full bg-amber-300"></span>
+                    <ClipboardList className="h-4 w-4" aria-hidden="true" />
                     Incident Report
                   </h3>
                   <div className="space-y-2 text-sm leading-relaxed text-gray-300">
-                    {(selectedScenario as any).userReport && (
-                      <p className="text-gray-200">{(selectedScenario as any).userReport}</p>
+                    {scenarioDetails?.userReport && (
+                      <p className="text-gray-200">{scenarioDetails.userReport}</p>
                     )}
-                    {(selectedScenario as any).expectedBehavior && (
+                    {scenarioDetails?.expectedBehavior && (
                       <p>
                         <span className="font-medium text-gray-100">Expected:</span>{" "}
-                        {(selectedScenario as any).expectedBehavior}
+                        {scenarioDetails.expectedBehavior}
                       </p>
                     )}
-                    {(selectedScenario as any).reproductionSteps?.length > 0 && (
+                    {reproductionSteps.length > 0 && (
                       <div>
-                        <p className="mb-1 text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-amber-200 uppercase">
                           Repro Steps
                         </p>
                         <ol className="list-decimal space-y-1.5 pl-4 text-xs text-gray-400">
-                          {(selectedScenario as any).reproductionSteps.map(
-                            (step: string, index: number) => (
-                              <li key={`${step}-${index}`}>{step}</li>
-                            )
-                          )}
+                          {reproductionSteps.map((step: string, index: number) => (
+                            <li key={`${step}-${index}`}>{step}</li>
+                          ))}
                         </ol>
                       </div>
                     )}
-                    {(selectedScenario as any).visibleLogs?.length > 0 && (
+                    {visibleLogs.length > 0 && (
                       <div>
-                        <p className="mb-1 text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-amber-200 uppercase">
                           Visible Logs
                         </p>
                         <div className="space-y-1 rounded border border-gray-700/60 bg-gray-950/50 p-2 font-mono text-[11px] text-gray-300">
-                          {(selectedScenario as any).visibleLogs.map(
-                            (log: string, index: number) => (
-                              <p key={`${log}-${index}`}>{log}</p>
-                            )
-                          )}
+                          {visibleLogs.map((log: string, index: number) => (
+                            <p key={`${log}-${index}`}>{log}</p>
+                          ))}
                         </div>
                       </div>
                     )}
-                    {(selectedScenario as any).successCriteria?.length > 0 && (
+                    {successCriteria.length > 0 && (
                       <div>
-                        <p className="mb-1 text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-emerald-200 uppercase">
                           Success Criteria
                         </p>
                         <ul className="space-y-1 pl-1 text-xs text-gray-400">
-                          {(selectedScenario as any).successCriteria.map(
-                            (criterion: string, index: number) => (
-                              <li key={`${criterion}-${index}`} className="flex gap-2">
-                                <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-blue-300" />
-                                <span>{criterion}</span>
-                              </li>
-                            )
-                          )}
+                          {successCriteria.map((criterion: string, index: number) => (
+                            <li key={`${criterion}-${index}`} className="flex gap-2">
+                              <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-emerald-300" />
+                              <span>{criterion}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     )}
@@ -225,51 +242,105 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
               )}
 
               {isBugfix && isInterviewStarted && bugfixReflection && (
-                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wide text-emerald-300 uppercase">
-                    <span className="h-4 w-1 rounded-full bg-emerald-300"></span>
-                    Debugging Notes
+                <div className="rounded-lg border border-gray-700/70 bg-gray-950/35 p-3">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wide text-cyan-200 uppercase">
+                    <span className="h-4 w-1 rounded-full bg-cyan-300"></span>
+                    Investigation Notes
                   </h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-300">
-                        Hypothesis
-                      </label>
+                      <div
+                        className="mb-1 flex items-center justify-between gap-2"
+                        data-bugfix-tour="hypothesis"
+                      >
+                        <label
+                          htmlFor="bugfix-hypothesis"
+                          className="block text-xs font-semibold tracking-wide text-amber-200 uppercase"
+                        >
+                          Hypothesis
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!bugfixReflection.hypothesis.trim()}
+                          onClick={() => onBugfixReflectionCommit?.("hypothesis")}
+                          className="h-8 border-amber-400/30 px-2 text-xs text-amber-100 hover:bg-amber-500/10"
+                        >
+                          <Save className="mr-1 h-3 w-3" />
+                          Save hypothesis
+                        </Button>
+                      </div>
                       <Textarea
+                        id="bugfix-hypothesis"
                         value={bugfixReflection.hypothesis}
                         onChange={(event) =>
                           onBugfixReflectionChange?.("hypothesis", event.target.value)
                         }
                         onBlur={() => onBugfixReflectionCommit?.("hypothesis")}
-                        className="min-h-[64px] border-gray-700 bg-gray-950/60 text-xs text-gray-100"
+                        className="min-h-[72px] border-gray-700 bg-gray-950/60 text-sm text-gray-100"
                         placeholder="What do you think is causing the incident?"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-300">
-                        Root Cause
-                      </label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label
+                          htmlFor="bugfix-root-cause"
+                          className="block text-xs font-semibold tracking-wide text-cyan-200 uppercase"
+                        >
+                          Root Cause
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!bugfixReflection.rootCause.trim()}
+                          onClick={() => onBugfixReflectionCommit?.("rootCause")}
+                          className="h-8 border-cyan-400/30 px-2 text-xs text-cyan-100 hover:bg-cyan-500/10"
+                        >
+                          <Save className="mr-1 h-3 w-3" />
+                          Save root cause
+                        </Button>
+                      </div>
                       <Textarea
+                        id="bugfix-root-cause"
                         value={bugfixReflection.rootCause}
                         onChange={(event) =>
                           onBugfixReflectionChange?.("rootCause", event.target.value)
                         }
                         onBlur={() => onBugfixReflectionCommit?.("rootCause")}
-                        className="min-h-[64px] border-gray-700 bg-gray-950/60 text-xs text-gray-100"
+                        className="min-h-[72px] border-gray-700 bg-gray-950/60 text-sm text-gray-100"
                         placeholder="What failed, and why?"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-300">
-                        Prevention
-                      </label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label
+                          htmlFor="bugfix-prevention"
+                          className="block text-xs font-semibold tracking-wide text-emerald-200 uppercase"
+                        >
+                          Prevention
+                        </label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!bugfixReflection.prevention.trim()}
+                          onClick={() => onBugfixReflectionCommit?.("prevention")}
+                          className="h-8 border-emerald-400/30 px-2 text-xs text-emerald-100 hover:bg-emerald-500/10"
+                        >
+                          <Save className="mr-1 h-3 w-3" />
+                          Save prevention
+                        </Button>
+                      </div>
                       <Textarea
+                        id="bugfix-prevention"
                         value={bugfixReflection.prevention}
                         onChange={(event) =>
                           onBugfixReflectionChange?.("prevention", event.target.value)
                         }
                         onBlur={() => onBugfixReflectionCommit?.("prevention")}
-                        className="min-h-[64px] border-gray-700 bg-gray-950/60 text-xs text-gray-100"
+                        className="min-h-[72px] border-gray-700 bg-gray-950/60 text-sm text-gray-100"
                         placeholder="What test, guardrail, or monitoring would catch this next time?"
                       />
                     </div>
@@ -277,15 +348,15 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 </div>
               )}
 
-              {/* AI Insights - Shown independently, right after description */}
+              {/* Debugging signals - shown independently, right after description */}
               {/* Only show hints when user has written meaningful code beyond starter code */}
               {/* Use hintFetchStatus to prevent flickering - section stays visible after first fetch attempt */}
               {isInterviewStarted && hintFetchStatus !== "idle" && (
                 <div className="space-y-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
-                    <span className="h-4 w-1 rounded-full bg-purple-400"></span>
-                    <Sparkles className="h-4 w-4" />
-                    AI Insights
+                  <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-amber-200 uppercase">
+                    <span className="h-4 w-1 rounded-full bg-amber-300"></span>
+                    <Lightbulb className="h-4 w-4" aria-hidden="true" />
+                    {isBugfix ? "Debugging Signals" : "Interview Signals"}
                     {ragHints.length > 0 && (
                       <span className="text-xs font-normal text-gray-500">
                         ({revealedAIHintIndices.size}/{ragHints.length} revealed)
@@ -293,21 +364,21 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                     )}
                   </h3>
                   {hintFetchStatus === "loading" ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-gray-400">
-                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
-                      Generating personalized hints...
+                    <div className="flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3 text-sm text-gray-400">
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
+                      Reading your session signal...
                     </div>
                   ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
                     <div className="rounded-lg border border-gray-600/30 bg-gray-800/30 p-3">
                       <p className="text-sm text-gray-400">
-                        Hints will appear here as you code. Keep working on your solution!
+                        Signals will appear here as you code. Keep working from evidence first.
                       </p>
                       <button
                         onClick={fetchRAGHints}
-                        className="mt-2 flex items-center gap-1.5 text-xs text-purple-400 transition-colors hover:text-purple-300"
+                        className="mt-2 flex items-center gap-1.5 text-xs text-amber-300 transition-colors hover:text-amber-200"
                       >
-                        <Sparkles className="h-3 w-3" />
-                        Try generating hints
+                        <Lightbulb className="h-3 w-3" aria-hidden="true" />
+                        Request another signal
                       </button>
                     </div>
                   ) : (
@@ -324,15 +395,15 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                               key={`ai-hint-${i}`}
                               className={`rounded-lg border transition-all ${
                                 isRevealed
-                                  ? "border-purple-500/30 bg-purple-500/10"
-                                  : "cursor-pointer border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10"
+                                  ? "border-amber-400/30 bg-amber-500/10"
+                                  : "cursor-pointer border-amber-400/20 bg-amber-500/5 hover:bg-amber-500/10"
                               }`}
                             >
                               {isRevealed ? (
                                 <div className="p-3">
                                   <div className="flex items-start justify-between gap-2">
-                                    <p className="flex-1 text-sm leading-relaxed text-purple-100">
-                                      <span className="font-medium text-purple-300">
+                                    <p className="flex-1 text-sm leading-relaxed text-amber-50">
+                                      <span className="font-medium text-amber-200">
                                         Level {hint.level}:
                                       </span>{" "}
                                       {hint.hint}
@@ -365,8 +436,9 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                   </div>
                                 </div>
                               ) : (
-                                <div
-                                  className="relative p-3"
+                                <button
+                                  type="button"
+                                  className="relative w-full p-3 text-left focus:ring-2 focus:ring-amber-300 focus:outline-none"
                                   onClick={() => {
                                     if (hint.id) {
                                       hintAgent.revealHint(hint.id)
@@ -374,17 +446,17 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                     setRevealedAIHintIndices((prev) => new Set([...prev, i]))
                                   }}
                                 >
-                                  <p className="pointer-events-none text-sm leading-relaxed text-purple-200/20 blur-sm select-none">
+                                  <p className="pointer-events-none text-sm leading-relaxed text-amber-200/20 blur-sm select-none">
                                     <span className="font-medium">Level {hint.level}:</span>{" "}
                                     {hint.hint.substring(0, 60)}...
                                   </p>
                                   <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs font-medium text-purple-300">
+                                    <div className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-200">
                                       <Eye className="h-3.5 w-3.5" />
-                                      Click to reveal hint {i + 1}
+                                      Reveal signal {i + 1}
                                     </div>
                                   </div>
-                                </div>
+                                </button>
                               )}
                             </div>
                           )
@@ -453,7 +525,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 )}
 
               {/* Optimal Approach - Collapsible (DSA only) */}
-              {selectedScenario.type === "dsa" && (selectedScenario as any).optimalComplexity && (
+              {selectedScenario.type === "dsa" && scenarioDetails?.optimalComplexity && (
                 <div className="rounded-md border border-gray-600/60 bg-gray-800/40">
                   <button
                     onClick={() => setShowOptimalApproach(!showOptimalApproach)}
@@ -476,13 +548,13 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                         <span className="flex items-center gap-1.5 text-gray-400">
                           <Clock className="h-3.5 w-3.5 text-gray-500" />
                           <code className="text-accent font-mono">
-                            {(selectedScenario as any).optimalComplexity.time}
+                            {scenarioDetails.optimalComplexity.time}
                           </code>
                         </span>
                         <span className="flex items-center gap-1.5 text-gray-400">
                           <HardDrive className="h-3.5 w-3.5 text-gray-500" />
                           <code className="text-accent font-mono">
-                            {(selectedScenario as any).optimalComplexity.space}
+                            {scenarioDetails.optimalComplexity.space}
                           </code>
                         </span>
                       </div>
@@ -496,8 +568,8 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
 
               {/* Legacy static hints are kept hidden during interviews so generated insights are the single hint surface. */}
               {!isInterviewStarted &&
-                (selectedScenario as any).hints &&
-                (selectedScenario as any).hints.length > 0 && (
+                scenarioDetails?.hints &&
+                scenarioDetails.hints.length > 0 && (
                   <div className="mt-3 border-t border-gray-700 pt-3">
                     <div className="mb-2 flex items-center justify-between">
                       <h3 className="flex items-center space-x-1 text-xs font-semibold text-white">
@@ -506,7 +578,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                           Hints ({revealedHintIndices.size}/{revealedHints} unlocked)
                         </span>
                       </h3>
-                      {revealedHints < (selectedScenario as any).hints.length && (
+                      {revealedHints < scenarioDetails.hints.length && (
                         <span className="text-xs text-gray-400">
                           Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
                         </span>
@@ -514,14 +586,15 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                     </div>
                     {revealedHints > 0 ? (
                       <div className="space-y-2">
-                        {(selectedScenario as any).hints
+                        {scenarioDetails.hints
                           .slice(0, revealedHints)
                           .map((hint: string, i: number) => {
                             const isHintRevealed = revealedHintIndices.has(i)
                             return (
-                              <div
+                              <button
+                                type="button"
                                 key={i}
-                                className={`cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 transition-all ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
+                                className={`w-full cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 text-left transition-all focus:ring-2 focus:ring-yellow-400 focus:outline-none ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
                                 onClick={() => {
                                   if (!isHintRevealed) {
                                     setRevealedHintIndices((prev) => new Set([...prev, i]))
@@ -546,7 +619,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                     </div>
                                   </div>
                                 )}
-                              </div>
+                              </button>
                             )
                           })}
                       </div>
@@ -566,8 +639,8 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="font-semibold text-white">Codebase Files</h3>
                 {selectedScenario.type === "bugfix" && (
-                  <Badge className="border-blue-500/30 bg-blue-500/10 text-[10px] text-blue-300">
-                    review first
+                  <Badge className="border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-200">
+                    inspect in editor
                   </Badge>
                 )}
               </div>
@@ -605,7 +678,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                   <Button
                     onClick={() => fileInputRef.current?.click()}
                     variant="outline"
-                    className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
+                    className="h-8 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
                   >
                     <Code className="mr-1 h-3 w-3" />
                     Upload Files

@@ -548,6 +548,7 @@ export function RateLimitBanner({
                       placeholder="What happened? (optional)"
                       className="border-input bg-background/80 focus:ring-ring w-full resize-none rounded border p-2 text-xs focus:ring-1 focus:outline-none"
                       rows={2}
+                      // eslint-disable-next-line jsx-a11y/no-autofocus
                       autoFocus
                     />
                     <div className="mt-2 flex items-center justify-between">

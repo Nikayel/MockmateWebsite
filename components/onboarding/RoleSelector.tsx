@@ -55,13 +55,15 @@ export function RoleSelector({
       className="p-8"
     >
       <div className="mb-6">
-        <p className="text-sm text-[#00d9ff] font-medium mb-1">Step 1 of 4</p>
-        <h2 className="text-xl font-bold text-white">What's your experience level?</h2>
-        <p className="text-sm text-gray-400 mt-1">This helps us calibrate problem difficulty.</p>
+        <p className="mb-1 text-sm font-medium text-cyan-300">Step 1 of 4</p>
+        <h2 className="text-xl font-bold text-white">Calibrate the interview room</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          This sets the difficulty and follow-up pressure.
+        </p>
       </div>
 
       <div
-        className="grid grid-cols-2 gap-3 mb-6"
+        className="mb-6 grid grid-cols-2 gap-3"
         role="radiogroup"
         aria-label="Experience level selection"
       >
@@ -75,14 +77,14 @@ export function RoleSelector({
               role="radio"
               aria-checked={isSelected}
               aria-label={`${role.label}: ${role.description}`}
-              className={`p-4 rounded-xl border text-left transition-all ${
+              className={`rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                 isSelected
-                  ? "border-[#00d9ff] bg-[#00d9ff]/10"
-                  : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
+                  ? "border-cyan-300 bg-cyan-300/10"
+                  : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
               }`}
             >
               <Icon
-                className={`h-5 w-5 mb-2 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`}
+                className={`mb-2 h-5 w-5 ${isSelected ? "text-cyan-300" : "text-gray-400"}`}
                 aria-hidden="true"
               />
               <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
@@ -94,14 +96,15 @@ export function RoleSelector({
         })}
       </div>
 
-      <div className="flex justify-between">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
         <Button variant="ghost" onClick={onBack} className="text-gray-400">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
+        <span className="text-sm text-gray-500">Experience</span>
         <Button
           onClick={onNext}
           disabled={!canProceed}
-          className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black disabled:opacity-50"
+          className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200 disabled:opacity-50"
         >
           Continue <ArrowRight className="ml-1 h-4 w-4" />
         </Button>

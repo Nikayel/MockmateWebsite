@@ -11,7 +11,14 @@ import {
   Workflow,
   ChevronRight,
   CheckCircle2,
+  Brain,
+  Code2,
+  Target,
+  TrendingUp,
+  MessageSquare,
+  Trophy,
 } from "lucide-react"
+import RadialOrbitalTimeline from "@/components/ui/radial-orbital-timeline"
 
 const interviewTypes = [
   {
@@ -90,6 +97,77 @@ const interviewTypes = [
   },
 ]
 
+const practiceJourneyData = [
+  {
+    id: 1,
+    title: "Learn Patterns",
+    date: "Week 1",
+    content: "Build intuition for the 15 core algorithmic patterns used in every FAANG interview.",
+    category: "Foundation",
+    icon: Brain,
+    relatedIds: [2, 3],
+    status: "completed" as const,
+    energy: 95,
+  },
+  {
+    id: 2,
+    title: "Code Live",
+    date: "Week 2",
+    content:
+      "Write real solutions under time pressure with an AI interviewer watching your approach.",
+    category: "Practice",
+    icon: Code2,
+    relatedIds: [1, 3],
+    status: "completed" as const,
+    energy: 80,
+  },
+  {
+    id: 3,
+    title: "Get Feedback",
+    date: "Week 2",
+    content: "Receive detailed rubric-based scoring on communication, correctness, and efficiency.",
+    category: "Feedback",
+    icon: MessageSquare,
+    relatedIds: [2, 4],
+    status: "in-progress" as const,
+    energy: 70,
+  },
+  {
+    id: 4,
+    title: "Track Gaps",
+    date: "Week 3",
+    content:
+      "Spaced repetition surfaces your weakest patterns so you review exactly what you need.",
+    category: "Analytics",
+    icon: TrendingUp,
+    relatedIds: [3, 5],
+    status: "in-progress" as const,
+    energy: 55,
+  },
+  {
+    id: 5,
+    title: "Mock Rounds",
+    date: "Week 4",
+    content: "Run full 60-minute FAANG-style loops across DSA, System Design, and Bug Fix rounds.",
+    category: "Simulation",
+    icon: Target,
+    relatedIds: [4, 6],
+    status: "pending" as const,
+    energy: 40,
+  },
+  {
+    id: 6,
+    title: "Ship the Offer",
+    date: "Week 5+",
+    content: "Walk into your real interview having already lived it. Confidence compounds.",
+    category: "Goal",
+    icon: Trophy,
+    relatedIds: [5, 1],
+    status: "pending" as const,
+    energy: 20,
+  },
+]
+
 export function FeaturesSection() {
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -99,7 +177,7 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative flex items-center overflow-hidden bg-[#09090b] px-4 py-16 font-[var(--font-geist)] sm:px-6 lg:px-12 lg:py-20 xl:px-16"
+      className="relative flex items-center overflow-hidden bg-[#09090b] px-4 py-12 font-[var(--font-geist)] sm:px-6 sm:py-16 lg:px-12 lg:py-20 xl:px-16"
     >
       {/* Dynamic Background Noise / Grid */}
       <div
@@ -114,24 +192,34 @@ export function FeaturesSection() {
       <div className="relative z-10 mx-auto w-full max-w-5xl">
         {/* Header */}
         <motion.div
-          className="mb-12 text-center sm:mb-16 lg:mb-20"
+          className="mb-10 text-center sm:mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <div className="mb-6 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 shadow-sm backdrop-blur-md">
+          <div className="mb-4 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 shadow-sm backdrop-blur-md">
             <span className="text-xs font-semibold tracking-wider text-zinc-300 uppercase">
-              The Arsenal
+              The practice system
             </span>
           </div>
           <h2 className="font-heading text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.04em] text-white">
-            Master every format
+            Every format. One feedback loop.
           </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-[clamp(1rem,1.5vw,1.125rem)] leading-relaxed font-medium text-zinc-400">
-            From raw algorithm optimization to navigating massive legacy codebases in the bug fix
-            round.
+          <p className="mx-auto mt-4 max-w-xl text-[clamp(0.9rem,1.4vw,1.05rem)] leading-relaxed font-medium text-zinc-400">
+            From raw algorithm optimization to full FAANG loops — click any node to explore the
+            journey, then drill into each format below.
           </p>
+        </motion.div>
+
+        {/* Orbital Journey */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        >
+          <RadialOrbitalTimeline timelineData={practiceJourneyData} />
         </motion.div>
 
         {/* Interactive Showcase Split Layout */}
