@@ -72,10 +72,10 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
                 {scenario.examples.slice(0, 2).map((ex, idx) => (
                   <div key={idx} className="rounded-lg bg-gray-800/50 p-3 font-mono text-xs">
                     <div className="text-gray-400">
-                      Input: <span className="text-blue-300">{ex.input}</span>
+                      Input: <span className="text-gray-200">{ex.input}</span>
                     </div>
                     <div className="text-gray-400">
-                      Output: <span className="text-green-300">{ex.output}</span>
+                      Output: <span className="text-gray-200">{ex.output}</span>
                     </div>
                   </div>
                 ))}

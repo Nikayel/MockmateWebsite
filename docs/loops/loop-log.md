@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C: off-palette example colors in FocusProblemPeek.tsx (new component)
+
+- changed: Rotated to a different workspace component now that ProblemColumn is clean. FocusProblemPeek (the focus-mode problem peek) rendered DSA example values in off-palette `text-blue-300` (Input) and `text-green-300` (Output); demoted both to `text-gray-200` — the same fix already shipped for ProblemColumn's examples (round 3), so the two components now render examples identically and on-palette. The "Input:"/"Output:" labels (gray-400) still carry the meaning and stay distinct from the gray-200 values. Color only — no behaviour/copy change. Left the difficulty badge (L49–51, green/yellow) untouched: same cross-cutting pattern across 10+ files.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on FocusProblemPeek.tsx · `pnpm build` → PASS
+- a11y: gray-200 mono values on the `bg-gray-800/50` card are high contrast (exceeds AA) and stay distinct from the gray-400 labels. No focus/keyboard change.
+- needs_human_review: false (color-only token swap matching an existing in-repo fix)
+- workspace off-palette scan (this iteration): remaining off-palette hits live in EditorColumn.tsx (3), PostInterviewView.tsx (1), ChatColumn.tsx (1) — candidates for future Target C rotations; plus the cross-cutting difficulty badge in FocusProblemPeek/InterviewTopBar/ProblemColumn and non-workspace files.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C (round 5): map off-palette yellow to amber (ProblemColumn.tsx)
 
 - changed: Removed the last off-palette hue (yellow) from ProblemColumn, completing the off-palette cleanup (prior rounds did blue→gray and green→gray). Two surfaces, both mapped to amber — the workspace's functional signal/warning role: (1) the legacy static-hints block (Lightbulb icon, hint card border/bg/focus-ring/hover, revealed + blurred hint text, and the "Click to reveal" chip) now uses the same amber treatment as the active Debugging Signals surface, unifying both hint surfaces on one color; (2) the add-functionality "prepared codebase workspace" warning moved from yellow to amber — a warning should use the palette's warning color (Target C "move a misused color to its correct functional role"). Shade mapping matched Debugging Signals: amber-400 borders, amber-500 fills, amber-200/300 text, ring-amber-300. Color only — no behaviour/copy change.
