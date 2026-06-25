@@ -3,16 +3,19 @@
 /**
  * ReviewStation (§7.5) — close the loop.
  *
- * A read-only recap of the prior milestones, a self-grade rubric, and (once
- * generated) the AI's structured feedback. Completing the lab marks the run
- * `completed` via the store. Generating feedback through the existing pipeline
- * and updating mastery is wired in the next increment.
+ * A read-only recap of the prior milestones, a self-grade rubric, and the AI's
+ * structured feedback. "Complete lab" saves the run, generates feedback through
+ * the existing pipeline (`/api/labs/feedback`), and marks the run completed;
+ * if generation fails it still completes the run locally.
  */
 
+import { useState } from "react"
+import { Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
+import { requestCaseLabFeedback, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
 import type { CaseLabRubricDimension } from "@/lib/labs/types"
 
 const RUBRIC: { key: CaseLabRubricDimension; label: string }[] = [
@@ -37,7 +40,33 @@ function RecapRow({ label, value }: { label: string; value: string }) {
 export function ReviewStation() {
   const run = useCaseLabStore((s) => s.activeRun)
   const setReview = useCaseLabStore((s) => s.setReview)
+  const setActiveRun = useCaseLabStore((s) => s.setActiveRun)
   const completeRun = useCaseLabStore((s) => s.completeRun)
+
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  const handleComplete = async () => {
+    if (!run) return
+    setGenerating(true)
+    setGenError(null)
+    try {
+      // Persist the latest answers (and obtain a server id) before generating.
+      const saved = await saveCaseLabRun(run)
+      const updated = await requestCaseLabFeedback(saved?.id ?? run.id)
+      if (updated) {
+        setActiveRun(updated)
+      } else {
+        completeRun()
+        setGenError("Couldn't generate feedback — marked the lab complete.")
+      }
+    } catch {
+      completeRun()
+      setGenError("Couldn't generate feedback — marked the lab complete.")
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   const answers = run?.answers
   const review = answers?.review
@@ -155,13 +184,22 @@ export function ReviewStation() {
         </div>
       ) : (
         <p className="text-muted-foreground text-xs">
-          Finish the lab to generate interviewer feedback.
+          {generating
+            ? "Generating interviewer feedback…"
+            : "Finish the lab to generate interviewer feedback."}
+        </p>
+      )}
+
+      {genError && (
+        <p className="text-destructive text-xs" role="alert">
+          {genError}
         </p>
       )}
 
       {!isCompleted && (
-        <Button type="button" onClick={completeRun} className="self-start">
-          Complete lab
+        <Button type="button" onClick={handleComplete} disabled={generating} className="self-start">
+          {generating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+          {generating ? "Completing…" : "Complete lab"}
         </Button>
       )}
     </section>

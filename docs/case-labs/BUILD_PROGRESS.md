@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 3
-**Last updated by loop:** Phase 3 — case-lab feedback pipeline (service + endpoint)
+**Last updated by loop:** Phase 3 — ReviewStation generates real feedback on complete
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Phase 3 — Build & Review (spec §7.4–7.5)
 - [x] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor)
-- [~] `ReviewStation` → existing feedback pipeline → render `structured_feedback` (UI done: recap, self-grade rubric, structured_feedback render; pipeline call to generate feedback next)
-- [~] On complete: update mastery + mark Run `completed` (marks Run completed via `completeRun` + autosave; mastery update with feedback generation next)
+- [x] `ReviewStation` → existing feedback pipeline → render `structured_feedback`
+- [~] On complete: update mastery + mark Run `completed` (Run marked `completed` + feedback generated/persisted; mastery/roadmap update still pending)
 
 ## Phase 4 — Port Palantir 911 Dispatch (spec §1, §7.4; ingredient: ../workbook-palantir-decomp/labs/lab_01_911_dispatch)
 - [ ] Map Clarify/Decompose/Design/Review content into the `CaseLab` definition
@@ -75,3 +75,4 @@
 - Phase 3 (Build complete): wired "Run tests" in BuildStation → POST `/api/execute` with `{scenarioId, language, workspaceFiles:[{path,content}]}` (editable files only), maps the response `results` to `BuildTestResult[]`, persists via `setBuild`, and renders a pass/fail panel with `n/m passing` + per-test check/X + error messages. Attaches the auth token when present; loading + error states handled. typecheck + lint clean; graph updated.
 - Phase 3 (Review UI): `components/labs/stations/ReviewStation.tsx` — read-only recap of all milestones (clarify/decompose/design/build with test pass count), 1–5 self-grade rubric across the 5 `CaseLabRubricDimension`s persisting via `setReview`, renders `structured_feedback` (tldr/whatWorked/fixNext/actionPlan) when present, and a "Complete lab" button → `completeRun`. Now all 5 stations are real, so `StationSwitcher` dropped the stub (exhaustive switch). Fixed BuildStation's stale doc-comment. typecheck + lint clean; graph updated.
 - Phase 3 (feedback pipeline, server): `lib/labs/case-lab-feedback.ts` — pure `buildCaseLabFeedbackPrompt` (summarizes every milestone) + `parseCaseLabFeedback` (tolerant JSON extraction → `structured_feedback` shape, raw fallback) + `generateCaseLabFeedback` (routes through `generateFeedbackResponse` so rate-limit/cache/cost-tracking apply). `app/api/labs/feedback/route.ts` (POST {runId}: auth, load, generate, persist aiFeedback + mark completed). Added `case-lab-feedback.test.ts` (6 tests, pass). ReviewStation will call this on "Complete"; mastery update still pending. typecheck + lint + tests clean; graph updated.
+- Phase 3 (feedback wiring, client): ReviewStation "Complete lab" → `saveCaseLabRun` (persist latest + get id) then `requestCaseLabFeedback` (new `lib/labs/case-lab-runs-client.ts` helper) → `setActiveRun` with the completed run (renders generated feedback). Loading ("Completing…/Generating…") + graceful fallback (`completeRun` locally + soft error) when generation/auth fails. `structured_feedback` → `render` item DONE. typecheck + lint clean; graph updated.

@@ -51,3 +51,20 @@ export async function saveCaseLabRun(run: CaseLabRun): Promise<CaseLabRun | null
   const data = (await res.json()) as { run: CaseLabRun }
   return data.run ?? null
 }
+
+/**
+ * Generate interviewer feedback for a run and mark it completed. Returns the
+ * updated run (with `answers.review.aiFeedback`), or null on failure.
+ */
+export async function requestCaseLabFeedback(runId: string): Promise<CaseLabRun | null> {
+  const headers = await authHeaders()
+  if (!headers) return null
+  const res = await fetch("/api/labs/feedback", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ runId }),
+  })
+  if (!res.ok) return null
+  const data = (await res.json()) as { run: CaseLabRun }
+  return data.run ?? null
+}
