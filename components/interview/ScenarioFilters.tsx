@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState } from "react"
+import { memo, useState, useRef, useEffect } from "react"
 import {
   Cpu,
   Bug,
@@ -152,6 +152,15 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 }: ScenarioFiltersProps) {
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
   const [companyQuery, setCompanyQuery] = useState("")
+  const companyTriggerRef = useRef<HTMLButtonElement>(null)
+  const companyMenuRef = useRef<HTMLDivElement>(null)
+  const companySearchRef = useRef<HTMLInputElement>(null)
+
+  // Focus the search box when the company menu opens (keyboard users); avoids the
+  // autoFocus prop, which jsx-a11y disallows.
+  useEffect(() => {
+    if (showCompanyDropdown) companySearchRef.current?.focus()
+  }, [showCompanyDropdown])
 
   const visibleTypes = availableTypes
     ? EXERCISE_TYPES.filter((t) => availableTypes.includes(t.id as ScenarioType))
@@ -160,6 +169,45 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   const visibleCompanies = companyQuery
     ? COMPANIES.filter((c) => c.toLowerCase().includes(companyQuery.toLowerCase()))
     : COMPANIES
+
+  const closeCompanyDropdown = (returnFocus = true) => {
+    setShowCompanyDropdown(false)
+    if (returnFocus) companyTriggerRef.current?.focus()
+  }
+
+  // Arrow / Home / End / Escape navigation within the open company menu. Focus
+  // starts in the search box (autoFocus); arrows move down into the list.
+  const handleCompanyMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      closeCompanyDropdown()
+      return
+    }
+    const items = Array.from(
+      companyMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]') ?? []
+    )
+    if (items.length === 0) return
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+    let nextIndex = currentIndex
+    switch (event.key) {
+      case "ArrowDown":
+        nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0
+        break
+      case "ArrowUp":
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1
+        break
+      case "Home":
+        nextIndex = 0
+        break
+      case "End":
+        nextIndex = items.length - 1
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+    items[nextIndex]?.focus()
+  }
 
   return (
     <div className="mb-6 space-y-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4 shadow-2xl backdrop-blur-2xl">
@@ -207,28 +255,47 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {/* Company Dropdown */}
           <div className="relative">
             <button
+              ref={companyTriggerRef}
               onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+              className={`focus-visible:ring-accent flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                 filterCompanies.length > 0
                   ? "border-transparent bg-white/10 text-white"
                   : "border-transparent bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
               } `}
+              aria-haspopup="menu"
+              aria-expanded={showCompanyDropdown}
+              aria-label={
+                filterCompanies.length > 0
+                  ? `Filter by company, ${filterCompanies.length} selected`
+                  : "Filter by company"
+              }
             >
-              <Building2 className="h-3.5 w-3.5" />
+              <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
               {filterCompanies.length > 0 ? `${filterCompanies.length} companies` : "Companies"}
               <ChevronDown
                 className={`h-3.5 w-3.5 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`}
+                aria-hidden="true"
               />
             </button>
 
             {showCompanyDropdown && (
               <>
-                {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
-                <div className="fixed inset-0 z-10" onClick={() => setShowCompanyDropdown(false)} />
-                <div className="absolute top-full right-0 z-20 mt-2 flex max-h-80 w-60 flex-col rounded-2xl border border-white/[0.06] bg-zinc-950/90 shadow-2xl backdrop-blur-xl">
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => closeCompanyDropdown(false)}
+                  aria-hidden="true"
+                />
+                <div
+                  ref={companyMenuRef}
+                  role="menu"
+                  tabIndex={-1}
+                  aria-label="Filter by company"
+                  onKeyDown={handleCompanyMenuKeyDown}
+                  className="absolute top-full right-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border border-white/[0.06] bg-zinc-950/90 shadow-2xl backdrop-blur-xl"
+                >
                   <div className="border-b border-white/[0.06] p-2">
                     <input
-                      autoFocus
+                      ref={companySearchRef}
                       value={companyQuery}
                       onChange={(e) => setCompanyQuery(e.target.value)}
                       placeholder="Search companies"
@@ -236,7 +303,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                       className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-white/15 focus:outline-none"
                     />
                   </div>
-                  <div className="overflow-y-auto py-1">
+                  <div className="max-h-64 overflow-y-auto py-1">
                     {visibleCompanies.length === 0 && (
                       <p className="px-3 py-2 text-sm text-zinc-600">No matches</p>
                     )}
@@ -245,8 +312,10 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                       return (
                         <button
                           key={company}
+                          role="menuitemcheckbox"
+                          aria-checked={isActive}
                           onClick={() => onToggleCompany(company as Company)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06] focus-visible:bg-white/[0.08] focus-visible:outline-none"
                         >
                           <span className={isActive ? "text-white" : "text-zinc-400"}>
                             {company}
@@ -255,7 +324,9 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                             <span className="text-xs text-zinc-600">
                               {COMPANY_COUNTS[company] ?? 0}
                             </span>
-                            {isActive && <Check className="h-3.5 w-3.5 text-zinc-200" />}
+                            {isActive && (
+                              <Check className="h-3.5 w-3.5 text-zinc-200" aria-hidden="true" />
+                            )}
                           </span>
                         </button>
                       )
@@ -263,10 +334,11 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   </div>
                   {filterCompanies.length > 0 && (
                     <>
-                      <div className="my-1 border-t border-white/10" />
+                      <div className="my-1 border-t border-white/10" role="separator" />
                       <button
+                        role="menuitem"
                         onClick={onClearCompanies}
-                        className="w-full px-3 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        className="w-full px-3 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.08] focus-visible:outline-none"
                       >
                         Clear selection
                       </button>
@@ -313,7 +385,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
       {/* Active Filters Summary */}
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-          <span className="text-xs text-zinc-600">Active:</span>
+          <span className="text-xs text-zinc-400">Active:</span>
           {filterType.map((t) => {
             const type = EXERCISE_TYPES.find((et) => et.id === t)
             if (!type) return null
@@ -325,8 +397,12 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               >
                 <Icon className="h-3 w-3" />
                 {type.label}
-                <button onClick={() => onRemoveType(t)} className="hover:opacity-70">
-                  <X className="h-3 w-3" />
+                <button
+                  onClick={() => onRemoveType(t)}
+                  aria-label={`Remove ${type.label} filter`}
+                  className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
             )
@@ -343,8 +419,12 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               }`}
             >
               {d}
-              <button onClick={() => onRemoveDifficulty(d)} className="hover:opacity-70">
-                <X className="h-3 w-3" />
+              <button
+                onClick={() => onRemoveDifficulty(d)}
+                aria-label={`Remove ${d} difficulty filter`}
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           ))}
@@ -354,16 +434,24 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300"
             >
               {c}
-              <button onClick={() => onRemoveCompany(c)} className="hover:opacity-70">
-                <X className="h-3 w-3" />
+              <button
+                onClick={() => onRemoveCompany(c)}
+                aria-label={`Remove ${c} filter`}
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           ))}
           {searchQuery && (
             <span className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300">
               "{searchQuery}"
-              <button onClick={() => onSearchChange("")} className="hover:opacity-70">
-                <X className="h-3 w-3" />
+              <button
+                onClick={() => onSearchChange("")}
+                aria-label="Clear search filter"
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           )}

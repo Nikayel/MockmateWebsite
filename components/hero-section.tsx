@@ -129,6 +129,13 @@ export function HeroSection() {
               See how it works
             </Link>
           </motion.div>
+
+          <motion.p
+            variants={staggerItem}
+            className="mt-5 text-[13px] font-medium text-[#c2c6d6]/70"
+          >
+            No credit card required · 200+ real scenarios · 15 DSA patterns
+          </motion.p>
         </motion.div>
 
         {/* Demo: a failing test + AI interviewer guiding the fix (matches the message) */}
