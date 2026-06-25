@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — cross-cutting: finish difficulty-color migration (remaining 7 files)
+
+- changed: Completed the repo-wide difficulty-color refactor by handling the 7 files the earlier inventory missed. Migrated the clean easy/medium/hard lookups to `difficultyColorClass`: ScenarioCard (dot variant; dropped now-unused DifficultyLevel import), ReviewCard + practice/SmartRecommendations (text variant), CompanyPrepContent + RoadmapModal inline maps (text variant). Fixed one-off shapes in place by mapping off-palette rose → red: ScenarioFilters filter chips (×3), RoadmapModal static "hard" label, interview-prep/[company] distribution ternary. Intentionally left NON-difficulty rose (CompanyPrepContent frequency/pace/style, ReviewCard urgency/score, practice/SmartRecommendations recommendation-type label) — those are separate semantic uses, not difficulty.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 NEW errors on the 7 files (pre-existing jsx-a11y errors in RoadmapModal L64/68 unrelated) · `pnpm build` → PASS
+- result: NO difficulty-context off-palette hues remain anywhere in the repo. The shared helper (`lib/ui/difficulty-colors.ts`) is now the single source of truth for every difficulty badge/dot/text across interview, prep, admin, dashboard, roadmap, and practice surfaces (metrics intentionally left — already on-palette).
+- needs_human_review: true (same as the prior entry — the consolidation shifts some shades/opacities; one screenshot pass across the listed surfaces confirms it).
+- commit: ee34993 (user-attributed). follow-up to the helper introduced in ebf64c5.
+
 ## 2026-06-25 — interview-workspace-ux-loop — cross-cutting: shared difficulty-colors helper (user-authorized refactor)
 
 - context: After the workspace was fully on-palette, the only remaining color gap was the difficulty badge (easy/medium/hard) duplicated inline across many files with three divergent, partly off-palette schemes (green/yellow/red, emerald/amber/rose, emerald/amber/red). The user authorized a dedicated repo-wide refactor (out of the normal one-component loop scope).
