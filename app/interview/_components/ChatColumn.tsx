@@ -81,7 +81,9 @@ export const ChatColumn = memo(function ChatColumn({
                 >
                   <div
                     className={`max-w-[90%] rounded-lg p-2 ${
-                      msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                      msg.type === "user"
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-gray-800 text-gray-100"
                     }`}
                   >
                     <div className="mb-1 flex items-center space-x-1">

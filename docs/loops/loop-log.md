@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C: ChatColumn user message bubble (off-palette blue → accent)
+
+- changed: The user's chat message bubble used off-palette `bg-blue-600 text-white`. Mapped it to the component's established filled-accent convention `bg-accent text-accent-foreground` (already used by the send button at L163 and the Brain/title accents), so the user's own messages now read in the product's cyan brand accent while the assistant bubble stays neutral `bg-gray-800 text-gray-100`. Reuses an existing design token (DRY) instead of a hardcoded blue. Color only — no behaviour/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on ChatColumn.tsx · `pnpm build` → PASS
+- a11y: `text-accent-foreground` is the theme's paired foreground token for accent surfaces (contrast handled by the design system, same as the existing send button); user-vs-assistant distinction is also conveyed by alignment (justify-end vs justify-start) and the User/Brain icon, so it is not color-only.
+- needs_human_review: false (on-palette token swap reusing an in-component pattern; layout unchanged)
+- remaining workspace off-palette: PostInterviewView.tsx L329 uses `bg-green-900/20 text-green-400` for a success state (palette success is emerald) — next Target C candidate. Plus the cross-cutting difficulty badge.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C: EditorColumn file-tab role colors (off-palette blue + yellow)
 
 - changed: EditorColumn color-codes file tabs by role. The roles already on-palette were left alone (test=emerald, readonly=amber, editable=cyan). Fixed the two off-palette ones: (1) the `docs` role used blue (icon `text-blue-300/400`, active border `border-b-blue-400`, badge `border-blue-400/25 bg-blue-400/10 text-blue-200`) → demoted to gray (`text-gray-200/400`, `border-b-gray-400`, `border-gray-500/30 bg-gray-500/10 text-gray-300`); docs are reference/"everything else" so gray is the correct role per the table, and stays clearly distinct from the colored functional roles. (2) the unsaved-edit indicator dot moved from `bg-yellow-300` to `bg-amber-300` — an "unsaved changes" attention signal maps to amber (the warning role). EditorColumn now has zero off-palette hues. Color only — no behaviour/copy change.
