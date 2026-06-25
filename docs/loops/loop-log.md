@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C (round 2): reserve amber for incident framing (ProblemColumn.tsx)
+
+- changed: Demoted the "Repro Steps" and "Visible Logs" sub-labels inside the Incident Report box from `text-amber-200` to `text-gray-400`. Amber is the workspace's single functional warning role; spreading it across neutral supporting sub-labels diluted it and flattened the hierarchy (every sub-label read as "warning"). Now amber is reserved for the incident framing itself (box tint + main "Incident Report" header), and the neutral sub-labels recede to gray per the palette table. "Success Criteria" keeps `text-emerald-200` (its correct success role). No new hue, no behaviour/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on ProblemColumn.tsx · `pnpm build` → PASS
+- a11y: gray-400 (#a1a1aa) uppercase label text on the light amber box over the dark theme meets AA for this secondary label; demotion does not reduce any primary-content contrast. No focus/keyboard change.
+- needs_human_review: false (token swap on two secondary labels; layout and hierarchy structure unchanged)
+- still-open for future Target C: DSA Examples Input/Output still use off-palette `text-green-400`/`text-blue-400`; Investigation Notes uses per-field amber/cyan/emerald labels (+ matching Save-button borders) — a candidate to collapse toward gray, but more debatable (may be intentional semantic coding) so deferred.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target A (round 2): Incident Report lead line (ProblemColumn.tsx)
 
 - changed: Gave the Incident Report internal hierarchy so it reads as a clear secondary focal point under the now-dominant Description. The `userReport` lead line was `text-gray-200` at inherited `text-sm` — tied in weight with the supporting "Expected/Repro" detail. Bumped it to `text-[15px] leading-relaxed text-gray-100`, one rung below the Description (text-base/gray-50) and clearly above the compressed supporting detail (text-xs/sm, gray-400). Establishes the size+contrast ladder: Description (16px/gray-50) → Incident lead (15px/gray-100) → supporting detail (12–14px/gray-400). No new hue (amber box treatment unchanged), no behaviour/copy change.

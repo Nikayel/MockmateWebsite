@@ -202,7 +202,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                     )}
                     {reproductionSteps.length > 0 && (
                       <div>
-                        <p className="mb-1 text-xs font-semibold tracking-wide text-amber-200 uppercase">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-gray-400 uppercase">
                           Repro Steps
                         </p>
                         <ol className="list-decimal space-y-1.5 pl-4 text-xs text-gray-400">
@@ -214,7 +214,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                     )}
                     {visibleLogs.length > 0 && (
                       <div>
-                        <p className="mb-1 text-xs font-semibold tracking-wide text-amber-200 uppercase">
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-gray-400 uppercase">
                           Visible Logs
                         </p>
                         <div className="space-y-1 rounded border border-gray-700/60 bg-gray-950/50 p-2 font-mono text-[11px] text-gray-300">
