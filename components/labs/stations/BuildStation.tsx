@@ -11,13 +11,19 @@
  */
 
 import { useMemo, useState } from "react"
-import { Lock } from "lucide-react"
+import { CheckCircle2, Loader2, Lock, Play, XCircle } from "lucide-react"
 import { getScenarioById } from "@/lib/scenarios"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { WorkspaceScenarioConfig, WorkspaceScenarioFile } from "@/lib/scenarios/types"
-import type { BuildAnswer } from "@/lib/labs/types"
+import type { BuildAnswer, BuildTestResult } from "@/lib/labs/types"
+
+interface ExecuteResponse {
+  results?: { description: string; passed: boolean; error?: string | null }[]
+}
 
 const baseName = (path: string) => path.split("/").pop() ?? path
 
@@ -29,7 +35,13 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
-function Workspace({ workspace }: { workspace: WorkspaceScenarioConfig }) {
+function Workspace({
+  workspace,
+  scenarioId,
+}: {
+  workspace: WorkspaceScenarioConfig
+  scenarioId: string
+}) {
   const run = useCaseLabStore((s) => s.activeRun)
   const setBuild = useCaseLabStore((s) => s.setBuild)
 
@@ -50,8 +62,11 @@ function Workspace({ workspace }: { workspace: WorkspaceScenarioConfig }) {
   const [activePath, setActivePath] = useState<string>(
     workspace.primaryFilePath || files[0]?.path || ""
   )
+  const [testResults, setTestResults] = useState<BuildTestResult[]>(savedBuild?.testResults ?? [])
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
 
-  const persist = (next: Record<string, string>, testResults: BuildAnswer["testResults"]) => {
+  const persist = (next: Record<string, string>, results: BuildAnswer["testResults"]) => {
     const touchedFiles = files
       .filter((f) => isEditable(f) && next[f.path] !== originalContent[f.path])
       .map((f) => f.path)
@@ -59,16 +74,56 @@ function Workspace({ workspace }: { workspace: WorkspaceScenarioConfig }) {
       touchedFiles,
       code: next[workspace.primaryFilePath] ?? "",
       language: workspace.language,
-      testResults,
+      testResults: results,
     })
   }
 
   const handleChange = (path: string, value: string) => {
     const next = { ...edited, [path]: value }
     setEdited(next)
-    persist(next, savedBuild?.testResults ?? [])
+    persist(next, testResults)
   }
 
+  const runTests = async () => {
+    setRunning(true)
+    setRunError(null)
+    try {
+      const token = await getCurrentUserToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
+      const workspaceFiles = files
+        .filter((f) => isEditable(f))
+        .map((f) => ({ path: f.path, content: edited[f.path] ?? f.content }))
+
+      const res = await fetch("/api/execute", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          scenarioId,
+          language: workspace.language,
+          workspaceFiles,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as ExecuteResponse & {
+        error?: string
+      }
+      if (!res.ok) throw new Error(data.error || "Run failed")
+
+      const results: BuildTestResult[] = (data.results ?? []).map((r) => ({
+        name: r.description,
+        passed: r.passed,
+        ...(r.error ? { message: r.error } : {}),
+      }))
+      setTestResults(results)
+      persist(edited, results)
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : "Run failed")
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const passedCount = testResults.filter((r) => r.passed).length
   const activeFile = files.find((f) => f.path === activePath)
 
   return (
@@ -122,6 +177,57 @@ function Workspace({ workspace }: { workspace: WorkspaceScenarioConfig }) {
           Read-only reference file — edit the editable files to solve the task.
         </p>
       )}
+
+      {/* Run tests + results */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <Button type="button" size="sm" onClick={runTests} disabled={running}>
+            {running ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Play className="h-4 w-4" aria-hidden />
+            )}
+            {running ? "Running…" : "Run tests"}
+          </Button>
+          {testResults.length > 0 && (
+            <span className="text-muted-foreground text-xs">
+              {passedCount}/{testResults.length} passing
+            </span>
+          )}
+        </div>
+
+        {runError && (
+          <p className="text-destructive text-xs" role="alert">
+            {runError}
+          </p>
+        )}
+
+        {testResults.length > 0 && (
+          <ul className="flex flex-col gap-1">
+            {testResults.map((result, i) => (
+              <li
+                key={i}
+                className="border-border flex items-start gap-2 rounded-md border px-2 py-1.5 text-xs"
+              >
+                {result.passed ? (
+                  <CheckCircle2
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500"
+                    aria-hidden
+                  />
+                ) : (
+                  <XCircle className="text-destructive mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                )}
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-foreground">{result.name}</span>
+                  {result.message && (
+                    <span className="text-muted-foreground">{result.message}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -152,7 +258,7 @@ export function BuildStation() {
         ) : !scenario.workspace ? (
           <EmptyState message="This lab's build isn't a multi-file workspace." />
         ) : (
-          <Workspace workspace={scenario.workspace} />
+          <Workspace workspace={scenario.workspace} scenarioId={lab.buildScenarioId} />
         )}
       </div>
     </section>
