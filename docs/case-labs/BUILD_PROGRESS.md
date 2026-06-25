@@ -5,8 +5,8 @@
 > Spec detail lives in `CASE_LABS.md` (§ references below). Keep notes terse.
 
 **Status:** in progress
-**Current phase:** Phase 3
-**Last updated by loop:** Phase 3 — ReviewStation generates real feedback on complete
+**Current phase:** Phase 4
+**Last updated by loop:** Phase 4 — Palantir 911 Dispatch CaseLab definition + registry
 
 ---
 
@@ -33,7 +33,7 @@
 - [~] On complete: update mastery + mark Run `completed` (Run marked `completed` + feedback generated/persisted; mastery/roadmap update still pending)
 
 ## Phase 4 — Port Palantir 911 Dispatch (spec §1, §7.4; ingredient: ../workbook-palantir-decomp/labs/lab_01_911_dispatch)
-- [ ] Map Clarify/Decompose/Design/Review content into the `CaseLab` definition
+- [x] Map Clarify/Decompose/Design/Review content into the `CaseLab` definition
 - [ ] RESHAPE Build into a multi-file bugfix/add-functionality scenario (no blank single-file starter)
 - [ ] Lab fully playable through all 5 milestones
 
@@ -76,3 +76,4 @@
 - Phase 3 (Review UI): `components/labs/stations/ReviewStation.tsx` — read-only recap of all milestones (clarify/decompose/design/build with test pass count), 1–5 self-grade rubric across the 5 `CaseLabRubricDimension`s persisting via `setReview`, renders `structured_feedback` (tldr/whatWorked/fixNext/actionPlan) when present, and a "Complete lab" button → `completeRun`. Now all 5 stations are real, so `StationSwitcher` dropped the stub (exhaustive switch). Fixed BuildStation's stale doc-comment. typecheck + lint clean; graph updated.
 - Phase 3 (feedback pipeline, server): `lib/labs/case-lab-feedback.ts` — pure `buildCaseLabFeedbackPrompt` (summarizes every milestone) + `parseCaseLabFeedback` (tolerant JSON extraction → `structured_feedback` shape, raw fallback) + `generateCaseLabFeedback` (routes through `generateFeedbackResponse` so rate-limit/cache/cost-tracking apply). `app/api/labs/feedback/route.ts` (POST {runId}: auth, load, generate, persist aiFeedback + mark completed). Added `case-lab-feedback.test.ts` (6 tests, pass). ReviewStation will call this on "Complete"; mastery update still pending. typecheck + lint + tests clean; graph updated.
 - Phase 3 (feedback wiring, client): ReviewStation "Complete lab" → `saveCaseLabRun` (persist latest + get id) then `requestCaseLabFeedback` (new `lib/labs/case-lab-runs-client.ts` helper) → `setActiveRun` with the completed run (renders generated feedback). Loading ("Completing…/Generating…") + graceful fallback (`completeRun` locally + soft error) when generation/auth fails. `structured_feedback` → `render` item DONE. typecheck + lint clean; graph updated.
+- Phase 4 (lab definition): read ingredient `lab_01_911_dispatch` (workbook/meta/reference/tests). `lib/labs/case-labs/palantir-911-dispatch.ts` — `CaseLab` with company/role/whyThisCompany (P6), skills, 5 milestones with lab-specific purposes + clarify/decompose ghost examples; `buildScenarioId: "palantir-911-dispatch-build"`, `buildScenarioType: "add-functionality"` (codebase drop, NOT DSA). `lib/labs/case-labs/index.ts` registry (`getCaseLabById`/`listCaseLabs`). Test asserts THE CORE RULE (build type ∈ codebase types) + all 5 milestones in order. NEXT: reshape the build into the multi-file `palantir-911-dispatch-build` workspace scenario. typecheck + lint + tests clean; graph updated.
