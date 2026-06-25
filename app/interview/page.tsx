@@ -5125,7 +5125,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden transition-all duration-300 sm:gap-2 ${
                     focusMode
                       ? "grid-cols-1" // Focus mode: editor only
-                      : "grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_240px] xl:grid-cols-[280px_minmax(0,1fr)_260px] 2xl:grid-cols-[320px_minmax(0,1fr)_280px]"
+                      : "grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_240px] xl:grid-cols-[360px_minmax(0,1fr)_260px] 2xl:grid-cols-[400px_minmax(0,1fr)_280px]"
                   }`}
                 >
                   {focusMode && (
