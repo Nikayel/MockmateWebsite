@@ -45,6 +45,7 @@ interface CaseLabState {
   // Lifecycle
   setActiveLab: (lab: CaseLab | null) => void
   setActiveRun: (run: CaseLabRun | null) => void
+  startRun: (lab: CaseLab, mode: CaseLabMode) => void
   reset: () => void
 
   // Navigation (soft — P1)
@@ -91,6 +92,32 @@ export const useCaseLabStore = create<CaseLabState>()(
       // Lifecycle
       setActiveLab: (lab) => set({ activeLab: lab }),
       setActiveRun: (run) => set({ activeRun: run }),
+      startRun: (lab, mode) => {
+        const now = new Date().toISOString()
+        set({
+          activeLab: lab,
+          error: null,
+          activeRun: {
+            id: `run_${crypto.randomUUID()}`,
+            // Real owner is stamped server-side on first save.
+            userId: "",
+            caseLabId: lab.id,
+            mode,
+            status: "in_progress",
+            currentMilestone: "clarify",
+            startedAt: now,
+            updatedAt: now,
+            answers: {},
+            milestoneStatus: {
+              clarify: "active",
+              decompose: "locked",
+              design: "locked",
+              build: "locked",
+              review: "locked",
+            },
+          },
+        })
+      },
       reset: () => set({ activeLab: null, activeRun: null, error: null }),
 
       // Navigation

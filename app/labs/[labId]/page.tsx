@@ -1,0 +1,81 @@
+"use client"
+
+/**
+ * Case Lab play surface — `/labs/[labId]`.
+ *
+ * Loads the lab definition into the store, resumes an in-progress run (or starts
+ * a fresh one), and renders the 3-column shell. This is the route that makes a
+ * lab fully playable through all five milestones.
+ */
+
+import { useEffect, useMemo } from "react"
+import { useParams } from "next/navigation"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
+import { getCaseLabById } from "@/lib/labs/case-labs"
+import { useCaseLabStore } from "@/lib/stores/case-lab-store"
+import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
+import { CaseLabShell } from "@/components/labs/CaseLabShell"
+
+export default function CaseLabPlayPage() {
+  const params = useParams<{ labId: string }>()
+  const labId = params?.labId ?? ""
+  const lab = useMemo(() => getCaseLabById(labId), [labId])
+
+  const setActiveLab = useCaseLabStore((s) => s.setActiveLab)
+  const startRun = useCaseLabStore((s) => s.startRun)
+  const activeRun = useCaseLabStore((s) => s.activeRun)
+  const isLoading = useCaseLabStore((s) => s.isLoading)
+
+  useEffect(() => {
+    if (lab) setActiveLab(lab)
+  }, [lab, setActiveLab])
+
+  // Resume an in-progress run for this lab (if any).
+  useCaseLabRunSync(lab?.id ?? null)
+
+  // Once resume settles with nothing to restore, start a fresh run.
+  useEffect(() => {
+    if (!lab || isLoading) return
+    if (!activeRun || activeRun.caseLabId !== lab.id) {
+      startRun(lab, "practice")
+    }
+  }, [lab, isLoading, activeRun, startRun])
+
+  if (!lab) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <p className="text-muted-foreground text-sm">Lab not found.</p>
+          <Link href="/labs" className="text-primary text-sm underline">
+            Back to labs
+          </Link>
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="flex h-screen flex-col gap-3 p-3 sm:p-4">
+      <header className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/labs"
+            aria-label="Back to labs"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+          </Link>
+          <div className="flex flex-col">
+            <h1 className="text-foreground text-sm font-semibold">{lab.title}</h1>
+            <p className="text-muted-foreground text-xs capitalize">
+              {lab.company} · {lab.role}
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <CaseLabShell className="flex-1" />
+    </main>
+  )
+}

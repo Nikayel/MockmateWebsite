@@ -5,8 +5,8 @@
 > Spec detail lives in `CASE_LABS.md` (§ references below). Keep notes terse.
 
 **Status:** in progress
-**Current phase:** Phase 4
-**Last updated by loop:** Phase 4 — reshaped Build into multi-file 911 dispatch scenario
+**Current phase:** Phase 5
+**Last updated by loop:** Phase 4 complete — `/labs/[labId]` play route (lab fully playable)
 
 ---
 
@@ -35,7 +35,7 @@
 ## Phase 4 — Port Palantir 911 Dispatch (spec §1, §7.4; ingredient: ../workbook-palantir-decomp/labs/lab_01_911_dispatch)
 - [x] Map Clarify/Decompose/Design/Review content into the `CaseLab` definition
 - [x] RESHAPE Build into a multi-file bugfix/add-functionality scenario (no blank single-file starter)
-- [~] Lab fully playable through all 5 milestones (all stations + lab + build scenario exist and verified; needs a `/labs` route that loads the lab into the store — next increment)
+- [x] Lab fully playable through all 5 milestones
 
 ## Phase 5 — AI spine + browse + polish (spec §7, §8; only after 0–4 solid)
 - [ ] Pass `currentMilestone` into `/api/chat`; map milestones → phases; milestone-aware reactions + company persona
@@ -78,3 +78,4 @@
 - Phase 3 (feedback wiring, client): ReviewStation "Complete lab" → `saveCaseLabRun` (persist latest + get id) then `requestCaseLabFeedback` (new `lib/labs/case-lab-runs-client.ts` helper) → `setActiveRun` with the completed run (renders generated feedback). Loading ("Completing…/Generating…") + graceful fallback (`completeRun` locally + soft error) when generation/auth fails. `structured_feedback` → `render` item DONE. typecheck + lint clean; graph updated.
 - Phase 4 (lab definition): read ingredient `lab_01_911_dispatch` (workbook/meta/reference/tests). `lib/labs/case-labs/palantir-911-dispatch.ts` — `CaseLab` with company/role/whyThisCompany (P6), skills, 5 milestones with lab-specific purposes + clarify/decompose ghost examples; `buildScenarioId: "palantir-911-dispatch-build"`, `buildScenarioType: "add-functionality"` (codebase drop, NOT DSA). `lib/labs/case-labs/index.ts` registry (`getCaseLabById`/`listCaseLabs`). Test asserts THE CORE RULE (build type ∈ codebase types) + all 5 milestones in order. NEXT: reshape the build into the multi-file `palantir-911-dispatch-build` workspace scenario. typecheck + lint + tests clean; graph updated.
 - Phase 4 (build reshape): `lib/scenarios/add-functionality/add-feature-911-dispatch.ts` — reshaped the workbook's single-file `starter.py` into a MULTI-FILE workspace `add-functionality` scenario (read-only `src/geo.py`, editable `src/dispatch.py` recommender w/ TODO, editable `src/dispatch_service.py` wrapper, visible + hidden Python tests + runner, reference solution). Registered in the add-functionality index. Added `case-lab-build-wiring.test.ts` (lab → scenario resolves, workspace, not DSA, has reference). VERIFIED the reference solution passes all 5 tests (2 visible + 3 hidden) via a local python run. typecheck + lint + tests clean; graph updated.
+- Phase 4 (complete — playable): `app/labs/[labId]/page.tsx` — loads the lab via `getCaseLabById`, resumes via `useCaseLabRunSync` or starts a fresh run (new store `startRun` action: client uuid id, clarify active, rest locked), renders `CaseLabShell`. Lab-not-found + back-to-/labs handled. The 911 Dispatch lab is now playable end-to-end Clarify→Decompose→Design→Build(codebase)→Review with autosave/resume and AI feedback. typecheck + lint clean; graph updated.
