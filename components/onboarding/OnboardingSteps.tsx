@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button"
 import {
   ArrowRight,
   ArrowLeft,
-  Sparkles,
   CheckCircle2,
   Brain,
   Calendar,
   TrendingUp,
+  Route,
+  Terminal,
 } from "lucide-react"
 
 interface WelcomeStepProps {
@@ -26,39 +27,36 @@ export function WelcomeStep({ userName, onNext }: WelcomeStepProps) {
       exit={{ opacity: 0, x: -20 }}
       className="p-8"
     >
-      <div className="text-center mb-8">
+      <div className="mb-8 text-center">
         <div
-          className="w-16 h-16 bg-gradient-to-br from-[#00d9ff] to-[#00ff88] rounded-2xl flex items-center justify-center mx-auto mb-4"
+          className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10"
           aria-hidden="true"
         >
-          <Sparkles className="h-8 w-8 text-black" />
+          <Terminal className="h-8 w-8 text-cyan-200" />
         </div>
-        <h2 id="onboarding-title" className="text-2xl font-bold text-white mb-2">
+        <h2 id="onboarding-title" className="mb-2 text-2xl font-bold text-white">
           {userName ? `Welcome, ${userName}!` : "Welcome to CodeSparring!"}
         </h2>
         <p id="onboarding-description" className="text-gray-400">
-          Let's set up your personalized practice experience in 4 quick steps.
+          Let&apos;s calibrate your practice room in 4 quick steps.
         </p>
       </div>
 
-      <div className="space-y-3 mb-8">
+      <div className="mb-8 space-y-3">
         {[
-          "Personalized problem recommendations",
-          "Spaced repetition for long-term retention",
-          "Progress tracking across patterns",
+          "Interview formats matched to your target",
+          "Review timing based on completed reps",
+          "Pattern evidence across code, tests, and explanations",
         ].map((feature, i) => (
           <div key={i} className="flex items-center gap-3 text-gray-300">
-            <CheckCircle2 className="h-5 w-5 text-[#00d9ff]" />
+            <CheckCircle2 className="h-5 w-5 text-cyan-300" />
             <span>{feature}</span>
           </div>
         ))}
       </div>
 
-      <Button
-        onClick={onNext}
-        className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black py-6"
-      >
-        Let's Get Started
+      <Button onClick={onNext} className="h-10 w-full bg-cyan-300 text-gray-950 hover:bg-cyan-200">
+        Start setup
         <ArrowRight className="ml-2 h-5 w-5" />
       </Button>
     </motion.div>
@@ -93,16 +91,14 @@ export function DailyGoalStep({
       className="p-8"
     >
       <div className="mb-6">
-        <p className="text-sm text-[#00d9ff] font-medium mb-1">Step 3 of 4</p>
-        <h2 className="text-xl font-bold text-white">How much do you want to practice?</h2>
-        <p className="text-sm text-gray-400 mt-1">Set a daily goal. You can adjust this anytime.</p>
+        <p className="mb-1 text-sm font-medium text-cyan-300">Step 3 of 4</p>
+        <h2 className="text-xl font-bold text-white">Set the daily rep target</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Pick a pace you can finish under interview pressure.
+        </p>
       </div>
 
-      <div
-        className="space-y-3 mb-6"
-        role="radiogroup"
-        aria-label="Daily practice goal selection"
-      >
+      <div className="mb-6 space-y-3" role="radiogroup" aria-label="Daily practice goal selection">
         {dailyGoals.map((goal) => {
           const isSelected = dailyGoal === goal.value
           return (
@@ -112,14 +108,14 @@ export function DailyGoalStep({
               role="radio"
               aria-checked={isSelected}
               aria-label={`${goal.label}, ${goal.desc}, approximately ${goal.time}`}
-              className={`w-full p-4 rounded-xl border text-left transition-all flex items-center justify-between ${
+              className={`flex w-full items-center justify-between rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                 isSelected
-                  ? "border-[#00d9ff] bg-[#00d9ff]/10"
-                  : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
+                  ? "border-cyan-300 bg-cyan-300/10"
+                  : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`h-5 w-5 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`}>
+                <div className={`h-5 w-5 ${isSelected ? "text-cyan-300" : "text-gray-400"}`}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="20"
@@ -150,7 +146,7 @@ export function DailyGoalStep({
         })}
       </div>
 
-      <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700 mb-6">
+      <div className="mb-6 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
         <div className="flex items-start gap-3">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -162,7 +158,7 @@ export function DailyGoalStep({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-5 w-5 text-[#00d9ff] mt-0.5"
+            className="mt-0.5 h-5 w-5 text-cyan-300"
           >
             <circle cx="12" cy="12" r="10" />
             <circle cx="12" cy="12" r="6" />
@@ -170,17 +166,22 @@ export function DailyGoalStep({
           </svg>
           <div>
             <p className="text-sm text-gray-300">
-              Consistency beats intensity. Even 1 problem a day compounds over time.
+              Consistency beats intensity. A finished rep with review signal is better than a vague
+              streak.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex justify-between">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
         <Button variant="ghost" onClick={onBack} className="text-gray-400">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <Button onClick={onNext} className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black">
+        <span className="text-sm text-gray-500">Cadence</span>
+        <Button
+          onClick={onNext}
+          className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200"
+        >
           Continue <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
@@ -197,29 +198,23 @@ interface SystemOverviewStepProps {
 const systemFeatures = [
   {
     icon: Brain,
-    title: "Smart Recommendations",
-    description:
-      "We analyze your performance and suggest problems targeting your weak areas.",
+    title: "Recommendation signal",
+    description: "Your next reps are shaped by weak patterns, session results, and target format.",
   },
   {
     icon: Calendar,
-    title: "Spaced Repetition",
+    title: "Review schedule",
     description:
-      "Problems you've solved are scheduled for review at optimal intervals to build long-term retention.",
+      "Solved problems come back when the skill is likely to fade, not just when the streak asks.",
   },
   {
     icon: TrendingUp,
-    title: "Pattern Mastery",
-    description:
-      "Track your progress across 15 DSA patterns and see which ones need more attention.",
+    title: "Readiness trend",
+    description: "Track whether you can explain, test, and finish under realistic constraints.",
   },
 ]
 
-export function SystemOverviewStep({
-  isSubmitting,
-  onBack,
-  onComplete,
-}: SystemOverviewStepProps) {
+export function SystemOverviewStep({ isSubmitting, onBack, onComplete }: SystemOverviewStepProps) {
   return (
     <motion.div
       key="overview"
@@ -229,12 +224,12 @@ export function SystemOverviewStep({
       className="p-8"
     >
       <div className="mb-6">
-        <p className="text-sm text-[#00d9ff] font-medium mb-1">Step 4 of 4</p>
-        <h2 className="text-xl font-bold text-white">How CodeSparring works for you</h2>
-        <p className="text-sm text-gray-400 mt-1">Here's what to expect from your practice.</p>
+        <p className="mb-1 text-sm font-medium text-cyan-300">Step 4 of 4</p>
+        <h2 className="text-xl font-bold text-white">How the practice loop works</h2>
+        <p className="mt-1 text-sm text-gray-400">Here&apos;s what the system will keep visible.</p>
       </div>
 
-      <div className="space-y-4 mb-6">
+      <div className="mb-6 space-y-4">
         {systemFeatures.map((feature, i) => {
           const Icon = feature.icon
           return (
@@ -243,37 +238,38 @@ export function SystemOverviewStep({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="flex items-start gap-4 p-4 bg-gray-800/50 rounded-xl border border-gray-700"
+              className="flex items-start gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4"
             >
-              <div className="p-2 bg-[#00d9ff]/10 rounded-lg">
-                <Icon className="h-5 w-5 text-[#00d9ff]" />
+              <div className="rounded-lg bg-cyan-300/10 p-2">
+                <Icon className="h-5 w-5 text-cyan-300" />
               </div>
               <div>
                 <h4 className="font-medium text-white">{feature.title}</h4>
-                <p className="text-sm text-gray-400 mt-0.5">{feature.description}</p>
+                <p className="mt-0.5 text-sm text-gray-400">{feature.description}</p>
               </div>
             </motion.div>
           )
         })}
       </div>
 
-      <div className="p-4 bg-gradient-to-r from-[#00d9ff]/10 to-[#00ff88]/10 rounded-xl border border-[#00d9ff]/20 mb-6">
+      <div className="mb-6 rounded-lg border border-emerald-400/20 bg-emerald-500/10 p-4">
         <div className="flex items-center gap-3">
-          <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+          <CheckCircle2 className="h-5 w-5 text-emerald-300" />
           <div>
             <p className="text-sm text-gray-300">
-              <span className="text-white font-medium">Pro tip:</span> Check the Practice page
-              for your personalized review schedule.
+              <span className="font-medium text-white">First useful step:</span> Start one real
+              round, then let the review schedule tell you what to repeat.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex justify-between">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <Button variant="ghost" onClick={onBack} className="text-gray-400">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <div className="flex gap-3">
+        <span className="text-sm text-gray-500">Finish</span>
+        <div className="flex justify-end gap-3">
           <Button
             onClick={() => onComplete(false)}
             disabled={isSubmitting}
@@ -285,9 +281,9 @@ export function SystemOverviewStep({
           <Button
             onClick={() => onComplete(true)}
             disabled={isSubmitting}
-            className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black"
+            className="bg-cyan-300 text-gray-950 hover:bg-cyan-200"
           >
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Route className="mr-2 h-4 w-4" />
             {isSubmitting ? "Saving..." : "Quick Tour First"}
           </Button>
         </div>

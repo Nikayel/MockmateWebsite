@@ -1,6 +1,5 @@
 import { Metadata } from "next"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
-import { InteractiveTour } from "@/components/InteractiveTour"
 
 export const metadata: Metadata = {
   title: "Free AI Coding Interview Practice | CodeSparring",
@@ -19,8 +18,19 @@ export default function FreePracticePage() {
             We offer a completely free, interactive mock interview round so you can see exactly how
             the AI evaluates your problem-solving, communication, and coding efficiency.
           </p>
-          <div className="my-8 overflow-hidden rounded-xl border border-white/10 bg-zinc-950 p-4">
-            <InteractiveTour />
+          <div className="my-8 overflow-hidden rounded-xl border border-white/10 bg-zinc-950 p-5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["Reasoning", "Talk through assumptions before the code."],
+                ["Execution", "Run tests and inspect the result."],
+                ["Feedback", "Leave with the next best rep."],
+              ].map(([label, text]) => (
+                <div key={label} className="rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-4">
+                  <p className="text-sm font-semibold text-cyan-100">{label}</p>
+                  <p className="mt-1 text-sm text-zinc-400">{text}</p>
+                </div>
+              ))}
+            </div>
           </div>
           <p>
             Ready to jump into the real thing? Click below to start your first full, uninterrupted

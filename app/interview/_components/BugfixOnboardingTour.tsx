@@ -645,30 +645,25 @@ export function BugfixOnboardingTour({
                   />
                 ))}
               </div>
-              <div className="flex items-center justify-between gap-2">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   disabled={isFirstStep}
                   onClick={handleBack}
-                  className={isFirstStep ? "invisible" : "text-gray-300 hover:text-white"}
+                  className={`justify-self-start ${isFirstStep ? "invisible" : "text-gray-300 hover:text-white"}`}
                 >
                   <ArrowLeft className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                   Back
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => void skipTour("coachmark", step.id)}
-                  className="text-gray-300 hover:text-white"
-                >
-                  Skip
-                </Button>
+                <span className="text-xs text-gray-500">
+                  {stepIndex + 1} / {TOUR_STEPS.length}
+                </span>
                 <Button
                   type="button"
                   disabled={!canContinue}
                   onClick={() => handleNext("button")}
-                  className="bg-cyan-300 text-gray-950 hover:bg-cyan-200"
+                  className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200"
                 >
                   {isLastStep ? "Finish" : "Next"}
                   {!isLastStep && <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />}
