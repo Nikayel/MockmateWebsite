@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -354,18 +355,7 @@ export default function AIUsagePage() {
     return `$${cost.toFixed(4)}`
   }
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy":
-        return "bg-green-600/20 text-green-400 border-green-600/30"
-      case "medium":
-        return "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-      case "hard":
-        return "bg-red-600/20 text-red-400 border-red-600/30"
-      default:
-        return "bg-gray-600/20 text-gray-400 border-gray-600/30"
-    }
-  }
+  const getDifficultyColor = (difficulty: string) => difficultyColorClass(difficulty)
 
   const getStatusColor = (status: string) => {
     switch (status) {

@@ -18,6 +18,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, ChevronUp, Clock, Target, TrendingUp, Zap, AlertTriangle, BookOpen } from 'lucide-react'
 import type { DSAPattern } from '@/lib/types/dsa-patterns'
+import { difficultyColorClass } from '@/lib/ui/difficulty-colors'
 
 // Types matching our backend
 interface RecommendationSymbol {
@@ -164,12 +165,6 @@ function RecommendationCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const difficultyColors = {
-    easy: 'text-green-600 bg-green-50 dark:bg-green-900/20',
-    medium: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20',
-    hard: 'text-red-600 bg-red-50 dark:bg-red-900/20',
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -195,7 +190,7 @@ function RecommendationCard({
 
               {/* Tags row */}
               <div className="flex flex-wrap gap-1.5 mt-1">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColors[recommendation.difficulty]}`}>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColorClass(recommendation.difficulty, 'badgeOnLight')}`}>
                   {recommendation.difficulty.charAt(0).toUpperCase() + recommendation.difficulty.slice(1)}
                 </span>
                 <span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/20">

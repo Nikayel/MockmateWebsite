@@ -22,6 +22,7 @@ import {
   BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
 export type RoadmapStatusType = "expired" | "archived" | "completed" | "abandoned"
 
@@ -437,18 +438,8 @@ export function ArchivedRoadmapItem({
     }
   }
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy":
-        return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
-      case "medium":
-        return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30"
-      case "hard":
-        return "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30"
-      default:
-        return "text-muted-foreground bg-muted"
-    }
-  }
+  const getDifficultyColor = (difficulty: string) =>
+    difficultyColorClass(difficulty, "badgeOnLight")
 
   const getQuestionStatusIcon = (status: string) => {
     switch (status) {

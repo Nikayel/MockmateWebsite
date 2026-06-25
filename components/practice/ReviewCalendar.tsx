@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { ChevronLeft, ChevronRight, Brain, Calendar, Play } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { DueItem } from "@/lib/hooks/useSpacedRepetition"
 
 interface ReviewCalendarProps {
@@ -24,22 +25,13 @@ const DAYS_OF_WEEK = ["S", "M", "T", "W", "T", "F", "S"]
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 function getDifficultyColor(difficulty: string | undefined): string {
-  switch (difficulty?.toLowerCase()) {
-    case "hard":
-      return "bg-rose-500"
-    case "medium":
-      return "bg-amber-500"
-    case "easy":
-      return "bg-emerald-500"
-    default:
-      return "bg-indigo-500"
-  }
+  return difficultyColorClass(difficulty?.toLowerCase(), "dot")
 }
 
 function getDifficultyBorder(difficulty: string | undefined): string {
   switch (difficulty?.toLowerCase()) {
     case "hard":
-      return "border-rose-500/40 bg-rose-500/10"
+      return "border-red-500/40 bg-red-500/10"
     case "medium":
       return "border-amber-500/40 bg-amber-500/10"
     case "easy":
@@ -120,7 +112,7 @@ function TodayFocusCard({ items }: { items: DueItem[] }) {
       {/* Summary badges */}
       <div className="flex flex-wrap gap-1.5">
         {hardCount > 0 && (
-          <span className="rounded-md bg-rose-500/20 px-2 py-0.5 text-xs font-medium text-rose-400">
+          <span className="rounded-md bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">
             {hardCount} Hard
           </span>
         )}
@@ -150,7 +142,7 @@ function TodayFocusCard({ items }: { items: DueItem[] }) {
             <span
               className={cn(
                 "ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                item.difficulty?.toLowerCase() === "hard" && "bg-rose-500/20 text-rose-400",
+                item.difficulty?.toLowerCase() === "hard" && "bg-red-500/20 text-red-400",
                 item.difficulty?.toLowerCase() === "medium" && "bg-amber-500/20 text-amber-400",
                 item.difficulty?.toLowerCase() === "easy" && "bg-emerald-500/20 text-emerald-400"
               )}
@@ -218,7 +210,7 @@ function SelectedDayPanel({
               <span
                 className={cn(
                   "ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase",
-                  item.difficulty?.toLowerCase() === "hard" && "bg-rose-500/20 text-rose-400",
+                  item.difficulty?.toLowerCase() === "hard" && "bg-red-500/20 text-red-400",
                   item.difficulty?.toLowerCase() === "medium" && "bg-amber-500/20 text-amber-400",
                   item.difficulty?.toLowerCase() === "easy" && "bg-emerald-500/20 text-emerald-400"
                 )}
@@ -342,7 +334,7 @@ export function ReviewCalendar({
             <span>Med</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+            <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
             <span>Hard</span>
           </div>
         </div>
