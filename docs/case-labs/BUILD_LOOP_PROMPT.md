@@ -6,12 +6,17 @@
 
 ---
 
-## Setup (one time)
+## Setup (one time, temporary)
 
 ```bash
 # From inside MockmateWebsite — pull the ingredient repo in as a sibling dir:
 git clone https://github.com/Nikayel/workbook-palantir-decomp.git ../workbook-palantir-decomp
 ```
+
+> This is a **temporary read-only ingredient** — it lives outside `MockmateWebsite` and never touches your git history. Once the loop writes "CASE LABS BUILD COMPLETE", delete it:
+> ```bash
+> rm -rf ../workbook-palantir-decomp
+> ```
 
 Then open Claude Code in `MockmateWebsite` and start the loop (10-minute cadence; it auto-resumes
 across iterations and will stop itself when done):
@@ -70,7 +75,7 @@ PHASES (build in order; details in spec §12):
 - Phase 4 — Port Palantir 911 Dispatch: read ../workbook-palantir-decomp/labs/lab_01_911_dispatch; map Clarify/Decompose/Design/Review content into the CaseLab; RESHAPE the Build into a multi-file bugfix/add-functionality scenario wired via buildScenarioId (do NOT port starter.py as a blank single-file task). Lab fully playable through all 5 milestones.
 - Phase 5 — AI spine + browse + polish (only after 0-4 solid): pass currentMilestone into /api/chat, map milestones->phases, milestone-aware reactions + company persona (§7,§8,P4/P6); /labs gallery (filter by company/skill, show progress); CaseLabIntro start screen + Practice/Onsite toggle; handle loading/empty/error/unauthorized states everywhere; analytics events.
 
-DEFINITION OF DONE (v1): the Palantir 911 Dispatch Case Lab is fully playable Clarify->Decompose->Design->Build(multi-file codebase drop)->Review, AI engaged across milestones, structured feedback at the end; pnpm typecheck/lint/test pass; new surfaces handle loading/empty/error/unauthorized; graph updated; every increment was committed separately with clean human-authored messages.
+DEFINITION OF DONE (v1): the Palantir 911 Dispatch Case Lab is fully playable Clarify->Decompose->Design->Build(multi-file codebase drop)->Review, AI engaged across milestones, structured feedback at the end; pnpm typecheck/lint/test pass; new surfaces handle loading/empty/error/unauthorized; graph updated; every increment was committed separately with clean human-authored messages. When done: write "CASE LABS BUILD COMPLETE" in the ledger, do a final commit, then tell the user: "Run `rm -rf ../workbook-palantir-decomp` to remove the temporary ingredient repo — it's no longer needed."
 
 Begin this iteration now: orient via the ledger, pick the next task, implement, verify, commit, update the ledger.
 ```
