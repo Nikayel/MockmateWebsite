@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +44,13 @@ interface MasteredProblem {
   masteredAt: string
 }
 
+interface PatternStat {
+  displayName: string
+  averageScore: number // Overall / interview score for this pattern
+  averageTechnicalScore: number // Technical score for this pattern
+  proficiency: string
+}
+
 interface QuickMetrics {
   totalSessions: number
   totalPracticeHours: number
@@ -51,17 +58,7 @@ interface QuickMetrics {
   averageTechnicalScore: number // Technical (code-focused, excludes communication)
   weeklyAverage: number
   trend: "improving" | "stable" | "declining"
-  topPattern?: {
-    name: string
-    score: number
-    technicalScore: number
-    proficiency: string
-  }
-  weakestPattern?: {
-    name: string
-    score: number
-    technicalScore: number
-  }
+  patterns: PatternStat[]
   // Score breakdown from the 4 weighted categories
   scoreBreakdown?: {
     codeQuality: number // 30%
@@ -126,15 +123,6 @@ export function MetricsOverview() {
           if (data.success) {
             const { overview, patterns, trends } = data.data
 
-            // Find strongest and weakest patterns (use technical score for ranking)
-            const sortedPatterns = [...patterns].sort(
-              (a: any, b: any) =>
-                (b.averageTechnicalScore || b.averageScore) -
-                (a.averageTechnicalScore || a.averageScore)
-            )
-            const topPattern = sortedPatterns[0]
-            const weakestPattern = sortedPatterns[sortedPatterns.length - 1]
-
             setMetrics({
               totalSessions: overview.totalSessions,
               totalPracticeHours: overview.totalPracticeHours,
@@ -142,23 +130,10 @@ export function MetricsOverview() {
               averageTechnicalScore: overview.averageTechnicalScore || overview.averageScore,
               weeklyAverage: trends.weeklyAverage,
               trend: trends.trend,
-              topPattern: topPattern
-                ? {
-                    name: topPattern.displayName,
-                    score: topPattern.averageScore,
-                    technicalScore: topPattern.averageTechnicalScore || topPattern.averageScore,
-                    proficiency: topPattern.proficiency,
-                  }
-                : undefined,
-              weakestPattern:
-                weakestPattern && weakestPattern !== topPattern
-                  ? {
-                      name: weakestPattern.displayName,
-                      score: weakestPattern.averageScore,
-                      technicalScore:
-                        weakestPattern.averageTechnicalScore || weakestPattern.averageScore,
-                    }
-                  : undefined,
+              // Keep the full pattern list; strongest/weakest are derived reactively
+              // from whichever score (interview vs technical) is currently displayed,
+              // so the ranking metric always matches the number shown on the badge.
+              patterns: (patterns || []) as PatternStat[],
               scoreBreakdown: data.data.scoreBreakdown || undefined,
               mastery: data.data.mastery || undefined,
             })
@@ -173,6 +148,32 @@ export function MetricsOverview() {
 
     loadMetrics()
   }, [firebaseUser])
+
+  // Derive strongest / focus-area patterns from the metric that is actually
+  // displayed (interview vs technical). Ranking and the shown number must use
+  // the same score, otherwise the badges can look swapped (e.g. "Strongest"
+  // showing a lower % than "Focus Area").
+  const { topPattern, weakestPattern } = useMemo(() => {
+    const patterns = metrics?.patterns ?? []
+    if (patterns.length === 0) {
+      return { topPattern: undefined, weakestPattern: undefined }
+    }
+    const scoreOf = (p: PatternStat) =>
+      showOverallScore ? p.averageScore : p.averageTechnicalScore ?? p.averageScore
+    const sorted = [...patterns].sort((a, b) => scoreOf(b) - scoreOf(a))
+    const top = sorted[0]
+    const weak = sorted[sorted.length - 1]
+    const toView = (p: PatternStat) => ({
+      name: p.displayName,
+      score: p.averageScore,
+      technicalScore: p.averageTechnicalScore ?? p.averageScore,
+      proficiency: p.proficiency,
+    })
+    return {
+      topPattern: top ? toView(top) : undefined,
+      weakestPattern: weak && weak !== top ? toView(weak) : undefined,
+    }
+  }, [metrics?.patterns, showOverallScore])
 
   if (loading) {
     return (
@@ -481,19 +482,19 @@ export function MetricsOverview() {
         )}
 
         {/* Pattern Highlights - score changes based on toggle */}
-        {metrics.topPattern && (
+        {topPattern && (
           <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/10 p-2">
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-green-400" />
               <div>
                 <div className="text-xs font-medium text-green-400">Strongest</div>
-                <div className="text-sm text-white">{metrics.topPattern.name}</div>
+                <div className="text-sm text-white">{topPattern.name}</div>
               </div>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge className="cursor-default border-green-500/30 bg-green-500/20 text-xs text-green-400">
-                  {showOverallScore ? metrics.topPattern.score : metrics.topPattern.technicalScore}%
+                  {showOverallScore ? topPattern.score : topPattern.technicalScore}%
                 </Badge>
               </TooltipTrigger>
               <TooltipContent side="left" className="text-xs">
@@ -503,21 +504,21 @@ export function MetricsOverview() {
           </div>
         )}
 
-        {metrics.weakestPattern && (
+        {weakestPattern && (
           <div className="flex items-center justify-between rounded-lg border border-orange-500/20 bg-orange-500/10 p-2">
             <div className="flex items-center gap-2">
               <Flame className="h-4 w-4 text-orange-400" />
               <div>
                 <div className="text-xs font-medium text-orange-400">Focus Area</div>
-                <div className="text-sm text-white">{metrics.weakestPattern.name}</div>
+                <div className="text-sm text-white">{weakestPattern.name}</div>
               </div>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge className="cursor-default border-orange-500/30 bg-orange-500/20 text-xs text-orange-400">
                   {showOverallScore
-                    ? metrics.weakestPattern.score
-                    : metrics.weakestPattern.technicalScore}
+                    ? weakestPattern.score
+                    : weakestPattern.technicalScore}
                   %
                 </Badge>
               </TooltipTrigger>
