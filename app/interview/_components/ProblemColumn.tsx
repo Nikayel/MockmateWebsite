@@ -575,7 +575,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                   <div className="mt-3 border-t border-gray-700 pt-3">
                     <div className="mb-2 flex items-center justify-between">
                       <h3 className="flex items-center space-x-1 text-xs font-semibold text-white">
-                        <Lightbulb className="h-3 w-3 text-yellow-400" />
+                        <Lightbulb className="h-3 w-3 text-amber-300" />
                         <span>
                           Hints ({revealedHintIndices.size}/{revealedHints} unlocked)
                         </span>
@@ -596,7 +596,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                               <button
                                 type="button"
                                 key={i}
-                                className={`w-full cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 text-left transition-all focus:ring-2 focus:ring-yellow-400 focus:outline-none ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
+                                className={`w-full cursor-pointer rounded border border-amber-400/20 bg-amber-500/10 p-2 text-left transition-all focus:ring-2 focus:ring-amber-300 focus:outline-none ${!isHintRevealed ? "hover:bg-amber-500/15" : ""}`}
                                 onClick={() => {
                                   if (!isHintRevealed) {
                                     setRevealedHintIndices((prev) => new Set([...prev, i]))
@@ -604,17 +604,17 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                 }}
                               >
                                 {isHintRevealed ? (
-                                  <p className="text-xs leading-relaxed text-yellow-200">
+                                  <p className="text-xs leading-relaxed text-amber-200">
                                     <span className="font-semibold">Hint {i + 1}:</span> {hint}
                                   </p>
                                 ) : (
                                   <div className="relative">
-                                    <p className="pointer-events-none text-xs leading-relaxed text-yellow-200/30 blur-sm select-none">
+                                    <p className="pointer-events-none text-xs leading-relaxed text-amber-200/30 blur-sm select-none">
                                       <span className="font-semibold">Hint {i + 1}:</span>{" "}
                                       {hint.substring(0, 50)}...
                                     </p>
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400">
+                                      <div className="flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">
                                         <HelpCircle className="h-3 w-3" />
                                         <span>Click to reveal Hint {i + 1}</span>
                                       </div>
@@ -650,8 +650,8 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
               {selectedScenario &&
                 selectedScenario.type === "add-functionality" &&
                 workspaceContext.length === 0 && (
-                  <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
-                    <p className="text-xs text-yellow-300">
+                  <div className="mb-2 rounded border border-amber-400/30 bg-amber-500/10 p-2">
+                    <p className="text-xs text-amber-300">
                       This scenario uses a prepared codebase workspace. Reload the scenario if the
                       files do not appear.
                     </p>
