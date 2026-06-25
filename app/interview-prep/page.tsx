@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import { ALL_COMPANIES, COMPANY_TIERS } from "@/lib/data/company-questions"
 import { BreadcrumbJsonLd, WebPageJsonLd } from "@/components/seo/JsonLd"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
 export const metadata: Metadata = {
   title: "Interview Prep Guides by Company | Google, Meta, Amazon & More",
@@ -35,9 +36,9 @@ export const metadata: Metadata = {
 }
 
 function getDifficultyColor(distribution: { easy: number; medium: number; hard: number }) {
-  if (distribution.hard >= 35) return "text-rose-400"
-  if (distribution.hard >= 25) return "text-amber-400"
-  return "text-emerald-400"
+  if (distribution.hard >= 35) return difficultyColorClass("hard", "text")
+  if (distribution.hard >= 25) return difficultyColorClass("medium", "text")
+  return difficultyColorClass("easy", "text")
 }
 
 export default function InterviewPrepPage() {
