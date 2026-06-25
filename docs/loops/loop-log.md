@@ -12,6 +12,13 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target A (round 2): Incident Report lead line (ProblemColumn.tsx)
+
+- changed: Gave the Incident Report internal hierarchy so it reads as a clear secondary focal point under the now-dominant Description. The `userReport` lead line was `text-gray-200` at inherited `text-sm` — tied in weight with the supporting "Expected/Repro" detail. Bumped it to `text-[15px] leading-relaxed text-gray-100`, one rung below the Description (text-base/gray-50) and clearly above the compressed supporting detail (text-xs/sm, gray-400). Establishes the size+contrast ladder: Description (16px/gray-50) → Incident lead (15px/gray-100) → supporting detail (12–14px/gray-400). No new hue (amber box treatment unchanged), no behaviour/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on ProblemColumn.tsx · `pnpm build` → PASS
+- a11y: gray-100 (#f4f4f5) on the light amber incident box over the dark theme is very high contrast (exceeds AA); larger lead line aids first-glance scanning. Static text — no focus/keyboard change.
+- needs_human_review: false (typographic weight/contrast only within an existing box; layout structure and color system unchanged)
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C: color reduction (ProblemColumn.tsx, Codebase Files section)
 
 - changed: Demoted the off-palette `blue` hue in the Codebase Files section to the gray scale. The "Your codebase files are available as tabs…" hint went `text-blue-400` → `text-gray-400` (secondary informational text), and the file-list button hover went `hover:text-blue-400` → `hover:text-gray-200` (secondary/interactive chrome). Blue is not in the target palette (cyan/amber/emerald/red + gray), so this removes a foreign accent from the bugfix/add-functionality workspace path without adding any new hue. Color only — no behaviour/layout/copy change.

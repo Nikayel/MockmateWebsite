@@ -190,7 +190,9 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                   </h3>
                   <div className="space-y-2 text-sm leading-relaxed text-gray-300">
                     {scenarioDetails?.userReport && (
-                      <p className="text-gray-200">{scenarioDetails.userReport}</p>
+                      <p className="text-[15px] leading-relaxed text-gray-100">
+                        {scenarioDetails.userReport}
+                      </p>
                     )}
                     {scenarioDetails?.expectedBehavior && (
                       <p>
