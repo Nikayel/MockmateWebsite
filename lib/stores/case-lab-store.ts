@@ -1,0 +1,208 @@
+/**
+ * Zustand store for an active Case Lab run.
+ *
+ * Holds the in-flight lab definition, the resumable Run, and per-milestone
+ * answers. Soft navigation (P1): the user can move between milestones freely;
+ * `milestoneStatus` tracks progress without hard-gating.
+ *
+ * The Run is loaded fresh from Firebase per session (it is NOT persisted to
+ * localStorage) to avoid cross-user data leaks on shared browsers — same policy
+ * as `roadmap-store.ts`. Firebase save/resume wiring lands in a later phase.
+ */
+
+import { create } from "zustand"
+import { devtools } from "zustand/middleware"
+import type {
+  CaseLab,
+  CaseLabRun,
+  CaseLabMode,
+  MilestoneKind,
+  MilestoneStatusMap,
+  ClarifyAnswer,
+  DecomposeAnswer,
+  DesignAnswer,
+  BuildAnswer,
+  ReviewAnswer,
+} from "@/lib/labs/types"
+
+export const MILESTONE_ORDER: MilestoneKind[] = [
+  "clarify",
+  "decompose",
+  "design",
+  "build",
+  "review",
+]
+
+interface CaseLabState {
+  // The lab being played + the user's resumable run
+  activeLab: CaseLab | null
+  activeRun: CaseLabRun | null
+
+  // UI state
+  isLoading: boolean
+  error: string | null
+
+  // Lifecycle
+  setActiveLab: (lab: CaseLab | null) => void
+  setActiveRun: (run: CaseLabRun | null) => void
+  reset: () => void
+
+  // Navigation (soft — P1)
+  goToMilestone: (kind: MilestoneKind) => void
+  markMilestoneDone: (kind: MilestoneKind) => void
+  setMode: (mode: CaseLabMode) => void
+  completeRun: () => void
+
+  // Per-milestone answers
+  setClarify: (answers: ClarifyAnswer[]) => void
+  setDecompose: (answer: DecomposeAnswer) => void
+  setDesign: (answer: DesignAnswer) => void
+  setBuild: (answer: BuildAnswer) => void
+  setReview: (answer: ReviewAnswer) => void
+
+  // UI actions
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
+
+  // Computed helpers
+  getCurrentMilestone: () => MilestoneKind | null
+  getMilestoneStatus: (kind: MilestoneKind) => MilestoneStatusMap[MilestoneKind] | null
+  getProgress: () => { completed: number; total: number; percentage: number }
+  isComplete: () => boolean
+}
+
+/** Immutably patch the active run, stamping `updatedAt`. No-op when no run. */
+function patchRun(run: CaseLabRun | null, patch: Partial<CaseLabRun>): CaseLabRun | null {
+  if (!run) return run
+  return { ...run, ...patch, updatedAt: new Date().toISOString() }
+}
+
+export const useCaseLabStore = create<CaseLabState>()(
+  devtools(
+    (set, get) => ({
+      // Initial state
+      activeLab: null,
+      activeRun: null,
+      isLoading: false,
+      error: null,
+
+      // Lifecycle
+      setActiveLab: (lab) => set({ activeLab: lab }),
+      setActiveRun: (run) => set({ activeRun: run }),
+      reset: () => set({ activeLab: null, activeRun: null, error: null }),
+
+      // Navigation
+      goToMilestone: (kind) =>
+        set((state) => {
+          if (!state.activeRun) return state
+          const milestoneStatus: MilestoneStatusMap = {
+            ...state.activeRun.milestoneStatus,
+            // Entering an unstarted milestone makes it active; "done" stays done.
+            [kind]: state.activeRun.milestoneStatus[kind] === "done" ? "done" : "active",
+          }
+          return {
+            activeRun: patchRun(state.activeRun, {
+              currentMilestone: kind,
+              milestoneStatus,
+            }),
+          }
+        }),
+
+      markMilestoneDone: (kind) =>
+        set((state) => {
+          if (!state.activeRun) return state
+          return {
+            activeRun: patchRun(state.activeRun, {
+              milestoneStatus: {
+                ...state.activeRun.milestoneStatus,
+                [kind]: "done",
+              },
+            }),
+          }
+        }),
+
+      setMode: (mode) => set((state) => ({ activeRun: patchRun(state.activeRun, { mode }) })),
+
+      completeRun: () =>
+        set((state) => {
+          if (!state.activeRun) return state
+          return {
+            activeRun: patchRun(state.activeRun, {
+              status: "completed",
+              completedAt: new Date().toISOString(),
+              milestoneStatus: {
+                ...state.activeRun.milestoneStatus,
+                review: "done",
+              },
+            }),
+          }
+        }),
+
+      // Per-milestone answers
+      setClarify: (answers) =>
+        set((state) => ({
+          activeRun: patchRun(state.activeRun, {
+            answers: { ...state.activeRun?.answers, clarify: answers },
+          }),
+        })),
+
+      setDecompose: (answer) =>
+        set((state) => ({
+          activeRun: patchRun(state.activeRun, {
+            answers: { ...state.activeRun?.answers, decompose: answer },
+          }),
+        })),
+
+      setDesign: (answer) =>
+        set((state) => ({
+          activeRun: patchRun(state.activeRun, {
+            answers: { ...state.activeRun?.answers, design: answer },
+          }),
+        })),
+
+      setBuild: (answer) =>
+        set((state) => ({
+          activeRun: patchRun(state.activeRun, {
+            answers: { ...state.activeRun?.answers, build: answer },
+          }),
+        })),
+
+      setReview: (answer) =>
+        set((state) => ({
+          activeRun: patchRun(state.activeRun, {
+            answers: { ...state.activeRun?.answers, review: answer },
+          }),
+        })),
+
+      // UI actions
+      setLoading: (loading) => set({ isLoading: loading }),
+      setError: (error) => set({ error }),
+
+      // Computed helpers
+      getCurrentMilestone: () => get().activeRun?.currentMilestone ?? null,
+
+      getMilestoneStatus: (kind) => get().activeRun?.milestoneStatus[kind] ?? null,
+
+      getProgress: () => {
+        const run = get().activeRun
+        const total = MILESTONE_ORDER.length
+        if (!run) return { completed: 0, total, percentage: 0 }
+        const completed = MILESTONE_ORDER.filter((k) => run.milestoneStatus[k] === "done").length
+        return {
+          completed,
+          total,
+          percentage: Math.round((completed / total) * 100),
+        }
+      },
+
+      isComplete: () => get().activeRun?.status === "completed",
+    }),
+    { name: "case-lab-store" }
+  )
+)
+
+// Selector hooks for common use cases
+export const useActiveLab = () => useCaseLabStore((s) => s.activeLab)
+export const useActiveRun = () => useCaseLabStore((s) => s.activeRun)
+export const useCurrentMilestone = () => useCaseLabStore((s) => s.getCurrentMilestone())
+export const useCaseLabProgress = () => useCaseLabStore((s) => s.getProgress())
