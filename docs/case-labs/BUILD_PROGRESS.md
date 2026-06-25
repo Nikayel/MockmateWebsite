@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 1
-**Last updated by loop:** Phase 1 — `MilestoneRail` shipped
+**Last updated by loop:** Phase 1 — `StationSwitcher` + stub stations shipped
 
 ---
 
@@ -17,7 +17,7 @@
 
 ## Phase 1 — Shell & milestone rail, no AI (spec §6, P1/P3)
 - [x] `MilestoneRail` (where-am-I / what's-next / why)
-- [ ] `StationSwitcher` + stub stations
+- [x] `StationSwitcher` + stub stations
 - [ ] 3-column layout reusing the `/interview` shell; center morphs per milestone
 - [ ] Soft navigation between milestones
 
@@ -63,3 +63,4 @@
 - Phase 0: documented `caseLabRuns` collection in `docs/FIREBASE_STRUCTURE.md` (annotated shape mirroring `CaseLabRun`, noted as the source-of-truth contract to keep in sync). Docs-only, no code change.
 - Phase 0 (complete): `lib/stores/case-lab-store.ts` — zustand store (devtools, no persist → Run loads fresh from Firebase like roadmap-store to avoid cross-user leaks). Soft navigation, per-milestone answer setters, progress/complete helpers, `MILESTONE_ORDER`, selector hooks. Firebase save/resume wiring deferred to a later phase. typecheck + lint clean; graph updated.
 - Phase 1: `components/labs/MilestoneRail.tsx` — vertical stepper on `progress` + `collapsible`, reads the store, soft navigation via `goToMilestone`. P3 baked in (active highlight, ✓ done markers, "Next: …" label, per-row purpose line). Falls back to default milestone labels when no lab is loaded; collapsible on small screens, always-open on lg. typecheck + lint clean; graph updated.
+- Phase 1: `components/labs/StationSwitcher.tsx` — center column that morphs per `currentMilestone` (P2), with a stub station + empty state ("start a lab to begin"). Extracted shared `lib/labs/milestones.ts` (`DEFAULT_MILESTONE_META`) so the rail and switcher share one source of milestone copy (DRY); rail now imports it. Real stations replace stubs in Phases 2–3. typecheck + lint clean; graph updated.

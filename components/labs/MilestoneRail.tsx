@@ -16,16 +16,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { MILESTONE_ORDER, useCaseLabStore } from "@/lib/stores/case-lab-store"
+import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
 import type { CaseLabMilestone, MilestoneKind, MilestoneStatus } from "@/lib/labs/types"
-
-/** Fallback labels so the rail renders sensibly before a full lab is loaded. */
-const DEFAULT_MILESTONE_META: Record<MilestoneKind, { title: string; purpose: string }> = {
-  clarify: { title: "Clarify", purpose: "Surface the ambiguity before building." },
-  decompose: { title: "Decompose", purpose: "Break the system into its parts." },
-  design: { title: "Design", purpose: "Commit to a contract and defend tradeoffs." },
-  build: { title: "Build", purpose: "Work inside the real codebase." },
-  review: { title: "Review", purpose: "Turn the work into a score and next step." },
-}
 
 /** Milestones from the active lab in canonical order, with a sane fallback. */
 function useRailMilestones(): CaseLabMilestone[] {
