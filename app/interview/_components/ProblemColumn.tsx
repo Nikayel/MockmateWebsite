@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
 import type { WorkspaceContextFile } from "../_types"
 
@@ -140,13 +141,9 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
             </div>
             {selectedScenario && (
               <Badge
-                className={`ml-2 flex-shrink-0 text-xs ${
-                  selectedScenario.difficulty === "easy"
-                    ? "border-green-500/30 bg-green-500/20 text-green-400"
-                    : selectedScenario.difficulty === "medium"
-                      ? "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
-                      : "border-red-500/30 bg-red-500/20 text-red-400"
-                }`}
+                className={`ml-2 flex-shrink-0 text-xs ${difficultyColorClass(
+                  selectedScenario.difficulty,
+                )}`}
               >
                 {selectedScenario.difficulty}
               </Badge>

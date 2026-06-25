@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { InterviewTimer } from "@/components/interview"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
 import type { EditorLanguage } from "../_types"
 import { isLanguageSupported } from "../_utils/language"
@@ -91,13 +92,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
           {selectedScenario?.title}
         </h2>
         <Badge
-          className={`${
-            selectedScenario?.difficulty === "easy"
-              ? "bg-emerald-500/15 text-emerald-300"
-              : selectedScenario?.difficulty === "medium"
-                ? "bg-amber-500/15 text-amber-200"
-                : "bg-rose-500/15 text-rose-300"
-          } shrink-0 text-xs`}
+          className={`${difficultyColorClass(selectedScenario?.difficulty)} shrink-0 text-xs`}
         >
           {selectedScenario?.difficulty?.toUpperCase()}
         </Badge>

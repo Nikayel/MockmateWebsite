@@ -4,6 +4,7 @@ import { memo } from "react"
 import { Target } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
 
 interface FocusProblemPeekProps {
@@ -43,15 +44,7 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
               <Target className="text-accent h-4 w-4" />
               <span className="text-sm font-semibold text-white">{scenario.title}</span>
             </div>
-            <Badge
-              className={`text-xs ${
-                scenario.difficulty === "easy"
-                  ? "bg-green-500/20 text-green-400"
-                  : scenario.difficulty === "medium"
-                    ? "bg-yellow-500/20 text-yellow-400"
-                    : "bg-red-500/20 text-red-400"
-              }`}
-            >
+            <Badge className={`text-xs ${difficultyColorClass(scenario.difficulty)}`}>
               {scenario.difficulty}
             </Badge>
           </div>

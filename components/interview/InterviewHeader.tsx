@@ -15,6 +15,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { difficultyColorClass } from '@/lib/ui/difficulty-colors';
 import type { Scenario } from '@/lib/scenarios';
 
 /**
@@ -52,20 +53,6 @@ function getTypeIcon(type: string) {
       return <Layers className="h-4 w-4" />;
     default:
       return <Code className="h-4 w-4" />;
-  }
-}
-
-// Get difficulty color
-function getDifficultyColor(difficulty: string) {
-  switch (difficulty) {
-    case 'easy':
-      return 'bg-green-500/20 text-green-400 border-green-500/30';
-    case 'medium':
-      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-    case 'hard':
-      return 'bg-red-500/20 text-red-400 border-red-500/30';
-    default:
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   }
 }
 
@@ -107,7 +94,7 @@ export function InterviewHeader({
           <h1 className="text-sm font-medium text-white truncate max-w-[200px] md:max-w-[400px]">
             {scenario.title}
           </h1>
-          <Badge className={cn('text-xs capitalize', getDifficultyColor(scenario.difficulty))}>
+          <Badge className={cn('text-xs capitalize', difficultyColorClass(scenario.difficulty))}>
             {scenario.difficulty}
           </Badge>
         </div>

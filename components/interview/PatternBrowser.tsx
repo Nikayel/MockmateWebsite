@@ -13,6 +13,7 @@ import {
   type DifficultyLevel,
 } from "@/lib/scenarios"
 import { DSA_PATTERNS, PATTERN_METADATA, type DSAPattern } from "@/lib/types/dsa-patterns"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
 interface PatternBrowserProps {
   onStartInterview: (scenario: Scenario) => void
@@ -226,14 +227,8 @@ function inferPattern(scenario: Scenario): DSAPattern | null {
   return 'arrays-hashing' // Default fallback
 }
 
-const getDifficultyColor = (difficulty: DifficultyLevel) => {
-  switch (difficulty) {
-    case "easy": return "text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
-    case "medium": return "text-amber-300 bg-amber-500/10 border-amber-500/20"
-    case "hard": return "text-rose-300 bg-rose-500/10 border-rose-500/20"
-    default: return "text-gray-300 bg-gray-500/10 border-gray-500/20"
-  }
-}
+const getDifficultyColor = (difficulty: DifficultyLevel) =>
+  difficultyColorClass(difficulty, "softBadge")
 
 export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, completedProblems = [] }: PatternBrowserProps) {
   const [expandedPattern, setExpandedPattern] = useState<string | null>(null)
@@ -418,15 +413,15 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
         <h4 className="text-sm font-medium text-gray-400 mb-3">Pattern Difficulty Guide</h4>
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-400"></div>
+            <div className={`w-3 h-3 rounded-full ${difficultyColorClass("easy", "dot")}`}></div>
             <span className="text-gray-300">Easy - Good for beginners</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+            <div className={`w-3 h-3 rounded-full ${difficultyColorClass("medium", "dot")}`}></div>
             <span className="text-gray-300">Medium - Core interview problems</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-400"></div>
+            <div className={`w-3 h-3 rounded-full ${difficultyColorClass("hard", "dot")}`}></div>
             <span className="text-gray-300">Hard - Advanced challenges</span>
           </div>
         </div>
