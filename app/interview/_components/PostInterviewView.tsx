@@ -326,7 +326,7 @@ export function PostInterviewView({
                           key={index}
                           className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${
                             result.passed
-                              ? "bg-green-900/20 text-green-400"
+                              ? "bg-emerald-900/20 text-emerald-400"
                               : "bg-red-900/20 text-red-400"
                           }`}
                         >

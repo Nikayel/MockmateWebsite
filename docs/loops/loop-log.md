@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C: PostInterviewView test-result success color (green → emerald)
+
+- changed: The post-interview test-results list colored a passing test with off-palette `bg-green-900/20 text-green-400`, paired against a failing test's on-palette `bg-red-900/20 text-red-400`. Mapped the pass state to emerald (`bg-emerald-900/20 text-emerald-400`) so both states use the palette's functional roles — emerald = success, red = error. PostInterviewView now has no off-palette green. Color only — no behaviour/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on PostInterviewView.tsx · `pnpm build` → PASS
+- a11y: emerald-400 on the dark `bg-emerald-900/20` row meets AA; pass/fail is also conveyed by the CheckCircle vs XCircle icon, so the state is not color-only.
+- needs_human_review: false (on-palette functional-role recolor; layout unchanged)
+- workspace status: a full off-palette scan of app/interview/_components/* now comes back clean except the cross-cutting difficulty badge (green/yellow/red, duplicated inline across 10+ files incl. ProblemColumn/InterviewTopBar/FocusProblemPeek and non-workspace files). That badge is the only remaining color gap and needs a shared difficulty-color helper applied repo-wide — out of scope for a single-component loop iteration. Recommend a dedicated task for it (or pausing the loop).
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C: ChatColumn user message bubble (off-palette blue → accent)
 
 - changed: The user's chat message bubble used off-palette `bg-blue-600 text-white`. Mapped it to the component's established filled-accent convention `bg-accent text-accent-foreground` (already used by the send button at L163 and the Brain/title accents), so the user's own messages now read in the product's cyan brand accent while the assistant bubble stays neutral `bg-gray-800 text-gray-100`. Reuses an existing design token (DRY) instead of a hardcoded blue. Color only — no behaviour/copy change.
