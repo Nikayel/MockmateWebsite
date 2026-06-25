@@ -486,13 +486,13 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                           <div className="space-y-1.5 font-mono text-sm">
                             <div className="flex items-start gap-2">
                               <span className="min-w-[55px] font-medium text-gray-500">Input:</span>
-                              <code className="break-all text-green-400">{ex.input}</code>
+                              <code className="break-all text-gray-200">{ex.input}</code>
                             </div>
                             <div className="flex items-start gap-2">
                               <span className="min-w-[55px] font-medium text-gray-500">
                                 Output:
                               </span>
-                              <code className="break-all text-blue-400">{ex.output}</code>
+                              <code className="break-all text-gray-200">{ex.output}</code>
                             </div>
                           </div>
                           {ex.explanation && (

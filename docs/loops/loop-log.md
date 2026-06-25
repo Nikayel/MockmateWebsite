@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C (round 3): demote off-palette green/blue in DSA Examples (ProblemColumn.tsx)
+
+- changed: Demoted the DSA Example values from off-palette hues to gray — input `text-green-400` → `text-gray-200`, output `text-blue-400` → `text-gray-200`. Green and blue are not in the workspace palette (cyan/amber/emerald/red + gray); they were decorative coloring on code values whose meaning is already carried by the "Input:"/"Output:" labels (gray-500). The values stay clearly distinct from the labels (gray-200 vs gray-500) while the example box recedes to tertiary detail per the hierarchy spec. Removes the last off-palette green/blue from the DSA path. Color only — no behaviour/copy change. (Left intentionally: the difficulty badge green/red at L145 is a cross-cutting pattern duplicated across 10+ files; the thumbs-up "helpful" green at L419 is a legitimate positive feedback signal.)
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on ProblemColumn.tsx · `pnpm build` → PASS
+- a11y: gray-200 (#e4e4e7) mono code on the dark example card is high contrast (exceeds AA); distinction from gray-500 labels preserves scannability. No focus/keyboard change.
+- needs_human_review: false (token swap on two code values; layout/hierarchy unchanged)
+- loop status: the high-confidence hierarchy + color gaps in ProblemColumn are now addressed (Description dominant, Incident lead line, panel width, off-palette blue/green removed, amber reserved to incident framing). Remaining candidates are cross-cutting (difficulty badge across 10+ files) or debatable (Investigation Notes per-field amber/cyan/emerald semantic labels) — both better as a deliberate human-reviewed pass than incremental loop tweaks. Recommend pausing this loop or rotating to a different workspace component before churn sets in.
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C (round 2): reserve amber for incident framing (ProblemColumn.tsx)
 
 - changed: Demoted the "Repro Steps" and "Visible Logs" sub-labels inside the Incident Report box from `text-amber-200` to `text-gray-400`. Amber is the workspace's single functional warning role; spreading it across neutral supporting sub-labels diluted it and flattened the hierarchy (every sub-label read as "warning"). Now amber is reserved for the incident framing itself (box tint + main "Incident Report" header), and the neutral sub-labels recede to gray per the palette table. "Success Criteria" keeps `text-emerald-200` (its correct success role). No new hue, no behaviour/copy change.
