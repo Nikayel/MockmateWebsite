@@ -93,10 +93,10 @@ export const InterviewTopBar = memo(function InterviewTopBar({
         <Badge
           className={`${
             selectedScenario?.difficulty === "easy"
-              ? "bg-green-600/20 text-green-400"
+              ? "bg-emerald-500/15 text-emerald-300"
               : selectedScenario?.difficulty === "medium"
-                ? "bg-yellow-600/20 text-yellow-400"
-                : "bg-red-600/20 text-red-400"
+                ? "bg-amber-500/15 text-amber-200"
+                : "bg-rose-500/15 text-rose-300"
           } shrink-0 text-xs`}
         >
           {selectedScenario?.difficulty?.toUpperCase()}
@@ -110,7 +110,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
               ? `Workspace scenario language: ${selectedScenario.workspace.language}`
               : "Choose editor language"
           }
-          className="hidden rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-[#00d9ff] focus:outline-none sm:block"
+          className="focus:ring-accent hidden rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:ring-2 focus:outline-none sm:block"
         >
           <option value="javascript">JavaScript</option>
           <option value="typescript">TypeScript</option>
@@ -123,39 +123,49 @@ export const InterviewTopBar = memo(function InterviewTopBar({
         </select>
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg bg-gray-800/50 p-0.5 lg:hidden">
+      <div
+        className="flex items-center gap-1 rounded-lg bg-gray-800/50 p-0.5 lg:hidden"
+        role="tablist"
+        aria-label="Switch panel"
+      >
         <button
           onClick={() => onActivePanelChange("problem")}
-          className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
+          className={`flex h-9 w-9 items-center justify-center rounded transition-all ${
             activePanel === "problem"
               ? "bg-accent text-accent-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
           title="Problem"
+          aria-label="Show problem"
+          aria-pressed={activePanel === "problem"}
         >
-          <Target className="h-3 w-3" />
+          <Target className="h-4 w-4" />
         </button>
         <button
           onClick={() => onActivePanelChange("editor")}
-          className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
+          className={`flex h-9 w-9 items-center justify-center rounded transition-all ${
             activePanel === "editor"
               ? "bg-accent text-accent-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
           title="Code Editor"
+          aria-label="Show code editor"
+          aria-pressed={activePanel === "editor"}
         >
-          <Code className="h-3 w-3" />
+          <Code className="h-4 w-4" />
         </button>
         <button
           onClick={() => onActivePanelChange("chat")}
-          className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
+          className={`flex h-9 w-9 items-center justify-center rounded transition-all ${
             activePanel === "chat"
               ? "bg-accent text-accent-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
           title="Interview Chat"
+          aria-label="Show interview chat"
+          aria-pressed={activePanel === "chat"}
         >
-          <Brain className="h-3 w-3" />
+          <Brain className="h-4 w-4" />
         </button>
       </div>
 
