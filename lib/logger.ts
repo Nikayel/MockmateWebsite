@@ -171,6 +171,102 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 /**
+ * Map our log levels to Sentry severity levels.
+ */
+function toSentryLevel(level: LogLevel): 'debug' | 'info' | 'warning' | 'error' {
+  return level === 'warn' ? 'warning' : level
+}
+
+interface ParsedDsn {
+  ingestUrl: string
+  publicKey: string
+}
+
+let cachedDsn: ParsedDsn | null | undefined
+
+/**
+ * Parse a Sentry DSN into the store-endpoint URL and public key.
+ * DSN shape: https://<publicKey>@<host>/<projectId>
+ * Returns null (cached) when the DSN is missing or malformed.
+ */
+function parseSentryDsn(): ParsedDsn | null {
+  if (cachedDsn !== undefined) return cachedDsn
+
+  const dsn = process.env.SENTRY_DSN
+  if (!dsn) {
+    cachedDsn = null
+    return null
+  }
+
+  try {
+    const url = new URL(dsn)
+    const projectId = url.pathname.replace(/^\//, '')
+    if (!url.username || !projectId) {
+      cachedDsn = null
+      return null
+    }
+    cachedDsn = {
+      ingestUrl: `${url.protocol}//${url.host}/api/${projectId}/store/`,
+      publicKey: url.username,
+    }
+  } catch {
+    cachedDsn = null
+  }
+  return cachedDsn
+}
+
+/**
+ * Send an event to Sentry via the public ingestion API.
+ *
+ * Uses a direct fetch to Sentry's store endpoint so we get production error
+ * tracking without bundling the @sentry/nextjs SDK (zero bundle cost, works in
+ * both Node and Edge runtimes). Context is PII-redacted before it leaves the
+ * process. Upgrade to @sentry/nextjs later if performance tracing is needed.
+ */
+async function sendToSentry(
+  level: LogLevel,
+  message: string,
+  context?: ErrorContext
+): Promise<void> {
+  const dsn = parseSentryDsn()
+  if (!dsn) return
+
+  const safeContext = context ? (redactPII(context) as Record<string, unknown>) : undefined
+  const event = {
+    event_id: crypto.randomUUID().replace(/-/g, ''),
+    timestamp: new Date().toISOString(),
+    platform: 'node',
+    level: toSentryLevel(level),
+    logger: 'codesparring',
+    environment: process.env.NODE_ENV || 'production',
+    release: process.env.VERCEL_GIT_COMMIT_SHA || undefined,
+    server_name: process.env.VERCEL_REGION || undefined,
+    message: { formatted: redactPIIFromString(message) },
+    tags: {
+      endpoint: context?.endpoint,
+      statusCode: context?.statusCode,
+    },
+    extra: safeContext,
+  }
+
+  await fetch(dsn.ingestUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sentry-Auth': `Sentry sentry_version=7, sentry_client=codesparring/1.0, sentry_key=${dsn.publicKey}`,
+    },
+    body: JSON.stringify(event),
+  }).then(async (res) => {
+    if (!res.ok && res.status !== 429) {
+      const body = await res.text().catch(() => '')
+      console.error(`[Sentry] Failed to send event (${res.status}): ${body}`)
+    }
+  }).catch((err) => {
+    console.error('[Sentry] Network error sending event:', err?.message || err)
+  })
+}
+
+/**
  * Send error to external monitoring service
  * Configure with environment variables:
  * - SENTRY_DSN: Sentry error tracking
@@ -185,14 +281,10 @@ async function sendToExternalService(
   if (isDev || isTest) return
 
   try {
-    // Sentry integration (if configured)
-    // Note: To enable Sentry, install @sentry/nextjs and uncomment this block
-    // The Sentry SDK is not bundled by default to reduce bundle size
-    if (process.env.SENTRY_DSN && level === 'error') {
-      // Sentry error tracking would go here if @sentry/nextjs is installed
-      // For now, we rely on LogFlare or console logging
-      // TODO: Add Sentry integration when ready for production monitoring
-      console.error('[Sentry not configured]', message, context)
+    // Sentry integration (active when SENTRY_DSN is configured).
+    // Capture errors and warnings; skip lower-severity noise.
+    if (level === 'error' || level === 'warn') {
+      await sendToSentry(level, message, context)
     }
 
     // LogFlare integration (if configured)
