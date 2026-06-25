@@ -12,6 +12,14 @@ Format:
 
 <!-- entries below -->
 
+## 2026-06-25 — interview-workspace-ux-loop — Target C: Guest Mode banner gradient (off-palette purple → accent) in page.tsx
+
+- changed: A full off-palette scan of app/interview/page.tsx surfaced one last foreign hue: the Guest Mode "Free Trial" banner used a `from-accent/20 … to-purple-600/20` gradient. Every other element in the banner is cyan (text-accent, border-accent/30, the sign-up link), so purple was the lone outlier. Replaced `to-purple-600/20` with `to-accent/5`, making it a single-accent cyan wash. Per the loop's hard rule (never add a new accent hue), and since amber/emerald/red don't fit a trial/upgrade banner semantically, single-accent cyan is the correct on-palette choice. Color only — no behaviour/copy change.
+- gates: `pnpm typecheck` → PASS · `pnpm lint` → 0 errors on page.tsx · `pnpm build` → PASS
+- a11y: gradient is a decorative background tint behind text that already uses its own contrast tokens (text-accent / text-muted-foreground); softening the far stop to accent/5 does not reduce text contrast. No focus/keyboard change.
+- needs_human_review: false (decorative background tint, on-palette; layout unchanged)
+- WORKSPACE NOW FULLY ON-PALETTE: a complete scan of app/interview/page.tsx + app/interview/_components/* finds zero off-palette hues. The ONLY remaining color gap anywhere in scope is the cross-cutting difficulty badge (green/yellow/red), duplicated inline across 10+ files (workspace + roadmap/metrics/dashboard/admin). That requires a single shared difficulty-color helper applied repo-wide — explicitly out of scope for this "one component per iteration" loop, which also forbids cross-cutting refactors. RECOMMENDATION: pause this loop; open a dedicated task for the difficulty-badge helper; and review the two needs_human_review items (panel-width widening; Investigation Notes de-rainbow).
+
 ## 2026-06-25 — interview-workspace-ux-loop — Target C: PostInterviewView test-result success color (green → emerald)
 
 - changed: The post-interview test-results list colored a passing test with off-palette `bg-green-900/20 text-green-400`, paired against a failing test's on-palette `bg-red-900/20 text-red-400`. Mapped the pass state to emerald (`bg-emerald-900/20 text-emerald-400`) so both states use the palette's functional roles — emerald = success, red = error. PostInterviewView now has no off-palette green. Color only — no behaviour/copy change.

@@ -5034,7 +5034,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       {/* Guest Mode Banner - Sticky below header */}
       {isGuestMode && !showFeedback && (
-        <div className="from-accent/20 border-accent/30 fixed top-[64px] right-0 left-0 z-40 border-b bg-gradient-to-r to-purple-600/20 backdrop-blur-sm">
+        <div className="from-accent/20 border-accent/30 fixed top-[64px] right-0 left-0 z-40 border-b bg-gradient-to-r to-accent/5 backdrop-blur-sm">
           <div className="container mx-auto flex items-center justify-between px-4 py-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-accent font-medium">Free Trial</span>
