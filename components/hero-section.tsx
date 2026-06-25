@@ -6,6 +6,7 @@ import Link from "next/link"
 import { motion, useReducedMotion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import { GridBackground } from "@/components/GridBackground"
+import { trackEvent } from "@/lib/analytics"
 
 // Lazy load Three.js particles for performance
 const SubtleParticles = dynamic(
@@ -108,12 +109,21 @@ export function HeroSection() {
           >
             <Link
               href="/interview"
+              onClick={() =>
+                trackEvent("cta_click", { location: "hero_primary", destination: "/interview" })
+              }
               className="bg-accent inline-flex rounded-[14px] px-10 py-4 text-base font-extrabold text-zinc-950 shadow-[0_0_40px_rgba(34,211,238,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-95 hover:shadow-[0_0_46px_rgba(34,211,238,0.34)]"
             >
               Try free
             </Link>
             <Link
               href="/why-codesparring"
+              onClick={() =>
+                trackEvent("cta_click", {
+                  location: "hero_secondary",
+                  destination: "/why-codesparring",
+                })
+              }
               className="inline-flex rounded-[14px] border border-white/12 px-7 py-4 text-base font-semibold text-[#dfe4f2] transition-colors duration-200 hover:bg-white/[0.06]"
             >
               See how it works

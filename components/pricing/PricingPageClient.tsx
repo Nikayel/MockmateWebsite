@@ -6,6 +6,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown } from "lucide-react"
 import { getProPricing } from "@/lib/config"
+import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -72,7 +73,12 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
 
               <div className="mb-2 text-4xl font-bold text-white">Free</div>
 
-              <Link href="/interview">
+              <Link
+                href="/interview"
+                onClick={() =>
+                  trackEvent("cta_click", { location: "pricing_free", destination: "/interview" })
+                }
+              >
                 <Button
                   variant="outline"
                   className="mb-4 w-full border-white/20 text-white hover:bg-white/10"
@@ -109,7 +115,16 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                 <span className="text-sm text-gray-400">{currentProPrice.period}</span>
               </div>
 
-              <Link href="/upgrade">
+              <Link
+                href="/upgrade"
+                onClick={() =>
+                  trackEvent("cta_click", {
+                    location: "pricing_pro_subscribe",
+                    destination: "/upgrade",
+                    billing_period: billingPeriod,
+                  })
+                }
+              >
                 <Button className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-black">
                   Subscribe
                 </Button>
