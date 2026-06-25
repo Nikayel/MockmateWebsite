@@ -6,8 +6,8 @@
  * Embeds the existing multi-file workspace editor on the build scenario the lab
  * points at (`buildScenarioId`) — a partial implementation to extend/fix, NOT a
  * blank single-file DSA task. Editable files are editable; reference/test/docs
- * files are read-only. Edits persist to the run via `setBuild`. Running tests
- * against `/api/execute` is wired in the next increment.
+ * files are read-only. Edits persist to the run via `setBuild`, and "Run tests"
+ * executes the editable files against `/api/execute`, showing pass/fail results.
  */
 
 import { useMemo, useState } from "react"

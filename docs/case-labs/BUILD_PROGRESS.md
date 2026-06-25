@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 3
-**Last updated by loop:** Phase 3 — Build station run-tests wired to /api/execute
+**Last updated by loop:** Phase 3 — `ReviewStation` (recap + self-grade + feedback render)
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Phase 3 — Build & Review (spec §7.4–7.5)
 - [x] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor)
-- [ ] `ReviewStation` → existing feedback pipeline → render `structured_feedback`
-- [ ] On complete: update mastery + mark Run `completed`
+- [~] `ReviewStation` → existing feedback pipeline → render `structured_feedback` (UI done: recap, self-grade rubric, structured_feedback render; pipeline call to generate feedback next)
+- [~] On complete: update mastery + mark Run `completed` (marks Run completed via `completeRun` + autosave; mastery update with feedback generation next)
 
 ## Phase 4 — Port Palantir 911 Dispatch (spec §1, §7.4; ingredient: ../workbook-palantir-decomp/labs/lab_01_911_dispatch)
 - [ ] Map Clarify/Decompose/Design/Review content into the `CaseLab` definition
@@ -73,3 +73,4 @@
 - Phase 2 (complete): client persistence — `lib/labs/case-lab-runs-client.ts` (token-attached fetch wrappers, degrade to null when signed out/failed) + `components/labs/useCaseLabRunSync.ts` (loads the in-progress run once per lab for resume; debounced 1s autosave on answer/status/nav changes; adopts a server-assigned id without clobbering in-flight edits; soft error on failure). typecheck + lint clean; graph updated.
 - Phase 3 (Build scaffold): `components/labs/stations/BuildStation.tsx` — loads the lab's `buildScenarioId` via `getScenarioById`, renders the multi-file workspace (file tabs with lock icons for read-only, reused `CodeMirrorEditor` + error boundary), persists edits via `setBuild` (touchedFiles diffed vs originals, primary-file code). Handles no-scenario / not-found / non-workspace empty states. Wired into `StationSwitcher`. NOTE: persists primary-file code for now (multi-file content persistence + `/api/execute` run-tests are the next increment). typecheck + lint clean; graph updated.
 - Phase 3 (Build complete): wired "Run tests" in BuildStation → POST `/api/execute` with `{scenarioId, language, workspaceFiles:[{path,content}]}` (editable files only), maps the response `results` to `BuildTestResult[]`, persists via `setBuild`, and renders a pass/fail panel with `n/m passing` + per-test check/X + error messages. Attaches the auth token when present; loading + error states handled. typecheck + lint clean; graph updated.
+- Phase 3 (Review UI): `components/labs/stations/ReviewStation.tsx` — read-only recap of all milestones (clarify/decompose/design/build with test pass count), 1–5 self-grade rubric across the 5 `CaseLabRubricDimension`s persisting via `setReview`, renders `structured_feedback` (tldr/whatWorked/fixNext/actionPlan) when present, and a "Complete lab" button → `completeRun`. Now all 5 stations are real, so `StationSwitcher` dropped the stub (exhaustive switch). Fixed BuildStation's stale doc-comment. typecheck + lint clean; graph updated.
