@@ -8,6 +8,7 @@
 import { analytics } from "./firebase"
 import { logEvent as firebaseLogEvent } from "firebase/analytics"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
+import { getAttributionParams } from "./attribution"
 
 /**
  * Check if analytics tracking is allowed based on user consent
@@ -32,7 +33,9 @@ export function trackEvent(eventName: string, params?: Record<string, any>) {
   }
 
   try {
-    firebaseLogEvent(analytics, eventName, params)
+    // Attach first-touch channel attribution so every conversion event is
+    // traceable back to the channel (content / community / paid) that drove it.
+    firebaseLogEvent(analytics, eventName, { ...getAttributionParams(), ...params })
   } catch (error) {
     console.error("Analytics error:", error)
   }

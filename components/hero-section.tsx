@@ -1,10 +1,9 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { TypewriterText } from "@/components/ui/rotating-text"
-import { Bot, Sparkles } from "lucide-react"
+import { Bug, Bot, Repeat } from "lucide-react"
 import Link from "next/link"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import { GridBackground } from "@/components/GridBackground"
 
@@ -15,203 +14,174 @@ const SubtleParticles = dynamic(
 )
 
 /**
- * Hero Section - Research-backed UX improvements
+ * Hero Section — bugfix-led positioning + cognitive-load-aware UX.
  *
- * Changes based on cognitive load research:
- * 1. Clear product descriptor above headline ("AI Mock Interview Platform")
- * 2. Rotating text showing capabilities - progressive disclosure
- * 3. Softer background (bg-background instead of bg-black)
- * 4. Clearer value proposition hierarchy
- *
- * Sources: NN/G, Voyage AI patterns, 2025 Eye Tracking Studies
+ * Principles applied (Sweller intrinsic/extraneous/germane load; NN/G):
+ * - One message at a time: single headline → one subhead → one primary CTA.
+ * - Reduced extraneous motion: static pillar chips instead of a running
+ *   typewriter; particles + entrance animation disabled under
+ *   prefers-reduced-motion.
+ * - Content matches the message: the demo shows a failing test + AI guiding the
+ *   fix (real-codebase debugging), not a LeetCode snippet.
+ * - Restrained color: single brand accent token + neutrals.
  */
 
-// Capabilities to rotate through - focused on real value
-const capabilities = [
-  "Voice-enabled mock interviews",
-  "Available 24/7, no scheduling",
-  "Real-time AI feedback",
-  "Spaced repetition scheduling",
-  "15 DSA patterns covered",
+// The three supporting pillars beneath the bugfix wedge. Static (no motion to track).
+const pillars = [
+  { icon: Bug, label: "Real-codebase debugging" },
+  { icon: Bot, label: "An AI interviewer that reacts" },
+  { icon: Repeat, label: "Spaced repetition that sticks" },
 ]
 
 export function HeroSection() {
+  const reduceMotion = useReducedMotion()
+
   return (
     <section className="relative flex min-h-[100svh] flex-col items-center overflow-hidden bg-[#131317] px-4 pt-[clamp(8rem,18vh,13rem)] pb-16 text-center font-[var(--font-geist)] md:px-16">
       {/* CSS Background - lightweight base */}
       <GridBackground />
 
-      {/* Subtle Three.js particles overlay */}
-      <SubtleParticles
-        className="absolute inset-0 z-[1] opacity-40"
-        particleCount={15}
-        primaryColor="#adc6ff"
-        secondaryColor="#60a5fa"
-      />
+      {/* Subtle particles overlay — skipped entirely under reduced motion */}
+      {!reduceMotion && (
+        <SubtleParticles
+          className="absolute inset-0 z-[1] opacity-25"
+          particleCount={12}
+          primaryColor="#22d3ee"
+          secondaryColor="#0891b2"
+        />
+      )}
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-[620px] bg-[radial-gradient(circle_at_50%_-20%,rgba(173,198,255,0.12),rgba(19,19,23,0)_70%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-[620px] bg-[radial-gradient(circle_at_50%_-20%,rgba(34,211,238,0.10),rgba(19,19,23,0)_70%)]" />
 
       {/* Content */}
       <motion.div
         className="relative z-10 mx-auto w-full max-w-[1200px]"
         variants={staggerContainer}
-        initial="initial"
-        animate="animate"
+        initial={reduceMotion ? false : "initial"}
+        animate={reduceMotion ? false : "animate"}
       >
         <motion.div variants={staggerItem} className="mx-auto flex max-w-4xl flex-col items-center">
-          <span className="mb-8 inline-flex rounded-full border border-white/10 bg-[#2a2a2e]/80 px-4 py-1.5 text-[12px] font-bold tracking-[0.1em] text-[#adc6ff] uppercase lg:mb-9">
-            #1 Technical Interview Simulator
+          {/* Eyebrow: product descriptor */}
+          <span className="text-accent mb-8 inline-flex rounded-full border border-white/10 bg-[#2a2a2e]/80 px-4 py-1.5 text-[12px] font-bold tracking-[0.1em] uppercase lg:mb-9">
+            AI mock interviews for real engineering work
           </span>
 
+          {/* Focal point: bugfix-led headline */}
           <motion.h1
             variants={staggerItem}
-            className="font-heading mb-6 text-[clamp(3.25rem,8vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.055em] text-[#e9e8ef]"
+            className="font-heading mb-6 text-[clamp(3rem,7.5vw,4.75rem)] leading-[1.06] font-extrabold tracking-[-0.05em] text-[#e9e8ef]"
           >
-            CodeSparring: AI
+            Debug <span className="text-accent">real codebases</span>
             <br />
-            <span className="text-[#adc6ff]">Technical Interview Practice</span>
+            in a live AI interview
           </motion.h1>
 
+          {/* One-line subhead naming the three pillars */}
           <motion.p
             variants={staggerItem}
-            className="mx-auto mb-5 max-w-2xl text-base leading-7 font-medium text-[#c2c6d6] sm:text-lg md:text-xl md:leading-8"
+            className="mx-auto mb-7 max-w-2xl text-base leading-7 font-medium text-[#c2c6d6] sm:text-lg md:text-xl md:leading-8"
           >
-            Practice technical interviews with an AI interviewer that scores your code,
-            communication, and problem-solving.
+            Fix failing tests in real codebases with an AI interviewer that reacts as you work—then
+            keep it with spaced repetition. The round LeetCode never gave you.
           </motion.p>
 
+          {/* Static pillar chips (supporting pillars, no animation) */}
+          <motion.ul
+            variants={staggerItem}
+            className="mb-9 flex flex-wrap items-center justify-center gap-2"
+          >
+            {pillars.map(({ icon: Icon, label }) => (
+              <li
+                key={label}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-sm font-medium text-[#dfe4f2]"
+              >
+                <Icon className="text-accent h-3.5 w-3.5" />
+                {label}
+              </li>
+            ))}
+          </motion.ul>
+
+          {/* One primary CTA + one quiet secondary */}
           <motion.div
             variants={staggerItem}
-            className="mb-8 flex h-8 items-center justify-center text-sm font-semibold text-[#dfe4f2] sm:text-base"
+            className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4"
           >
-            <Sparkles className="mr-2 h-4 w-4 flex-shrink-0 text-[#adc6ff]" />
-            <TypewriterText
-              texts={capabilities}
-              typingSpeed={40}
-              deletingSpeed={25}
-              pauseDuration={2500}
-              className="text-[#dfe4f2]"
-            />
-          </motion.div>
-
-          <motion.div variants={staggerItem}>
             <Link
               href="/interview"
-              className="inline-flex rounded-[14px] bg-[#adc6ff] px-10 py-4 text-base font-extrabold text-[#001a42] shadow-[0_0_40px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#bfd0ff] hover:shadow-[0_0_46px_rgba(173,198,255,0.36)]"
+              className="bg-accent inline-flex rounded-[14px] px-10 py-4 text-base font-extrabold text-zinc-950 shadow-[0_0_40px_rgba(34,211,238,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-95 hover:shadow-[0_0_46px_rgba(34,211,238,0.34)]"
             >
-              Try Free
+              Try free
+            </Link>
+            <Link
+              href="/why-codesparring"
+              className="inline-flex rounded-[14px] border border-white/12 px-7 py-4 text-base font-semibold text-[#dfe4f2] transition-colors duration-200 hover:bg-white/[0.06]"
+            >
+              See how it works
             </Link>
           </motion.div>
         </motion.div>
 
+        {/* Demo: a failing test + AI interviewer guiding the fix (matches the message) */}
         <motion.div
           variants={staggerItem}
           className="mx-auto mt-[clamp(3rem,8vh,5rem)] w-full max-w-[1000px] px-2"
         >
-          <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#1f1f23]/45 shadow-[0_30px_90px_-40px_rgba(96,165,250,0.45)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1 hover:border-[#adc6ff]/30">
+          <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#1f1f23]/45 shadow-[0_30px_90px_-40px_rgba(34,211,238,0.4)] backdrop-blur-xl">
             <div className="flex h-10 items-center gap-2 border-b border-white/10 bg-[#2a2a2e]/45 px-4">
               <div className="flex gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-[#ffb4ab]/50" />
                 <div className="h-2.5 w-2.5 rounded-full bg-[#ffb786]/50" />
-                <div className="h-2.5 w-2.5 rounded-full bg-[#adc6ff]/50" />
+                <div className="bg-accent/50 h-2.5 w-2.5 rounded-full" />
               </div>
               <div className="mx-auto font-mono text-xs text-[#c2c6d6]/60">
-                Interview Session: Two Sum (Optimal)
+                Debugging Session: checkout total returns NaN
               </div>
             </div>
 
             <div className="grid min-h-[360px] grid-cols-1 overflow-hidden text-left md:grid-cols-12">
               <div className="overflow-hidden border-white/10 bg-[#1a1a1f] p-6 font-mono text-sm leading-6 text-[#c2c6d6] md:col-span-8 md:border-r md:p-8">
-                <pre className="whitespace-pre-wrap">
-                  <span className="text-[#adc6ff]">const</span>{" "}
-                  <span className="text-[#e4e1e7]">twoSum</span> = (nums, target) =&gt; {"{"}
-                  {"\n"}
-                  {"    "}
-                  <span className="text-[#adc6ff]">const</span> map ={" "}
-                  <span className="text-[#adc6ff]">new</span> Map();{"\n"}
-                  {"    "}
-                  <span className="text-[#ffb786]">
-                    {"// I'm thinking... if I use a hashmap here"}
+                <div className="mb-4 flex items-center gap-2 text-xs">
+                  <span className="rounded bg-[#ffb4ab]/15 px-2 py-0.5 font-semibold text-[#ffb4ab]">
+                    ✕ 1 failing
                   </span>
+                  <span className="text-[#c2c6d6]/60">cart.test.ts › applies discount</span>
+                </div>
+                <pre className="whitespace-pre-wrap">
+                  <span className="text-[#ffb4ab]">{"  expect(total).toBe(90)"}</span>
                   {"\n"}
-                  {"    "}
-                  <span className="text-[#ffb786]">{"// I can look up values in O(1)"}</span>
+                  <span className="text-[#ffb4ab]">{"  Received: NaN"}</span>
+                  {"\n\n"}
+                  <span className="text-accent">function</span>{" "}
+                  <span className="text-[#e4e1e7]">applyDiscount</span>(price, pct) {"{"}
                   {"\n"}
-                  {"    "}
-                  <span className="text-[#adc6ff]">for</span> (
-                  <span className="text-[#adc6ff]">let</span> i = 0; i &lt; nums.length; i++) {"{"}
+                  {"  "}
+                  <span className="text-[#ffb786]">{'// pct arrives as "20", not 0.2'}</span>
                   {"\n"}
-                  {"        "}
-                  <span className="text-[#adc6ff]">const</span> complement = target - nums[i];
-                  {"\n"}
-                  {"        "}
-                  <span className="text-[#adc6ff]">if</span> (map.has(complement)) {"{"}
-                  {"\n"}
-                  {"            "}
-                  <span className="text-[#adc6ff]">return</span> [map.get(complement), i];{"\n"}
-                  {"        "}
+                  {"  "}
+                  <span className="text-accent">return</span> price - price * pct;{"\n"}
                   {"}"}
-                  {"\n"}
-                  {"        "}map.set(nums[i], i);{"\n"}
-                  {"    "}
-                  {"}"}
-                  {"\n"}
-                  {"}"};
                 </pre>
               </div>
 
               <div className="flex flex-col gap-6 bg-[#1b1b1f]/65 p-6 md:col-span-4 md:p-8">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#adc6ff]/30 bg-[#adc6ff]/20">
-                    <Bot className="h-4 w-4 text-[#adc6ff]" />
+                  <div className="border-accent/30 bg-accent/20 flex h-8 w-8 items-center justify-center rounded-full border">
+                    <Bot className="text-accent h-4 w-4" />
                   </div>
                   <div className="text-sm font-bold text-[#e4e1e7]">AI Interviewer</div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-[#1f1f23]/60 p-5 text-sm leading-6 text-[#c2c6d6]">
-                  "Exactly right. Walk me through what you'd store in the hashmap and how you'd
-                  handle the lookup."
+                  "The test expects 90 but gets NaN. Before you change the formula—what are the
+                  actual types of <span className="text-accent font-mono">price</span> and{" "}
+                  <span className="text-accent font-mono">pct</span> here?"
                 </div>
-                <div className="mt-auto border-t border-white/10 pt-6">
-                  <div className="mb-3 flex items-center justify-between text-[10px] font-bold tracking-[0.14em] text-[#c2c6d6] uppercase">
-                    <span>Voice Activity</span>
-                    <span className="flex items-center gap-1 text-[#adc6ff]">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#adc6ff]" />
-                      Recording...
-                    </span>
-                  </div>
-                  <div className="flex h-8 items-center gap-1.5">
-                    {[16, 32, 24, 16, 28, 20].map((height, index) => (
-                      <div
-                        key={index}
-                        className="w-1 animate-bounce rounded-full bg-[#adc6ff]"
-                        style={{
-                          height,
-                          opacity: index === 0 || index === 5 ? 0.45 : index === 3 ? 0.65 : 1,
-                          animationDelay: `${index * 0.1}s`,
-                        }}
-                      />
-                    ))}
-                  </div>
+                <div className="mt-auto rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-[#c2c6d6]/80">
+                  Navigate the repo · reproduce · find root cause · ship the fix
                 </div>
               </div>
             </div>
           </div>
         </motion.div>
-      </motion.div>
-
-      {/* Scroll indicator */}
-      <motion.div
-        className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2"
-        animate={{ y: [0, 6, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <div className="border-border flex h-8 w-5 items-start justify-center rounded-full border p-1.5">
-          <motion.div
-            className="bg-muted-foreground/30 h-1.5 w-1 rounded-full"
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        </div>
       </motion.div>
     </section>
   )

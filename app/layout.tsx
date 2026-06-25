@@ -10,6 +10,7 @@ import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
 import { ReferralCapture } from "@/components/ReferralCapture"
+import { AttributionCapture } from "@/components/AttributionCapture"
 import {
   OrganizationJsonLd,
   SoftwareApplicationJsonLd,
@@ -219,6 +220,7 @@ html {
         </a>
         <PerformancePolyfill />
         <ReferralCapture />
+        <AttributionCapture />
         <ErrorBoundaryProvider>
           <AuthProvider>
             <RateLimitProvider>

@@ -350,6 +350,49 @@ export function BreadcrumbJsonLd({ items }: { items: Array<{ name: string; url: 
   )
 }
 
+// CollectionPage + ItemList Schema - richer SERP for the /blog listing
+export function BlogCollectionJsonLd({
+  posts,
+}: {
+  posts: Array<{ slug: string; title: string; description: string; date: string }>
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "CodeSparring Blog",
+    description:
+      "Guides on technical interview prep, real-codebase debugging, spaced repetition, and FAANG interviews.",
+    url: `${SITE_URL}/blog`,
+    isPartOf: {
+      "@type": "WebSite",
+      name: "CodeSparring",
+      url: SITE_URL,
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: posts.map((post, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${SITE_URL}/blog/${post.slug}`,
+        item: {
+          "@type": "BlogPosting",
+          headline: post.title,
+          description: post.description,
+          datePublished: post.date,
+          url: `${SITE_URL}/blog/${post.slug}`,
+        },
+      })),
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
 // Person Schema - for founder name SEO (helps your name show up in searches)
 // This is a standalone Person schema separate from Organization.founder
 export function FounderPersonJsonLd() {
