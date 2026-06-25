@@ -4,14 +4,14 @@
 > The loop reads this each iteration to find the next unchecked task, and checks items off as it ships them.
 > Spec detail lives in `CASE_LABS.md` (§ references below). Keep notes terse.
 
-**Status:** not started
+**Status:** in progress
 **Current phase:** Phase 0
-**Last updated by loop:** —
+**Last updated by loop:** Phase 0 — `lib/labs/types.ts` shipped
 
 ---
 
 ## Phase 0 — Scaffolding & types (spec §9, §12)
-- [ ] `lib/labs/types.ts` — `CaseLab`, `CaseLabMilestone`, `MilestoneKind` (buildScenarioType = bugfix|add-functionality|system-design, never DSA)
+- [x] `lib/labs/types.ts` — `CaseLab`, `CaseLabMilestone`, `MilestoneKind` (buildScenarioType = bugfix|add-functionality|system-design, never DSA)
 - [ ] Firestore `caseLabRuns` shape documented in `docs/FIREBASE_STRUCTURE.md`
 - [ ] `lib/stores/case-lab-store.ts` — milestone + answers state
 
@@ -56,7 +56,7 @@
 ---
 
 ## Decision log (loop appends new choices here)
-- _(none yet)_
+- `lib/labs/types.ts` is the single home for all Case Labs domain types (lab definition + milestone answers + `CaseLabRun`). The Firestore-shape task (next) documents the same `CaseLabRun` in `FIREBASE_STRUCTURE.md`; the store imports these types rather than redefining them.
 
 ## Iteration notes (loop appends one line per increment)
-- _(none yet)_
+- Phase 0: `lib/labs/types.ts` — full Case Labs type module (CaseLab/CaseLabMilestone/MilestoneKind, per-milestone answer shapes, resumable `CaseLabRun`). Reuses `DifficultyLevel`, `WorkspaceScenarioLanguage`, and `InterviewSession.structured_feedback` to stay DRY. typecheck + lint clean.
