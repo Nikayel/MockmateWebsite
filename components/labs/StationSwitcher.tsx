@@ -13,6 +13,7 @@ import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
 import type { MilestoneKind } from "@/lib/labs/types"
 import { MilestoneNav } from "./MilestoneNav"
+import { ClarifyStation } from "./stations/ClarifyStation"
 
 /** Placeholder station — replaced by real stations in Phases 2–3. */
 function StationStub({ kind }: { kind: MilestoneKind }) {
@@ -49,10 +50,18 @@ export function StationSwitcher({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex h-full flex-col gap-3", className)}>
-      <div className="min-h-0 flex-1">
-        <StationStub kind={current} />
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{renderStation(current)}</div>
       <MilestoneNav />
     </div>
   )
+}
+
+/** Map a milestone to its station; stations not yet built fall back to a stub. */
+function renderStation(kind: MilestoneKind) {
+  switch (kind) {
+    case "clarify":
+      return <ClarifyStation />
+    default:
+      return <StationStub kind={kind} />
+  }
 }
