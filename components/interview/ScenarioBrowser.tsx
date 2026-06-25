@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, memo } from "react"
-import { Search, LayoutGrid, List, Target } from "lucide-react"
+import { useState, useEffect, memo } from "react"
+import { Search, LayoutGrid, List, Target, Rows3 } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 import type { Scenario } from "@/lib/scenarios"
@@ -9,6 +9,7 @@ import { useScenarioFilters } from "@/lib/hooks"
 import { PatternBrowser } from "./PatternBrowser"
 import { DSARoadmap } from "./DSARoadmap"
 import { ScenarioCard } from "./ScenarioCard"
+import { ScenarioListRow } from "./ScenarioListRow"
 import { ScenarioFilters } from "./ScenarioFilters"
 
 interface ScenarioBrowserProps {
@@ -19,6 +20,9 @@ interface ScenarioBrowserProps {
 }
 
 type ViewMode = "roadmap" | "patterns" | "list"
+// Density of the Codebases catalog: rich cards for discovery, compact rows for scanning.
+type Density = "cards" | "rows"
+const DENSITY_STORAGE_KEY = "mockmate_scenario_density"
 
 export const ScenarioBrowser = memo(function ScenarioBrowser({
   onStartInterview,
@@ -27,6 +31,19 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   hasGuestBanner = false,
 }: ScenarioBrowserProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [density, setDensity] = useState<Density>("cards")
+
+  // Restore the user's preferred density once on mount (client-only).
+  useEffect(() => {
+    const saved = localStorage.getItem(DENSITY_STORAGE_KEY)
+    if (saved === "cards" || saved === "rows") setDensity(saved)
+  }, [])
+
+  const updateDensity = (next: Density) => {
+    setDensity(next)
+    localStorage.setItem(DENSITY_STORAGE_KEY, next)
+  }
+
   const { selectedScenario, setSelectedScenario } = useInterviewStore(
     useShallow((state) => ({
       selectedScenario: state.selectedScenario,
@@ -144,6 +161,40 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 onClearCompanies={clearCompanyFilters}
               />
 
+              {/* Density toggle: rich cards for discovery, compact rows for scanning */}
+              {filteredScenarios.length > 0 && (
+                <div className="mb-4 flex justify-end">
+                  <div className="inline-flex rounded-lg border border-white/[0.06] bg-zinc-900/60 p-0.5">
+                    <button
+                      onClick={() => updateDensity("cards")}
+                      aria-pressed={density === "cards"}
+                      title="Card view"
+                      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        density === "cards"
+                          ? "bg-white text-zinc-950"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Cards</span>
+                    </button>
+                    <button
+                      onClick={() => updateDensity("rows")}
+                      aria-pressed={density === "rows"}
+                      title="List view"
+                      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        density === "rows"
+                          ? "bg-white text-zinc-950"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      <Rows3 className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">List</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Scenarios Grid */}
               {filteredScenarios.length === 0 ? (
                 <div className="py-16 text-center">
@@ -157,6 +208,20 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                   >
                     Clear all filters
                   </button>
+                </div>
+              ) : density === "rows" ? (
+                <div className="flex flex-col gap-1.5">
+                  {filteredScenarios.map((scenario) => (
+                    <ScenarioListRow
+                      key={scenario.id}
+                      scenario={scenario}
+                      isSelected={selectedScenario?.id === scenario.id}
+                      isCompleted={completedProblems.includes(scenario.id)}
+                      usageLimit={usageLimit}
+                      onSelect={setSelectedScenario}
+                      onStart={onStartInterview}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

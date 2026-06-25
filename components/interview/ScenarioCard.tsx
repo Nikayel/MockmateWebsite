@@ -2,10 +2,11 @@
 
 import { memo } from "react"
 import Link from "next/link"
-import { Play, Check, Clock, Cpu, Bug, Wrench, Zap, Shield, Layers } from "lucide-react"
+import { Play, Check, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Scenario, ScenarioType, DifficultyLevel } from "@/lib/scenarios"
+import type { Scenario } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
+import { getDifficultyStyle, getTypeConfig } from "./scenario-display"
 
 interface ScenarioCardProps {
   scenario: Scenario
@@ -14,58 +15,6 @@ interface ScenarioCardProps {
   usageLimit: UsageLimit | null
   onSelect: (scenario: Scenario) => void
   onStart: (scenario: Scenario) => void
-}
-
-// Exercise type quick filters with descriptions
-const EXERCISE_TYPES = [
-  {
-    id: "bugfix",
-    label: "Bug Fix",
-    icon: Bug,
-  },
-  {
-    id: "add-functionality",
-    label: "Add Feature",
-    icon: Wrench,
-  },
-  {
-    id: "optimization",
-    label: "Optimize",
-    icon: Zap,
-  },
-  {
-    id: "security",
-    label: "Security",
-    icon: Shield,
-  },
-  {
-    id: "system-design",
-    label: "System Design",
-    icon: Layers,
-  },
-  {
-    id: "dsa",
-    label: "DSA Drill",
-    icon: Cpu,
-  },
-] as const
-
-const getDifficultyStyle = (difficulty: DifficultyLevel) => {
-  switch (difficulty) {
-    case "easy":
-      return "border-transparent bg-emerald-500/10 text-emerald-300"
-    case "medium":
-      return "border-transparent bg-amber-500/10 text-amber-200"
-    case "hard":
-      return "border-transparent bg-rose-500/10 text-rose-300"
-    default:
-      return "border-transparent bg-white/5 text-zinc-300"
-  }
-}
-
-const getTypeConfig = (type: ScenarioType) => {
-  const config = EXERCISE_TYPES.find((t) => t.id === type)
-  return config || EXERCISE_TYPES[0]
 }
 
 export const ScenarioCard = memo(function ScenarioCard({
