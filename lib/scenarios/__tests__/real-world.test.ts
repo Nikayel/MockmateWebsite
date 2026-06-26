@@ -18,6 +18,7 @@ describe("real-world scenario modules", () => {
     "bugfix-comment-thread-merge",
     "bugfix-event-aggregation-retries",
     "bugfix-feature-pipeline-nan-workspace",
+    "bugfix-temperature-alert-regression",
     "bugfix-onboarding",
   ]
 
