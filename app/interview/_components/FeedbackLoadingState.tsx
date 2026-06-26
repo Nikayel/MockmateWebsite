@@ -80,10 +80,10 @@ export function FeedbackLoadingState({
       <div className="w-full max-w-sm">
         {/* Header - Apple-style clean typography */}
         <div className="mb-12 text-center">
-          <h2 className="mb-3 text-2xl font-semibold tracking-tight text-white">
+          <h2 className="mb-3 text-2xl font-semibold tracking-tight text-foreground">
             Generating Feedback
           </h2>
-          <p className="text-sm font-medium text-zinc-500">
+          <p className="text-sm font-medium text-muted-foreground">
             {elapsedTime < 60
               ? `${elapsedTime}s`
               : `${Math.floor(elapsedTime / 60)}m ${elapsedTime % 60}s`}
@@ -108,16 +108,16 @@ export function FeedbackLoadingState({
                     <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   ) : isCurrent ? (
                     <div className="relative flex h-5 w-5 items-center justify-center">
-                      <div className="absolute h-5 w-5 animate-ping rounded-full bg-white/20" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-white" />
+                      <div className="absolute h-5 w-5 animate-ping rounded-full bg-foreground/20" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-card" />
                     </div>
                   ) : (
-                    <div className="h-2 w-2 rounded-full bg-zinc-700" />
+                    <div className="h-2 w-2 rounded-full bg-muted" />
                   )}
                 </div>
                 <span
                   className={`text-sm font-medium transition-colors duration-300 ${
-                    isComplete ? "text-zinc-500" : isCurrent ? "text-white" : "text-zinc-600"
+                    isComplete ? "text-muted-foreground" : isCurrent ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
                   {step}
@@ -132,32 +132,32 @@ export function FeedbackLoadingState({
           <div className="flex justify-center gap-4">
             {interviewStats.testsPassed !== undefined &&
               interviewStats.totalTests !== undefined && (
-                <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
-                  <span className="text-lg font-semibold text-white">
+                <div className="flex flex-col items-center rounded-2xl bg-muted/50 px-5 py-3">
+                  <span className="text-lg font-semibold text-foreground">
                     {interviewStats.testsPassed}/{interviewStats.totalTests}
                   </span>
-                  <span className="text-xs font-medium text-zinc-500">tests</span>
+                  <span className="text-xs font-medium text-muted-foreground">tests</span>
                 </div>
               )}
             {interviewStats.timeSpentMinutes !== undefined && (
-              <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
-                <span className="text-lg font-semibold text-white">
+              <div className="flex flex-col items-center rounded-2xl bg-muted/50 px-5 py-3">
+                <span className="text-lg font-semibold text-foreground">
                   {interviewStats.timeSpentMinutes}m
                 </span>
-                <span className="text-xs font-medium text-zinc-500">duration</span>
+                <span className="text-xs font-medium text-muted-foreground">duration</span>
               </div>
             )}
             {interviewStats.codeLines !== undefined && (
-              <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
-                <span className="text-lg font-semibold text-white">{interviewStats.codeLines}</span>
-                <span className="text-xs font-medium text-zinc-500">lines</span>
+              <div className="flex flex-col items-center rounded-2xl bg-muted/50 px-5 py-3">
+                <span className="text-lg font-semibold text-foreground">{interviewStats.codeLines}</span>
+                <span className="text-xs font-medium text-muted-foreground">lines</span>
               </div>
             )}
           </div>
         )}
 
         {/* Subtle footer - Apple style */}
-        <p className="mt-10 text-center text-xs font-medium text-zinc-600">
+        <p className="mt-10 text-center text-xs font-medium text-muted-foreground">
           Your results will be saved automatically
         </p>
       </div>

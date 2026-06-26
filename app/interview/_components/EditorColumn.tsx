@@ -135,7 +135,7 @@ export const EditorColumn = memo(function EditorColumn({
 
   return (
     <Card
-      className={`editor-panel-card glass-effect order-2 h-full flex-col gap-0 overflow-hidden border-gray-700 bg-gray-900/50 py-0 ${
+      className={`editor-panel-card glass-effect order-2 h-full flex-col gap-0 overflow-hidden border-border bg-card/50 py-0 ${
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
@@ -144,7 +144,7 @@ export const EditorColumn = memo(function EditorColumn({
         workspaceContext &&
         workspaceContext.length > 0 ? (
           <div
-            className="flex w-full items-center justify-between border-b border-gray-700 bg-gray-900/80 pr-4"
+            className="flex w-full items-center justify-between border-b border-border bg-card/80 pr-4"
             data-bugfix-tour={selectedScenario?.type === "bugfix" ? "workspace-files" : undefined}
           >
             <div className="workspace-tabs-container no-scrollbar flex flex-1 overflow-x-auto">
@@ -153,7 +153,7 @@ export const EditorColumn = memo(function EditorColumn({
                 // Only show hidden files if they are the active file (though usually hidden files aren't in context, just to be safe)
                 if (file.hidden && !isActive) return null
 
-                let iconColor = "text-gray-400"
+                let iconColor = "text-muted-foreground"
                 let activeBorderClass = "border-b-cyan-400"
                 let roleBadgeClass = "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
                 let RoleIcon = FileCode
@@ -176,9 +176,9 @@ export const EditorColumn = memo(function EditorColumn({
                 } else if (file.role === "editable") {
                   iconColor = isActive ? "text-cyan-300" : "text-cyan-400/70"
                 } else if (file.role === "docs") {
-                  iconColor = isActive ? "text-gray-200" : "text-gray-400"
+                  iconColor = isActive ? "text-foreground" : "text-muted-foreground"
                   activeBorderClass = "border-b-gray-400"
-                  roleBadgeClass = "border-gray-500/30 bg-gray-500/10 text-gray-300"
+                  roleBadgeClass = "border-border/30 bg-gray-500/10 text-muted-foreground"
                   RoleIcon = BookOpen
                   roleLabel = "Docs"
                   roleDescription = "Documentation file"
@@ -190,10 +190,10 @@ export const EditorColumn = memo(function EditorColumn({
                     onClick={() => onFileSelect && onFileSelect(file)}
                     title={`${roleDescription}: ${file.path}`}
                     aria-label={`Open ${roleDescription.toLowerCase()} ${file.path}`}
-                    className={`workspace-tab-button flex items-center gap-1.5 border-r border-gray-700 px-3 py-2 text-xs whitespace-nowrap transition-colors ${
+                    className={`workspace-tab-button flex items-center gap-1.5 border-r border-border px-3 py-2 text-xs whitespace-nowrap transition-colors ${
                       isActive
-                        ? `border-b-2 ${activeBorderClass} bg-gray-800 text-white`
-                        : "border-b-2 border-b-transparent bg-gray-900/50 text-gray-400 hover:bg-gray-800/80 hover:text-gray-300"
+                        ? `border-b-2 ${activeBorderClass} bg-muted text-foreground`
+                        : "border-b-2 border-b-transparent bg-card/50 text-muted-foreground hover:bg-muted/80 hover:text-muted-foreground"
                     }`}
                   >
                     <RoleIcon className={`h-3.5 w-3.5 ${iconColor}`} />
@@ -222,7 +222,7 @@ export const EditorColumn = memo(function EditorColumn({
                   type="button"
                   variant="outline"
                   onClick={onResetActiveFile}
-                  className="h-8 border-gray-700 bg-gray-900 px-2 text-xs text-gray-300 hover:bg-gray-800"
+                  className="h-8 border-border bg-card px-2 text-xs text-muted-foreground hover:bg-muted"
                   title="Reset active file"
                   aria-label="Reset active file"
                 >
@@ -234,7 +234,7 @@ export const EditorColumn = memo(function EditorColumn({
                   type="button"
                   variant="outline"
                   onClick={onResetWorkspace}
-                  className="h-8 border-gray-700 bg-gray-900 px-2 text-xs text-gray-300 hover:bg-gray-800"
+                  className="h-8 border-border bg-card px-2 text-xs text-muted-foreground hover:bg-muted"
                   title="Reset workspace"
                   aria-label="Reset workspace"
                 >
@@ -253,7 +253,7 @@ export const EditorColumn = memo(function EditorColumn({
           </div>
         ) : (
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <CardTitle className="flex w-full items-center justify-between text-xs text-white">
+            <CardTitle className="flex w-full items-center justify-between text-xs text-foreground">
               <div className="flex items-center space-x-1">
                 <Code className="text-accent h-3 w-3" />
                 {selectedScenario?.type === "system-design" ? (
@@ -284,7 +284,7 @@ export const EditorColumn = memo(function EditorColumn({
       </CardHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
-        <div className="relative min-h-0 flex-1 overflow-auto rounded border border-gray-700">
+        <div className="relative min-h-0 flex-1 overflow-auto rounded border border-border">
           <ErrorBoundary>
             <CodeMirrorEditor
               ref={editorRef}
@@ -305,8 +305,8 @@ export const EditorColumn = memo(function EditorColumn({
                 <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
                   <PlayCircle className="text-accent h-8 w-8" />
                 </div>
-                <h3 className="mb-2 text-xl font-bold text-white">Ready to Start?</h3>
-                <p className="mb-4 text-sm text-gray-400">
+                <h3 className="mb-2 text-xl font-bold text-foreground">Ready to Start?</h3>
+                <p className="mb-4 text-sm text-muted-foreground">
                   Review the problem on the left, then start your interview when ready. The timer
                   will begin once you start.
                 </p>
@@ -317,7 +317,7 @@ export const EditorColumn = memo(function EditorColumn({
                   <PlayCircle className="mr-2 h-5 w-5" />
                   Start Interview
                 </Button>
-                <p className="mt-3 text-xs text-gray-500">
+                <p className="mt-3 text-xs text-muted-foreground">
                   Estimated time: {selectedScenario.estimatedTime || 30} minutes
                 </p>
               </div>
@@ -339,7 +339,7 @@ export const EditorColumn = memo(function EditorColumn({
 
         {selectedScenario?.type === "system-design" ? (
           <div className="flex flex-shrink-0 flex-col gap-2">
-            <div className="text-right text-xs text-gray-400">
+            <div className="text-right text-xs text-muted-foreground">
               Document your design decisions above, then submit when ready
             </div>
             <div className="flex items-center justify-end gap-2">
@@ -368,7 +368,7 @@ export const EditorColumn = memo(function EditorColumn({
               className={`${
                 isLanguageSupported(selectedLanguage)
                   ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
-                  : "border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  : "border-border bg-muted text-muted-foreground hover:bg-muted"
               }`}
               aria-label={isRunningTests ? "Running tests" : "Run tests"}
               data-bugfix-tour={selectedScenario?.type === "bugfix" ? "run-tests" : undefined}
@@ -389,42 +389,42 @@ export const EditorColumn = memo(function EditorColumn({
         )}
 
         {selectedScenario && selectedScenario.type !== "dsa" && (
-          <div className="flex-shrink-0 border-t border-gray-700 pt-2">
+          <div className="flex-shrink-0 border-t border-border pt-2">
             {!isAIPartnerExpanded ? (
               <button
                 type="button"
-                className="focus:ring-accent/60 flex w-full cursor-pointer items-center justify-between rounded-md bg-gray-800/50 px-3 py-2 text-left transition-colors hover:bg-gray-800 focus:ring-2 focus:outline-none"
+                className="focus:ring-accent/60 flex w-full cursor-pointer items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted focus:ring-2 focus:outline-none"
                 onClick={() => onAIPartnerExpandedChange(true)}
                 data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
               >
                 <div className="flex items-center gap-2">
                   <Bot className="text-accent h-4 w-4" />
-                  <span className="text-xs text-gray-300">
+                  <span className="text-xs text-muted-foreground">
                     {selectedScenario.type === "bugfix" ? "Debugging Partner" : "Interview Partner"}
                   </span>
-                  <span className="text-xs text-gray-600">· optional</span>
+                  <span className="text-xs text-muted-foreground">· optional</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {chatMessages.length > 0 && (
-                    <span className="text-xs text-gray-500">{chatMessages.length} msg</span>
+                    <span className="text-xs text-muted-foreground">{chatMessages.length} msg</span>
                   )}
-                  <ChevronUp className="h-3 w-3 text-gray-500" />
+                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
                 </div>
               </button>
             ) : (
               <div
-                className="rounded-md border border-gray-700/60 bg-gray-800/30 p-3"
+                className="rounded-md border border-border/60 bg-muted/30 p-3"
                 data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Bot className="text-accent h-4 w-4" />
-                    <span className="text-xs font-medium text-gray-200">
+                    <span className="text-xs font-medium text-foreground">
                       {selectedScenario.type === "bugfix"
                         ? "Debugging Partner"
                         : "Interview Partner"}
                     </span>
-                    <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[11px] text-gray-500">
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                       optional
                     </span>
                   </div>
@@ -432,7 +432,7 @@ export const EditorColumn = memo(function EditorColumn({
                     variant="ghost"
                     size="sm"
                     onClick={() => onAIPartnerExpandedChange(false)}
-                    className="h-8 w-8 p-0 text-gray-500 hover:text-white"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                     aria-label="Collapse debugging partner"
                   >
                     <ChevronDown className="h-4 w-4" />
@@ -441,7 +441,7 @@ export const EditorColumn = memo(function EditorColumn({
 
                 <div className="mb-2 max-h-[120px] space-y-1 overflow-y-auto">
                   {chatMessages.length === 0 ? (
-                    <p className="py-2 text-center text-xs text-gray-500">
+                    <p className="py-2 text-center text-xs text-muted-foreground">
                       {selectedScenario.type === "bugfix"
                         ? "Ask for a debugging nudge after you inspect the files"
                         : "Ask for hints, not solutions"}
@@ -453,7 +453,7 @@ export const EditorColumn = memo(function EditorColumn({
                         className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded px-2 py-1 text-xs ${msg.type === "user" ? "bg-cyan-700/80 text-white" : "bg-gray-700 text-gray-200"}`}
+                          className={`max-w-[85%] rounded px-2 py-1 text-xs ${msg.type === "user" ? "bg-cyan-700/80 text-foreground" : "bg-muted text-foreground"}`}
                         >
                           <MarkdownRenderer content={msg.message} className="text-xs break-words" />
                         </div>
@@ -472,7 +472,7 @@ export const EditorColumn = memo(function EditorColumn({
                         ? "Ask for a debugging nudge..."
                         : "Quick question..."
                     }
-                    className="h-8 flex-1 rounded-md border border-gray-700 bg-gray-900 px-3 py-1 text-xs text-white placeholder:text-gray-600 focus:ring-2 focus:ring-cyan-300 focus:outline-none"
+                    className="h-8 flex-1 rounded-md border border-border bg-card px-3 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-cyan-300 focus:outline-none"
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && !isLoadingChat) {
                         onSendPartnerMessage()
@@ -487,7 +487,7 @@ export const EditorColumn = memo(function EditorColumn({
                     aria-label="Send debugging partner message"
                   >
                     {isLoadingChat ? (
-                      <div className="h-3 w-3 animate-spin rounded-full border border-white/30 border-t-white" />
+                      <div className="h-3 w-3 animate-spin rounded-full border border-border border-t-white" />
                     ) : (
                       <Send className="h-3.5 w-3.5" />
                     )}

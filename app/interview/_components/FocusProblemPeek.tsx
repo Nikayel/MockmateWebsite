@@ -29,7 +29,7 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
         className={`focus-float-button focus:ring-accent/50 fixed top-20 left-4 z-50 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium shadow-xl transition-all duration-200 focus:ring-2 focus:outline-none ${
           showProblemPeek
             ? "bg-accent/90 text-accent-foreground shadow-accent/25"
-            : "hover:border-accent/30 border border-gray-600/50 bg-gray-800/95 text-gray-200 backdrop-blur-md hover:bg-gray-700/95 hover:text-white"
+            : "hover:border-accent/30 border border-border/50 bg-muted/95 text-foreground backdrop-blur-md hover:bg-muted/95 hover:text-foreground"
         }`}
         title="Peek at problem description (quick reference)"
       >
@@ -38,11 +38,11 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
       </button>
 
       {showProblemPeek && (
-        <div className="focus-float-button border-accent/20 fixed top-32 left-4 z-40 max-h-[60vh] w-[420px] overflow-hidden rounded-2xl border bg-gray-900/98 shadow-2xl shadow-black/50 backdrop-blur-xl">
-          <div className="flex items-center justify-between border-b border-gray-700 p-4">
+        <div className="focus-float-button border-accent/20 fixed top-32 left-4 z-40 max-h-[60vh] w-[420px] overflow-hidden rounded-2xl border bg-card/98 shadow-2xl shadow-black/50 backdrop-blur-xl">
+          <div className="flex items-center justify-between border-b border-border p-4">
             <div className="flex items-center gap-2">
               <Target className="text-accent h-4 w-4" />
-              <span className="text-sm font-semibold text-white">{scenario.title}</span>
+              <span className="text-sm font-semibold text-foreground">{scenario.title}</span>
             </div>
             <Badge className={`text-xs ${difficultyColorClass(scenario.difficulty)}`}>
               {scenario.difficulty}
@@ -55,7 +55,7 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
                   ? (scenario as { fuzzyStatement?: string }).fuzzyStatement || ""
                   : scenario.problemStatement
               }
-              className="text-sm leading-relaxed text-gray-200"
+              className="text-sm leading-relaxed text-foreground"
             />
             {scenario.type === "dsa" && scenario.examples && scenario.examples.length > 0 && (
               <div className="mt-4 space-y-3">
@@ -63,12 +63,12 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
                   Examples
                 </h4>
                 {scenario.examples.slice(0, 2).map((ex, idx) => (
-                  <div key={idx} className="rounded-lg bg-gray-800/50 p-3 font-mono text-xs">
-                    <div className="text-gray-400">
-                      Input: <span className="text-gray-200">{ex.input}</span>
+                  <div key={idx} className="rounded-lg bg-muted/50 p-3 font-mono text-xs">
+                    <div className="text-muted-foreground">
+                      Input: <span className="text-foreground">{ex.input}</span>
                     </div>
-                    <div className="text-gray-400">
-                      Output: <span className="text-gray-200">{ex.output}</span>
+                    <div className="text-muted-foreground">
+                      Output: <span className="text-foreground">{ex.output}</span>
                     </div>
                   </div>
                 ))}

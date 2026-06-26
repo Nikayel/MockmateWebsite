@@ -98,18 +98,18 @@ export const InterviewDialogs = memo(function InterviewDialogs({
       )}
 
       <AlertDialog open={showCloseDialog} onOpenChange={onShowCloseDialogChange}>
-        <AlertDialogContent className="border-gray-700 bg-gray-900">
+        <AlertDialogContent className="border-border bg-card">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">
+            <AlertDialogTitle className="text-foreground">
               You want to close this interview?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-300">
+            <AlertDialogDescription className="text-muted-foreground">
               If you close now, your progress will be saved but you'll exit the interview session.
               You can always come back to continue later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-gray-600 bg-gray-800 text-white hover:bg-gray-700">
+            <AlertDialogCancel className="border-border bg-muted text-foreground hover:bg-muted">
               Stay
             </AlertDialogCancel>
             <AlertDialogAction

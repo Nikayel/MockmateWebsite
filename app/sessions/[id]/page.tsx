@@ -116,7 +116,7 @@ export default function SessionDetailPage() {
 
   if (loading || authLoading || !initialized) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3">
           <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-600" />
           <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-500 delay-75" />
@@ -128,22 +128,22 @@ export default function SessionDetailPage() {
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-zinc-950">
+      <main className="min-h-screen bg-background">
         <Header />
         <div className="pt-24 pb-16">
           <div className="container mx-auto max-w-5xl px-4">
             <div className="py-20 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900">
-                <Clock className="h-7 w-7 text-zinc-600" />
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
+                <Clock className="h-7 w-7 text-muted-foreground" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-white">Session not found</h3>
-              <p className="mb-6 text-sm text-zinc-500">
+              <h3 className="mb-2 text-lg font-medium text-foreground">Session not found</h3>
+              <p className="mb-6 text-sm text-muted-foreground">
                 The session you're looking for doesn't exist
               </p>
               <Link href="/sessions">
                 <Button
                   variant="outline"
-                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  className="border-border text-muted-foreground hover:bg-muted"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Sessions
@@ -166,12 +166,12 @@ export default function SessionDetailPage() {
       case "hard":
         return "text-red-400 bg-red-500/10"
       default:
-        return "text-zinc-400 bg-zinc-500/10"
+        return "text-muted-foreground bg-zinc-500/10"
     }
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950">
+    <main className="min-h-screen bg-background">
       <Header />
 
       <div className="pt-24 pb-16">
@@ -182,7 +182,7 @@ export default function SessionDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="mb-4 -ml-2 h-8 text-zinc-500 hover:text-white"
+                className="mb-4 -ml-2 h-8 text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                 Sessions
@@ -192,14 +192,14 @@ export default function SessionDetailPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <h1 className="text-xl font-semibold text-white">{session.topic}</h1>
+                  <h1 className="text-xl font-semibold text-foreground">{session.topic}</h1>
                   <span
                     className={`rounded px-2 py-0.5 text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
                   >
                     {session.difficulty}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-zinc-500">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
                     {new Date(session.started_at).toLocaleDateString("en-US", {
@@ -235,7 +235,7 @@ export default function SessionDetailPage() {
                   >
                     {Math.round(session.performance_score)}%
                   </div>
-                  <div className="text-[10px] tracking-wider text-zinc-500 uppercase">Score</div>
+                  <div className="text-[10px] tracking-wider text-muted-foreground uppercase">Score</div>
                 </div>
               )}
             </div>
@@ -284,17 +284,17 @@ export default function SessionDetailPage() {
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10">
                 <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-white">Evaluating your submission</h3>
-              <p className="mb-4 text-sm text-zinc-400">
+              <h3 className="mb-2 text-lg font-medium text-foreground">Evaluating your submission</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
                 Your solution is being reviewed by our AI. This usually takes 30-60 seconds.
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 You can leave this page - we'll have your feedback ready when you return.
               </p>
               <Button
                 onClick={() => router.push("/dashboard")}
                 variant="outline"
-                className="mt-6 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                className="mt-6 border-border text-muted-foreground hover:bg-muted"
               >
                 Go to Dashboard
               </Button>
@@ -305,8 +305,8 @@ export default function SessionDetailPage() {
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
                 <Terminal className="h-7 w-7 text-red-400" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-white">Evaluation failed</h3>
-              <p className="mb-6 text-sm text-zinc-400">
+              <h3 className="mb-2 text-lg font-medium text-foreground">Evaluation failed</h3>
+              <p className="mb-6 text-sm text-muted-foreground">
                 We encountered an issue while evaluating your submission. Please try again.
               </p>
               {session.scenario_id && (
@@ -314,7 +314,7 @@ export default function SessionDetailPage() {
                   onClick={() =>
                     router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)
                   }
-                  className="bg-white text-zinc-900 hover:bg-zinc-200"
+                  className="bg-card text-zinc-900 hover:bg-zinc-200"
                 >
                   <Terminal className="mr-2 h-4 w-4" />
                   Retry Submission
@@ -323,18 +323,18 @@ export default function SessionDetailPage() {
             </div>
           ) : (
             // Session truly in progress - allow continuing
-            <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-12 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800">
-                <Terminal className="h-7 w-7 text-zinc-500" />
+            <div className="rounded-2xl border border-border/50 bg-card/50 p-12 text-center">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+                <Terminal className="h-7 w-7 text-muted-foreground" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-white">Session in progress</h3>
-              <p className="mb-6 text-sm text-zinc-500">This session hasn't been completed yet</p>
+              <h3 className="mb-2 text-lg font-medium text-foreground">Session in progress</h3>
+              <p className="mb-6 text-sm text-muted-foreground">This session hasn't been completed yet</p>
               {session.scenario_id && (
                 <Button
                   onClick={() =>
                     router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)
                   }
-                  className="bg-white text-zinc-900 hover:bg-zinc-200"
+                  className="bg-card text-zinc-900 hover:bg-zinc-200"
                 >
                   <Terminal className="mr-2 h-4 w-4" />
                   Continue Session

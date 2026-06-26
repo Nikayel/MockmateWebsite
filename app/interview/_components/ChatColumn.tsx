@@ -50,12 +50,12 @@ export const ChatColumn = memo(function ChatColumn({
 
   return (
     <Card
-      className={`glass-effect order-3 h-full flex-col gap-0 overflow-hidden border-gray-700 bg-gray-900/50 py-0 ${
+      className={`glass-effect order-3 h-full flex-col gap-0 overflow-hidden border-border bg-card/50 py-0 ${
         focusMode ? "hidden" : activePanel === "chat" ? "flex" : "hidden lg:flex"
       }`}
     >
       <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
-        <CardTitle className="flex items-center space-x-2 text-sm text-white">
+        <CardTitle className="flex items-center space-x-2 text-sm text-foreground">
           <div className="relative">
             <Brain className="text-accent animate-neural-pulse h-4 w-4" />
             <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
@@ -68,7 +68,7 @@ export const ChatColumn = memo(function ChatColumn({
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
         <div className="mb-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
           {interviewerMessages.length === 0 ? (
-            <div className="py-8 text-center text-gray-400">
+            <div className="py-8 text-center text-muted-foreground">
               <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p className="text-xs">Interview will begin when you start...</p>
             </div>
@@ -83,7 +83,7 @@ export const ChatColumn = memo(function ChatColumn({
                     className={`max-w-[90%] rounded-lg p-2 ${
                       msg.type === "user"
                         ? "bg-accent text-accent-foreground"
-                        : "bg-gray-800 text-gray-100"
+                        : "bg-muted text-foreground"
                     }`}
                   >
                     <div className="mb-1 flex items-center space-x-1">
@@ -102,7 +102,7 @@ export const ChatColumn = memo(function ChatColumn({
               ))}
               {isBusy && (
                 <div className="flex justify-start">
-                  <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
+                  <div className="max-w-[90%] rounded-lg border border-border/50 bg-muted/50 p-2 text-muted-foreground">
                     <div className="flex items-center space-x-2">
                       <Brain className="h-3 w-3 animate-pulse text-[#c4703f]" />
                       <span className="text-xs">CodeSparring AI is thinking</span>
@@ -129,7 +129,7 @@ export const ChatColumn = memo(function ChatColumn({
           )}
         </div>
         {(isInterviewStarted || showPostInterviewDiscussion) && (
-          <div className="flex flex-shrink-0 flex-col gap-2 border-t border-gray-700 pt-3">
+          <div className="flex flex-shrink-0 flex-col gap-2 border-t border-border pt-3">
             <VoiceModeToggle
               isRecording={isRecordingInterviewer}
               onToggleRecording={onToggleRecording}

@@ -60,10 +60,10 @@ export default function RoadmapPreviewPage() {
       <section className="pt-24 pb-8">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl">
-            <h1 className="text-3xl font-semibold text-white md:text-4xl mb-3">
+            <h1 className="text-3xl font-semibold text-foreground md:text-4xl mb-3">
               What your roadmap looks like
             </h1>
-            <p className="text-zinc-400 text-lg">
+            <p className="text-muted-foreground text-lg">
               This is a sample 30-day Google prep plan. Yours will be personalized to your
               interview date, company, and skill level.
             </p>
@@ -76,14 +76,14 @@ export default function RoadmapPreviewPage() {
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl">
             {/* Header bar */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-800">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <div>
-                <div className="text-sm text-zinc-500">Sample roadmap</div>
-                <div className="text-white font-medium">Google · 30 days · Intermediate</div>
+                <div className="text-sm text-muted-foreground">Sample roadmap</div>
+                <div className="text-foreground font-medium">Google · 30 days · Intermediate</div>
               </div>
               <div className="text-right text-sm">
-                <div className="text-white">42 problems</div>
-                <div className="text-zinc-500">~2 hrs/day</div>
+                <div className="text-foreground">42 problems</div>
+                <div className="text-muted-foreground">~2 hrs/day</div>
               </div>
             </div>
 
@@ -92,23 +92,23 @@ export default function RoadmapPreviewPage() {
               {sampleDays.map((day) => (
                 <div
                   key={day.day}
-                  className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
+                  className="rounded-lg border border-border bg-card/50 p-4"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <span className="text-zinc-500 text-sm">Day {day.day}</span>
-                      <span className="text-zinc-700 mx-2">·</span>
-                      <span className="text-white">{day.theme}</span>
+                      <span className="text-muted-foreground text-sm">Day {day.day}</span>
+                      <span className="text-muted-foreground mx-2">·</span>
+                      <span className="text-foreground">{day.theme}</span>
                     </div>
-                    <span className="text-xs text-zinc-500">{day.time}</span>
+                    <span className="text-xs text-muted-foreground">{day.time}</span>
                   </div>
                   <div className="space-y-1.5">
                     {day.problems.map((problem, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-2 text-sm text-zinc-400"
+                        className="flex items-center gap-2 text-sm text-muted-foreground"
                       >
-                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted" />
                         {problem}
                       </div>
                     ))}
@@ -123,15 +123,15 @@ export default function RoadmapPreviewPage() {
                 {[4, 5, 6].map((day) => (
                   <div
                     key={day}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 h-24"
+                    className="rounded-lg border border-border bg-card/50 p-4 h-24"
                   />
                 ))}
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <Lock className="h-6 w-6 text-zinc-600 mx-auto mb-2" />
-                  <div className="text-zinc-400 text-sm">27 more days</div>
-                  <div className="text-zinc-600 text-xs">Create your roadmap to see the full plan</div>
+                  <Lock className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                  <div className="text-muted-foreground text-sm">27 more days</div>
+                  <div className="text-muted-foreground text-xs">Create your roadmap to see the full plan</div>
                 </div>
               </div>
             </div>
@@ -143,39 +143,39 @@ export default function RoadmapPreviewPage() {
       <section className="py-12">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8">
-              <h2 className="text-xl font-medium text-white mb-2">
+            <div className="rounded-xl border border-border bg-card/50 p-8">
+              <h2 className="text-xl font-medium text-foreground mb-2">
                 Create your personalized roadmap
               </h2>
-              <p className="text-zinc-400 mb-6">
+              <p className="text-muted-foreground mb-6">
                 Tell us your interview date and target company. We'll build a day-by-day
                 schedule that prioritizes what matters most.
               </p>
 
               <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
                 <div>
-                  <div className="text-white font-medium">Your date</div>
-                  <div className="text-zinc-500">We work backwards</div>
+                  <div className="text-foreground font-medium">Your date</div>
+                  <div className="text-muted-foreground">We work backwards</div>
                 </div>
                 <div>
-                  <div className="text-white font-medium">Your company</div>
-                  <div className="text-zinc-500">Pattern priorities</div>
+                  <div className="text-foreground font-medium">Your company</div>
+                  <div className="text-muted-foreground">Pattern priorities</div>
                 </div>
                 <div>
-                  <div className="text-white font-medium">Your level</div>
-                  <div className="text-zinc-500">Skip what you know</div>
+                  <div className="text-foreground font-medium">Your level</div>
+                  <div className="text-muted-foreground">Skip what you know</div>
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/login?redirect=/roadmap/new" className="flex-1">
-                  <Button className="w-full bg-white text-black hover:bg-zinc-200">
+                  <Button className="w-full bg-card text-black hover:bg-zinc-200">
                     Create my roadmap
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
                 <Link href="/interview-prep">
-                  <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                  <Button variant="outline" className="border-border text-muted-foreground hover:bg-muted">
                     Browse companies first
                   </Button>
                 </Link>

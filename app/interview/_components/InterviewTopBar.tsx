@@ -88,7 +88,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   return (
     <div className="focus-header flex flex-shrink-0 items-center justify-between gap-2 pt-2 transition-all duration-300">
       <div className="flex min-w-0 flex-1 items-center space-x-2">
-        <h2 className="max-w-[200px] truncate text-sm font-semibold text-white sm:max-w-md">
+        <h2 className="max-w-[200px] truncate text-sm font-semibold text-foreground sm:max-w-md">
           {selectedScenario?.title}
         </h2>
         <Badge
@@ -105,7 +105,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
               ? `Workspace scenario language: ${selectedScenario.workspace.language}`
               : "Choose editor language"
           }
-          className="focus:ring-accent hidden rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:ring-2 focus:outline-none sm:block"
+          className="focus:ring-accent hidden rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground focus:ring-2 focus:outline-none sm:block"
         >
           <option value="javascript">JavaScript</option>
           <option value="typescript">TypeScript</option>
@@ -119,7 +119,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
       </div>
 
       <div
-        className="flex items-center gap-1 rounded-lg bg-gray-800/50 p-0.5 lg:hidden"
+        className="flex items-center gap-1 rounded-lg bg-muted/50 p-0.5 lg:hidden"
         role="tablist"
         aria-label="Switch panel"
       >

@@ -86,7 +86,7 @@ export default function SessionsPage() {
 
   if (loading || authLoading || !initialized) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3">
           <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-600" />
           <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-500 delay-75" />
@@ -105,7 +105,7 @@ export default function SessionsPage() {
       case "hard":
         return "text-red-400"
       default:
-        return "text-zinc-400"
+        return "text-muted-foreground"
     }
   }
 
@@ -116,7 +116,7 @@ export default function SessionsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950">
+    <main className="min-h-screen bg-background">
       <Header />
 
       <div className="pt-24 pb-16">
@@ -124,11 +124,11 @@ export default function SessionsPage() {
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="mb-1 text-2xl font-semibold text-white">Sessions</h1>
-              <p className="text-sm text-zinc-500">Your practice history</p>
+              <h1 className="mb-1 text-2xl font-semibold text-foreground">Sessions</h1>
+              <p className="text-sm text-muted-foreground">Your practice history</p>
             </div>
             <Link href="/interview">
-              <Button className="bg-white font-medium text-zinc-900 hover:bg-zinc-200">
+              <Button className="bg-card font-medium text-zinc-900 hover:bg-zinc-200">
                 <Terminal className="mr-2 h-4 w-4" />
                 New Session
               </Button>
@@ -138,22 +138,22 @@ export default function SessionsPage() {
           {/* Sessions List */}
           {sessions.length === 0 ? (
             <div className="py-20 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900">
-                <Clock className="h-7 w-7 text-zinc-600" />
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
+                <Clock className="h-7 w-7 text-muted-foreground" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-white">No sessions yet</h3>
-              <p className="mb-6 text-sm text-zinc-500">
+              <h3 className="mb-2 text-lg font-medium text-foreground">No sessions yet</h3>
+              <p className="mb-6 text-sm text-muted-foreground">
                 Start practicing to see your history here
               </p>
               <Link href="/interview">
-                <Button className="bg-white font-medium text-zinc-900 hover:bg-zinc-200">
+                <Button className="bg-card font-medium text-zinc-900 hover:bg-zinc-200">
                   <Terminal className="mr-2 h-4 w-4" />
                   Start First Session
                 </Button>
               </Link>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
               <div className="divide-y divide-zinc-800/50">
                 {sessions.map((session) => {
                   const isInProgress = !session.completed_at
@@ -192,7 +192,7 @@ export default function SessionsPage() {
                   return (
                     <div
                       key={session.id}
-                      className="group flex items-center gap-4 p-4 transition-colors hover:bg-zinc-800/30"
+                      className="group flex items-center gap-4 p-4 transition-colors hover:bg-muted/30"
                     >
                       {/* Score/Status indicator */}
                       <div
@@ -205,7 +205,7 @@ export default function SessionsPage() {
                                 ? "bg-purple-500/10 text-purple-400"
                                 : isInProgress
                                   ? "bg-amber-500/10 text-amber-400"
-                                  : "bg-zinc-800 text-zinc-400"
+                                  : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {score ? score : isFeedbackPending ? "..." : isInProgress ? "..." : "—"}
@@ -214,7 +214,7 @@ export default function SessionsPage() {
                       {/* Content */}
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex items-center gap-2">
-                          <span className="truncate font-medium text-white">{session.topic}</span>
+                          <span className="truncate font-medium text-foreground">{session.topic}</span>
                           <span
                             className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
                           >
@@ -242,7 +242,7 @@ export default function SessionsPage() {
                           )}
                           {hasFeedback && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-zinc-500">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {new Date(session.started_at).toLocaleDateString("en-US", {
@@ -288,7 +288,7 @@ export default function SessionsPage() {
                               )
                             }
                             size="sm"
-                            className="h-8 bg-white text-xs text-zinc-900 hover:bg-zinc-200"
+                            className="h-8 bg-card text-xs text-zinc-900 hover:bg-zinc-200"
                           >
                             <Play className="mr-1.5 h-3 w-3" />
                             Continue
@@ -310,7 +310,7 @@ export default function SessionsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 text-xs text-zinc-400 hover:text-white"
+                              className="h-8 text-xs text-muted-foreground hover:text-foreground"
                             >
                               <FileText className="mr-1.5 h-3 w-3" />
                               Details
@@ -330,7 +330,7 @@ export default function SessionsPage() {
                           </Link>
                         ) : (
                           <Link href={`/sessions/${session.id}`}>
-                            <ChevronRight className="h-4 w-4 text-zinc-600 hover:text-zinc-400" />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground hover:text-muted-foreground" />
                           </Link>
                         )}
                       </div>

@@ -477,7 +477,7 @@ export function BugfixOnboardingTour({
           <motion.div
             aria-describedby="bugfix-tour-welcome-description"
             aria-labelledby="bugfix-tour-welcome-title"
-            className="w-full max-w-md rounded-lg border border-cyan-400/25 bg-gray-950 p-5 shadow-2xl shadow-cyan-950/40"
+            className="w-full max-w-md rounded-lg border border-cyan-400/25 bg-background p-5 shadow-2xl shadow-cyan-950/40"
             exit={reduceMotion ? undefined : { scale: 0.98, y: 12 }}
             initial={reduceMotion ? undefined : { scale: 0.98, y: 12 }}
             animate={reduceMotion ? undefined : { scale: 1, y: 0 }}
@@ -487,15 +487,15 @@ export function BugfixOnboardingTour({
                 <Bug className="h-5 w-5" aria-hidden="true" />
               </div>
               <div>
-                <h2 id="bugfix-tour-welcome-title" className="text-lg font-semibold text-white">
+                <h2 id="bugfix-tour-welcome-title" className="text-lg font-semibold text-foreground">
                   Debug real code, like the interview
                 </h2>
-                <p className="text-xs text-gray-500">Bugfix tour</p>
+                <p className="text-xs text-muted-foreground">Bugfix tour</p>
               </div>
             </div>
             <p
               id="bugfix-tour-welcome-description"
-              className="mb-5 text-sm leading-relaxed text-gray-300"
+              className="mb-5 text-sm leading-relaxed text-muted-foreground"
             >
               Bugfix practice is different from DSA. You&apos;ll inspect files, form a hypothesis,
               run tests, make a minimal fix, and explain how to prevent the bug next time.
@@ -505,7 +505,7 @@ export function BugfixOnboardingTour({
                 type="button"
                 variant="ghost"
                 onClick={() => void skipTour("welcome")}
-                className="text-gray-300 hover:text-white"
+                className="text-muted-foreground hover:text-foreground"
               >
                 Maybe later
               </Button>
@@ -596,7 +596,7 @@ export function BugfixOnboardingTour({
               aria-describedby="bugfix-tour-step-description"
               aria-labelledby="bugfix-tour-step-title"
               aria-live="polite"
-              className="pointer-events-auto fixed rounded-lg border border-cyan-300/30 bg-gray-950 p-4 text-gray-100 shadow-2xl shadow-black/50"
+              className="pointer-events-auto fixed rounded-lg border border-cyan-300/30 bg-background p-4 text-foreground shadow-2xl shadow-black/50"
               role="dialog"
               style={coachMarkPosition}
             >
@@ -605,7 +605,7 @@ export function BugfixOnboardingTour({
                   <p className="mb-1 text-xs font-medium text-cyan-200">
                     Step {stepIndex + 1} of {TOUR_STEPS.length}
                   </p>
-                  <h2 id="bugfix-tour-step-title" className="text-base font-semibold text-white">
+                  <h2 id="bugfix-tour-step-title" className="text-base font-semibold text-foreground">
                     {step.title}
                   </h2>
                 </div>
@@ -613,7 +613,7 @@ export function BugfixOnboardingTour({
                   ref={closeButtonRef}
                   type="button"
                   onClick={() => void skipTour("coachmark", step.id)}
-                  className="rounded p-1 text-gray-400 transition hover:bg-white/10 hover:text-white focus:ring-2 focus:ring-cyan-300 focus:outline-none"
+                  className="rounded p-1 text-muted-foreground transition hover:bg-foreground/10 hover:text-foreground focus:ring-2 focus:ring-cyan-300 focus:outline-none"
                   aria-label="Skip bugfix tour"
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -621,11 +621,11 @@ export function BugfixOnboardingTour({
               </div>
               <p
                 id="bugfix-tour-step-description"
-                className="mb-3 text-sm leading-relaxed text-gray-300"
+                className="mb-3 text-sm leading-relaxed text-muted-foreground"
               >
                 {step.body}
               </p>
-              <div className="mb-4 rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-300">
+              <div className="mb-4 rounded-md border border-border bg-card/70 px-3 py-2 text-xs text-muted-foreground">
                 {step.id === "hypothesis" && hypothesisReady ? (
                   <span className="flex items-center gap-2 text-emerald-300">
                     <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -640,7 +640,7 @@ export function BugfixOnboardingTour({
                   <span
                     key={tourStep.id}
                     className={`h-1.5 flex-1 rounded-full ${
-                      index <= stepIndex ? "bg-cyan-300" : "bg-gray-700"
+                      index <= stepIndex ? "bg-cyan-300" : "bg-muted"
                     }`}
                   />
                 ))}
@@ -651,12 +651,12 @@ export function BugfixOnboardingTour({
                   variant="ghost"
                   disabled={isFirstStep}
                   onClick={handleBack}
-                  className={`justify-self-start ${isFirstStep ? "invisible" : "text-gray-300 hover:text-white"}`}
+                  className={`justify-self-start ${isFirstStep ? "invisible" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   <ArrowLeft className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                   Back
                 </Button>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   {stepIndex + 1} / {TOUR_STEPS.length}
                 </span>
                 <Button

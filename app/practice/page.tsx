@@ -15,22 +15,22 @@ import Link from "next/link"
 // Dynamic imports for heavy components - reduces initial bundle size
 const StreakBanner = dynamic(
   () => import("@/components/practice").then((mod) => mod.StreakBanner),
-  { ssr: false, loading: () => <div className="h-16 animate-pulse rounded-lg bg-white/5" /> }
+  { ssr: false, loading: () => <div className="h-16 animate-pulse rounded-lg bg-foreground/5" /> }
 )
 
 const DueForReview = dynamic(
   () => import("@/components/practice").then((mod) => mod.DueForReview),
-  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-lg bg-white/5" /> }
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-lg bg-foreground/5" /> }
 )
 
 const PatternMastery = dynamic(
   () => import("@/components/practice").then((mod) => mod.PatternMastery),
-  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-white/5" /> }
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-foreground/5" /> }
 )
 
 const ReviewCalendar = dynamic(
   () => import("@/components/practice").then((mod) => mod.ReviewCalendar),
-  { ssr: false, loading: () => <div className="h-96 animate-pulse rounded-lg bg-white/5" /> }
+  { ssr: false, loading: () => <div className="h-96 animate-pulse rounded-lg bg-foreground/5" /> }
 )
 
 interface StatsData {
@@ -294,7 +294,7 @@ export default function PracticePage() {
   if (!initialized || authLoading || isPro === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-6 w-6 animate-spin text-white" />
+        <Loader2 className="h-6 w-6 animate-spin text-foreground" />
       </div>
     )
   }
@@ -306,11 +306,11 @@ export default function PracticePage() {
         <Header />
         <main className="container mx-auto px-4 pt-24 pb-16">
           <div className="mx-auto max-w-lg text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-gray-800">
-              <Lock className="h-8 w-8 text-gray-500" />
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <Lock className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h1 className="mb-3 text-2xl font-bold text-white">Spaced Repetition Practice</h1>
-            <p className="mb-8 text-gray-400">
+            <h1 className="mb-3 text-2xl font-bold text-foreground">Spaced Repetition Practice</h1>
+            <p className="mb-8 text-muted-foreground">
               Smart practice sessions with spaced repetition to maximize your learning and
               retention.
             </p>
@@ -321,14 +321,14 @@ export default function PracticePage() {
                 "Personalized recommendations",
                 "Daily goals and streaks",
               ].map((feature, i) => (
-                <div key={i} className="flex items-center gap-3 text-gray-300">
-                  <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                <div key={i} className="flex items-center gap-3 text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-card" />
                   <span>{feature}</span>
                 </div>
               ))}
             </div>
             <Link href="/pricing">
-              <Button className="bg-white text-black hover:bg-gray-200">
+              <Button className="bg-card text-black hover:bg-muted">
                 Upgrade to Pro
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -347,8 +347,8 @@ export default function PracticePage() {
         <div className="mx-auto max-w-5xl">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="mb-1 text-2xl font-bold text-white">Practice</h1>
-            <p className="text-gray-500">Review problems at optimal intervals</p>
+            <h1 className="mb-1 text-2xl font-bold text-foreground">Practice</h1>
+            <p className="text-muted-foreground">Review problems at optimal intervals</p>
           </div>
 
           {error && (
@@ -358,7 +358,7 @@ export default function PracticePage() {
           )}
 
           {/* Streak Banner */}
-          <div className="mb-8 border-b border-white/5 pb-6">
+          <div className="mb-8 border-b border-border pb-6">
             <StreakBanner
               streakDays={stats?.overall.streak_days || 0}
               dailyGoal={stats?.daily_goal || 5}
@@ -372,13 +372,13 @@ export default function PracticePage() {
           <div className="space-y-8">
             {/* View Toggle */}
             <div className="mb-4 flex items-center justify-end">
-              <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+              <div className="inline-flex rounded-lg border border-border bg-foreground/5 p-1">
                 <button
                   onClick={() => setViewMode("list")}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                     viewMode === "list"
-                      ? "bg-white/10 text-white"
-                      : "text-gray-500 hover:text-gray-300"
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:text-muted-foreground"
                   }`}
                 >
                   <List className="h-4 w-4" />
@@ -388,8 +388,8 @@ export default function PracticePage() {
                   onClick={() => setViewMode("calendar")}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                     viewMode === "calendar"
-                      ? "bg-white/10 text-white"
-                      : "text-gray-500 hover:text-gray-300"
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:text-muted-foreground"
                   }`}
                 >
                   <CalendarDays className="h-4 w-4" />
@@ -400,7 +400,7 @@ export default function PracticePage() {
 
             {/* Due for Review - List View */}
             {viewMode === "list" && (
-              <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
+              <div className="rounded-xl border border-border bg-card/30 p-6">
                 <DueForReview
                   dueNow={due?.due_now || []}
                   dueInMinutes={due?.due_in_minutes || []}
@@ -424,7 +424,7 @@ export default function PracticePage() {
 
             {/* Due for Review - Calendar View */}
             {viewMode === "calendar" && (
-              <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
+              <div className="rounded-xl border border-border bg-card/30 p-6">
                 <ReviewCalendar
                   dueItems={[
                     ...(due?.due_now || []),
@@ -437,7 +437,7 @@ export default function PracticePage() {
             )}
 
             {/* Pattern Mastery */}
-            <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
+            <div className="rounded-xl border border-border bg-card/30 p-6">
               <PatternMastery patterns={stats?.by_pattern || []} isLoading={isLoading} />
             </div>
           </div>
@@ -446,26 +446,26 @@ export default function PracticePage() {
           {stats && !isLoading && (
             <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
               <div className="py-4 text-center">
-                <div className="text-2xl font-bold text-white">
+                <div className="text-2xl font-bold text-foreground">
                   {stats.overall.total_problems_seen}
                 </div>
-                <div className="text-sm text-gray-500">Problems</div>
+                <div className="text-sm text-muted-foreground">Problems</div>
               </div>
               <div className="py-4 text-center">
                 <div className="text-2xl font-bold text-emerald-400">
                   {stats.overall.problems_mastered}
                 </div>
-                <div className="text-sm text-gray-500">Mastered</div>
+                <div className="text-sm text-muted-foreground">Mastered</div>
               </div>
               <div className="py-4 text-center">
-                <div className="text-2xl font-bold text-white">{stats.overall.average_score}%</div>
-                <div className="flex items-center justify-center gap-1 text-sm text-gray-500">
+                <div className="text-2xl font-bold text-foreground">{stats.overall.average_score}%</div>
+                <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
                   Review Avg
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <HelpCircle className="h-3 w-3 cursor-help text-gray-600" />
+                      <HelpCircle className="h-3 w-3 cursor-help text-muted-foreground" />
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-xs bg-zinc-800 text-zinc-200">
+                    <TooltipContent className="max-w-xs bg-muted text-foreground">
                       <p>
                         Review Average: Your average score across spaced repetition reviews. This
                         tracks how well you perform when revisiting problems over time.
@@ -475,10 +475,10 @@ export default function PracticePage() {
                 </div>
               </div>
               <div className="py-4 text-center">
-                <div className="text-2xl font-bold text-white">
+                <div className="text-2xl font-bold text-foreground">
                   {Math.round(stats.overall.total_time_minutes / 60)}h
                 </div>
-                <div className="text-sm text-gray-500">Practice Time</div>
+                <div className="text-sm text-muted-foreground">Practice Time</div>
               </div>
             </div>
           )}
