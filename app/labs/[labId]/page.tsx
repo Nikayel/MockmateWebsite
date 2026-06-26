@@ -17,6 +17,7 @@ import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
 import { CaseLabChat } from "@/components/labs/CaseLabChat"
+import { CaseLabIntro } from "@/components/labs/CaseLabIntro"
 
 export default function CaseLabPlayPage() {
   const params = useParams<{ labId: string }>()
@@ -35,13 +36,7 @@ export default function CaseLabPlayPage() {
   // Resume an in-progress run for this lab (if any).
   useCaseLabRunSync(lab?.id ?? null)
 
-  // Once resume settles with nothing to restore, start a fresh run.
-  useEffect(() => {
-    if (!lab || isLoading) return
-    if (!activeRun || activeRun.caseLabId !== lab.id) {
-      startRun(lab, "practice")
-    }
-  }, [lab, isLoading, activeRun, startRun])
+  const hasRunForLab = Boolean(activeRun && lab && activeRun.caseLabId === lab.id)
 
   if (!lab) {
     return (
@@ -76,7 +71,17 @@ export default function CaseLabPlayPage() {
         </div>
       </header>
 
-      <CaseLabShell className="flex-1" chatSlot={<CaseLabChat />} />
+      {isLoading && !hasRunForLab ? (
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-muted-foreground text-sm">Loading your progress…</p>
+        </div>
+      ) : hasRunForLab ? (
+        <CaseLabShell className="flex-1" chatSlot={<CaseLabChat />} />
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <CaseLabIntro lab={lab} onStart={(mode) => startRun(lab, mode)} />
+        </div>
+      )}
     </main>
   )
 }
