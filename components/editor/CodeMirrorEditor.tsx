@@ -2,11 +2,12 @@
 
 import React, { memo, useMemo, useCallback, useEffect, useState } from "react"
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror"
+import { useTheme } from "next-themes"
 import { javascript } from "@codemirror/lang-javascript"
-import { oneDark } from "@codemirror/theme-one-dark"
 import { EditorView, keymap } from "@codemirror/view"
 import { Extension } from "@codemirror/state"
-import { indentUnit } from "@codemirror/language"
+import { indentUnit, syntaxHighlighting } from "@codemirror/language"
+import { classHighlighter } from "@lezer/highlight"
 import { insertNewlineAndIndent, indentMore, indentLess } from "@codemirror/commands"
 
 // Lazy-loaded language extensions (reduces initial bundle by ~100KB)
@@ -72,183 +73,89 @@ const getJsExtension = (language: string): Extension | null => {
 }
 
 /*
- * Research-Backed Editor Themes
- *
- * Key improvements based on cognitive load research:
- * 1. Editor background is LIGHTER than app background (reduces "cave effect")
- * 2. Calmer selection colors (40% desaturated cyan)
- * 3. Softer contrast for reduced eye strain
- * 4. Warm undertones in dark mode
- *
- * Sources: NN/G Dark Mode Study, ACM Eye Tracking 2025
+ * Calm, warm editor chrome (Claude-inspired). These themes set ONLY the editor
+ * surface — background, gutter, cursor, selection, brackets — in the clay
+ * palette. Syntax token colors are NOT set here: they come from the centralized
+ * `.tok-*` CSS variables in globals.css (applied via CodeMirror's
+ * classHighlighter), so highlighting is restrained, on-palette, and follows the
+ * light/dark theme automatically instead of CodeMirror's default rainbow.
  */
+const EDITOR_FONT = '"Fira Code", "Consolas", "Monaco", monospace'
 
-// Dark theme - Calmer, research-backed colors
-const customDarkTheme = EditorView.theme({
-  "&": {
-    // Lighter than app background (#1c1c1e) for better depth perception
-    backgroundColor: "#222228",
-    color: "#d8d8dc",
-    height: "100%",
+const darkTheme = EditorView.theme(
+  {
+    "&": { backgroundColor: "#1e1d1b", color: "#ece9e1", height: "100%" },
+    ".cm-content": {
+      caretColor: "#ece9e1",
+      fontFamily: EDITOR_FONT,
+      fontSize: "14px",
+      lineHeight: "22px",
+      padding: "8px 0",
+    },
+    ".cm-cursor": { borderLeftColor: "#ece9e1", borderLeftWidth: "2px" },
+    ".cm-activeLine": { backgroundColor: "transparent" },
+    "&.cm-focused .cm-activeLine": { backgroundColor: "rgba(255, 255, 255, 0.035)" },
+    ".cm-gutters": {
+      backgroundColor: "#1a1917",
+      color: "#6a675f",
+      border: "none",
+      borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+      paddingRight: "8px",
+    },
+    ".cm-activeLineGutter": { backgroundColor: "rgba(255, 255, 255, 0.035)" },
+    ".cm-lineNumbers .cm-gutterElement": { minWidth: "3ch", padding: "0 8px 0 0" },
+    ".cm-scroller": { overflow: "auto", fontFamily: EDITOR_FONT },
+    ".cm-selectionBackground": { backgroundColor: "rgba(196, 112, 63, 0.20) !important" },
+    "&.cm-focused .cm-selectionBackground": {
+      backgroundColor: "rgba(196, 112, 63, 0.30) !important",
+    },
+    ".cm-matchingBracket": { backgroundColor: "rgba(196, 112, 63, 0.30)", outline: "none" },
+    ".cm-searchMatch": { backgroundColor: "rgba(76, 199, 155, 0.22)" },
+    ".cm-searchMatch.cm-searchMatch-selected": {
+      backgroundColor: "rgba(196, 112, 63, 0.38)",
+    },
   },
-  ".cm-content": {
-    caretColor: "#e8e8e8",
-    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-    fontSize: "14px",
-    lineHeight: "22px",
-    padding: "8px 0",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "#e8e8e8",
-    borderLeftWidth: "2px",
-  },
-  ".cm-activeLine": {
-    backgroundColor: "transparent",
-  },
-  "&.cm-focused .cm-activeLine": {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-  },
-  ".cm-gutters": {
-    backgroundColor: "#252530",
-    color: "#707080",
-    border: "none",
-    borderRight: "1px solid rgba(255, 255, 255, 0.06)",
-    paddingRight: "8px",
-  },
-  ".cm-lineNumbers .cm-gutterElement": {
-    minWidth: "3ch",
-    padding: "0 8px 0 0",
-  },
-  ".cm-scroller": {
-    overflow: "auto",
-    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-  },
-  // Calmer selection - 40% desaturated cyan
-  ".cm-selectionBackground": {
-    backgroundColor: "rgba(95, 180, 217, 0.18) !important",
-  },
-  "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(95, 180, 217, 0.25) !important",
-  },
-  ".cm-matchingBracket": {
-    backgroundColor: "rgba(95, 180, 217, 0.25)",
-    outline: "none",
-  },
-  // Calmer search highlights
-  ".cm-searchMatch": {
-    backgroundColor: "rgba(95, 217, 154, 0.2)",
-  },
-  ".cm-searchMatch.cm-searchMatch-selected": {
-    backgroundColor: "rgba(95, 180, 217, 0.35)",
-  },
-})
+  { dark: true }
+)
 
-// Calm mode dark theme - Even more muted for anxiety reduction
-const calmDarkTheme = EditorView.theme({
-  "&": {
-    // Slight blue tint for relaxation
-    backgroundColor: "#202028",
-    color: "#d0d0d8",
-    height: "100%",
+const lightTheme = EditorView.theme(
+  {
+    "&": { backgroundColor: "#f8f7f3", color: "#292824", height: "100%" },
+    ".cm-content": {
+      caretColor: "#292824",
+      fontFamily: EDITOR_FONT,
+      fontSize: "14px",
+      lineHeight: "22px",
+      padding: "8px 0",
+    },
+    ".cm-cursor": { borderLeftColor: "#292824", borderLeftWidth: "2px" },
+    ".cm-activeLine": { backgroundColor: "transparent" },
+    "&.cm-focused .cm-activeLine": { backgroundColor: "rgba(196, 112, 63, 0.06)" },
+    ".cm-gutters": {
+      backgroundColor: "#f3f2ee",
+      color: "#a8a49c",
+      border: "none",
+      borderRight: "1px solid rgba(0, 0, 0, 0.06)",
+      paddingRight: "8px",
+    },
+    ".cm-activeLineGutter": { backgroundColor: "rgba(196, 112, 63, 0.06)" },
+    ".cm-lineNumbers .cm-gutterElement": { minWidth: "3ch", padding: "0 8px 0 0" },
+    ".cm-scroller": { overflow: "auto", fontFamily: EDITOR_FONT },
+    ".cm-selectionBackground": { backgroundColor: "rgba(196, 112, 63, 0.16) !important" },
+    "&.cm-focused .cm-selectionBackground": {
+      backgroundColor: "rgba(196, 112, 63, 0.24) !important",
+    },
+    ".cm-matchingBracket": { backgroundColor: "rgba(196, 112, 63, 0.22)", outline: "none" },
+    ".cm-searchMatch": { backgroundColor: "rgba(29, 158, 117, 0.18)" },
+    ".cm-searchMatch.cm-searchMatch-selected": {
+      backgroundColor: "rgba(196, 112, 63, 0.30)",
+    },
   },
-  ".cm-content": {
-    caretColor: "#c0c0c8",
-    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-    fontSize: "14px",
-    lineHeight: "24px", // Slightly more line height for readability
-    padding: "10px 0",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "#a0a0b0",
-    borderLeftWidth: "2px",
-  },
-  ".cm-activeLine": {
-    backgroundColor: "transparent",
-  },
-  "&.cm-focused .cm-activeLine": {
-    backgroundColor: "rgba(122, 184, 204, 0.04)",
-  },
-  ".cm-gutters": {
-    backgroundColor: "#1a1a22",
-    color: "#606070",
-    border: "none",
-    borderRight: "1px solid rgba(255, 255, 255, 0.04)",
-    paddingRight: "8px",
-  },
-  ".cm-lineNumbers .cm-gutterElement": {
-    minWidth: "3ch",
-    padding: "0 8px 0 0",
-  },
-  ".cm-scroller": {
-    overflow: "auto",
-    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-  },
-  // Very muted selection for minimal visual stimulation
-  ".cm-selectionBackground": {
-    backgroundColor: "rgba(122, 184, 204, 0.12) !important",
-  },
-  "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(122, 184, 204, 0.18) !important",
-  },
-  ".cm-matchingBracket": {
-    backgroundColor: "rgba(122, 184, 204, 0.15)",
-    outline: "none",
-  },
-})
+  { dark: false }
+)
 
-// Light theme - Reduced glare with off-white background
-const lightTheme = EditorView.theme({
-  "&": {
-    backgroundColor: "#fafafa",
-    color: "#1a1a1e",
-    height: "100%",
-  },
-  ".cm-content": {
-    caretColor: "#1a1a1e",
-    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-    fontSize: "14px",
-    lineHeight: "22px",
-    padding: "8px 0",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "#1a1a1e",
-    borderLeftWidth: "2px",
-  },
-  ".cm-activeLine": {
-    backgroundColor: "transparent",
-  },
-  "&.cm-focused .cm-activeLine": {
-    backgroundColor: "rgba(95, 180, 217, 0.06)",
-  },
-  ".cm-gutters": {
-    backgroundColor: "#f5f5f5",
-    color: "#6e6e78",
-    border: "none",
-    borderRight: "1px solid rgba(0, 0, 0, 0.06)",
-    paddingRight: "8px",
-  },
-  ".cm-lineNumbers .cm-gutterElement": {
-    minWidth: "3ch",
-    padding: "0 8px 0 0",
-  },
-  ".cm-scroller": {
-    overflow: "auto",
-    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-  },
-  ".cm-selectionBackground": {
-    backgroundColor: "rgba(95, 180, 217, 0.18) !important",
-  },
-  "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(95, 180, 217, 0.25) !important",
-  },
-  ".cm-matchingBracket": {
-    backgroundColor: "rgba(95, 180, 217, 0.2)",
-    outline: "none",
-  },
-})
-
-// Keep legacy name for backwards compatibility
-const customTheme = customDarkTheme
+// Stable token classes (.tok-keyword, .tok-string, …) colored from globals.css.
+const calmSyntax = syntaxHighlighting(classHighlighter)
 
 // Base extensions for the editor
 const baseExtensions: Extension[] = [EditorView.lineWrapping]
@@ -266,13 +173,18 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       language,
       height = "100%",
       readOnly = false,
-      theme = "dark",
+      theme,
       className = "",
       calmMode = false,
     }: CodeMirrorEditorProps,
     ref
   ) => {
     const editorRef = React.useRef<ReactCodeMirrorRef>(null)
+    // Follow the global (next-themes) theme unless a caller forces one. Stays
+    // dark until mounted to avoid a hydration mismatch on the resolved theme.
+    const { resolvedTheme } = useTheme()
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), [])
 
     React.useImperativeHandle(ref, () => ({
       get view() {
@@ -353,8 +265,11 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       return () => observer.disconnect()
     }, [calmMode])
 
-    // Normalize theme to dark/light
-    const isDarkTheme = theme === "dark" || theme === "vs-dark" || theme === "hc-black" || !theme
+    // Resolve the effective theme: an explicit prop wins; otherwise follow the
+    // global app theme (next-themes), defaulting to dark before mount.
+    const effectiveTheme = theme ?? (mounted && resolvedTheme === "light" ? "light" : "dark")
+    const isDarkTheme =
+      effectiveTheme === "dark" || effectiveTheme === "vs-dark" || effectiveTheme === "hc-black"
 
     // Get indentation size for the language
     const indentSize = getIndentSize(language)
@@ -384,18 +299,10 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
         ])
       )
 
-      // Add appropriate theme based on mode
-      if (isDarkTheme) {
-        if (isCalm) {
-          // Use calm theme for reduced visual stress
-          exts.push(calmDarkTheme, oneDark)
-        } else {
-          // Use standard calmer dark theme
-          exts.push(customDarkTheme, oneDark)
-        }
-      } else {
-        exts.push(lightTheme)
-      }
+      // Calm, on-palette surface + centralized syntax classes. Calm mode keeps
+      // the same restrained theme (token colors are already low-saturation, so
+      // there's no rainbow to mute); it's retained in deps for parity.
+      exts.push(isDarkTheme ? darkTheme : lightTheme, calmSyntax)
 
       return exts
     }, [loadedLangExt, indentSize, isDarkTheme, isCalm])
@@ -425,7 +332,7 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
           ref={editorRef}
           value={value}
           height="100%"
-          theme={isDarkTheme ? "dark" : "light"}
+          theme="none"
           extensions={extensions}
           onChange={handleChange}
           readOnly={readOnly}

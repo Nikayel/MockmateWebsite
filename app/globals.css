@@ -741,6 +741,125 @@
   font-variant-ligatures: contextual;
 }
 
+/* ===== EDITOR SYNTAX PALETTE (centralized, theme-aware) =====
+   CodeMirror's classHighlighter emits stable .tok-* classes; we color them from
+   these warm, low-saturation tokens (Claude-inspired ink-on-paper) so syntax
+   highlighting is calm and follows light/dark — not the default rainbow. One
+   source of truth here; the editor component carries no token colors. */
+:root {
+  --code-comment: #a8a49c;
+  --code-keyword: #9a5b3f;
+  --code-string: #5f7a52;
+  --code-number: #9c6f3f;
+  --code-function: #7c4a2d;
+  --code-type: #7c6a4a;
+  --code-variable: #3a3833;
+  --code-property: #5f5e5a;
+  --code-punct: #908c82;
+  --code-regexp: #5f7a52;
+  --code-meta: #a8a49c;
+  --code-invalid: #b4502f;
+}
+.dark {
+  --code-comment: #8a8780;
+  --code-keyword: #d0824f;
+  --code-string: #9bb585;
+  --code-number: #d6a86a;
+  --code-function: #e0a074;
+  --code-type: #cbb893;
+  --code-variable: #ece9e1;
+  --code-property: #d8d3c6;
+  --code-punct: #a8a49c;
+  --code-regexp: #9bb585;
+  --code-meta: #8a8780;
+  --code-invalid: #e0917a;
+}
+
+/* Order matters: .tok-function is last so it wins for method/function names
+   (classHighlighter tags them as e.g. "tok-function tok-variableName"). */
+.cm-editor .tok-comment,
+.cm-editor .tok-lineComment,
+.cm-editor .tok-blockComment {
+  color: var(--code-comment);
+  font-style: italic;
+}
+.cm-editor .tok-keyword,
+.cm-editor .tok-modifier,
+.cm-editor .tok-controlKeyword,
+.cm-editor .tok-operatorKeyword,
+.cm-editor .tok-definitionKeyword,
+.cm-editor .tok-moduleKeyword,
+.cm-editor .tok-self {
+  color: var(--code-keyword);
+}
+.cm-editor .tok-string,
+.cm-editor .tok-string2,
+.cm-editor .tok-character {
+  color: var(--code-string);
+}
+.cm-editor .tok-number,
+.cm-editor .tok-integer,
+.cm-editor .tok-float,
+.cm-editor .tok-bool,
+.cm-editor .tok-atom,
+.cm-editor .tok-null {
+  color: var(--code-number);
+}
+.cm-editor .tok-variableName,
+.cm-editor .tok-definition,
+.cm-editor .tok-labelName {
+  color: var(--code-variable);
+}
+.cm-editor .tok-propertyName,
+.cm-editor .tok-attributeName {
+  color: var(--code-property);
+}
+.cm-editor .tok-typeName,
+.cm-editor .tok-className,
+.cm-editor .tok-namespace,
+.cm-editor .tok-tagName {
+  color: var(--code-type);
+}
+.cm-editor .tok-operator,
+.cm-editor .tok-punctuation,
+.cm-editor .tok-bracket,
+.cm-editor .tok-angleBracket,
+.cm-editor .tok-squareBracket,
+.cm-editor .tok-brace,
+.cm-editor .tok-paren,
+.cm-editor .tok-derefOperator,
+.cm-editor .tok-separator {
+  color: var(--code-punct);
+}
+.cm-editor .tok-regexp,
+.cm-editor .tok-escape {
+  color: var(--code-regexp);
+}
+.cm-editor .tok-meta,
+.cm-editor .tok-attributeValue {
+  color: var(--code-meta);
+}
+.cm-editor .tok-link {
+  color: var(--code-keyword);
+  text-decoration: underline;
+}
+.cm-editor .tok-heading {
+  color: var(--code-function);
+  font-weight: 600;
+}
+.cm-editor .tok-strong {
+  font-weight: 600;
+}
+.cm-editor .tok-emphasis {
+  font-style: italic;
+}
+.cm-editor .tok-invalid {
+  color: var(--code-invalid);
+}
+.cm-editor .tok-function {
+  color: var(--code-function);
+}
+
 /* === BUG-FIX / WORKSPACE IDE CHROME ===
    The code workspace should read like a real editor, not a web template.
    Tool chrome uses Geist (UI), code-adjacent text uses Geist Mono. */
