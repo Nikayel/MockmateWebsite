@@ -10,24 +10,26 @@
  * screens so the center station gets the room.
  */
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import { MILESTONE_ORDER, useCaseLabStore } from "@/lib/stores/case-lab-store"
+import { MILESTONE_ORDER, useCaseLabProgress, useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
 import type { CaseLabMilestone, MilestoneKind, MilestoneStatus } from "@/lib/labs/types"
 
 /** Milestones from the active lab in canonical order, with a sane fallback. */
 function useRailMilestones(): CaseLabMilestone[] {
   const lab = useCaseLabStore((s) => s.activeLab)
-  if (lab?.milestones?.length) {
-    return [...lab.milestones].sort(
-      (a, b) => MILESTONE_ORDER.indexOf(a.kind) - MILESTONE_ORDER.indexOf(b.kind)
-    )
-  }
-  return MILESTONE_ORDER.map((kind) => ({ kind, ...DEFAULT_MILESTONE_META[kind] }))
+  return useMemo(() => {
+    if (lab?.milestones?.length) {
+      return [...lab.milestones].sort(
+        (a, b) => MILESTONE_ORDER.indexOf(a.kind) - MILESTONE_ORDER.indexOf(b.kind)
+      )
+    }
+    return MILESTONE_ORDER.map((kind) => ({ kind, ...DEFAULT_MILESTONE_META[kind] }))
+  }, [lab])
 }
 
 function StatusMarker({ status }: { status: MilestoneStatus }) {
@@ -56,7 +58,7 @@ export function MilestoneRail({ className }: { className?: string }) {
   const milestones = useRailMilestones()
   const run = useCaseLabStore((s) => s.activeRun)
   const goToMilestone = useCaseLabStore((s) => s.goToMilestone)
-  const progress = useCaseLabStore((s) => s.getProgress())
+  const progress = useCaseLabProgress()
   const [open, setOpen] = useState(true)
 
   const current = run?.currentMilestone ?? milestones[0]?.kind ?? null

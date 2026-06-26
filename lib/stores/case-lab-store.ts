@@ -10,6 +10,7 @@
  * as `roadmap-store.ts`. Firebase save/resume wiring lands in a later phase.
  */
 
+import { useMemo } from "react"
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 import type {
@@ -32,6 +33,25 @@ export const MILESTONE_ORDER: MilestoneKind[] = [
   "build",
   "review",
 ]
+
+export interface CaseLabProgress {
+  completed: number
+  total: number
+  percentage: number
+}
+
+/**
+ * Pure progress derivation shared by the imperative `getProgress` helper and the
+ * reactive `useCaseLabProgress` hook. Kept pure (no store access) so the hook can
+ * memoize it on `activeRun` — returning a fresh object straight from a zustand
+ * selector would change identity every render and trigger an infinite loop.
+ */
+export function computeCaseLabProgress(run: CaseLabRun | null): CaseLabProgress {
+  const total = MILESTONE_ORDER.length
+  if (!run) return { completed: 0, total, percentage: 0 }
+  const completed = MILESTONE_ORDER.filter((kind) => run.milestoneStatus[kind] === "done").length
+  return { completed, total, percentage: Math.round((completed / total) * 100) }
+}
 
 interface CaseLabState {
   // The lab being played + the user's resumable run
@@ -226,17 +246,7 @@ export const useCaseLabStore = create<CaseLabState>()(
 
       getMilestoneStatus: (kind) => get().activeRun?.milestoneStatus[kind] ?? null,
 
-      getProgress: () => {
-        const run = get().activeRun
-        const total = MILESTONE_ORDER.length
-        if (!run) return { completed: 0, total, percentage: 0 }
-        const completed = MILESTONE_ORDER.filter((k) => run.milestoneStatus[k] === "done").length
-        return {
-          completed,
-          total,
-          percentage: Math.round((completed / total) * 100),
-        }
-      },
+      getProgress: () => computeCaseLabProgress(get().activeRun),
 
       isComplete: () => get().activeRun?.status === "completed",
     }),
@@ -248,4 +258,13 @@ export const useCaseLabStore = create<CaseLabState>()(
 export const useActiveLab = () => useCaseLabStore((s) => s.activeLab)
 export const useActiveRun = () => useCaseLabStore((s) => s.activeRun)
 export const useCurrentMilestone = () => useCaseLabStore((s) => s.getCurrentMilestone())
-export const useCaseLabProgress = () => useCaseLabStore((s) => s.getProgress())
+
+/**
+ * Reactive progress. Selects the stable `activeRun` reference and derives the
+ * progress object via `useMemo`, so the returned object only changes identity
+ * when the run actually changes — never per render (which would loop forever).
+ */
+export const useCaseLabProgress = (): CaseLabProgress => {
+  const run = useCaseLabStore((s) => s.activeRun)
+  return useMemo(() => computeCaseLabProgress(run), [run])
+}
