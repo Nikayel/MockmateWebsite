@@ -22,3 +22,41 @@ export type WorkspaceContextFile = {
   language?: WorkspaceScenarioFile["language"]
   hidden?: boolean
 }
+
+export type ChatMessage = {
+  type: "user" | "ai"
+  message: string
+  timestamp?: number
+}
+
+export type TestResult = {
+  description: string
+  passed: boolean
+  input: unknown
+  expected: unknown
+  actual: unknown
+  error: string | null
+}
+
+export type TestSummary = {
+  total: number
+  passed: number
+  failed: number
+  passRate: number
+}
+
+export type EfficiencyMetrics = {
+  linesOfCode: number
+  complexity: string
+  estimatedTimeComplexity: string
+  estimatedSpaceComplexity: string
+  optimalTimeComplexity: string
+  optimalSpaceComplexity: string
+  efficiencyScore: number
+}
+
+export type ConsoleLogEntry = {
+  type: string
+  message: string
+  timestamp: number
+}

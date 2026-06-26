@@ -31,7 +31,6 @@ const SCAN_DIRS = ["app/interview", "lib/interview"]
 // Interview hooks/services that live alongside non-interview code in lib/hooks.
 // Listed explicitly so the contract stays scoped as the refactor adopts them.
 const SCAN_FILES = [
-  "lib/hooks/useCodeExecution.ts",
   "lib/hooks/useInterviewChat.ts",
   "lib/hooks/useInterviewSession.ts",
   "lib/hooks/useInterviewPhase.ts",

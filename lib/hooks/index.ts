@@ -18,15 +18,6 @@ export type {
   UseInterviewChatReturn,
 } from "./useInterviewChat"
 
-export { useCodeExecution } from "./useCodeExecution"
-export type {
-  TestResult,
-  EfficiencyMetrics,
-  TestSummary,
-  UseCodeExecutionOptions,
-  UseCodeExecutionReturn,
-} from "./useCodeExecution"
-
 export { useNotifications } from "./useNotifications"
 export type { UseNotificationsOptions, UseNotificationsReturn } from "./useNotifications"
 
