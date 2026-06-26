@@ -21,6 +21,7 @@ import {
 import { getCompanyById } from "@/lib/data/company-questions"
 import { DSAScenario } from "@/lib/scenarios"
 import { formatPatternLabel } from "@/lib/pattern-labels"
+import { getRoleTrackAlignment } from "./prioritization-algorithm"
 
 // Import new modules
 import {
@@ -283,6 +284,11 @@ export function calculateEnhancedPriorityScore(
       reasons.push(`Common in ${companyData.name} intern interviews`)
     }
   }
+
+  // Question-level role/track alignment (e.g. Palantir FDSE vs core SWE)
+  const roleTrack = getRoleTrackAlignment(scenario.roles, assessment)
+  score += roleTrack.bonus
+  reasons.push(...roleTrack.reasons)
 
   // ═══════════════════════════════════════════════════════════════
   // PREREQUISITES (5%)

@@ -1,10 +1,20 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronRight, ChevronLeft, Zap, Book, Target, Clock, GraduationCap } from 'lucide-react'
-import { DSAPattern, PATTERN_METADATA } from '@/lib/types/dsa-patterns'
-import { cn } from '@/lib/utils'
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+  ChevronRight,
+  ChevronLeft,
+  Zap,
+  Book,
+  Target,
+  Clock,
+  GraduationCap,
+  Code2,
+  Compass,
+} from "lucide-react"
+import { DSAPattern, PATTERN_METADATA } from "@/lib/types/dsa-patterns"
+import { cn } from "@/lib/utils"
 
 interface SkillAssessmentProps {
   onComplete: (assessment: AssessmentResult) => void
@@ -12,46 +22,55 @@ interface SkillAssessmentProps {
 }
 
 export interface AssessmentResult {
-  experienceLevel: 'intern' | 'beginner' | 'intermediate' | 'advanced'
+  experienceLevel: "intern" | "beginner" | "intermediate" | "advanced"
+  targetTrack?: "swe" | "fdse"
   problemsSolved: number
   hoursPerDay: number
-  patternFamiliarity: { pattern: DSAPattern; level: 'unknown' | 'seen' | 'practiced' | 'confident' }[]
+  patternFamiliarity: {
+    pattern: DSAPattern
+    level: "unknown" | "seen" | "practiced" | "confident"
+  }[]
 }
 
-type Step = 'experience' | 'problems' | 'hours' | 'patterns'
+type Step = "experience" | "track" | "problems" | "hours" | "patterns"
 
 const CORE_PATTERNS: DSAPattern[] = [
-  'arrays-hashing',
-  'two-pointers',
-  'sliding-window',
-  'binary-search',
-  'trees',
-  'bfs',
-  'dp-1d',
-  'heap',
+  "arrays-hashing",
+  "two-pointers",
+  "sliding-window",
+  "binary-search",
+  "trees",
+  "bfs",
+  "dp-1d",
+  "heap",
 ]
 
 export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
-  const [step, setStep] = useState<Step>('experience')
-  const [experienceLevel, setExperienceLevel] = useState<'intern' | 'beginner' | 'intermediate' | 'advanced' | null>(null)
+  const [step, setStep] = useState<Step>("experience")
+  const [experienceLevel, setExperienceLevel] = useState<
+    "intern" | "beginner" | "intermediate" | "advanced" | null
+  >(null)
+  const [targetTrack, setTargetTrack] = useState<"swe" | "fdse" | null>(null)
   const [problemsSolved, setProblemsSolved] = useState<number>(0)
   const [hoursPerDay, setHoursPerDay] = useState<number>(2)
   const [patternFamiliarity, setPatternFamiliarity] = useState<
-    Record<DSAPattern, 'unknown' | 'seen' | 'practiced' | 'confident'>
-  >({} as Record<DSAPattern, 'unknown' | 'seen' | 'practiced' | 'confident'>)
+    Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">
+  >({} as Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">)
 
-  const steps: Step[] = ['experience', 'problems', 'hours', 'patterns']
+  const steps: Step[] = ["experience", "track", "problems", "hours", "patterns"]
   const currentStepIndex = steps.indexOf(step)
 
   const canContinue = () => {
     switch (step) {
-      case 'experience':
+      case "experience":
         return experienceLevel !== null
-      case 'problems':
+      case "track":
+        return true // Optional — users without a track preference can skip
+      case "problems":
         return true // Always can continue, default 0
-      case 'hours':
+      case "hours":
         return hoursPerDay >= 0.5
-      case 'patterns':
+      case "patterns":
         return Object.keys(patternFamiliarity).length >= 4
       default:
         return false
@@ -59,9 +78,10 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
   }
 
   const handleNext = () => {
-    if (step === 'patterns') {
+    if (step === "patterns") {
       onComplete({
         experienceLevel: experienceLevel!,
+        targetTrack: targetTrack ?? undefined,
         problemsSolved,
         hoursPerDay,
         patternFamiliarity: Object.entries(patternFamiliarity).map(([pattern, level]) => ({
@@ -93,8 +113,8 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
           <div
             key={s}
             className={cn(
-              'h-2 rounded-full transition-all',
-              i <= currentStepIndex ? 'bg-primary w-8' : 'bg-muted w-4'
+              "h-2 rounded-full transition-all",
+              i <= currentStepIndex ? "bg-primary w-8" : "bg-muted w-4"
             )}
           />
         ))}
@@ -109,25 +129,15 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2 }}
         >
-          {step === 'experience' && (
-            <ExperienceStep
-              selected={experienceLevel}
-              onSelect={setExperienceLevel}
-            />
+          {step === "experience" && (
+            <ExperienceStep selected={experienceLevel} onSelect={setExperienceLevel} />
           )}
-          {step === 'problems' && (
-            <ProblemsSolvedStep
-              value={problemsSolved}
-              onChange={setProblemsSolved}
-            />
+          {step === "track" && <TrackStep selected={targetTrack} onSelect={setTargetTrack} />}
+          {step === "problems" && (
+            <ProblemsSolvedStep value={problemsSolved} onChange={setProblemsSolved} />
           )}
-          {step === 'hours' && (
-            <HoursPerDayStep
-              value={hoursPerDay}
-              onChange={setHoursPerDay}
-            />
-          )}
-          {step === 'patterns' && (
+          {step === "hours" && <HoursPerDayStep value={hoursPerDay} onChange={setHoursPerDay} />}
+          {step === "patterns" && (
             <PatternFamiliarityStep
               familiarity={patternFamiliarity}
               onChange={(pattern, level) =>
@@ -142,7 +152,7 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
       <div className="flex justify-between pt-4">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted-foreground hover:text-foreground flex items-center gap-2 px-4 py-2 transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
           Back
@@ -151,13 +161,13 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
           onClick={handleNext}
           disabled={!canContinue()}
           className={cn(
-            'flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors',
+            "flex items-center gap-2 rounded-lg px-6 py-2 font-medium transition-colors",
             canContinue()
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-              : 'bg-muted text-muted-foreground cursor-not-allowed'
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "bg-muted text-muted-foreground cursor-not-allowed"
           )}
         >
-          {step === 'patterns' ? 'Generate Roadmap' : 'Continue'}
+          {step === "patterns" ? "Generate Roadmap" : "Continue"}
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -169,46 +179,46 @@ function ExperienceStep({
   selected,
   onSelect,
 }: {
-  selected: 'intern' | 'beginner' | 'intermediate' | 'advanced' | null
-  onSelect: (level: 'intern' | 'beginner' | 'intermediate' | 'advanced') => void
+  selected: "intern" | "beginner" | "intermediate" | "advanced" | null
+  onSelect: (level: "intern" | "beginner" | "intermediate" | "advanced") => void
 }) {
   const options = [
     {
-      level: 'intern' as const,
+      level: "intern" as const,
       icon: GraduationCap,
-      title: 'Intern / Student',
-      description: 'Preparing for internship interviews',
-      detail: 'Focus on core patterns and fundamentals',
-      badge: 'Tailored for internships',
+      title: "Intern / Student",
+      description: "Preparing for internship interviews",
+      detail: "Focus on core patterns and fundamentals",
+      badge: "Tailored for internships",
     },
     {
-      level: 'beginner' as const,
+      level: "beginner" as const,
       icon: Book,
-      title: 'Beginner',
-      description: 'New to DSA or solved < 50 problems',
-      detail: 'Learning fundamentals, need more practice time',
+      title: "Beginner",
+      description: "New to DSA or solved < 50 problems",
+      detail: "Learning fundamentals, need more practice time",
     },
     {
-      level: 'intermediate' as const,
+      level: "intermediate" as const,
       icon: Target,
-      title: 'Intermediate',
-      description: 'Solved 50-150 problems',
-      detail: 'Know common patterns, working on optimization',
+      title: "Intermediate",
+      description: "Solved 50-150 problems",
+      detail: "Know common patterns, working on optimization",
     },
     {
-      level: 'advanced' as const,
+      level: "advanced" as const,
       icon: Zap,
-      title: 'Advanced',
-      description: 'Solved 150+ problems',
-      detail: 'Strong foundations, focusing on hard problems',
+      title: "Advanced",
+      description: "Solved 150+ problems",
+      detail: "Strong foundations, focusing on hard problems",
     },
   ]
 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-xl font-bold text-foreground">What's Your Experience Level?</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 className="text-foreground text-xl font-bold">What's Your Experience Level?</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
           This helps us calibrate problem difficulty and pacing
         </p>
       </div>
@@ -223,32 +233,100 @@ function ExperienceStep({
               key={option.level}
               onClick={() => onSelect(option.level)}
               className={cn(
-                'p-3 rounded-xl border-2 text-left transition-all hover:shadow-md',
-                isSelected
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
+                "rounded-xl border-2 p-3 text-left transition-all hover:shadow-md",
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
               )}
             >
               <div className="flex items-start gap-3">
                 <div
                   className={cn(
-                    'p-1.5 rounded-lg shrink-0',
-                    isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                    "shrink-0 rounded-lg p-1.5",
+                    isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
                   )}
                 >
                   <Icon className="h-4 w-4" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm">{option.title}</h3>
-                    {'badge' in option && option.badge && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full">
+                    <h3 className="text-sm font-semibold">{option.title}</h3>
+                    {"badge" in option && option.badge && (
+                      <span className="bg-primary/10 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-medium">
                         {option.badge}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{option.description}</p>
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">{option.detail}</p>
+                  <p className="text-muted-foreground text-xs">{option.description}</p>
+                  <p className="text-muted-foreground/70 mt-0.5 text-[10px]">{option.detail}</p>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TrackStep({
+  selected,
+  onSelect,
+}: {
+  selected: "swe" | "fdse" | null
+  onSelect: (track: "swe" | "fdse" | null) => void
+}) {
+  const options = [
+    {
+      track: "swe" as const,
+      icon: Code2,
+      title: "Core Software Engineer",
+      description: "General SWE / new-grad / backend roles",
+      detail: "Heavier on graphs, algorithms, and harder problems",
+    },
+    {
+      track: "fdse" as const,
+      icon: Compass,
+      title: "Forward Deployed (FDSE)",
+      description: "Forward Deployed Software / Solutions Engineer",
+      detail: "Leans on data modeling, parsing, and hashmaps over hard algorithms",
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-foreground text-xl font-bold">Which Engineering Track?</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Optional — tailors question emphasis (e.g. Palantir FDSE vs core SWE). Skip if unsure.
+        </p>
+      </div>
+
+      <div className="grid gap-3">
+        {options.map((option) => {
+          const Icon = option.icon
+          const isSelected = selected === option.track
+
+          return (
+            <button
+              key={option.track}
+              onClick={() => onSelect(isSelected ? null : option.track)}
+              className={cn(
+                "rounded-xl border-2 p-3 text-left transition-all hover:shadow-md",
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "shrink-0 rounded-lg p-1.5",
+                    isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold">{option.title}</h3>
+                  <p className="text-muted-foreground text-xs">{option.description}</p>
+                  <p className="text-muted-foreground/70 mt-0.5 text-[10px]">{option.detail}</p>
                 </div>
               </div>
             </button>
@@ -271,25 +349,23 @@ function ProblemsSolvedStep({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">How Many Problems Have You Solved?</h2>
-        <p className="mt-2 text-muted-foreground">
+        <h2 className="text-foreground text-2xl font-bold">How Many Problems Have You Solved?</h2>
+        <p className="text-muted-foreground mt-2">
           Approximate LeetCode / HackerRank problems solved
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 justify-center">
+      <div className="flex flex-wrap justify-center gap-2">
         {presets.map((preset) => (
           <button
             key={preset}
             onClick={() => onChange(preset)}
             className={cn(
-              'px-4 py-2 rounded-lg font-medium transition-colors',
-              value === preset
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80'
+              "rounded-lg px-4 py-2 font-medium transition-colors",
+              value === preset ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
             )}
           >
-            {preset === 0 ? '< 10' : preset === 300 ? '300+' : preset}
+            {preset === 0 ? "< 10" : preset === 300 ? "300+" : preset}
           </button>
         ))}
       </div>
@@ -310,7 +386,9 @@ function ProblemsSolvedStep({
           aria-valuemax={500}
           aria-valuenow={value}
         />
-        <p className="mt-2 text-lg font-semibold" aria-live="polite">{value} problems</p>
+        <p className="mt-2 text-lg font-semibold" aria-live="polite">
+          {value} problems
+        </p>
       </div>
     </div>
   )
@@ -324,36 +402,34 @@ function HoursPerDayStep({
   onChange: (value: number) => void
 }) {
   const presets = [
-    { hours: 1, label: '1 hour', description: 'Light practice' },
-    { hours: 2, label: '2 hours', description: 'Recommended' },
-    { hours: 3, label: '3 hours', description: 'Intensive' },
-    { hours: 4, label: '4+ hours', description: 'Full-time prep' },
+    { hours: 1, label: "1 hour", description: "Light practice" },
+    { hours: 2, label: "2 hours", description: "Recommended" },
+    { hours: 3, label: "3 hours", description: "Intensive" },
+    { hours: 4, label: "4+ hours", description: "Full-time prep" },
   ]
 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">How Much Time Can You Study Daily?</h2>
-        <p className="mt-2 text-muted-foreground">
-          We'll adjust your roadmap to fit your schedule
-        </p>
+        <h2 className="text-foreground text-2xl font-bold">How Much Time Can You Study Daily?</h2>
+        <p className="text-muted-foreground mt-2">We'll adjust your roadmap to fit your schedule</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+      <div className="mx-auto grid max-w-md grid-cols-2 gap-4">
         {presets.map((preset) => (
           <button
             key={preset.hours}
             onClick={() => onChange(preset.hours)}
             className={cn(
-              'p-4 rounded-xl border-2 text-center transition-all',
+              "rounded-xl border-2 p-4 text-center transition-all",
               value === preset.hours
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50"
             )}
           >
-            <Clock className="h-6 w-6 mx-auto mb-2 text-primary" />
+            <Clock className="text-primary mx-auto mb-2 h-6 w-6" />
             <p className="font-semibold">{preset.label}</p>
-            <p className="text-xs text-muted-foreground">{preset.description}</p>
+            <p className="text-muted-foreground text-xs">{preset.description}</p>
           </button>
         ))}
       </div>
@@ -365,21 +441,21 @@ function PatternFamiliarityStep({
   familiarity,
   onChange,
 }: {
-  familiarity: Record<DSAPattern, 'unknown' | 'seen' | 'practiced' | 'confident'>
-  onChange: (pattern: DSAPattern, level: 'unknown' | 'seen' | 'practiced' | 'confident') => void
+  familiarity: Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">
+  onChange: (pattern: DSAPattern, level: "unknown" | "seen" | "practiced" | "confident") => void
 }) {
   const levels = [
-    { level: 'unknown' as const, label: 'New', color: 'bg-gray-200 text-gray-700' },
-    { level: 'seen' as const, label: 'Seen', color: 'bg-yellow-100 text-yellow-700' },
-    { level: 'practiced' as const, label: 'Practiced', color: 'bg-blue-100 text-blue-700' },
-    { level: 'confident' as const, label: 'Confident', color: 'bg-green-100 text-green-700' },
+    { level: "unknown" as const, label: "New", color: "bg-gray-200 text-gray-700" },
+    { level: "seen" as const, label: "Seen", color: "bg-yellow-100 text-yellow-700" },
+    { level: "practiced" as const, label: "Practiced", color: "bg-blue-100 text-blue-700" },
+    { level: "confident" as const, label: "Confident", color: "bg-green-100 text-green-700" },
   ]
 
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">Rate Your Pattern Knowledge</h2>
-        <p className="mt-2 text-muted-foreground">
+        <h2 className="text-foreground text-2xl font-bold">Rate Your Pattern Knowledge</h2>
+        <p className="text-muted-foreground mt-2">
           How comfortable are you with these core patterns?
         </p>
       </div>
@@ -392,12 +468,12 @@ function PatternFamiliarityStep({
           return (
             <div
               key={pattern}
-              className="flex items-center justify-between p-3 rounded-lg border border-border"
+              className="border-border flex items-center justify-between rounded-lg border p-3"
             >
               <div>
                 <p className="font-medium">{metadata?.name || pattern}</p>
-                <p className="text-xs text-muted-foreground line-clamp-1">
-                  {metadata?.description || ''}
+                <p className="text-muted-foreground line-clamp-1 text-xs">
+                  {metadata?.description || ""}
                 </p>
               </div>
               <div className="flex gap-1">
@@ -406,10 +482,10 @@ function PatternFamiliarityStep({
                     key={l.level}
                     onClick={() => onChange(pattern, l.level)}
                     className={cn(
-                      'px-2 py-1 text-xs rounded transition-all',
+                      "rounded px-2 py-1 text-xs transition-all",
                       currentLevel === l.level
-                        ? l.color + ' ring-2 ring-offset-1 ring-current'
-                        : 'bg-muted text-muted-foreground hover:opacity-80'
+                        ? l.color + " ring-2 ring-current ring-offset-1"
+                        : "bg-muted text-muted-foreground hover:opacity-80"
                     )}
                   >
                     {l.label}
@@ -421,7 +497,7 @@ function PatternFamiliarityStep({
         })}
       </div>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-center text-sm">
         Rate at least 4 patterns to continue
       </p>
     </div>

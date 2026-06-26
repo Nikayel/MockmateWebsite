@@ -22,6 +22,7 @@ interface CreateRoadmapRequestBody {
   targetCompany?: UserRoadmapAssessment["targetCompany"]
   interviewDate?: string | Date
   experienceLevel?: UserRoadmapAssessment["experienceLevel"]
+  targetTrack?: UserRoadmapAssessment["targetTrack"]
   problemsSolved?: number
   hoursPerDay?: number
   patternFamiliarity?: UserRoadmapAssessment["patternFamiliarity"]
@@ -246,6 +247,7 @@ export async function POST(request: NextRequest) {
       targetCompany,
       interviewDate,
       experienceLevel,
+      targetTrack,
       problemsSolved,
       hoursPerDay,
       patternFamiliarity,
@@ -272,6 +274,7 @@ export async function POST(request: NextRequest) {
       interviewDate: interview,
       daysRemaining,
       experienceLevel: experienceLevel || "intermediate",
+      targetTrack,
       problemsSolvedEstimate: problemsSolved || 0,
       patternFamiliarity: patternFamiliarity || [],
       hoursPerDay: hoursPerDay || 2,

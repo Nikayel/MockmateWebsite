@@ -138,6 +138,13 @@ export interface CompanyQuestionData {
   }
 }
 
+/**
+ * Engineering track the user is targeting. Affects which role-tagged questions
+ * are prioritized (e.g. Palantir FDSE leans on parsing/data-modeling while core
+ * SWE leans on harder graph/algorithm work). Undefined = no track preference.
+ */
+export type CompanyTrack = "swe" | "fdse"
+
 export interface UserRoadmapAssessment {
   targetCompany: CompanyId
   interviewDate: Date
@@ -145,6 +152,9 @@ export interface UserRoadmapAssessment {
 
   // User's current level (including intern for internship candidates)
   experienceLevel: "intern" | "beginner" | "intermediate" | "advanced"
+  // Optional engineering track (core SWE vs forward-deployed). Affects role-aware
+  // question prioritization; undefined means no track preference.
+  targetTrack?: CompanyTrack
   problemsSolvedEstimate: number
 
   // Pattern familiarity (from self-assessment)

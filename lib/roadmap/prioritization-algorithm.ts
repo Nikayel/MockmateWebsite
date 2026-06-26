@@ -50,14 +50,50 @@ const CONFIG = {
 /**
  * Map a user's experience level to the seniority role tag used on questions.
  * Lets role-tagged questions (e.g. Palantir's intern vs senior split) surface
- * for the matching level. Track tags (swe/fdse) need an explicit track input
- * and are not inferred here.
+ * for the matching level.
  */
-const EXPERIENCE_TO_ROLE: Record<UserRoadmapAssessment["experienceLevel"], RoleTag> = {
+export const EXPERIENCE_TO_ROLE: Record<UserRoadmapAssessment["experienceLevel"], RoleTag> = {
   intern: "intern",
   beginner: "new-grad",
   intermediate: "junior",
   advanced: "senior",
+}
+
+/**
+ * Compute a role/track alignment bonus for a question given the user's
+ * experience level and (optional) target track. Boosts questions tagged for the
+ * matching seniority and track (e.g. FDSE), and mildly deprioritizes questions
+ * that belong to the *other* track. Shared by the standard and RAG-enhanced
+ * prioritizers so both rank consistently. Returns 0 for untagged questions.
+ */
+export function getRoleTrackAlignment(
+  roles: RoleTag[] | undefined,
+  assessment: Pick<UserRoadmapAssessment, "experienceLevel" | "targetTrack">
+): { bonus: number; reasons: string[] } {
+  if (!roles?.length) return { bonus: 0, reasons: [] }
+
+  let bonus = 0
+  const reasons: string[] = []
+
+  const targetRole = EXPERIENCE_TO_ROLE[assessment.experienceLevel]
+  if (targetRole && roles.includes(targetRole)) {
+    bonus += 10
+    reasons.push(`Commonly asked at the ${targetRole} level`)
+  }
+
+  const track = assessment.targetTrack
+  if (track) {
+    const hasTrackTag = roles.includes("swe") || roles.includes("fdse")
+    if (roles.includes(track)) {
+      bonus += 12
+      reasons.push(`Matches your ${track.toUpperCase()} track`)
+    } else if (hasTrackTag) {
+      bonus -= 8
+      reasons.push(`Less central to the ${track.toUpperCase()} track`)
+    }
+  }
+
+  return { bonus, reasons }
 }
 
 /**
@@ -92,15 +128,11 @@ export function calculatePriorityScore(
     }
   }
 
-  // 1c. Role-alignment bonus — nudge up questions tagged for the user's target
-  // role (e.g. Palantir's intern/new-grad/junior/senior split).
-  if (scenario.roles?.length) {
-    const targetRole = EXPERIENCE_TO_ROLE[assessment.experienceLevel]
-    if (targetRole && scenario.roles.includes(targetRole)) {
-      score += 10
-      reasons.push(`Commonly asked at the ${targetRole} level`)
-    }
-  }
+  // 1c. Role/track alignment bonus — surface questions tagged for the user's
+  // target seniority and track (e.g. Palantir FDSE vs core SWE).
+  const alignment = getRoleTrackAlignment(scenario.roles, assessment)
+  score += alignment.bonus
+  reasons.push(...alignment.reasons)
 
   // 2. Must-know question bonus (25%)
   const isMustKnow = companyData.mustKnowQuestions.some((q) => q.scenarioId === scenario.id)
