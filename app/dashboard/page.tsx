@@ -26,6 +26,7 @@ import {
   TrendingUp,
   HelpCircle,
   ShieldCheck,
+  FlaskConical,
 } from "lucide-react"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import Link from "next/link"
@@ -359,7 +360,19 @@ export default function DashboardPage() {
       <div className="pt-20 pb-12 sm:pt-24 sm:pb-16">
         <div className="container mx-auto max-w-6xl px-4">
           <h1 className="sr-only">Dashboard</h1>
-          <div className="mb-6 flex justify-end sm:mb-8" data-tour="welcome">
+          <div
+            className="mb-6 flex flex-col gap-2 sm:mb-8 sm:flex-row sm:justify-end"
+            data-tour="welcome"
+          >
+            <Link href="/labs">
+              <Button
+                variant="outline"
+                className="w-full border-zinc-700 font-medium text-zinc-300 hover:bg-zinc-800 sm:w-auto"
+              >
+                <FlaskConical className="mr-2 h-4 w-4" />
+                Case Labs
+              </Button>
+            </Link>
             <Link href="/interview" data-tour="start-practice-btn">
               <Button className="w-full bg-white font-medium text-zinc-900 hover:bg-zinc-200 sm:w-auto">
                 <Terminal className="mr-2 h-4 w-4" />
