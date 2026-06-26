@@ -11,6 +11,7 @@ import {
   LogOut,
   Map,
   Brain,
+  FlaskConical,
   ChevronDown,
 } from "lucide-react"
 import Link from "next/link"
@@ -169,6 +170,13 @@ export function Header() {
                   <span>Interview</span>
                 </Link>
                 <Link
+                  href="/labs"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
+                  <FlaskConical className="h-4 w-4" />
+                  <span>Labs</span>
+                </Link>
+                <Link
                   href="/sessions"
                   className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
                 >
@@ -291,6 +299,14 @@ export function Header() {
                   >
                     <Terminal className="h-4 w-4" />
                     <span>Interview</span>
+                  </Link>
+                  <Link
+                    href="/labs"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <FlaskConical className="h-4 w-4" />
+                    <span>Labs</span>
                   </Link>
                   <Link
                     href="/sessions"
