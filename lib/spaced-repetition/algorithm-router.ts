@@ -129,6 +129,7 @@ function reconstructFSRSCardFromFields(data: {
     nextReview,
     reps: data.review_count,
     lapses: data.fsrs_lapses || 0,
+    learningSteps: 0, // Legacy cards without a serialized blob restart at step 0
     elapsedDays: lastReview
       ? Math.floor((Date.now() - lastReview.getTime()) / (1000 * 60 * 60 * 24))
       : 0,
@@ -394,6 +395,7 @@ export function reconstructState(
               : new Date(data.next_review_at),
           reps: parsed.reps ?? data.review_count,
           lapses: parsed.lapses ?? data.fsrs_lapses ?? 0,
+          learningSteps: parsed.learningSteps ?? parsed.learning_steps ?? 0,
           elapsedDays: parsed.elapsedDays ?? parsed.elapsed_days ?? 0,
           scheduledDays: parsed.scheduledDays ?? parsed.scheduled_days ?? data.interval_days,
         }

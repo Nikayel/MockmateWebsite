@@ -31,6 +31,7 @@ export interface FSRSCard {
   nextReview: Date
   reps: number // Total reviews
   lapses: number // Times forgotten (rated Again)
+  learningSteps: number // Index into the (re)learning steps for short-term scheduling
 
   // For analytics
   elapsedDays: number // Days since last review
@@ -132,7 +133,7 @@ function toTsCard(card: FSRSCard): Card {
     difficulty: card.difficulty,
     elapsed_days: card.elapsedDays,
     scheduled_days: card.scheduledDays,
-    learning_steps: 0,
+    learning_steps: card.learningSteps ?? 0,
     reps: card.reps,
     lapses: card.lapses,
     state: toTsState(card.state),
@@ -149,6 +150,7 @@ function fromTsCard(card: Card): FSRSCard {
     nextReview: card.due,
     reps: card.reps,
     lapses: card.lapses,
+    learningSteps: card.learning_steps ?? 0,
     elapsedDays: card.elapsed_days,
     scheduledDays: card.scheduled_days,
   }
