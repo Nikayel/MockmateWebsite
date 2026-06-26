@@ -87,7 +87,7 @@ const ScenarioBrowser = nextDynamic(
     ssr: false,
     loading: () => (
       <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-gray-400">Loading scenarios...</div>
+        <div className="text-muted-foreground">Loading scenarios...</div>
       </div>
     ),
   }
@@ -97,7 +97,7 @@ const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center p-8">
-      <div className="text-sm text-gray-400">Loading feedback...</div>
+      <div className="text-sm text-muted-foreground">Loading feedback...</div>
     </div>
   ),
 })
@@ -4883,7 +4883,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black">
-        <div className="text-xl text-white">Loading...</div>
+        <div className="text-xl text-foreground">Loading...</div>
       </main>
     )
   }
@@ -4938,7 +4938,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       {/* Interview Interface */}
       {!showScenarioBrowser && (
         <section
-          className={`flex flex-col bg-gradient-to-b from-gray-900 to-black pt-1.5 pb-1.5 ${
+          className={`flex flex-col bg-gradient-to-b from-card to-black pt-1.5 pb-1.5 ${
             isResultView
               ? "min-h-screen overflow-x-hidden overflow-y-auto"
               : "h-screen overflow-hidden"
@@ -5207,7 +5207,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                     <div className="mt-6 flex justify-center">
                       <Button
                         onClick={() => router.push("/roadmap")}
-                        className="bg-primary hover:bg-primary/90 text-white"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
                       >
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to Roadmap
@@ -5265,10 +5265,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 // Loading fallback for Suspense boundary
 function InterviewPageLoading() {
   return (
-    <main className="flex min-h-screen flex-1 items-center justify-center bg-gradient-to-b from-gray-900 via-black to-gray-900">
+    <main className="flex min-h-screen flex-1 items-center justify-center bg-gradient-to-b from-card via-background to-card">
       <div className="text-center">
         <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
-        <p className="text-gray-400">Loading interview...</p>
+        <p className="text-muted-foreground">Loading interview...</p>
       </div>
     </main>
   )
