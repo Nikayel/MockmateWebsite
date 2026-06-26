@@ -66,9 +66,9 @@ function CalendarDay({
       disabled={!day.isCurrentMonth}
       className={cn(
         "relative flex h-9 w-full flex-col items-center justify-center rounded-lg transition-all",
-        day.isCurrentMonth ? "hover:bg-white/5" : "opacity-30",
+        day.isCurrentMonth ? "hover:bg-foreground/5" : "opacity-30",
         day.isToday && "bg-indigo-500/10 ring-1 ring-indigo-500",
-        isSelected && !day.isToday && "bg-white/10",
+        isSelected && !day.isToday && "bg-foreground/10",
         hasItems &&
           day.isCurrentMonth &&
           !day.isToday &&
@@ -80,8 +80,8 @@ function CalendarDay({
       <span
         className={cn(
           "text-xs font-medium",
-          day.isToday ? "text-indigo-400" : day.isCurrentMonth ? "text-white" : "text-gray-600",
-          day.isPast && !day.isToday && "text-gray-500"
+          day.isToday ? "text-indigo-400" : day.isCurrentMonth ? "text-foreground" : "text-muted-foreground",
+          day.isPast && !day.isToday && "text-muted-foreground"
         )}
       >
         {day.date.getDate()}
@@ -133,11 +133,11 @@ function TodayFocusCard({ items }: { items: DueItem[] }) {
         {items.slice(0, 8).map((item) => (
           <div
             key={item.problem_id}
-            className="flex items-center justify-between rounded-lg border border-white/5 bg-white/5 px-3 py-2"
+            className="flex items-center justify-between rounded-lg border border-border bg-foreground/5 px-3 py-2"
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">{item.title}</p>
-              <p className="truncate text-xs text-gray-500">{item.pattern}</p>
+              <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+              <p className="truncate text-xs text-muted-foreground">{item.pattern}</p>
             </div>
             <span
               className={cn(
@@ -152,7 +152,7 @@ function TodayFocusCard({ items }: { items: DueItem[] }) {
           </div>
         ))}
         {items.length > 8 && (
-          <p className="text-center text-xs text-gray-500">+{items.length - 8} more</p>
+          <p className="text-center text-xs text-muted-foreground">+{items.length - 8} more</p>
         )}
       </div>
     </div>
@@ -175,10 +175,10 @@ function SelectedDayPanel({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+          <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             {isToday ? "Today" : isFuture ? "Scheduled" : "Past Due"}
           </span>
-          <h3 className="text-sm font-semibold text-white">
+          <h3 className="text-sm font-semibold text-foreground">
             {date.toLocaleDateString("en-US", {
               weekday: "short",
               month: "short",
@@ -188,24 +188,24 @@ function SelectedDayPanel({
         </div>
         <button
           onClick={onClose}
-          className="rounded p-1 text-lg leading-none text-gray-500 transition-colors hover:bg-white/5 hover:text-white"
+          className="rounded p-1 text-lg leading-none text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
         >
           ×
         </button>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-xs text-gray-500">No reviews scheduled</p>
+        <p className="text-xs text-muted-foreground">No reviews scheduled</p>
       ) : (
         <div className="max-h-[280px] space-y-1.5 overflow-y-auto pr-1">
           {items.map((item) => (
             <div
               key={item.problem_id}
-              className="flex items-center justify-between rounded-lg border border-white/5 bg-white/5 px-3 py-2"
+              className="flex items-center justify-between rounded-lg border border-border bg-foreground/5 px-3 py-2"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">{item.title}</p>
-                <p className="truncate text-xs text-gray-500">{item.pattern}</p>
+                <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                <p className="truncate text-xs text-muted-foreground">{item.pattern}</p>
               </div>
               <span
                 className={cn(
@@ -322,9 +322,9 @@ export function ReviewCalendar({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Brain className="h-4 w-4 text-indigo-400" />
-          <h2 className="text-base font-semibold text-white">Review Schedule</h2>
+          <h2 className="text-base font-semibold text-foreground">Review Schedule</h2>
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-gray-500">
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
           <div className="flex items-center gap-1">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             <span>Easy</span>
@@ -344,21 +344,21 @@ export function ReviewCalendar({
       <div className="flex gap-4">
         {/* Calendar - Left side */}
         <div className="min-w-0 flex-1">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="rounded-xl border border-border bg-foreground/5 p-3">
             {/* Month Navigation */}
             <div className="mb-2 flex items-center justify-between">
               <button
                 onClick={handlePrevMonth}
-                className="rounded p-1 text-gray-500 transition-colors hover:bg-white/5 hover:text-white"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm font-medium text-white">
+              <span className="text-sm font-medium text-foreground">
                 {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
               </span>
               <button
                 onClick={handleNextMonth}
-                className="rounded p-1 text-gray-500 transition-colors hover:bg-white/5 hover:text-white"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -369,7 +369,7 @@ export function ReviewCalendar({
               {DAYS_OF_WEEK.map((day, idx) => (
                 <div
                   key={idx}
-                  className="flex h-6 items-center justify-center text-[10px] font-medium text-gray-500"
+                  className="flex h-6 items-center justify-center text-[10px] font-medium text-muted-foreground"
                 >
                   {day}
                 </div>
@@ -389,7 +389,7 @@ export function ReviewCalendar({
             </div>
 
             {/* Stats footer */}
-            <div className="mt-2 flex items-center justify-center gap-3 border-t border-white/5 pt-2 text-[10px] text-gray-500">
+            <div className="mt-2 flex items-center justify-center gap-3 border-t border-border pt-2 text-[10px] text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 <span>{monthStats.daysWithReviews} days scheduled</span>
@@ -402,11 +402,11 @@ export function ReviewCalendar({
 
         {/* Side Panel - Right side */}
         <div className="w-64 shrink-0">
-          <div className="h-full rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="h-full rounded-xl border border-border bg-foreground/5 p-3">
             {/* Panel Header */}
             <div className="mb-3 flex items-center gap-2">
               <Play className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="text-xs font-semibold text-white">
+              <span className="text-xs font-semibold text-foreground">
                 {showTodayPanel ? "Today's Review" : showSelectedPanel ? "Selected Day" : "Reviews"}
               </span>
               {(showTodayPanel || showSelectedPanel) && (
@@ -429,9 +429,9 @@ export function ReviewCalendar({
 
             {showEmptyState && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Calendar className="mb-2 h-8 w-8 text-gray-600" />
-                <p className="text-xs text-gray-500">No reviews due today</p>
-                <p className="mt-1 text-[10px] text-gray-600">
+                <Calendar className="mb-2 h-8 w-8 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">No reviews due today</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   Click a date to see scheduled reviews
                 </p>
               </div>

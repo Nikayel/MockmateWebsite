@@ -363,13 +363,13 @@ export function ScoreDisplay({
       </div>
 
       {/* Compact Header with Grade */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
         {/* Close Button - Apple-style prominent placement */}
         {onClose && (
-          <div className="flex items-center justify-end border-b border-zinc-800/50 px-5 py-3">
+          <div className="flex items-center justify-end border-b border-border/50 px-5 py-3">
             <button
               onClick={onClose}
-              className="flex h-10 items-center gap-2 rounded-full bg-zinc-800 px-4 text-sm font-medium text-zinc-300 shadow-sm transition-all duration-200 hover:bg-zinc-700 hover:text-white active:scale-[0.98]"
+              className="flex h-10 items-center gap-2 rounded-full bg-muted px-4 text-sm font-medium text-muted-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-[0.98]"
             >
               <ArrowLeft className="h-4 w-4" />
               Close
@@ -407,7 +407,7 @@ export function ScoreDisplay({
                     "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
                     showTechnicalOnly
                       ? "bg-violet-500/20 text-violet-400"
-                      : "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
                   )}
                 >
                   {showTechnicalOnly ? "Technical" : "Overall"}
@@ -419,7 +419,7 @@ export function ScoreDisplay({
                         "transition-colors",
                         showTechnicalOnly
                           ? "text-violet-400 hover:text-violet-300"
-                          : "text-zinc-400 hover:text-zinc-300"
+                          : "text-muted-foreground hover:text-muted-foreground"
                       )}
                     >
                       <Info className="h-3 w-3" />
@@ -427,15 +427,15 @@ export function ScoreDisplay({
                   </TooltipTrigger>
                   <TooltipContent
                     side="right"
-                    className="max-w-xs border border-zinc-700 bg-zinc-800 text-zinc-100"
+                    className="max-w-xs border border-border bg-muted text-foreground"
                   >
                     {showTechnicalOnly ? (
                       <div className="space-y-2 p-1">
                         <p className="font-semibold text-violet-400">Technical Score Breakdown</p>
-                        <p className="text-[11px] text-zinc-300">
+                        <p className="text-[11px] text-muted-foreground">
                           Excludes communication - pure coding ability:
                         </p>
-                        <ul className="space-y-1 text-[11px] text-zinc-300">
+                        <ul className="space-y-1 text-[11px] text-muted-foreground">
                           <li>
                             <span className="font-medium text-violet-400">60%</span> Code Quality —
                             test pass rate, efficiency, complexity
@@ -449,7 +449,7 @@ export function ScoreDisplay({
                             code explanation, complexity analysis
                           </li>
                         </ul>
-                        <p className="border-t border-zinc-700 pt-1 text-[10px] text-zinc-500">
+                        <p className="border-t border-border pt-1 text-[10px] text-muted-foreground">
                           Technical can differ from Overall because it heavily weights Code Quality
                           (60%) while Overall includes Communication (20%) and weights Code Quality
                           at only 30%.
@@ -457,29 +457,29 @@ export function ScoreDisplay({
                       </div>
                     ) : (
                       <div className="space-y-2 p-1">
-                        <p className="font-semibold text-zinc-200">Overall Score Breakdown</p>
-                        <p className="text-[11px] text-zinc-300">
+                        <p className="font-semibold text-foreground">Overall Score Breakdown</p>
+                        <p className="text-[11px] text-muted-foreground">
                           Full interview performance including soft skills:
                         </p>
-                        <ul className="space-y-1 text-[11px] text-zinc-300">
+                        <ul className="space-y-1 text-[11px] text-muted-foreground">
                           <li>
-                            <span className="font-medium text-zinc-200">30%</span> Code Quality —
+                            <span className="font-medium text-foreground">30%</span> Code Quality —
                             test pass rate, efficiency, complexity
                           </li>
                           <li>
-                            <span className="font-medium text-zinc-200">25%</span> Problem Solving —
+                            <span className="font-medium text-foreground">25%</span> Problem Solving —
                             approach, debugging, optimization attempts
                           </li>
                           <li>
-                            <span className="font-medium text-zinc-200">25%</span> Understanding —
+                            <span className="font-medium text-foreground">25%</span> Understanding —
                             code explanation, complexity analysis
                           </li>
                           <li>
-                            <span className="font-medium text-zinc-200">20%</span> Communication —
+                            <span className="font-medium text-foreground">20%</span> Communication —
                             thought process, answering questions
                           </li>
                         </ul>
-                        <p className="border-t border-zinc-700 pt-1 text-[10px] text-zinc-500">
+                        <p className="border-t border-border pt-1 text-[10px] text-muted-foreground">
                           Click to see Technical score which excludes communication and focuses on
                           pure coding ability.
                         </p>
@@ -492,7 +492,7 @@ export function ScoreDisplay({
 
             {/* TL;DR */}
             <div className="min-w-0 flex-1">
-              <p className="text-sm leading-relaxed text-zinc-300">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {sections.tldr ||
                   (problemType === "system-design"
                     ? overallScore < 25
@@ -506,14 +506,14 @@ export function ScoreDisplay({
               </p>
 
               {/* Quick stats */}
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   {formatTime(elapsedTime)}
                 </span>
                 <button
                   onClick={handleExport}
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   title="Export feedback as PDF"
                 >
                   <Download className="h-3 w-3" />
@@ -525,7 +525,7 @@ export function ScoreDisplay({
                       {hasRequirements ? (
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                       ) : (
-                        <AlertTriangle className="h-3 w-3 text-zinc-600" />
+                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
                       )}
                       Requirements
                     </span>
@@ -533,7 +533,7 @@ export function ScoreDisplay({
                       {hasScalability ? (
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                       ) : (
-                        <AlertTriangle className="h-3 w-3 text-zinc-600" />
+                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
                       )}
                       Scalability
                     </span>
@@ -544,7 +544,7 @@ export function ScoreDisplay({
                       {hasBugIdentified ? (
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                       ) : (
-                        <AlertTriangle className="h-3 w-3 text-zinc-600" />
+                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
                       )}
                       Bug Found
                     </span>
@@ -552,7 +552,7 @@ export function ScoreDisplay({
                       {hasRootCause ? (
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                       ) : (
-                        <AlertTriangle className="h-3 w-3 text-zinc-600" />
+                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
                       )}
                       Root Cause
                     </span>
@@ -563,7 +563,7 @@ export function ScoreDisplay({
                       {complexityAccurate ? (
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                       ) : (
-                        <AlertTriangle className="h-3 w-3 text-zinc-600" />
+                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
                       )}
                       Complexity
                     </span>
@@ -571,7 +571,7 @@ export function ScoreDisplay({
                       {edgeCasesDiscussed ? (
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                       ) : (
-                        <AlertTriangle className="h-3 w-3 text-zinc-600" />
+                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
                       )}
                       Edge Cases
                     </span>
@@ -586,15 +586,15 @@ export function ScoreDisplay({
       {/* Score Breakdown - Horizontal compact cards */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {scoreItems.map((item) => (
-          <div key={item.name} className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-3">
+          <div key={item.name} className="rounded-xl border border-border/50 bg-card/50 p-3">
             <div className="mb-2 flex items-center gap-1.5">
               <item.icon className={cn("h-3.5 w-3.5", item.colorClass)} />
-              <span className="text-[11px] text-zinc-400">{item.name}</span>
-              <span className="ml-auto text-[10px] text-zinc-600">{item.weight}</span>
+              <span className="text-[11px] text-muted-foreground">{item.name}</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">{item.weight}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-white">{item.score}%</span>
-              <Progress value={item.score} className="h-1 flex-1 bg-zinc-800" />
+              <span className="text-lg font-semibold text-foreground">{item.score}%</span>
+              <Progress value={item.score} className="h-1 flex-1 bg-muted" />
             </div>
           </div>
         ))}

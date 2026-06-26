@@ -47,7 +47,7 @@ export const NODE_POSITIONS: Record<string, { x: number; y: number; tier: number
 // Simplified: single style for unlocked nodes (reduces cognitive load from 4 tier colors to 1)
 const NODE_STYLE = {
   unlocked: {
-    bg: "from-zinc-700/50 to-zinc-800/50",
+    bg: "from-muted/50 to-muted/50",
     border: "border-border",
     text: "text-foreground",
     glow: "shadow-zinc-500/10",
@@ -128,13 +128,13 @@ export function RoadmapNode({
           {/* Mastered checkmark */}
           {isMastered && (
             <div className="absolute -top-1 -right-1 rounded-full bg-emerald-500 p-0.5">
-              <Check className="h-2.5 w-2.5 text-black" />
+              <Check className="h-2.5 w-2.5 text-foreground" />
             </div>
           )}
 
           {/* Lock icon for locked nodes */}
           {!isUnlocked && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/50">
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-background/50">
               <Lock className="h-4 w-4 text-muted-foreground" />
             </div>
           )}

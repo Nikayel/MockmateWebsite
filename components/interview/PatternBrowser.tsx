@@ -146,7 +146,7 @@ const PATTERN_GROUPS = [
     name: "Bit Manipulation",
     patterns: ["bit-manipulation"] as DSAPattern[],
     icon: Binary,
-    color: "from-slate-500/60 to-gray-500/60",
+    color: "from-slate-500/60 to-muted/60",
     bgColor: "bg-slate-900/60",
     borderColor: "border-slate-700/70",
   },
@@ -390,8 +390,8 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
                               }}
                               className={`${
                                 isCompleted
-                                  ? 'bg-muted hover:bg-gray-600 text-muted-foreground'
-                                  : 'bg-[#c4703f] hover:bg-[#c4703f]/80 text-black'
+                                  ? 'bg-muted hover:bg-muted text-muted-foreground'
+                                  : 'bg-[#c4703f] hover:bg-[#c4703f]/80 text-white'
                               }`}
                             >
                               <Play className="h-3 w-3 mr-1" />

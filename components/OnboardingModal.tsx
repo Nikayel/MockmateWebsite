@@ -105,7 +105,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/90 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/90 p-4 backdrop-blur-sm"
         role="presentation"
       >
         <motion.div
@@ -114,7 +114,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="my-auto w-full max-w-xl overflow-hidden rounded-2xl border border-gray-800 bg-gray-900"
+          className="my-auto w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card"
           role="dialog"
           aria-modal="true"
           aria-labelledby="onboarding-title"
@@ -122,7 +122,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
         >
           {/* Progress bar - Accessibility: aria-valuenow for screen readers */}
           <div
-            className="h-1 bg-gray-800"
+            className="h-1 bg-muted"
             role="progressbar"
             aria-valuenow={step + 1}
             aria-valuemin={1}

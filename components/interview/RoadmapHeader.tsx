@@ -26,7 +26,7 @@ export function RoadmapHeader({ totalCompleted, totalProblems }: RoadmapHeaderPr
         {/* Inline mini-legend */}
         <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-zinc-600"></div>
+            <div className="w-2 h-2 rounded-full bg-muted"></div>
             Ready
           </span>
           <span className="flex items-center gap-1">

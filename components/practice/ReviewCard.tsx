@@ -220,12 +220,12 @@ function InfoTooltip({ text }: { text: string }) {
         }
       }}
     >
-      <span className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-700/50 text-[10px] text-gray-400 transition-colors hover:bg-gray-600/50 hover:text-gray-300">
+      <span className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted/50 text-[10px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-muted-foreground">
         ?
       </span>
       {isVisible && (
-        <span className="absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg border border-gray-700 bg-gray-800 p-3 text-xs leading-relaxed text-gray-300 shadow-xl">
-          <span className="mb-1 block font-medium text-white">Why this interval?</span>
+        <span className="absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg border border-border bg-muted p-3 text-xs leading-relaxed text-muted-foreground shadow-xl">
+          <span className="mb-1 block font-medium text-foreground">Why this interval?</span>
           {text}
           <span className="absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 border-t-[6px] border-r-[6px] border-l-[6px] border-t-gray-700 border-r-transparent border-l-transparent" />
         </span>
@@ -313,11 +313,11 @@ export function ReviewCard({
 
   return (
     <>
-      <div className="group -mx-4 flex items-center justify-between rounded-lg px-4 py-3 transition-colors hover:bg-white/[0.02]">
+      <div className="group -mx-4 flex items-center justify-between rounded-lg px-4 py-3 transition-colors hover:bg-card/[0.02]">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate font-medium text-white">{item.title}</span>
+              <span className="truncate font-medium text-foreground">{item.title}</span>
               {showOverdue && item.days_overdue > 0 && (
                 <span className="flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-xs text-rose-400">
                   <AlertTriangle className="h-3 w-3" />
@@ -340,8 +340,8 @@ export function ReviewCard({
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm">
               <span className={difficultyColorClass(item.difficulty, "text")}>{item.difficulty}</span>
-              <span className="text-gray-500">{formatPatternLabel(item.pattern)}</span>
-              <span className="text-gray-600">{item.estimated_minutes}m</span>
+              <span className="text-muted-foreground">{formatPatternLabel(item.pattern)}</span>
+              <span className="text-muted-foreground">{item.estimated_minutes}m</span>
               {item.last_score > 0 && (
                 <span
                   className={`${item.last_score >= 70 ? "text-emerald-500" : item.last_score >= 50 ? "text-amber-500" : "text-rose-400"}`}
@@ -350,9 +350,9 @@ export function ReviewCard({
                 </span>
               )}
               {/* Show review reason with science tooltip */}
-              <span className="flex items-center text-gray-500">
-                <span className="text-gray-600">·</span>
-                <span className="ml-2 text-gray-400 italic">{reviewReason.short}</span>
+              <span className="flex items-center text-muted-foreground">
+                <span className="text-muted-foreground">·</span>
+                <span className="ml-2 text-muted-foreground italic">{reviewReason.short}</span>
                 <InfoTooltip text={reviewReason.tooltip} />
               </span>
             </div>
@@ -363,7 +363,7 @@ export function ReviewCard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 text-gray-500 hover:text-gray-300"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-muted-foreground"
               onClick={() => onSkip(item.problem_id)}
               disabled={isSkipping}
               title="Skip for now"
@@ -387,7 +387,7 @@ export function ReviewCard({
           {isUpcoming && isScheduledForFuture ? (
             <Button
               size="sm"
-              className="h-8 bg-gray-700 text-gray-300 hover:bg-gray-600"
+              className="h-8 bg-muted text-muted-foreground hover:bg-muted"
               onClick={handleStartClick}
             >
               <Play className="mr-1 h-3 w-3" />
@@ -395,7 +395,7 @@ export function ReviewCard({
             </Button>
           ) : (
             <Link href={`/interview?scenario=${item.scenario_id}&practice=true`}>
-              <Button size="sm" className="h-8 bg-white text-black hover:bg-gray-200">
+              <Button size="sm" className="h-8 bg-card text-foreground hover:bg-muted">
                 <Play className="mr-1 h-3 w-3" />
                 Start
               </Button>
@@ -406,22 +406,22 @@ export function ReviewCard({
 
       {/* Early Practice Warning Modal */}
       {showEarlyWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-start gap-3">
               <div className="rounded-lg bg-amber-500/10 p-2">
                 <Clock className="h-5 w-5 text-amber-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{warning.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-gray-400">{warning.message}</p>
+                <h3 className="text-lg font-semibold text-foreground">{warning.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{warning.message}</p>
               </div>
             </div>
 
             <div className="mt-6 flex gap-3">
               <Button
                 variant="outline"
-                className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                className="flex-1 border-border text-muted-foreground hover:bg-muted"
                 onClick={() => setShowEarlyWarning(false)}
               >
                 Wait for Due Date
@@ -436,7 +436,7 @@ export function ReviewCard({
               </Link>
             </div>
 
-            <p className="mt-4 text-center text-xs text-gray-500">
+            <p className="mt-4 text-center text-xs text-muted-foreground">
               Tip: Focus on overdue problems first for maximum retention benefit
             </p>
           </div>

@@ -62,7 +62,7 @@ export function RoadmapModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-background/70 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
@@ -77,7 +77,7 @@ export function RoadmapModal({
                 <h2 className="text-lg font-semibold text-foreground">{node.name}</h2>
                 {stats.isComplete && (
                   <span className="bg-emerald-500 rounded-full p-0.5">
-                    <Check className="h-3 w-3 text-black" />
+                    <Check className="h-3 w-3 text-foreground" />
                   </span>
                 )}
               </div>

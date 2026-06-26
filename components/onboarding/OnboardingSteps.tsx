@@ -34,10 +34,10 @@ export function WelcomeStep({ userName, onNext }: WelcomeStepProps) {
         >
           <Terminal className="h-8 w-8 text-cyan-200" />
         </div>
-        <h2 id="onboarding-title" className="mb-2 text-2xl font-bold text-white">
+        <h2 id="onboarding-title" className="mb-2 text-2xl font-bold text-foreground">
           {userName ? `Welcome, ${userName}!` : "Welcome to CodeSparring!"}
         </h2>
-        <p id="onboarding-description" className="text-gray-400">
+        <p id="onboarding-description" className="text-muted-foreground">
           Let&apos;s calibrate your practice room in 4 quick steps.
         </p>
       </div>
@@ -48,14 +48,14 @@ export function WelcomeStep({ userName, onNext }: WelcomeStepProps) {
           "Review timing based on completed reps",
           "Pattern evidence across code, tests, and explanations",
         ].map((feature, i) => (
-          <div key={i} className="flex items-center gap-3 text-gray-300">
+          <div key={i} className="flex items-center gap-3 text-muted-foreground">
             <CheckCircle2 className="h-5 w-5 text-cyan-300" />
             <span>{feature}</span>
           </div>
         ))}
       </div>
 
-      <Button onClick={onNext} className="h-10 w-full bg-cyan-300 text-gray-950 hover:bg-cyan-200">
+      <Button onClick={onNext} className="h-10 w-full bg-cyan-300 text-foreground hover:bg-cyan-200">
         Start setup
         <ArrowRight className="ml-2 h-5 w-5" />
       </Button>
@@ -92,8 +92,8 @@ export function DailyGoalStep({
     >
       <div className="mb-6">
         <p className="mb-1 text-sm font-medium text-cyan-300">Step 3 of 4</p>
-        <h2 className="text-xl font-bold text-white">Set the daily rep target</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <h2 className="text-xl font-bold text-foreground">Set the daily rep target</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Pick a pace you can finish under interview pressure.
         </p>
       </div>
@@ -111,11 +111,11 @@ export function DailyGoalStep({
               className={`flex w-full items-center justify-between rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                 isSelected
                   ? "border-cyan-300 bg-cyan-300/10"
-                  : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                  : "border-border bg-muted/50 hover:border-border"
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`h-5 w-5 ${isSelected ? "text-cyan-300" : "text-gray-400"}`}>
+                <div className={`h-5 w-5 ${isSelected ? "text-cyan-300" : "text-muted-foreground"}`}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="20"
@@ -132,13 +132,13 @@ export function DailyGoalStep({
                   </svg>
                 </div>
                 <div>
-                  <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
+                  <div className={`font-medium ${isSelected ? "text-foreground" : "text-foreground"}`}>
                     {goal.label}
                   </div>
-                  <div className="text-xs text-gray-500">{goal.desc}</div>
+                  <div className="text-xs text-muted-foreground">{goal.desc}</div>
                 </div>
               </div>
-              <div className="text-sm text-gray-400" aria-hidden="true">
+              <div className="text-sm text-muted-foreground" aria-hidden="true">
                 {goal.time}
               </div>
             </button>
@@ -146,7 +146,7 @@ export function DailyGoalStep({
         })}
       </div>
 
-      <div className="mb-6 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+      <div className="mb-6 rounded-lg border border-border bg-muted/50 p-4">
         <div className="flex items-start gap-3">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -165,7 +165,7 @@ export function DailyGoalStep({
             <circle cx="12" cy="12" r="2" />
           </svg>
           <div>
-            <p className="text-sm text-gray-300">
+            <p className="text-sm text-muted-foreground">
               Consistency beats intensity. A finished rep with review signal is better than a vague
               streak.
             </p>
@@ -174,13 +174,13 @@ export function DailyGoalStep({
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-        <Button variant="ghost" onClick={onBack} className="text-gray-400">
+        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <span className="text-sm text-gray-500">Cadence</span>
+        <span className="text-sm text-muted-foreground">Cadence</span>
         <Button
           onClick={onNext}
-          className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200"
+          className="justify-self-end bg-cyan-300 text-foreground hover:bg-cyan-200"
         >
           Continue <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
@@ -225,8 +225,8 @@ export function SystemOverviewStep({ isSubmitting, onBack, onComplete }: SystemO
     >
       <div className="mb-6">
         <p className="mb-1 text-sm font-medium text-cyan-300">Step 4 of 4</p>
-        <h2 className="text-xl font-bold text-white">How the practice loop works</h2>
-        <p className="mt-1 text-sm text-gray-400">Here&apos;s what the system will keep visible.</p>
+        <h2 className="text-xl font-bold text-foreground">How the practice loop works</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Here&apos;s what the system will keep visible.</p>
       </div>
 
       <div className="mb-6 space-y-4">
@@ -238,14 +238,14 @@ export function SystemOverviewStep({ isSubmitting, onBack, onComplete }: SystemO
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="flex items-start gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4"
+              className="flex items-start gap-4 rounded-lg border border-border bg-muted/50 p-4"
             >
               <div className="rounded-lg bg-cyan-300/10 p-2">
                 <Icon className="h-5 w-5 text-cyan-300" />
               </div>
               <div>
-                <h4 className="font-medium text-white">{feature.title}</h4>
-                <p className="mt-0.5 text-sm text-gray-400">{feature.description}</p>
+                <h4 className="font-medium text-foreground">{feature.title}</h4>
+                <p className="mt-0.5 text-sm text-muted-foreground">{feature.description}</p>
               </div>
             </motion.div>
           )
@@ -256,8 +256,8 @@ export function SystemOverviewStep({ isSubmitting, onBack, onComplete }: SystemO
         <div className="flex items-center gap-3">
           <CheckCircle2 className="h-5 w-5 text-emerald-300" />
           <div>
-            <p className="text-sm text-gray-300">
-              <span className="font-medium text-white">First useful step:</span> Start one real
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">First useful step:</span> Start one real
               round, then let the review schedule tell you what to repeat.
             </p>
           </div>
@@ -265,23 +265,23 @@ export function SystemOverviewStep({ isSubmitting, onBack, onComplete }: SystemO
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <Button variant="ghost" onClick={onBack} className="text-gray-400">
+        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <span className="text-sm text-gray-500">Finish</span>
+        <span className="text-sm text-muted-foreground">Finish</span>
         <div className="flex justify-end gap-3">
           <Button
             onClick={() => onComplete(false)}
             disabled={isSubmitting}
             variant="outline"
-            className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            className="border-border text-muted-foreground hover:bg-muted"
           >
             {isSubmitting ? "Saving..." : "Start Practicing"}
           </Button>
           <Button
             onClick={() => onComplete(true)}
             disabled={isSubmitting}
-            className="bg-cyan-300 text-gray-950 hover:bg-cyan-200"
+            className="bg-cyan-300 text-foreground hover:bg-cyan-200"
           >
             <Route className="mr-2 h-4 w-4" />
             {isSubmitting ? "Saving..." : "Quick Tour First"}

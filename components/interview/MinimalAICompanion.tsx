@@ -94,7 +94,7 @@ export function MinimalAICompanion({
           <Bot className="h-5 w-5 text-[#c4703f]" />
         </Button>
         {messages.length > 0 && (
-          <span className="absolute -top-1 -right-1 h-4 w-4 bg-[#c4703f] rounded-full text-[10px] flex items-center justify-center text-black font-medium">
+          <span className="absolute -top-1 -right-1 h-4 w-4 bg-[#c4703f] rounded-full text-[10px] flex items-center justify-center text-white font-medium">
             {messages.length}
           </span>
         )}
@@ -251,7 +251,7 @@ export function MinimalAICompanion({
                     'h-7 w-7 p-0',
                     isRecording
                       ? 'bg-red-500 hover:bg-red-600 animate-pulse'
-                      : 'bg-muted hover:bg-gray-600'
+                      : 'bg-muted hover:bg-muted'
                   )}
                 >
                   {isRecording ? (

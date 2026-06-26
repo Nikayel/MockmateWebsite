@@ -149,24 +149,24 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
       <div className="pt-24 pb-16">
         <div className="container mx-auto max-w-7xl px-4">
           <div className="mb-8">
-            <h1 className="font-heading mb-2 text-4xl font-bold text-white">
+            <h1 className="font-heading mb-2 text-4xl font-bold text-foreground">
               Welcome back, {user.user_metadata?.full_name || "Developer"}!
             </h1>
-            <p className="text-gray-400">Ready to practice? Start a new interview session</p>
+            <p className="text-muted-foreground">Ready to practice? Start a new interview session</p>
           </div>
 
           <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-            <Card className="border-gray-700 bg-gray-900/50">
+            <Card className="border-border bg-card/50">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center text-sm font-medium text-white">
+                <CardTitle className="flex items-center text-sm font-medium text-foreground">
                   <BarChart3 className="mr-2 h-4 w-4" />
                   Practice Sessions
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="mb-2 text-3xl font-bold text-white">
+                <div className="mb-2 text-3xl font-bold text-foreground">
                   {usage?.used || 0} / {usage?.limit || 8}
-                  <span className="ml-2 text-sm font-normal text-gray-400">used</span>
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">used</span>
                 </div>
                 <Progress
                   value={usage ? (usage.used / usage.limit) * 100 : 0}
@@ -177,13 +177,13 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                     {usage?.freeOpensRemaining} free opens remaining
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     {usage?.allowed
                       ? `Next session uses 1 credit, then 10 free opens`
                       : "Limit reached - upgrade for more"}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Resets{" "}
                   {usage?.periodEnd
                     ? new Date(usage.periodEnd).toLocaleDateString("en-US", {
@@ -195,9 +195,9 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
               </CardContent>
             </Card>
 
-            <Card className="border-gray-700 bg-gray-900/50">
+            <Card className="border-border bg-card/50">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center text-sm font-medium text-white">
+                <CardTitle className="flex items-center text-sm font-medium text-foreground">
                   <Crown className="mr-2 h-4 w-4" />
                   Subscription
                 </CardTitle>
@@ -207,7 +207,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                   className={
                     isPro
                       ? "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
-                      : "border-gray-500/30 bg-gray-500/20 text-gray-400"
+                      : "border-border/30 bg-muted/20 text-muted-foreground"
                   }
                 >
                   {isPro ? "Pro Plan" : "Free Plan"}
@@ -225,9 +225,9 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
               </CardContent>
             </Card>
 
-            <Card className="border-gray-700 bg-gray-900/50">
+            <Card className="border-border bg-card/50">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center text-sm font-medium text-white">
+                <CardTitle className="flex items-center text-sm font-medium text-foreground">
                   <Terminal className="mr-2 h-4 w-4" />
                   Quick Start
                 </CardTitle>
@@ -243,9 +243,9 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
             </Card>
           </div>
 
-          <Card className="border-gray-700 bg-gray-900/50">
+          <Card className="border-border bg-card/50">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between text-white">
+              <CardTitle className="flex items-center justify-between text-foreground">
                 <span className="flex items-center">
                   <Terminal className="mr-2 h-5 w-5 text-[#c4703f]" />
                   Coding Practice
@@ -260,7 +260,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
             <CardContent>
               {usage?.allowed ? (
                 <div className="space-y-4">
-                  <p className="text-gray-300">
+                  <p className="text-muted-foreground">
                     Ready to practice? Start a new interview session and work on real coding
                     problems with AI guidance.
                   </p>
@@ -276,12 +276,12 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                 <div className="space-y-4">
                   <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4">
                     <p className="mb-2 font-medium text-yellow-400">Monthly Limit Reached</p>
-                    <p className="mb-4 text-sm text-gray-300">
+                    <p className="mb-4 text-sm text-muted-foreground">
                       You've used all {usage?.limit || 8} free sessions this month. Upgrade to Pro
                       for unlimited practice!
                     </p>
                     <Link href="/upgrade">
-                      <Button className="bg-yellow-500 text-black hover:bg-yellow-600">
+                      <Button className="bg-yellow-500 text-foreground hover:bg-yellow-600">
                         <Crown className="mr-2 h-4 w-4" />
                         Upgrade to Pro
                       </Button>

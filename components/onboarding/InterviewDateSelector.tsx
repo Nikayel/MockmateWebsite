@@ -71,8 +71,8 @@ export function InterviewDateSelector({
     >
       <div className="mb-6">
         <p className="mb-1 text-sm font-medium text-cyan-300">Step 2 of 4</p>
-        <h2 className="text-xl font-bold text-white">Choose the target signal</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <h2 className="text-xl font-bold text-foreground">Choose the target signal</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           We&apos;ll shape recommendations around the interview you are preparing for.
         </p>
       </div>
@@ -91,17 +91,17 @@ export function InterviewDateSelector({
               className={`rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                 isSelected
                   ? "border-cyan-300 bg-cyan-300/10"
-                  : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                  : "border-border bg-muted/50 hover:border-border"
               }`}
             >
               <Icon
-                className={`mb-2 h-5 w-5 ${isSelected ? "text-cyan-300" : "text-gray-400"}`}
+                className={`mb-2 h-5 w-5 ${isSelected ? "text-cyan-300" : "text-muted-foreground"}`}
                 aria-hidden="true"
               />
-              <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
+              <div className={`font-medium ${isSelected ? "text-foreground" : "text-foreground"}`}>
                 {goal.label}
               </div>
-              <div className="text-xs text-gray-500">{goal.description}</div>
+              <div className="text-xs text-muted-foreground">{goal.description}</div>
             </button>
           )
         })}
@@ -113,7 +113,7 @@ export function InterviewDateSelector({
           animate={{ opacity: 1, height: "auto" }}
           className="mb-4"
         >
-          <p className="mb-2 text-sm text-gray-400">Target company (optional)</p>
+          <p className="mb-2 text-sm text-muted-foreground">Target company (optional)</p>
           <div className="flex flex-wrap gap-2">
             {targetCompanies.map((company) => (
               <button
@@ -121,8 +121,8 @@ export function InterviewDateSelector({
                 onClick={() => handleCompanyClick(company)}
                 className={`rounded-md px-3 py-1.5 text-sm transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
                   targetCompany === company
-                    ? "bg-cyan-300 text-gray-950"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    ? "bg-cyan-300 text-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted"
                 }`}
               >
                 {company}
@@ -133,14 +133,14 @@ export function InterviewDateSelector({
       )}
 
       <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center">
-        <Button variant="ghost" onClick={onBack} className="text-gray-400">
+        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <span className="text-sm text-gray-500">Goal</span>
+        <span className="text-sm text-muted-foreground">Goal</span>
         <Button
           onClick={onNext}
           disabled={!canProceed}
-          className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200 disabled:opacity-50"
+          className="justify-self-end bg-cyan-300 text-foreground hover:bg-cyan-200 disabled:opacity-50"
         >
           Continue <ArrowRight className="ml-1 h-4 w-4" />
         </Button>

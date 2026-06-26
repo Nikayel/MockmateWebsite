@@ -79,7 +79,7 @@ export function ComplexityAnalysisCard({
   )
 
   return (
-    <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
       <div className="mb-3 flex items-center gap-2">
         <Zap className="h-4 w-4 text-cyan-400" />
         <span className="text-xs font-medium text-cyan-400">Complexity Analysis</span>
@@ -91,7 +91,7 @@ export function ComplexityAnalysisCard({
                 ? "bg-emerald-500/20 text-emerald-400"
                 : codeAnalyzed.confidence === "medium"
                   ? "bg-amber-500/20 text-amber-400"
-                  : "bg-zinc-700 text-zinc-400"
+                  : "bg-muted text-muted-foreground"
             )}
           >
             {codeAnalyzed.confidence} confidence
@@ -101,25 +101,25 @@ export function ComplexityAnalysisCard({
 
       {/* Approach Used */}
       {approachUsed && (
-        <div className="mb-3 rounded-lg bg-zinc-800/50 px-3 py-2">
-          <span className="text-[10px] text-zinc-500">Your Approach</span>
-          <p className="text-sm font-medium text-white">{approachUsed}</p>
+        <div className="mb-3 rounded-lg bg-muted/50 px-3 py-2">
+          <span className="text-[10px] text-muted-foreground">Your Approach</span>
+          <p className="text-sm font-medium text-foreground">{approachUsed}</p>
         </div>
       )}
 
       {/* Complexity Comparison Table */}
-      <div className="mb-3 overflow-hidden rounded-lg border border-zinc-800">
+      <div className="mb-3 overflow-hidden rounded-lg border border-border">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-800/50">
-              <th className="px-3 py-2 text-left font-medium text-zinc-400"></th>
-              <th className="px-3 py-2 text-center font-medium text-zinc-400">
+            <tr className="border-b border-border bg-muted/50">
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground"></th>
+              <th className="px-3 py-2 text-center font-medium text-muted-foreground">
                 <div className="flex items-center justify-center gap-1">
                   <Clock className="h-3 w-3" />
                   Time
                 </div>
               </th>
-              <th className="px-3 py-2 text-center font-medium text-zinc-400">
+              <th className="px-3 py-2 text-center font-medium text-muted-foreground">
                 <div className="flex items-center justify-center gap-1">
                   <HardDrive className="h-3 w-3" />
                   Space
@@ -130,11 +130,11 @@ export function ComplexityAnalysisCard({
           <tbody>
             {/* User Stated Row */}
             {hasUserStated && (
-              <tr className="border-b border-zinc-800/50">
-                <td className="px-3 py-2 text-zinc-400">You Said</td>
+              <tr className="border-b border-border/50">
+                <td className="px-3 py-2 text-muted-foreground">You Said</td>
                 <td className="px-3 py-2 text-center">
                   <div className="flex items-center justify-center gap-1">
-                    <span className="text-white">{userStatedTime || "—"}</span>
+                    <span className="text-foreground">{userStatedTime || "—"}</span>
                     {timeMatches !== null && (
                       <>
                         {timeMatches ? (
@@ -148,7 +148,7 @@ export function ComplexityAnalysisCard({
                 </td>
                 <td className="px-3 py-2 text-center">
                   <div className="flex items-center justify-center gap-1">
-                    <span className="text-white">{userStatedSpace || "—"}</span>
+                    <span className="text-foreground">{userStatedSpace || "—"}</span>
                     {spaceMatches !== null && (
                       <>
                         {spaceMatches ? (
@@ -165,7 +165,7 @@ export function ComplexityAnalysisCard({
 
             {/* Actual/Detected Row */}
             <tr>
-              <td className="px-3 py-2 text-zinc-400">{hasUserStated ? "Actual" : "Detected"}</td>
+              <td className="px-3 py-2 text-muted-foreground">{hasUserStated ? "Actual" : "Detected"}</td>
               <td className="px-3 py-2 text-center">
                 <span className="font-mono text-cyan-400">
                   {codeAnalyzed.timeComplexity || "—"}
@@ -203,16 +203,16 @@ export function ComplexityAnalysisCard({
             >
               {isAccurate ? "Correct Analysis!" : "Complexity Mismatch"}
             </p>
-            {feedback && <p className="mt-1 text-[11px] text-zinc-400">{feedback}</p>}
+            {feedback && <p className="mt-1 text-[11px] text-muted-foreground">{feedback}</p>}
           </div>
         </div>
       )}
 
       {/* No User Statement Warning */}
       {!hasUserStated && (
-        <div className="mb-3 flex items-start gap-2 rounded-lg bg-zinc-800/50 p-3">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
-          <p className="text-[11px] text-zinc-400">
+        <div className="mb-3 flex items-start gap-2 rounded-lg bg-muted/50 p-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <p className="text-[11px] text-muted-foreground">
             You didn't discuss complexity during the interview. In real interviews, always state
             your time and space complexity after coding.
           </p>
@@ -222,10 +222,10 @@ export function ComplexityAnalysisCard({
       {/* Detected Patterns */}
       {codeAnalyzed.detectedPatterns && codeAnalyzed.detectedPatterns.length > 0 && (
         <div className="mb-3">
-          <span className="text-[10px] text-zinc-500">Detected Patterns</span>
+          <span className="text-[10px] text-muted-foreground">Detected Patterns</span>
           <div className="mt-1 flex flex-wrap gap-1">
             {codeAnalyzed.detectedPatterns.map((pattern, i) => (
-              <span key={i} className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-300">
+              <span key={i} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                 {pattern}
               </span>
             ))}
@@ -238,7 +238,7 @@ export function ComplexityAnalysisCard({
         <>
           <button
             onClick={() => setShowAlternatives(!showAlternatives)}
-            className="flex w-full items-center justify-between rounded-lg bg-zinc-800/30 px-3 py-2 text-xs text-zinc-400 transition-colors hover:bg-zinc-800/50"
+            className="flex w-full items-center justify-between rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/50"
           >
             <span>Other Valid Approaches ({otherApproaches.length})</span>
             {showAlternatives ? (
@@ -251,9 +251,9 @@ export function ComplexityAnalysisCard({
           {showAlternatives && (
             <div className="mt-2 space-y-2">
               {otherApproaches.map((approach, i) => (
-                <div key={i} className="rounded-lg border border-zinc-800/50 bg-zinc-800/30 p-3">
+                <div key={i} className="rounded-lg border border-border/50 bg-muted/30 p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-white">{approach.name}</span>
+                    <span className="text-xs font-medium text-foreground">{approach.name}</span>
                     <div className="flex gap-2">
                       {approach.isOptimalTime && (
                         <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] text-emerald-400">
@@ -268,16 +268,16 @@ export function ComplexityAnalysisCard({
                     </div>
                   </div>
                   <div className="mt-2 flex gap-4 text-[10px]">
-                    <span className="text-zinc-400">
+                    <span className="text-muted-foreground">
                       Time:{" "}
-                      <span className="font-mono text-zinc-300">{approach.timeComplexity}</span>
+                      <span className="font-mono text-muted-foreground">{approach.timeComplexity}</span>
                     </span>
-                    <span className="text-zinc-400">
+                    <span className="text-muted-foreground">
                       Space:{" "}
-                      <span className="font-mono text-zinc-300">{approach.spaceComplexity}</span>
+                      <span className="font-mono text-muted-foreground">{approach.spaceComplexity}</span>
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-zinc-500">{approach.tradeOff}</p>
+                  <p className="mt-2 text-[10px] text-muted-foreground">{approach.tradeOff}</p>
                 </div>
               ))}
             </div>

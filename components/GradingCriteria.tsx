@@ -150,7 +150,7 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
                 >
                   {activeCriterion.weight}%
                 </div>
-                <div className="text-xs text-gray-400 max-w-[80px]">
+                <div className="text-xs text-muted-foreground max-w-[80px]">
                   {activeCriterion.label}
                 </div>
               </motion.div>
@@ -162,9 +162,9 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
                 exit={{ opacity: 0 }}
                 className="text-center"
               >
-                <div className="text-sm font-medium text-gray-300">How</div>
-                <div className="text-sm font-medium text-gray-300">you're</div>
-                <div className="text-sm font-medium text-white">graded</div>
+                <div className="text-sm font-medium text-muted-foreground">How</div>
+                <div className="text-sm font-medium text-muted-foreground">you're</div>
+                <div className="text-sm font-medium text-foreground">graded</div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -187,9 +187,9 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: criterion.color }}
             />
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted-foreground">
               {criterion.label}
-              <span className="text-gray-600 ml-1">· {criterion.hint}</span>
+              <span className="text-muted-foreground ml-1">· {criterion.hint}</span>
             </span>
           </div>
         ))}
@@ -220,11 +220,11 @@ export function GradingCriteriaCompact({ className }: { className?: string }) {
 
           {/* Tooltip on hover */}
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-            <div className="bg-gray-900 border border-gray-700 rounded px-2 py-1 whitespace-nowrap">
+            <div className="bg-card border border-border rounded px-2 py-1 whitespace-nowrap">
               <span className="text-[10px] font-medium" style={{ color: criterion.color }}>
                 {criterion.label}
               </span>
-              <span className="text-[10px] text-gray-500 ml-1">{criterion.weight}%</span>
+              <span className="text-[10px] text-muted-foreground ml-1">{criterion.weight}%</span>
             </div>
           </div>
         </div>
@@ -241,7 +241,7 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
     <div className={cn('relative', className)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground transition-colors"
       >
         <span className="flex gap-0.5">
           {criteria.map((c) => (
@@ -272,8 +272,8 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
               transition={{ duration: 0.15 }}
               className="absolute bottom-full left-0 mb-2 z-50"
             >
-              <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-3 shadow-xl min-w-[200px]">
-                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">
+              <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl min-w-[200px]">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">
                   What matters
                 </div>
                 <div className="space-y-1.5">
@@ -283,7 +283,7 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
                         className="w-1 h-3 rounded-full"
                         style={{ backgroundColor: criterion.color }}
                       />
-                      <div className="flex-1 text-xs text-gray-300">
+                      <div className="flex-1 text-xs text-muted-foreground">
                         {criterion.label}
                       </div>
                       <div
@@ -295,8 +295,8 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 pt-2 border-t border-gray-800">
-                  <p className="text-[10px] text-gray-500 leading-relaxed">
+                <div className="mt-2 pt-2 border-t border-border">
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
                     AI usage is optional. Explain your thinking.
                   </p>
                 </div>

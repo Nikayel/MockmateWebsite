@@ -62,9 +62,9 @@ function CodeViewerDialogInner({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[80vh] flex flex-col bg-gray-900 border-gray-700">
+      <DialogContent className="max-w-5xl h-[80vh] flex flex-col bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="text-foreground flex items-center gap-2">
             <span className="text-blue-400">📄</span>
             {fileName}
           </DialogTitle>
@@ -79,7 +79,7 @@ function CodeViewerDialogInner({
               readOnly
             />
           </div>
-          <div className="flex justify-between items-center text-xs text-gray-400 p-3 border-t border-gray-700 bg-gray-800 flex-shrink-0">
+          <div className="flex justify-between items-center text-xs text-muted-foreground p-3 border-t border-border bg-muted flex-shrink-0">
             <span>Language: {editorLanguage}</span>
             <span>{content.split('\n').length} lines</span>
           </div>

@@ -132,7 +132,7 @@ function InterviewEditorInner({
 
         {/* Terminal/Console Output */}
         {testResults.length > 0 && (
-          <div className="flex max-h-48 min-h-[120px] flex-shrink-0 flex-col rounded border border-border bg-black">
+          <div className="flex max-h-48 min-h-[120px] flex-shrink-0 flex-col rounded border border-border bg-background">
             {/* Terminal Header */}
             <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-muted px-3 py-1.5">
               <div className="flex items-center space-x-2">

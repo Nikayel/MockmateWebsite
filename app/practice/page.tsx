@@ -293,7 +293,7 @@ export default function PracticePage() {
 
   if (!initialized || authLoading || isPro === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-foreground" />
       </div>
     )
@@ -302,7 +302,7 @@ export default function PracticePage() {
   // Upgrade prompt for non-Pro users
   if (!isPro) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-4 pt-24 pb-16">
           <div className="mx-auto max-w-lg text-center">
@@ -328,7 +328,7 @@ export default function PracticePage() {
               ))}
             </div>
             <Link href="/pricing">
-              <Button className="bg-card text-black hover:bg-muted">
+              <Button className="bg-card text-foreground hover:bg-muted">
                 Upgrade to Pro
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -341,7 +341,7 @@ export default function PracticePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="mx-auto max-w-5xl">

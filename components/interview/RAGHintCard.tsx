@@ -117,8 +117,8 @@ function getLevelColors(level: HintLevel): {
     default:
       return {
         border: "border-border/30",
-        bg: "bg-gray-500/5",
-        badge: "bg-gray-500/20 text-muted-foreground border-border/30",
+        bg: "bg-muted/5",
+        badge: "bg-muted/20 text-muted-foreground border-border/30",
         text: "text-muted-foreground",
       }
   }

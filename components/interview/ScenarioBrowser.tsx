@@ -116,7 +116,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
           aria-pressed={density === "cards"}
           title="Card view"
           className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            density === "cards" ? "bg-card text-zinc-950" : "text-muted-foreground hover:text-foreground"
+            density === "cards" ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <LayoutGrid className="h-3.5 w-3.5" />
@@ -127,7 +127,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
           aria-pressed={density === "rows"}
           title="List view"
           className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            density === "rows" ? "bg-card text-zinc-950" : "text-muted-foreground hover:text-foreground"
+            density === "rows" ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <Rows3 className="h-3.5 w-3.5" />
@@ -231,7 +231,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               onClick={() => switchMainTab("debugging")}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                 mainTab === "debugging"
-                  ? "bg-card text-zinc-950"
+                  ? "bg-card text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -243,7 +243,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               aria-selected={mainTab === "dsa"}
               onClick={() => switchMainTab("dsa")}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-                mainTab === "dsa" ? "bg-card text-zinc-950" : "text-muted-foreground hover:text-foreground"
+                mainTab === "dsa" ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Cpu className="h-4 w-4" />

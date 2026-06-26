@@ -4882,7 +4882,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black">
+      <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-xl text-foreground">Loading...</div>
       </main>
     )
@@ -4898,7 +4898,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
   const isResultView = showFeedback || showPostInterviewDiscussion
 
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <h1 className="sr-only">Mock Interview Environment</h1>
       {!isInterviewMode && <Header />}
 
@@ -4938,7 +4938,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       {/* Interview Interface */}
       {!showScenarioBrowser && (
         <section
-          className={`flex flex-col bg-gradient-to-b from-card to-black pt-1.5 pb-1.5 ${
+          className={`flex flex-col bg-gradient-to-b from-card to-background pt-1.5 pb-1.5 ${
             isResultView
               ? "min-h-screen overflow-x-hidden overflow-y-auto"
               : "h-screen overflow-hidden"

@@ -51,15 +51,15 @@ function PatternRow({ pattern }: { pattern: PatternStats }) {
     <div className="group py-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="font-medium text-white">{formatPatternLabel(pattern.pattern)}</span>
-          <span className="text-xs text-gray-500">{getMasteryLabel(pattern)}</span>
+          <span className="font-medium text-foreground">{formatPatternLabel(pattern.pattern)}</span>
+          <span className="text-xs text-muted-foreground">{getMasteryLabel(pattern)}</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">{pattern.mastery_percentage}%</span>
+          <span className="text-sm text-muted-foreground">{pattern.mastery_percentage}%</span>
           {pattern.weakest_problem_id && (
             <Link
               href={`/interview?scenario=${pattern.weakest_problem_id}`}
-              className="flex items-center gap-1 text-xs text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-white"
+              className="flex items-center gap-1 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
             >
               Practice
               <ArrowRight className="h-3 w-3" />
@@ -67,7 +67,7 @@ function PatternRow({ pattern }: { pattern: PatternStats }) {
           )}
         </div>
       </div>
-      <div className="h-1 overflow-hidden rounded-full bg-gray-800">
+      <div className="h-1 overflow-hidden rounded-full bg-muted">
         <div
           className={`h-full rounded-full ${colorClass} transition-all duration-500`}
           style={{ width: `${pattern.mastery_percentage}%` }}
@@ -84,7 +84,7 @@ export function PatternMastery({ patterns, isLoading = false }: PatternMasteryPr
     return (
       <div className="space-y-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-12 animate-pulse rounded-lg bg-white/5" />
+          <div key={i} className="h-12 animate-pulse rounded-lg bg-foreground/5" />
         ))}
       </div>
     )
@@ -93,7 +93,7 @@ export function PatternMastery({ patterns, isLoading = false }: PatternMasteryPr
   if (patterns.length === 0) {
     return (
       <div className="py-12 text-center">
-        <p className="text-gray-500">Start practicing to see pattern mastery.</p>
+        <p className="text-muted-foreground">Start practicing to see pattern mastery.</p>
       </div>
     )
   }
@@ -114,19 +114,19 @@ export function PatternMastery({ patterns, isLoading = false }: PatternMasteryPr
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium text-white">Pattern Mastery</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="text-lg font-medium text-foreground">Pattern Mastery</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
             {sortedPatterns.length > 0 && sortedPatterns[0].mastery_percentage < 50 && (
               <>
                 Focus on{" "}
-                <span className="text-white">{formatPatternLabel(sortedPatterns[0].pattern)}</span>
+                <span className="text-foreground">{formatPatternLabel(sortedPatterns[0].pattern)}</span>
               </>
             )}
           </p>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-bold text-white">{overallMastery}%</div>
-          <p className="text-xs text-gray-500">overall</p>
+          <div className="text-2xl font-bold text-foreground">{overallMastery}%</div>
+          <p className="text-xs text-muted-foreground">overall</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ export function PatternMastery({ patterns, isLoading = false }: PatternMasteryPr
           <Button
             variant="ghost"
             onClick={() => setShowAll(!showAll)}
-            className="h-auto p-0 text-gray-500 hover:text-gray-300"
+            className="h-auto p-0 text-muted-foreground hover:text-muted-foreground"
           >
             {showAll ? "Show less" : `Show all ${patterns.length} patterns`}
             <ChevronRight

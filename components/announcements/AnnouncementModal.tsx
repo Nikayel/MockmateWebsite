@@ -53,7 +53,7 @@ const priorityConfig = {
     icon: AlertCircle,
     iconColor: "text-destructive",
     titleColor: "text-foreground",
-    buttonPrimary: "bg-destructive hover:bg-destructive/90 text-white",
+    buttonPrimary: "bg-destructive hover:bg-destructive/90 text-foreground",
     buttonSecondary: "border-destructive/30 text-destructive hover:bg-destructive/10",
     accentColor: "destructive",
   },
@@ -65,7 +65,7 @@ const priorityConfig = {
     icon: CheckCircle,
     iconColor: "text-neural",
     titleColor: "text-foreground",
-    buttonPrimary: "bg-neural hover:bg-neural/90 text-black",
+    buttonPrimary: "bg-neural hover:bg-neural/90 text-foreground",
     buttonSecondary: "border-neural/30 text-neural hover:bg-neural/10",
     accentColor: "neural",
   },
@@ -171,7 +171,7 @@ export function AnnouncementModal({ announcement, onClose, onDismiss }: Announce
       {/* Backdrop */}
       <div
         className={cn(
-          "absolute inset-0 bg-black/60 backdrop-blur-sm",
+          "absolute inset-0 bg-background/60 backdrop-blur-sm",
           "transition-opacity duration-200"
         )}
         aria-hidden="true"

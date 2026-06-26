@@ -171,7 +171,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                       ? scenarioDetails.fuzzyStatement
                       : selectedScenario.problemStatement
                   }
-                  className="text-base leading-relaxed text-gray-50"
+                  className="text-base leading-relaxed text-foreground"
                 />
               </div>
 

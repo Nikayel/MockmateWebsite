@@ -102,7 +102,7 @@ export function LearningRecommendations({
       case "declining":
         return <TrendingDown className="h-4 w-4 text-red-500" />
       default:
-        return <Minus className="h-4 w-4 text-gray-500" />
+        return <Minus className="h-4 w-4 text-muted-foreground" />
     }
   }
 
@@ -113,7 +113,7 @@ export function LearningRecommendations({
       case "declining":
         return "text-red-600 bg-red-50"
       default:
-        return "text-gray-600 bg-gray-50"
+        return "text-muted-foreground bg-muted"
     }
   }
 

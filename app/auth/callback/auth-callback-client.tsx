@@ -169,8 +169,8 @@ export function AuthCallbackClient() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-foreground text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c4703f] mx-auto mb-4"></div>
           <p>Completing sign in...</p>
         </div>
@@ -180,8 +180,8 @@ export function AuthCallbackClient() {
 
   if (status === "error") {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Card className="bg-gray-900/50 border-gray-700 max-w-md">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="bg-card/50 border-border max-w-md">
           <CardContent className="p-6 text-center">
             <p className="text-red-400 mb-4">Authentication failed</p>
             <Button onClick={() => (window.location.href = "/login")}>Try Again</Button>
@@ -192,14 +192,14 @@ export function AuthCallbackClient() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <Card className="bg-gray-900/50 border-gray-700 max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <Card className="bg-card/50 border-border max-w-md">
         <CardHeader className="text-center">
           <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
-          <CardTitle className="text-white">Successfully Signed In!</CardTitle>
+          <CardTitle className="text-foreground">Successfully Signed In!</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-gray-300 text-center">Welcome {user?.user_metadata?.full_name || user?.email}!</p>
+          <p className="text-muted-foreground text-center">Welcome {user?.user_metadata?.full_name || user?.email}!</p>
 
           <div className="space-y-3">
             {redirectUrl ? (
@@ -219,13 +219,13 @@ export function AuthCallbackClient() {
             <Button
               onClick={() => (window.location.href = "/dashboard")}
               variant="outline"
-              className="w-full border-gray-600 text-white hover:bg-gray-800"
+              className="w-full border-border text-foreground hover:bg-muted"
             >
               Go to Dashboard
             </Button>
           </div>
 
-          <div className="text-center text-sm text-gray-400">
+          <div className="text-center text-sm text-muted-foreground">
             <p>Don't have the extension installed?</p>
             <Button variant="link" className="text-[#c4703f] p-0" onClick={() => (window.location.href = "/install")}>
               <Download className="mr-1 h-3 w-3" />

@@ -49,16 +49,16 @@ function RecommendationRow({ rec }: { rec: Recommendation }) {
   return (
     <Link
       href={`/interview?scenario=${rec.scenario_id}`}
-      className="group -mx-4 flex items-center justify-between rounded-lg px-4 py-3 transition-colors hover:bg-white/[0.02]"
+      className="group -mx-4 flex items-center justify-between rounded-lg px-4 py-3 transition-colors hover:bg-card/[0.02]"
     >
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center gap-2">
           <span className={`text-xs font-medium ${typeInfo.color}`}>{typeInfo.label}</span>
-          <span className="text-gray-600">·</span>
+          <span className="text-muted-foreground">·</span>
           <span className={`text-xs ${difficultyColorClass(rec.difficulty, "text")}`}>{rec.difficulty}</span>
         </div>
-        <div className="truncate font-medium text-white">{rec.title}</div>
-        <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
+        <div className="truncate font-medium text-foreground">{rec.title}</div>
+        <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
           <span>{formatPatternLabel(rec.pattern)}</span>
           <span>·</span>
           <span>{rec.estimated_minutes}m</span>
@@ -73,7 +73,7 @@ function RecommendationRow({ rec }: { rec: Recommendation }) {
           )}
         </div>
       </div>
-      <ArrowRight className="h-4 w-4 text-gray-600 transition-colors group-hover:text-white" />
+      <ArrowRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
     </Link>
   )
 }
@@ -88,7 +88,7 @@ export function SmartRecommendations({
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 animate-pulse rounded-lg bg-white/5" />
+          <div key={i} className="h-20 animate-pulse rounded-lg bg-foreground/5" />
         ))}
       </div>
     )
@@ -97,11 +97,11 @@ export function SmartRecommendations({
   if (recommendations.length === 0) {
     return (
       <div className="py-12 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-800">
-          <Target className="h-6 w-6 text-gray-500" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <Target className="h-6 w-6 text-muted-foreground" />
         </div>
-        <h3 className="mb-1 text-lg font-medium text-white">No recommendations yet</h3>
-        <p className="text-sm text-gray-500">
+        <h3 className="mb-1 text-lg font-medium text-foreground">No recommendations yet</h3>
+        <p className="text-sm text-muted-foreground">
           Complete some problems to get personalized suggestions.
         </p>
       </div>
@@ -112,21 +112,21 @@ export function SmartRecommendations({
     <div>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-medium text-white">Recommended</h3>
+        <h3 className="text-lg font-medium text-foreground">Recommended</h3>
         {onRefresh && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-300"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-muted-foreground"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         )}
       </div>
 
-      <p className="mb-4 text-sm text-gray-500">Based on your progress and weak areas</p>
+      <p className="mb-4 text-sm text-muted-foreground">Based on your progress and weak areas</p>
 
       {/* Recommendations */}
       <div className="divide-y divide-white/5">

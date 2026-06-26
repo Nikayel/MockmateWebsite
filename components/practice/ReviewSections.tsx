@@ -48,7 +48,7 @@ function CollapsibleSection({
   children,
   defaultExpanded = true,
   icon: Icon,
-  iconColor = "text-gray-500",
+  iconColor = "text-muted-foreground",
   badge,
   subtitle,
 }: {
@@ -69,23 +69,23 @@ function CollapsibleSection({
     <div className="mb-4">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-gray-300"
+        className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-muted-foreground"
       >
         {isExpanded ? (
-          <ChevronDown className="h-3 w-3 text-gray-500" />
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-gray-500" />
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
         )}
         {Icon && <Icon className={`h-3 w-3 ${iconColor}`} />}
-        <span className="text-gray-400">{title}</span>
-        <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+        <span className="text-muted-foreground">{title}</span>
+        <span className="rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           {count}
         </span>
         {badge}
         <span className="flex-1" />
       </button>
       {subtitle && !isExpanded && (
-        <p className="-mt-1 mb-2 ml-5 text-xs text-gray-600">{subtitle}</p>
+        <p className="-mt-1 mb-2 ml-5 text-xs text-muted-foreground">{subtitle}</p>
       )}
       {isExpanded && <div className="divide-y divide-white/5">{children}</div>}
     </div>
@@ -164,8 +164,8 @@ export function ReviewSections({
       {/* Header with Algorithm Indicator */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h3 className="text-lg font-medium text-white">Due for Review</h3>
-          {totalDue > 0 && <span className="text-sm text-gray-500">{totalDue} due today</span>}
+          <h3 className="text-lg font-medium text-foreground">Due for Review</h3>
+          {totalDue > 0 && <span className="text-sm text-muted-foreground">{totalDue} due today</span>}
           {/* Algorithm transparency indicator */}
           {userAlgorithm && (
             <span
@@ -191,7 +191,7 @@ export function ReviewSections({
         </div>
         {allDue.length > 0 && (
           <Link href={`/interview?scenario=${allDue[0].scenario_id}&practice=true`}>
-            <Button size="sm" className="bg-white text-black hover:bg-gray-200">
+            <Button size="sm" className="bg-card text-foreground hover:bg-muted">
               <Play className="mr-1.5 h-3 w-3" />
               Start Review
             </Button>
@@ -230,7 +230,7 @@ export function ReviewSections({
           </span>
         }
       >
-        <p className="-mt-1 mb-3 text-xs text-gray-600">
+        <p className="-mt-1 mb-3 text-xs text-muted-foreground">
           Complete these quick reviews to progress through the learning phase
         </p>
         {dueInMinutes.map((item) => (
@@ -286,10 +286,10 @@ export function ReviewSections({
 
       {/* Coming Up Section - Separate from Due for Review */}
       {(dueSoon.length > 0 || dueLater.length > 0) && (
-        <div className="mt-6 border-t border-white/10 pt-6">
+        <div className="mt-6 border-t border-border pt-6">
           <div className="mb-4 flex items-center gap-3">
-            <h3 className="text-lg font-medium text-white">Coming Up</h3>
-            <span className="text-sm text-gray-500">{totalUpcoming} scheduled</span>
+            <h3 className="text-lg font-medium text-foreground">Coming Up</h3>
+            <span className="text-sm text-muted-foreground">{totalUpcoming} scheduled</span>
           </div>
 
           {/* Due Soon (Within 7 days) */}
@@ -310,19 +310,19 @@ export function ReviewSections({
             <div className="mt-2">
               <button
                 onClick={() => setShowAllScheduled(!showAllScheduled)}
-                className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-gray-300"
+                className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-muted-foreground"
               >
                 {showAllScheduled ? (
-                  <ChevronDown className="h-3 w-3 text-gray-500" />
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 ) : (
-                  <ChevronRight className="h-3 w-3 text-gray-500" />
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
                 )}
-                <Archive className="h-3 w-3 text-gray-500" />
-                <span className="text-gray-400">Later</span>
-                <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                <Archive className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Later</span>
+                <span className="rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                   {dueLater.length}
                 </span>
-                <span className="ml-1 text-[10px] font-normal text-gray-600 normal-case">
+                <span className="ml-1 text-[10px] font-normal text-muted-foreground normal-case">
                   Beyond 7 days
                 </span>
                 <span className="flex-1" />
@@ -342,10 +342,10 @@ export function ReviewSections({
 
       {/* Empty state */}
       {allDue.length === 0 && dueSoon.length === 0 && dueLater.length === 0 && (
-        <div className="rounded-lg border border-white/5 bg-white/5 p-8 text-center">
-          <Calendar className="mx-auto mb-3 h-8 w-8 text-gray-600" />
-          <p className="text-sm text-gray-400">No problems scheduled for review</p>
-          <p className="mt-1 text-xs text-gray-600">
+        <div className="rounded-lg border border-border bg-foreground/5 p-8 text-center">
+          <Calendar className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No problems scheduled for review</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Complete some practice sessions to build your review queue
           </p>
         </div>

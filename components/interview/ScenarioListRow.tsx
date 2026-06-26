@@ -122,7 +122,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
               e.stopPropagation()
               onStart(scenario)
             }}
-            className="h-8 rounded-full bg-card px-3 text-xs font-semibold text-zinc-950 hover:bg-zinc-200"
+            className="h-8 rounded-full bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted"
           >
             <Play className="mr-1 h-3 w-3" />
             Start

@@ -413,7 +413,7 @@ export function CodeConsole({
                         💡 {errorInfo.hint}
                       </div>
                     )}
-                    <div className="rounded bg-black/20 p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-red-300/80">
+                    <div className="rounded bg-background/20 p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-red-300/80">
                       {errorInfo.details}
                     </div>
                   </div>

@@ -114,7 +114,7 @@ export const ScenarioCard = memo(function ScenarioCard({
           <Link href="/limit-reached">
             <Button
               size="sm"
-              className="h-7 w-full bg-card text-xs text-zinc-950 hover:bg-zinc-200"
+              className="h-7 w-full bg-card text-xs text-foreground hover:bg-muted"
             >
               Upgrade
             </Button>
@@ -131,7 +131,7 @@ export const ScenarioCard = memo(function ScenarioCard({
               onStart(scenario)
             }}
             disabled={isLocked}
-            className="w-full bg-card font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50"
+            className="w-full bg-card font-semibold text-foreground hover:bg-muted disabled:opacity-50"
           >
             <Play className="mr-2 h-4 w-4" />
             Start practice

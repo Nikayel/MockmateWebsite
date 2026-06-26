@@ -114,7 +114,7 @@ export function ReferralWidget() {
   // Show placeholder when not logged in or error occurred
   if (!stats) {
     return (
-      <Card className="border-border/50 bg-gradient-to-br from-purple-900/20 to-zinc-900/50">
+      <Card className="border-border/50 bg-gradient-to-br from-purple-900/20 to-card/50">
         <CardContent className="p-4">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/20">
@@ -136,7 +136,7 @@ export function ReferralWidget() {
   }
 
   return (
-    <Card className="border-border/50 bg-gradient-to-br from-purple-900/20 to-zinc-900/50">
+    <Card className="border-border/50 bg-gradient-to-br from-purple-900/20 to-card/50">
       <CardContent className="p-4">
         {/* Header */}
         <div className="mb-3 flex items-center justify-between">

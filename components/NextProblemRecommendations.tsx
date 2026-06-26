@@ -92,9 +92,9 @@ export function NextProblemRecommendations({
 
   if (loading) {
     return (
-      <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
+      <Card className="glass-effect mb-8 border-border bg-card/50">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-white">
+          <CardTitle className="flex items-center space-x-2 text-foreground">
             <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
@@ -102,7 +102,7 @@ export function NextProblemRecommendations({
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-[#c4703f]" />
-            <span className="ml-2 text-gray-400">Finding similar problems...</span>
+            <span className="ml-2 text-muted-foreground">Finding similar problems...</span>
           </div>
         </CardContent>
       </Card>
@@ -111,15 +111,15 @@ export function NextProblemRecommendations({
 
   if (error) {
     return (
-      <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
+      <Card className="glass-effect mb-8 border-border bg-card/50">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-white">
+          <CardTitle className="flex items-center space-x-2 text-foreground">
             <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-400">{error}</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
         </CardContent>
       </Card>
     )
@@ -127,15 +127,15 @@ export function NextProblemRecommendations({
 
   if (recommendations.length === 0) {
     return (
-      <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
+      <Card className="glass-effect mb-8 border-border bg-card/50">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-white">
+          <CardTitle className="flex items-center space-x-2 text-foreground">
             <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-muted-foreground">
             No similar unsolved problems found. Try exploring new problem types!
           </p>
         </CardContent>
@@ -144,13 +144,13 @@ export function NextProblemRecommendations({
   }
 
   return (
-    <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
+    <Card className="glass-effect mb-8 border-border bg-card/50">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-white">
+        <CardTitle className="flex items-center space-x-2 text-foreground">
           <Sparkles className="h-5 w-5 text-[#c4703f]" />
           <span>Similar Problems You Haven't Solved</span>
         </CardTitle>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           Powered by RAG - These problems are similar to what you just solved
         </p>
       </CardHeader>
@@ -159,26 +159,26 @@ export function NextProblemRecommendations({
           {recommendations.map((rec, index) => (
             <div
               key={rec.problemId || index}
-              className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 transition-colors hover:border-[#c4703f]/50"
+              className="rounded-lg border border-border bg-muted/50 p-4 transition-colors hover:border-[#c4703f]/50"
             >
               <div className="mb-2 flex items-start justify-between">
                 <div className="flex-1">
-                  <h4 className="mb-1 font-medium text-white">{rec.title}</h4>
-                  <p className="mb-2 line-clamp-2 text-sm text-gray-400">{rec.text}</p>
+                  <h4 className="mb-1 font-medium text-foreground">{rec.title}</h4>
+                  <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">{rec.text}</p>
                   <div className="flex items-center gap-2">
                     <Badge className="border-[#c4703f]/30 bg-[#c4703f]/20 text-[#c4703f]">
                       {rec.difficulty}
                     </Badge>
-                    <Badge variant="outline" className="border-gray-600 text-gray-400">
+                    <Badge variant="outline" className="border-border text-muted-foreground">
                       {rec.type}
                     </Badge>
-                    <span className="text-xs text-gray-500">{rec.similarity}% similar</span>
+                    <span className="text-xs text-muted-foreground">{rec.similarity}% similar</span>
                   </div>
                 </div>
               </div>
               <Button
                 onClick={() => handleSelectProblem(rec.problemId)}
-                className="mt-3 w-full bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
+                className="mt-3 w-full bg-[#c4703f] text-white hover:bg-[#c4703f]/80"
                 size="sm"
               >
                 Try This Problem

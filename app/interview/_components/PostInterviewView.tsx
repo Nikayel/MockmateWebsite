@@ -237,7 +237,7 @@ export function PostInterviewView({
             <Button
               onClick={proceedToFinalFeedback}
               size="sm"
-              className="h-10 min-h-[44px] flex-1 rounded-full bg-card px-4 text-xs font-semibold text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-50 hover:shadow-md active:scale-[0.98] sm:h-11 sm:flex-none sm:px-5 sm:text-sm lg:px-6"
+              className="h-10 min-h-[44px] flex-1 rounded-full bg-card px-4 text-xs font-semibold text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:shadow-md active:scale-[0.98] sm:h-11 sm:flex-none sm:px-5 sm:text-sm lg:px-6"
             >
               <span className="hidden sm:inline">See Full Interview Score</span>
               <span className="sm:hidden">View Score</span>
@@ -415,15 +415,15 @@ export function PostInterviewView({
                           <span className="text-xs text-muted-foreground">Typing</span>
                           <span className="flex gap-0.5">
                             <span
-                              className="h-1 w-1 animate-pulse rounded-full bg-gray-500"
+                              className="h-1 w-1 animate-pulse rounded-full bg-muted"
                               style={{ animationDelay: "0ms" }}
                             />
                             <span
-                              className="h-1 w-1 animate-pulse rounded-full bg-gray-500"
+                              className="h-1 w-1 animate-pulse rounded-full bg-muted"
                               style={{ animationDelay: "150ms" }}
                             />
                             <span
-                              className="h-1 w-1 animate-pulse rounded-full bg-gray-500"
+                              className="h-1 w-1 animate-pulse rounded-full bg-muted"
                               style={{ animationDelay: "300ms" }}
                             />
                           </span>
@@ -461,7 +461,7 @@ export function PostInterviewView({
                       value={interviewerInput}
                       onChange={(e) => setInterviewerInput(e.target.value)}
                       placeholder="Ask about your solution..."
-                      className="h-11 flex-1 border-border bg-muted text-sm text-foreground placeholder-gray-500"
+                      className="h-11 flex-1 border-border bg-muted text-sm text-foreground placeholder-muted-foreground"
                       onKeyDown={(e) =>
                         e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)
                       }

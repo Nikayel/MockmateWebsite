@@ -178,7 +178,7 @@ export const EditorColumn = memo(function EditorColumn({
                 } else if (file.role === "docs") {
                   iconColor = isActive ? "text-foreground" : "text-muted-foreground"
                   activeBorderClass = "border-b-gray-400"
-                  roleBadgeClass = "border-border/30 bg-gray-500/10 text-muted-foreground"
+                  roleBadgeClass = "border-border/30 bg-muted/10 text-muted-foreground"
                   RoleIcon = BookOpen
                   roleLabel = "Docs"
                   roleDescription = "Documentation file"
@@ -300,7 +300,7 @@ export const EditorColumn = memo(function EditorColumn({
             />
           </ErrorBoundary>
           {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
+            <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm">
               <div className="max-h-full max-w-md p-2 text-center sm:p-6">
                 <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
                   <PlayCircle className="text-accent h-8 w-8" />

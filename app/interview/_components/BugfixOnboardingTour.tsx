@@ -468,7 +468,7 @@ export function BugfixOnboardingTour({
       {showWelcome && (
         <motion.div
           aria-modal="true"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm"
           exit={reduceMotion ? undefined : { opacity: 0 }}
           initial={reduceMotion ? undefined : { opacity: 0 }}
           role="dialog"
@@ -513,7 +513,7 @@ export function BugfixOnboardingTour({
                 ref={startButtonRef}
                 type="button"
                 onClick={handleWelcomeStart}
-                className="inline-flex h-10 items-center justify-center rounded-md bg-cyan-300 px-4 py-2 text-sm font-medium text-gray-950 transition-colors hover:bg-cyan-200 focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-gray-950 focus:outline-none"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-cyan-300 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-cyan-200 focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-background focus:outline-none"
               >
                 Start tour
               </button>
@@ -583,7 +583,7 @@ export function BugfixOnboardingTour({
             initial={reduceMotion ? undefined : { opacity: 0 }}
             animate={reduceMotion ? undefined : { opacity: 1 }}
           >
-            <div className="absolute inset-0 bg-black/55" aria-hidden="true" />
+            <div className="absolute inset-0 bg-background/55" aria-hidden="true" />
             {spotlightStyle && (
               <motion.div
                 aria-hidden="true"
@@ -663,7 +663,7 @@ export function BugfixOnboardingTour({
                   type="button"
                   disabled={!canContinue}
                   onClick={() => handleNext("button")}
-                  className="justify-self-end bg-cyan-300 text-gray-950 hover:bg-cyan-200"
+                  className="justify-self-end bg-cyan-300 text-foreground hover:bg-cyan-200"
                 >
                   {isLastStep ? "Finish" : "Next"}
                   {!isLastStep && <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />}

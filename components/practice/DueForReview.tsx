@@ -70,7 +70,7 @@ export function DueForReview({
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 animate-pulse rounded-lg bg-white/5" />
+          <div key={i} className="h-16 animate-pulse rounded-lg bg-foreground/5" />
         ))}
       </div>
     )
@@ -82,8 +82,8 @@ export function DueForReview({
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
           <Check className="h-6 w-6 text-emerald-400" />
         </div>
-        <h3 className="mb-1 text-lg font-medium text-white">All caught up</h3>
-        <p className="text-sm text-gray-500">
+        <h3 className="mb-1 text-lg font-medium text-foreground">All caught up</h3>
+        <p className="text-sm text-muted-foreground">
           No reviews due. Check back later or practice new problems.
         </p>
       </div>

@@ -138,7 +138,7 @@ export function InterviewHeader({
             size="sm"
             onClick={onSubmit}
             disabled={isSubmitting}
-            className="h-8 bg-[#c4703f] hover:bg-[#c4703f]/80 text-black font-medium"
+            className="h-8 bg-[#c4703f] hover:bg-[#c4703f]/80 text-white font-medium"
           >
             {isSubmitting ? (
               <div className="h-4 w-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />

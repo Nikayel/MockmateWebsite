@@ -131,7 +131,7 @@ function CollapsibleMessage({
         {children}
       </div>
       {needsCollapse && !isExpanded && (
-        <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-8 bg-gradient-to-t from-gray-800 to-transparent" />
+        <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-8 bg-gradient-to-t from-muted to-transparent" />
       )}
       {needsCollapse && (
         <button
@@ -296,7 +296,7 @@ export function InterviewerChat({
                   >
                     <div
                       className={`max-w-[90%] rounded-lg p-2 ${
-                        msg.type === "user" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
+                        msg.type === "user" ? "bg-blue-600 text-white" : "bg-muted text-white"
                       }`}
                     >
                       <div className="mb-1 flex items-center space-x-1">
@@ -379,7 +379,7 @@ export function InterviewerChat({
                     ? "Ask about optimization or improvements..."
                     : "Ask a question..."
               }
-              className="h-7 flex-1 border-border bg-muted text-xs text-foreground placeholder-gray-400"
+              className="h-7 flex-1 border-border bg-muted text-xs text-foreground placeholder-muted-foreground"
               onKeyPress={handleKeyPress}
               disabled={isLoadingInterviewer || isGeneratingDiscussion}
               aria-label="Chat with interviewer"
@@ -389,7 +389,7 @@ export function InterviewerChat({
               onClick={isRecording ? onStopRecording || onToggleRecording : onToggleRecording}
               className={cn(
                 "h-7 px-2 text-foreground",
-                isRecording ? "bg-red-500 hover:bg-red-600" : "bg-muted hover:bg-gray-600"
+                isRecording ? "bg-red-500 hover:bg-red-600" : "bg-muted hover:bg-muted"
               )}
               aria-label={isRecording ? "Stop recording" : "Start voice input"}
               disabled={isLoadingInterviewer || isGeneratingDiscussion}
@@ -521,7 +521,7 @@ export function AIChatPartner({
             >
               <div
                 className={`max-w-[85%] rounded p-1.5 text-xs ${
-                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
+                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-muted text-white"
                 }`}
               >
                 <div className="mb-0.5 flex items-center space-x-1">
@@ -576,7 +576,7 @@ export function AIChatPartner({
         {(hasNewMessages || !isAtBottom) && chatMessages.length > 0 && (
           <button
             onClick={() => scrollToBottom("smooth")}
-            className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-muted/95 px-2 py-1 text-xs text-muted-foreground shadow-lg backdrop-blur-sm transition-all hover:bg-gray-600 hover:text-foreground"
+            className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-muted/95 px-2 py-1 text-xs text-muted-foreground shadow-lg backdrop-blur-sm transition-all hover:bg-muted hover:text-foreground"
             aria-label="Scroll to latest messages"
           >
             <ChevronDown className="h-2.5 w-2.5" />
@@ -589,7 +589,7 @@ export function AIChatPartner({
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
           placeholder={isRecording ? "Listening... click Send when ready" : "Ask for help..."}
-          className="h-7 flex-1 border-border bg-muted text-xs text-foreground placeholder-gray-400"
+          className="h-7 flex-1 border-border bg-muted text-xs text-foreground placeholder-muted-foreground"
           onKeyPress={handleKeyPress}
           disabled={isLoadingChat}
           aria-label="Chat with AI partner"
@@ -599,7 +599,7 @@ export function AIChatPartner({
           onClick={isRecording ? onStopRecording || onToggleRecording : onToggleRecording}
           className={cn(
             "h-7 px-2 text-foreground",
-            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-muted hover:bg-gray-600"
+            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-muted hover:bg-muted"
           )}
           aria-label={isRecording ? "Stop recording" : "Start voice input"}
           disabled={isLoadingChat}

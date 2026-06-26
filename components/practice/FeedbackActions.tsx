@@ -103,7 +103,7 @@ export function FeedbackActions({
   return (
     <button
       onClick={handleExport}
-      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       title="Export feedback as PDF"
     >
       <Download className="h-3 w-3" />

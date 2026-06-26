@@ -445,7 +445,7 @@ function PatternFamiliarityStep({
   onChange: (pattern: DSAPattern, level: "unknown" | "seen" | "practiced" | "confident") => void
 }) {
   const levels = [
-    { level: "unknown" as const, label: "New", color: "bg-gray-200 text-gray-700" },
+    { level: "unknown" as const, label: "New", color: "bg-muted text-muted-foreground" },
     { level: "seen" as const, label: "Seen", color: "bg-yellow-100 text-yellow-700" },
     { level: "practiced" as const, label: "Practiced", color: "bg-blue-100 text-blue-700" },
     { level: "confident" as const, label: "Confident", color: "bg-green-100 text-green-700" },

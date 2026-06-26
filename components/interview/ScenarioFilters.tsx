@@ -364,7 +364,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                 onClick={() => onToggleType(type.id as ScenarioType)}
                 className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "border-transparent bg-card text-zinc-950 shadow-sm"
+                    ? "border-transparent bg-card text-foreground shadow-sm"
                     : "border-transparent bg-card/[0.03] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
                 } `}
                 aria-pressed={isActive}
@@ -400,7 +400,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                 <button
                   onClick={() => onRemoveType(t)}
                   aria-label={`Remove ${type.label} filter`}
-                  className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+                  className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   <X className="h-3 w-3" aria-hidden="true" />
                 </button>
@@ -422,7 +422,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               <button
                 onClick={() => onRemoveDifficulty(d)}
                 aria-label={`Remove ${d} difficulty filter`}
-                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
@@ -437,7 +437,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               <button
                 onClick={() => onRemoveCompany(c)}
                 aria-label={`Remove ${c} filter`}
-                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
@@ -449,7 +449,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               <button
                 onClick={() => onSearchChange("")}
                 aria-label="Clear search filter"
-                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-white/50 focus-visible:outline-none"
+                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>

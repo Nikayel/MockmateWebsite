@@ -114,7 +114,7 @@ export function CompanyPicker({
                   <Button
                     variant="default"
                     size="sm"
-                    className="cursor-default gap-2 bg-[#c4703f] text-black hover:bg-[#c4703f]"
+                    className="cursor-default gap-2 bg-[#c4703f] text-white hover:bg-[#c4703f]"
                     disabled
                   >
                     <Building2 className="h-4 w-4" />
@@ -134,7 +134,7 @@ export function CompanyPicker({
                 <Button
                   variant="default"
                   size="sm"
-                  className="cursor-default gap-2 bg-gray-600 hover:bg-gray-600"
+                  className="cursor-default gap-2 bg-muted hover:bg-muted"
                   disabled
                 >
                   <Sparkles className="h-4 w-4" />
@@ -160,7 +160,7 @@ export function CompanyPicker({
                         key={companyId}
                         variant={isSelected ? "default" : "outline"}
                         size="sm"
-                        className={`gap-2 ${isSelected ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/90" : ""}`}
+                        className={`gap-2 ${isSelected ? "bg-[#c4703f] text-white hover:bg-[#c4703f]/90" : ""}`}
                         onClick={() => setSelected(companyId)}
                       >
                         <Building2 className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function CompanyPicker({
                 <Button
                   variant={selected === "freeball" ? "default" : "outline"}
                   size="sm"
-                  className={`gap-2 ${selected === "freeball" ? "bg-gray-600 hover:bg-gray-600/90" : ""}`}
+                  className={`gap-2 ${selected === "freeball" ? "bg-muted hover:bg-muted/90" : ""}`}
                   onClick={() => setSelected("freeball")}
                 >
                   <Sparkles className="h-4 w-4" />
@@ -284,7 +284,7 @@ export function CompanyPicker({
             <Button
               onClick={handleConfirm}
               disabled={!selected}
-              className="bg-[#c4703f] text-black hover:bg-[#c4703f]/90"
+              className="bg-[#c4703f] text-white hover:bg-[#c4703f]/90"
             >
               {isLocked && realInterviewMode ? "Start Real Interview" : "Start Interview"}
             </Button>
