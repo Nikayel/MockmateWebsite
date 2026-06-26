@@ -82,6 +82,7 @@ import {
 import type { WorkspaceContextFile } from "./_types"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
 import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
+import { useInterviewTimer } from "./_hooks/useInterviewTimer"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -337,8 +338,9 @@ function InterviewPageContent() {
   } | null>(null)
 
   // Timer
-  const [startTime, setStartTime] = useState<number | null>(null)
-  const [elapsedTime, setElapsedTime] = useState(0)
+  const { startTime, setStartTime, elapsedTime, setElapsedTime } = useInterviewTimer(
+    isInterviewStarted && !showFeedback
+  )
 
   // Hints
   const [revealedHints, setRevealedHints] = useState<number>(0)
@@ -1230,17 +1232,6 @@ Let's continue!`
     }
     checkAuth()
   }, [router, searchParams, firebaseUser, authLoading, initialized, authCheckComplete])
-
-  // Timer effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (isInterviewStarted && !showFeedback && startTime) {
-      interval = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [isInterviewStarted, showFeedback, startTime])
 
   // Sound effects - disabled in calm mode for reduced stimulation
   const playSound = (type: "hint" | "success" | "fail" | "milestone") => {
