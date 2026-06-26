@@ -28,7 +28,44 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-type MarketingTab = "platform" | "features" | "interviews" | "pricing"
+type MarketingNavItem = {
+  label: string
+  href: string
+  isActive: (pathname: string, hash: string) => boolean
+}
+
+// Single source of truth for the marketing (logged-out) nav. Desktop and mobile
+// both render from this list so the two menus can never drift apart, and every
+// destination stays reachable on every viewport. Labels are concrete
+// goal-oriented words (research: users scan for their task, not org-chart terms
+// like "Platform").
+const MARKETING_NAV: MarketingNavItem[] = [
+  {
+    label: "How it works",
+    href: "/why-codesparring",
+    isActive: (pathname) => pathname.startsWith("/why-codesparring"),
+  },
+  {
+    label: "Features",
+    href: "/#features",
+    isActive: (pathname, hash) => pathname === "/" && hash === "#features",
+  },
+  {
+    label: "Interviews",
+    href: "/interview-prep",
+    isActive: (pathname) => pathname.startsWith("/interview-prep"),
+  },
+  {
+    label: "Pricing",
+    href: "/pricing",
+    isActive: (pathname) => pathname.startsWith("/pricing"),
+  },
+  {
+    label: "Blog",
+    href: "/blog",
+    isActive: (pathname) => pathname.startsWith("/blog"),
+  },
+]
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -55,20 +92,11 @@ export function Header() {
     return () => window.removeEventListener("hashchange", syncHash)
   }, [pathname])
 
-  const activeTab: MarketingTab | null =
-    pathname === "/"
-      ? hash === "#features"
-        ? "features"
-        : "platform"
-      : pathname.startsWith("/interview-prep")
-        ? "interviews"
-        : pathname.startsWith("/pricing")
-          ? "pricing"
-          : null
-
-  const tabClass = (tab: MarketingTab) =>
-    `cursor-pointer pb-1 text-[11px] font-bold tracking-[0.1em] uppercase transition-colors duration-300 border-b-2 ${
-      activeTab === tab
+  // 12px (up from 11px) and slightly looser tracking for legibility; uppercase
+  // is kept to match the brand wordmark/CTA treatment.
+  const marketingTabClass = (active: boolean) =>
+    `cursor-pointer pb-1 text-xs font-bold tracking-[0.08em] uppercase transition-colors duration-300 border-b-2 ${
+      active
         ? "border-[#adc6ff] text-[#adc6ff]"
         : "border-transparent text-[#c2c6d6] hover:text-white hover:border-white/30"
     }`
@@ -205,26 +233,23 @@ export function Header() {
               </>
             ) : (
               <>
-                <Link href="/" className={tabClass("platform")}>
-                  Platform
-                </Link>
-                <Link href="/#features" className={tabClass("features")}>
-                  Features
-                </Link>
-                <Link href="/interview-prep" className={tabClass("interviews")}>
-                  Interviews
-                </Link>
-                <Link href="/pricing" className={tabClass("pricing")}>
-                  Pricing
-                </Link>
+                {MARKETING_NAV.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={marketingTabClass(item.isActive(pathname, hash))}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
                 <Link
                   href="/login"
-                  className="ml-8 cursor-pointer text-[11px] font-bold tracking-[0.1em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white lg:ml-16 xl:ml-28"
+                  className="ml-6 cursor-pointer text-xs font-bold tracking-[0.08em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white lg:ml-10"
                 >
                   Login
                 </Link>
                 <Link href="/interview">
-                  <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-[11px] font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff]">
+                  <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff]">
                     Get Started
                   </span>
                 </Link>
@@ -316,41 +341,18 @@ export function Header() {
                 </>
               ) : (
                 <>
-                  <Link
-                    href="/interview-prep"
-                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Company Prep
-                  </Link>
-                  <Link
-                    href="/why-codesparring"
-                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    How it works
-                  </Link>
-                  <Link
-                    href="/#features"
-                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Features
-                  </Link>
-                  <Link
-                    href="/blog"
-                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Blog
-                  </Link>
-                  <Link
-                    href="/pricing"
-                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Pricing
-                  </Link>
+                  {MARKETING_NAV.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`hover:text-accent cursor-pointer transition-colors duration-300 ${
+                        item.isActive(pathname, hash) ? "text-[#adc6ff]" : "text-white/90"
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
                   <Link
                     href="/careers"
                     className="hover:text-accent cursor-pointer text-sm text-white/60 transition-colors duration-300"
@@ -365,6 +367,11 @@ export function Header() {
                     >
                       Login
                     </Button>
+                  </Link>
+                  <Link href="/interview" onClick={() => setIsMobileMenuOpen(false)}>
+                    <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:bg-[#c1d3ff]">
+                      Get Started
+                    </span>
                   </Link>
                 </>
               )}
