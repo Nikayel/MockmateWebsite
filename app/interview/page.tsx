@@ -86,6 +86,7 @@ import { useCodeExecution } from "./_hooks/useCodeExecution"
 import { useInterviewPhaseTracking } from "./_hooks/useInterviewPhaseTracking"
 import { useInterviewChat } from "./_hooks/useInterviewChat"
 import { useInterviewProactiveAI } from "./_hooks/useInterviewProactiveAI"
+import { useInterviewMetrics } from "./_hooks/useInterviewMetrics"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -308,7 +309,6 @@ function InterviewPageContent() {
         ? "success"
         : "idle"
   const [revealedAIHintIndices, setRevealedAIHintIndices] = useState<Set<number>>(new Set())
-  const [hintFeedback, setHintFeedback] = useState<Map<string, "helpful" | "unhelpful">>(new Map())
 
   // Voice mode - always auto-send on pause (research-backed simplification)
   const voiceAutoSend = true // Always enabled now
@@ -1843,83 +1843,20 @@ Let's continue!`
     router,
   ])
 
-  // Track session completion through metrics API for proper stats tracking
-  const trackSessionCompletion = async (params: {
-    sessionId: string
-    finalCode: string
-    language: string
-    testsPassed: number
-    testsTotal: number
-    efficiencyScore: number
-    communicationScore?: number
-  }) => {
-    try {
-      const token = await firebaseUser?.getIdToken()
-      if (!token) return
-
-      await fetch("/api/session/metrics", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          event: "session_complete",
-          sessionId: params.sessionId,
-          data: {
-            finalCode: params.finalCode,
-            language: params.language,
-            testsPassed: params.testsPassed,
-            testsTotal: params.testsTotal,
-            efficiencyScore: params.efficiencyScore,
-            communicationScore: params.communicationScore,
-          },
-        }),
-      })
-    } catch (error) {
-      console.error("[Session Metrics] Failed to track completion:", error)
-    }
-  }
-
-  // Update spaced repetition state after completing a problem
-  // This updates the due dates and streak for the user
-  const updateSpacedRepetition = async (params: {
-    problemId: string
-    performanceScore: number
-    masteryScore?: number
-    timeSpentMinutes: number
-    hintsUsed: number
-    testCasesPassed: number
-    testCasesTotal: number
-  }) => {
-    try {
-      const token = await firebaseUser?.getIdToken()
-      if (!token) return
-
-      const response = await fetch("/api/spaced-repetition/complete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          problem_id: params.problemId,
-          performance_score: params.performanceScore,
-          mastery_score: params.masteryScore,
-          time_spent_minutes: params.timeSpentMinutes,
-          hints_used: params.hintsUsed,
-          test_cases_passed: params.testCasesPassed,
-          test_cases_total: params.testCasesTotal,
-        }),
-      })
-
-      if (!response.ok) {
-        console.error("[Spaced Repetition] Failed to update:", await response.text())
-      }
-    } catch (error) {
-      console.error("[Spaced Repetition] Failed to update:", error)
-    }
-  }
+  const {
+    trackSessionCompletion,
+    updateSpacedRepetition,
+    submitHintFeedback,
+    hintFeedback,
+    setHintFeedback,
+  } = useInterviewMetrics({
+    firebaseUser,
+    selectedScenarioId: selectedScenario?.id,
+    userId: user?.id,
+    guestId,
+    currentSessionId,
+    ragHints,
+  })
 
   // Extract edge cases from scenario for interviewer to ask about
   const getEdgeCasesForInterviewer = (): { description: string; input: unknown }[] => {
@@ -3037,39 +2974,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       toast.error("Failed to generate feedback")
     } finally {
       setIsGeneratingFeedback(false)
-    }
-  }
-
-  // Submit feedback for a hint (async, non-blocking)
-  const submitHintFeedback = async (hintIndex: number, feedbackType: "helpful" | "unhelpful") => {
-    const hintId = `hint-${selectedScenario?.id}-${hintIndex}`
-
-    // Update local state immediately for responsive UI
-    setHintFeedback((prev) => {
-      const newMap = new Map(prev)
-      newMap.set(hintId, feedbackType)
-      return newMap
-    })
-
-    // Send feedback to API (non-blocking)
-    try {
-      await fetch("/api/rag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "record-feedback",
-          hintId,
-          feedbackType,
-          userId: user?.id || guestId,
-          sessionId: currentSessionId,
-          problemId: selectedScenario?.id,
-          hintText: ragHints[hintIndex]?.hint,
-          source: "ai-hint",
-        }),
-      })
-    } catch (error) {
-      console.error("Error submitting hint feedback:", error)
-      // Don't revert - feedback is stored locally anyway
     }
   }
 
