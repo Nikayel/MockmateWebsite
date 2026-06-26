@@ -16,6 +16,7 @@ import { getCaseLabById } from "@/lib/labs/case-labs"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
+import { CaseLabChat } from "@/components/labs/CaseLabChat"
 
 export default function CaseLabPlayPage() {
   const params = useParams<{ labId: string }>()
@@ -75,7 +76,7 @@ export default function CaseLabPlayPage() {
         </div>
       </header>
 
-      <CaseLabShell className="flex-1" />
+      <CaseLabShell className="flex-1" chatSlot={<CaseLabChat />} />
     </main>
   )
 }

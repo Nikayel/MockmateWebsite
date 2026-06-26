@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 5
-**Last updated by loop:** Phase 5 — milestone-aware AI chat service + endpoint
+**Last updated by loop:** Phase 5 — interviewer chat wired into the shell (AI spine live)
 
 ---
 
@@ -38,7 +38,7 @@
 - [x] Lab fully playable through all 5 milestones
 
 ## Phase 5 — AI spine + browse + polish (spec §7, §8; only after 0–4 solid)
-- [~] Pass `currentMilestone` into chat; milestone-aware reactions + company persona (server done: dedicated `/api/labs/chat` reusing `generateAIResponse` with milestone-aware persona prompt + tests; chat UI in `chatSlot` next)
+- [x] Pass `currentMilestone` into chat; milestone-aware reactions + company persona
 - [ ] `/labs` gallery (filter by company/skill; show progress)
 - [ ] `CaseLabIntro` start screen + Practice/Onsite mode toggle
 - [ ] Loading / empty / error / unauthorized states on all new surfaces
@@ -48,7 +48,7 @@
 
 ## Definition of Done (v1)
 - [ ] 911 Dispatch lab fully playable: Clarify → Decompose → Design → Build (multi-file codebase drop) → Review
-- [ ] AI interviewer engaged across milestones; structured feedback at the end
+- [x] AI interviewer engaged across milestones; structured feedback at the end
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass
 - [ ] New surfaces handle loading/empty/error/unauthorized
 - [ ] `graphify update .` run; graph current
@@ -80,3 +80,4 @@
 - Phase 4 (build reshape): `lib/scenarios/add-functionality/add-feature-911-dispatch.ts` — reshaped the workbook's single-file `starter.py` into a MULTI-FILE workspace `add-functionality` scenario (read-only `src/geo.py`, editable `src/dispatch.py` recommender w/ TODO, editable `src/dispatch_service.py` wrapper, visible + hidden Python tests + runner, reference solution). Registered in the add-functionality index. Added `case-lab-build-wiring.test.ts` (lab → scenario resolves, workspace, not DSA, has reference). VERIFIED the reference solution passes all 5 tests (2 visible + 3 hidden) via a local python run. typecheck + lint + tests clean; graph updated.
 - Phase 4 (complete — playable): `app/labs/[labId]/page.tsx` — loads the lab via `getCaseLabById`, resumes via `useCaseLabRunSync` or starts a fresh run (new store `startRun` action: client uuid id, clarify active, rest locked), renders `CaseLabShell`. Lab-not-found + back-to-/labs handled. The 911 Dispatch lab is now playable end-to-end Clarify→Decompose→Design→Build(codebase)→Review with autosave/resume and AI feedback. typecheck + lint clean; graph updated.
 - Phase 5 (AI spine, server): `lib/labs/case-lab-chat.ts` — pure `buildCaseLabChatSystemPrompt` (company persona + per-milestone coaching + optional answer context) + `generateCaseLabChatReply` (reuses `generateAIResponse`, `chat_message` event). Decision: a dedicated `/api/labs/chat` endpoint rather than threading the 864-line interview `/api/chat` (it's tightly coupled to interview scenarios/phases) — same persona/milestone goal, far less risk. Added `case-lab-chat.test.ts` (3 tests, pass). Chat UI in `chatSlot` next. typecheck + lint + tests clean; graph updated.
+- Phase 5 (AI spine, UI): `components/labs/CaseLabChat.tsx` — right-column interviewer; sends `{milestone, messages, lab persona, answer-summary context}` to `/api/labs/chat`, renders the conversation (user/assistant bubbles, typing spinner, empty + soft-error states, Enter-to-send), attaches auth token. Wired into the play route via `chatSlot`. The AI is now engaged across every milestone — **DoD item "AI interviewer engaged across milestones" met**. typecheck + lint clean; graph updated.
