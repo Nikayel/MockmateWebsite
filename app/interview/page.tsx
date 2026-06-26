@@ -15,7 +15,6 @@ import { ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import {
-  checkUsageLimit,
   recordSessionStart,
   getUserProfile,
   createInterviewSession,
@@ -25,12 +24,7 @@ import {
   findLatestSubmittedSession,
   markSessionEvaluating,
 } from "@/lib/firestore-helpers"
-import {
-  getOrCreateGuestId,
-  canStartFreeTrial,
-  markFreeTrialUsed,
-  saveGuestSessionData,
-} from "@/lib/guest-session"
+import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
@@ -84,6 +78,7 @@ import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfi
 import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
 import { useInterviewTimer } from "./_hooks/useInterviewTimer"
 import { useInterviewModes } from "./_hooks/useInterviewModes"
+import { useGuestQuota, isUsageBlocked } from "./_hooks/useGuestQuota"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -223,9 +218,16 @@ function InterviewPageContent() {
   // Filters (handled inside ScenarioBrowser now)
   const [completedProblems, setCompletedProblems] = useState<string[]>([])
 
-  // Guest mode state
-  const [isGuestMode, setIsGuestMode] = useState(false)
-  const [guestId, setGuestId] = useState<string | null>(null)
+  // Guest-mode + usage-limit entitlement state (see useGuestQuota)
+  const {
+    isGuestMode,
+    guestId,
+    usageLimit,
+    canStartGuestTrial,
+    enterGuestMode,
+    exitGuestMode,
+    refreshUsageLimit,
+  } = useGuestQuota()
   const [showSignupPrompt, setShowSignupPrompt] = useState(false)
 
   // Chat states
@@ -373,11 +375,6 @@ function InterviewPageContent() {
     : selectedLanguage
   const lastCodeHashRef = useRef<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
-  const [usageLimit, setUsageLimit] = useState<{
-    used: number
-    limit: number
-    allowed: boolean
-  } | null>(null)
   const [cachedUserProfile, setCachedUserProfile] = useState<Profile | null>(null)
   const userProfileRequestRef = useRef<Promise<Profile | null> | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
@@ -846,12 +843,10 @@ function InterviewPageContent() {
 
       if (!firebaseUser) {
         // Check if guest can start free trial
-        const canTrial = canStartFreeTrial()
+        const canTrial = canStartGuestTrial()
         if (canTrial) {
           // Allow guest mode
-          const gId = getOrCreateGuestId()
-          setGuestId(gId)
-          setIsGuestMode(true)
+          enterGuestMode()
           setIsLoading(false)
           return
         } else {
@@ -862,12 +857,10 @@ function InterviewPageContent() {
       }
 
       // Authenticated user - disable guest mode if it was set
-      setIsGuestMode(false)
-      setGuestId(null)
+      exitGuestMode()
 
       // Check usage limit
-      const usage = await checkUsageLimit(firebaseUser.uid)
-      setUsageLimit(usage)
+      await refreshUsageLimit(firebaseUser.uid)
 
       // Check if we're reopening a session or starting from roadmap
       const sessionId = searchParams?.get("session")
@@ -2614,7 +2607,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setTargetCompany(effectiveTargetCompany)
 
     // Check usage limit before starting - redirect to limit page (skip for DSA questions)
-    if (user && usageLimit && !usageLimit.allowed && scenario.type !== "dsa") {
+    if (isUsageBlocked(!!user, usageLimit, scenario.type)) {
       router.push("/limit-reached")
       return
     }
@@ -2668,8 +2661,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           toast.success(`Session started! You now have ${result.freeOpensRemaining} free opens.`)
         }
         // Refresh usage limit
-        const updatedUsage = await checkUsageLimit(user.id)
-        setUsageLimit(updatedUsage)
+        await refreshUsageLimit(user.id)
       } catch (error) {
         console.error("Error creating session:", error)
         toast.error("Session tracking error", {
