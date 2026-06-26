@@ -3,6 +3,8 @@ import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 import { getCaseLabRun, upsertCaseLabRun } from "@/lib/labs/case-lab-runs"
 import { generateCaseLabFeedback } from "@/lib/labs/case-lab-feedback"
+import { getCaseLabById } from "@/lib/labs/case-labs"
+import { recordCaseLabMastery } from "@/lib/labs/case-lab-mastery"
 
 export const dynamic = "force-dynamic"
 
@@ -41,6 +43,14 @@ export async function POST(request: NextRequest) {
       },
       milestoneStatus: { ...run.milestoneStatus, review: "done" },
     })
+
+    // §7.5: map the completed Build scenario into the spaced-repetition mastery
+    // system, reusing the same entry point as interview sessions. Best-effort —
+    // recordCaseLabMastery swallows its own errors so it can't fail completion.
+    const lab = getCaseLabById(saved.caseLabId)
+    if (lab) {
+      await recordCaseLabMastery(auth.userId, lab, saved)
+    }
 
     return NextResponse.json({ run: saved, feedback })
   } catch (error) {

@@ -30,7 +30,7 @@
 ## Phase 3 — Build & Review (spec §7.4–7.5)
 - [x] Build station embeds multi-file workspace editor + `/api/execute` (codebase drop, NOT DSA editor)
 - [x] `ReviewStation` → existing feedback pipeline → render `structured_feedback`
-- [~] On complete: update mastery + mark Run `completed` (Run marked `completed` + feedback generated/persisted; mastery/roadmap update still pending)
+- [x] On complete: update mastery + mark Run `completed` (Run marked `completed` + feedback generated/persisted; mastery/roadmap now updated via `recordCaseLabMastery` in the feedback route)
 
 ## Phase 4 — Port Palantir 911 Dispatch (spec §1, §7.4; ingredient: ../workbook-palantir-decomp/labs/lab_01_911_dispatch)
 - [x] Map Clarify/Decompose/Design/Review content into the `CaseLab` definition
@@ -47,7 +47,7 @@
 ## Phase 6 — Wiring & integration (make it discoverable; close deferred integrations)
 - [x] Add `/labs` to the app's primary navigation (header/menu) — it's URL-only today
 - [x] Add a Case Labs entry point on the dashboard / practice surface (discoverable in-product)
-- [ ] Update mastery / roadmap on lab completion (map the completed Build scenario into `lib/spaced-repetition`, §7.5)
+- [x] Update mastery / roadmap on lab completion (map the completed Build scenario into `lib/spaced-repetition`, §7.5)
 - [ ] Onsite mode: inject a Build curveball partway through when `mode === "onsite"` (§7.4)
 - [ ] `/labs` gallery: filter by company/skill + per-lab progress (resume state)
 - [ ] Gating decision: feature flag if it should stay hidden until launch, else document it's public
@@ -118,6 +118,7 @@ files Case Labs never touched: 2 `real-world.test.ts` cases (stale expected list
 - Phase 5 (browse): `app/labs/page.tsx` gallery + `components/labs/CaseLabCard.tsx` (company/role, difficulty badge via shared `difficultyColorClass`, why-this-company teaser, skills, est. minutes, Start → play route). Empty state handled; fixes the play route's previously-dangling `/labs` back-link. Filter-by-company/skill + progress badges deferred to polish. typecheck + lint clean; graph updated.
 - Phase 5 (intro + modes): `components/labs/CaseLabIntro.tsx` — start screen (company framing P6, milestone preview, Practice/Onsite toggle with descriptions) → `onStart(mode)`. Play route now gates: loading state while resuming, intro when no run for this lab, shell once a run exists (resume skips intro). `startRun` now honors the chosen mode. typecheck + lint clean; graph updated.
 - Phase 5 (analytics): `lib/labs/case-lab-analytics.ts` — typed wrappers over shared `trackEvent` (`case_lab_started` w/ mode, `case_lab_milestone_completed`, `case_lab_completed`). Wired: play route `onStart` (started + mode), `MilestoneNav` Next (milestone completed, soft), ReviewStation `handleComplete` (completed). typecheck + lint clean; graph updated.
+- Phase 6 (mastery on completion, §7.5): `lib/labs/case-lab-mastery.ts` — pure `buildCaseLabMasterySession(lab, run)` maps the completed Build (`lab.buildScenarioId`) into the SR session payload, deriving the technical mastery score from the build test pass rate via the shared `calculateMasteryScore`; `recordCaseLabMastery` reuses the SAME entry point as interview sessions (`completeSessionWithMastery`) — no duplicated SR logic. Non-DSA build uses the same `arrays-hashing` pattern fallback the interview feedback route already uses (DRY/consistency). Wired into `app/api/labs/feedback/route.ts` after the run is marked completed (best-effort, swallows its own errors). Added `case-lab-mastery.test.ts` (4 tests: scenario mapping, pass-rate→score monotonicity, no-tests safety, completedAt fallback). typecheck + lint + tests clean; graph updated.
 - Phase 6 (dashboard entry point): added a "Case Labs" CTA button (FlaskConical icon, outline variant) beside "Start Practice" in the dashboard header action row (`app/dashboard/page.tsx`); made the row stack on mobile / row on `sm+`. Reuses the existing Button/Link pattern — no new component. Case Labs is now discoverable in-product, not just via nav. typecheck + dashboard lint clean; graph updated.
 - Phase 6 (nav wiring): added a "Labs" link (FlaskConical icon) to the authenticated primary nav in `components/header.tsx` — desktop (after Interview) and mobile menus, matching the existing Dashboard/Interview/Sessions/Roadmap/Review link pattern so the two stay in sync. `/labs` is no longer URL-only for signed-in users. typecheck + header lint clean; graph updated.
 - Phase 5 (verification): ran full `pnpm test` (3 failures: 1 mine — `add-functionality.test.ts` curated-list assertion needed the new `palantir-911-dispatch-build` id; fixed → 2/2 pass) and full `pnpm lint`. Confirmed via git history that the other 2 test failures + all 40 lint errors are PRE-EXISTING and unrelated to Case Labs (files I never touched; the offending bugfix scenario predates this work). All Case Labs code: typecheck ✅, eslint ✅, 18 tests ✅. NOT declaring COMPLETE yet — Phase 5 polish (mastery, analytics, /labs filters, states audit) still open.
