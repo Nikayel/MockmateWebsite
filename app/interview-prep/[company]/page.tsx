@@ -121,25 +121,29 @@ export default async function CompanyPrepPage({
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-5xl">
             {/* Breadcrumb */}
-            <nav className="mb-4 text-sm text-zinc-500">
-              <Link href="/interview-prep" className="hover:text-white">
+            <nav className="text-muted-foreground mb-4 text-sm">
+              <Link href="/interview-prep" className="hover:text-foreground">
                 ← All companies
               </Link>
             </nav>
 
-            <h1 className="font-heading text-3xl font-semibold text-white md:text-4xl mb-2">
+            <h1 className="font-heading text-foreground mb-2 text-3xl font-semibold md:text-4xl">
               {company.name}
             </h1>
 
             {/* Key info inline */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-400 mb-6">
+            <div className="text-muted-foreground mb-6 flex flex-wrap items-center gap-4 text-sm">
               <span>{company.interviewProcess.totalRounds} rounds</span>
               <span>·</span>
               <span>{company.interviewProcess.timeline}</span>
               <span>·</span>
               <span>{company.topPatterns.length} patterns</span>
               <span>·</span>
-              <span className={company.difficultyDistribution.hard >= 30 ? "text-red-400" : "text-amber-400"}>
+              <span
+                className={
+                  company.difficultyDistribution.hard >= 30 ? "text-red-400" : "text-amber-400"
+                }
+              >
                 {company.difficultyDistribution.hard}% hard
               </span>
             </div>
@@ -157,14 +161,14 @@ export default async function CompanyPrepPage({
       </section>
 
       {/* Related Companies - Simple */}
-      <section className="border-t border-zinc-800 py-8">
+      <section className="border-border border-t py-8">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-sm text-zinc-500 mb-4">Other companies</h2>
+            <h2 className="text-muted-foreground mb-4 text-sm">Other companies</h2>
             <div className="flex flex-wrap gap-2">
               {relatedCompanies.map((related) => (
                 <Link key={related.id} href={`/interview-prep/${related.id}`}>
-                  <span className="inline-block rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm text-white hover:border-zinc-700 hover:bg-zinc-900 transition-colors">
+                  <span className="border-border bg-card text-foreground hover:border-border hover:bg-muted inline-block rounded-lg border px-4 py-2 text-sm transition-colors">
                     {related.name}
                   </span>
                 </Link>

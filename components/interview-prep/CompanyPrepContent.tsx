@@ -92,12 +92,19 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                 </div>
                 <div>
                   <p className="text-sm text-white">
-                    <span className="font-semibold text-emerald-400">{monthlyCount.toLocaleString()}</span> engineers prepared for {company.name} this month
+                    <span className="font-semibold text-emerald-400">
+                      {monthlyCount.toLocaleString()}
+                    </span>{" "}
+                    engineers prepared for {company.name} this month
                   </p>
                 </div>
               </div>
               <Link href={`/login?redirect=/interview-prep/${company.id}`}>
-                <Button size="sm" variant="outline" className="border-emerald-700 text-emerald-400 hover:bg-emerald-900/50 text-xs">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-emerald-700 text-xs text-emerald-400 hover:bg-emerald-900/50"
+                >
                   Join them
                 </Button>
               </Link>
@@ -107,35 +114,37 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
 
         {/* Top Patterns */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-white">Key patterns</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-foreground text-lg font-medium">Key patterns</h2>
             {!isLoggedIn && lockedPatternsCount > 0 && (
-              <span className="text-xs text-zinc-500">
+              <span className="text-muted-foreground text-xs">
                 Showing {FREE_PATTERNS_COUNT} of {company.topPatterns.length}
               </span>
             )}
           </div>
           <div className="space-y-2">
             {/* Free patterns */}
-            {company.topPatterns.slice(0, isLoggedIn ? undefined : FREE_PATTERNS_COUNT).map((pattern, idx) => (
-              <div
-                key={pattern.pattern}
-                className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-600 w-5">{idx + 1}</span>
-                  <span className="text-white capitalize">
-                    {pattern.pattern.replace(/-/g, " ")}
-                  </span>
+            {company.topPatterns
+              .slice(0, isLoggedIn ? undefined : FREE_PATTERNS_COUNT)
+              .map((pattern, idx) => (
+                <div
+                  key={pattern.pattern}
+                  className="border-border bg-card flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground/70 w-5 text-xs">{idx + 1}</span>
+                    <span className="text-foreground capitalize">
+                      {pattern.pattern.replace(/-/g, " ")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className={difficultyColorClass(pattern.typicalDifficulty, "text")}>
+                      {pattern.typicalDifficulty}
+                    </span>
+                    <span className="text-muted-foreground">{pattern.frequency}%</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className={difficultyColorClass(pattern.typicalDifficulty, "text")}>
-                    {pattern.typicalDifficulty}
-                  </span>
-                  <span className="text-zinc-500">{pattern.frequency}%</span>
-                </div>
-              </div>
-            ))}
+              ))}
 
             {/* Locked patterns overlay */}
             {!isLoggedIn && lockedPatternsCount > 0 && (
@@ -144,23 +153,27 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                 contentType="patterns"
                 companyName={company.name}
                 companyId={company.id}
-                previewItems={company.topPatterns.slice(FREE_PATTERNS_COUNT, FREE_PATTERNS_COUNT + 2).map((p, idx) => (
-                  <div
-                    key={p.pattern}
-                    className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-zinc-600 w-5">{FREE_PATTERNS_COUNT + idx + 1}</span>
-                      <span className="text-white capitalize">
-                        {p.pattern.replace(/-/g, " ")}
-                      </span>
+                previewItems={company.topPatterns
+                  .slice(FREE_PATTERNS_COUNT, FREE_PATTERNS_COUNT + 2)
+                  .map((p, idx) => (
+                    <div
+                      key={p.pattern}
+                      className="border-border bg-card flex items-center justify-between rounded-lg border p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground/70 w-5 text-xs">
+                          {FREE_PATTERNS_COUNT + idx + 1}
+                        </span>
+                        <span className="text-foreground capitalize">
+                          {p.pattern.replace(/-/g, " ")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-amber-400">{p.typicalDifficulty}</span>
+                        <span className="text-muted-foreground">{p.frequency}%</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="text-amber-400">{p.typicalDifficulty}</span>
-                      <span className="text-zinc-500">{p.frequency}%</span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               />
             )}
           </div>
@@ -168,30 +181,37 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
 
         {/* Must-Know Questions */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-white">Common questions</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-foreground text-lg font-medium">Common questions</h2>
             {!isLoggedIn && lockedQuestionsCount > 0 && (
-              <span className="text-xs text-zinc-500">
+              <span className="text-muted-foreground text-xs">
                 Showing {FREE_QUESTIONS_COUNT} of {company.mustKnowQuestions.length}
               </span>
             )}
           </div>
           <div className="space-y-2">
             {/* Free questions */}
-            {company.mustKnowQuestions.slice(0, isLoggedIn ? undefined : FREE_QUESTIONS_COUNT).map((question) => (
-              <div
-                key={question.scenarioId}
-                className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3"
-              >
-                <span className="text-white">{question.title}</span>
-                <span className={`text-xs ${
-                  question.frequency === "very_common" ? "text-rose-400" :
-                  question.frequency === "common" ? "text-amber-400" : "text-zinc-500"
-                }`}>
-                  {question.frequency.replace("_", " ")}
-                </span>
-              </div>
-            ))}
+            {company.mustKnowQuestions
+              .slice(0, isLoggedIn ? undefined : FREE_QUESTIONS_COUNT)
+              .map((question) => (
+                <div
+                  key={question.scenarioId}
+                  className="border-border bg-card flex items-center justify-between rounded-lg border p-3"
+                >
+                  <span className="text-foreground">{question.title}</span>
+                  <span
+                    className={`text-xs ${
+                      question.frequency === "very_common"
+                        ? "text-rose-400"
+                        : question.frequency === "common"
+                          ? "text-amber-400"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {question.frequency.replace("_", " ")}
+                  </span>
+                </div>
+              ))}
 
             {/* Locked questions overlay */}
             {!isLoggedIn && lockedQuestionsCount > 0 && (
@@ -200,20 +220,27 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                 contentType="must-know questions"
                 companyName={company.name}
                 companyId={company.id}
-                previewItems={company.mustKnowQuestions.slice(FREE_QUESTIONS_COUNT, FREE_QUESTIONS_COUNT + 2).map((q) => (
-                  <div
-                    key={q.scenarioId}
-                    className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3"
-                  >
-                    <span className="text-white">{q.title}</span>
-                    <span className="text-xs text-amber-400">{q.frequency.replace("_", " ")}</span>
-                  </div>
-                ))}
+                previewItems={company.mustKnowQuestions
+                  .slice(FREE_QUESTIONS_COUNT, FREE_QUESTIONS_COUNT + 2)
+                  .map((q) => (
+                    <div
+                      key={q.scenarioId}
+                      className="border-border bg-card flex items-center justify-between rounded-lg border p-3"
+                    >
+                      <span className="text-foreground">{q.title}</span>
+                      <span className="text-xs text-amber-400">
+                        {q.frequency.replace("_", " ")}
+                      </span>
+                    </div>
+                  ))}
               />
             )}
           </div>
-          <Link href="/interview" className="block mt-4">
-            <Button variant="outline" className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+          <Link href="/interview" className="mt-4 block">
+            <Button
+              variant="outline"
+              className="border-border text-muted-foreground hover:bg-muted hover:text-foreground w-full"
+            >
               Practice these
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -222,33 +249,38 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
 
         {/* Interview Process */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-white">Interview process</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-foreground text-lg font-medium">Interview process</h2>
             {!isLoggedIn && lockedRoundsCount > 0 && (
-              <span className="text-xs text-zinc-500">
+              <span className="text-muted-foreground text-xs">
                 Showing {FREE_ROUNDS_COUNT} of {company.interviewProcess.rounds.length} rounds
               </span>
             )}
           </div>
           <div className="space-y-3">
             {/* Free rounds */}
-            {company.interviewProcess.rounds.slice(0, isLoggedIn ? undefined : FREE_ROUNDS_COUNT).map((round, idx) => (
-              <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-white">
-                    {idx + 1}. {round.description}
-                  </span>
-                  <span className="text-xs text-zinc-500">{round.duration} min</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {round.focusAreas.map((area) => (
-                    <span key={area} className="text-xs text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
-                      {area}
+            {company.interviewProcess.rounds
+              .slice(0, isLoggedIn ? undefined : FREE_ROUNDS_COUNT)
+              .map((round, idx) => (
+                <div key={idx} className="border-border bg-card rounded-lg border p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-foreground font-medium">
+                      {idx + 1}. {round.description}
                     </span>
-                  ))}
+                    <span className="text-muted-foreground text-xs">{round.duration} min</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {round.focusAreas.map((area) => (
+                      <span
+                        key={area}
+                        className="text-muted-foreground bg-muted rounded px-2 py-0.5 text-xs"
+                      >
+                        {area}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
             {/* Locked rounds overlay */}
             {!isLoggedIn && lockedRoundsCount > 0 && (
@@ -257,23 +289,28 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                 contentType="interview rounds"
                 companyName={company.name}
                 companyId={company.id}
-                previewItems={company.interviewProcess.rounds.slice(FREE_ROUNDS_COUNT, FREE_ROUNDS_COUNT + 1).map((round, idx) => (
-                  <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-white">
-                        {FREE_ROUNDS_COUNT + idx + 1}. {round.description}
-                      </span>
-                      <span className="text-xs text-zinc-500">{round.duration} min</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {round.focusAreas.slice(0, 2).map((area) => (
-                        <span key={area} className="text-xs text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
-                          {area}
+                previewItems={company.interviewProcess.rounds
+                  .slice(FREE_ROUNDS_COUNT, FREE_ROUNDS_COUNT + 1)
+                  .map((round, idx) => (
+                    <div key={idx} className="border-border bg-card rounded-lg border p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-foreground font-medium">
+                          {FREE_ROUNDS_COUNT + idx + 1}. {round.description}
                         </span>
-                      ))}
+                        <span className="text-muted-foreground text-xs">{round.duration} min</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {round.focusAreas.slice(0, 2).map((area) => (
+                          <span
+                            key={area}
+                            className="text-muted-foreground bg-muted rounded px-2 py-0.5 text-xs"
+                          >
+                            {area}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               />
             )}
           </div>
@@ -283,25 +320,42 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
       {/* Right Column - Sidebar */}
       <div className="space-y-6">
         {/* Quick facts - Always visible */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <h3 className="text-sm font-medium text-white mb-3">Quick facts</h3>
+        <div className="border-border bg-card rounded-lg border p-4">
+          <h3 className="text-foreground mb-3 text-sm font-medium">Quick facts</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-zinc-500">Pace</span>
-              <span className={
-                company.interviewStyle.pace === "fast" ? "text-rose-400" :
-                company.interviewStyle.pace === "moderate" ? "text-amber-400" : "text-emerald-400"
-              }>{company.interviewStyle.pace}</span>
+              <span className="text-muted-foreground">Pace</span>
+              <span
+                className={
+                  company.interviewStyle.pace === "fast"
+                    ? "text-rose-400"
+                    : company.interviewStyle.pace === "moderate"
+                      ? "text-amber-400"
+                      : "text-emerald-400"
+                }
+              >
+                {company.interviewStyle.pace}
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-500">Optimal required</span>
-              <span className={company.interviewStyle.optimalSolutionRequired ? "text-rose-400" : "text-emerald-400"}>
+              <span className="text-muted-foreground">Optimal required</span>
+              <span
+                className={
+                  company.interviewStyle.optimalSolutionRequired
+                    ? "text-rose-400"
+                    : "text-emerald-400"
+                }
+              >
                 {company.interviewStyle.optimalSolutionRequired ? "yes" : "no"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-zinc-500">Hints given</span>
-              <span className={company.interviewStyle.providesHints ? "text-emerald-400" : "text-amber-400"}>
+              <span className="text-muted-foreground">Hints given</span>
+              <span
+                className={
+                  company.interviewStyle.providesHints ? "text-emerald-400" : "text-amber-400"
+                }
+              >
                 {company.interviewStyle.providesHints ? "yes" : "rarely"}
               </span>
             </div>
@@ -309,27 +363,31 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
         </div>
 
         {/* Tips - Gated */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-white">Insider tips</h3>
+        <div className="border-border bg-card rounded-lg border p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-foreground text-sm font-medium">Insider tips</h3>
             {!isLoggedIn && lockedTipsCount > 0 && (
-              <span className="text-xs text-zinc-500">{FREE_TIPS_COUNT}/{company.interviewProcess.tips.length}</span>
+              <span className="text-muted-foreground text-xs">
+                {FREE_TIPS_COUNT}/{company.interviewProcess.tips.length}
+              </span>
             )}
           </div>
           <ul className="space-y-2">
-            {company.interviewProcess.tips.slice(0, isLoggedIn ? undefined : FREE_TIPS_COUNT).map((tip, idx) => (
-              <li key={idx} className="text-sm text-zinc-400 flex gap-2">
-                <span className="text-zinc-600">·</span>
-                {tip}
-              </li>
-            ))}
+            {company.interviewProcess.tips
+              .slice(0, isLoggedIn ? undefined : FREE_TIPS_COUNT)
+              .map((tip, idx) => (
+                <li key={idx} className="text-muted-foreground flex gap-2 text-sm">
+                  <span className="text-muted-foreground/70">·</span>
+                  {tip}
+                </li>
+              ))}
           </ul>
 
           {/* Locked tips */}
           {!isLoggedIn && lockedTipsCount > 0 && (
-            <div className="mt-3 pt-3 border-t border-zinc-800">
+            <div className="border-border mt-3 border-t pt-3">
               <Link href={`/login?redirect=/interview-prep/${company.id}`}>
-                <div className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer">
+                <div className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 text-xs transition-colors">
                   <Lock className="h-3 w-3" />
                   <span>+{lockedTipsCount} more insider tips</span>
                 </div>
@@ -339,91 +397,95 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
         </div>
 
         {/* Compensation - Fully gated for non-logged-in users */}
-        {company.compensation && (
-          isLoggedIn ? (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-              <h3 className="text-sm font-medium text-white mb-3">Compensation (TC)</h3>
+        {company.compensation &&
+          (isLoggedIn ? (
+            <div className="border-border bg-card rounded-lg border p-4">
+              <h3 className="text-foreground mb-3 text-sm font-medium">Compensation (TC)</h3>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Entry</span>
+                  <span className="text-muted-foreground">Entry</span>
                   <span className="text-emerald-400">{company.compensation.entryLevel}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Mid</span>
+                  <span className="text-muted-foreground">Mid</span>
                   <span className="text-emerald-400">{company.compensation.midLevel}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Senior</span>
+                  <span className="text-muted-foreground">Senior</span>
                   <span className="text-emerald-400">{company.compensation.seniorLevel}</span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/90 z-10" />
-              <div className="blur-sm opacity-50">
-                <h3 className="text-sm font-medium text-white mb-3">Compensation (TC)</h3>
+            <div className="border-border bg-card relative overflow-hidden rounded-lg border p-4">
+              <div className="to-background/90 absolute inset-0 z-10 bg-gradient-to-b from-transparent" />
+              <div className="opacity-50 blur-sm">
+                <h3 className="text-foreground mb-3 text-sm font-medium">Compensation (TC)</h3>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Entry</span>
+                    <span className="text-muted-foreground">Entry</span>
                     <span className="text-emerald-400">$XXX,XXX</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Mid</span>
+                    <span className="text-muted-foreground">Mid</span>
                     <span className="text-emerald-400">$XXX,XXX</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">Senior</span>
+                    <span className="text-muted-foreground">Senior</span>
                     <span className="text-emerald-400">$XXX,XXX</span>
                   </div>
                 </div>
               </div>
               <div className="absolute inset-0 z-20 flex items-center justify-center">
                 <Link href={`/login?redirect=/interview-prep/${company.id}`}>
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/95 px-3 py-2 text-xs text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors">
+                  <div className="border-border bg-popover/95 text-muted-foreground hover:border-border hover:text-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors">
                     <Lock className="h-3 w-3" />
                     Unlock salary data
                   </div>
                 </Link>
               </div>
             </div>
-          )
-        )}
+          ))}
 
         {/* Personalized Roadmap CTA */}
-        <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-sm font-medium text-white">Get a {company.name} study plan</h3>
+        <div className="border-border bg-muted rounded-lg border p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <h3 className="text-foreground text-sm font-medium">Get a {company.name} study plan</h3>
             {isLoggedIn && !isProLoading && !isPro && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#c4703f]/10 border border-[#c4703f]/30 text-[10px] font-medium text-[#c4703f]">
+              <span className="inline-flex items-center gap-1 rounded border border-[#c4703f]/30 bg-[#c4703f]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#c4703f]">
                 <Crown className="h-2.5 w-2.5" />
                 Pro
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mb-3">
-            Enter your interview date → we prioritize {company.name}'s top patterns → you get a day-by-day schedule.
+          <p className="text-muted-foreground mb-3 text-xs">
+            Enter your interview date → we prioritize {company.name}'s top patterns → you get a
+            day-by-day schedule.
           </p>
 
           {/* Different CTA based on auth/subscription status */}
           {!isLoggedIn ? (
             // Not logged in - prompt to sign up first
             <Link href={`/login?redirect=/interview-prep/${company.id}`}>
-              <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
+              <Button size="sm" className="w-full bg-white text-xs text-black hover:bg-zinc-200">
                 Sign up to create roadmap
                 <ArrowRight className="ml-1.5 h-3 w-3" />
               </Button>
             </Link>
           ) : isProLoading ? (
             // Loading state - show neutral button
-            <Button size="sm" className="w-full bg-zinc-700 text-zinc-300 text-xs cursor-wait" disabled>
-              <span className="inline-block h-3 w-3 mr-1.5 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+            <Button
+              size="sm"
+              className="w-full cursor-wait bg-zinc-700 text-xs text-zinc-300"
+              disabled
+            >
+              <span className="mr-1.5 inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-500 border-t-transparent" />
               Loading...
             </Button>
           ) : isPro ? (
             // Pro user - direct to roadmap creation
             <Link href={`/roadmap/new?company=${company.id}`}>
-              <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
+              <Button size="sm" className="w-full bg-white text-xs text-black hover:bg-zinc-200">
                 Create roadmap
                 <ArrowRight className="ml-1.5 h-3 w-3" />
               </Button>
@@ -431,7 +493,10 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
           ) : (
             // Free user - show upgrade CTA
             <Link href="/upgrade">
-              <Button size="sm" className="w-full bg-[#c4703f] text-black hover:bg-[#c4703f]/90 text-xs">
+              <Button
+                size="sm"
+                className="w-full bg-[#c4703f] text-xs text-black hover:bg-[#c4703f]/90"
+              >
                 <Crown className="mr-1.5 h-3 w-3" />
                 Upgrade to Pro
               </Button>
@@ -440,7 +505,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
 
           {/* Show what Pro includes for free users */}
           {isLoggedIn && !isProLoading && !isPro && (
-            <p className="text-[10px] text-zinc-500 mt-2 text-center">
+            <p className="text-muted-foreground mt-2 text-center text-[10px]">
               Personalized roadmap is a Pro feature
             </p>
           )}
@@ -450,14 +515,19 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
         {!isLoggedIn && (
           <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4">
             <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
               <div>
-                <h3 className="text-sm font-medium text-amber-400 mb-1">Interview coming up?</h3>
-                <p className="text-xs text-zinc-400 mb-3">
-                  The average {company.name} candidate needs {Math.ceil(company.mustKnowQuestions.length * 2.5)} hours to cover all patterns.
+                <h3 className="mb-1 text-sm font-medium text-amber-400">Interview coming up?</h3>
+                <p className="text-muted-foreground mb-3 text-xs">
+                  The average {company.name} candidate needs{" "}
+                  {Math.ceil(company.mustKnowQuestions.length * 2.5)} hours to cover all patterns.
                 </p>
                 <Link href={`/login?redirect=/interview-prep/${company.id}`}>
-                  <Button size="sm" variant="outline" className="w-full border-amber-700 text-amber-400 hover:bg-amber-900/30 text-xs">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full border-amber-700 text-xs text-amber-400 hover:bg-amber-900/30"
+                  >
                     Start preparing now
                   </Button>
                 </Link>
@@ -487,26 +557,24 @@ function LockedContentOverlay({
   return (
     <div className="relative mt-2">
       {/* Blur overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-zinc-900/70 to-zinc-900 z-10 rounded-lg pointer-events-none" />
+      <div className="via-background/70 to-background pointer-events-none absolute inset-0 z-10 rounded-lg bg-gradient-to-b from-transparent" />
 
       {/* Blurred preview content */}
-      <div className="blur-[2px] opacity-40 pointer-events-none select-none space-y-2">
+      <div className="pointer-events-none space-y-2 opacity-40 blur-[2px] select-none">
         {previewItems}
       </div>
 
       {/* Lock CTA */}
       <div className="absolute inset-0 z-20 flex items-center justify-center">
         <Link href={`/login?redirect=/interview-prep/${companyId}`}>
-          <div className="rounded-xl border border-zinc-700 bg-zinc-900/95 px-5 py-4 text-center backdrop-blur-sm hover:border-zinc-600 transition-colors cursor-pointer group">
-            <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
-              <Lock className="h-4 w-4 text-zinc-400" />
+          <div className="border-border bg-popover/95 hover:border-border group cursor-pointer rounded-xl border px-5 py-4 text-center backdrop-blur-sm transition-colors">
+            <div className="bg-muted group-hover:bg-accent/20 mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full transition-colors">
+              <Lock className="text-muted-foreground h-4 w-4" />
             </div>
-            <p className="text-sm text-white font-medium mb-0.5">
+            <p className="text-foreground mb-0.5 text-sm font-medium">
               +{count} more {contentType}
             </p>
-            <p className="text-xs text-zinc-500">
-              Sign up free to unlock
-            </p>
+            <p className="text-muted-foreground text-xs">Sign up free to unlock</p>
           </div>
         </Link>
       </div>

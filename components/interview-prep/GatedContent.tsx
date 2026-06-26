@@ -43,23 +43,21 @@ export function GatedContent({
       {/* Blurred/Locked Section */}
       <div className="relative mt-2">
         {/* Blur overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-zinc-900/80 to-zinc-900 z-10 rounded-lg" />
+        <div className="via-background/80 to-background absolute inset-0 z-10 rounded-lg bg-gradient-to-b from-transparent" />
 
         {/* Blurred content preview */}
-        <div className="blur-sm opacity-50 pointer-events-none select-none">
-          {lockedContent}
-        </div>
+        <div className="pointer-events-none opacity-50 blur-sm select-none">{lockedContent}</div>
 
         {/* Lock CTA overlay */}
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4">
-          <div className="rounded-xl border border-zinc-700 bg-zinc-900/95 p-6 text-center max-w-sm backdrop-blur-sm">
-            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800">
-              <Lock className="h-5 w-5 text-zinc-400" />
+          <div className="border-border bg-popover/95 max-w-sm rounded-xl border p-6 text-center backdrop-blur-sm">
+            <div className="bg-muted mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full">
+              <Lock className="text-muted-foreground h-5 w-5" />
             </div>
-            <h3 className="text-white font-medium mb-1">
+            <h3 className="text-foreground mb-1 font-medium">
               +{lockedCount} more {contentType}
             </h3>
-            <p className="text-sm text-zinc-400 mb-4">
+            <p className="text-muted-foreground mb-4 text-sm">
               Sign up free to unlock the full {companyName} interview guide
             </p>
             <Link href={`/login?redirect=/interview-prep/${companyId}`}>
@@ -98,18 +96,16 @@ export function GatedSidebar({
   return (
     <div className="relative">
       {/* Blur overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900/90 z-10 rounded-lg" />
+      <div className="to-background/90 absolute inset-0 z-10 rounded-lg bg-gradient-to-b from-transparent" />
 
       {/* Blurred content */}
-      <div className="blur-sm opacity-40 pointer-events-none select-none">
-        {children}
-      </div>
+      <div className="pointer-events-none opacity-40 blur-sm select-none">{children}</div>
 
       {/* Lock overlay */}
       {showTeaser && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <Link href={`/login?redirect=/interview-prep/${companyId}`} className="group">
-            <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/95 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors">
+            <div className="border-border bg-popover/95 text-muted-foreground hover:border-border hover:text-foreground flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors">
               <Lock className="h-3.5 w-3.5" />
               {teaserText}
             </div>
@@ -128,12 +124,13 @@ export function SocialProofBanner({ companyName }: { companyName: string }) {
   // Generate a realistic-looking number based on company name (deterministic)
   const hash = companyName.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
   const baseCount = 1200 + (hash % 800)
-  const monthlyCount = Math.floor(baseCount + (Date.now() / 1000000000) % 500)
+  const monthlyCount = Math.floor(baseCount + ((Date.now() / 1000000000) % 500))
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 mb-4">
-      <p className="text-xs text-zinc-400 text-center">
-        <span className="text-emerald-400 font-medium">{monthlyCount.toLocaleString()}</span> engineers prepared for {companyName} this month
+    <div className="border-border bg-card mb-4 rounded-lg border p-3">
+      <p className="text-muted-foreground text-center text-xs">
+        <span className="font-medium text-emerald-400">{monthlyCount.toLocaleString()}</span>{" "}
+        engineers prepared for {companyName} this month
       </p>
     </div>
   )

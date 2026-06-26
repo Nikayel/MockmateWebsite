@@ -71,8 +71,8 @@ export function CompanyHeroCTA({ companyId, careersUrl }: CompanyHeroCTAProps) {
         </Link>
       ) : isProLoading ? (
         // Loading state - show neutral button while checking Pro status
-        <Button className="bg-zinc-700 text-zinc-300 cursor-wait" disabled>
-          <span className="inline-block h-4 w-4 mr-2 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+        <Button className="cursor-wait bg-zinc-700 text-zinc-300" disabled>
+          <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-500 border-t-transparent" />
           Create study plan
         </Button>
       ) : isPro ? (
@@ -95,7 +95,10 @@ export function CompanyHeroCTA({ companyId, careersUrl }: CompanyHeroCTAProps) {
       )}
 
       <a href={careersUrl} target="_blank" rel="noopener noreferrer">
-        <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+        <Button
+          variant="outline"
+          className="border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
           Careers page
           <ExternalLink className="ml-2 h-3 w-3" />
         </Button>

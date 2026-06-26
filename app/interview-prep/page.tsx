@@ -68,10 +68,10 @@ export default function InterviewPrepPage() {
       <section className="pt-24 pb-8">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-3xl">
-            <h1 className="font-heading mb-4 text-3xl font-semibold text-white md:text-4xl">
+            <h1 className="font-heading text-foreground mb-4 text-3xl font-semibold md:text-4xl">
               Interview prep by company
             </h1>
-            <p className="text-lg text-zinc-400">
+            <p className="text-muted-foreground text-lg">
               Different companies, different patterns. Pick yours.
             </p>
           </div>
@@ -84,8 +84,8 @@ export default function InterviewPrepPage() {
           <div className="container mx-auto px-4">
             <div className="mx-auto max-w-5xl">
               <div className="mb-6">
-                <h2 className="text-xl font-medium text-white">{tier.name}</h2>
-                <p className="text-sm text-zinc-500">{tier.description}</p>
+                <h2 className="text-foreground text-xl font-medium">{tier.name}</h2>
+                <p className="text-muted-foreground text-sm">{tier.description}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -95,12 +95,12 @@ export default function InterviewPrepPage() {
 
                   return (
                     <Link key={company.id} href={`/interview-prep/${company.id}`}>
-                      <div className="group flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700 hover:bg-zinc-900">
+                      <div className="group border-border bg-card hover:border-border hover:bg-muted flex items-center justify-between rounded-lg border p-4 transition-colors">
                         <div>
-                          <div className="font-medium text-white group-hover:text-emerald-400 transition-colors">
+                          <div className="text-foreground font-medium transition-colors group-hover:text-emerald-400">
                             {company.name}
                           </div>
-                          <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+                          <div className="text-muted-foreground mt-1 flex items-center gap-3 text-xs">
                             <span>{company.topPatterns.length} patterns</span>
                             <span>·</span>
                             <span>{company.interviewProcess.timeline}</span>
@@ -108,10 +108,12 @@ export default function InterviewPrepPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {/* Simple difficulty indicator */}
-                          <span className={`text-xs ${getDifficultyColor(company.difficultyDistribution)}`}>
+                          <span
+                            className={`text-xs ${getDifficultyColor(company.difficultyDistribution)}`}
+                          >
                             {company.difficultyDistribution.hard}% hard
                           </span>
-                          <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                          <ArrowRight className="text-muted-foreground/70 group-hover:text-foreground h-4 w-4 transition-colors" />
                         </div>
                       </div>
                     </Link>
@@ -124,29 +126,29 @@ export default function InterviewPrepPage() {
       ))}
 
       {/* Personalized Roadmap Value Prop */}
-      <section className="border-t border-zinc-800 py-16">
+      <section className="border-border border-t py-16">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-3xl">
-            <h2 className="text-2xl font-semibold text-white mb-2">
+            <h2 className="text-foreground mb-2 text-2xl font-semibold">
               Your interview. Your timeline. Your plan.
             </h2>
-            <p className="text-zinc-400 mb-8">
-              Tell us when your interview is and we'll build a day-by-day study schedule
-              that prioritizes what matters most for your target company.
+            <p className="text-muted-foreground mb-8">
+              Tell us when your interview is and we'll build a day-by-day study schedule that
+              prioritizes what matters most for your target company.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="text-sm">
-                <div className="text-white font-medium mb-1">Interview date</div>
-                <div className="text-zinc-500">We work backwards from your deadline</div>
+                <div className="text-foreground mb-1 font-medium">Interview date</div>
+                <div className="text-muted-foreground">We work backwards from your deadline</div>
               </div>
               <div className="text-sm">
-                <div className="text-white font-medium mb-1">Your skill level</div>
-                <div className="text-zinc-500">Skip what you know, focus on gaps</div>
+                <div className="text-foreground mb-1 font-medium">Your skill level</div>
+                <div className="text-muted-foreground">Skip what you know, focus on gaps</div>
               </div>
               <div className="text-sm">
-                <div className="text-white font-medium mb-1">Company patterns</div>
-                <div className="text-zinc-500">Prioritized by what they actually ask</div>
+                <div className="text-foreground mb-1 font-medium">Company patterns</div>
+                <div className="text-muted-foreground">Prioritized by what they actually ask</div>
               </div>
             </div>
 
