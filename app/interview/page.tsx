@@ -12,9 +12,7 @@ import { collection, getDocs, query, where } from "firebase/firestore"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import {
-  recordSessionStart,
   getUserProfile,
-  createInterviewSession,
   updateInterviewSession,
   saveSessionState,
   getSessionState,
@@ -80,6 +78,8 @@ import { useInterviewPhaseTracking } from "./_hooks/useInterviewPhaseTracking"
 import { useInterviewChat } from "./_hooks/useInterviewChat"
 import { useInterviewProactiveAI } from "./_hooks/useInterviewProactiveAI"
 import { useInterviewMetrics } from "./_hooks/useInterviewMetrics"
+import { useInterviewSessionStart } from "./_hooks/useInterviewSessionStart"
+import { useInterviewSessionReset } from "./_hooks/useInterviewSessionReset"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -1902,6 +1902,113 @@ Let's continue!`
     getCachedUserProfile,
   })
 
+  const { startInterview } = useInterviewSessionStart({
+    router,
+    user,
+    firebaseUser,
+    isGuestMode,
+    guestId,
+    usageLimit,
+    refreshUsageLimit,
+    selectedScenario,
+    targetCompany,
+    activeRoadmap,
+    selectedLanguage,
+    setSelectedScenario,
+    setShowOptimalApproach,
+    setTargetCompany,
+    setLockedCompanyForPicker,
+    setShowCompanyPicker,
+    setCurrentSessionId,
+    setIsInterviewStarted,
+    setShowScenarioBrowser,
+    setStartTime,
+    setTestResults,
+    setTestSummary,
+    setEfficiencyMetrics,
+    setElapsedTime,
+    setRevealedHints,
+    setRevealedHintIndices,
+    setRevealedAIHintIndices,
+    setHintFeedback,
+    setWorkspaceContext,
+    setActiveWorkspacePath,
+    setComprehensiveFeedback,
+    setPerformanceScore,
+    setTechnicalScore,
+    setScoreBreakdown,
+    setSelectedLanguage,
+    setCode,
+    setStarterCode,
+    setBugfixEvidenceEvents,
+    setProtectedElements,
+    setInterviewerMessages,
+    setRecentNudgeTopics,
+    setChatMessages,
+    hintAgent,
+    resetBugfixSessionState,
+  })
+
+  const { resetInterview } = useInterviewSessionReset({
+    user,
+    firebaseUser,
+    selectedScenario,
+    selectedLanguage,
+    currentSessionId,
+    showFeedback,
+    showPostInterviewDiscussion,
+    testSummary,
+    performanceScore,
+    comprehensiveFeedback,
+    code,
+    testResults,
+    efficiencyMetrics,
+    technicalScore,
+    scoreBreakdown,
+    structuredFeedback,
+    clarifyingQuestionsAssessment,
+    streamingFeedback,
+    setCurrentSessionId,
+    setIsInterviewStarted,
+    setShowScenarioBrowser,
+    setStartTime,
+    setTestResults,
+    setTestSummary,
+    setEfficiencyMetrics,
+    setElapsedTime,
+    setRevealedHints,
+    setRevealedHintIndices,
+    setRevealedAIHintIndices,
+    setHintFeedback,
+    setWorkspaceContext,
+    setActiveWorkspacePath,
+    setComprehensiveFeedback,
+    setPerformanceScore,
+    setTechnicalScore,
+    setScoreBreakdown,
+    setCode,
+    setStarterCode,
+    setProtectedElements,
+    setInterviewerMessages,
+    setRecentNudgeTopics,
+    setChatMessages,
+    setShowFeedback,
+    setShowPostInterviewDiscussion,
+    setIsGeneratingDiscussion,
+    hintAgent,
+    resetBugfixSessionState,
+    interviewerVoice,
+    partnerVoice,
+    proactiveTimer,
+    setProactiveTimer,
+    inactivityTimerRef,
+    hasTriggeredInactivityRef,
+    hasFetchedHintsRef,
+    lastCodeChangeRef,
+    lastCodeHashRef,
+    resetProactiveState,
+  })
+
   const triggerPostInterviewDiscussion = async (testResults: TestResult[], summary: any) => {
     setIsGeneratingDiscussion(true)
 
@@ -2072,525 +2179,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       setWorkspaceContext((prev) => [...prev, ...newFiles])
       toast.success(`Added ${newFiles.length} file(s) to workspace context`)
     }
-  }
-
-  const startInterview = async (
-    scenarioOverride?: Scenario,
-    companyOverride?: InterviewTargetCompany
-  ) => {
-    // Use passed scenario if provided, otherwise use state (handles race condition)
-    const scenario = scenarioOverride || selectedScenario
-
-    if (!scenario) {
-      toast.error("Please select a scenario first")
-      return
-    }
-
-    // If we received a scenario override, update state
-    if (scenarioOverride) {
-      setSelectedScenario(scenarioOverride)
-      setShowOptimalApproach(false) // Reset optimal approach visibility for new scenario
-    }
-
-    // Determine target company:
-    // 1. If override provided (from company picker), use it
-    // 2. If from roadmap, use roadmap's target company (but show picker if fuzzy)
-    // 3. If freeball with multiple companies and no selection, show picker
-    // 4. If freeball with single company, use that company
-    // 5. Otherwise, use "freeball" (generic)
-    let effectiveTargetCompany: InterviewTargetCompany = companyOverride ?? targetCompany
-    const hasFuzzyMode = !!(scenario as any).fuzzyStatement
-
-    if (!effectiveTargetCompany) {
-      // Check if coming from roadmap
-      if (activeRoadmap?.targetCompany) {
-        // If scenario has fuzzy mode, show picker to ask about Real Interview Mode
-        // Company is pre-selected/locked from roadmap
-        if (hasFuzzyMode) {
-          setLockedCompanyForPicker(activeRoadmap.targetCompany)
-          setShowCompanyPicker(true)
-          return // Wait for user to choose Real Interview Mode
-        }
-        effectiveTargetCompany = activeRoadmap.targetCompany
-      }
-      // Check if scenario has companies tagged
-      else if (scenario.companies && scenario.companies.length > 0) {
-        if (scenario.companies.length === 1) {
-          // Single company - auto-select it
-          effectiveTargetCompany = scenario.companies[0].toLowerCase() as CompanyId
-        } else {
-          // Multiple companies - show picker
-          setLockedCompanyForPicker(null) // Not locked, let user choose
-          setShowCompanyPicker(true)
-          return // Wait for user to pick
-        }
-      } else {
-        // No companies tagged - freeball
-        effectiveTargetCompany = "freeball"
-      }
-    }
-
-    // Store the target company in state
-    setTargetCompany(effectiveTargetCompany)
-
-    // Check usage limit before starting - redirect to limit page (skip for DSA questions)
-    if (isUsageBlocked(!!user, usageLimit, scenario.type)) {
-      router.push("/limit-reached")
-      return
-    }
-
-    // Create session and increment usage when starting interview
-    // DSA questions don't count against session limit
-    if (user) {
-      try {
-        // Create session document first
-        // Include pattern for stats aggregation (used by dashboard Performance Insights)
-        const scenarioPattern =
-          ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
-        const sessionId = await createInterviewSession(
-          user.id,
-          scenario.title,
-          scenario.type,
-          scenario.difficulty,
-          scenario.id,
-          scenarioPattern,
-          effectiveTargetCompany // Pass target company for RAG + analytics
-        )
-        setCurrentSessionId(sessionId)
-
-        // Initialize session metrics tracking (required for completion tracking)
-        const token = await firebaseUser?.getIdToken()
-        if (token) {
-          fetch("/api/session/metrics", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              event: "session_start",
-              sessionId,
-              data: {
-                scenarioId: scenario.id,
-                scenarioTitle: scenario.title,
-                pattern: ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown",
-                difficulty: scenario.difficulty,
-                scenarioType: scenario.type,
-                hintsTotal: (scenario as any).hints?.length || 3,
-              },
-            }),
-          }).catch((err) => console.error("Session metrics init failed:", err))
-        }
-
-        // Record session start (uses free opens or consumes 1 usage)
-        const result = await recordSessionStart(user.id)
-        if (result.usedPaidSession) {
-          toast.success(`Session started! You now have ${result.freeOpensRemaining} free opens.`)
-        }
-        // Refresh usage limit
-        await refreshUsageLimit(user.id)
-      } catch (error) {
-        console.error("Error creating session:", error)
-        toast.error("Session tracking error", {
-          description: "Your progress will still be saved locally. You can continue the interview.",
-        })
-      }
-    } else if (isGuestMode && guestId) {
-      // Guest user - create session via API
-      try {
-        const scenarioPattern =
-          ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
-        const response = await fetch("/api/guest-session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            guestId,
-            scenarioTitle: scenario.title,
-            scenarioType: scenario.type,
-            scenarioId: scenario.id,
-            difficulty: scenario.difficulty,
-            pattern: scenarioPattern,
-            targetCompany: effectiveTargetCompany, // Pass target company for RAG + analytics
-          }),
-        })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          if (data.code === "FREE_TRIAL_EXHAUSTED") {
-            toast.error("Free trial already used", {
-              description: "Sign up to continue practicing!",
-            })
-            markFreeTrialUsed()
-            router.push("/login?redirect=interview")
-            return
-          }
-          throw new Error(data.error || "Failed to create session")
-        }
-
-        setCurrentSessionId(data.sessionId)
-
-        // Save initial guest session data to localStorage
-        saveGuestSessionData({
-          sessionId: data.sessionId,
-          scenarioId: scenario.id,
-          scenarioTitle: scenario.title,
-          startedAt: new Date().toISOString(),
-        })
-
-        toast.success("Free trial session started!", {
-          description: "Complete the interview to see your personalized feedback.",
-        })
-      } catch (error) {
-        console.error("Error creating guest session:", error)
-        toast.error("Session tracking error", {
-          description: "Your progress will still be saved locally. You can continue the interview.",
-        })
-      }
-    }
-
-    setIsInterviewStarted(true)
-    setShowScenarioBrowser(false)
-    setStartTime(Date.now())
-
-    // Clear previous session's test results and metrics (fixes terminal persistence bug)
-    setTestResults([])
-    setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
-    setEfficiencyMetrics(null)
-    setElapsedTime(0)
-    setRevealedHints(0)
-    setRevealedHintIndices(new Set())
-    hintAgent.resetHints()
-    setRevealedAIHintIndices(new Set())
-    setHintFeedback(new Map())
-    setWorkspaceContext([])
-    setActiveWorkspacePath(null)
-    resetBugfixSessionState()
-    setComprehensiveFeedback("")
-    setPerformanceScore(null)
-    setTechnicalScore(null)
-    setScoreBreakdown(null)
-
-    // Initialize code based on scenario type
-    let initialCode: string
-    let activeLanguage = selectedLanguage
-    let initialBugfixFileEvent: BugfixEvidenceEvent | null = null
-    if (isWorkspaceScenario(scenario)) {
-      activeLanguage = scenario.workspace.language
-      if (activeLanguage !== selectedLanguage) {
-        setSelectedLanguage(activeLanguage)
-      }
-      const contextFiles = toWorkspaceScenarioFiles(scenario)
-      const primaryFile = contextFiles.find(
-        (file) => file.path === scenario.workspace.primaryFilePath
-      )
-      initialCode = primaryFile?.content || ""
-      setWorkspaceContext(contextFiles)
-      setActiveWorkspacePath(primaryFile?.path || scenario.workspace.primaryFilePath)
-      if (scenario.type === "bugfix" && primaryFile) {
-        initialBugfixFileEvent = createBugfixEvidenceEvent({
-          type:
-            primaryFile.role === "test" || primaryFile.role === "docs"
-              ? "test_or_doc_opened"
-              : "file_opened",
-          filePath: primaryFile.path,
-          fileRole: primaryFile.role,
-          timestamp: Date.now() + 2,
-        })
-      }
-      toast.success(`Loaded ${contextFiles.length} codebase file(s) for review`)
-    } else if (scenario.type === "bugfix") {
-      activeLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
-      if (activeLanguage !== selectedLanguage) {
-        setSelectedLanguage(activeLanguage)
-        toast.info(`Switched to ${activeLanguage} for this bugfix codebase`)
-      }
-
-      // For bug fixes, load buggy code
-      initialCode =
-        (scenario as any).buggyCode?.[activeLanguage] ||
-        `// Bug fix code not available for ${activeLanguage}`
-
-      // Auto-load codebase files into workspace context for bug fixes
-      const codebaseFiles = (scenario as any).codebaseFiles?.[activeLanguage] || []
-      if (codebaseFiles.length > 0) {
-        const contextFiles = toWorkspaceContextFiles(codebaseFiles)
-        setWorkspaceContext(contextFiles)
-        toast.success(`Loaded ${contextFiles.length} codebase file(s) for review`)
-      }
-    } else if (scenario.type === "add-functionality") {
-      // For Add Functionality scenarios, load existing code to extend
-      initialCode =
-        (scenario as any).existingCode?.[selectedLanguage] ||
-        `// Add functionality to the existing codebase`
-
-      // Auto-load codebase files into workspace context
-      const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
-      if (codebaseFiles.length > 0) {
-        const contextFiles = toWorkspaceContextFiles(codebaseFiles)
-        setWorkspaceContext(contextFiles)
-        toast.success(
-          `Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`
-        )
-      }
-    } else if (scenario.type === "system-design") {
-      // For system design, provide a design notes template
-      initialCode = `// DESIGN NOTES: ${scenario.title}
-// Use this space to document your design decisions
-
-/* ============================================
-   1. REQUIREMENTS CLARIFICATION
-   ============================================ */
-// Functional:
-// -
-//
-// Non-Functional:
-// - Scale:
-// - Latency:
-// - Availability:
-
-/* ============================================
-   2. HIGH-LEVEL ARCHITECTURE
-   ============================================ */
-// Key Components:
-// 1.
-// 2.
-// 3.
-
-/* ============================================
-   3. DATA MODEL
-   ============================================ */
-// Tables/Collections:
-//
-
-/* ============================================
-   4. API DESIGN
-   ============================================ */
-// Endpoints:
-// POST /api/...
-// GET /api/...
-
-/* ============================================
-   5. SCALING & TRADE-OFFS
-   ============================================ */
-// -
-`
-    } else {
-      // For DSA problems, load starter code
-      initialCode =
-        (scenario as any).starterCode?.[selectedLanguage] ||
-        `function solution() {
-  // Write your solution here
-
-}`
-    }
-    setCode(initialCode)
-    setStarterCode(initialCode)
-
-    if (scenario.type === "bugfix") {
-      const startedAt = Date.now()
-      setBugfixEvidenceEvents([
-        createBugfixEvidenceEvent({
-          type: "session_started",
-          timestamp: startedAt,
-        }),
-        createBugfixEvidenceEvent({
-          type: "incident_read",
-          timestamp: startedAt + 1,
-        }),
-        ...(initialBugfixFileEvent ? [initialBugfixFileEvent] : []),
-      ])
-    }
-
-    // Extract protected elements for code protection
-    const protectedElementsData = extractProtectedElements(initialCode, activeLanguage)
-    setProtectedElements(protectedElementsData)
-
-    // Initialize interviewer with welcome message (problem details are now in left panel)
-    const problemType = getProblemTypeLabel(scenario.type)
-    const initialMessage = getInitialInterviewerMessage(
-      scenario.title,
-      scenario.difficulty,
-      problemType
-    )
-
-    setInterviewerMessages([{ type: "ai", message: initialMessage }])
-    setRecentNudgeTopics([]) // Reset tracked topics for new interview
-    // Only set chat messages for non-DSA scenarios (DSA has no AI partner)
-    const partnerMessage = getInitialPartnerMessage(scenario)
-    if (partnerMessage) {
-      setChatMessages([{ type: "ai", message: partnerMessage }])
-    } else {
-      setChatMessages([]) // Clear chat messages for DSA
-    }
-
-    // Don't fetch hints immediately - wait for user to write code
-    // Hints will be fetched when user has written meaningful code (see useEffect below)
-  }
-
-  const resetInterview = async () => {
-    // Update session if it exists and was completed
-    const isSystemDesign = selectedScenario?.type === "system-design"
-    const hasTests = testSummary.total > 0
-    const shouldUpdate =
-      currentSessionId &&
-      (showFeedback || showPostInterviewDiscussion) &&
-      (hasTests || isSystemDesign)
-
-    if (shouldUpdate) {
-      try {
-        // IMPORTANT: Only update session if feedback has NOT been persisted by the streaming flow
-        // The persist endpoint saves the authoritative feedback/scores to Firestore
-        // We should NOT overwrite that data with potentially stale React state
-        const feedbackWasPersisted = streamingFeedback.state.isPersisted
-
-        if (!feedbackWasPersisted) {
-          // Feedback wasn't persisted (maybe user left early or streaming failed)
-          // Save whatever we have as a fallback
-          const scoreToSave =
-            performanceScore !== null ? performanceScore : hasTests ? testSummary.passRate : 0
-          const feedbackText = isSystemDesign
-            ? comprehensiveFeedback ||
-              `Completed system design interview: ${selectedScenario?.title}`
-            : comprehensiveFeedback ||
-              `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
-
-          await updateInterviewSession(currentSessionId, scoreToSave, feedbackText, {
-            code: code || (isSystemDesign ? "// Design notes" : ""),
-            language: isSystemDesign ? "notes" : selectedLanguage,
-            testResults: hasTests ? testResults : undefined,
-            timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
-            spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
-            efficiencyScore: efficiencyMetrics?.efficiencyScore,
-            feedbackStatus: "complete", // Mark as complete even if fallback
-            technicalScore: technicalScore ?? undefined,
-            scoreBreakdown: scoreBreakdown
-              ? {
-                  understanding: scoreBreakdown.understandingScore,
-                  problemSolving: scoreBreakdown.problemSolvingScore,
-                  codeQuality: scoreBreakdown.codeQualityScore,
-                  communication: scoreBreakdown.communicationScore,
-                }
-              : undefined,
-            structuredFeedback: structuredFeedback
-              ? {
-                  ...structuredFeedback,
-                  rawFeedback: feedbackText,
-                }
-              : undefined,
-            clarifyingQuestionsAssessment: clarifyingQuestionsAssessment || undefined,
-          })
-        }
-        // If feedbackWasPersisted is true, the persist endpoint already saved the correct data
-        // to Firestore, so we don't need to do anything here
-
-        // Store system design notes if not already stored (this is separate from feedback)
-        if (isSystemDesign && selectedScenario?.id && user) {
-          const scoreForRag =
-            performanceScore !== null ? performanceScore : hasTests ? testSummary.passRate : 0
-          fetch("/api/rag", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "store-solution",
-              userId: user.id,
-              problemId: selectedScenario.id,
-              problemTitle: selectedScenario.title,
-              solutionCode: code.trim() || "// Design discussion completed via chat",
-              language: "notes",
-              passed: true,
-              score: scoreForRag,
-              problemType: "system-design",
-            }),
-          }).catch((err) => {
-            console.error("System design solution storage error (non-blocking):", err)
-          })
-        }
-      } catch (error) {
-        console.error("Error updating session:", error)
-        // Silent failure - session data is also saved locally
-      }
-    }
-
-    // CodeMirror 6 handles cleanup automatically through React lifecycle
-
-    // Clear URL params when resetting
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href)
-      url.searchParams.delete("session")
-      url.searchParams.delete("scenario")
-      window.history.replaceState({}, "", url.toString())
-    }
-
-    // Clear auto-save data to prevent "session restored" toast on next visit
-    if (firebaseUser && selectedScenario) {
-      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-      try {
-        localStorage.removeItem(storageKey)
-      } catch (e) {
-        // Silent failure - localStorage might be unavailable
-      }
-    }
-
-    // Stop any active voice recordings and countdowns to prevent Deepgram billing
-    interviewerVoice.cancelCountdown()
-    partnerVoice.cancelCountdown()
-    if (interviewerVoice.isRecording) {
-      interviewerVoice.stopRecording()
-    }
-    if (partnerVoice.isRecording) {
-      partnerVoice.stopRecording()
-    }
-
-    // Clear all proactive interview timers
-    if (proactiveTimer) {
-      clearTimeout(proactiveTimer)
-      setProactiveTimer(null)
-    }
-    if (inactivityTimerRef.current) {
-      clearInterval(inactivityTimerRef.current)
-      inactivityTimerRef.current = null
-    }
-    // Silence-detection teardown + flag reset is owned by useInterviewProactiveAI
-    resetProactiveState()
-
-    // Reset proactive trigger flags
-    hasTriggeredInactivityRef.current = false
-    hasFetchedHintsRef.current = false
-    lastCodeChangeRef.current = Date.now()
-
-    setIsInterviewStarted(false)
-    setShowFeedback(false)
-    setShowPostInterviewDiscussion(false)
-    setComprehensiveFeedback("")
-    setPerformanceScore(null)
-    setTechnicalScore(null)
-    setScoreBreakdown(null)
-    setIsGeneratingDiscussion(false)
-    setShowScenarioBrowser(true)
-    setCode("")
-    setInterviewerMessages([])
-    setChatMessages([])
-    setRecentNudgeTopics([])
-    setTestResults([])
-    setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
-    setStartTime(null)
-    setElapsedTime(0)
-    lastCodeHashRef.current = ""
-    setCurrentSessionId(null)
-    setRevealedHints(0)
-    setRevealedHintIndices(new Set())
-    hintAgent.resetHints()
-    setRevealedAIHintIndices(new Set())
-    setHintFeedback(new Map())
-    setWorkspaceContext([])
-    setActiveWorkspacePath(null)
-    resetBugfixSessionState()
-    setEfficiencyMetrics(null)
-    setProtectedElements(null)
-    setStarterCode("")
   }
 
   const proceedToFinalFeedback = async () => {
