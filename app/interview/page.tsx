@@ -14,9 +14,6 @@ import type { Profile } from "@/lib/types"
 import {
   getUserProfile,
   updateInterviewSession,
-  saveSessionState,
-  getSessionState,
-  findLatestSubmittedSession,
   markSessionEvaluating,
 } from "@/lib/firestore-helpers"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
@@ -24,7 +21,7 @@ import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
-import { getScenarioById, type Scenario } from "@/lib/scenarios"
+import { type Scenario } from "@/lib/scenarios"
 import type { BugFixScenario } from "@/lib/scenarios/types"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
@@ -49,11 +46,7 @@ import type { ProblemColumnCtx } from "./_components/ProblemColumn"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
-import {
-  getInitialInterviewerMessage,
-  getInitialPartnerMessage,
-  getProblemTypeLabel,
-} from "./_utils/interview-messages"
+import { getInitialPartnerMessage, getProblemTypeLabel } from "./_utils/interview-messages"
 import { EDITOR_LANGUAGES, getBugfixScenarioLanguage, type EditorLanguage } from "./_utils/language"
 import {
   isWorkspaceScenario,
@@ -80,6 +73,9 @@ import { useInterviewProactiveAI } from "./_hooks/useInterviewProactiveAI"
 import { useInterviewMetrics } from "./_hooks/useInterviewMetrics"
 import { useInterviewSessionStart } from "./_hooks/useInterviewSessionStart"
 import { useInterviewSessionReset } from "./_hooks/useInterviewSessionReset"
+import { useSessionReopen } from "./_hooks/useSessionReopen"
+import { useInterviewAutosave } from "./_hooks/useInterviewAutosave"
+import { useSessionRestore } from "./_hooks/useSessionRestore"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -807,333 +803,6 @@ function InterviewPageContent() {
     loadCompletedProblems()
   }, [firebaseUser])
 
-  // Check authentication and usage limit, handle session reopening
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (authLoading || !initialized || !authCheckComplete) return
-
-      if (!firebaseUser) {
-        // Check if guest can start free trial
-        const canTrial = canStartGuestTrial()
-        if (canTrial) {
-          // Allow guest mode
-          enterGuestMode()
-          setIsLoading(false)
-          return
-        } else {
-          // Free trial already used, require signup
-          router.push("/login?redirect=interview&message=trial-used")
-          return
-        }
-      }
-
-      // Authenticated user - disable guest mode if it was set
-      exitGuestMode()
-
-      // Check usage limit
-      await refreshUsageLimit(firebaseUser.uid)
-
-      // Check if we're reopening a session or starting from roadmap
-      const sessionId = searchParams?.get("session")
-      const scenarioId = searchParams?.get("scenario")
-      const fromRoadmap = searchParams?.get("roadmap") === "true"
-      const fromPractice = searchParams?.get("practice") === "true"
-      const isPostInterviewResume = searchParams?.get("postInterview") === "true"
-
-      // Case 1: Reopening an existing session
-      if (sessionId && scenarioId) {
-        // Load the scenario and reopen the session
-        const scenario = getScenarioById(scenarioId)
-        if (scenario) {
-          setSelectedScenario(scenario)
-          setShowOptimalApproach(false) // Reset optimal approach visibility
-          setCurrentSessionId(sessionId)
-          setShowScenarioBrowser(false)
-
-          // Check if there's saved session state FIRST before starting interview
-          const savedState = await getSessionState(sessionId)
-
-          // Restore Real Interview Mode and strict time limit settings EARLY
-          // This needs to happen before rendering so the UI shows the correct problem statement
-          if (savedState?.realInterviewMode !== undefined) {
-            useInterviewStore.getState().setRealInterviewMode(savedState.realInterviewMode)
-          }
-          if (savedState?.strictTimeLimit !== undefined) {
-            useInterviewStore.getState().setStrictTimeLimit(savedState.strictTimeLimit)
-          }
-
-          // Now start the interview with restored state
-          setIsInterviewStarted(true)
-          setStartTime(Date.now())
-
-          // CRITICAL: If session is completed or evaluating, redirect to results page
-          // This prevents users from being put back into interview mode
-          if (savedState?.completedAt || savedState?.feedbackStatus === "pending") {
-            toast.info(
-              savedState?.feedbackStatus === "pending"
-                ? "Session is being evaluated"
-                : "Session already submitted",
-              { description: "Redirecting to your results..." }
-            )
-            router.push(`/sessions/${sessionId}`)
-            return
-          }
-
-          const hasExistingProgress =
-            savedState &&
-            ((savedState.interviewerMessages && savedState.interviewerMessages.length > 1) ||
-              (savedState.chatMessages && savedState.chatMessages.length > 1) ||
-              (savedState.elapsedTime && savedState.elapsedTime > 60))
-
-          // Initialize code based on scenario type
-          let initialCode: string
-          if (isWorkspaceScenario(scenario)) {
-            const scenarioLanguage = scenario.workspace.language
-            if (scenarioLanguage !== selectedLanguage) {
-              setSelectedLanguage(scenarioLanguage)
-            }
-            const contextFiles =
-              hasExistingProgress && savedState?.workspaceContext?.length
-                ? (savedState.workspaceContext as WorkspaceContextFile[])
-                : toWorkspaceScenarioFiles(scenario)
-            const activePath =
-              savedState?.activeWorkspacePath ||
-              scenario.workspace.primaryFilePath ||
-              contextFiles[0]?.path
-            const activeFile =
-              contextFiles.find((file) => file.path === activePath) ||
-              contextFiles.find((file) => file.path === scenario.workspace.primaryFilePath) ||
-              contextFiles[0]
-
-            initialCode = activeFile?.content || ""
-            setWorkspaceContext(contextFiles)
-            setActiveWorkspacePath(activeFile?.path || scenario.workspace.primaryFilePath)
-          } else if (scenario.type === "bugfix") {
-            const scenarioLanguage = getBugfixScenarioLanguage(scenario, selectedLanguage)
-            if (scenarioLanguage !== selectedLanguage) {
-              setSelectedLanguage(scenarioLanguage)
-            }
-            initialCode =
-              (scenario as any).buggyCode?.[scenarioLanguage] ||
-              `// Bug fix code not available for ${scenarioLanguage}`
-            const codebaseFiles = (scenario as any).codebaseFiles?.[scenarioLanguage] || []
-            if (codebaseFiles.length > 0) {
-              setWorkspaceContext(toWorkspaceContextFiles(codebaseFiles))
-            }
-          } else if (scenario.type === "system-design") {
-            // For system design, provide a design notes template
-            initialCode = `// DESIGN NOTES: ${scenario.title}
-// Use this space to document your design decisions
-
-/* ============================================
-   1. REQUIREMENTS CLARIFICATION
-   ============================================ */
-// Functional:
-// -
-//
-// Non-Functional:
-// - Scale:
-// - Latency:
-// - Availability:
-
-/* ============================================
-   2. HIGH-LEVEL ARCHITECTURE
-   ============================================ */
-// Key Components:
-// 1.
-// 2.
-// 3.
-
-/* ============================================
-   3. DATA MODEL
-   ============================================ */
-// Tables/Collections:
-//
-
-/* ============================================
-   4. API DESIGN
-   ============================================ */
-// Endpoints:
-// POST /api/...
-// GET /api/...
-
-/* ============================================
-   5. SCALING & TRADE-OFFS
-   ============================================ */
-// -
-`
-          } else {
-            initialCode =
-              (scenario as any).starterCode?.[selectedLanguage] ||
-              `function solution() {
-  // Write your solution here
-
-}`
-          }
-
-          // If there's saved code, use it; otherwise use starter code
-          if (hasExistingProgress && savedState?.code) {
-            setCode(savedState.code)
-            if (savedState.language) {
-              setSelectedLanguage(savedState.language as any)
-            }
-          } else {
-            setCode(initialCode)
-          }
-
-          // Initialize interviewer with appropriate message based on progress
-          const problemType =
-            scenario.type === "bugfix"
-              ? "BUG FIX"
-              : scenario.type === "add-functionality"
-                ? "ADD FUNCTIONALITY"
-                : scenario.type.toUpperCase()
-
-          let initialMessage: string
-          if (hasExistingProgress) {
-            // True resume - user has made progress
-            initialMessage = `Welcome back! I'm Sable, your interviewer. You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
-
-You can continue where you left off. Feel free to:
-- Ask me clarifying questions about the requirements
-- Discuss your approach before coding
-- Ask for hints if you get stuck
-
-Let's continue!`
-
-            // Restore previous messages if available
-            if (savedState?.interviewerMessages && savedState.interviewerMessages.length > 0) {
-              setInterviewerMessages(
-                savedState.interviewerMessages as Array<{ type: "ai" | "user"; message: string }>
-              )
-            } else {
-              setInterviewerMessages([{ type: "ai", message: initialMessage }])
-            }
-            if (savedState?.chatMessages && savedState.chatMessages.length > 0) {
-              setChatMessages(
-                savedState.chatMessages as Array<{ type: "ai" | "user"; message: string }>
-              )
-            } else {
-              setChatMessages([
-                {
-                  type: "ai",
-                  message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-                },
-              ])
-            }
-            // Restore elapsed time and test results
-            if (savedState?.elapsedTime) {
-              setElapsedTime(savedState.elapsedTime)
-            }
-            if (savedState?.testResults && savedState.testResults.length > 0) {
-              setTestResults(savedState.testResults)
-            }
-            if (savedState?.testSummary) {
-              setTestSummary(savedState.testSummary)
-            }
-            if (savedState?.consoleLogs) {
-              setConsoleLogs(savedState.consoleLogs as typeof consoleLogs)
-            }
-            if (scenario.type === "bugfix") {
-              setBugfixEvidenceEvents(
-                (savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || []
-              )
-              setBugfixHypothesis(savedState.bugfixHypothesis || "")
-              setBugfixRootCause(savedState.bugfixRootCause || "")
-              setBugfixPrevention(savedState.bugfixPrevention || "")
-              recordedBugfixEditPathsRef.current = new Set(
-                ((savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || [])
-                  .filter((event) => event.type === "file_edited" && event.filePath)
-                  .map((event) => event.filePath as string)
-              )
-            }
-
-            // If resuming post-interview discussion, show that view directly
-            if (isPostInterviewResume && savedState?.isPostInterviewDiscussion) {
-              setShowPostInterviewDiscussion(true)
-              // Restore test summary if available
-              if (savedState.testSummary) {
-                setTestSummary(savedState.testSummary)
-              }
-              toast.success("Resuming post-interview discussion")
-            } else {
-              toast.success("Session resumed")
-            }
-          } else {
-            // Fresh start - no previous progress
-            const isDSAScenario = scenario.type === "dsa"
-            initialMessage = getInitialInterviewerMessage(
-              scenario.title,
-              scenario.difficulty,
-              problemType
-            )
-
-            if (scenario.type === "bugfix") {
-              resetBugfixSessionState()
-              setBugfixEvidenceEvents([
-                createBugfixEvidenceEvent({ type: "session_started", timestamp: Date.now() }),
-                createBugfixEvidenceEvent({ type: "incident_read", timestamp: Date.now() + 1 }),
-              ])
-            }
-
-            setInterviewerMessages([{ type: "ai", message: initialMessage }])
-            if (!isDSAScenario) {
-              setChatMessages([
-                {
-                  type: "ai",
-                  message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-                },
-              ])
-            } else {
-              setChatMessages([]) // No AI partner for DSA
-            }
-          }
-        } else {
-          toast.error("Scenario not found")
-        }
-      }
-      // Case 2: Starting fresh from roadmap or practice (scenario only, no session)
-      else if (scenarioId && !sessionId && (fromRoadmap || fromPractice)) {
-        const scenario = getScenarioById(scenarioId)
-        if (scenario) {
-          // Check if there's already an evaluating session for this scenario
-          // Only redirect if evaluating - otherwise let user start a new session
-          if (user?.id && !fromPractice) {
-            const existingSession = await findLatestSubmittedSession(user.id, scenarioId)
-            if (existingSession?.isEvaluating) {
-              toast.info("Session is being evaluated", {
-                description: "Redirecting to your results...",
-              })
-              router.push(`/sessions/${existingSession.sessionId}`)
-              return
-            }
-            // If session was completed but not evaluating, allow user to start fresh
-          }
-
-          // Select the scenario and hide browser to show the problem view
-          setSelectedScenario(scenario)
-          setShowOptimalApproach(false) // Reset optimal approach visibility
-          setShowScenarioBrowser(false)
-
-          // If from roadmap, call startInterview to trigger proper initialization
-          // This will handle company selection, Real Interview Mode, etc.
-          if (fromRoadmap) {
-            // Small delay to ensure state is set before calling startInterview
-            setTimeout(() => {
-              startInterview(scenario)
-            }, 100)
-          }
-        } else {
-          toast.error("Scenario not found")
-          setShowScenarioBrowser(true)
-        }
-      }
-
-      setIsLoading(false)
-    }
-    checkAuth()
-  }, [router, searchParams, firebaseUser, authLoading, initialized, authCheckComplete])
-
   // Sound effects - disabled in calm mode for reduced stimulation
   const playSound = (type: "hint" | "success" | "fail" | "milestone") => {
     // Skip sounds in calm mode - reduces anxiety triggers
@@ -1418,414 +1087,12 @@ Let's continue!`
     }
   }, [])
 
-  // Auto-save session data every 30 seconds (localStorage + Firestore/API)
-  useEffect(() => {
-    // Allow auto-save for both authenticated users and guests
-    if (!isInterviewStarted || !selectedScenario) return
-    if (!firebaseUser && !isGuestMode) return
-
-    const autoSaveInterval = setInterval(async () => {
-      try {
-        const sessionData = {
-          scenarioId: selectedScenario.id,
-          code,
-          chatMessages,
-          interviewerMessages,
-          selectedLanguage,
-          elapsedTime,
-          testResults,
-          testSummary,
-          workspaceContext,
-          activeWorkspacePath,
-          consoleLogs,
-          bugfixEvidenceEvents,
-          bugfixHypothesis,
-          bugfixRootCause,
-          bugfixPrevention,
-          isPostInterviewDiscussion: showPostInterviewDiscussion,
-          timestamp: Date.now(),
-        }
-
-        if (firebaseUser) {
-          // Authenticated user - save to localStorage with user-specific key
-          const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-          localStorage.setItem(storageKey, JSON.stringify(sessionData))
-
-          // Also save to Firestore if we have a session ID (for cross-device recovery)
-          if (currentSessionId) {
-            await saveSessionState(currentSessionId, {
-              code,
-              selectedLanguage,
-              elapsedTime,
-              chatMessages,
-              interviewerMessages,
-              testResults,
-              testSummary,
-              workspaceContext,
-              activeWorkspacePath,
-              consoleLogs,
-              bugfixEvidenceEvents,
-              bugfixHypothesis,
-              bugfixRootCause,
-              bugfixPrevention,
-              isPostInterviewDiscussion: showPostInterviewDiscussion,
-              realInterviewMode,
-              strictTimeLimit,
-            })
-          }
-        } else if (isGuestMode && guestId) {
-          // Guest user - save to localStorage with guest-specific key
-          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
-          localStorage.setItem(storageKey, JSON.stringify(sessionData))
-
-          // Also save state to Firestore via API (for session recovery)
-          if (currentSessionId) {
-            await fetch("/api/guest-session", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                sessionId: currentSessionId,
-                guestId,
-                sessionState: {
-                  code,
-                  language: selectedLanguage,
-                  elapsedTime,
-                  chatMessages: chatMessages.slice(-20), // Limit messages
-                  interviewerMessages: interviewerMessages.slice(-20),
-                  testResults: testResults.slice(-10),
-                  testSummary,
-                  workspaceContext,
-                  activeWorkspacePath,
-                  consoleLogs,
-                  bugfixEvidenceEvents,
-                  bugfixHypothesis,
-                  bugfixRootCause,
-                  bugfixPrevention,
-                  isPostInterviewDiscussion: showPostInterviewDiscussion,
-                  realInterviewMode,
-                  strictTimeLimit,
-                },
-              }),
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Auto-save failed:", error)
-      }
-    }, 30000) // 30 seconds
-
-    // Cleanup on unmount
-    return () => {
-      clearInterval(autoSaveInterval)
-    }
-  }, [
-    isInterviewStarted,
-    selectedScenario,
-    firebaseUser,
-    isGuestMode,
-    guestId,
-    code,
-    chatMessages,
-    interviewerMessages,
-    selectedLanguage,
-    elapsedTime,
-    testResults,
-    testSummary,
-    workspaceContext,
-    activeWorkspacePath,
-    consoleLogs,
-    bugfixEvidenceEvents,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
-    currentSessionId,
-    showPostInterviewDiscussion,
-  ])
-
   // Track when code value changes
   useEffect(() => {
     if (previousCodeRef.current !== code) {
       previousCodeRef.current = code
     }
   }, [code])
-
-  // Restore auto-saved session on mount (check both localStorage and Firestore/API)
-  useEffect(() => {
-    // Allow restoration for both authenticated users and guests
-    if (!selectedScenario || isInterviewStarted) return
-    if (!firebaseUser && !isGuestMode) return
-
-    const restoreSession = async () => {
-      try {
-        const sessionIdFromUrl = searchParams?.get("session")
-
-        // Check if there's already a completed session for this scenario
-        // This prevents old chat history from bleeding into new sessions
-        if (firebaseUser && !sessionIdFromUrl) {
-          const existingSession = await findLatestSubmittedSession(
-            firebaseUser.uid,
-            selectedScenario.id
-          )
-          if (existingSession) {
-            // There's an existing session - handle based on state
-            if (existingSession.isEvaluating) {
-              // Session is being evaluated - redirect to results
-              toast.info("Session is being evaluated", {
-                description: "Redirecting to your results...",
-              })
-              router.push(`/sessions/${existingSession.sessionId}`)
-              return
-            }
-            // Session is completed - clear old autosave and start fresh
-            // This is critical: when a user opens a problem they've already completed,
-            // we must NOT restore old chat messages from the previous session
-            const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-            localStorage.removeItem(storageKey)
-            // Don't restore anything - let user start fresh
-            return
-          }
-        }
-
-        let localData = null
-        let localTimestamp = 0
-        let remoteData = null
-        let remoteTimestamp = 0
-
-        if (firebaseUser) {
-          // Authenticated user - check localStorage with user-specific key
-          const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-          const savedData = localStorage.getItem(storageKey)
-
-          if (savedData) {
-            const parsed = JSON.parse(savedData)
-            const timeSinceLastSave = Date.now() - parsed.timestamp
-            if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
-              localData = parsed
-              localTimestamp = parsed.timestamp
-            } else {
-              localStorage.removeItem(storageKey)
-            }
-          }
-
-          // Check Firestore if we have a session ID in URL
-          if (sessionIdFromUrl) {
-            const firestoreState = await getSessionState(sessionIdFromUrl)
-
-            // If session was already submitted, redirect to results page
-            if (firestoreState?.completedAt) {
-              toast.info("Session already submitted", {
-                description: "Redirecting to your results...",
-              })
-              router.push(`/sessions/${sessionIdFromUrl}`)
-              return
-            }
-
-            // If session is being evaluated (submitted but feedback pending), redirect to session page
-            // This prevents users from being put back into interview mode during evaluation
-            if (firestoreState?.feedbackStatus === "pending") {
-              toast.info("Session is being evaluated", {
-                description: "Redirecting to your results page...",
-              })
-              router.push(`/sessions/${sessionIdFromUrl}`)
-              return
-            }
-
-            if (firestoreState?.savedAt) {
-              remoteData = firestoreState
-              remoteTimestamp = new Date(firestoreState.savedAt).getTime()
-              setCurrentSessionId(sessionIdFromUrl)
-            }
-          }
-        } else if (isGuestMode && guestId) {
-          // Guest user - check localStorage with guest-specific key
-          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
-          const savedData = localStorage.getItem(storageKey)
-
-          if (savedData) {
-            const parsed = JSON.parse(savedData)
-            const timeSinceLastSave = Date.now() - parsed.timestamp
-            // Guest sessions expire after 24 hours
-            if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
-              localData = parsed
-              localTimestamp = parsed.timestamp
-            } else {
-              localStorage.removeItem(storageKey)
-            }
-          }
-
-          // Check API for saved session state (guest sessions)
-          if (sessionIdFromUrl) {
-            try {
-              const response = await fetch(
-                `/api/guest-session?sessionId=${sessionIdFromUrl}&guestId=${guestId}`
-              )
-              if (response.ok) {
-                const data = await response.json()
-
-                // If session was already submitted, redirect to results page
-                if (data.session?.completed_at) {
-                  toast.info("Session already submitted", {
-                    description: "Redirecting to your results...",
-                  })
-                  router.push(`/sessions/${sessionIdFromUrl}`)
-                  return
-                }
-
-                // If session is being evaluated, redirect to session page
-                if (data.session?.feedback_status === "pending") {
-                  toast.info("Session is being evaluated", {
-                    description: "Redirecting to your results page...",
-                  })
-                  router.push(`/sessions/${sessionIdFromUrl}`)
-                  return
-                }
-
-                if (data.session?.session_state) {
-                  remoteData = {
-                    code: data.session.session_state.code,
-                    chatMessages: data.session.session_state.chat_messages,
-                    interviewerMessages: data.session.session_state.interviewer_messages,
-                    language: data.session.session_state.language,
-                    elapsedTime: data.session.session_state.elapsed_time,
-                    testResults: data.session.session_state.test_results,
-                    testSummary: data.session.session_state.test_summary,
-                    workspaceContext: data.session.session_state.workspace_context,
-                    activeWorkspacePath: data.session.session_state.active_workspace_path,
-                    consoleLogs: data.session.session_state.console_logs,
-                    bugfixEvidenceEvents: data.session.session_state.bugfix_evidence_events,
-                    bugfixHypothesis: data.session.session_state.bugfix_hypothesis,
-                    bugfixRootCause: data.session.session_state.bugfix_root_cause,
-                    bugfixPrevention: data.session.session_state.bugfix_prevention,
-                    isPostInterviewDiscussion:
-                      data.session.session_state.is_post_interview_discussion,
-                    savedAt: data.session.session_state.saved_at,
-                  }
-                  remoteTimestamp = new Date(data.session.session_state.saved_at).getTime()
-                  setCurrentSessionId(sessionIdFromUrl)
-                }
-              }
-            } catch (err) {
-              console.error("Failed to fetch guest session state:", err)
-            }
-          }
-        }
-
-        // Use the most recent save (prefer remote if same time for cross-device)
-        const useRemote = remoteData && (!localData || remoteTimestamp >= localTimestamp)
-
-        if (useRemote && remoteData) {
-          setCode(remoteData.code || "")
-          setChatMessages((remoteData.chatMessages as ChatMessage[]) || [])
-          setInterviewerMessages((remoteData.interviewerMessages as ChatMessage[]) || [])
-          setSelectedLanguage((remoteData.language as typeof selectedLanguage) || "javascript")
-          setTestResults(remoteData.testResults || [])
-          setWorkspaceContext(remoteData.workspaceContext || [])
-          if (remoteData.workspaceContext?.length) {
-            setActiveWorkspacePath(
-              remoteData.activeWorkspacePath || remoteData.workspaceContext[0].path
-            )
-          }
-          setConsoleLogs(remoteData.consoleLogs || [])
-          setBugfixEvidenceEvents((remoteData.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
-          setBugfixHypothesis(remoteData.bugfixHypothesis || "")
-          setBugfixRootCause(remoteData.bugfixRootCause || "")
-          setBugfixPrevention(remoteData.bugfixPrevention || "")
-          recordedBugfixEditPathsRef.current = new Set(
-            ((remoteData.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
-              .filter((event) => event.type === "file_edited" && event.filePath)
-              .map((event) => event.filePath as string)
-          )
-          if (remoteData.elapsedTime) {
-            setElapsedTime(remoteData.elapsedTime)
-          }
-          // Restore test summary if available
-          if (remoteData.testSummary) {
-            setTestSummary(remoteData.testSummary)
-          }
-          // Restore post-interview discussion state
-          if (remoteData.isPostInterviewDiscussion) {
-            setShowPostInterviewDiscussion(true)
-            setIsInterviewStarted(true)
-            setShowScenarioBrowser(false)
-            toast.info("Post-interview discussion restored", {
-              description: "Continue your discussion with the interviewer.",
-            })
-          } else {
-            toast.info("Session restored from cloud backup", {
-              description: "Your progress was saved. Continue where you left off!",
-            })
-          }
-        } else if (localData) {
-          setCode(localData.code || "")
-          setChatMessages(localData.chatMessages || [])
-          setInterviewerMessages(localData.interviewerMessages || [])
-          setSelectedLanguage(localData.selectedLanguage || "javascript")
-          setTestResults(localData.testResults || [])
-          setWorkspaceContext(localData.workspaceContext || [])
-          if (localData.workspaceContext?.length) {
-            const restoredPrimary =
-              isWorkspaceScenario(selectedScenario) &&
-              localData.workspaceContext.find(
-                (file: WorkspaceContextFile) =>
-                  file.path === selectedScenario.workspace.primaryFilePath
-              )
-            setActiveWorkspacePath(
-              localData.activeWorkspacePath ||
-                restoredPrimary?.path ||
-                localData.workspaceContext[0].path
-            )
-          }
-          setConsoleLogs(localData.consoleLogs || [])
-          setBugfixEvidenceEvents(localData.bugfixEvidenceEvents || [])
-          setBugfixHypothesis(localData.bugfixHypothesis || "")
-          setBugfixRootCause(localData.bugfixRootCause || "")
-          setBugfixPrevention(localData.bugfixPrevention || "")
-          recordedBugfixEditPathsRef.current = new Set(
-            (localData.bugfixEvidenceEvents || [])
-              .filter(
-                (event: BugfixEvidenceEvent) => event.type === "file_edited" && event.filePath
-              )
-              .map((event: BugfixEvidenceEvent) => event.filePath as string)
-          )
-          if (localData.elapsedTime) {
-            setElapsedTime(localData.elapsedTime)
-          }
-          // Restore test summary if available
-          if (localData.testSummary) {
-            setTestSummary(localData.testSummary)
-          }
-          // Restore post-interview discussion state
-          if (localData.isPostInterviewDiscussion) {
-            setShowPostInterviewDiscussion(true)
-            setIsInterviewStarted(true)
-            setShowScenarioBrowser(false)
-            toast.info("Post-interview discussion restored", {
-              description: "Continue your discussion with the interviewer.",
-            })
-          } else {
-            toast.info("Session restored from auto-save", {
-              description: "Your local progress was recovered.",
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Failed to restore auto-saved session:", error)
-        toast.error("Could not restore session", {
-          description: "Starting fresh. Previous progress may be lost.",
-        })
-      }
-    }
-
-    restoreSession()
-  }, [
-    firebaseUser,
-    isGuestMode,
-    guestId,
-    selectedScenario,
-    searchParams,
-    isInterviewStarted,
-    router,
-  ])
 
   const {
     trackSessionCompletion,
@@ -2007,6 +1274,103 @@ Let's continue!`
     lastCodeChangeRef,
     lastCodeHashRef,
     resetProactiveState,
+  })
+
+  useSessionReopen({
+    router,
+    searchParams,
+    firebaseUser,
+    authLoading,
+    initialized,
+    authCheckComplete,
+    user,
+    selectedLanguage,
+    consoleLogs,
+    canStartGuestTrial,
+    enterGuestMode,
+    exitGuestMode,
+    refreshUsageLimit,
+    startInterview,
+    resetBugfixSessionState,
+    setIsLoading,
+    setSelectedScenario,
+    setShowOptimalApproach,
+    setCurrentSessionId,
+    setShowScenarioBrowser,
+    setIsInterviewStarted,
+    setStartTime,
+    setSelectedLanguage,
+    setWorkspaceContext,
+    setActiveWorkspacePath,
+    setCode,
+    setInterviewerMessages,
+    setChatMessages,
+    setElapsedTime,
+    setTestResults,
+    setTestSummary,
+    setConsoleLogs,
+    setBugfixEvidenceEvents,
+    setBugfixHypothesis,
+    setBugfixRootCause,
+    setBugfixPrevention,
+    setShowPostInterviewDiscussion,
+    recordedBugfixEditPathsRef,
+  })
+
+  useInterviewAutosave({
+    isInterviewStarted,
+    selectedScenario,
+    firebaseUser,
+    isGuestMode,
+    guestId,
+    currentSessionId,
+    code,
+    chatMessages,
+    interviewerMessages,
+    selectedLanguage,
+    elapsedTime,
+    testResults,
+    testSummary,
+    workspaceContext,
+    activeWorkspacePath,
+    consoleLogs,
+    bugfixEvidenceEvents,
+    bugfixHypothesis,
+    bugfixRootCause,
+    bugfixPrevention,
+    showPostInterviewDiscussion,
+    realInterviewMode,
+    strictTimeLimit,
+  })
+
+  useSessionRestore({
+    firebaseUser,
+    isGuestMode,
+    guestId,
+    selectedScenario,
+    searchParams,
+    isInterviewStarted,
+    router,
+    selectedLanguage,
+    setCurrentSessionId,
+    setCode,
+    setChatMessages,
+    setInterviewerMessages,
+    setSelectedLanguage,
+    setTestResults,
+    setWorkspaceContext,
+    setActiveWorkspacePath,
+    setConsoleLogs,
+    setBugfixEvidenceEvents,
+    setBugfixHypothesis,
+    setBugfixRootCause,
+    setBugfixPrevention,
+    setElapsedTime,
+    setTestSummary,
+    setShowPostInterviewDiscussion,
+    setIsInterviewStarted,
+    setShowScenarioBrowser,
+    recordedBugfixEditPathsRef,
   })
 
   const triggerPostInterviewDiscussion = async (testResults: TestResult[], summary: any) => {
