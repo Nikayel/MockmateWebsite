@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ArrowRight, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import { CaseLabProgressBadge } from "@/components/labs/CaseLabProgressBadge"
 import type { CaseLab } from "@/lib/labs/types"
 
 export function CaseLabCard({ lab }: { lab: CaseLab }) {
@@ -30,6 +31,8 @@ export function CaseLabCard({ lab }: { lab: CaseLab }) {
           {lab.difficulty}
         </span>
       </div>
+
+      <CaseLabProgressBadge labId={lab.id} />
 
       <p className="text-muted-foreground line-clamp-3 text-sm">{lab.whyThisCompany}</p>
 
