@@ -100,11 +100,11 @@ export function ReferralWidget() {
 
   if (loading) {
     return (
-      <Card className="border-zinc-800/50 bg-zinc-900/50">
+      <Card className="border-border/50 bg-card/50">
         <CardContent className="p-4">
           <div className="animate-pulse space-y-3">
-            <div className="h-4 w-1/3 rounded bg-zinc-800" />
-            <div className="h-8 w-full rounded bg-zinc-800" />
+            <div className="h-4 w-1/3 rounded bg-muted" />
+            <div className="h-8 w-full rounded bg-muted" />
           </div>
         </CardContent>
       </Card>
@@ -114,18 +114,18 @@ export function ReferralWidget() {
   // Show placeholder when not logged in or error occurred
   if (!stats) {
     return (
-      <Card className="border-zinc-800/50 bg-gradient-to-br from-purple-900/20 to-zinc-900/50">
+      <Card className="border-border/50 bg-gradient-to-br from-purple-900/20 to-zinc-900/50">
         <CardContent className="p-4">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/20">
               <Gift className="h-4 w-4 text-purple-400" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white">Invite Friends</p>
-              <p className="text-xs text-zinc-500">Earn rewards for referrals</p>
+              <p className="text-sm font-medium text-foreground">Invite Friends</p>
+              <p className="text-xs text-muted-foreground">Earn rewards for referrals</p>
             </div>
           </div>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-muted-foreground">
             {error
               ? "Unable to load referral data. Please refresh."
               : "Sign in to get your referral code"}
@@ -136,7 +136,7 @@ export function ReferralWidget() {
   }
 
   return (
-    <Card className="border-zinc-800/50 bg-gradient-to-br from-purple-900/20 to-zinc-900/50">
+    <Card className="border-border/50 bg-gradient-to-br from-purple-900/20 to-zinc-900/50">
       <CardContent className="p-4">
         {/* Header */}
         <div className="mb-3 flex items-center justify-between">
@@ -145,8 +145,8 @@ export function ReferralWidget() {
               <Gift className="h-4 w-4 text-purple-400" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white">Invite Friends</p>
-              <p className="text-xs text-zinc-500">Earn rewards for referrals</p>
+              <p className="text-sm font-medium text-foreground">Invite Friends</p>
+              <p className="text-xs text-muted-foreground">Earn rewards for referrals</p>
             </div>
           </div>
           {stats.referralCount > 0 && (
@@ -158,18 +158,18 @@ export function ReferralWidget() {
 
         {/* Shareable Link */}
         <div className="mb-3">
-          <p className="mb-1.5 text-[10px] tracking-wide text-zinc-500 uppercase">
+          <p className="mb-1.5 text-[10px] tracking-wide text-muted-foreground uppercase">
             Your referral link
           </p>
           <div className="flex items-center gap-2">
-            <div className="flex-1 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2">
-              <p className="truncate text-xs text-white">{stats.shareUrl}</p>
+            <div className="flex-1 overflow-hidden rounded-lg border border-border bg-muted/50 px-3 py-2">
+              <p className="truncate text-xs text-foreground">{stats.shareUrl}</p>
             </div>
             <Button
               size="sm"
               variant="outline"
               onClick={copyToClipboard}
-              className="shrink-0 border-zinc-700 hover:bg-zinc-800"
+              className="shrink-0 border-border hover:bg-muted"
             >
               {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
             </Button>
@@ -184,38 +184,38 @@ export function ReferralWidget() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 rounded-lg bg-zinc-800/30 p-2">
+        <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/30 p-2">
           <div className="text-center">
             <div className="flex items-center justify-center gap-1">
-              <Users className="h-3 w-3 text-zinc-500" />
-              <span className="text-lg font-bold text-white">{stats.referralCount}</span>
+              <Users className="h-3 w-3 text-muted-foreground" />
+              <span className="text-lg font-bold text-foreground">{stats.referralCount}</span>
             </div>
-            <p className="text-[10px] text-zinc-500">Signups</p>
+            <p className="text-[10px] text-muted-foreground">Signups</p>
           </div>
-          <div className="border-x border-zinc-700/50 text-center">
+          <div className="border-x border-border/50 text-center">
             <div className="flex items-center justify-center gap-1">
-              <Gift className="h-3 w-3 text-zinc-500" />
+              <Gift className="h-3 w-3 text-muted-foreground" />
               <span className="text-lg font-bold text-purple-400">
                 {(stats.rewards?.pendingFreeMonths || 0) +
                   (stats.rewards?.totalFreeMonthsEarned || 0)}
               </span>
             </div>
-            <p className="text-[10px] text-zinc-500">Free Months</p>
+            <p className="text-[10px] text-muted-foreground">Free Months</p>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-1">
-              <DollarSign className="h-3 w-3 text-zinc-500" />
+              <DollarSign className="h-3 w-3 text-muted-foreground" />
               <span className="text-lg font-bold text-green-400">
                 ${(stats.rewards?.pendingCash || 0) + (stats.rewards?.totalCashEarned || 0)}
               </span>
             </div>
-            <p className="text-[10px] text-zinc-500">Earned</p>
+            <p className="text-[10px] text-muted-foreground">Earned</p>
           </div>
         </div>
 
         {/* Rewards Info */}
-        <div className="mt-3 rounded-lg border border-dashed border-zinc-700 p-2">
-          <p className="text-[11px] leading-relaxed text-zinc-400">
+        <div className="mt-3 rounded-lg border border-dashed border-border p-2">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
             <span className="font-medium text-purple-400">Earn rewards:</span> Get{" "}
             <span className="text-purple-400">1 free month</span> per signup +{" "}
             <span className="text-green-400">$10</span> &{" "}
@@ -223,7 +223,7 @@ export function ReferralWidget() {
           </p>
           <a
             href="/referral-terms"
-            className="mt-1 block text-[10px] text-zinc-500 underline hover:text-zinc-400"
+            className="mt-1 block text-[10px] text-muted-foreground underline hover:text-muted-foreground"
           >
             Terms & Conditions
           </a>
@@ -232,7 +232,7 @@ export function ReferralWidget() {
         {/* Terms Link */}
         <a
           href="/referral-terms"
-          className="mt-2 flex items-center justify-center gap-1 text-[10px] text-zinc-500 transition-colors hover:text-zinc-400"
+          className="mt-2 flex items-center justify-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-muted-foreground"
         >
           Program terms apply
           <ChevronRight className="h-3 w-3" />

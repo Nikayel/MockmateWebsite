@@ -177,18 +177,18 @@ export function MetricsOverview() {
 
   if (loading) {
     return (
-      <Card className="border-gray-700 bg-gray-900/50">
+      <Card className="border-border bg-card/50">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-sm font-medium text-white">
+          <CardTitle className="flex items-center text-sm font-medium text-foreground">
             <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
-            <div className="h-4 w-3/4 rounded bg-gray-800"></div>
-            <div className="h-4 w-1/2 rounded bg-gray-800"></div>
-            <div className="h-4 w-2/3 rounded bg-gray-800"></div>
+            <div className="h-4 w-3/4 rounded bg-muted"></div>
+            <div className="h-4 w-1/2 rounded bg-muted"></div>
+            <div className="h-4 w-2/3 rounded bg-muted"></div>
           </div>
         </CardContent>
       </Card>
@@ -197,17 +197,17 @@ export function MetricsOverview() {
 
   if (!metrics || metrics.totalSessions === 0) {
     return (
-      <Card className="border-gray-700 bg-gray-900/50">
+      <Card className="border-border bg-card/50">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-sm font-medium text-white">
+          <CardTitle className="flex items-center text-sm font-medium text-foreground">
             <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="py-4 text-center">
-            <Sparkles className="mx-auto mb-2 h-8 w-8 text-gray-600" />
-            <p className="mb-3 text-sm text-gray-400">Start practicing to see your insights</p>
+            <Sparkles className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="mb-3 text-sm text-muted-foreground">Start practicing to see your insights</p>
             <Link href="/interview">
               <Button size="sm" className="bg-[#c4703f] text-white hover:bg-[#c4703f]/80">
                 Begin Practice
@@ -230,18 +230,18 @@ export function MetricsOverview() {
       ? "text-green-400"
       : metrics.trend === "declining"
         ? "text-red-400"
-        : "text-gray-400"
+        : "text-muted-foreground"
 
   return (
-    <Card className="border-gray-700 bg-gray-900/50">
+    <Card className="border-border bg-card/50">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-sm font-medium text-white">
+        <CardTitle className="flex items-center justify-between text-sm font-medium text-foreground">
           <span className="flex items-center">
             <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </span>
           <Link href="/metrics">
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[#c4703f] hover:text-white">
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-[#c4703f] hover:text-foreground">
               View All
               <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
@@ -252,12 +252,12 @@ export function MetricsOverview() {
         {/* Quick Stats Row */}
         <div className="grid grid-cols-3 gap-3 text-center">
           <div>
-            <div className="text-2xl font-bold text-white">{metrics.totalSessions}</div>
-            <div className="text-xs text-gray-400">Sessions</div>
+            <div className="text-2xl font-bold text-foreground">{metrics.totalSessions}</div>
+            <div className="text-xs text-muted-foreground">Sessions</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">{metrics.totalPracticeHours}h</div>
-            <div className="text-xs text-gray-400">Practice</div>
+            <div className="text-2xl font-bold text-foreground">{metrics.totalPracticeHours}h</div>
+            <div className="text-xs text-muted-foreground">Practice</div>
           </div>
           <div>
             <div
@@ -266,27 +266,27 @@ export function MetricsOverview() {
               {metrics.weeklyAverage}%
               <TrendIcon className="h-4 w-4" />
             </div>
-            <div className="text-xs text-gray-400">This Week</div>
+            <div className="text-xs text-muted-foreground">This Week</div>
           </div>
         </div>
 
         {/* Average Score Progress with Toggle */}
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-xs text-gray-400">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Target className="h-3 w-3" />
               {showOverallScore ? "Mock Interview Score" : "Technical Score"}
               <ScoreInfoTooltip type={showOverallScore ? "overall" : "technical"} />
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-white">
+              <span className="font-mono text-sm text-foreground">
                 {showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}%
               </span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setShowOverallScore(!showOverallScore)}
-                    className="text-gray-500 transition-colors hover:text-[#c4703f]"
+                    className="text-muted-foreground transition-colors hover:text-[#c4703f]"
                   >
                     {showOverallScore ? (
                       <ToggleRight className="h-4 w-4 text-[#c4703f]" />
@@ -295,7 +295,7 @@ export function MetricsOverview() {
                     )}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent className="bg-zinc-800 text-zinc-200">
+                <TooltipContent className="bg-muted text-foreground">
                   <p>
                     {showOverallScore ? "Switch to Technical Score" : "Switch to Interview Score"}
                   </p>
@@ -307,7 +307,7 @@ export function MetricsOverview() {
             value={showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}
             className="h-2"
           />
-          <div className="mt-1 text-[10px] text-gray-500">
+          <div className="mt-1 text-[10px] text-muted-foreground">
             {showOverallScore
               ? "What you'd likely get in a real interview (communication matters!)"
               : "Objective metrics: test pass rate, time efficiency, independence"}
@@ -318,11 +318,11 @@ export function MetricsOverview() {
         {metrics.mastery && metrics.mastery.total > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
+              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 Mastery Progress
                 <ScoreInfoTooltip type="mastery" />
               </span>
-              <span className="font-mono text-xs text-white">
+              <span className="font-mono text-xs text-foreground">
                 {metrics.mastery.masteryRate}% mastered
               </span>
             </div>
@@ -342,7 +342,7 @@ export function MetricsOverview() {
                         {metrics.mastery.mastered}
                       </span>
                     </div>
-                    <div className="flex items-center justify-center text-[10px] text-gray-400">
+                    <div className="flex items-center justify-center text-[10px] text-muted-foreground">
                       Mastered
                       <ScoreInfoTooltip type="mastered" iconClassName="h-2.5 w-2.5" asSpan />
                     </div>
@@ -357,9 +357,9 @@ export function MetricsOverview() {
                   </DialogHeader>
                   <div className="space-y-2">
                     {loadingMastered ? (
-                      <div className="py-8 text-center text-gray-400">Loading...</div>
+                      <div className="py-8 text-center text-muted-foreground">Loading...</div>
                     ) : masteredProblems.length === 0 ? (
-                      <div className="py-8 text-center text-gray-400">
+                      <div className="py-8 text-center text-muted-foreground">
                         No mastered problems yet. Keep practicing!
                       </div>
                     ) : (
@@ -367,11 +367,11 @@ export function MetricsOverview() {
                         <Link
                           key={problem.problemId}
                           href={`/interview?scenario=${problem.scenarioId}`}
-                          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 transition-colors hover:border-emerald-500/30 hover:bg-zinc-800/50"
+                          className="flex items-center justify-between rounded-lg border border-border bg-card/50 p-3 transition-colors hover:border-emerald-500/30 hover:bg-muted/50"
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="truncate font-medium text-white">{problem.title}</div>
-                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <div className="truncate font-medium text-foreground">{problem.title}</div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span className="capitalize">
                                 {problem.pattern.replace(/-/g, " ")}
                               </span>
@@ -389,7 +389,7 @@ export function MetricsOverview() {
                               </span>
                             </div>
                           </div>
-                          <ExternalLink className="h-4 w-4 shrink-0 text-gray-500" />
+                          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
                         </Link>
                       ))
                     )}
@@ -403,7 +403,7 @@ export function MetricsOverview() {
                     {metrics.mastery.reviewing}
                   </span>
                 </div>
-                <div className="flex items-center justify-center text-[10px] text-gray-400">
+                <div className="flex items-center justify-center text-[10px] text-muted-foreground">
                   Reviewing
                   <ScoreInfoTooltip type="reviewing" iconClassName="h-2.5 w-2.5" />
                 </div>
@@ -415,7 +415,7 @@ export function MetricsOverview() {
                     {metrics.mastery.learning}
                   </span>
                 </div>
-                <div className="flex items-center justify-center text-[10px] text-gray-400">
+                <div className="flex items-center justify-center text-[10px] text-muted-foreground">
                   Learning
                   <ScoreInfoTooltip type="learning" iconClassName="h-2.5 w-2.5" />
                 </div>
@@ -427,51 +427,51 @@ export function MetricsOverview() {
         {/* Score Breakdown - 4 weighted categories */}
         {metrics.scoreBreakdown && (
           <div className="space-y-2">
-            <div className="mb-2 text-xs font-medium text-gray-400">Skill Breakdown</div>
+            <div className="mb-2 text-xs font-medium text-muted-foreground">Skill Breakdown</div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded bg-gray-800/50 p-2">
+              <div className="rounded bg-muted/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-gray-400">
+                  <span className="flex items-center text-xs text-muted-foreground">
                     Code Quality
                     <ScoreInfoTooltip type="codeQuality" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-white">
+                  <span className="font-mono text-xs text-foreground">
                     {metrics.scoreBreakdown.codeQuality}%
                   </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.codeQuality} className="h-1" />
               </div>
-              <div className="rounded bg-gray-800/50 p-2">
+              <div className="rounded bg-muted/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-gray-400">
+                  <span className="flex items-center text-xs text-muted-foreground">
                     Problem Solving
                     <ScoreInfoTooltip type="problemSolving" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-white">
+                  <span className="font-mono text-xs text-foreground">
                     {metrics.scoreBreakdown.problemSolving}%
                   </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.problemSolving} className="h-1" />
               </div>
-              <div className="rounded bg-gray-800/50 p-2">
+              <div className="rounded bg-muted/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-gray-400">
+                  <span className="flex items-center text-xs text-muted-foreground">
                     Understanding
                     <ScoreInfoTooltip type="understanding" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-white">
+                  <span className="font-mono text-xs text-foreground">
                     {metrics.scoreBreakdown.understanding}%
                   </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.understanding} className="h-1" />
               </div>
-              <div className="rounded bg-gray-800/50 p-2">
+              <div className="rounded bg-muted/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-gray-400">
+                  <span className="flex items-center text-xs text-muted-foreground">
                     Communication
                     <ScoreInfoTooltip type="communication" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-white">
+                  <span className="font-mono text-xs text-foreground">
                     {metrics.scoreBreakdown.communication}%
                   </span>
                 </div>
@@ -488,7 +488,7 @@ export function MetricsOverview() {
               <Brain className="h-4 w-4 text-green-400" />
               <div>
                 <div className="text-xs font-medium text-green-400">Strongest</div>
-                <div className="text-sm text-white">{topPattern.name}</div>
+                <div className="text-sm text-foreground">{topPattern.name}</div>
               </div>
             </div>
             <Tooltip>
@@ -510,7 +510,7 @@ export function MetricsOverview() {
               <Flame className="h-4 w-4 text-orange-400" />
               <div>
                 <div className="text-xs font-medium text-orange-400">Focus Area</div>
-                <div className="text-sm text-white">{weakestPattern.name}</div>
+                <div className="text-sm text-foreground">{weakestPattern.name}</div>
               </div>
             </div>
             <Tooltip>
