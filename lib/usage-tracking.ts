@@ -40,7 +40,8 @@ export const DEEPGRAM_COSTS = {
 
 // Embedding costs per 1K tokens
 export const EMBEDDING_COSTS = {
-  "text-embedding-004": 0.000025, // Gemini: Free tier generous, ~$0.025/1M chars
+  "gemini-embedding-001": 0.000025, // Gemini: current model (replaced text-embedding-004)
+  "text-embedding-004": 0.000025, // Gemini: retired by Google; kept for legacy cost rows
   "text-embedding-3-small": 0.00002, // OpenAI: $0.02/1M tokens
   "text-embedding-3-large": 0.00013, // OpenAI: $0.13/1M tokens
   "text-embedding-ada-002": 0.0001, // OpenAI: $0.10/1M tokens (legacy)

@@ -82,7 +82,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
     // Initialize Gemini provider if available (primary choice)
     if (isGeminiAvailable()) {
       this.geminiProvider = new GeminiEmbeddingProvider({
-        model: config.geminiModel || "text-embedding-004",
+        model: config.geminiModel || "gemini-embedding-001",
       })
     } else {
       this.geminiProvider = null

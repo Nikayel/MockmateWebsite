@@ -32,7 +32,7 @@ export const EMBEDDING_CONFIG = {
    */
   gemini: {
     /** Default model for Gemini embeddings */
-    model: process.env.GEMINI_EMBEDDING_MODEL || "text-embedding-004",
+    model: process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001",
     /** Maximum retries for failed requests */
     maxRetries: parseInt(process.env.GEMINI_MAX_RETRIES || "3", 10),
     /** Request timeout in milliseconds */

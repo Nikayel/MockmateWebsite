@@ -5,10 +5,12 @@
  * 768 dimensions, optimized for semantic search and RAG applications
  */
 
-import type { EmbeddingProvider } from '../types'
+import type { EmbeddingProvider } from "../types"
 
-// Gemini embedding model configurations
-export type GeminiEmbeddingModel = 'text-embedding-004' // Latest Gemini embedding model
+// Gemini embedding model configurations.
+// NOTE: text-embedding-004 was retired by Google (returns 404). gemini-embedding-001
+// is the current model and supports outputDimensionality to match a 768-dim index.
+export type GeminiEmbeddingModel = "gemini-embedding-001" | "text-embedding-004"
 
 interface GeminiProviderConfig {
   apiKey?: string
@@ -16,7 +18,12 @@ interface GeminiProviderConfig {
   maxRetries?: number
   timeout?: number
   batchSize?: number
-  taskType?: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING'
+  taskType?:
+    | "RETRIEVAL_DOCUMENT"
+    | "RETRIEVAL_QUERY"
+    | "SEMANTIC_SIMILARITY"
+    | "CLASSIFICATION"
+    | "CLUSTERING"
 }
 
 interface GeminiEmbeddingResponse {
@@ -31,9 +38,11 @@ interface GeminiBatchEmbeddingResponse {
   }>
 }
 
-// Model dimension defaults - Gemini text-embedding-004 uses 768 dimensions
+// Model dimension defaults. We request 768 to match the existing Pinecone index;
+// gemini-embedding-001 defaults to 3072 unless outputDimensionality is sent.
 const MODEL_DIMENSIONS: Record<GeminiEmbeddingModel, number> = {
-  'text-embedding-004': 768,
+  "gemini-embedding-001": 768,
+  "text-embedding-004": 768,
 }
 
 // Rate limiting tracking
@@ -65,13 +74,13 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
   private rateLimitState: RateLimitState
 
   constructor(config: GeminiProviderConfig = {}) {
-    this.apiKey = config.apiKey || process.env.GEMINI_API_KEY || ''
-    this.model = config.model || 'text-embedding-004'
+    this.apiKey = config.apiKey || process.env.GEMINI_API_KEY || ""
+    this.model = config.model || "gemini-embedding-001"
     this.dimensions = MODEL_DIMENSIONS[this.model]
     this.maxRetries = config.maxRetries || 3
     this.timeout = config.timeout || 30000
     this.batchSize = config.batchSize || 100 // Gemini supports batch requests
-    this.taskType = config.taskType || 'RETRIEVAL_DOCUMENT'
+    this.taskType = config.taskType || "RETRIEVAL_DOCUMENT"
     this.rateLimitState = {
       requestsRemaining: 1500, // Gemini default rate limit
       resetTime: 0,
@@ -108,8 +117,8 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
    * - CLASSIFICATION: For text classification
    * - CLUSTERING: For clustering texts
    */
-  setTaskType(taskType: GeminiProviderConfig['taskType']): void {
-    this.taskType = taskType || 'RETRIEVAL_DOCUMENT'
+  setTaskType(taskType: GeminiProviderConfig["taskType"]): void {
+    this.taskType = taskType || "RETRIEVAL_DOCUMENT"
   }
 
   /**
@@ -117,7 +126,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
    */
   async generateEmbedding(text: string): Promise<number[]> {
     if (!this.isConfigured()) {
-      throw new Error('[Gemini] API key not configured. Set GEMINI_API_KEY environment variable.')
+      throw new Error("[Gemini] API key not configured. Set GEMINI_API_KEY environment variable.")
     }
 
     const cleanedText = this.cleanText(text)
@@ -129,7 +138,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
    */
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     if (!this.isConfigured()) {
-      throw new Error('[Gemini] API key not configured. Set GEMINI_API_KEY environment variable.')
+      throw new Error("[Gemini] API key not configured. Set GEMINI_API_KEY environment variable.")
     }
 
     if (texts.length === 0) {
@@ -137,7 +146,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     }
 
     // Clean and validate texts
-    const cleanedTexts = texts.map(text => this.cleanText(text))
+    const cleanedTexts = texts.map((text) => this.cleanText(text))
 
     // Process in batches if needed
     if (cleanedTexts.length > this.batchSize) {
@@ -158,7 +167,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
    */
   private cleanText(text: string): string {
     // Remove excessive whitespace
-    let cleaned = text.replace(/\s+/g, ' ').trim()
+    let cleaned = text.replace(/\s+/g, " ").trim()
 
     // Truncate if too long (Gemini has a token limit)
     // Rough estimate: 4 characters per token, max ~8000 tokens
@@ -170,7 +179,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
     // Handle empty text
     if (cleaned.length === 0) {
-      cleaned = ' ' // Gemini doesn't accept empty strings
+      cleaned = " " // Gemini doesn't accept empty strings
     }
 
     return cleaned
@@ -192,15 +201,19 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
         const body = {
           model: `models/${this.model}`,
           content: {
-            parts: [{ text }]
+            parts: [{ text }],
           },
           taskType: this.taskType,
+          // gemini-embedding-001 defaults to 3072 dims; pin to the index size.
+          ...(this.model.startsWith("gemini-embedding")
+            ? { outputDimensionality: this.dimensions }
+            : {}),
         }
 
         const response = await fetch(url, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(this.timeout),
@@ -210,7 +223,8 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          const errorMessage = (errorData as { error?: { message?: string } })?.error?.message || response.statusText
+          const errorMessage =
+            (errorData as { error?: { message?: string } })?.error?.message || response.statusText
 
           if (response.status === 429) {
             // Rate limited - wait and retry
@@ -234,17 +248,16 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
         const data: GeminiEmbeddingResponse = await response.json()
 
         if (!data.embedding?.values) {
-          throw new Error('Gemini API returned invalid response: missing embedding values')
+          throw new Error("Gemini API returned invalid response: missing embedding values")
         }
 
         console.log(`[Gemini] Generated embedding with ${data.embedding.values.length} dimensions`)
 
-        return data.embedding.values
-
+        return this.normalizeIfTruncated(data.embedding.values)
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
 
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (error instanceof Error && error.name === "AbortError") {
           console.warn(`[Gemini] Request timed out (attempt ${attempt + 1}/${this.maxRetries})`)
         } else {
           console.error(`[Gemini] Error on attempt ${attempt + 1}:`, error)
@@ -257,7 +270,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
       }
     }
 
-    throw lastError || new Error('Gemini embedding generation failed after all retries')
+    throw lastError || new Error("Gemini embedding generation failed after all retries")
   }
 
   /**
@@ -273,20 +286,24 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:batchEmbedContents?key=${this.apiKey}`
 
-        const requests = texts.map(text => ({
+        const requests = texts.map((text) => ({
           model: `models/${this.model}`,
           content: {
-            parts: [{ text }]
+            parts: [{ text }],
           },
           taskType: this.taskType,
+          // gemini-embedding-001 defaults to 3072 dims; pin to the index size.
+          ...(this.model.startsWith("gemini-embedding")
+            ? { outputDimensionality: this.dimensions }
+            : {}),
         }))
 
         const body = { requests }
 
         const response = await fetch(url, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(this.timeout),
@@ -296,7 +313,8 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          const errorMessage = (errorData as { error?: { message?: string } })?.error?.message || response.statusText
+          const errorMessage =
+            (errorData as { error?: { message?: string } })?.error?.message || response.statusText
 
           if (response.status === 429) {
             // Rate limited - wait and retry
@@ -320,18 +338,21 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
         const data: GeminiBatchEmbeddingResponse = await response.json()
 
         if (!data.embeddings || !Array.isArray(data.embeddings)) {
-          throw new Error('Gemini API returned invalid batch response: missing embeddings')
+          throw new Error("Gemini API returned invalid batch response: missing embeddings")
         }
 
-        console.log(`[Gemini] Generated ${data.embeddings.length} embeddings with ${data.embeddings[0]?.values?.length || 0} dimensions each`)
+        console.log(
+          `[Gemini] Generated ${data.embeddings.length} embeddings with ${data.embeddings[0]?.values?.length || 0} dimensions each`
+        )
 
-        return data.embeddings.map(e => e.values)
-
+        return data.embeddings.map((e) => this.normalizeIfTruncated(e.values))
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
 
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.warn(`[Gemini] Batch request timed out (attempt ${attempt + 1}/${this.maxRetries})`)
+        if (error instanceof Error && error.name === "AbortError") {
+          console.warn(
+            `[Gemini] Batch request timed out (attempt ${attempt + 1}/${this.maxRetries})`
+          )
         } else {
           console.error(`[Gemini] Batch error on attempt ${attempt + 1}:`, error)
         }
@@ -343,7 +364,7 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
       }
     }
 
-    throw lastError || new Error('Gemini batch embedding generation failed after all retries')
+    throw lastError || new Error("Gemini batch embedding generation failed after all retries")
   }
 
   /**
@@ -360,7 +381,8 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
     // Implement basic rate limiting - max 60 requests per minute
     const timeSinceLastRequest = now - this.rateLimitState.lastRequestTime
-    if (timeSinceLastRequest < 100) { // Min 100ms between requests
+    if (timeSinceLastRequest < 100) {
+      // Min 100ms between requests
       await this.sleep(100 - timeSinceLastRequest)
     }
   }
@@ -381,10 +403,25 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
   }
 
   /**
+   * gemini-embedding-001 returns un-normalized vectors when outputDimensionality
+   * is below its native 3072 (text-embedding-004 returned normalized 768-dim
+   * vectors). L2-normalize truncated outputs so the index stays consistent and
+   * cosine/dot-product similarity behaves correctly.
+   */
+  private normalizeIfTruncated(values: number[]): number[] {
+    if (!this.model.startsWith("gemini-embedding")) return values
+    let sumSq = 0
+    for (const v of values) sumSq += v * v
+    const norm = Math.sqrt(sumSq)
+    if (norm === 0) return values
+    return values.map((v) => v / norm)
+  }
+
+  /**
    * Sleep helper
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   /**

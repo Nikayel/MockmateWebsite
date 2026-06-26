@@ -4,7 +4,7 @@ import { prepareTextForEmbedding } from "../utils/sanitize"
 
 const embeddingProvider = getHybridProvider({
   mode: "gemini-with-fallback",
-  geminiModel: "text-embedding-004",
+  geminiModel: "gemini-embedding-001",
   openaiModel: "text-embedding-3-small",
   openaiDimensions: 1536,
   cacheEnabled: true,
@@ -21,10 +21,10 @@ export function getEmbeddingUsageMetadata(): {
   const activeProvider = embeddingProvider.getActiveProvider()
   const model =
     activeProvider === "gemini"
-      ? "text-embedding-004"
+      ? "gemini-embedding-001"
       : activeProvider === "openai"
         ? "text-embedding-3-small"
-        : "text-embedding-004"
+        : "gemini-embedding-001"
   const provider =
     activeProvider === "openai" ? "openai" : activeProvider === "tfidf" ? "tfidf" : "gemini"
 
