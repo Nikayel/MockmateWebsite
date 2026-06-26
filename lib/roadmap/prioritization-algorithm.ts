@@ -14,7 +14,7 @@ import {
   Milestone,
 } from "@/lib/data/company-questions/types"
 import { getCompanyById } from "@/lib/data/company-questions"
-import { DSAScenario } from "@/lib/scenarios"
+import { DSAScenario, RoleTag } from "@/lib/scenarios"
 import { formatPatternLabel } from "@/lib/pattern-labels"
 import {
   PRIORITY_WEIGHTS,
@@ -48,6 +48,19 @@ const CONFIG = {
 }
 
 /**
+ * Map a user's experience level to the seniority role tag used on questions.
+ * Lets role-tagged questions (e.g. Palantir's intern vs senior split) surface
+ * for the matching level. Track tags (swe/fdse) need an explicit track input
+ * and are not inferred here.
+ */
+const EXPERIENCE_TO_ROLE: Record<UserRoadmapAssessment["experienceLevel"], RoleTag> = {
+  intern: "intern",
+  beginner: "new-grad",
+  intermediate: "junior",
+  advanced: "senior",
+}
+
+/**
  * Calculate priority score for a single question
  * Supports intern, beginner, intermediate, and advanced experience levels
  */
@@ -76,6 +89,16 @@ export function calculatePriorityScore(
     score += 15 // Bonus for fundamental patterns commonly asked in intern interviews
     if (!patternData || patternData.frequency < 80) {
       reasons.push("Core pattern for internship interviews")
+    }
+  }
+
+  // 1c. Role-alignment bonus — nudge up questions tagged for the user's target
+  // role (e.g. Palantir's intern/new-grad/junior/senior split).
+  if (scenario.roles?.length) {
+    const targetRole = EXPERIENCE_TO_ROLE[assessment.experienceLevel]
+    if (targetRole && scenario.roles.includes(targetRole)) {
+      score += 10
+      reasons.push(`Commonly asked at the ${targetRole} level`)
     }
   }
 

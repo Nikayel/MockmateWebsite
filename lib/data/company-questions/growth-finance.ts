@@ -563,28 +563,53 @@ export const palantirData: CompanyQuestionData = {
   logo: "/company-logos/palantir.svg",
   careers_url: "https://palantir.com/careers",
 
+  // Palantir coding bar centers on LeetCode Medium framed as messy real-world
+  // mini-problems; "completeness > optimality". Not the hard-DP grind its
+  // reputation suggests.
   difficultyDistribution: {
-    easy: 5,
-    medium: 45,
-    hard: 50,
+    easy: 10,
+    medium: 60,
+    hard: 30,
   },
 
+  // Signature emphasis is graphs + decomposition: dependency/topological
+  // ordering, traversal-with-state, entity resolution (union-find), and
+  // parsing — NOT dynamic programming, which is over-represented online.
   topPatterns: [
-    { pattern: "bfs", frequency: 90, priority: 10, typicalDifficulty: "hard" },
-    { pattern: "dfs", frequency: 90, priority: 10, typicalDifficulty: "hard" },
-    { pattern: "dp-1d", frequency: 85, priority: 9, typicalDifficulty: "hard" },
-    { pattern: "dp-2d", frequency: 80, priority: 9, typicalDifficulty: "hard" },
-    { pattern: "trees", frequency: 75, priority: 8, typicalDifficulty: "hard" },
-    { pattern: "arrays-hashing", frequency: 70, priority: 8, typicalDifficulty: "medium" },
-    { pattern: "binary-search", frequency: 65, priority: 7, typicalDifficulty: "medium" },
-    { pattern: "backtracking", frequency: 60, priority: 7, typicalDifficulty: "hard" },
+    { pattern: "graphs", frequency: 95, priority: 10, typicalDifficulty: "medium" },
+    { pattern: "bfs", frequency: 90, priority: 10, typicalDifficulty: "medium" },
+    { pattern: "dfs", frequency: 90, priority: 10, typicalDifficulty: "medium" },
+    { pattern: "arrays-hashing", frequency: 85, priority: 9, typicalDifficulty: "medium" },
+    { pattern: "topological-sort", frequency: 80, priority: 9, typicalDifficulty: "medium" },
+    { pattern: "union-find", frequency: 70, priority: 8, typicalDifficulty: "medium" },
+    { pattern: "stack", frequency: 65, priority: 7, typicalDifficulty: "medium" },
+    { pattern: "trees", frequency: 60, priority: 6, typicalDifficulty: "medium" },
+    { pattern: "intervals", frequency: 55, priority: 6, typicalDifficulty: "medium" },
+    { pattern: "binary-search", frequency: 50, priority: 5, typicalDifficulty: "medium" },
   ],
 
+  // Real, Palantir-tagged scenarios in our bank (the dependency/entity-resolution
+  // /parsing archetypes Palantir is known for).
   mustKnowQuestions: [
-    { scenarioId: "graph-decomposition", title: "Graph Decomposition", frequency: "very_common" },
-    { scenarioId: "path-finding", title: "Complex Path Finding", frequency: "very_common" },
-    { scenarioId: "data-integration", title: "Data Integration", frequency: "common" },
-    { scenarioId: "anomaly-detection", title: "Anomaly Detection", frequency: "occasional" },
+    {
+      scenarioId: "dsa-course-schedule",
+      title: "Course Schedule (Dependency Resolution)",
+      frequency: "very_common",
+    },
+    { scenarioId: "dsa-number-of-islands", title: "Number of Islands", frequency: "very_common" },
+    {
+      scenarioId: "dsa-accounts-merge",
+      title: "Accounts Merge (Entity Resolution)",
+      frequency: "common",
+    },
+    { scenarioId: "dsa-alien-dictionary", title: "Alien Dictionary", frequency: "common" },
+    { scenarioId: "dsa-evaluate-division", title: "Evaluate Division", frequency: "common" },
+    { scenarioId: "dsa-word-ladder", title: "Word Ladder", frequency: "occasional" },
+    {
+      scenarioId: "dsa-basic-calculator",
+      title: "Basic Calculator (Parsing)",
+      frequency: "occasional",
+    },
   ],
 
   interviewProcess: {
@@ -605,8 +630,8 @@ export const palantirData: CompanyQuestionData = {
       {
         type: "coding",
         duration: 60,
-        description: "Onsite coding 2",
-        focusAreas: ["dp", "optimization"],
+        description: "Onsite coding 2 (re-engineering / decomposition)",
+        focusAreas: ["graphs", "parsing", "decomposition"],
       },
       {
         type: "system_design",
@@ -623,26 +648,27 @@ export const palantirData: CompanyQuestionData = {
     ],
     timeline: "4-8 weeks",
     tips: [
-      "Extremely difficult interview - heavy on graphs and DP",
-      "Practice hard LeetCode problems extensively",
-      "They value mission alignment (government/defense work)",
-      "Be prepared for ethical questions about the work",
-      "Security clearance may be required",
+      "The signature round is decomposition: take a vague real-world problem, clarify it, and model entities/events BEFORE coding - jumping to a solution is the #1 rejection cause",
+      "Mostly LeetCode Medium framed as messy mini-projects (graphs, dependency/topological ordering, parsing, hashmaps) - completeness and clear reasoning beat the optimal trick",
+      "Graphs are genuinely over-represented; dynamic programming is not - don't over-index on hard DP",
+      "FDSE skews lighter on algorithms and heavier on data modeling, parsing, and product sense ('who is the user?'); core SWE leans harder on graphs and re-engineering",
+      "They value mission alignment (government/defense work) - be ready for ethics questions; security clearance may be required",
     ],
   },
 
   interviewStyle: {
-    pace: "fast",
-    communicationEmphasis: 8,
+    pace: "moderate",
+    communicationEmphasis: 9,
     codeQualityEmphasis: 9,
-    optimalSolutionRequired: true,
-    allowsPseudocode: false,
-    providesHints: false,
+    optimalSolutionRequired: false,
+    allowsPseudocode: true,
+    providesHints: true,
     uniqueTraits: [
-      "Very hard technical bar",
-      "Graph and DP heavy",
-      "Mission/ethics focus",
-      "Security clearance often required",
+      "Decomposition-first: clarify and model before coding",
+      "Graph and dependency-resolution heavy (not DP)",
+      "Interviewers change requirements mid-round to test adaptation",
+      "Completeness and reasoning over the optimal trick",
+      "Mission/ethics focus; security clearance often required",
     ],
   },
 
@@ -663,8 +689,8 @@ export const palantirData: CompanyQuestionData = {
     behavioralExpectations: [
       "Show genuine alignment with company mission (government/defense)",
       "Demonstrate exceptional problem-solving abilities",
-      "Exhibit willingness to work on challenging, hard problems",
-      "Display strong graph and algorithm skills",
+      "Clarify and decompose ambiguous problems before solutioning",
+      "Display strong graph and decomposition skills",
       "Show comfort with ambiguity and complex domains",
     ],
     valueKeywords: [
@@ -988,12 +1014,25 @@ export const bloombergData: CompanyQuestionData = {
     { scenarioId: "first-unique-char", title: "First Unique Character", frequency: "common" },
     { scenarioId: "word-pattern", title: "Word Pattern", frequency: "occasional" },
     // Stack - Bloomberg is famous for stack/queue problems
-    { scenarioId: "dsa-max-frequency-stack", title: "Maximum Frequency Stack", frequency: "common", lastReported: "2025 Q1" },
-    { scenarioId: "dsa-next-greater-element-ii", title: "Next Greater Element II", frequency: "common" },
+    {
+      scenarioId: "dsa-max-frequency-stack",
+      title: "Maximum Frequency Stack",
+      frequency: "common",
+      lastReported: "2025 Q1",
+    },
+    {
+      scenarioId: "dsa-next-greater-element-ii",
+      title: "Next Greater Element II",
+      frequency: "common",
+    },
     { scenarioId: "dsa-online-stock-span", title: "Online Stock Span", frequency: "common" },
     // Trees
     { scenarioId: "dsa-validate-bst", title: "Validate Binary Search Tree", frequency: "common" },
-    { scenarioId: "dsa-vertical-order-traversal", title: "Vertical Order Traversal", frequency: "occasional" },
+    {
+      scenarioId: "dsa-vertical-order-traversal",
+      title: "Vertical Order Traversal",
+      frequency: "occasional",
+    },
   ],
 
   interviewProcess: {
