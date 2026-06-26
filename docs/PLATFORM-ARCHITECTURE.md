@@ -59,6 +59,7 @@ flowchart TB
 1. Presentation Layer
 - `app/*` pages and route segments.
 - `components/*` UI, interview console, dashboard, admin views.
+- The interview page (`app/interview/page.tsx`) is decomposed into single-responsibility hooks in `app/interview/_hooks/*` (session start/reset, autosave/restore/reopen, code execution, chat, phase tracking, proactive AI, metrics, feedback/streaming/system-design, timer, modes, guest quota) and presentational components in `app/interview/_components/*` (+ `_sub/*`); the page itself is the orchestrator that wires them. Pure helpers live in `app/interview/_utils/*`.
 - Client state via Zustand stores in `lib/stores/*`.
 
 2. API Layer
