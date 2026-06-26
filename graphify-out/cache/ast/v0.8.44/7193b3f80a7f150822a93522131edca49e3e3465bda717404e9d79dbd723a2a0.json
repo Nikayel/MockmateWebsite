@@ -1,0 +1,271 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_loops_loop_log_md",
+      "label": "loop-log.md",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "loops_loop_log_loop_log",
+      "label": "Loop Log",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_cross_cutting_shared_difficulty_colors_helper_user_authorized_refactor",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 cross-cutting: shared difficulty-colors helper (user-authorized refactor)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L15"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_guest_mode_banner_gradient_off_palette_purple_accent_in_page_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C: Guest Mode banner gradient (off-palette purple \u2192 accent) in page.tsx",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L24"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_postinterviewview_test_result_success_color_green_emerald",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C: PostInterviewView test-result success color (green \u2192 emerald)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L32"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_chatcolumn_user_message_bubble_off_palette_blue_accent",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C: ChatColumn user message bubble (off-palette blue \u2192 accent)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L40"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_editorcolumn_file_tab_role_colors_off_palette_blue_yellow",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C: EditorColumn file-tab role colors (off-palette blue + yellow)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L48"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_off_palette_example_colors_in_focusproblempeek_tsx_new_component",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C: off-palette example colors in FocusProblemPeek.tsx (new component)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L56"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_5_map_off_palette_yellow_to_amber_problemcolumn_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C (round 5): map off-palette yellow to amber (ProblemColumn.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L64"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_4_collapse_investigation_notes_per_field_rainbow_problemcolumn_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C (round 4): collapse Investigation Notes per-field rainbow (ProblemColumn.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L72"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_3_demote_off_palette_green_blue_in_dsa_examples_problemcolumn_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C (round 3): demote off-palette green/blue in DSA Examples (ProblemColumn.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L79"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_2_reserve_amber_for_incident_framing_problemcolumn_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C (round 2): reserve amber for incident framing (ProblemColumn.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L87"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_a_round_2_incident_report_lead_line_problemcolumn_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target A (round 2): Incident Report lead line (ProblemColumn.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L95"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_color_reduction_problemcolumn_tsx_codebase_files_section",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target C: color reduction (ProblemColumn.tsx, Codebase Files section)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L102"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_b_left_panel_width_app_interview_page_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target B: left-panel width (app/interview/page.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L110"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_a_left_panel_hierarchy_problemcolumn_tsx",
+      "label": "2026-06-25 \u2014 interview-workspace-ux-loop \u2014 Target A: left-panel hierarchy (ProblemColumn.tsx)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L117"
+    },
+    {
+      "id": "loops_loop_log_2026_06_25_bugfix_realism_loop_bugfix_quality_ts_realism_validator",
+      "label": "2026-06-25 \u2014 bugfix-realism-loop \u2014 bugfix-quality.ts (realism validator)",
+      "file_type": "document",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L124"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_loops_loop_log_md",
+      "target": "loops_loop_log_loop_log",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_cross_cutting_shared_difficulty_colors_helper_user_authorized_refactor",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_guest_mode_banner_gradient_off_palette_purple_accent_in_page_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_postinterviewview_test_result_success_color_green_emerald",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_chatcolumn_user_message_bubble_off_palette_blue_accent",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_editorcolumn_file_tab_role_colors_off_palette_blue_yellow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L48",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_off_palette_example_colors_in_focusproblempeek_tsx_new_component",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L56",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_5_map_off_palette_yellow_to_amber_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_4_collapse_investigation_notes_per_field_rainbow_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_3_demote_off_palette_green_blue_in_dsa_examples_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L79",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_round_2_reserve_amber_for_incident_framing_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L87",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_a_round_2_incident_report_lead_line_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L95",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_c_color_reduction_problemcolumn_tsx_codebase_files_section",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L102",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_b_left_panel_width_app_interview_page_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L110",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_interview_workspace_ux_loop_target_a_left_panel_hierarchy_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L117",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_loop_log_loop_log",
+      "target": "loops_loop_log_2026_06_25_bugfix_realism_loop_bugfix_quality_ts_realism_validator",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/loop-log.md",
+      "source_location": "L124",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

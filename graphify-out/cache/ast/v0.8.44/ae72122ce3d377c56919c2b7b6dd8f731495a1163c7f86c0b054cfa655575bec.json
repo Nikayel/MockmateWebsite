@@ -1,0 +1,385 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "label": "spaced-repetition-for-coding-interviews.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_the_problem_we_forget_everything",
+      "label": "The Problem: We Forget Everything",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L15"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_the_solution_spaced_repetition",
+      "label": "The Solution: Spaced Repetition",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L26"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_how_spaced_repetition_works_for_coding",
+      "label": "How Spaced Repetition Works for Coding",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L39"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_the_basic_algorithm_sm_2",
+      "label": "The Basic Algorithm (SM-2)",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L41"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_practical_example",
+      "label": "Practical Example",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L51"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_diy_spaced_repetition_setup",
+      "label": "DIY Spaced Repetition Setup",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L65"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_using_anki_free",
+      "label": "Using Anki (Free)",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L69"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_using_notion_or_spreadsheet",
+      "label": "Using Notion or Spreadsheet",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L84"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_automated_spaced_repetition_for_code",
+      "label": "Automated Spaced Repetition for Code",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L97"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_what_to_put_in_your_spaced_repetition_system",
+      "label": "What to Put in Your Spaced Repetition System",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L108"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_high_priority_review_frequently",
+      "label": "High-Priority (Review Frequently)",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L112"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_low_priority_review_occasionally",
+      "label": "Low-Priority (Review Occasionally)",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L117"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_skip_entirely",
+      "label": "Skip Entirely",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L122"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_the_15_minute_daily_review",
+      "label": "The 15-Minute Daily Review",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L127"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_common_mistakes",
+      "label": "Common Mistakes",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L145"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_1_reviewing_solutions_instead_of_solving",
+      "label": "1. Reviewing Solutions Instead of Solving",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L147"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_2_too_many_cards_problems",
+      "label": "2. Too Many Cards/Problems",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L150"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_3_skipping_review_days",
+      "label": "3. Skipping Review Days",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L153"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_4_not_rating_honestly",
+      "label": "4. Not Rating Honestly",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L156"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_does_it_actually_work",
+      "label": "Does It Actually Work?",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L159"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_getting_started_today",
+      "label": "Getting Started Today",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L169"
+    },
+    {
+      "id": "blog_spaced_repetition_for_coding_interviews_the_bottom_line",
+      "label": "The Bottom Line",
+      "file_type": "document",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L185"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_the_problem_we_forget_everything",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_the_solution_spaced_repetition",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_how_spaced_repetition_works_for_coding",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_how_spaced_repetition_works_for_coding",
+      "target": "blog_spaced_repetition_for_coding_interviews_the_basic_algorithm_sm_2",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_how_spaced_repetition_works_for_coding",
+      "target": "blog_spaced_repetition_for_coding_interviews_practical_example",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L51",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_diy_spaced_repetition_setup",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L65",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_diy_spaced_repetition_setup",
+      "target": "blog_spaced_repetition_for_coding_interviews_using_anki_free",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L69",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_diy_spaced_repetition_setup",
+      "target": "blog_spaced_repetition_for_coding_interviews_using_notion_or_spreadsheet",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L84",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_automated_spaced_repetition_for_code",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L97",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "dashboard_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L106",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_what_to_put_in_your_spaced_repetition_system",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_what_to_put_in_your_spaced_repetition_system",
+      "target": "blog_spaced_repetition_for_coding_interviews_high_priority_review_frequently",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L112",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_what_to_put_in_your_spaced_repetition_system",
+      "target": "blog_spaced_repetition_for_coding_interviews_low_priority_review_occasionally",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L117",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_what_to_put_in_your_spaced_repetition_system",
+      "target": "blog_spaced_repetition_for_coding_interviews_skip_entirely",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L122",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_the_15_minute_daily_review",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L127",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_common_mistakes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L145",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_common_mistakes",
+      "target": "blog_spaced_repetition_for_coding_interviews_1_reviewing_solutions_instead_of_solving",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L147",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_common_mistakes",
+      "target": "blog_spaced_repetition_for_coding_interviews_2_too_many_cards_problems",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L150",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_common_mistakes",
+      "target": "blog_spaced_repetition_for_coding_interviews_3_skipping_review_days",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L153",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_spaced_repetition_for_coding_interviews_common_mistakes",
+      "target": "blog_spaced_repetition_for_coding_interviews_4_not_rating_honestly",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L156",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_does_it_actually_work",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L159",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_getting_started_today",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L169",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_15_dsa_patterns_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L173",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_spaced_repetition_for_coding_interviews_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_the_bottom_line",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/spaced-repetition-for-coding-interviews.mdx",
+      "source_location": "L185",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

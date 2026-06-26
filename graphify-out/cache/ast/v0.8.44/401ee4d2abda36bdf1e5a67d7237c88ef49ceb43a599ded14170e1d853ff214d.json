@@ -1,0 +1,362 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_prd_md",
+      "label": "PRD.md",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_prd_codesparring_product_requirements_document_prd",
+      "label": "CodeSparring \u2014 Product Requirements Document (PRD)",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_prd_1_vision_mission",
+      "label": "1. Vision & mission",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L9"
+    },
+    {
+      "id": "docs_prd_2_problem_statement",
+      "label": "2. Problem statement",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L17"
+    },
+    {
+      "id": "docs_prd_3_target_users_personas",
+      "label": "3. Target users & personas",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L27"
+    },
+    {
+      "id": "docs_prd_4_goals_non_goals",
+      "label": "4. Goals & non-goals",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L37"
+    },
+    {
+      "id": "docs_prd_4_1_goals_product",
+      "label": "4.1 Goals (product)",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L39"
+    },
+    {
+      "id": "docs_prd_4_2_non_goals_explicit",
+      "label": "4.2 Non-goals (explicit)",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L46"
+    },
+    {
+      "id": "docs_prd_5_user_journeys_summary",
+      "label": "5. User journeys (summary)",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L54"
+    },
+    {
+      "id": "docs_prd_6_functional_requirements",
+      "label": "6. Functional requirements",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L64"
+    },
+    {
+      "id": "docs_prd_6_1_interview_core",
+      "label": "6.1 Interview core",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L68"
+    },
+    {
+      "id": "docs_prd_6_2_learning_progression",
+      "label": "6.2 Learning & progression",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L79"
+    },
+    {
+      "id": "docs_prd_6_3_account_monetization",
+      "label": "6.3 Account & monetization",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L88"
+    },
+    {
+      "id": "docs_prd_6_4_trust_compliance",
+      "label": "6.4 Trust & compliance",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L98"
+    },
+    {
+      "id": "docs_prd_6_5_platform_administration",
+      "label": "6.5 Platform & administration",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L106"
+    },
+    {
+      "id": "docs_prd_7_non_functional_requirements",
+      "label": "7. Non-functional requirements",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L117"
+    },
+    {
+      "id": "docs_prd_8_success_metrics_kpis",
+      "label": "8. Success metrics (KPIs)",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L130"
+    },
+    {
+      "id": "docs_prd_9_dependencies_integrations",
+      "label": "9. Dependencies & integrations",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L142"
+    },
+    {
+      "id": "docs_prd_10_risks_mitigations",
+      "label": "10. Risks & mitigations",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L155"
+    },
+    {
+      "id": "docs_prd_11_out_of_scope_future_candidates",
+      "label": "11. Out of scope / future (candidates)",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L166"
+    },
+    {
+      "id": "docs_prd_12_engineering_traceability",
+      "label": "12. Engineering traceability",
+      "file_type": "document",
+      "source_file": "docs/PRD.md",
+      "source_location": "L174"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_prd_md",
+      "target": "docs_prd_codesparring_product_requirements_document_prd",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_1_vision_mission",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_2_problem_statement",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_3_target_users_personas",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_4_goals_non_goals",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_4_goals_non_goals",
+      "target": "docs_prd_4_1_goals_product",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_4_goals_non_goals",
+      "target": "docs_prd_4_2_non_goals_explicit",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_5_user_journeys_summary",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_6_functional_requirements",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_6_functional_requirements",
+      "target": "docs_prd_6_1_interview_core",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L68",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_6_functional_requirements",
+      "target": "docs_prd_6_2_learning_progression",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L79",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_6_functional_requirements",
+      "target": "docs_prd_6_3_account_monetization",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L88",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_6_functional_requirements",
+      "target": "docs_prd_6_4_trust_compliance",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L98",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_6_functional_requirements",
+      "target": "docs_prd_6_5_platform_administration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L106",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_7_non_functional_requirements",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L117",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_8_success_metrics_kpis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L130",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_9_dependencies_integrations",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L142",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_10_risks_mitigations",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L155",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_11_out_of_scope_future_candidates",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L166",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_prd_codesparring_product_requirements_document_prd",
+      "target": "docs_prd_12_engineering_traceability",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L174",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_prd_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_architecture_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L184",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_prd_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L185",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_prd_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_api_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PRD.md",
+      "source_location": "L186",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

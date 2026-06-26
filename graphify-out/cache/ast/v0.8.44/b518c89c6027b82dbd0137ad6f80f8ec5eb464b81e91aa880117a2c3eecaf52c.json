@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_ship_progress_md",
+      "label": "._SHIP_PROGRESS.md",
+      "file_type": "document",
+      "source_file": "docs/case-labs/._SHIP_PROGRESS.md",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

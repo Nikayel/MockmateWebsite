@@ -1,0 +1,152 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "label": "leetcode-vs-codesparring.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_the_core_difference",
+      "label": "The Core Difference",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L13"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_feature_comparison",
+      "label": "Feature Comparison",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L19"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_who_should_use_leetcode",
+      "label": "Who Should Use LeetCode?",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L31"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_who_should_use_codesparring",
+      "label": "Who Should Use CodeSparring?",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L38"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_the_retention_problem",
+      "label": "The Retention Problem",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L46"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_the_interview_simulation_gap",
+      "label": "The Interview Simulation Gap",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L54"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_the_verdict",
+      "label": "The Verdict",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L64"
+    },
+    {
+      "id": "blog_leetcode_vs_codesparring_try_both",
+      "label": "Try Both",
+      "file_type": "document",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L70"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_the_core_difference",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_feature_comparison",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_who_should_use_leetcode",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_who_should_use_codesparring",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_the_retention_problem",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_the_interview_simulation_gap",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_the_verdict",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "blog_leetcode_vs_codesparring_try_both",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L70",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_leetcode_vs_codesparring_mdx",
+      "target": "interview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/leetcode-vs-codesparring.mdx",
+      "source_location": "L74",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

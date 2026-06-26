@@ -1,0 +1,280 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "label": "why-you-forget-leetcode-problems.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_the_forgetting_curve",
+      "label": "The Forgetting Curve",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L15"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_why_leetcode_grinding_fails",
+      "label": "Why LeetCode Grinding Fails",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L29"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_the_science_of_retention",
+      "label": "The Science of Retention",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L43"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_1_the_spacing_effect_1885",
+      "label": "1. The Spacing Effect (1885)",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L47"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_2_the_testing_effect_2006",
+      "label": "2. The Testing Effect (2006)",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L58"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_3_interleaving_2007",
+      "label": "3. Interleaving (2007)",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L69"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_the_optimal_review_schedule",
+      "label": "The Optimal Review Schedule",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L80"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_why_this_is_hard_to_do_manually",
+      "label": "Why This Is Hard to Do Manually",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L94"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_the_pattern_problem",
+      "label": "The Pattern Problem",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L105"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_practical_implementation",
+      "label": "Practical Implementation",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L131"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_option_1_manual_spaced_repetition",
+      "label": "Option 1: Manual Spaced Repetition",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L133"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_option_2_flashcard_apps_anki",
+      "label": "Option 2: Flashcard Apps (Anki)",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L146"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_option_3_purpose_built_tools",
+      "label": "Option 3: Purpose-Built Tools",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L155"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_how_codesparring_solves_this",
+      "label": "How CodeSparring Solves This",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L163"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_the_math_of_retention",
+      "label": "The Math of Retention",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L187"
+    },
+    {
+      "id": "blog_why_you_forget_leetcode_problems_start_retaining_what_you_learn",
+      "label": "Start Retaining What You Learn",
+      "file_type": "document",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L203"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_the_forgetting_curve",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_why_leetcode_grinding_fails",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_the_science_of_retention",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_why_you_forget_leetcode_problems_the_science_of_retention",
+      "target": "blog_why_you_forget_leetcode_problems_1_the_spacing_effect_1885",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_why_you_forget_leetcode_problems_the_science_of_retention",
+      "target": "blog_why_you_forget_leetcode_problems_2_the_testing_effect_2006",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L58",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_why_you_forget_leetcode_problems_the_science_of_retention",
+      "target": "blog_why_you_forget_leetcode_problems_3_interleaving_2007",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L69",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_the_optimal_review_schedule",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L80",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_why_this_is_hard_to_do_manually",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L94",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_the_pattern_problem",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L105",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_practical_implementation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L131",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_why_you_forget_leetcode_problems_practical_implementation",
+      "target": "blog_why_you_forget_leetcode_problems_option_1_manual_spaced_repetition",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L133",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_why_you_forget_leetcode_problems_practical_implementation",
+      "target": "blog_why_you_forget_leetcode_problems_option_2_flashcard_apps_anki",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L146",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_why_you_forget_leetcode_problems_practical_implementation",
+      "target": "blog_why_you_forget_leetcode_problems_option_3_purpose_built_tools",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L155",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_how_codesparring_solves_this",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L163",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_the_math_of_retention",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L187",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "blog_why_you_forget_leetcode_problems_start_retaining_what_you_learn",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L203",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_why_you_forget_leetcode_problems_mdx",
+      "target": "interview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/why-you-forget-leetcode-problems.mdx",
+      "source_location": "L213",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

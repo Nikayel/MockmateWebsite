@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_loops_loop_log_md",
+      "label": "._loop-log.md",
+      "file_type": "document",
+      "source_file": "docs/loops/._loop-log.md",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

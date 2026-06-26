@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_loops_interview_workspace_ux_loop_md",
+      "label": "interview-workspace-ux-loop.md",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "label": "Interview Workspace UX Loop",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "loops_interview_workspace_ux_loop_research_grounding_apply_these_don_t_re_derive_them",
+      "label": "Research grounding (apply these, don't re-derive them)",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L10"
+    },
+    {
+      "id": "loops_interview_workspace_ux_loop_color_system_for_this_workspace_the_target_state",
+      "label": "Color system for this workspace (the target state)",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L22"
+    },
+    {
+      "id": "loops_interview_workspace_ux_loop_the_target_hierarchy_for_the_left_panel_problemcolumn_tsx",
+      "label": "The target hierarchy for the left panel (`ProblemColumn.tsx`)",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L36"
+    },
+    {
+      "id": "loops_interview_workspace_ux_loop_one_iteration",
+      "label": "One iteration",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L53"
+    },
+    {
+      "id": "loops_interview_workspace_ux_loop_hard_nevers",
+      "label": "Hard NEVERs",
+      "file_type": "document",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L81"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_loops_interview_workspace_ux_loop_md",
+      "target": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "target": "loops_interview_workspace_ux_loop_research_grounding_apply_these_don_t_re_derive_them",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "target": "loops_interview_workspace_ux_loop_color_system_for_this_workspace_the_target_state",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "target": "loops_interview_workspace_ux_loop_the_target_hierarchy_for_the_left_panel_problemcolumn_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L36",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "target": "loops_interview_workspace_ux_loop_one_iteration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_interview_workspace_ux_loop_interview_workspace_ux_loop",
+      "target": "loops_interview_workspace_ux_loop_hard_nevers",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/interview-workspace-ux-loop.md",
+      "source_location": "L81",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

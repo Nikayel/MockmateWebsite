@@ -1,0 +1,440 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "label": "google-interview-30-day-prep-plan.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_before_you_start_the_google_format",
+      "label": "Before You Start: The Google Format",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L17"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_week_1_foundation_pattern_recognition",
+      "label": "Week 1: Foundation & Pattern Recognition",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L31"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_1_2_arrays_hashing",
+      "label": "Day 1-2: Arrays & Hashing",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L37"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_3_4_two_pointers",
+      "label": "Day 3-4: Two Pointers",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L50"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_5_6_sliding_window",
+      "label": "Day 5-6: Sliding Window",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L62"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_7_review_integration",
+      "label": "Day 7: Review & Integration",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L74"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_week_2_trees_graphs_recursion",
+      "label": "Week 2: Trees, Graphs & Recursion",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L80"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_8_9_binary_trees",
+      "label": "Day 8-9: Binary Trees",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L86"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_10_11_graphs_bfs_dfs",
+      "label": "Day 10-11: Graphs (BFS/DFS)",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L99"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_12_13_backtracking",
+      "label": "Day 12-13: Backtracking",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L112"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_14_review_mock_interview",
+      "label": "Day 14: Review & Mock Interview",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L125"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_week_3_dynamic_programming_advanced_patterns",
+      "label": "Week 3: Dynamic Programming & Advanced Patterns",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L131"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_15_16_1d_dynamic_programming",
+      "label": "Day 15-16: 1D Dynamic Programming",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L137"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_17_18_2d_dynamic_programming",
+      "label": "Day 17-18: 2D Dynamic Programming",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L150"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_19_20_binary_search_variants",
+      "label": "Day 19-20: Binary Search Variants",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L162"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_21_full_mock_interview_day",
+      "label": "Day 21: Full Mock Interview Day",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L174"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "label": "Week 4: System Design, Behavioral & Final Push",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L180"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_22_23_system_design_l4",
+      "label": "Day 22-23: System Design (L4+)",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L186"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_24_behavioral_prep",
+      "label": "Day 24: Behavioral Prep",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L203"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_25_26_weak_spot_intensive",
+      "label": "Day 25-26: Weak Spot Intensive",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L215"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_27_28_full_interview_simulations",
+      "label": "Day 27-28: Full Interview Simulations",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L224"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_29_light_review",
+      "label": "Day 29: Light Review",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L231"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_day_30_interview_day",
+      "label": "Day 30: Interview Day",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L238"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_the_problems_that_matter_most",
+      "label": "The Problems That Matter Most",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L244"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_common_mistakes_to_avoid",
+      "label": "Common Mistakes to Avoid",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L273"
+    },
+    {
+      "id": "blog_google_interview_30_day_prep_plan_how_codesparring_accelerates_this_plan",
+      "label": "How CodeSparring Accelerates This Plan",
+      "file_type": "document",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L290"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_before_you_start_the_google_format",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_week_1_foundation_pattern_recognition",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_1_foundation_pattern_recognition",
+      "target": "blog_google_interview_30_day_prep_plan_day_1_2_arrays_hashing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_1_foundation_pattern_recognition",
+      "target": "blog_google_interview_30_day_prep_plan_day_3_4_two_pointers",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L50",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_1_foundation_pattern_recognition",
+      "target": "blog_google_interview_30_day_prep_plan_day_5_6_sliding_window",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L62",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_1_foundation_pattern_recognition",
+      "target": "blog_google_interview_30_day_prep_plan_day_7_review_integration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L74",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_week_2_trees_graphs_recursion",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L80",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_2_trees_graphs_recursion",
+      "target": "blog_google_interview_30_day_prep_plan_day_8_9_binary_trees",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L86",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_2_trees_graphs_recursion",
+      "target": "blog_google_interview_30_day_prep_plan_day_10_11_graphs_bfs_dfs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L99",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_2_trees_graphs_recursion",
+      "target": "blog_google_interview_30_day_prep_plan_day_12_13_backtracking",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L112",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_2_trees_graphs_recursion",
+      "target": "blog_google_interview_30_day_prep_plan_day_14_review_mock_interview",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L125",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_week_3_dynamic_programming_advanced_patterns",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L131",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_3_dynamic_programming_advanced_patterns",
+      "target": "blog_google_interview_30_day_prep_plan_day_15_16_1d_dynamic_programming",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L137",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_3_dynamic_programming_advanced_patterns",
+      "target": "blog_google_interview_30_day_prep_plan_day_17_18_2d_dynamic_programming",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L150",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_3_dynamic_programming_advanced_patterns",
+      "target": "blog_google_interview_30_day_prep_plan_day_19_20_binary_search_variants",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L162",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_3_dynamic_programming_advanced_patterns",
+      "target": "blog_google_interview_30_day_prep_plan_day_21_full_mock_interview_day",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L174",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L180",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "target": "blog_google_interview_30_day_prep_plan_day_22_23_system_design_l4",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L186",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "target": "blog_google_interview_30_day_prep_plan_day_24_behavioral_prep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L203",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "target": "blog_google_interview_30_day_prep_plan_day_25_26_weak_spot_intensive",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L215",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "target": "blog_google_interview_30_day_prep_plan_day_27_28_full_interview_simulations",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L224",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "target": "blog_google_interview_30_day_prep_plan_day_29_light_review",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L231",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_google_interview_30_day_prep_plan_week_4_system_design_behavioral_final_push",
+      "target": "blog_google_interview_30_day_prep_plan_day_30_interview_day",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L238",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_the_problems_that_matter_most",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L244",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_common_mistakes_to_avoid",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L273",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "blog_google_interview_30_day_prep_plan_how_codesparring_accelerates_this_plan",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L290",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_google_interview_30_day_prep_plan_mdx",
+      "target": "interview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/google-interview-30-day-prep-plan.mdx",
+      "source_location": "L305",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

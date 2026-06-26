@@ -1,0 +1,671 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_onboarding_md",
+      "label": "ONBOARDING.md",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_onboarding_engineering_onboarding_guide",
+      "label": "Engineering Onboarding Guide",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_onboarding_day_1_setup_orientation",
+      "label": "Day 1: Setup & Orientation",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "docs_onboarding_1_clone_install",
+      "label": "1. Clone & Install",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L7"
+    },
+    {
+      "id": "docs_onboarding_2_environment_setup",
+      "label": "2. Environment Setup",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L21"
+    },
+    {
+      "id": "docs_onboarding_3_start_development",
+      "label": "3. Start Development",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L56"
+    },
+    {
+      "id": "docs_onboarding_4_test_login",
+      "label": "4. Test Login",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L64"
+    },
+    {
+      "id": "docs_onboarding_week_1_learn_the_codebase",
+      "label": "Week 1: Learn the Codebase",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L72"
+    },
+    {
+      "id": "docs_onboarding_key_commands",
+      "label": "Key Commands",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L74"
+    },
+    {
+      "id": "docs_onboarding_recommended_reading_order",
+      "label": "Recommended Reading Order",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L91"
+    },
+    {
+      "id": "docs_onboarding_key_files_to_explore",
+      "label": "Key Files to Explore",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L99"
+    },
+    {
+      "id": "docs_onboarding_engineering_domains",
+      "label": "Engineering Domains",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L120"
+    },
+    {
+      "id": "docs_onboarding_1_interview_engine",
+      "label": "1. Interview Engine",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L124"
+    },
+    {
+      "id": "docs_onboarding_2_learning_system",
+      "label": "2. Learning System",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L136"
+    },
+    {
+      "id": "docs_onboarding_3_ai_rag_platform",
+      "label": "3. AI/RAG Platform",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L147"
+    },
+    {
+      "id": "docs_onboarding_4_user_dashboard_pages",
+      "label": "4. User Dashboard & Pages",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L158"
+    },
+    {
+      "id": "docs_onboarding_5_platform_infrastructure",
+      "label": "5. Platform & Infrastructure",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L171"
+    },
+    {
+      "id": "docs_onboarding_6_growth_engagement",
+      "label": "6. Growth & Engagement",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L184"
+    },
+    {
+      "id": "docs_onboarding_7_voice_mode",
+      "label": "7. Voice Mode",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L195"
+    },
+    {
+      "id": "docs_onboarding_code_conventions",
+      "label": "Code Conventions",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L208"
+    },
+    {
+      "id": "docs_onboarding_typescript",
+      "label": "TypeScript",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L210"
+    },
+    {
+      "id": "docs_onboarding_react_components",
+      "label": "React Components",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L227"
+    },
+    {
+      "id": "docs_onboarding_api_routes",
+      "label": "API Routes",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L248"
+    },
+    {
+      "id": "docs_onboarding_file_organization",
+      "label": "File Organization",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L274"
+    },
+    {
+      "id": "docs_onboarding_naming_conventions",
+      "label": "Naming Conventions",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L284"
+    },
+    {
+      "id": "docs_onboarding_git_workflow",
+      "label": "Git Workflow",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L296"
+    },
+    {
+      "id": "docs_onboarding_branch_naming",
+      "label": "Branch Naming",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L298"
+    },
+    {
+      "id": "docs_onboarding_commit_messages",
+      "label": "Commit Messages",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L307"
+    },
+    {
+      "id": "docs_onboarding_pull_request_process",
+      "label": "Pull Request Process",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L319"
+    },
+    {
+      "id": "docs_onboarding_debugging_tips",
+      "label": "Debugging Tips",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L330"
+    },
+    {
+      "id": "docs_onboarding_firebase_issues",
+      "label": "Firebase Issues",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L332"
+    },
+    {
+      "id": "docs_onboarding_api_debugging",
+      "label": "API Debugging",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L344"
+    },
+    {
+      "id": "docs_onboarding_state_debugging",
+      "label": "State Debugging",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L352"
+    },
+    {
+      "id": "docs_onboarding_database_debugging",
+      "label": "Database Debugging",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L366"
+    },
+    {
+      "id": "docs_onboarding_common_tasks",
+      "label": "Common Tasks",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L374"
+    },
+    {
+      "id": "docs_onboarding_add_a_new_api_endpoint",
+      "label": "Add a New API Endpoint",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L376"
+    },
+    {
+      "id": "docs_onboarding_add_a_new_component",
+      "label": "Add a New Component",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L384"
+    },
+    {
+      "id": "docs_onboarding_add_a_new_feature",
+      "label": "Add a New Feature",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L391"
+    },
+    {
+      "id": "docs_onboarding_getting_help",
+      "label": "Getting Help",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L403"
+    },
+    {
+      "id": "docs_onboarding_first_week_checklist",
+      "label": "First Week Checklist",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L412"
+    },
+    {
+      "id": "docs_onboarding_useful_links",
+      "label": "Useful Links",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L427"
+    },
+    {
+      "id": "docs_onboarding_tech_stack_quick_reference",
+      "label": "Tech Stack Quick Reference",
+      "file_type": "document",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L442"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_onboarding_md",
+      "target": "docs_onboarding_engineering_onboarding_guide",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_day_1_setup_orientation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_day_1_setup_orientation",
+      "target": "docs_onboarding_1_clone_install",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_day_1_setup_orientation",
+      "target": "docs_onboarding_2_environment_setup",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_day_1_setup_orientation",
+      "target": "docs_onboarding_3_start_development",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L56",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_day_1_setup_orientation",
+      "target": "docs_onboarding_4_test_login",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_week_1_learn_the_codebase",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_week_1_learn_the_codebase",
+      "target": "docs_onboarding_key_commands",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L74",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_week_1_learn_the_codebase",
+      "target": "docs_onboarding_recommended_reading_order",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L91",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_week_1_learn_the_codebase",
+      "target": "docs_onboarding_key_files_to_explore",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L99",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_engineering_domains",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L120",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_1_interview_engine",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L124",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_2_learning_system",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L136",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_3_ai_rag_platform",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L147",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_4_user_dashboard_pages",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L158",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_5_platform_infrastructure",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L171",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_6_growth_engagement",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L184",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_domains",
+      "target": "docs_onboarding_7_voice_mode",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L195",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_code_conventions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L208",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_code_conventions",
+      "target": "docs_onboarding_typescript",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L210",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_code_conventions",
+      "target": "docs_onboarding_react_components",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L227",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_code_conventions",
+      "target": "docs_onboarding_api_routes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L248",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_code_conventions",
+      "target": "docs_onboarding_file_organization",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L274",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_code_conventions",
+      "target": "docs_onboarding_naming_conventions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L284",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_git_workflow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L296",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_git_workflow",
+      "target": "docs_onboarding_branch_naming",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L298",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_git_workflow",
+      "target": "docs_onboarding_commit_messages",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L307",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_git_workflow",
+      "target": "docs_onboarding_pull_request_process",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L319",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_debugging_tips",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L330",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_debugging_tips",
+      "target": "docs_onboarding_firebase_issues",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L332",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_debugging_tips",
+      "target": "docs_onboarding_api_debugging",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L344",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_debugging_tips",
+      "target": "docs_onboarding_state_debugging",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L352",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_debugging_tips",
+      "target": "docs_onboarding_database_debugging",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L366",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_common_tasks",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L374",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_common_tasks",
+      "target": "docs_onboarding_add_a_new_api_endpoint",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L376",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_common_tasks",
+      "target": "docs_onboarding_add_a_new_component",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L384",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_common_tasks",
+      "target": "docs_onboarding_add_a_new_feature",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L391",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_getting_help",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L403",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_first_week_checklist",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L412",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_useful_links",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L427",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_onboarding_engineering_onboarding_guide",
+      "target": "docs_onboarding_tech_stack_quick_reference",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ONBOARDING.md",
+      "source_location": "L442",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

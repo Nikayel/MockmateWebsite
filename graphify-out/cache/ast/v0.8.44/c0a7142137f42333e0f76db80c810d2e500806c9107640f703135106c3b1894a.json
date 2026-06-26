@@ -1,0 +1,546 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_what_is_codesparring",
+      "label": "What is CodeSparring?",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L27"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_key_features",
+      "label": "Key Features",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L31"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_tech_stack",
+      "label": "Tech Stack",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L46"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_quick_start",
+      "label": "Quick Start",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L65"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_prerequisites",
+      "label": "Prerequisites",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L67"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_installation",
+      "label": "Installation",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L74"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_environment_variables",
+      "label": "Environment Variables",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L94"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_project_structure",
+      "label": "Project Structure",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L112"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_see_it_in_action",
+      "label": "See It In Action",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L145"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_performance_dashboard",
+      "label": "Performance Dashboard",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L158"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_problem_selection",
+      "label": "Problem Selection",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L166"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_documentation",
+      "label": "Documentation",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L178"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_development",
+      "label": "Development",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L196"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_available_scripts",
+      "label": "Available Scripts",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L198"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_code_quality",
+      "label": "Code Quality",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L213"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_architecture_overview",
+      "label": "Architecture Overview",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L222"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_hint_agent_flow",
+      "label": "Hint Agent Flow",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L252"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_rag_data_processing",
+      "label": "RAG Data Processing",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L270"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_api_highlights",
+      "label": "API Highlights",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L295"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_interview_chat",
+      "label": "Interview Chat",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L297"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_code_execution",
+      "label": "Code Execution",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L310"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_engineering_domains",
+      "label": "Engineering Domains",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L325"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_contributing",
+      "label": "Contributing",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L340"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_quick_contribution_guide",
+      "label": "Quick Contribution Guide",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L344"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_security",
+      "label": "Security",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L355"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_license",
+      "label": "License",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L361"
+    },
+    {
+      "id": "mockmatewebsitet7_readme_support",
+      "label": "Support",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L367"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_what_is_codesparring",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_what_is_codesparring",
+      "target": "mockmatewebsitet7_readme_key_features",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_tech_stack",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_quick_start",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L65",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_quick_start",
+      "target": "mockmatewebsitet7_readme_prerequisites",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L67",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_quick_start",
+      "target": "mockmatewebsitet7_readme_installation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L74",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_quick_start",
+      "target": "mockmatewebsitet7_readme_environment_variables",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L94",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_project_structure",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L112",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_see_it_in_action",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L145",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_see_it_in_action",
+      "target": "mockmatewebsitet7_readme_performance_dashboard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L158",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_see_it_in_action",
+      "target": "mockmatewebsitet7_readme_problem_selection",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L166",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_documentation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L178",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_architecture_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L182",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_platform_architecture_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L183",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L184",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_prd_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L185",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_platform_architecture_mermaid_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L186",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_api_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L187",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_onboarding_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L188",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_firebase_structure_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L189",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_testing_guide_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L190",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_contributing_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L191",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_security_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L192",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_development",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L196",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_development",
+      "target": "mockmatewebsitet7_readme_available_scripts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L198",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_development",
+      "target": "mockmatewebsitet7_readme_code_quality",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L213",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_architecture_overview",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L222",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_architecture_overview",
+      "target": "mockmatewebsitet7_readme_hint_agent_flow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L252",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_architecture_overview",
+      "target": "mockmatewebsitet7_readme_rag_data_processing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L270",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_api_highlights",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L295",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_api_highlights",
+      "target": "mockmatewebsitet7_readme_interview_chat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L297",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_api_highlights",
+      "target": "mockmatewebsitet7_readme_code_execution",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L310",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_engineering_domains",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L325",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_contributing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L340",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_readme_contributing",
+      "target": "mockmatewebsitet7_readme_quick_contribution_guide",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L344",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_security",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L355",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_license",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L361",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "target": "mockmatewebsitet7_readme_support",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L367",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

@@ -1,0 +1,282 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "label": "how-codesparring-creates-your-personalized-roadmap.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_the_three_inputs_that_change_everything",
+      "label": "The Three Inputs That Change Everything",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L17"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_1_your_target_company",
+      "label": "1. Your Target Company",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L21"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_2_your_interview_date",
+      "label": "2. Your Interview Date",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L38"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_3_your_current_skill_level",
+      "label": "3. Your Current Skill Level",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L61"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_inside_the_algorithm",
+      "label": "Inside the Algorithm",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L72"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_step_1_score_every_pattern",
+      "label": "Step 1: Score Every Pattern",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L76"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_step_2_generate_daily_plans",
+      "label": "Step 2: Generate Daily Plans",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L98"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_step_3_build_in_spaced_repetition",
+      "label": "Step 3: Build in Spaced Repetition",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L107"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_step_4_set_milestones",
+      "label": "Step 4: Set Milestones",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L120"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_what_makes_this_different_from_generic_plans",
+      "label": "What Makes This Different from Generic Plans",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L131"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_real_example_30_day_google_prep",
+      "label": "Real Example: 30-Day Google Prep",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L141"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_the_scoring_in_action",
+      "label": "The Scoring in Action",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L170"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_why_personalization_matters",
+      "label": "Why Personalization Matters",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L188"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_get_your_personalized_roadmap",
+      "label": "Get Your Personalized Roadmap",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L206"
+    },
+    {
+      "id": "blog_how_codesparring_creates_your_personalized_roadmap_the_bottom_line",
+      "label": "The Bottom Line",
+      "file_type": "document",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L219"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_the_three_inputs_that_change_everything",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_the_three_inputs_that_change_everything",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_1_your_target_company",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "interview_prep_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L36",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_the_three_inputs_that_change_everything",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_2_your_interview_date",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_the_three_inputs_that_change_everything",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_3_your_current_skill_level",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L61",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_inside_the_algorithm",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_inside_the_algorithm",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_step_1_score_every_pattern",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_inside_the_algorithm",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_step_2_generate_daily_plans",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L98",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_inside_the_algorithm",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_step_3_build_in_spaced_repetition",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L107",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_spaced_repetition_for_coding_interviews_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L118",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_how_codesparring_creates_your_personalized_roadmap_inside_the_algorithm",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_step_4_set_milestones",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L120",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_what_makes_this_different_from_generic_plans",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L131",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_real_example_30_day_google_prep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L141",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_the_scoring_in_action",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L170",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_why_personalization_matters",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L188",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_get_your_personalized_roadmap",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L206",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "roadmap_preview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L215",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_how_codesparring_creates_your_personalized_roadmap_mdx",
+      "target": "blog_how_codesparring_creates_your_personalized_roadmap_the_bottom_line",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/how-codesparring-creates-your-personalized-roadmap.mdx",
+      "source_location": "L219",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

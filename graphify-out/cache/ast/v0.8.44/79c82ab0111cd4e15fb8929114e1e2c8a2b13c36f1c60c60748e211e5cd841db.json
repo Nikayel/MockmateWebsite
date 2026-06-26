@@ -1,0 +1,648 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "label": "faang-vs-top-tech-interview-comparison.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_quick_comparison_table",
+      "label": "Quick Comparison Table",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L17"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "label": "Tier 1: FAANG+ (The Big Six)",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L34"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_google",
+      "label": "Google",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L36"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_meta_facebook",
+      "label": "Meta (Facebook)",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L59"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_amazon",
+      "label": "Amazon",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L82"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_apple",
+      "label": "Apple",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L107"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_netflix",
+      "label": "Netflix",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L130"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_microsoft",
+      "label": "Microsoft",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L153"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_tier_2_top_tech_companies",
+      "label": "Tier 2: Top Tech Companies",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L176"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_stripe",
+      "label": "Stripe",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L178"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_uber",
+      "label": "Uber",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L187"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_airbnb",
+      "label": "Airbnb",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L196"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_linkedin",
+      "label": "LinkedIn",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L205"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_tier_3_high_growth_finance",
+      "label": "Tier 3: High-Growth & Finance",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L214"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_coinbase",
+      "label": "Coinbase",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L216"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_databricks",
+      "label": "Databricks",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L225"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_snowflake",
+      "label": "Snowflake",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L234"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_jane_street",
+      "label": "Jane Street",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L243"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_choosing_your_target",
+      "label": "Choosing Your Target",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L252"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_if_you_value_work_life_balance",
+      "label": "If You Value Work-Life Balance:",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L254"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_if_you_want_maximum_compensation",
+      "label": "If You Want Maximum Compensation:",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L259"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_if_you_re_a_new_grad_intern",
+      "label": "If You're a New Grad/Intern:",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L264"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_if_you_want_fast_interview_process",
+      "label": "If You Want Fast Interview Process:",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L269"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_universal_interview_truths",
+      "label": "Universal Interview Truths",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L276"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_1_communication_matters_everywhere",
+      "label": "1. Communication Matters Everywhere",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L280"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_2_fundamentals_beat_tricks",
+      "label": "2. Fundamentals Beat Tricks",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L283"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_3_behavioral_prep_is_non_negotiable",
+      "label": "3. Behavioral Prep is Non-Negotiable",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L286"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_4_system_design_for_experienced_candidates",
+      "label": "4. System Design (for Experienced Candidates)",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L289"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_your_next_steps",
+      "label": "Your Next Steps",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L294"
+    },
+    {
+      "id": "blog_faang_vs_top_tech_interview_comparison_the_bottom_line",
+      "label": "The Bottom Line",
+      "file_type": "document",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L307"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_quick_comparison_table",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "target": "blog_faang_vs_top_tech_interview_comparison_google",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L36",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_google_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "target": "blog_faang_vs_top_tech_interview_comparison_meta_facebook",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L59",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_meta_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L62",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "target": "blog_faang_vs_top_tech_interview_comparison_amazon",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L82",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_amazon_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L85",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L103",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "target": "blog_faang_vs_top_tech_interview_comparison_apple",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L107",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_apple_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L110",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "target": "blog_faang_vs_top_tech_interview_comparison_netflix",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L130",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_netflix_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L133",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_1_faang_the_big_six",
+      "target": "blog_faang_vs_top_tech_interview_comparison_microsoft",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L153",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_microsoft_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L156",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_tier_2_top_tech_companies",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L176",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_2_top_tech_companies",
+      "target": "blog_faang_vs_top_tech_interview_comparison_stripe",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L178",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_stripe_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L181",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_2_top_tech_companies",
+      "target": "blog_faang_vs_top_tech_interview_comparison_uber",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L187",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_uber_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L190",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_2_top_tech_companies",
+      "target": "blog_faang_vs_top_tech_interview_comparison_airbnb",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L196",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_airbnb_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L199",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_2_top_tech_companies",
+      "target": "blog_faang_vs_top_tech_interview_comparison_linkedin",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L205",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_linkedin_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L208",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_tier_3_high_growth_finance",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L214",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_3_high_growth_finance",
+      "target": "blog_faang_vs_top_tech_interview_comparison_coinbase",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L216",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_coinbase_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L219",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_3_high_growth_finance",
+      "target": "blog_faang_vs_top_tech_interview_comparison_databricks",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L225",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_databricks_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L228",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_3_high_growth_finance",
+      "target": "blog_faang_vs_top_tech_interview_comparison_snowflake",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L234",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_snowflake_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L237",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_tier_3_high_growth_finance",
+      "target": "blog_faang_vs_top_tech_interview_comparison_jane_street",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L243",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "interview_prep_jane_street_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L246",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_choosing_your_target",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L252",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_choosing_your_target",
+      "target": "blog_faang_vs_top_tech_interview_comparison_if_you_value_work_life_balance",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L254",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_choosing_your_target",
+      "target": "blog_faang_vs_top_tech_interview_comparison_if_you_want_maximum_compensation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L259",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_choosing_your_target",
+      "target": "blog_faang_vs_top_tech_interview_comparison_if_you_re_a_new_grad_intern",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L264",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_choosing_your_target",
+      "target": "blog_faang_vs_top_tech_interview_comparison_if_you_want_fast_interview_process",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L269",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_universal_interview_truths",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L276",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_universal_interview_truths",
+      "target": "blog_faang_vs_top_tech_interview_comparison_1_communication_matters_everywhere",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L280",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_universal_interview_truths",
+      "target": "blog_faang_vs_top_tech_interview_comparison_2_fundamentals_beat_tricks",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L283",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_universal_interview_truths",
+      "target": "blog_faang_vs_top_tech_interview_comparison_3_behavioral_prep_is_non_negotiable",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L286",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_faang_vs_top_tech_interview_comparison_universal_interview_truths",
+      "target": "blog_faang_vs_top_tech_interview_comparison_4_system_design_for_experienced_candidates",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L289",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_your_next_steps",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L294",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "roadmap_preview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L303",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_faang_vs_top_tech_interview_comparison_mdx",
+      "target": "blog_faang_vs_top_tech_interview_comparison_the_bottom_line",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/faang-vs-top-tech-interview-comparison.mdx",
+      "source_location": "L307",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

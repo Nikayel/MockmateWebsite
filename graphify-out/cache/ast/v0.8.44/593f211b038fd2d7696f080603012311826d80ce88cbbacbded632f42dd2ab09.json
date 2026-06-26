@@ -1,0 +1,223 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_build_progress_md",
+      "label": "BUILD_PROGRESS.md",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "label": "Case Labs \u2014 Build Progress Ledger",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "case_labs_build_progress_phase_0_scaffolding_types_spec_9_12",
+      "label": "Phase 0 \u2014 Scaffolding & types (spec \u00a79, \u00a712)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L13"
+    },
+    {
+      "id": "case_labs_build_progress_phase_1_shell_milestone_rail_no_ai_spec_6_p1_p3",
+      "label": "Phase 1 \u2014 Shell & milestone rail, no AI (spec \u00a76, P1/P3)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L18"
+    },
+    {
+      "id": "case_labs_build_progress_phase_2_form_stations_spec_7_1_7_3_p2",
+      "label": "Phase 2 \u2014 Form stations (spec \u00a77.1\u20137.3, P2)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L24"
+    },
+    {
+      "id": "case_labs_build_progress_phase_3_build_review_spec_7_4_7_5",
+      "label": "Phase 3 \u2014 Build & Review (spec \u00a77.4\u20137.5)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L30"
+    },
+    {
+      "id": "case_labs_build_progress_phase_4_port_palantir_911_dispatch_spec_1_7_4_ingredient_workbook_palantir_decomp_labs_lab_01_911_dispatch",
+      "label": "Phase 4 \u2014 Port Palantir 911 Dispatch (spec \u00a71, \u00a77.4; ingredient: ../workbook-palantir-decomp/labs/lab_01_911_dispatch)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L35"
+    },
+    {
+      "id": "case_labs_build_progress_phase_5_ai_spine_browse_polish_spec_7_8_only_after_0_4_solid",
+      "label": "Phase 5 \u2014 AI spine + browse + polish (spec \u00a77, \u00a78; only after 0\u20134 solid)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L40"
+    },
+    {
+      "id": "case_labs_build_progress_phase_6_wiring_integration_make_it_discoverable_close_deferred_integrations",
+      "label": "Phase 6 \u2014 Wiring & integration (make it discoverable; close deferred integrations)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L47"
+    },
+    {
+      "id": "case_labs_build_progress_definition_of_done",
+      "label": "Definition of Done",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L57"
+    },
+    {
+      "id": "case_labs_build_progress_case_labs_build_complete",
+      "label": "CASE LABS BUILD COMPLETE",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L67"
+    },
+    {
+      "id": "case_labs_build_progress_caveat_pre_existing_not_introduced_here",
+      "label": "Caveat (pre-existing, NOT introduced here)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L86"
+    },
+    {
+      "id": "case_labs_build_progress_decision_log_loop_appends_new_choices_here",
+      "label": "Decision log (loop appends new choices here)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L94"
+    },
+    {
+      "id": "case_labs_build_progress_iteration_notes_loop_appends_one_line_per_increment",
+      "label": "Iteration notes (loop appends one line per increment)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L98"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_build_progress_md",
+      "target": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_0_scaffolding_types_spec_9_12",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_1_shell_milestone_rail_no_ai_spec_6_p1_p3",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_2_form_stations_spec_7_1_7_3_p2",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_3_build_review_spec_7_4_7_5",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_4_port_palantir_911_dispatch_spec_1_7_4_ingredient_workbook_palantir_decomp_labs_lab_01_911_dispatch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_5_ai_spine_browse_polish_spec_7_8_only_after_0_4_solid",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_phase_6_wiring_integration_make_it_discoverable_close_deferred_integrations",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_definition_of_done",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L57",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_case_labs_build_complete",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L67",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_complete",
+      "target": "case_labs_build_progress_caveat_pre_existing_not_introduced_here",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L86",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_decision_log_loop_appends_new_choices_here",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L94",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_progress_case_labs_build_progress_ledger",
+      "target": "case_labs_build_progress_iteration_notes_loop_appends_one_line_per_increment",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_PROGRESS.md",
+      "source_location": "L98",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

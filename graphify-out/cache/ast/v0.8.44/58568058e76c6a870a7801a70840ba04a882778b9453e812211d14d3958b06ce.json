@@ -1,0 +1,671 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_api_md",
+      "label": "API.md",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_api_codesparring_api_reference",
+      "label": "CodeSparring API Reference",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_api_base_url",
+      "label": "Base URL",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "docs_api_authentication",
+      "label": "Authentication",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L12"
+    },
+    {
+      "id": "docs_api_getting_a_token_client_side",
+      "label": "Getting a Token (Client-Side)",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L20"
+    },
+    {
+      "id": "docs_api_quick_reference",
+      "label": "Quick Reference",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L30"
+    },
+    {
+      "id": "docs_api_rate_limits",
+      "label": "Rate Limits",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L42"
+    },
+    {
+      "id": "docs_api_interview_apis",
+      "label": "Interview APIs",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L70"
+    },
+    {
+      "id": "docs_api_post_api_chat",
+      "label": "POST /api/chat",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L72"
+    },
+    {
+      "id": "docs_api_request",
+      "label": "Request",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L78"
+    },
+    {
+      "id": "docs_api_response",
+      "label": "Response",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L94"
+    },
+    {
+      "id": "docs_api_example",
+      "label": "Example",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L107"
+    },
+    {
+      "id": "docs_api_ai_roles",
+      "label": "AI Roles",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L130"
+    },
+    {
+      "id": "docs_api_post_api_execute",
+      "label": "POST /api/execute",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L139"
+    },
+    {
+      "id": "docs_api_request_146",
+      "label": "Request",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L146"
+    },
+    {
+      "id": "docs_api_response_157",
+      "label": "Response",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L157"
+    },
+    {
+      "id": "docs_api_example_183",
+      "label": "Example",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L183"
+    },
+    {
+      "id": "docs_api_supported_languages",
+      "label": "Supported Languages",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L208"
+    },
+    {
+      "id": "docs_api_post_api_generate_feedback",
+      "label": "POST /api/generate-feedback",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L222"
+    },
+    {
+      "id": "docs_api_request_228",
+      "label": "Request",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L228"
+    },
+    {
+      "id": "docs_api_response_249",
+      "label": "Response",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L249"
+    },
+    {
+      "id": "docs_api_user_apis",
+      "label": "User APIs",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L269"
+    },
+    {
+      "id": "docs_api_get_api_user_profile",
+      "label": "GET /api/user/profile",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L271"
+    },
+    {
+      "id": "docs_api_post_api_user_profile",
+      "label": "POST /api/user/profile",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L290"
+    },
+    {
+      "id": "docs_api_get_api_user_metrics",
+      "label": "GET /api/user/metrics",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L304"
+    },
+    {
+      "id": "docs_api_get_api_user_usage",
+      "label": "GET /api/user/usage",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L329"
+    },
+    {
+      "id": "docs_api_spaced_repetition_apis",
+      "label": "Spaced Repetition APIs",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L353"
+    },
+    {
+      "id": "docs_api_get_api_spaced_repetition_due",
+      "label": "GET /api/spaced-repetition/due",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L355"
+    },
+    {
+      "id": "docs_api_post_api_spaced_repetition_complete",
+      "label": "POST /api/spaced-repetition/complete",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L378"
+    },
+    {
+      "id": "docs_api_get_api_spaced_repetition_stats",
+      "label": "GET /api/spaced-repetition/stats",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L401"
+    },
+    {
+      "id": "docs_api_payment_apis",
+      "label": "Payment APIs",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L425"
+    },
+    {
+      "id": "docs_api_post_api_create_checkout",
+      "label": "POST /api/create-checkout",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L427"
+    },
+    {
+      "id": "docs_api_post_api_customer_portal",
+      "label": "POST /api/customer-portal",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L446"
+    },
+    {
+      "id": "docs_api_post_api_sync_subscription",
+      "label": "POST /api/sync-subscription",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L462"
+    },
+    {
+      "id": "docs_api_admin_apis",
+      "label": "Admin APIs",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L477"
+    },
+    {
+      "id": "docs_api_get_api_admin_analytics",
+      "label": "GET /api/admin/analytics",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L481"
+    },
+    {
+      "id": "docs_api_get_api_admin_users",
+      "label": "GET /api/admin/users",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L515"
+    },
+    {
+      "id": "docs_api_get_api_admin_revenue",
+      "label": "GET /api/admin/revenue",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L533"
+    },
+    {
+      "id": "docs_api_webhook",
+      "label": "Webhook",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L555"
+    },
+    {
+      "id": "docs_api_post_api_webhook_stripe",
+      "label": "POST /api/webhook/stripe",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L557"
+    },
+    {
+      "id": "docs_api_error_codes",
+      "label": "Error Codes",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L570"
+    },
+    {
+      "id": "docs_api_sdk_example",
+      "label": "SDK Example",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L585"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_api_md",
+      "target": "docs_api_codesparring_api_reference",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_base_url",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_authentication",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_authentication",
+      "target": "docs_api_getting_a_token_client_side",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_quick_reference",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_rate_limits",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_interview_apis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L70",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_interview_apis",
+      "target": "docs_api_post_api_chat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_chat",
+      "target": "docs_api_request",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L78",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_chat",
+      "target": "docs_api_response",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L94",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_chat",
+      "target": "docs_api_example",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L107",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_chat",
+      "target": "docs_api_ai_roles",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L130",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_interview_apis",
+      "target": "docs_api_post_api_execute",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L139",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_execute",
+      "target": "docs_api_request_146",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L146",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_execute",
+      "target": "docs_api_response_157",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L157",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_execute",
+      "target": "docs_api_example_183",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L183",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_execute",
+      "target": "docs_api_supported_languages",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L208",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_interview_apis",
+      "target": "docs_api_post_api_generate_feedback",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L222",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_generate_feedback",
+      "target": "docs_api_request_228",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L228",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_post_api_generate_feedback",
+      "target": "docs_api_response_249",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L249",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_user_apis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L269",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_user_apis",
+      "target": "docs_api_get_api_user_profile",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L271",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_user_apis",
+      "target": "docs_api_post_api_user_profile",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L290",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_user_apis",
+      "target": "docs_api_get_api_user_metrics",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L304",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_user_apis",
+      "target": "docs_api_get_api_user_usage",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L329",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_spaced_repetition_apis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L353",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_spaced_repetition_apis",
+      "target": "docs_api_get_api_spaced_repetition_due",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L355",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_spaced_repetition_apis",
+      "target": "docs_api_post_api_spaced_repetition_complete",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L378",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_spaced_repetition_apis",
+      "target": "docs_api_get_api_spaced_repetition_stats",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L401",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_payment_apis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L425",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_payment_apis",
+      "target": "docs_api_post_api_create_checkout",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L427",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_payment_apis",
+      "target": "docs_api_post_api_customer_portal",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L446",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_payment_apis",
+      "target": "docs_api_post_api_sync_subscription",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L462",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_admin_apis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L477",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_admin_apis",
+      "target": "docs_api_get_api_admin_analytics",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L481",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_admin_apis",
+      "target": "docs_api_get_api_admin_users",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L515",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_admin_apis",
+      "target": "docs_api_get_api_admin_revenue",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L533",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_webhook",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L555",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_webhook",
+      "target": "docs_api_post_api_webhook_stripe",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L557",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_error_codes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L570",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_api_codesparring_api_reference",
+      "target": "docs_api_sdk_example",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L585",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

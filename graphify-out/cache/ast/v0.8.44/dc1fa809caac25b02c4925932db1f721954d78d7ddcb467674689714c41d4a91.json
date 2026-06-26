@@ -1,0 +1,456 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "label": "amazon-leadership-principles-interview-guide.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_why_leadership_principles_matter",
+      "label": "Why Leadership Principles Matter",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L15"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "label": "The 16 Amazon Leadership Principles",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L21"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_1_customer_obsession",
+      "label": "1. Customer Obsession",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L23"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_2_ownership",
+      "label": "2. Ownership",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L42"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_3_invent_and_simplify",
+      "label": "3. Invent and Simplify",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L53"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_4_are_right_a_lot",
+      "label": "4. Are Right, A Lot",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L64"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_5_learn_and_be_curious",
+      "label": "5. Learn and Be Curious",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L75"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_6_hire_and_develop_the_best",
+      "label": "6. Hire and Develop the Best",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L86"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_7_insist_on_the_highest_standards",
+      "label": "7. Insist on the Highest Standards",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L97"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_8_think_big",
+      "label": "8. Think Big",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L108"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_9_bias_for_action",
+      "label": "9. Bias for Action",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L119"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_10_frugality",
+      "label": "10. Frugality",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L130"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_11_earn_trust",
+      "label": "11. Earn Trust",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L141"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_12_dive_deep",
+      "label": "12. Dive Deep",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L152"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_13_have_backbone_disagree_and_commit",
+      "label": "13. Have Backbone; Disagree and Commit",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L163"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_14_deliver_results",
+      "label": "14. Deliver Results",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L174"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_15_strive_to_be_earth_s_best_employer",
+      "label": "15. Strive to be Earth's Best Employer",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L185"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_16_success_and_scale_bring_broad_responsibility",
+      "label": "16. Success and Scale Bring Broad Responsibility",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L196"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_the_star_method_your_answer_framework",
+      "label": "The STAR Method: Your Answer Framework",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L207"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_common_star_mistakes",
+      "label": "Common STAR Mistakes",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L218"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_preparing_your_story_bank",
+      "label": "Preparing Your Story Bank",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L228"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_story_template",
+      "label": "Story Template",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L232"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_stories_you_need",
+      "label": "Stories You Need",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L244"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_red_flags_interviewers_watch_for",
+      "label": "Red Flags Interviewers Watch For",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L257"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_interview_day_tips",
+      "label": "Interview Day Tips",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L269"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_how_codesparring_helps_with_lp_prep",
+      "label": "How CodeSparring Helps with LP Prep",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L287"
+    },
+    {
+      "id": "blog_amazon_leadership_principles_interview_guide_final_checklist",
+      "label": "Final Checklist",
+      "file_type": "document",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L302"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_why_leadership_principles_matter",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_1_customer_obsession",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_2_ownership",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_3_invent_and_simplify",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_4_are_right_a_lot",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_5_learn_and_be_curious",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L75",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_6_hire_and_develop_the_best",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L86",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_7_insist_on_the_highest_standards",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L97",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_8_think_big",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_9_bias_for_action",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L119",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_10_frugality",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L130",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_11_earn_trust",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L141",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_12_dive_deep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L152",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_13_have_backbone_disagree_and_commit",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L163",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_14_deliver_results",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L174",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_15_strive_to_be_earth_s_best_employer",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L185",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_16_amazon_leadership_principles",
+      "target": "blog_amazon_leadership_principles_interview_guide_16_success_and_scale_bring_broad_responsibility",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L196",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_the_star_method_your_answer_framework",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L207",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_the_star_method_your_answer_framework",
+      "target": "blog_amazon_leadership_principles_interview_guide_common_star_mistakes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L218",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_preparing_your_story_bank",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L228",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_preparing_your_story_bank",
+      "target": "blog_amazon_leadership_principles_interview_guide_story_template",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L232",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_amazon_leadership_principles_interview_guide_preparing_your_story_bank",
+      "target": "blog_amazon_leadership_principles_interview_guide_stories_you_need",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L244",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_red_flags_interviewers_watch_for",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L257",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_interview_day_tips",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L269",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_how_codesparring_helps_with_lp_prep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L287",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "interview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L300",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_amazon_leadership_principles_interview_guide_mdx",
+      "target": "blog_amazon_leadership_principles_interview_guide_final_checklist",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/amazon-leadership-principles-interview-guide.mdx",
+      "source_location": "L302",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

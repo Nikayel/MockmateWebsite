@@ -1,0 +1,63 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_plans_technical_chores_md",
+      "label": "technical-chores.md",
+      "file_type": "document",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "plans_technical_chores_technical_chores",
+      "label": "Technical Chores",
+      "file_type": "document",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "plans_technical_chores_checklist",
+      "label": "Checklist",
+      "file_type": "document",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L9"
+    },
+    {
+      "id": "plans_technical_chores_verification",
+      "label": "Verification",
+      "file_type": "document",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L26"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_plans_technical_chores_md",
+      "target": "plans_technical_chores_technical_chores",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "plans_technical_chores_technical_chores",
+      "target": "plans_technical_chores_checklist",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "plans_technical_chores_technical_chores",
+      "target": "plans_technical_chores_verification",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/technical-chores.md",
+      "source_location": "L26",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

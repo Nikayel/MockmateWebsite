@@ -25,9 +25,9 @@
     "hash": "3258ce698b297b7fe5c0d102ae353311682a90364766fcf4694a25bca97f2224"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/package.json": {
-    "size": 5119,
-    "mtime_ns": 1781915214570000000,
-    "hash": "9571a6199fcf42bc8a03e58c3e3e7a25f48c50da02376a4c4f9d8cd4499e393d"
+    "size": 5160,
+    "mtime_ns": 1782347190520000000,
+    "hash": "8c81fe315535d2ddf087f530e0f1472ae3fbee94866b9587ebec68dec44acd98"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/patch_runners.py": {
     "size": 2047,
@@ -70,9 +70,9 @@
     "hash": "4ad1e9b8d2a1f2348ec2c9b1c280a2df165cc0458895d965ed7dbb6898000171"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/CLAUDE.md": {
-    "size": 4440,
-    "mtime_ns": 1778171371000000000,
-    "hash": "652fbb824c90b82c901b2b014cf10ac5680ad82a4ee919d3d767ac96ff88f348"
+    "size": 5213,
+    "mtime_ns": 1782347189920000000,
+    "hash": "620ac2c17460a58cd17f67037e4225c61daf7fb0efb3618eb05ff2ce82aa00fd"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/CONTRIBUTING.md": {
     "size": 12581,
@@ -175,9 +175,9 @@
     "hash": "d5eda75b382793033ec2c6941a4b187cbcfbeec0957186b929095a3a7dd9c0c0"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/docs/FIREBASE_STRUCTURE.md": {
-    "size": 7119,
-    "mtime_ns": 1767544828000000000,
-    "hash": "0fd765d0af4c46dc03977d721a91efc837583c0ffcee138bd3cad9e2bc551c44"
+    "size": 8946,
+    "mtime_ns": 1782415765750000000,
+    "hash": "7bb1a537e2720c6dfb30b9e57644f9c8a4fce549dc08aa3356c6ff4becf1204a"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/docs/ONBOARDING.md": {
     "size": 11991,
@@ -458,5 +458,140 @@
     "size": 600529,
     "mtime_ns": 1763159550000000000,
     "hash": "1dcf47067a53e3505c28f97f468be85058927f814c59a0ecc451451905ac5cdd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/.claude/settings.json": {
+    "size": 1997,
+    "mtime_ns": 1782347189910000000,
+    "hash": "e43eb1c413581f3e666a96fc11ac41c6a7cb59739fcd1ee2d56cf25f504c4ba6"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/eslint-results.json": {
+    "size": 5077542,
+    "mtime_ns": 1782347190190000000,
+    "hash": "df9aabfa1e7c0ef28d74e451d09dc3a2e4e1de5997476dd8b95da8c766c2f7ad"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/Design.md": {
+    "size": 37095,
+    "mtime_ns": 1782347189930000000,
+    "hash": "3424f6f3826bd8b49a520d38032905753319c6e16bd2fec17920030d441c1237"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/._CASE_LABS.md": {
+    "size": 4096,
+    "mtime_ns": 1782412617510000000,
+    "hash": "d3809bd3154f1f073ff82b76c4a49515870d9e6ea95914400656a64947507bcd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/._go-live-vc-strategy.md": {
+    "size": 4096,
+    "mtime_ns": 1782412534750000000,
+    "hash": "d76d67469850f988ad8f0a6da710287d7296d0199216b181526bd048de5a79da"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/CASE_LABS.md": {
+    "size": 31422,
+    "mtime_ns": 1782412617510000000,
+    "hash": "ef4c7a34532e8016c057750da12287d9873e06ab1c45d2e90adbd96146edfe88"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/go-live-vc-strategy.md": {
+    "size": 16350,
+    "mtime_ns": 1782347190160000000,
+    "hash": "878320d77f94913a866e2f90ed9d2d74912bbd218ee9f2d89c4afc0e17e36a41"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/README.md": {
+    "size": 3809,
+    "mtime_ns": 1782404509780000000,
+    "hash": "cab91f8e87e4f8873d6026cb21a6da8a07c71722f457233562cda00e15d5d56d"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/bugfix-realism-loop.md": {
+    "size": 4710,
+    "mtime_ns": 1782402835480000000,
+    "hash": "2ba5d805fa54577c9cd52d7bb7bac3131db978c4fd5ab35b5e103920c80bc2ca"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/interview-workspace-ux-loop.md": {
+    "size": 5174,
+    "mtime_ns": 1782404509780000000,
+    "hash": "2be622276b6ffade849786573ca4929f8432ef503e471d1791f290790c3977e5"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/loop-log.md": {
+    "size": 25535,
+    "mtime_ns": 1782413332550000000,
+    "hash": "0200e431f05faf5e6e3a4c3909ca98a20ada27636fdca136bbc3037ea579cc10"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/ui-conformance-loop.md": {
+    "size": 3218,
+    "mtime_ns": 1782402835480000000,
+    "hash": "8295071513ae047889a03a6325db45f6f86647a2163277655cc16d062c2f7f2a"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/ux-voice-loop.md": {
+    "size": 4243,
+    "mtime_ns": 1782402835480000000,
+    "hash": "b37dc27995d0d5e83fdbdbfef8f062d041f9976e3a376828ee1adcc47c13da29"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/refactor-interview-page.md": {
+    "size": 1678,
+    "mtime_ns": 1782402835490000000,
+    "hash": "2c309a7a8318e56823b543b9d45b9ba6861a929519356221b1d9a8f2ad9c0ed8"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/technical-chores.md": {
+    "size": 1426,
+    "mtime_ns": 1782402835490000000,
+    "hash": "52c0986b52cebe331daf1f3d73a30c1cd6228bcda0fb8aaef1e25a2e5e957ade"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/loops/._loop-log.md": {
+    "size": 4096,
+    "mtime_ns": 1782413332550000000,
+    "hash": "0f9f645891ca409a6fe3ed5cb6bbbb49e8ade919d15551ec37cff9098653f415"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/._BUILD_LOOP_PROMPT.md": {
+    "size": 4096,
+    "mtime_ns": 1782435366260000000,
+    "hash": "5e069c46916c0390a80a83210081c4621a1ee0c3cd50e431ca937d328447e3fd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/._BUILD_PROGRESS.md": {
+    "size": 4096,
+    "mtime_ns": 1782437371370000000,
+    "hash": "02e242b8b55d9391587415e3df3edf698bd55806095eea78cbfab64026a826bd"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/._CASE_LABS.md": {
+    "size": 4096,
+    "mtime_ns": 1782437223740000000,
+    "hash": "26c65e5dd371811edd0eca9e184be652b6c27d0d8427f3c5ab1badbb89fd2df5"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/BUILD_LOOP_PROMPT.md": {
+    "size": 10157,
+    "mtime_ns": 1782435366270000000,
+    "hash": "997f4c74d346c1d9bda42cd2b3ee40f6d940dbd5e92330d12a7e87b2df484e6e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/BUILD_PROGRESS.md": {
+    "size": 22951,
+    "mtime_ns": 1782437371380000000,
+    "hash": "593f211b038fd2d7696f080603012311826d80ce88cbbacbded632f42dd2ab09"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/CASE_LABS.md": {
+    "size": 36774,
+    "mtime_ns": 1782437223750000000,
+    "hash": "d8923320645dfcdda092b3a4b6cb879edd26d84a367537373e8614497aa7b6c3"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/._FIREBASE_STRUCTURE.md": {
+    "size": 4096,
+    "mtime_ns": 1782415765750000000,
+    "hash": "ed88e299379d87bca1f41efe88c6b28a78d08f2a7ee4432d6dcd1372f100591e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/._SHIP_LOOP_PROMPT.md": {
+    "size": 4096,
+    "mtime_ns": 1782434585330000000,
+    "hash": "bb477191ded8d08b8900bbe828402fad6dc2c6c8beb2422516d432e9eafa745b"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/._SHIP_PROGRESS.md": {
+    "size": 4096,
+    "mtime_ns": 1782434585340000000,
+    "hash": "b518c89c6027b82dbd0137ad6f80f8ec5eb464b81e91aa880117a2c3eecaf52c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/SHIP_LOOP_PROMPT.md": {
+    "size": 7866,
+    "mtime_ns": 1782434585340000000,
+    "hash": "fc25ca4dd242405b75d850b4f2acd46b70c467f09dc1aeb77c2db79307057c0c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/SHIP_PROGRESS.md": {
+    "size": 3185,
+    "mtime_ns": 1782434585340000000,
+    "hash": "5b187aa453aaf32c81279a0b9f4acb333102738abafab65fed83e5905a282160"
   }
 }

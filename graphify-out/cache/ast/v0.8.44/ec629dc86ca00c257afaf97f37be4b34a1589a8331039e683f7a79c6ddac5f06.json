@@ -1,0 +1,289 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "label": "free-mock-interview-practice-online.mdx",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L1"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_why_mock_interviews_matter",
+      "label": "Why Mock Interviews Matter",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L15"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_free_mock_interview_options",
+      "label": "Free Mock Interview Options",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L26"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_1_ai_mock_interviewers",
+      "label": "1. AI Mock Interviewers",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L28"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_2_peer_matching_platforms",
+      "label": "2. Peer Matching Platforms",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L40"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_3_self_recording_practice",
+      "label": "3. Self-Recording Practice",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L58"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_what_to_practice",
+      "label": "What to Practice",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L68"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_technical_interviews",
+      "label": "Technical Interviews",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L72"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_behavioral_interviews",
+      "label": "Behavioral Interviews",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L77"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_system_design_senior_roles",
+      "label": "System Design (Senior roles)",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L83"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_how_often_should_you_practice",
+      "label": "How Often Should You Practice?",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L88"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_making_the_most_of_each_session",
+      "label": "Making the Most of Each Session",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L98"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_before_the_interview",
+      "label": "Before the Interview",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L100"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_during_the_interview",
+      "label": "During the Interview",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L105"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_after_the_interview",
+      "label": "After the Interview",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L111"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_the_free_vs_paid_tradeoff",
+      "label": "The Free vs Paid Tradeoff",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L117"
+    },
+    {
+      "id": "blog_free_mock_interview_practice_online_start_practicing_now",
+      "label": "Start Practicing Now",
+      "file_type": "document",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L133"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_why_mock_interviews_matter",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_free_mock_interview_options",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_free_mock_interview_options",
+      "target": "blog_free_mock_interview_practice_online_1_ai_mock_interviewers",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "interview_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_free_mock_interview_options",
+      "target": "blog_free_mock_interview_practice_online_2_peer_matching_platforms",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_free_mock_interview_options",
+      "target": "blog_free_mock_interview_practice_online_3_self_recording_practice",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L58",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_what_to_practice",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L68",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_what_to_practice",
+      "target": "blog_free_mock_interview_practice_online_technical_interviews",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_15_dsa_patterns_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L75",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_what_to_practice",
+      "target": "blog_free_mock_interview_practice_online_behavioral_interviews",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L77",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_what_to_practice",
+      "target": "blog_free_mock_interview_practice_online_system_design_senior_roles",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L83",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_how_often_should_you_practice",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L88",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_making_the_most_of_each_session",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L98",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_making_the_most_of_each_session",
+      "target": "blog_free_mock_interview_practice_online_before_the_interview",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L100",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_making_the_most_of_each_session",
+      "target": "blog_free_mock_interview_practice_online_during_the_interview",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L105",
+      "weight": 1.0
+    },
+    {
+      "source": "blog_free_mock_interview_practice_online_making_the_most_of_each_session",
+      "target": "blog_free_mock_interview_practice_online_after_the_interview",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L111",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_the_free_vs_paid_tradeoff",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L117",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_content_blog_free_mock_interview_practice_online_mdx",
+      "target": "blog_free_mock_interview_practice_online_start_practicing_now",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "content/blog/free-mock-interview-practice-online.mdx",
+      "source_location": "L133",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

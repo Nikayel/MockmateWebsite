@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_go_live_vc_strategy_md",
+      "label": "._go-live-vc-strategy.md",
+      "file_type": "document",
+      "source_file": "docs/._go-live-vc-strategy.md",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

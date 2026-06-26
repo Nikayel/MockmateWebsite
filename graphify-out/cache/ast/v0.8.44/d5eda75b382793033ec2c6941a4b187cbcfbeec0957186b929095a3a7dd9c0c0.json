@@ -1,0 +1,314 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "label": "BACKEND.md",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_backend_codesparring_backend",
+      "label": "CodeSparring Backend",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_backend_1_role_of_the_backend",
+      "label": "1. Role of the backend",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L7"
+    },
+    {
+      "id": "docs_backend_2_runtime_deployment",
+      "label": "2. Runtime & deployment",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L23"
+    },
+    {
+      "id": "docs_backend_3_request_lifecycle_typical_authenticated_route",
+      "label": "3. Request lifecycle (typical authenticated route)",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L31"
+    },
+    {
+      "id": "docs_backend_4_api_surface_by_domain",
+      "label": "4. API surface (by domain)",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L49"
+    },
+    {
+      "id": "docs_backend_interview_ai",
+      "label": "Interview & AI",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L53"
+    },
+    {
+      "id": "docs_backend_learning",
+      "label": "Learning",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L64"
+    },
+    {
+      "id": "docs_backend_user_account",
+      "label": "User & account",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L71"
+    },
+    {
+      "id": "docs_backend_monetization_growth",
+      "label": "Monetization & growth",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L80"
+    },
+    {
+      "id": "docs_backend_platform_voice",
+      "label": "Platform & voice",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L88"
+    },
+    {
+      "id": "docs_backend_admin_operations",
+      "label": "Admin & operations",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L96"
+    },
+    {
+      "id": "docs_backend_scheduled_jobs",
+      "label": "Scheduled jobs",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L105"
+    },
+    {
+      "id": "docs_backend_5_external_services",
+      "label": "5. External services",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L116"
+    },
+    {
+      "id": "docs_backend_6_data_access_pattern",
+      "label": "6. Data access pattern",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L132"
+    },
+    {
+      "id": "docs_backend_7_security_controls",
+      "label": "7. Security controls",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L140"
+    },
+    {
+      "id": "docs_backend_8_observability",
+      "label": "8. Observability",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L150"
+    },
+    {
+      "id": "docs_backend_9_scaling_notes",
+      "label": "9. Scaling notes",
+      "file_type": "document",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L157"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "target": "docs_backend_codesparring_backend",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_1_role_of_the_backend",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_architecture_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_api_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_backend_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_docs_firebase_structure_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_2_runtime_deployment",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_3_request_lifecycle_typical_authenticated_route",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_4_api_surface_by_domain",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_interview_ai",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_learning",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_user_account",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_monetization_growth",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L80",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_platform_voice",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L88",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_admin_operations",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L96",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_4_api_surface_by_domain",
+      "target": "docs_backend_scheduled_jobs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L105",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_5_external_services",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L116",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_6_data_access_pattern",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L132",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_7_security_controls",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L140",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_8_observability",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L150",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_backend_codesparring_backend",
+      "target": "docs_backend_9_scaling_notes",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/BACKEND.md",
+      "source_location": "L157",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

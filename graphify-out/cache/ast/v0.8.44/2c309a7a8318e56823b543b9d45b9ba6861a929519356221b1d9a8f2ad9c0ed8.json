@@ -1,0 +1,95 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_plans_refactor_interview_page_md",
+      "label": "refactor-interview-page.md",
+      "file_type": "document",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "plans_refactor_interview_page_refactoring_plan_app_interview_page_tsx",
+      "label": "Refactoring Plan \u2014 `app/interview/page.tsx`",
+      "file_type": "document",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "plans_refactor_interview_page_problem",
+      "label": "Problem",
+      "file_type": "document",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "plans_refactor_interview_page_principle",
+      "label": "Principle",
+      "file_type": "document",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L12"
+    },
+    {
+      "id": "plans_refactor_interview_page_checklist",
+      "label": "Checklist",
+      "file_type": "document",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L17"
+    },
+    {
+      "id": "plans_refactor_interview_page_verification",
+      "label": "Verification",
+      "file_type": "document",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L31"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_plans_refactor_interview_page_md",
+      "target": "plans_refactor_interview_page_refactoring_plan_app_interview_page_tsx",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "plans_refactor_interview_page_refactoring_plan_app_interview_page_tsx",
+      "target": "plans_refactor_interview_page_problem",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "plans_refactor_interview_page_refactoring_plan_app_interview_page_tsx",
+      "target": "plans_refactor_interview_page_principle",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "plans_refactor_interview_page_refactoring_plan_app_interview_page_tsx",
+      "target": "plans_refactor_interview_page_checklist",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "plans_refactor_interview_page_refactoring_plan_app_interview_page_tsx",
+      "target": "plans_refactor_interview_page_verification",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/plans/refactor-interview-page.md",
+      "source_location": "L31",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

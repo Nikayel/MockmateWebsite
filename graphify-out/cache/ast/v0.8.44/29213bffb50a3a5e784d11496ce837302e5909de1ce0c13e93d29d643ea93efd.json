@@ -1,0 +1,239 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_platform_architecture_mermaid_md",
+      "label": "PLATFORM-ARCHITECTURE-MERMAID.md",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "label": "CodeSparring \u2014 Platform architecture (Mermaid)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_1_system_context_c4_style",
+      "label": "1. System context (C4-style)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L9"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_2_interview_session_behavior_sequence",
+      "label": "2. Interview session \u2014 behavior (sequence)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L60"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_3_code_execution_and_console_capture",
+      "label": "3. Code execution and console capture",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L97"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_4_ai_orchestration_lib_ai_providers_ts",
+      "label": "4. AI orchestration (`lib/ai-providers.ts`)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L119"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_5_rag_pipeline_retrieval_augmented_generation",
+      "label": "5. RAG pipeline (retrieval-augmented generation)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L140"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_6_rag_vectorization_and_data_processing",
+      "label": "6. RAG vectorization and data processing",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L191"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_7_hint_agent_langgraph_flow",
+      "label": "7. Hint agent LangGraph flow",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L233"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_8_authentication_api_requests",
+      "label": "8. Authentication (API requests)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L255"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_9_stripe_subscription_lifecycle",
+      "label": "9. Stripe subscription lifecycle",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L272"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_10_cron_jobs_scheduled_maintenance",
+      "label": "10. Cron jobs (scheduled maintenance)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L295"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_11_admin_request_path_rbac",
+      "label": "11. Admin request path (RBAC)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L309"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_12_data_stores_conceptual_not_erd",
+      "label": "12. Data stores \u2014 conceptual (not ERD)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L323"
+    },
+    {
+      "id": "docs_platform_architecture_mermaid_copy_paste_single_combined_overview_one_canvas",
+      "label": "Copy-paste: single combined overview (one canvas)",
+      "file_type": "document",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L347"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_platform_architecture_mermaid_md",
+      "target": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_1_system_context_c4_style",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_2_interview_session_behavior_sequence",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L60",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_3_code_execution_and_console_capture",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L97",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_4_ai_orchestration_lib_ai_providers_ts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L119",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_5_rag_pipeline_retrieval_augmented_generation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L140",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_6_rag_vectorization_and_data_processing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L191",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_7_hint_agent_langgraph_flow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L233",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_8_authentication_api_requests",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L255",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_9_stripe_subscription_lifecycle",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L272",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_10_cron_jobs_scheduled_maintenance",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L295",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_11_admin_request_path_rbac",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L309",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_12_data_stores_conceptual_not_erd",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L323",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_platform_architecture_mermaid_codesparring_platform_architecture_mermaid",
+      "target": "docs_platform_architecture_mermaid_copy_paste_single_combined_overview_one_canvas",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PLATFORM-ARCHITECTURE-MERMAID.md",
+      "source_location": "L347",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

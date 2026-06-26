@@ -1,0 +1,607 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_go_live_vc_strategy_md",
+      "label": "go-live-vc-strategy.md",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "label": "CodeSparring Go-Live and VC Strategy",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_executive_verdict",
+      "label": "Executive Verdict",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_market_read",
+      "label": "Market Read",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L19"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_current_product_reality",
+      "label": "Current Product Reality",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L31"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_what_is_strong",
+      "label": "What Is Strong",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L33"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_what_is_misaligned",
+      "label": "What Is Misaligned",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L41"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_cto_risk",
+      "label": "CTO Risk",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L49"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_the_three_angles",
+      "label": "The Three Angles",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L60"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_1_real_codebase_bugfix_and_ai_assisted_debugging",
+      "label": "1. Real-Codebase Bugfix and AI-Assisted Debugging",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L62"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_strategy",
+      "label": "Strategy",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L64"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_product_changes_before_go_live",
+      "label": "Product Changes Before Go-Live",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L72"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_hardening_gates",
+      "label": "Hardening Gates",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L81"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_30_60_90",
+      "label": "30/60/90",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L91"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "label": "2. Company and Role-Specific Workbooks",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L112"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_strategy_114",
+      "label": "Strategy",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L114"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_product_shape",
+      "label": "Product Shape",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L124"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_what_needs_to_change",
+      "label": "What Needs To Change",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L139"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_mvp",
+      "label": "MVP",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L147"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_why_vcs_should_care",
+      "label": "Why VCs Should Care",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L156"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_3_dsa_roadmaps_and_spaced_repetition",
+      "label": "3. DSA, Roadmaps, and Spaced Repetition",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L160"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_strategy_162",
+      "label": "Strategy",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L162"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_what_to_keep",
+      "label": "What To Keep",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L170"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_what_to_fix",
+      "label": "What To Fix",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L178"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_cmo_positioning",
+      "label": "CMO Positioning",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L186"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_one_line_pitch",
+      "label": "One-Line Pitch",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L188"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_homepage_hero",
+      "label": "Homepage Hero",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L192"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_investor_pitch",
+      "label": "Investor Pitch",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L210"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_cpo_product_priorities",
+      "label": "CPO Product Priorities",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L241"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_must_fix_before_public_launch",
+      "label": "Must Fix Before Public Launch",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L243"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_should_fix_before_vc_pitch",
+      "label": "Should Fix Before VC Pitch",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L252"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_can_wait",
+      "label": "Can Wait",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L260"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_cto_hardening_priorities",
+      "label": "CTO Hardening Priorities",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L268"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_p0",
+      "label": "P0",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L270"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_p1",
+      "label": "P1",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L278"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_p2",
+      "label": "P2",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L286"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_vc_readiness_checklist",
+      "label": "VC Readiness Checklist",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L293"
+    },
+    {
+      "id": "docs_go_live_vc_strategy_final_recommendation",
+      "label": "Final Recommendation",
+      "file_type": "document",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L303"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_go_live_vc_strategy_md",
+      "target": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_executive_verdict",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_market_read",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_current_product_reality",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_current_product_reality",
+      "target": "docs_go_live_vc_strategy_what_is_strong",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_current_product_reality",
+      "target": "docs_go_live_vc_strategy_what_is_misaligned",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_current_product_reality",
+      "target": "docs_go_live_vc_strategy_cto_risk",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_the_three_angles",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L60",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_1_real_codebase_bugfix_and_ai_assisted_debugging",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L62",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_1_real_codebase_bugfix_and_ai_assisted_debugging",
+      "target": "docs_go_live_vc_strategy_strategy",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L64",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_1_real_codebase_bugfix_and_ai_assisted_debugging",
+      "target": "docs_go_live_vc_strategy_product_changes_before_go_live",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L72",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_1_real_codebase_bugfix_and_ai_assisted_debugging",
+      "target": "docs_go_live_vc_strategy_hardening_gates",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L81",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_1_real_codebase_bugfix_and_ai_assisted_debugging",
+      "target": "docs_go_live_vc_strategy_30_60_90",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L91",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L112",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "target": "docs_go_live_vc_strategy_strategy_114",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L114",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "target": "docs_go_live_vc_strategy_product_shape",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L124",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "target": "docs_go_live_vc_strategy_what_needs_to_change",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L139",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "target": "docs_go_live_vc_strategy_mvp",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L147",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_2_company_and_role_specific_workbooks",
+      "target": "docs_go_live_vc_strategy_why_vcs_should_care",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L156",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_3_dsa_roadmaps_and_spaced_repetition",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L160",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_3_dsa_roadmaps_and_spaced_repetition",
+      "target": "docs_go_live_vc_strategy_strategy_162",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L162",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_3_dsa_roadmaps_and_spaced_repetition",
+      "target": "docs_go_live_vc_strategy_what_to_keep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L170",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_3_dsa_roadmaps_and_spaced_repetition",
+      "target": "docs_go_live_vc_strategy_what_to_fix",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L178",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_cmo_positioning",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L186",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cmo_positioning",
+      "target": "docs_go_live_vc_strategy_one_line_pitch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L188",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cmo_positioning",
+      "target": "docs_go_live_vc_strategy_homepage_hero",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L192",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cmo_positioning",
+      "target": "docs_go_live_vc_strategy_investor_pitch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L210",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_cpo_product_priorities",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L241",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cpo_product_priorities",
+      "target": "docs_go_live_vc_strategy_must_fix_before_public_launch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L243",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cpo_product_priorities",
+      "target": "docs_go_live_vc_strategy_should_fix_before_vc_pitch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L252",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cpo_product_priorities",
+      "target": "docs_go_live_vc_strategy_can_wait",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L260",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_cto_hardening_priorities",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L268",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cto_hardening_priorities",
+      "target": "docs_go_live_vc_strategy_p0",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L270",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cto_hardening_priorities",
+      "target": "docs_go_live_vc_strategy_p1",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L278",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_cto_hardening_priorities",
+      "target": "docs_go_live_vc_strategy_p2",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L286",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_vc_readiness_checklist",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L293",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_go_live_vc_strategy_codesparring_go_live_and_vc_strategy",
+      "target": "docs_go_live_vc_strategy_final_recommendation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/go-live-vc-strategy.md",
+      "source_location": "L303",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

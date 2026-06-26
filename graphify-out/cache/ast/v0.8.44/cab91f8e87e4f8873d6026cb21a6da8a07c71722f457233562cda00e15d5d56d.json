@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_loops_readme_md",
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "loops_readme_codesparring_engineering_loops",
+      "label": "CodeSparring Engineering Loops",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "loops_readme_how_to_run",
+      "label": "How to run",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L13"
+    },
+    {
+      "id": "loops_readme_available_loops",
+      "label": "Available loops",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L24"
+    },
+    {
+      "id": "loops_readme_the_shared_contract_every_loop_obeys_this",
+      "label": "The shared contract (every loop obeys this)",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L33"
+    },
+    {
+      "id": "loops_readme_brand_guard_applies_to_every_loop",
+      "label": "Brand guard (applies to every loop)",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L54"
+    },
+    {
+      "id": "loops_readme_source_of_truth_map_read_before_editing",
+      "label": "Source-of-truth map (read before editing)",
+      "file_type": "document",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L61"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_loops_readme_md",
+      "target": "loops_readme_codesparring_engineering_loops",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_readme_codesparring_engineering_loops",
+      "target": "loops_readme_how_to_run",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_readme_how_to_run",
+      "target": "loops_readme_available_loops",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_readme_codesparring_engineering_loops",
+      "target": "loops_readme_the_shared_contract_every_loop_obeys_this",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L33",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_readme_codesparring_engineering_loops",
+      "target": "loops_readme_brand_guard_applies_to_every_loop",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "loops_readme_codesparring_engineering_loops",
+      "target": "loops_readme_source_of_truth_map_read_before_editing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/loops/README.md",
+      "source_location": "L61",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

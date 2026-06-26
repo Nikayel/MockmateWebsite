@@ -1,0 +1,769 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_contributing_md",
+      "label": "CONTRIBUTING.md",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "label": "Contributing to CodeSparring",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_table_of_contents",
+      "label": "Table of Contents",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L5"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_code_of_conduct",
+      "label": "Code of Conduct",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L18"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_our_pledge",
+      "label": "Our Pledge",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L20"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_unacceptable_behavior",
+      "label": "Unacceptable Behavior",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L30"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_enforcement",
+      "label": "Enforcement",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L37"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_getting_started",
+      "label": "Getting Started",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L41"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_prerequisites",
+      "label": "Prerequisites",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L43"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_fork_and_clone",
+      "label": "Fork and Clone",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L56"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_development_setup",
+      "label": "Development Setup",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L69"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_1_install_dependencies",
+      "label": "1. Install Dependencies",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L71"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_2_environment_configuration",
+      "label": "2. Environment Configuration",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L77"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_3_start_development_server",
+      "label": "3. Start Development Server",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L108"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_4_firebase_setup_optional",
+      "label": "4. Firebase Setup (Optional)",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L116"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_how_to_contribute",
+      "label": "How to Contribute",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L131"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_types_of_contributions",
+      "label": "Types of Contributions",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L133"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_finding_work",
+      "label": "Finding Work",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L145"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_before_you_start",
+      "label": "Before You Start",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L152"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_coding_standards",
+      "label": "Coding Standards",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L159"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_typescript_guidelines",
+      "label": "TypeScript Guidelines",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L161"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_react_best_practices",
+      "label": "React Best Practices",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L180"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_code_style",
+      "label": "Code Style",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L206"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_file_naming_conventions",
+      "label": "File Naming Conventions",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L228"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_security_guidelines",
+      "label": "Security Guidelines",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L236"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_commit_guidelines",
+      "label": "Commit Guidelines",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L246"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_commit_message_format",
+      "label": "Commit Message Format",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L250"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_types",
+      "label": "Types",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L260"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_examples",
+      "label": "Examples",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L272"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_commit_best_practices",
+      "label": "Commit Best Practices",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L288"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_pull_request_process",
+      "label": "Pull Request Process",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L298"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_before_submitting",
+      "label": "Before Submitting",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L300"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_submitting_the_pr",
+      "label": "Submitting the PR",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L337"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_pr_review_process",
+      "label": "PR Review Process",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L367"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_after_your_pr_is_merged",
+      "label": "After Your PR is Merged",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L374"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_testing",
+      "label": "Testing",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L389"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_running_tests",
+      "label": "Running Tests",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L391"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_writing_tests",
+      "label": "Writing Tests",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L404"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_test_coverage_goals",
+      "label": "Test Coverage Goals",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L427"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_documentation",
+      "label": "Documentation",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L433"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_types_of_documentation",
+      "label": "Types of Documentation",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L435"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_jsdoc_example",
+      "label": "JSDoc Example",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L443"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_community",
+      "label": "Community",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L461"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_getting_help",
+      "label": "Getting Help",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L463"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_recognition",
+      "label": "Recognition",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L470"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_becoming_a_maintainer",
+      "label": "Becoming a Maintainer",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L477"
+    },
+    {
+      "id": "mockmatewebsitet7_contributing_license",
+      "label": "License",
+      "file_type": "document",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L485"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_contributing_md",
+      "target": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_table_of_contents",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_code_of_conduct",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_code_of_conduct",
+      "target": "mockmatewebsitet7_contributing_our_pledge",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_code_of_conduct",
+      "target": "mockmatewebsitet7_contributing_unacceptable_behavior",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_code_of_conduct",
+      "target": "mockmatewebsitet7_contributing_enforcement",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_getting_started",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_getting_started",
+      "target": "mockmatewebsitet7_contributing_prerequisites",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_getting_started",
+      "target": "mockmatewebsitet7_contributing_fork_and_clone",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L56",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_development_setup",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L69",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_development_setup",
+      "target": "mockmatewebsitet7_contributing_1_install_dependencies",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L71",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_development_setup",
+      "target": "mockmatewebsitet7_contributing_2_environment_configuration",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L77",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_development_setup",
+      "target": "mockmatewebsitet7_contributing_3_start_development_server",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L108",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_development_setup",
+      "target": "mockmatewebsitet7_contributing_4_firebase_setup_optional",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L116",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_how_to_contribute",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L131",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_how_to_contribute",
+      "target": "mockmatewebsitet7_contributing_types_of_contributions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L133",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_how_to_contribute",
+      "target": "mockmatewebsitet7_contributing_finding_work",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L145",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_how_to_contribute",
+      "target": "mockmatewebsitet7_contributing_before_you_start",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L152",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_coding_standards",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L159",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_coding_standards",
+      "target": "mockmatewebsitet7_contributing_typescript_guidelines",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L161",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_coding_standards",
+      "target": "mockmatewebsitet7_contributing_react_best_practices",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L180",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_coding_standards",
+      "target": "mockmatewebsitet7_contributing_code_style",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L206",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_coding_standards",
+      "target": "mockmatewebsitet7_contributing_file_naming_conventions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L228",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_coding_standards",
+      "target": "mockmatewebsitet7_contributing_security_guidelines",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L236",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_contributing_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_security_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L238",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_commit_guidelines",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L246",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_commit_guidelines",
+      "target": "mockmatewebsitet7_contributing_commit_message_format",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L250",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_commit_guidelines",
+      "target": "mockmatewebsitet7_contributing_types",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L260",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_commit_guidelines",
+      "target": "mockmatewebsitet7_contributing_examples",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L272",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_commit_guidelines",
+      "target": "mockmatewebsitet7_contributing_commit_best_practices",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L288",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_pull_request_process",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L298",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_pull_request_process",
+      "target": "mockmatewebsitet7_contributing_before_submitting",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L300",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_pull_request_process",
+      "target": "mockmatewebsitet7_contributing_submitting_the_pr",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L337",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_pull_request_process",
+      "target": "mockmatewebsitet7_contributing_pr_review_process",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L367",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_pull_request_process",
+      "target": "mockmatewebsitet7_contributing_after_your_pr_is_merged",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L374",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_testing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L389",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_testing",
+      "target": "mockmatewebsitet7_contributing_running_tests",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L391",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_testing",
+      "target": "mockmatewebsitet7_contributing_writing_tests",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L404",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_testing",
+      "target": "mockmatewebsitet7_contributing_test_coverage_goals",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L427",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_documentation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L433",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_documentation",
+      "target": "mockmatewebsitet7_contributing_types_of_documentation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L435",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_documentation",
+      "target": "mockmatewebsitet7_contributing_jsdoc_example",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L443",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_community",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L461",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_community",
+      "target": "mockmatewebsitet7_contributing_getting_help",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L463",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_community",
+      "target": "mockmatewebsitet7_contributing_recognition",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L470",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_community",
+      "target": "mockmatewebsitet7_contributing_becoming_a_maintainer",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L477",
+      "weight": 1.0
+    },
+    {
+      "source": "mockmatewebsitet7_contributing_contributing_to_codesparring",
+      "target": "mockmatewebsitet7_contributing_license",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L485",
+      "weight": 1.0
+    },
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_contributing_md",
+      "target": "volumes_t7_shield_mockmatewebsitet7_readme_md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "CONTRIBUTING.md",
+      "source_location": "L487",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

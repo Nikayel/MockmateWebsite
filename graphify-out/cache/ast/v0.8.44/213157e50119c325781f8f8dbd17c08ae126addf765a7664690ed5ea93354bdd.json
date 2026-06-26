@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_build_loop_prompt_md",
+      "label": "BUILD_LOOP_PROMPT.md",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "case_labs_build_loop_prompt_case_labs_build_loop_loop_file",
+      "label": "Case Labs \u2014 Build Loop (`/loop` file)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "case_labs_build_loop_prompt_setup_one_time",
+      "label": "Setup (one time)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L9"
+    },
+    {
+      "id": "case_labs_build_loop_prompt_the_loop_body_paste_this_after_loop_10m",
+      "label": "THE LOOP BODY (paste this after `/loop 10m`)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L29"
+    },
+    {
+      "id": "case_labs_build_loop_prompt_notes_for_you_the_human",
+      "label": "Notes for you (the human)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L80"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_build_loop_prompt_md",
+      "target": "case_labs_build_loop_prompt_case_labs_build_loop_loop_file",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_loop_prompt_case_labs_build_loop_loop_file",
+      "target": "case_labs_build_loop_prompt_setup_one_time",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_loop_prompt_case_labs_build_loop_loop_file",
+      "target": "case_labs_build_loop_prompt_the_loop_body_paste_this_after_loop_10m",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_build_loop_prompt_case_labs_build_loop_loop_file",
+      "target": "case_labs_build_loop_prompt_notes_for_you_the_human",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/BUILD_LOOP_PROMPT.md",
+      "source_location": "L80",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
