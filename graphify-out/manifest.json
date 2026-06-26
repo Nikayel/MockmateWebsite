@@ -775,13 +775,13 @@
     "semantic_hash": ""
   },
   "app/interview-prep/[company]/page.tsx": {
-    "mtime": 1782499378.13,
-    "ast_hash": "6b65ca3a3b0ad5dd3f3e6a84fc30b78f",
+    "mtime": 1782499831.13,
+    "ast_hash": "c0de4be8687ad2b0ef546939848685df",
     "semantic_hash": ""
   },
   "app/interview-prep/page.tsx": {
-    "mtime": 1782499360.82,
-    "ast_hash": "ca3754779fcd211bffdde3da2182d34d",
+    "mtime": 1782499831.47,
+    "ast_hash": "67eacd02047c4b9ee4ca1dbdbbe596db",
     "semantic_hash": ""
   },
   "app/interview/_components/ChatColumn.tsx": {
@@ -860,8 +860,8 @@
     "semantic_hash": ""
   },
   "app/interview/page.tsx": {
-    "mtime": 1782499381.01,
-    "ast_hash": "bc5951c978254e779e2265d7fb551e7e",
+    "mtime": 1782500379.4,
+    "ast_hash": "6bc353c865a74ad5113bc9e2aedc41a1",
     "semantic_hash": ""
   },
   "app/layout.tsx": {
@@ -900,8 +900,8 @@
     "semantic_hash": "55095a7f909a9d0c829bc733258ad789"
   },
   "app/page.tsx": {
-    "mtime": 1782496811.83,
-    "ast_hash": "efa608529412015501de1b8de68b960e",
+    "mtime": 1782500244.94,
+    "ast_hash": "eebbee4ea4847d7d7f5b94871438fc1f",
     "semantic_hash": ""
   },
   "app/practice/page.tsx": {
@@ -1350,18 +1350,18 @@
     "semantic_hash": ""
   },
   "components/interview-prep/CompanyHeroCTA.tsx": {
-    "mtime": 1782499388.69,
-    "ast_hash": "08dd607f948f1a9c649a93979da51540",
+    "mtime": 1782499831.62,
+    "ast_hash": "f625b13defe9b8a7ea224badf32fc521",
     "semantic_hash": ""
   },
   "components/interview-prep/CompanyPrepContent.tsx": {
-    "mtime": 1782499583.03,
-    "ast_hash": "7fbd64842b7633209b0a777ecb78c058",
+    "mtime": 1782499831.84,
+    "ast_hash": "0ac50add94df654880d1c0b426286e54",
     "semantic_hash": ""
   },
   "components/interview-prep/GatedContent.tsx": {
-    "mtime": 1782499420.95,
-    "ast_hash": "da147a685683b61d1215843923335802",
+    "mtime": 1782499831.97,
+    "ast_hash": "c143c2558b0cb356ce86cfb60332d4ef",
     "semantic_hash": ""
   },
   "components/interview/CodeConsole.tsx": {
@@ -1485,8 +1485,8 @@
     "semantic_hash": "3df45f08a68f2283633712622cd4a41d"
   },
   "components/metrics-marketing-section.tsx": {
-    "mtime": 1782499181.21,
-    "ast_hash": "069558cc91397a21cfa21ce86f810626",
+    "mtime": 1782499824.85,
+    "ast_hash": "50aab0385e7e4e26abdcc51e408f8ac0",
     "semantic_hash": ""
   },
   "components/notification-bell.tsx": {
@@ -1600,8 +1600,8 @@
     "semantic_hash": ""
   },
   "components/problem-teaser.tsx": {
-    "mtime": 1782498472.5,
-    "ast_hash": "f6a337f7768bc2a3999035dfc9f11157",
+    "mtime": 1782500247.75,
+    "ast_hash": "d944a2c9a1d8a97cd82f19f4c97bb5fd",
     "semantic_hash": ""
   },
   "components/providers/LenisProvider.tsx": {
@@ -7022,6 +7022,26 @@
   "app/interview/_hooks/useInterviewSessionReset.ts": {
     "mtime": 1782499408.12,
     "ast_hash": "47002d652f6c36c2c1b8373cfc0e449f",
+    "semantic_hash": ""
+  },
+  "app/interview/_hooks/useInterviewAutosave.ts": {
+    "mtime": 1782500263.13,
+    "ast_hash": "f3cdb00f09959284becea68cb4363c68",
+    "semantic_hash": ""
+  },
+  "app/interview/_hooks/useSessionReopen.ts": {
+    "mtime": 1782500026.04,
+    "ast_hash": "d59a77abceeb1b75c0be5a3573e24c2f",
+    "semantic_hash": ""
+  },
+  "app/interview/_hooks/useSessionRestore.ts": {
+    "mtime": 1782500116.59,
+    "ast_hash": "bc61ba8db343aedffa7e6fea34f47520",
+    "semantic_hash": ""
+  },
+  "components/relevance-gap-section.tsx": {
+    "mtime": 1782500221.02,
+    "ast_hash": "158e1c89edde686b1c1b0c04b610d3fd",
     "semantic_hash": ""
   }
 }
