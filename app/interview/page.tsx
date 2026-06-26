@@ -83,6 +83,7 @@ import type { WorkspaceContextFile } from "./_types"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
 import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
 import { useInterviewTimer } from "./_hooks/useInterviewTimer"
+import { useInterviewModes } from "./_hooks/useInterviewModes"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -492,9 +493,22 @@ function InterviewPageContent() {
   // Close confirmation dialog state
   const [showCloseDialog, setShowCloseDialog] = useState(false)
 
-  // Focus mode - reduces cognitive load by hiding non-essential panels
-  // Research: Selective attention (Broadbent, 1958) - reducing distractors improves performance
-  const [focusMode, setFocusMode] = useState(false)
+  // Display modes (focus/calm/hide-timer/panel/peek) + their side effects and
+  // the Cmd/Ctrl+K→Z keyboard chord live in useInterviewModes.
+  // Focus mode reduces cognitive load by hiding non-essential panels
+  // (Broadbent, 1958); calm mode mutes colors for anxiety reduction.
+  const {
+    focusMode,
+    setFocusMode,
+    calmMode,
+    setCalmMode,
+    hideTimer,
+    setHideTimer,
+    activePanel,
+    setActivePanel,
+    showProblemPeek,
+    setShowProblemPeek,
+  } = useInterviewModes()
 
   // Experience level from roadmap (for level-appropriate interviewer questions)
   // Falls back to "intermediate" if no roadmap (direct practice mode)
@@ -533,30 +547,8 @@ function InterviewPageContent() {
     void getCachedUserProfile()
   }, [cachedUserProfile, getCachedUserProfile, selectedScenario?.type, user])
 
-  // Calm mode - muted colors for anxiety reduction (research-backed)
-  // Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
-  const [calmMode, setCalmMode] = useState(false)
-  // Hide timer option - reduces time pressure anxiety
-  // Research: WCAG 2.1 recommends letting users manage time on their terms
-  const [hideTimer, setHideTimer] = useState(false)
-  // Mobile panel switcher - only one visible at a time (Miller's Law)
-  const [activePanel, setActivePanel] = useState<"problem" | "editor" | "chat">("editor")
-
-  // State for focus mode problem peek overlay
-  const [showProblemPeek, setShowProblemPeek] = useState(false)
-
   // State for collapsible optimal approach section (collapsed by default to not give away solution)
   const [showOptimalApproach, setShowOptimalApproach] = useState(false)
-
-  // Toggle calm mode on document for CSS cascade
-  useEffect(() => {
-    if (calmMode) {
-      document.documentElement.classList.add("calm")
-    } else {
-      document.documentElement.classList.remove("calm")
-    }
-    return () => document.documentElement.classList.remove("calm")
-  }, [calmMode])
 
   // Handle streaming feedback: update state when feedback arrives and is persisted
   // Track if we've already shown completion toast to prevent duplicates
@@ -633,61 +625,6 @@ function InterviewPageContent() {
       feedbackCompletionToastShown.current = false
     }
   }, [streamingFeedback.state])
-
-  // Toggle focus mode class on document for CSS cascade
-  useEffect(() => {
-    if (focusMode) {
-      document.documentElement.classList.add("focus-mode-active")
-    } else {
-      document.documentElement.classList.remove("focus-mode-active")
-      setShowProblemPeek(false) // Close peek when exiting focus mode
-    }
-    return () => document.documentElement.classList.remove("focus-mode-active")
-  }, [focusMode])
-
-  // Keyboard shortcut for Focus Mode (Cmd/Ctrl+K then Z - VS Code style)
-  // Also supports Escape to exit focus mode
-  useEffect(() => {
-    let waitingForZ = false
-    let timeoutId: NodeJS.Timeout | null = null
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape exits focus mode
-      if (e.key === "Escape" && focusMode) {
-        setFocusMode(false)
-        return
-      }
-
-      // Cmd/Ctrl + K starts the chord
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault()
-        waitingForZ = true
-        // Reset after 1 second if Z isn't pressed
-        timeoutId = setTimeout(() => {
-          waitingForZ = false
-        }, 1000)
-        return
-      }
-
-      // Z completes the chord
-      if (waitingForZ && e.key === "z") {
-        e.preventDefault()
-        waitingForZ = false
-        if (timeoutId) clearTimeout(timeoutId)
-        setFocusMode(!focusMode)
-        // Auto-enable calm mode when entering focus
-        if (!focusMode && !calmMode) {
-          setCalmMode(true)
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [focusMode, calmMode, setFocusMode, setCalmMode])
 
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<
