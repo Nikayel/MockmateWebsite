@@ -11,13 +11,6 @@ export type {
   UseInterviewSessionReturn,
 } from "./useInterviewSession"
 
-export { useInterviewChat } from "./useInterviewChat"
-export type {
-  ChatMessage,
-  UseInterviewChatOptions,
-  UseInterviewChatReturn,
-} from "./useInterviewChat"
-
 export { useNotifications } from "./useNotifications"
 export type { UseNotificationsOptions, UseNotificationsReturn } from "./useNotifications"
 

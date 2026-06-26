@@ -136,21 +136,6 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "userContext",
       "workspaceContext",
     ],
-    [
-      "context",
-      "currentCode",
-      "message",
-      "role",
-      "userContext",
-    ],
-    [
-      "context",
-      "currentCode",
-      "message",
-      "role",
-      "userContext",
-      "workspaceContext",
-    ],
   ],
   "fetch POST /api/execute": [
     [
