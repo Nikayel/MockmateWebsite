@@ -11,18 +11,12 @@ import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
-import {
-  getUserProfile,
-  updateInterviewSession,
-  markSessionEvaluating,
-} from "@/lib/firestore-helpers"
-import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
+import { getUserProfile } from "@/lib/firestore-helpers"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { type Scenario } from "@/lib/scenarios"
-import type { BugFixScenario } from "@/lib/scenarios/types"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
 // Interview phase tracking
@@ -32,12 +26,7 @@ import {
   createEmptyTracker,
 } from "@/lib/interview/interview-phases"
 // Extracted utilities
-import {
-  extractTopicsFromMessage,
-  analyzeCodeEfficiency,
-  analyzeComplexityWithLLM,
-  type LLMComplexityResult,
-} from "@/lib/interview"
+import { extractTopicsFromMessage } from "@/lib/interview"
 // Local page components
 import { GuestModeBanner, InterviewLayoutGrid, InterviewFeedbackView } from "./_components"
 import { InterviewDialogs } from "./_components/InterviewDialogs"
@@ -62,7 +51,6 @@ import type {
   WorkspaceContextFile,
 } from "./_types"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
-import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
 import { useInterviewTimer } from "./_hooks/useInterviewTimer"
 import { useInterviewModes } from "./_hooks/useInterviewModes"
 import { useGuestQuota, isUsageBlocked } from "./_hooks/useGuestQuota"
@@ -76,6 +64,11 @@ import { useInterviewSessionReset } from "./_hooks/useInterviewSessionReset"
 import { useSessionReopen } from "./_hooks/useSessionReopen"
 import { useInterviewAutosave } from "./_hooks/useInterviewAutosave"
 import { useSessionRestore } from "./_hooks/useSessionRestore"
+import { usePostInterviewDiscussion } from "./_hooks/usePostInterviewDiscussion"
+import { useFeedbackStreaming } from "./_hooks/useFeedbackStreaming"
+import { useInterviewFeedback } from "./_hooks/useInterviewFeedback"
+import { useSystemDesignFeedback } from "./_hooks/useSystemDesignFeedback"
+import { useSystemDesignSubmit } from "./_hooks/useSystemDesignSubmit"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -514,81 +507,7 @@ function InterviewPageContent() {
   // State for collapsible optimal approach section (collapsed by default to not give away solution)
   const [showOptimalApproach, setShowOptimalApproach] = useState(false)
 
-  // Handle streaming feedback: update state when feedback arrives and is persisted
-  // Track if we've already shown completion toast to prevent duplicates
-  const feedbackCompletionToastShown = useRef(false)
-
-  useEffect(() => {
-    const feedbackState = streamingFeedback.state
-
-    // IMPORTANT: Only update scores/feedback when fully persisted to avoid showing partial data
-    // During streaming, we just track progress via the phase message
-
-    // Wait for feedback to be persisted before showing final scores
-    // This prevents the "flickering scores" issue where instant scores show then get replaced
-    if (feedbackState.isPersisted && feedbackState.feedback) {
-      // Use the final scores from the feedback (which includes refined scores)
-      const finalScores = feedbackState.feedback.scores
-      if (finalScores) {
-        setScoreBreakdown({
-          understandingScore: finalScores.understanding,
-          problemSolvingScore: finalScores.problemSolving,
-          codeQualityScore: finalScores.codeQuality,
-          communicationScore: finalScores.communication,
-        })
-        setPerformanceScore(finalScores.overall)
-      }
-
-      // Use mastery/technical scores from persist endpoint (properly calculated)
-      if (feedbackState.technicalScore !== null) {
-        setTechnicalScore(feedbackState.technicalScore)
-      }
-
-      // Update feedback content
-      setComprehensiveFeedback(feedbackState.feedback.raw || "")
-      setStructuredFeedback({
-        whatWorked: feedbackState.feedback.whatWorked || [],
-        fixNext: feedbackState.feedback.fixNext || [],
-        actionPlan: feedbackState.feedback.actionPlan || [],
-        tldr: feedbackState.feedback.tldr || "",
-      })
-    }
-
-    // Handle completion - only show toast once AND only after persist completes
-    if (
-      feedbackState.phase === "complete" &&
-      feedbackState.isPersisted &&
-      !feedbackState.error &&
-      !feedbackCompletionToastShown.current
-    ) {
-      feedbackCompletionToastShown.current = true
-      setIsGeneratingFeedback(false)
-      toast.success("Feedback ready!", {
-        description: "Your personalized analysis is complete.",
-      })
-    } else if (feedbackState.error && !feedbackCompletionToastShown.current) {
-      feedbackCompletionToastShown.current = true
-      setIsGeneratingFeedback(false)
-      // If we have feedback but persist failed, still show success (feedback is in UI)
-      if (feedbackState.feedback) {
-        toast.warning("Feedback generated", {
-          description: "Results may not be saved to history.",
-        })
-      } else {
-        toast.error("Feedback generation failed", {
-          description: "Applying automated fallback scoring.",
-        })
-        if (lastFeedbackRequestRef.current) {
-          applyFallbackFeedback(lastFeedbackRequestRef.current)
-        }
-      }
-    }
-
-    // Reset toast flag when state resets to idle
-    if (feedbackState.phase === "idle") {
-      feedbackCompletionToastShown.current = false
-    }
-  }, [streamingFeedback.state])
+  // The streaming-feedback → page-state mapping effect lives in useInterviewFeedback.
 
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<
@@ -596,60 +515,7 @@ function InterviewPageContent() {
   > | null>(null)
   const [starterCode, setStarterCode] = useState("")
 
-  // Track the last feedback request for fallback scoring if streaming fails
-  const lastFeedbackRequestRef = useRef<any>(null)
-
-  const applyFallbackFeedback = useCallback(
-    async (request: any) => {
-      try {
-        const { scoreBreakdown: mappedBreakdown, performanceScore } = computeFallbackScores(request)
-
-        setScoreBreakdown(mappedBreakdown)
-        setPerformanceScore(performanceScore)
-
-        const fallbackText =
-          "Automated scoring applied. Detailed AI feedback is unavailable due to a service error."
-        setComprehensiveFeedback(fallbackText)
-
-        if (currentSessionId) {
-          await fetch("/api/feedback/persist", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: request.sessionId,
-              userId: request.userId,
-              scores: {
-                understanding: mappedBreakdown.understandingScore,
-                problemSolving: mappedBreakdown.problemSolvingScore,
-                codeQuality: mappedBreakdown.codeQualityScore,
-                communication: mappedBreakdown.communicationScore,
-                overall: performanceScore,
-              },
-              feedback: {
-                raw: fallbackText,
-                tldr: "Service Error",
-                whatWorked: [],
-                fixNext: [],
-                actionPlan: [],
-              },
-              testsPassed: request.testsPassed,
-              testsTotal: request.testsTotal,
-              timeSpentMinutes: Math.round((request.elapsedTimeSeconds || 0) / 60),
-              hintsUsed: request.hintsUsed || 0,
-              difficulty: request.scenarioDifficulty || "medium",
-              scenarioType: request.scenarioType || "dsa",
-              scenarioTitle: request.scenarioTitle || "Unknown",
-              scenarioId: request.scenarioId,
-              scenarioPattern: request.scenarioPattern,
-            }),
-          })
-        }
-      } catch (e) {
-        console.error("Fallback logic failed", e)
-      }
-    },
-    [currentSessionId]
-  )
+  // The last-feedback-request ref + applyFallbackFeedback live in useInterviewFeedback.
 
   // Roadmap tracking
   const isFromRoadmap = searchParams?.get("roadmap") === "true"
@@ -1373,145 +1239,133 @@ function InterviewPageContent() {
     recordedBugfixEditPathsRef,
   })
 
-  const triggerPostInterviewDiscussion = async (testResults: TestResult[], summary: any) => {
-    setIsGeneratingDiscussion(true)
+  const { triggerPostInterviewDiscussion } = usePostInterviewDiscussion({
+    user,
+    usageLimit,
+    experienceLevel,
+    selectedScenario,
+    code,
+    selectedLanguage,
+    elapsedTime,
+    interviewerMessages,
+    consoleLogs,
+    conversationTracker,
+    recentNudgeTopics,
+    targetCompany,
+    chatWorkspaceContext,
+    setIsGeneratingDiscussion,
+    setEfficiencyMetrics,
+    setInterviewerMessages,
+    getCachedUserProfile,
+    getEdgeCasesForInterviewer,
+    updateTrackerOnMessage,
+  })
 
-    try {
-      if (!selectedScenario) {
-        return
-      }
+  const { applyFallbackFeedback, lastFeedbackRequestRef } = useFeedbackStreaming({
+    currentSessionId,
+    streamingFeedback,
+    setScoreBreakdown,
+    setPerformanceScore,
+    setTechnicalScore,
+    setComprehensiveFeedback,
+    setStructuredFeedback,
+    setIsGeneratingFeedback,
+  })
 
-      const optimalComplexity = (selectedScenario as any)?.optimalComplexity
+  const { proceedToFinalFeedback } = useInterviewFeedback({
+    user,
+    isGuestMode,
+    guestId,
+    selectedScenario,
+    code,
+    selectedLanguage,
+    elapsedTime,
+    chatMessages,
+    interviewerMessages,
+    testResults,
+    testSummary,
+    workspaceContext,
+    activeWorkspacePath,
+    consoleLogs,
+    bugfixHypothesis,
+    bugfixRootCause,
+    bugfixPrevention,
+    conversationTracker,
+    revealedHints,
+    revealedHintIndices,
+    revealedAIHintIndices,
+    isFromRoadmap,
+    activeRoadmap,
+    currentSessionId,
+    streamingFeedback,
+    setScoreBreakdown,
+    setPerformanceScore,
+    setTechnicalScore,
+    setComprehensiveFeedback,
+    setStructuredFeedback,
+    setIsGeneratingFeedback,
+    setShowFeedback,
+    setShowPostInterviewDiscussion,
+    setShowSignupPrompt,
+    buildBugfixEvidencePayload,
+    getBugfixExpectedTouchedFiles,
+    getCurrentInterviewPhase,
+    trackSessionCompletion,
+    markQuestionCompleted,
+    addActualTime,
+    applyFallbackFeedback,
+    lastFeedbackRequestRef,
+  })
 
-      // Use LLM-based complexity analysis for accurate semantic understanding
-      // Falls back to regex-based analysis if LLM fails
-      let llmComplexity: LLMComplexityResult | null = null
-      try {
-        llmComplexity = await analyzeComplexityWithLLM({
-          code,
-          language: selectedLanguage,
-          problemTitle: selectedScenario.title,
-          problemDescription: selectedScenario.description,
-          optimalTimeComplexity: optimalComplexity?.time,
-          optimalSpaceComplexity: optimalComplexity?.space,
-        })
-      } catch (llmError) {
-        console.warn("LLM complexity analysis failed, using regex fallback:", llmError)
-      }
+  const { triggerSystemDesignFeedback } = useSystemDesignFeedback({
+    user,
+    isGuestMode,
+    guestId,
+    experienceLevel,
+    searchParams,
+    activeRoadmap,
+    selectedScenario,
+    code,
+    elapsedTime,
+    chatMessages,
+    interviewerMessages,
+    testResults,
+    consoleLogs,
+    conversationTracker,
+    recentNudgeTopics,
+    revealedHints,
+    revealedHintIndices,
+    revealedAIHintIndices,
+    targetCompany,
+    realInterviewMode,
+    currentSessionId,
+    setIsGeneratingDiscussion,
+    setStructuredFeedback,
+    setTechnicalScore,
+    setScoreBreakdown,
+    setComprehensiveFeedback,
+    setPerformanceScore,
+    setShowPostInterviewDiscussion,
+    setInterviewerMessages,
+    markQuestionCompleted,
+    addActualTime,
+    trackSessionCompletion,
+    updateSpacedRepetition,
+    getEdgeCasesForInterviewer,
+    updateTrackerOnMessage,
+  })
 
-      // Build metrics: prefer LLM results, fall back to regex for missing values
-      const regexMetrics = analyzeCodeEfficiency(code, optimalComplexity)
-
-      // Use LLM complexity if available and confident, otherwise use regex
-      let finalTimeComplexity = regexMetrics.estimatedTimeComplexity
-      let finalSpaceComplexity = regexMetrics.estimatedSpaceComplexity
-
-      if (llmComplexity && llmComplexity.confidence !== "low") {
-        if (llmComplexity.timeComplexity !== "Unknown") {
-          finalTimeComplexity = llmComplexity.timeComplexity
-        }
-        if (llmComplexity.spaceComplexity !== "Unknown") {
-          finalSpaceComplexity = llmComplexity.spaceComplexity
-        }
-      }
-
-      const metrics = {
-        ...regexMetrics,
-        estimatedTimeComplexity: finalTimeComplexity,
-        estimatedSpaceComplexity: finalSpaceComplexity,
-      }
-
-      // Update state so PostInterviewView shows accurate complexity
-      setEfficiencyMetrics(metrics)
-
-      // Trigger interviewer to discuss the solution
-      // NOTE: Feedback generation is now DEFERRED until user clicks "View Detailed Feedback"
-      // This allows post-interview discussion to be included in the final scoring
-      const userProfile = await getCachedUserProfile()
-
-      const discussionPrompt = `[POST-INTERVIEW DISCUSSION - CONTINUE CONVERSATION] This is a continuation of our interview conversation. The candidate has just completed their coding solution.
-
-TEST RESULTS: ${summary.passed}/${summary.total} tests passed (${summary.passRate}% pass rate)
-TIME SPENT: ${Math.floor(elapsedTime / 60)} minutes ${elapsedTime % 60} seconds
-EFFICIENCY METRICS:
-- Time Complexity: ${metrics.estimatedTimeComplexity} (Optimal: ${metrics.optimalTimeComplexity})
-- Space Complexity: ${metrics.estimatedSpaceComplexity} (Optimal: ${metrics.optimalSpaceComplexity})
-- Efficiency Score: ${metrics.efficiencyScore}/100
-- Code Complexity: ${metrics.complexity}
-- Lines of Code: ${metrics.linesOfCode}
-
-IMPORTANT: This is a POST-INTERVIEW DISCUSSION phase. You should:
-1. Continue the conversation naturally - reference previous discussion points if relevant
-2. Discuss the results and solution quality
-3. Ask about edge cases, optimizations, or alternative approaches
-4. Probe their understanding of time/space complexity
-5. Be conversational - this is a debrief, not a restart
-
-Do NOT reintroduce yourself. Continue as if we're in the middle of a discussion about their completed solution.
-
-Be conversational and thorough - like a real interviewer debriefing after a coding interview. The candidate's responses during this discussion will be factored into their final score.`
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: discussionPrompt,
-          context: interviewerMessages,
-          role: "interviewer",
-          userContext: userProfile
-            ? {
-                email: user?.email,
-                subscription_tier: userProfile.subscription_tier,
-                sessions_used: usageLimit?.used || 0,
-                skill_level: experienceLevel,
-              }
-            : { skill_level: experienceLevel },
-          workspaceContext: chatWorkspaceContext,
-          currentCode: code,
-          scenarioTitle: selectedScenario?.title,
-          scenarioType: selectedScenario?.type,
-          scenarioCompany: targetCompany,
-          isProactive: false,
-          edgeCases: getEdgeCasesForInterviewer(),
-          recentNudgeTopics: recentNudgeTopics,
-          // Pass test results and console logs for interviewer awareness
-          testResults: testResults,
-          consoleLogs: consoleLogs,
-          // Phase-aware interview tracking
-          // NOTE: Explicitly set hasSubmitted=true and interviewPhase='post_interview'
-          // because React state may not have updated yet when this is called
-          interviewPhase: "post_interview" as const,
-          conversationTracker,
-          hasSubmitted: true, // Explicit - don't rely on state timing
-          // Use freshly computed metrics (not stale state)
-          solutionComplexity: {
-            estimated: metrics.estimatedTimeComplexity,
-            optimal: metrics.optimalTimeComplexity,
-            isOptimal: metrics.estimatedTimeComplexity === metrics.optimalTimeComplexity,
-            // Include space complexity for real-time validation of user claims
-            estimatedSpace: metrics.estimatedSpaceComplexity,
-            optimalSpace: metrics.optimalSpaceComplexity,
-          },
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        console.warn("[API] Request failed:", response.status, response.url, data)
-      }
-
-      if (data.reply) {
-        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
-        // Track interviewer response for conversation context
-        updateTrackerOnMessage(data.reply, "interviewer")
-      }
-    } catch (error) {
-      console.error("Error in post-interview discussion:", error)
-      toast.error("Failed to start discussion")
-    } finally {
-      setIsGeneratingDiscussion(false)
-    }
-  }
+  const { submitSystemDesign } = useSystemDesignSubmit({
+    firebaseUser,
+    isGuestMode,
+    isFromRoadmap,
+    activeRoadmap,
+    selectedScenario,
+    setIsRunningTests,
+    playSound,
+    markQuestionEvaluating,
+    triggerSystemDesignFeedback,
+  })
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -1542,374 +1396,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     if (newFiles.length > 0) {
       setWorkspaceContext((prev) => [...prev, ...newFiles])
       toast.success(`Added ${newFiles.length} file(s) to workspace context`)
-    }
-  }
-
-  const proceedToFinalFeedback = async () => {
-    const bugfixEvidencePayload = buildBugfixEvidencePayload()
-    const bugfixExpectedTouchedFiles = getBugfixExpectedTouchedFiles()
-
-    setShowPostInterviewDiscussion(false)
-    setIsGeneratingFeedback(true)
-    setShowFeedback(true)
-
-    // CRITICAL: Mark session as evaluating FIRST, before generating feedback
-    // This ensures if user navigates away, the session shows as "evaluating" not "in progress"
-    if (currentSessionId && user) {
-      try {
-        await markSessionEvaluating(currentSessionId, {
-          code,
-          language: selectedLanguage,
-          elapsedTime,
-          chatMessages,
-          interviewerMessages,
-          testResults,
-          testSummary,
-          isPostInterviewDiscussion: true,
-          workspaceContext,
-          activeWorkspacePath,
-          consoleLogs,
-          bugfixEvidenceEvents: bugfixEvidencePayload,
-          bugfixHypothesis,
-          bugfixRootCause,
-          bugfixPrevention,
-        })
-      } catch (markError) {
-        console.error("Failed to mark session as evaluating:", markError)
-        // Continue anyway - feedback generation should still proceed
-      }
-    }
-
-    // Now generate feedback - includes ALL conversation including post-interview discussion
-    try {
-      if (!selectedScenario) {
-        setIsGeneratingFeedback(false)
-        return
-      }
-
-      const partnerMessagesSent = chatMessages.filter((msg) => msg.type === "user").length
-      const partnerMessagesReceived = chatMessages.filter((msg) => msg.type === "ai").length
-      const interviewerUserMessages = interviewerMessages.filter((msg) => msg.type === "user")
-      const interviewerQuestionsAnswered = interviewerUserMessages.length
-      const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
-        msg.message.includes("?")
-      ).length
-      const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
-        /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
-      ).length
-      const proactiveInteractions =
-        interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
-
-      const aiCollaborationMetrics = {
-        partnerMessagesSent,
-        partnerMessagesReceived,
-        partnerHintsRequested: revealedHints,
-      }
-
-      const interactionMetrics = {
-        interviewerQuestionsAnswered,
-        interviewerClarificationsRequested,
-        interviewerFeedbackAcknowledged,
-        proactiveInteractions,
-        problemDifficulty: selectedScenario?.difficulty,
-        problemType: selectedScenario?.type,
-        skillsDemonstrated: selectedScenario?.tags || [],
-      }
-
-      const feedbackText = `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
-      let calculatedPerformanceScore = testSummary.passRate
-      const localTechnicalScore: number | undefined = undefined
-      let scoreBreakdownData: {
-        understanding?: number
-        problemSolving?: number
-        codeQuality?: number
-        communication?: number
-      } | null = null
-      let aiFeedbackSucceeded = false
-      const localConstitutionalAICritique: Record<string, unknown> | null = null
-      const localClarifyingQuestionsAssessment: {
-        score: number
-        totalExpected: number
-        totalAsked: number
-        requiredAsked: number
-        requiredTotal: number
-        results: Array<{
-          question: string
-          required: boolean
-          asked: boolean
-          matchedPhrase?: string
-        }>
-      } | null = null
-
-      const efficiencyData = analyzeCodeEfficiency(
-        code,
-        (selectedScenario as any)?.optimalComplexity
-      )
-
-      if (currentSessionId && user && code.trim()) {
-        try {
-          // Prepare conversation transcript - NOW includes ALL messages including post-interview discussion
-          const conversationTranscript = [
-            ...interviewerMessages.map((m) => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-              timestamp: m.timestamp,
-            })),
-            ...chatMessages.map((m) => ({
-              role: m.type === "user" ? "candidate" : "ai_partner",
-              content: m.message,
-              timestamp: m.timestamp,
-            })),
-          ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-
-          // Build phase tracking info for scoring
-          const phaseTracking = {
-            submittedFromPhase: getCurrentInterviewPhase(),
-            testsRanBeforeSubmit: testResults.length > 0,
-            hadDiscussionPhase: conversationTracker.approachExplained,
-            conversationTracker: {
-              approachExplained: conversationTracker.approachExplained,
-              approachType: conversationTracker.approachType,
-              timeComplexityMentioned: conversationTracker.timeComplexityMentioned,
-              spaceComplexityMentioned: conversationTracker.spaceComplexityMentioned,
-              complexityExplanationGiven: conversationTracker.complexityExplanationGiven,
-              edgeCasesMentioned: conversationTracker.edgeCasesMentioned,
-              hintsGiven: conversationTracker.hintsGiven,
-            },
-          }
-
-          // ================================================================
-          // TWO-PHASE FEEDBACK: Get instant scores, then poll for rich feedback
-          // Phase 1: Instant algorithmic scores (< 3 seconds)
-          // Phase 2: Rich AI-generated narrative (background, polled)
-          // ================================================================
-          // ================================================================
-          // STREAMING FEEDBACK: Edge function with NO TIMEOUT
-          // Scores stream in immediately, then rich feedback follows
-          // ================================================================
-          const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
-          const feedbackRequest = {
-            sessionId: currentSessionId,
-            userId: user.id,
-            code,
-            language: selectedLanguage,
-            testsPassed: testSummary.passed,
-            testsTotal: testSummary.total,
-            scenarioType: selectedScenario?.type,
-            scenarioTitle: selectedScenario?.title,
-            scenarioId: selectedScenario?.id,
-            scenarioDifficulty: selectedScenario?.difficulty,
-            scenarioPattern: (selectedScenario as any)?.pattern,
-            conversationTranscript,
-            partnerMessages: chatMessages.filter((m) => m.type === "ai").map((m) => m.message),
-            phaseTracking,
-            silentNotes: conversationTracker.silentNotes || [],
-            efficiencyMetrics: efficiencyData,
-            submittedFromPhase: getCurrentInterviewPhase(),
-            testsRanBeforeSubmit: testResults.length > 0,
-            // For mastery score calculation in persist endpoint
-            hintsUsed: hintsUsedCount,
-            elapsedTimeSeconds: elapsedTime,
-            bugfixEvidenceEvents: bugfixEvidencePayload,
-            bugfixExpectedTouchedFiles,
-            bugfixHypothesis,
-            bugfixRootCause,
-            bugfixPrevention,
-            bugfixRootCauseRubric:
-              selectedScenario?.type === "bugfix"
-                ? (selectedScenario as BugFixScenario).rootCauseRubric
-                : [],
-            bugfixGroundTruth:
-              selectedScenario?.type === "bugfix"
-                ? (selectedScenario as BugFixScenario).bugDescription
-                : "",
-          }
-
-          // Start streaming feedback - scores come first, then rich feedback
-          // The useEffect above handles updating state as events stream in
-          lastFeedbackRequestRef.current = feedbackRequest
-          streamingFeedback.startStreaming(feedbackRequest)
-
-          // Set initial values while streaming
-          aiFeedbackSucceeded = true
-          calculatedPerformanceScore = testSummary.passRate // Will be updated by stream
-          scoreBreakdownData = {
-            understanding: 50,
-            problemSolving: 50,
-            codeQuality: 50,
-            communication: 50,
-          }
-        } catch (feedbackError) {
-          console.error("Error generating feedback:", feedbackError)
-          toast.error("Feedback generation failed", {
-            description: "Applying automated fallback scoring.",
-          })
-          if (lastFeedbackRequestRef.current) {
-            applyFallbackFeedback(lastFeedbackRequestRef.current)
-          }
-        }
-      }
-
-      // Don't set placeholder feedback - wait for streaming to complete
-      // The useEffect watching streamingFeedback.state will update these
-      // Only set initial performance score based on test results (will be updated by streaming)
-      setPerformanceScore(calculatedPerformanceScore)
-
-      // Save basic session completion data (code, test results, etc.)
-      // NOTE: The persist endpoint will handle saving the AI-generated feedback and scores
-      // We only save basic data here with feedbackStatus: "processing"
-      if (currentSessionId && user) {
-        try {
-          // Save basic session data - feedback and scores will be updated by /api/feedback/persist
-          await updateInterviewSession(currentSessionId, undefined, undefined, {
-            code,
-            language: selectedLanguage,
-            testResults,
-            timeComplexity: efficiencyData?.estimatedTimeComplexity,
-            spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
-            efficiencyScore: efficiencyData?.efficiencyScore,
-            // Mark as processing - persist endpoint will update to "complete"
-            feedbackStatus: "processing",
-            bugfixEvidenceEvents: bugfixEvidencePayload,
-            bugfixHypothesis,
-            bugfixRootCause,
-            bugfixPrevention,
-          })
-
-          trackSessionCompletion({
-            sessionId: currentSessionId,
-            finalCode: code,
-            language: selectedLanguage,
-            testsPassed: testSummary.passed,
-            testsTotal: testSummary.total,
-            efficiencyScore: efficiencyData?.efficiencyScore || 50,
-          }).catch((err) => console.error("Session metrics tracking failed:", err))
-
-          // Note: Spaced repetition update will be triggered by persist endpoint
-          // after mastery score is properly calculated
-
-          if (isFromRoadmap && selectedScenario && activeRoadmap) {
-            markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
-            const minutesSpent = Math.round(elapsedTime / 60)
-            if (minutesSpent > 0) {
-              addActualTime(minutesSpent)
-            }
-            sessionStorage.setItem(
-              "roadmap-question-just-completed",
-              JSON.stringify({
-                scenarioId: selectedScenario.id,
-                roadmapId: activeRoadmap.id,
-                timestamp: Date.now(),
-              })
-            )
-            toast.success("Progress saved to your roadmap!")
-          }
-
-          const isSystemDesign = selectedScenario?.type === "system-design"
-          const shouldStore = selectedScenario?.id && (code.trim() || isSystemDesign)
-
-          if (shouldStore) {
-            fetch("/api/rag", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "store-solution",
-                userId: user.id,
-                problemId: selectedScenario.id,
-                problemTitle: selectedScenario.title,
-                solutionCode:
-                  code || (isSystemDesign ? "// Design discussion completed via chat" : ""),
-                language: selectedLanguage,
-                passed: isSystemDesign ? true : testSummary.passed === testSummary.total,
-                score: calculatedPerformanceScore,
-                problemType: selectedScenario.type,
-              }),
-            }).catch((err) => console.error("Solution storage error:", err))
-          }
-
-          fetch("/api/vectorize-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: user.id,
-              sessionId: currentSessionId,
-              scenarioId: selectedScenario?.id,
-              scenarioTitle: selectedScenario?.title,
-              language: selectedLanguage,
-              code,
-              testResults,
-              timeSpent: elapsedTime,
-              aiCollaborationMetrics,
-              interactionMetrics,
-              efficiencyMetrics: efficiencyData,
-              scores: {
-                correctness:
-                  testResults.length > 0
-                    ? (testResults.filter((t: TestResult) => t.passed).length /
-                        testResults.length) *
-                      100
-                    : 0,
-                efficiency: efficiencyData.efficiencyScore,
-                codeQuality: 70,
-                reasoningExplanation: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
-                aiCollaboration: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
-                overall: calculatedPerformanceScore,
-              },
-            }),
-          }).catch((err) => console.error("Vectorization error:", err))
-        } catch (error) {
-          console.error("Error updating session on completion:", error)
-          toast.warning("Session progress may not be fully saved", {
-            description:
-              "Your feedback is still available, but progress tracking may be incomplete.",
-          })
-        }
-      } else if (currentSessionId && isGuestMode && guestId) {
-        try {
-          await fetch("/api/guest-session", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: currentSessionId,
-              guestId,
-              performanceScore: calculatedPerformanceScore,
-              feedback: feedbackText,
-              finalCode: code,
-              language: selectedLanguage,
-              testResults,
-              timeComplexity: efficiencyData?.estimatedTimeComplexity,
-              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
-              efficiencyScore: efficiencyData?.efficiencyScore,
-            }),
-          })
-        } catch (error) {
-          console.error("Error saving guest session completion:", error)
-        }
-      }
-
-      // Show signup prompt for guest users
-      if (isGuestMode && guestId) {
-        setTimeout(() => setShowSignupPrompt(true), 2000)
-        markFreeTrialUsed()
-        if (currentSessionId && selectedScenario) {
-          saveGuestSessionData({
-            sessionId: currentSessionId,
-            scenarioId: selectedScenario.id,
-            scenarioTitle: selectedScenario.title,
-            startedAt: new Date().toISOString(),
-            feedback: {
-              score: calculatedPerformanceScore || 0,
-              summary: feedbackText,
-              feedbackData: null,
-            },
-          })
-        }
-      }
-    } catch (error) {
-      console.error("Error generating final feedback:", error)
-      toast.error("Failed to generate feedback")
-    } finally {
-      setIsGeneratingFeedback(false)
     }
   }
 
@@ -2078,415 +1564,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
   // Note: analyzeCodeEfficiency is now imported from @/lib/interview
   // Usage: analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
-
-  const submitSystemDesign = async () => {
-    if (!selectedScenario || selectedScenario.type !== "system-design") return
-
-    setIsRunningTests(true) // Reuse this state for loading indicator
-
-    // Clear auto-save data immediately on submission to prevent session restoration
-    if (firebaseUser && selectedScenario) {
-      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-      try {
-        localStorage.removeItem(storageKey)
-      } catch (e) {
-        // Silent failure - localStorage might be unavailable
-      }
-    } else if (isGuestMode && selectedScenario) {
-      const storageKey = `interview_autosave_guest_${selectedScenario.id}`
-      try {
-        localStorage.removeItem(storageKey)
-      } catch (e) {
-        // Silent failure
-      }
-    }
-
-    try {
-      // Mark question as evaluating in roadmap (if from roadmap)
-      if (isFromRoadmap && selectedScenario && activeRoadmap) {
-        markQuestionEvaluating(selectedScenario.id)
-      }
-
-      // Generate feedback for system design based on conversation and design notes
-      await triggerSystemDesignFeedback()
-
-      // Show success feedback
-      playSound("success")
-      toast.success("Design submitted!", {
-        description: "Your design notes have been saved. Review your feedback below.",
-      })
-    } catch (error) {
-      console.error("System design submission error:", error)
-      toast.error("Failed to submit design", {
-        description: "There was a problem submitting your design. Please try again.",
-        duration: 6000,
-        action: {
-          label: "Retry",
-          onClick: () => submitSystemDesign(),
-        },
-      })
-    } finally {
-      setIsRunningTests(false)
-    }
-  }
-
-  const triggerSystemDesignFeedback = async () => {
-    setIsGeneratingDiscussion(true)
-
-    try {
-      if (!selectedScenario || selectedScenario.type !== "system-design") {
-        return
-      }
-
-      const partnerMessagesSent = chatMessages.filter((msg) => msg.type === "user").length
-      const partnerMessagesReceived = chatMessages.filter((msg) => msg.type === "ai").length
-      const interviewerUserMessages = interviewerMessages.filter((msg) => msg.type === "user")
-      const interviewerQuestionsAnswered = interviewerUserMessages.length
-      const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
-        msg.message.includes("?")
-      ).length
-      const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
-        /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
-      ).length
-      const proactiveInteractions =
-        interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
-
-      const aiCollaborationMetrics = {
-        partnerMessagesSent,
-        partnerMessagesReceived,
-        partnerHintsRequested: revealedHints,
-      }
-
-      const interactionMetrics = {
-        interviewerQuestionsAnswered,
-        interviewerClarificationsRequested,
-        interviewerFeedbackAcknowledged,
-        proactiveInteractions,
-        problemDifficulty: selectedScenario?.difficulty,
-        problemType: selectedScenario?.type,
-        skillsDemonstrated: selectedScenario?.tags || [],
-      }
-
-      // For system design, generate feedback based on conversation and design notes
-      // Create a mock summary for system design (no tests, but we need the structure)
-      const mockSummary = {
-        passed: 0,
-        failed: 0,
-        total: 0,
-        passRate: 0, // Will be calculated by feedback system based on conversation
-      }
-
-      // Generate comprehensive feedback
-      let comprehensiveFeedback = `Completed system design interview: ${selectedScenario?.title}`
-      let calculatedPerformanceScore = 0
-
-      // Mark session as evaluating BEFORE feedback generation starts
-      // This prevents the session from being reopened if user refreshes
-      if (currentSessionId && user) {
-        try {
-          await markSessionEvaluating(currentSessionId, {
-            code: code || "// Design notes completed via discussion",
-            language: "notes",
-            elapsedTime,
-            chatMessages,
-            interviewerMessages,
-            testResults: [],
-            testSummary: mockSummary,
-            isPostInterviewDiscussion: true,
-          })
-        } catch (markError) {
-          console.error("Failed to mark session as evaluating:", markError)
-          // Continue anyway - this is non-critical
-        }
-      }
-
-      // Prepare conversation transcript for content-based evaluation
-      // This allows the AI to evaluate WHAT was said, not just message counts
-      const conversationTranscript = [
-        ...interviewerMessages.map((m) => ({
-          role: m.type === "user" ? "candidate" : "interviewer",
-          content: m.message,
-          timestamp: m.timestamp,
-        })),
-        ...chatMessages.map((m) => ({
-          role: m.type === "user" ? "candidate" : "ai_partner",
-          content: m.message,
-          timestamp: m.timestamp,
-        })),
-      ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-
-      // Generate feedback using the feedback API
-      const feedbackResponse = await fetch("/api/generate-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: code || "// Design notes completed via discussion",
-          scenarioTitle: selectedScenario.title,
-          scenarioType: selectedScenario.type,
-          scenarioId: selectedScenario.id,
-          scenarioDifficulty: selectedScenario.difficulty,
-          scenarioPattern: (selectedScenario as any)?.pattern,
-          scenarioCompany: targetCompany, // Target company for company-specific feedback
-          testResults: [], // No tests for system design
-          language: "notes",
-          timeSpent: elapsedTime,
-          aiCollaborationMetrics,
-          interactionMetrics,
-          efficiencyMetrics: null, // No code efficiency for system design
-          conversationTranscript, // Pass actual conversation for AI analysis
-          sessionId: currentSessionId,
-          userId: user?.id,
-          // Real Interview Mode (clarifying questions)
-          scenarioClarifyingQuestions: (selectedScenario as any)?.clarifyingQuestions,
-          realInterviewMode,
-          // Pass silent notes from real-time tracking (systemic fix)
-          silentNotes: conversationTracker.silentNotes || [],
-        }),
-      })
-
-      let systemDesignScoreBreakdown: {
-        understanding?: number
-        problemSolving?: number
-        codeQuality?: number
-        communication?: number
-      } | null = null
-      let systemDesignTechnicalScore: number | undefined = undefined
-      let systemDesignStructuredFeedback:
-        | {
-            scores?: Record<string, number>
-            tldr?: string
-            whatWorked?: string[]
-            fixNext?: string[]
-            actionPlan?: string[]
-            rawFeedback?: string
-          }
-        | undefined
-      if (feedbackResponse.ok) {
-        const feedbackData = await feedbackResponse.json()
-        comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
-        calculatedPerformanceScore = feedbackData.scores?.overall || 0
-        if (feedbackData.structured) {
-          systemDesignStructuredFeedback = feedbackData.structured
-          setStructuredFeedback({
-            whatWorked: feedbackData.structured.whatWorked || [],
-            fixNext: feedbackData.structured.fixNext || [],
-            actionPlan: feedbackData.structured.actionPlan || [],
-            tldr: feedbackData.structured.tldr || "",
-          })
-        }
-        // Store technical score (mastery-based) for Overall/Technical toggle
-        if (feedbackData.technicalScore !== undefined) {
-          systemDesignTechnicalScore = feedbackData.technicalScore
-          setTechnicalScore(feedbackData.technicalScore)
-        }
-        // Store score breakdown for technical score calculations and display
-        if (feedbackData.scores) {
-          systemDesignScoreBreakdown = feedbackData.scores
-          // Also set state for PracticeFeedback component
-          // Ensure all scores are defined numbers before setting state
-          if (feedbackData.scores) {
-            const scores = feedbackData.scores
-            setScoreBreakdown({
-              understandingScore:
-                scores.understanding !== undefined && scores.understanding !== null
-                  ? scores.understanding
-                  : undefined,
-              problemSolvingScore:
-                scores.problemSolving !== undefined && scores.problemSolving !== null
-                  ? scores.problemSolving
-                  : undefined,
-              codeQualityScore:
-                scores.codeQuality !== undefined && scores.codeQuality !== null
-                  ? scores.codeQuality
-                  : undefined,
-              communicationScore:
-                scores.communication !== undefined && scores.communication !== null
-                  ? scores.communication
-                  : undefined,
-            })
-          }
-        }
-      }
-
-      setComprehensiveFeedback(comprehensiveFeedback)
-      setPerformanceScore(calculatedPerformanceScore)
-
-      // Update session with completion data
-      if (currentSessionId && user) {
-        try {
-          await updateInterviewSession(
-            currentSessionId,
-            calculatedPerformanceScore,
-            comprehensiveFeedback,
-            {
-              code: code || "// Design notes",
-              language: "notes",
-              testResults: [],
-              feedbackStatus: "complete", // Feedback generation is done
-              // Pass pre-calculated technical score from API for consistency
-              technicalScore: systemDesignTechnicalScore,
-              scoreBreakdown: systemDesignScoreBreakdown || undefined,
-              structuredFeedback: systemDesignStructuredFeedback,
-            }
-          )
-
-          // Track session completion for user stats (async, non-blocking)
-          trackSessionCompletion({
-            sessionId: currentSessionId,
-            finalCode: code || "// Design notes",
-            language: "notes",
-            testsPassed: 1, // System design counts as passed
-            testsTotal: 1,
-            efficiencyScore: 50, // Not applicable for system design
-            communicationScore: calculatedPerformanceScore,
-          }).catch((err) => console.error("Session metrics tracking failed:", err))
-
-          // Update spaced repetition state (due dates and streak)
-          if (selectedScenario) {
-            const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
-            updateSpacedRepetition({
-              problemId: selectedScenario.id,
-              performanceScore: calculatedPerformanceScore,
-              masteryScore: systemDesignScoreBreakdown
-                ? Math.round(
-                    (systemDesignScoreBreakdown.understanding || 0) * 0.3 +
-                      (systemDesignScoreBreakdown.problemSolving || 0) * 0.4 +
-                      (systemDesignScoreBreakdown.codeQuality || 0) * 0.3
-                  )
-                : undefined,
-              timeSpentMinutes: Math.round(elapsedTime / 60),
-              hintsUsed: hintsUsedCount,
-              testCasesPassed: 1, // System design counts as passed
-              testCasesTotal: 1,
-            }).catch((err) => console.error("Spaced repetition update failed:", err))
-          }
-
-          // Mark question complete in roadmap if user came from roadmap
-          // Note: Check both param patterns for compatibility
-          const isFromRoadmapHere =
-            searchParams.get("from") === "roadmap" || searchParams.get("roadmap") === "true"
-          if (isFromRoadmapHere && selectedScenario && activeRoadmap) {
-            markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
-            const minutesSpent = Math.round(elapsedTime / 60)
-            if (minutesSpent > 0) {
-              addActualTime(minutesSpent)
-            }
-            // Signal to roadmap page that a question was just completed (for day completion modal)
-            sessionStorage.setItem(
-              "roadmap-question-just-completed",
-              JSON.stringify({
-                scenarioId: selectedScenario.id,
-                roadmapId: activeRoadmap.id,
-                timestamp: Date.now(),
-              })
-            )
-            toast.success("Progress saved to your roadmap!")
-          }
-
-          // Store solution for RAG (async, non-blocking)
-          if (selectedScenario?.id) {
-            fetch("/api/rag", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "store-solution",
-                userId: user.id,
-                problemId: selectedScenario.id,
-                problemTitle: selectedScenario.title,
-                solutionCode: code.trim() || "// Design discussion completed",
-                language: "notes",
-                passed: true,
-                score: calculatedPerformanceScore,
-                problemType: "system-design",
-              }),
-            }).catch((err) => {
-              console.error("Solution storage error (non-blocking):", err)
-            })
-          }
-        } catch (error) {
-          console.error("Error updating session:", error)
-        }
-      } else if (currentSessionId && isGuestMode && guestId) {
-        // Guest user - save completion data via API
-        try {
-          await fetch("/api/guest-session", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: currentSessionId,
-              guestId,
-              performanceScore: calculatedPerformanceScore,
-              feedback: comprehensiveFeedback,
-              finalCode: code || "// Design notes",
-              language: "notes",
-              testResults: [],
-            }),
-          })
-        } catch (error) {
-          console.error("Error saving guest session completion:", error)
-        }
-      }
-
-      // Start post-interview discussion phase
-      setShowPostInterviewDiscussion(true)
-
-      // Trigger interviewer to provide final feedback
-      const finalMessage = `The candidate has submitted their design. Please provide a brief summary of their performance, highlighting strengths and areas for improvement. Keep it concise (2-3 sentences).`
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: finalMessage,
-          context: interviewerMessages,
-          role: "interviewer",
-          userContext: user
-            ? {
-                email: user.email,
-                full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
-                skill_level: experienceLevel,
-              }
-            : { skill_level: experienceLevel },
-          currentCode: code,
-          scenarioTitle: selectedScenario?.title,
-          scenarioType: selectedScenario?.type,
-          scenarioCompany: targetCompany, // Target company for RAG context
-          isProactive: false,
-          isPostInterview: true,
-          isEndingSession: false,
-          edgeCases: getEdgeCasesForInterviewer(),
-          // Pass recent topics to prevent repetitive questions
-          recentNudgeTopics: recentNudgeTopics,
-          // Pass test results and console logs for interviewer awareness
-          testResults: testResults,
-          consoleLogs: consoleLogs,
-          // Phase-aware interview tracking
-          // NOTE: Explicitly set phase params because React state may not have updated yet
-          interviewPhase: "post_interview" as const,
-          conversationTracker,
-          hasSubmitted: true,
-          solutionComplexity: null, // System design doesn't have complexity metrics
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        console.warn("[API] Request failed:", response.status, response.url, data)
-      }
-      if (data.reply) {
-        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
-        // Track interviewer response for conversation context
-        updateTrackerOnMessage(data.reply, "interviewer")
-      }
-    } catch (error) {
-      console.error("Error generating system design feedback:", error)
-      toast.error("Failed to generate feedback", {
-        description: "There was a problem generating your feedback. Please try again.",
-      })
-    } finally {
-      setIsGeneratingDiscussion(false)
-    }
-  }
 
   const { runCode, submitCode } = useCodeExecution({
     selectedScenario,
