@@ -32,16 +32,6 @@ export type { UseNotificationsOptions, UseNotificationsReturn } from "./useNotif
 
 export { useSessionMetrics } from "./use-session-metrics"
 
-// New interview hooks
-export { useInterviewState } from "./useInterviewState"
-export type { UseInterviewStateOptions, UseInterviewStateReturn } from "./useInterviewState"
-
-export { useInterviewUI } from "./useInterviewUI"
-export type { UseInterviewUIOptions, UseInterviewUIReturn } from "./useInterviewUI"
-
-export { useTestExecution } from "./useTestExecution"
-export type { UseTestExecutionOptions, UseTestExecutionReturn } from "./useTestExecution"
-
 export { useFocusTrap } from "./useFocusTrap"
 
 export { useSpacedRepetition } from "./useSpacedRepetition"
