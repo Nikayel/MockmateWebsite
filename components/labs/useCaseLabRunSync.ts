@@ -45,6 +45,14 @@ export function useCaseLabRunSync(caseLabId: string | null) {
 
   // Load the in-progress run once per (lab, retry). The ref guards against the
   // double-invoke React does in dev StrictMode, keyed so a Retry still fires.
+  //
+  // Staleness is gated on `loadedKey.current` (a persistent ref) rather than a
+  // per-invocation `cancelled` closure. The StrictMode remount runs cleanup on
+  // the first effect *before* its fetch settles; a closure flag would mark that
+  // in-flight load cancelled while the remount's early-return skips re-fetching,
+  // stranding `isLoading` at `true` forever. Comparing the still-current key
+  // instead lets the original load apply its result and clear loading, while a
+  // genuine lab/retry change (which advances the key) correctly ignores it.
   const loadedKey = useRef<string | null>(null)
   useEffect(() => {
     if (!caseLabId) return
@@ -52,22 +60,18 @@ export function useCaseLabRunSync(caseLabId: string | null) {
     if (loadedKey.current === key) return
     loadedKey.current = key
 
-    let cancelled = false
     setError(null)
     setLoading(true)
     fetchActiveCaseLabRun(caseLabId)
       .then((run) => {
-        if (!cancelled && run) setActiveRun(run)
+        if (loadedKey.current === key && run) setActiveRun(run)
       })
       .catch(() => {
-        if (!cancelled) setError("Couldn't load your saved progress.")
+        if (loadedKey.current === key) setError("Couldn't load your saved progress.")
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (loadedKey.current === key) setLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
   }, [caseLabId, reloadNonce, setActiveRun, setLoading, setError])
 
   // Debounced autosave on meaningful run changes.
