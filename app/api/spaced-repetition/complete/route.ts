@@ -176,7 +176,10 @@ export async function POST(request: NextRequest) {
       const learningState = learningStateDoc.data()
       const streakDays = learningState?.streak_days || 0
 
-      // Reconstruct algorithm state from stored data (including scores_history for SM-2)
+      // Reconstruct algorithm state from stored data (including scores_history for SM-2).
+      // FSRS fields MUST be passed too, otherwise the card is rebuilt from defaults
+      // (difficulty=5, stability=interval) and the learned difficulty/stability/lapses
+      // are lost on every review, defeating FSRS.
       const currentState = reconstructState(userAlgorithm, {
         interval_days: existingMastery.interval_days,
         next_review_at: existingMastery.next_review_at,
@@ -186,6 +189,10 @@ export async function POST(request: NextRequest) {
         ease_factor: existingMastery.ease_factor,
         last_reviewed_at: existingMastery.last_reviewed_at,
         scores_history: existingMastery.scores_history,
+        fsrs_difficulty: existingMastery.fsrs_difficulty,
+        fsrs_stability: existingMastery.fsrs_stability,
+        fsrs_state: existingMastery.fsrs_state,
+        fsrs_lapses: existingMastery.fsrs_lapses,
       })
 
       // Estimate pre-review retention

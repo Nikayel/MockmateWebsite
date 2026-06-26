@@ -112,7 +112,9 @@ export async function POST(request: NextRequest) {
     const isEarlyReview = nextReviewAtDate > now
 
     // Reconstruct algorithm state
-    // Include scores_history for consecutive perfect score detection in SM-2
+    // Include scores_history for consecutive perfect score detection in SM-2.
+    // FSRS fields MUST be passed too, otherwise the card is rebuilt from defaults
+    // (difficulty=5, stability=interval) and the learned state is lost each review.
     const currentState = reconstructState(userAlgorithm, {
       interval_days: existingMastery.interval_days,
       next_review_at: existingMastery.next_review_at,
@@ -122,6 +124,10 @@ export async function POST(request: NextRequest) {
       ease_factor: existingMastery.ease_factor,
       last_reviewed_at: existingMastery.last_reviewed_at,
       scores_history: existingMastery.scores_history,
+      fsrs_difficulty: existingMastery.fsrs_difficulty,
+      fsrs_stability: existingMastery.fsrs_stability,
+      fsrs_state: existingMastery.fsrs_state,
+      fsrs_lapses: existingMastery.fsrs_lapses,
     })
 
     // Estimate pre-review retention
