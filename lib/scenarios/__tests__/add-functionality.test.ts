@@ -5,7 +5,11 @@ import { scenarios } from "../../scenarios"
 import { isWorkspaceScenario, validateWorkspaceScenario } from "../../workspace-execution"
 
 describe("add functionality scenarios", () => {
-  const publicFeatureIds = ["add-feature-support-ticket-search", "add-feature-digest-scheduler"]
+  const publicFeatureIds = [
+    "add-feature-support-ticket-search",
+    "add-feature-digest-scheduler",
+    "palantir-911-dispatch-build",
+  ]
 
   it("publishes the curated workspace feature scenarios", () => {
     expect(addFunctionalityScenarios.map((scenario) => scenario.id)).toEqual(publicFeatureIds)

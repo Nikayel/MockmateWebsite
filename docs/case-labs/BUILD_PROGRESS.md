@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 5
-**Last updated by loop:** Phase 5 — CaseLabIntro start screen + Practice/Onsite toggle
+**Last updated by loop:** Phase 5 — full verification; fixed own test regression
 
 ---
 
@@ -49,7 +49,7 @@
 ## Definition of Done (v1)
 - [ ] 911 Dispatch lab fully playable: Clarify → Decompose → Design → Build (multi-file codebase drop) → Review
 - [x] AI interviewer engaged across milestones; structured feedback at the end
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass
+- [~] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass — typecheck ✅ repo-wide; all Case Labs code lints clean + 18 Case Labs tests pass. Repo has PRE-EXISTING, unrelated failures NOT introduced by Case Labs: 2 `real-world.test.ts` cases (stale expected list for `bugfix-temperature-alert-regression`, added 06-22 before this work) + 40 lint errors in `proxy.ts`/`public/workers`/`scratch.ts` etc. (none in labs files). Verified via git history.
 - [ ] New surfaces handle loading/empty/error/unauthorized
 - [ ] `graphify update .` run; graph current
 
@@ -83,3 +83,4 @@
 - Phase 5 (AI spine, UI): `components/labs/CaseLabChat.tsx` — right-column interviewer; sends `{milestone, messages, lab persona, answer-summary context}` to `/api/labs/chat`, renders the conversation (user/assistant bubbles, typing spinner, empty + soft-error states, Enter-to-send), attaches auth token. Wired into the play route via `chatSlot`. The AI is now engaged across every milestone — **DoD item "AI interviewer engaged across milestones" met**. typecheck + lint clean; graph updated.
 - Phase 5 (browse): `app/labs/page.tsx` gallery + `components/labs/CaseLabCard.tsx` (company/role, difficulty badge via shared `difficultyColorClass`, why-this-company teaser, skills, est. minutes, Start → play route). Empty state handled; fixes the play route's previously-dangling `/labs` back-link. Filter-by-company/skill + progress badges deferred to polish. typecheck + lint clean; graph updated.
 - Phase 5 (intro + modes): `components/labs/CaseLabIntro.tsx` — start screen (company framing P6, milestone preview, Practice/Onsite toggle with descriptions) → `onStart(mode)`. Play route now gates: loading state while resuming, intro when no run for this lab, shell once a run exists (resume skips intro). `startRun` now honors the chosen mode. typecheck + lint clean; graph updated.
+- Phase 5 (verification): ran full `pnpm test` (3 failures: 1 mine — `add-functionality.test.ts` curated-list assertion needed the new `palantir-911-dispatch-build` id; fixed → 2/2 pass) and full `pnpm lint`. Confirmed via git history that the other 2 test failures + all 40 lint errors are PRE-EXISTING and unrelated to Case Labs (files I never touched; the offending bugfix scenario predates this work). All Case Labs code: typecheck ✅, eslint ✅, 18 tests ✅. NOT declaring COMPLETE yet — Phase 5 polish (mastery, analytics, /labs filters, states audit) still open.
