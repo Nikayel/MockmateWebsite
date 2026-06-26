@@ -16,7 +16,7 @@ Live checklist for the loop agent. Update the status + metrics after each slice.
 | 0 | Baseline + payload snapshots | DONE | 5,414 | AST payload-contract oracle added; baseline caveats below |
 | 1 | Delete dead hooks (useInterviewState/UI, useTestExecution) | DONE | 5,414 | Files already deleted by prior commit; removed 3 dangling re-exports from lib/hooks/index.ts. Commit 500a356. typecheck GREEN; lint clean in touched file; vitest = 2 pre-existing baseline failures only. |
 | 2 | Pure helpers (interview-messages, fallback-feedback) | DONE | 5,364 | Created `lib/interview/fallback-feedback.ts` (pure `computeFallbackScores`; fetch/persist stays inline → payload snapshot unchanged) + `_utils/interview-messages.ts` (consolidates interviewer/partner/label builders; deleted `interview-copy.ts`). Tests added. Commit d905fb4. All gates green (suite now fully green — parallel agent fixed the 2 baseline scenario failures). |
-| 3 | useInterviewTimer | TODO | | |
+| 3 | useInterviewTimer | DONE | 5,355 | `_hooks/useInterviewTimer.ts` owns startTime/elapsedTime + tick effect; returns state+setters so the ~20 inline reads keep working. Pure `computeElapsedSeconds` exported + unit-tested (node env: no React renderer, so hook-render tests not possible — test pure logic). Commit 1ec300e. Gates green. NOTE for future hook slices: no @testing-library/react / jsdom in repo (env=node) — test extracted pure logic, not rendered hooks. |
 | 4 | useInterviewModes | TODO | | |
 | 5 | useGuestQuota (entitlement) | TODO | | |
 | 6 | Adopt useCodeExecution to parity | TODO | | |
