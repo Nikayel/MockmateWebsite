@@ -175,8 +175,8 @@ export function Header() {
           user ? "max-w-7xl" : "max-w-5xl"
         } ${
           isScrolled
-            ? "border-white/12 bg-[#15151a]/90 shadow-black/30 backdrop-blur-xl"
-            : "border-white/10 bg-[#17171c]/80 shadow-black/20 backdrop-blur-xl"
+            ? "border-white/12 bg-[#1a1917]/90 shadow-black/30 backdrop-blur-xl"
+            : "border-white/10 bg-[#1a1917]/80 shadow-black/20 backdrop-blur-xl"
         }`}
       >
         <div className="flex items-center justify-between gap-4 font-[var(--font-geist)]">
@@ -245,7 +245,7 @@ export function Header() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="w-56 border-white/10 bg-[#17171c] text-white shadow-xl shadow-black/30"
+                      className="w-56 border-white/10 bg-[#1a1917] text-white shadow-xl shadow-black/30"
                     >
                       <DropdownMenuLabel className="font-normal">
                         <span className="block text-xs text-white/50">Signed in as</span>
@@ -262,7 +262,7 @@ export function Header() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={handleSignOut}
-                        className="cursor-pointer gap-2 text-[#adc6ff] focus:bg-[#adc6ff] focus:text-[#001a42]"
+                        className="cursor-pointer gap-2 text-[#adc6ff] focus:bg-[#adc6ff] focus:text-[#1a1917]"
                       >
                         <LogOut className="h-4 w-4" />
                         Sign Out
@@ -283,7 +283,7 @@ export function Header() {
                   </Link>
                 ))}
                 <Link href="/login" className="ml-6 lg:ml-10">
-                  <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff]">
+                  <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#1a1917] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff]">
                     Sign in
                   </span>
                 </Link>
@@ -373,7 +373,7 @@ export function Header() {
                     Join us
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                    <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:bg-[#c1d3ff]">
+                    <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#1a1917] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:bg-[#c1d3ff]">
                       Sign in
                     </span>
                   </Link>

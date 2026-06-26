@@ -534,7 +534,7 @@ export default function ScoringPage() {
                           </Pie>
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "#1f2937",
+                              backgroundColor: "#232220",
                               border: "1px solid #374151",
                               borderRadius: "8px",
                             }}
@@ -575,7 +575,7 @@ export default function ScoringPage() {
                       <YAxis dataKey="category" type="category" stroke="#9ca3af" width={100} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "#1f2937",
+                          backgroundColor: "#232220",
                           border: "1px solid #374151",
                           borderRadius: "8px",
                         }}
@@ -641,7 +641,7 @@ export default function ScoringPage() {
                           <YAxis stroke="#9ca3af" domain={[0, 100]} />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "#1f2937",
+                              backgroundColor: "#232220",
                               border: "1px solid #374151",
                               borderRadius: "8px",
                             }}
@@ -678,7 +678,7 @@ export default function ScoringPage() {
                           <YAxis stroke="#9ca3af" />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "#1f2937",
+                              backgroundColor: "#232220",
                               border: "1px solid #374151",
                               borderRadius: "8px",
                             }}
@@ -714,7 +714,7 @@ export default function ScoringPage() {
                           <YAxis stroke="#9ca3af" />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "#1f2937",
+                              backgroundColor: "#232220",
                               border: "1px solid #374151",
                               borderRadius: "8px",
                             }}

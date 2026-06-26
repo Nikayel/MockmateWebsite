@@ -177,7 +177,7 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative flex items-center overflow-hidden bg-[#09090b] px-4 py-12 font-[var(--font-geist)] sm:px-6 sm:py-16 lg:px-12 lg:py-20 xl:px-16"
+      className="relative flex items-center overflow-hidden bg-[#121110] px-4 py-12 font-[var(--font-geist)] sm:px-6 sm:py-16 lg:px-12 lg:py-20 xl:px-16"
     >
       {/* Dynamic Background Noise / Grid */}
       <div

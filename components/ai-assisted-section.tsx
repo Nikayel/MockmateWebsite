@@ -234,7 +234,7 @@ export function AIAssistedSection() {
         <div className="text-center">
           <Link
             href="/interview"
-            className="group inline-flex items-center gap-2.5 rounded-full bg-[#adc6ff] px-7 py-3.5 text-sm font-semibold tracking-wide text-[#001a42] shadow-[0_0_30px_rgba(173,198,255,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff] hover:shadow-[0_0_40px_rgba(173,198,255,0.4)]"
+            className="group inline-flex items-center gap-2.5 rounded-full bg-[#adc6ff] px-7 py-3.5 text-sm font-semibold tracking-wide text-[#1a1917] shadow-[0_0_30px_rgba(173,198,255,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff] hover:shadow-[0_0_40px_rgba(173,198,255,0.4)]"
           >
             <Zap className="h-4 w-4" />
             Practice Like the Real Thing

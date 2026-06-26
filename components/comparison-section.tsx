@@ -79,7 +79,7 @@ function FeatureRow({
       )
     }
     if (value) {
-      return <Check className="h-4 w-4" style={{ color: highlight ? "#0066cc" : "#7a7a7a" }} />
+      return <Check className="h-4 w-4" style={{ color: highlight ? "#c4703f" : "#7a7a7a" }} />
     }
     return <X className="h-4 w-4" style={{ color: "#e0e0e0" }} />
   }
@@ -97,7 +97,7 @@ function FeatureRow({
         style={{
           fontFamily: fontBody,
           fontSize: "14px",
-          color: "#1d1d1f",
+          color: "#1a1917",
           letterSpacing: "-0.224px",
         }}
       >
@@ -138,9 +138,9 @@ export function ComparisonSection() {
   const fontBody = "var(--font-open-sans), system-ui, -apple-system, sans-serif"
 
   return (
-    // Dark tile (#272729) — fixed dark surface, not theme-reactive by design.
+    // Dark tile (#232220) — fixed dark surface, not theme-reactive by design.
     // This section deliberately sits outside the light/dark theme as a full-bleed dark tile.
-    <section ref={sectionRef} className="py-20 lg:py-28" style={{ backgroundColor: "#272729" }}>
+    <section ref={sectionRef} className="py-20 lg:py-28" style={{ backgroundColor: "#232220" }}>
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-4xl">
           {/* Header */}
@@ -219,7 +219,7 @@ export function ComparisonSection() {
                   style={{
                     fontFamily: fontHeading,
                     fontSize: "40px",
-                    color: "#1d1d1f",
+                    color: "#1a1917",
                     lineHeight: 1.1,
                   }}
                 />
@@ -231,7 +231,7 @@ export function ComparisonSection() {
                   style={{
                     fontFamily: fontHeading,
                     fontSize: "40px",
-                    color: "#1d1d1f",
+                    color: "#1a1917",
                     lineHeight: 1.1,
                   }}
                 />
@@ -252,7 +252,7 @@ export function ComparisonSection() {
               <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
                 <div
                   className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1d1d1f" }}
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1a1917" }}
                 >
                   <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#7a7a7a" }} />
                   Real human feedback
@@ -270,7 +270,7 @@ export function ComparisonSection() {
             {/* CodeSparring — Action Blue border to signal selection */}
             <motion.div
               className="rounded-[18px] p-6"
-              style={{ backgroundColor: "#ffffff", border: "2px solid #0066cc" }}
+              style={{ backgroundColor: "#ffffff", border: "2px solid #c4703f" }}
               initial={{ opacity: 0, y: 16 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.2, duration: 0.5 }}
@@ -282,7 +282,7 @@ export function ComparisonSection() {
                     fontFamily: fontBody,
                     fontSize: "14px",
                     letterSpacing: "0.08em",
-                    color: "#0066cc",
+                    color: "#c4703f",
                   }}
                 >
                   CodeSparring
@@ -308,7 +308,7 @@ export function ComparisonSection() {
                   style={{
                     fontFamily: fontHeading,
                     fontSize: "40px",
-                    color: "#1d1d1f",
+                    color: "#1a1917",
                     lineHeight: 1.1,
                   }}
                 />
@@ -339,16 +339,16 @@ export function ComparisonSection() {
               <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
                 <div
                   className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1d1d1f" }}
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1a1917" }}
                 >
-                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#0066cc" }} />
+                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#c4703f" }} />
                   AI adapts to your skill level
                 </div>
                 <div
                   className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1d1d1f" }}
+                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1a1917" }}
                 >
-                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#0066cc" }} />
+                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#c4703f" }} />
                   Practice at 2am before your 9am interview
                 </div>
               </div>
@@ -420,11 +420,11 @@ export function ComparisonSection() {
               <div className="text-center">
                 <span
                   className="block font-semibold"
-                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#0066cc" }}
+                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#c4703f" }}
                 >
                   Ours
                 </span>
-                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#0066cc" }}>
+                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#c4703f" }}>
                   $24/mo
                 </span>
               </div>
@@ -449,7 +449,7 @@ export function ComparisonSection() {
                 className="inline-flex items-center font-medium transition-transform active:scale-95"
                 style={{
                   fontFamily: fontBody,
-                  backgroundColor: "#0066cc",
+                  backgroundColor: "#c4703f",
                   color: "#ffffff",
                   borderRadius: "9999px",
                   padding: "11px 28px",

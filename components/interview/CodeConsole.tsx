@@ -309,12 +309,12 @@ export function CodeConsole({
   return (
     <div
       className={cn(
-        "flex flex-shrink-0 flex-col rounded border border-gray-700 bg-[#1e1e1e]",
+        "flex flex-shrink-0 flex-col rounded border border-gray-700 bg-[#1e1d1b]",
         className
       )}
     >
       {/* Console Header */}
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-[#252526] px-3 py-1.5">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-[#232220] px-3 py-1.5">
         <div className="flex items-center space-x-2">
           <Terminal className="h-3.5 w-3.5 text-gray-400" />
           <span className="text-xs font-medium text-gray-400">Console</span>

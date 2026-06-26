@@ -184,7 +184,7 @@ function ScoreRing({ score, size = 120, label }: { score: number; size?: number;
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#27272a"
+          stroke="#232220"
           strokeWidth="6"
         />
         <circle

@@ -136,7 +136,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (authLoading || isAdmin === null) {
     return (
-      <div className="flex min-h-screen bg-[#0a0a0f]">
+      <div className="flex min-h-screen bg-[#1a1917]">
         {/* Sidebar skeleton */}
         <aside className="fixed top-0 left-0 z-40 h-screen w-64 border-r border-gray-800 bg-gray-900/95">
           <div className="flex h-14 items-center justify-between border-b border-gray-800 px-3">
@@ -168,7 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!isAdmin) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+      <div className="flex min-h-screen items-center justify-center bg-[#1a1917]">
         <div className="max-w-md rounded-lg border border-red-500/30 bg-gray-900/50 p-8 text-center">
           <Shield className="mx-auto mb-4 h-12 w-12 text-red-400" />
           <h1 className="mb-2 text-xl font-bold text-white">Access Denied</h1>
@@ -198,7 +198,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0f]">
+    <div className="flex min-h-screen bg-[#1a1917]">
       {/* Sidebar */}
       <aside
         className={cn(
