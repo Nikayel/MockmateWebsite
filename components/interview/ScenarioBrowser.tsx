@@ -35,6 +35,12 @@ const DEBUGGING_TYPES: ScenarioType[] = [
 type Density = "cards" | "rows"
 const DENSITY_STORAGE_KEY = "mockmate_scenario_density"
 
+// Progressive reveal: render a light initial batch and let users expand in chunks
+// rather than mounting the whole catalog up front. Resets when the visible list
+// changes (tab/filter/search) so an expanded count never leaks across contexts.
+const INITIAL_VISIBLE = 18
+const LOAD_MORE_STEP = 18
+
 export const ScenarioBrowser = memo(function ScenarioBrowser({
   onStartInterview,
   usageLimit,
@@ -44,6 +50,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const [mainTab, setMainTab] = useState<MainTab>("debugging")
   const [dsaView, setDsaView] = useState<DsaView>("roadmap")
   const [density, setDensity] = useState<Density>("cards")
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
 
   // Restore the user's preferred density once on mount (client-only).
   useEffect(() => {
@@ -88,8 +95,15 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     setMainTab(tab)
   }
 
-  // Dynamic padding: more when guest banner is shown (header 64px + banner ~40px)
-  const topPadding = hasGuestBanner ? "pt-28" : "pt-20"
+  // Collapse the reveal back to the initial batch whenever the visible set
+  // changes — switching tab/view or applying filters/search starts fresh.
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE)
+  }, [filteredScenarios, mainTab, dsaView])
+
+  // Dynamic padding: clear the floating navbar (64px) plus comfortable breathing
+  // room below it; extra when the guest banner (~40px) is also shown.
+  const topPadding = hasGuestBanner ? "pt-40" : "pt-32"
 
   const debuggingScenarios = filteredScenarios.filter((s) => s.type !== "dsa")
   const dsaScenarios = filteredScenarios.filter((s) => s.type === "dsa")
@@ -142,38 +156,60 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
         )}
       </div>
     ) : (
-      <>
-        {renderDensityToggle()}
-        {density === "rows" ? (
-          <div className="flex flex-col gap-1.5">
-            {list.map((scenario) => (
-              <ScenarioListRow
-                key={scenario.id}
-                scenario={scenario}
-                isSelected={selectedScenario?.id === scenario.id}
-                isCompleted={completedProblems.includes(scenario.id)}
-                usageLimit={usageLimit}
-                onSelect={setSelectedScenario}
-                onStart={onStartInterview}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {list.map((scenario) => (
-              <ScenarioCard
-                key={scenario.id}
-                scenario={scenario}
-                isSelected={selectedScenario?.id === scenario.id}
-                isCompleted={completedProblems.includes(scenario.id)}
-                usageLimit={usageLimit}
-                onSelect={setSelectedScenario}
-                onStart={onStartInterview}
-              />
-            ))}
-          </div>
-        )}
-      </>
+      (() => {
+        const visible = list.slice(0, visibleCount)
+        const remaining = list.length - visible.length
+        return (
+          <>
+            {renderDensityToggle()}
+            {density === "rows" ? (
+              <div className="flex flex-col gap-1.5">
+                {visible.map((scenario) => (
+                  <ScenarioListRow
+                    key={scenario.id}
+                    scenario={scenario}
+                    isSelected={selectedScenario?.id === scenario.id}
+                    isCompleted={completedProblems.includes(scenario.id)}
+                    usageLimit={usageLimit}
+                    onSelect={setSelectedScenario}
+                    onStart={onStartInterview}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {visible.map((scenario) => (
+                  <ScenarioCard
+                    key={scenario.id}
+                    scenario={scenario}
+                    isSelected={selectedScenario?.id === scenario.id}
+                    isCompleted={completedProblems.includes(scenario.id)}
+                    usageLimit={usageLimit}
+                    onSelect={setSelectedScenario}
+                    onStart={onStartInterview}
+                  />
+                ))}
+              </div>
+            )}
+            {remaining > 0 && (
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <button
+                  onClick={() => setVisibleCount((count) => count + LOAD_MORE_STEP)}
+                  className="rounded-full border border-white/[0.08] bg-white/[0.03] px-5 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-white/[0.06] hover:text-white"
+                >
+                  Show more
+                  <span className="ml-1.5 text-zinc-500">
+                    ({Math.min(LOAD_MORE_STEP, remaining)})
+                  </span>
+                </button>
+                <p className="text-xs text-zinc-500">
+                  Showing {visible.length} of {list.length}
+                </p>
+              </div>
+            )}
+          </>
+        )
+      })()
     )
 
   return (

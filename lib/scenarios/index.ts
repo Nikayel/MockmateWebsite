@@ -40,7 +40,7 @@ export type {
   AddFunctionalityScenario,
   ScenarioMeta,
 }
-export type { ScenarioType, DifficultyLevel, Company }
+export type { ScenarioType, DifficultyLevel, Company, RoleTag } from "./types"
 
 // Re-export from legacy for backward compatibility
 // This allows: import { scenarios } from '@/lib/scenarios/index'

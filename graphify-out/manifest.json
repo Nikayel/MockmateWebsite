@@ -1335,7 +1335,7 @@
     "semantic_hash": ""
   },
   "components/header.tsx": {
-    "mtime": 1782444735.29,
+    "mtime": 1782445405.04,
     "ast_hash": "49b0db377c7b191ee765e66b98a9a73b",
     "semantic_hash": ""
   },
@@ -1455,8 +1455,8 @@
     "semantic_hash": ""
   },
   "components/interview/ScenarioBrowser.tsx": {
-    "mtime": 1782444950.76,
-    "ast_hash": "de4820f10062aa8e819a95b617edf9d3",
+    "mtime": 1782445935.89,
+    "ast_hash": "d1a44335aefc235e5d7b13bfdc75cd0a",
     "semantic_hash": ""
   },
   "components/interview/ScenarioCard.tsx": {
@@ -5625,7 +5625,7 @@
     "semantic_hash": "cf02edff78e1da2fd6d3d4cd94152497"
   },
   "package.json": {
-    "mtime": 1782444272.0,
+    "mtime": 1782445405.21,
     "ast_hash": "61fda2f2c825686c2b1b031570119d22",
     "semantic_hash": ""
   },
@@ -6575,12 +6575,12 @@
     "semantic_hash": ""
   },
   "components/labs/useCaseLabRunSync.ts": {
-    "mtime": 1782445113.01,
+    "mtime": 1782445405.06,
     "ast_hash": "6ea01ff89ea837b5f94428d77c61ff3e",
     "semantic_hash": ""
   },
   "lib/labs/case-lab-runs-client.ts": {
-    "mtime": 1782445081.52,
+    "mtime": 1782445405.17,
     "ast_hash": "d3a280d052c121c2563ad1655fac355f",
     "semantic_hash": ""
   },
@@ -6615,8 +6615,8 @@
     "semantic_hash": ""
   },
   "lib/labs/case-labs/index.ts": {
-    "mtime": 1782419959.66,
-    "ast_hash": "85c9c8e408d7403618393d48cd0a18c7",
+    "mtime": 1782445415.37,
+    "ast_hash": "767bed94f319f7be84bee0fc792a4832",
     "semantic_hash": ""
   },
   "lib/labs/case-labs/palantir-911-dispatch.ts": {
@@ -6635,7 +6635,7 @@
     "semantic_hash": ""
   },
   "app/labs/[labId]/page.tsx": {
-    "mtime": 1782445136.15,
+    "mtime": 1782445405.04,
     "ast_hash": "27bbb2e5ede9a5c11b269bc099f16a00",
     "semantic_hash": ""
   },
@@ -6695,7 +6695,7 @@
     "semantic_hash": ""
   },
   "components/labs/CaseLabGallery.tsx": {
-    "mtime": 1782444679.34,
+    "mtime": 1782445405.05,
     "ast_hash": "56503ff9f1b132c5ebe025b6eacca7a7",
     "semantic_hash": ""
   },
@@ -6715,18 +6715,18 @@
     "semantic_hash": ""
   },
   "components/labs/CaseLabRow.tsx": {
-    "mtime": 1782444667.46,
-    "ast_hash": "d428fcee3f928e9dae6453a96aa5859d",
-    "semantic_hash": ""
-  },
-  "docs/case-labs/._GAPS_AND_PLAN.md": {
-    "mtime": 1782440205.05,
-    "ast_hash": "64bd59ee9c36a910b9532f339649b8b3",
+    "mtime": 1782445405.05,
+    "ast_hash": "717669d9dce4480502927d868ba5adab",
     "semantic_hash": ""
   },
   "docs/case-labs/GAPS_AND_PLAN.md": {
     "mtime": 1782440205.05,
     "ast_hash": "cbf0c9124e894cd445238dd49d508cb7",
+    "semantic_hash": ""
+  },
+  "lib/labs/case-labs/stripe-billing-webhook.ts": {
+    "mtime": 1782445415.38,
+    "ast_hash": "1b97587c2a7dbd00cc5f05c77f7b3697",
     "semantic_hash": ""
   }
 }

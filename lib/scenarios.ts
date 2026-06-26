@@ -43,6 +43,7 @@ export type {
   ScenarioType,
   DifficultyLevel,
   Company,
+  RoleTag,
   BaseScenario,
   DSAScenario,
   BugFixScenario,

@@ -7,8 +7,8 @@
  * This file is auto-generated from the full scenarios data.
  */
 
-import type { ScenarioMeta } from './types'
-import { DSAPattern } from '../types/dsa-patterns'
+import type { ScenarioMeta } from "./types"
+import { DSAPattern } from "../types/dsa-patterns"
 
 // This will be populated by extracting metadata from the legacy scenarios.ts
 // For now, we provide a function to extract from the legacy format
@@ -24,6 +24,7 @@ export function extractMetadata(scenario: any): ScenarioMeta {
     type: scenario.type,
     difficulty: scenario.difficulty,
     companies: scenario.companies,
+    roles: scenario.roles,
     description: scenario.description,
     tags: scenario.tags,
     estimatedTime: scenario.estimatedTime,

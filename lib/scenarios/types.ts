@@ -14,6 +14,13 @@ export type ScenarioType =
   | "system-design"
   | "add-functionality"
 export type DifficultyLevel = "easy" | "medium" | "hard"
+/**
+ * Interview role / track a question is representative of, used for role-aware
+ * roadmaps and company filtering. Seniority tags (intern / new-grad / junior /
+ * senior) and track tags (swe = core software engineer, fdse = forward deployed
+ * software engineer) can be combined, e.g. ["new-grad", "junior", "swe", "fdse"].
+ */
+export type RoleTag = "intern" | "new-grad" | "junior" | "senior" | "swe" | "fdse"
 export type Company =
   | "Google"
   | "Meta"
@@ -74,6 +81,12 @@ export interface BaseScenario {
   type: ScenarioType
   difficulty: DifficultyLevel
   companies: Company[]
+  /**
+   * Optional role/track tags indicating which interview roles this question is
+   * representative of (e.g. Palantir FDSE vs core SWE, intern vs senior). Used
+   * by role-aware roadmaps. Absent = not yet role-mapped (treated as all-role).
+   */
+  roles?: RoleTag[]
   description: string
   tags: string[]
   estimatedTime: number // in minutes
@@ -305,6 +318,7 @@ export interface ScenarioMeta {
   type: ScenarioType
   difficulty: DifficultyLevel
   companies: Company[]
+  roles?: RoleTag[]
   description: string
   tags: string[]
   estimatedTime: number
