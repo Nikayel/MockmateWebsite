@@ -1,6 +1,7 @@
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { ProblemTeaser } from "@/components/problem-teaser"
+import { CompanyRoadmapSection } from "@/components/company-roadmap-section"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { ComparisonSection } from "@/components/comparison-section"
@@ -34,10 +35,11 @@ export default function HomePage() {
         <Header />
         <HeroSection />
         <ProblemTeaser />
+        <CompanyRoadmapSection />
         <AIAssistedSection />
-        <ComparisonSection />
         <FeaturesSection />
         <MetricsMarketingSection />
+        <ComparisonSection />
         <Footer />
       </main>
     </LenisProvider>
