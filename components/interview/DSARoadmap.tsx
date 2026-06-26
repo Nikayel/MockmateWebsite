@@ -34,7 +34,7 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
       <RoadmapHeader totalCompleted={totalCompleted} totalProblems={totalProblems} />
 
       {/* Visual Tree Map - reduced height for less scroll */}
-      <div className="relative bg-zinc-900/30 rounded-xl border border-zinc-800 p-3 overflow-x-auto">
+      <div className="relative bg-card/30 rounded-xl border border-border p-3 overflow-x-auto">
         <div className="relative" style={{ minHeight: '520px', minWidth: '800px' }}>
           {/* SVG for connection lines */}
           <RoadmapConnections connections={connections} />

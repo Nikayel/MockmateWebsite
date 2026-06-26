@@ -263,22 +263,22 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
       {/* Header Stats */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">Practice by Pattern</h2>
-          <p className="text-gray-400">Group related problems into patterns to build deep intuition.</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Practice by Pattern</h2>
+          <p className="text-muted-foreground">Group related problems into patterns to build deep intuition.</p>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Progress</div>
-          <div className="text-lg font-semibold text-gray-100">{totalCompleted}/{totalProblems} solved</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Progress</div>
+          <div className="text-lg font-semibold text-foreground">{totalCompleted}/{totalProblems} solved</div>
         </div>
       </div>
 
       {/* Overall Progress */}
       <div className="mb-8">
-        <div className="flex justify-between text-xs mb-2 text-gray-400">
+        <div className="flex justify-between text-xs mb-2 text-muted-foreground">
           <span>Overall progress</span>
           <span>{Math.round((totalCompleted / totalProblems) * 100)}%</span>
         </div>
-        <Progress value={(totalCompleted / totalProblems) * 100} className="h-1.5 bg-gray-900/80" />
+        <Progress value={(totalCompleted / totalProblems) * 100} className="h-1.5 bg-card/80" />
       </div>
 
       {/* Pattern Grid */}
@@ -290,7 +290,7 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
           return (
             <Card
               key={group.name}
-              className={`${group.bgColor} ${group.borderColor} border transition-all duration-300 cursor-pointer hover:border-gray-500/80 ${
+              className={`${group.bgColor} ${group.borderColor} border transition-all duration-300 cursor-pointer hover:border-border/80 ${
                 isExpanded ? 'col-span-full' : ''
               }`}
               onClick={() => setExpandedPattern(isExpanded ? null : group.name)}
@@ -300,27 +300,27 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg bg-gradient-to-br ${group.color}`}>
-                      <Icon className="h-5 w-5 text-white" />
+                      <Icon className="h-5 w-5 text-foreground" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">{group.name}</h3>
-                      <p className="text-xs text-gray-400">{group.completed}/{group.total} solved</p>
+                      <h3 className="font-semibold text-foreground">{group.name}</h3>
+                      <p className="text-xs text-muted-foreground">{group.completed}/{group.total} solved</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-300">
+                    <span className="text-sm font-medium text-muted-foreground">
                       {Math.round(group.progress)}%
                     </span>
                     {isExpanded ? (
-                      <ChevronUp className="h-5 w-5 text-gray-400" />
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
                     ) : (
-                      <ChevronDown className="h-5 w-5 text-gray-400" />
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
                     )}
                   </div>
                 </div>
 
                 {/* Progress Bar */}
-                <Progress value={group.progress} className="h-1.5 bg-gray-800/50 mb-3" />
+                <Progress value={group.progress} className="h-1.5 bg-muted/50 mb-3" />
 
                 {/* Difficulty Distribution (when collapsed) */}
                 {!isExpanded && (
@@ -354,7 +354,7 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
                         return (
                           <div
                             key={scenario.id}
-                            className={`flex items-center justify-between p-3 rounded-lg bg-gray-900/50 border border-gray-700/50 hover:border-gray-600 transition-colors ${
+                            className={`flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/50 hover:border-border transition-colors ${
                               isCompleted ? 'opacity-70' : ''
                             }`}
                           >
@@ -364,19 +364,19 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
                                   <Check className="h-4 w-4 text-green-400" />
                                 </div>
                               ) : (
-                                <div className="p-1 rounded-full bg-gray-700">
-                                  <Code className="h-4 w-4 text-gray-400" />
+                                <div className="p-1 rounded-full bg-muted">
+                                  <Code className="h-4 w-4 text-muted-foreground" />
                                 </div>
                               )}
                               <div>
-                                <p className={`font-medium ${isCompleted ? 'text-gray-400' : 'text-white'}`}>
+                                <p className={`font-medium ${isCompleted ? 'text-muted-foreground' : 'text-foreground'}`}>
                                   {scenario.title}
                                 </p>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <Badge className={`${getDifficultyColor(scenario.difficulty)} text-xs px-1.5 py-0`}>
                                     {scenario.difficulty}
                                   </Badge>
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-muted-foreground">
                                     {scenario.companies.slice(0, 2).join(', ')}
                                   </span>
                                 </div>
@@ -390,7 +390,7 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
                               }}
                               className={`${
                                 isCompleted
-                                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                                  ? 'bg-muted hover:bg-gray-600 text-muted-foreground'
                                   : 'bg-[#c4703f] hover:bg-[#c4703f]/80 text-black'
                               }`}
                             >
@@ -409,20 +409,20 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
       </div>
 
       {/* Pattern Legend */}
-      <div className="mt-8 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
-        <h4 className="text-sm font-medium text-gray-400 mb-3">Pattern Difficulty Guide</h4>
+      <div className="mt-8 p-4 bg-card/30 rounded-lg border border-border">
+        <h4 className="text-sm font-medium text-muted-foreground mb-3">Pattern Difficulty Guide</h4>
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-full ${difficultyColorClass("easy", "dot")}`}></div>
-            <span className="text-gray-300">Easy - Good for beginners</span>
+            <span className="text-muted-foreground">Easy - Good for beginners</span>
           </div>
           <div className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-full ${difficultyColorClass("medium", "dot")}`}></div>
-            <span className="text-gray-300">Medium - Core interview problems</span>
+            <span className="text-muted-foreground">Medium - Core interview problems</span>
           </div>
           <div className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-full ${difficultyColorClass("hard", "dot")}`}></div>
-            <span className="text-gray-300">Hard - Advanced challenges</span>
+            <span className="text-muted-foreground">Hard - Advanced challenges</span>
           </div>
         </div>
       </div>

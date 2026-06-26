@@ -116,10 +116,10 @@ function getLevelColors(level: HintLevel): {
       }
     default:
       return {
-        border: "border-gray-500/30",
+        border: "border-border/30",
         bg: "bg-gray-500/5",
-        badge: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-        text: "text-gray-400",
+        badge: "bg-gray-500/20 text-muted-foreground border-border/30",
+        text: "text-muted-foreground",
       }
   }
 }
@@ -176,15 +176,15 @@ export function RAGHintCard({
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-700/50 p-3">
+      <div className="flex items-center justify-between border-b border-border/50 p-3">
         <div className="flex items-center gap-2">
           <CategoryIcon className={cn("h-4 w-4", colors.text)} />
-          <span className="text-sm font-medium text-gray-200">{hint.title}</span>
+          <span className="text-sm font-medium text-foreground">{hint.title}</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Source indicator */}
           <div
-            className="flex items-center gap-1 text-xs text-gray-500"
+            className="flex items-center gap-1 text-xs text-muted-foreground"
             title={`Source: ${hint.source}`}
           >
             <SourceIcon className="h-3 w-3" />
@@ -197,17 +197,17 @@ export function RAGHintCard({
       {/* Content */}
       <div className="p-3">
         {isLocked ? (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Lock className="h-4 w-4" />
             <span>Unlocks after {unlockTimeMinutes} minutes</span>
           </div>
         ) : isRevealed ? (
           <div className="space-y-2">
-            <p className="text-sm leading-relaxed text-gray-300">{hint.content}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{hint.content}</p>
 
             {/* Code snippet if available */}
             {hint.metadata?.codeSnippet && (
-              <pre className="mt-2 overflow-x-auto rounded bg-gray-900/50 p-2 text-xs text-gray-400">
+              <pre className="mt-2 overflow-x-auto rounded bg-card/50 p-2 text-xs text-muted-foreground">
                 <code>{hint.metadata.codeSnippet}</code>
               </pre>
             )}
@@ -219,7 +219,7 @@ export function RAGHintCard({
                   <Badge
                     key={idx}
                     variant="outline"
-                    className="border-gray-600 text-[10px] text-gray-500"
+                    className="border-border text-[10px] text-muted-foreground"
                   >
                     {concept}
                   </Badge>
@@ -232,7 +232,7 @@ export function RAGHintCard({
               variant="ghost"
               size="sm"
               onClick={handleHide}
-              className="mt-2 h-7 text-xs text-gray-400 hover:text-white"
+              className="mt-2 h-7 text-xs text-muted-foreground hover:text-foreground"
             >
               <EyeOff className="mr-1 h-3 w-3" />
               Hide
@@ -243,15 +243,15 @@ export function RAGHintCard({
             {/* Blurred preview */}
             <div className="relative">
               <p
-                className="text-sm leading-relaxed text-gray-400 blur-sm select-none"
+                className="text-sm leading-relaxed text-muted-foreground blur-sm select-none"
                 aria-hidden="true"
               >
                 {hint.content.substring(0, 100)}...
               </p>
 
               {/* Reveal overlay */}
-              <div className="absolute inset-0 flex items-center justify-center rounded bg-gray-900/30 transition-opacity group-hover:bg-gray-900/50">
-                <div className="flex items-center gap-2 rounded-full border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-gray-300 transition-colors group-hover:border-gray-500 group-hover:text-white">
+              <div className="absolute inset-0 flex items-center justify-center rounded bg-card/30 transition-opacity group-hover:bg-card/50">
+                <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-sm text-muted-foreground transition-colors group-hover:border-border group-hover:text-foreground">
                   <Eye className="h-3.5 w-3.5" />
                   <span>Click to reveal</span>
                 </div>
@@ -264,13 +264,13 @@ export function RAGHintCard({
       {/* Relevance indicator */}
       <div className="px-3 pb-2">
         <div className="flex items-center gap-2">
-          <div className="h-1 flex-1 overflow-hidden rounded-full bg-gray-700">
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className={cn("h-full rounded-full", colors.bg.replace("/5", "/50"))}
               style={{ width: `${hint.relevanceScore * 100}%` }}
             />
           </div>
-          <span className="text-[10px] text-gray-500">
+          <span className="text-[10px] text-muted-foreground">
             {Math.round(hint.relevanceScore * 100)}% relevant
           </span>
         </div>

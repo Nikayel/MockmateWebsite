@@ -204,7 +204,7 @@ export function VoiceModeToggle({
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-white"
                 />
               ) : (
                 <motion.div
@@ -311,7 +311,7 @@ export function VoiceModeToggle({
                 )}
               >
                 {isLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-white" />
                 ) : (
                   <>
                     <Send className="mr-1 h-4 w-4" />

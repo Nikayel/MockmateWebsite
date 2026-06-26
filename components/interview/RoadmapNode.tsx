@@ -48,11 +48,11 @@ export const NODE_POSITIONS: Record<string, { x: number; y: number; tier: number
 const NODE_STYLE = {
   unlocked: {
     bg: "from-zinc-700/50 to-zinc-800/50",
-    border: "border-zinc-600",
-    text: "text-white",
+    border: "border-border",
+    text: "text-foreground",
     glow: "shadow-zinc-500/10",
   },
-  locked: { bg: "bg-zinc-900/50", border: "border-zinc-800", text: "text-zinc-500" },
+  locked: { bg: "bg-card/50", border: "border-border", text: "text-muted-foreground" },
   mastered: {
     bg: "from-emerald-900/30 to-emerald-950/30",
     border: "border-emerald-500/50",
@@ -123,7 +123,7 @@ export function RoadmapNode({
         className={`relative cursor-pointer transition-all duration-200 ${isHovered && isUnlocked ? "z-20 scale-105" : "z-10"} ${!isUnlocked ? "cursor-not-allowed opacity-40" : ""} `}
       >
         <Card
-          className={`relative w-32 overflow-hidden bg-gradient-to-br transition-all duration-200 ${style.bg} ${style.border} border ${isUnlocked && !isMastered ? "hover:border-zinc-500" : ""} ${isMastered ? "ring-1 ring-emerald-500/40" : ""} `}
+          className={`relative w-32 overflow-hidden bg-gradient-to-br transition-all duration-200 ${style.bg} ${style.border} border ${isUnlocked && !isMastered ? "hover:border-border" : ""} ${isMastered ? "ring-1 ring-emerald-500/40" : ""} `}
         >
           {/* Mastered checkmark */}
           {isMastered && (
@@ -135,7 +135,7 @@ export function RoadmapNode({
           {/* Lock icon for locked nodes */}
           {!isUnlocked && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/50">
-              <Lock className="h-4 w-4 text-zinc-600" />
+              <Lock className="h-4 w-4 text-muted-foreground" />
             </div>
           )}
 
@@ -144,20 +144,20 @@ export function RoadmapNode({
             <h3 className={`mb-2 text-sm leading-tight font-medium ${style.text}`}>{node.name}</h3>
 
             {/* Simple progress: just the count */}
-            <div className="mb-1 flex items-center justify-between text-xs text-zinc-400">
+            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 {stats?.completed || 0}/{stats?.total || 0}
               </span>
             </div>
-            <Progress value={stats?.progress || 0} className="h-1 bg-zinc-800" />
+            <Progress value={stats?.progress || 0} className="h-1 bg-muted" />
           </CardContent>
         </Card>
 
         {/* Prerequisites tooltip - only on hover for locked nodes */}
         {isHovered && !isUnlocked && prerequisites.length > 0 && (
           <div className="absolute top-full left-1/2 z-50 mt-1.5 w-40 -translate-x-1/2 transform">
-            <div className="rounded-lg border border-zinc-700 bg-zinc-800 p-2 text-xs shadow-xl">
-              <div className="mb-1 text-zinc-400">Complete first:</div>
+            <div className="rounded-lg border border-border bg-muted p-2 text-xs shadow-xl">
+              <div className="mb-1 text-muted-foreground">Complete first:</div>
               <div className="flex flex-wrap gap-1">
                 {prerequisites.map((p) => (
                   <span
@@ -165,7 +165,7 @@ export function RoadmapNode({
                     className={`rounded px-1.5 py-0.5 text-xs ${
                       nodeStats[p.id]?.isComplete
                         ? "bg-emerald-500/20 text-emerald-400"
-                        : "bg-zinc-700 text-zinc-400"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {p.name}

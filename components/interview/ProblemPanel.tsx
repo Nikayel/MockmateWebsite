@@ -215,10 +215,10 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
   }
 
   return (
-    <Card className="glass-effect flex h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50">
+    <Card className="glass-effect flex h-full flex-col overflow-hidden border-border bg-card/50">
       {/* Enhanced Header with Title and Difficulty */}
-      <CardHeader className="flex-shrink-0 border-b border-gray-700/50 pb-3">
-        <CardTitle className="flex items-center justify-between text-white">
+      <CardHeader className="flex-shrink-0 border-b border-border/50 pb-3">
+        <CardTitle className="flex items-center justify-between text-foreground">
           <div className="flex items-center gap-2">
             <Target className="h-5 w-5 text-[#c4703f]" />
             <span className="truncate text-base font-semibold">{scenario.title}</span>
@@ -254,7 +254,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 ? (scenario as any).fuzzyStatement
                 : scenario.problemStatement
             }
-            className="text-[15px] leading-relaxed text-gray-200"
+            className="text-[15px] leading-relaxed text-foreground"
           />
         </div>
 
@@ -267,19 +267,19 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
             </h3>
             <div className="space-y-3">
               {scenario.examples.slice(0, 2).map((ex, i) => (
-                <div key={i} className="rounded-lg border border-gray-700/50 bg-gray-800/70 p-3">
+                <div key={i} className="rounded-lg border border-border/50 bg-muted/70 p-3">
                   <div className="space-y-1.5 font-mono text-sm">
                     <div className="flex items-start gap-2">
-                      <span className="min-w-[60px] font-medium text-gray-500">Input:</span>
+                      <span className="min-w-[60px] font-medium text-muted-foreground">Input:</span>
                       <code className="break-all text-green-400">{ex.input}</code>
                     </div>
                     <div className="flex items-start gap-2">
-                      <span className="min-w-[60px] font-medium text-gray-500">Output:</span>
+                      <span className="min-w-[60px] font-medium text-muted-foreground">Output:</span>
                       <code className="break-all text-blue-400">{ex.output}</code>
                     </div>
                   </div>
                   {ex.explanation && (
-                    <div className="mt-2 border-t border-gray-700/50 pt-2 text-sm text-gray-400 italic">
+                    <div className="mt-2 border-t border-border/50 pt-2 text-sm text-muted-foreground italic">
                       {ex.explanation}
                     </div>
                   )}
@@ -296,11 +296,11 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
               <span className="h-4 w-1 rounded-full bg-[#c4703f]"></span>
               Constraints
             </h3>
-            <ul className="space-y-1.5 text-gray-300">
+            <ul className="space-y-1.5 text-muted-foreground">
               {scenario.constraints.slice(0, 4).map((c, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
                   <span className="mt-0.5 text-[#c4703f]">•</span>
-                  <code className="font-mono text-gray-300">{c}</code>
+                  <code className="font-mono text-muted-foreground">{c}</code>
                 </li>
               ))}
             </ul>
@@ -309,39 +309,39 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
         {/* Optimal Approach - Collapsible (DSA only) */}
         {scenario.type === "dsa" && (scenario as DSAScenario).optimalComplexity && (
-          <div className="rounded-md border border-gray-600/60 bg-gray-800/40">
+          <div className="rounded-md border border-border/60 bg-muted/40">
             <button
               onClick={() => setShowOptimalApproach(!showOptimalApproach)}
-              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-gray-700/30"
+              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/30"
             >
               <div className="flex items-center gap-2">
                 <span className="h-4 w-1 rounded-full bg-[#c4703f]"></span>
-                <span className="text-sm font-medium text-gray-200">Target complexity</span>
+                <span className="text-sm font-medium text-foreground">Target complexity</span>
               </div>
               {showOptimalApproach ? (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
 
             {showOptimalApproach && (
               <div className="animate-in slide-in-from-top-2 px-3 pt-0.5 pb-3 duration-200">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-                  <span className="flex items-center gap-1.5 text-gray-400">
-                    <Clock className="h-3.5 w-3.5 text-gray-500" />
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                     <code className="font-mono text-[#c4703f]">
                       {(scenario as DSAScenario).optimalComplexity.time}
                     </code>
                   </span>
-                  <span className="flex items-center gap-1.5 text-gray-400">
-                    <HardDrive className="h-3.5 w-3.5 text-gray-500" />
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
                     <code className="font-mono text-[#c4703f]">
                       {(scenario as DSAScenario).optimalComplexity.space}
                     </code>
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">Aim for this before checking hints.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Aim for this before checking hints.</p>
               </div>
             )}
           </div>
@@ -349,10 +349,10 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
         {/* Pattern Analysis (DSA only) */}
         {scenario.type === "dsa" && patternMetadata && (
-          <div className="mt-3 border-t border-gray-700 pt-3">
+          <div className="mt-3 border-t border-border pt-3">
             <button
               onClick={() => setShowAnalysis(!showAnalysis)}
-              className="mb-2 flex w-full items-center justify-between font-semibold text-white transition-colors hover:text-[#c4703f]"
+              className="mb-2 flex w-full items-center justify-between font-semibold text-foreground transition-colors hover:text-[#c4703f]"
             >
               <span className="flex items-center gap-1.5 text-xs">
                 <BookOpen className="h-3 w-3 text-[#c4703f]" />
@@ -362,9 +362,9 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 </Badge>
               </span>
               {showAnalysis ? (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
 
@@ -372,14 +372,14 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
               <div className="animate-in slide-in-from-top-2 space-y-3 duration-200">
                 {/* Pattern Description */}
                 <div className="rounded-lg border border-[#c4703f]/30 bg-[#c4703f]/10 p-2">
-                  <p className="text-xs leading-relaxed text-gray-300">
+                  <p className="text-xs leading-relaxed text-muted-foreground">
                     {patternMetadata.description}
                   </p>
                 </div>
 
                 {/* Key Techniques */}
                 <div>
-                  <h4 className="mb-1.5 flex items-center gap-1 text-xs font-medium text-gray-400">
+                  <h4 className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                     <Zap className="h-3 w-3 text-yellow-400" />
                     Key Techniques to Consider
                   </h4>
@@ -399,7 +399,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 {/* Expected Complexity */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded border border-green-500/20 bg-green-500/10 p-2">
-                    <h4 className="mb-1 flex items-center gap-1 text-xs font-medium text-gray-400">
+                    <h4 className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                       <Clock className="h-3 w-3 text-green-400" />
                       Time Complexity
                     </h4>
@@ -412,7 +412,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                     </div>
                   </div>
                   <div className="rounded border border-blue-500/20 bg-blue-500/10 p-2">
-                    <h4 className="mb-1 flex items-center gap-1 text-xs font-medium text-gray-400">
+                    <h4 className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                       <HardDrive className="h-3 w-3 text-blue-400" />
                       Space Complexity
                     </h4>
@@ -436,7 +436,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                       {patternMetadata.commonQuestions.slice(0, 4).map((q, i) => (
                         <span
                           key={i}
-                          className="rounded bg-gray-800/50 px-1.5 py-0.5 text-xs text-gray-300"
+                          className="rounded bg-muted/50 px-1.5 py-0.5 text-xs text-muted-foreground"
                         >
                           {q}
                         </span>
@@ -453,7 +453,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                   </h4>
                   <ul className="space-y-1">
                     {patternMetadata.interviewerFollowUps.map((q, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-300">
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                         <span className="flex-shrink-0 text-orange-400">{i + 1}.</span>
                         {q}
                       </li>
@@ -467,16 +467,16 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
         {/* Hints Section */}
         {isInterviewStarted && hints.length > 0 && (
-          <div className="mt-3 border-t border-gray-700 pt-3">
+          <div className="mt-3 border-t border-border pt-3">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="flex items-center space-x-1 text-xs font-semibold text-white">
+              <h3 className="flex items-center space-x-1 text-xs font-semibold text-foreground">
                 <Lightbulb className="h-3 w-3 text-yellow-400" />
                 <span>
                   Hints ({revealedHints}/{hints.length})
                 </span>
               </h3>
               {revealedHints < hints.length && (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-muted-foreground">
                   Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
                 </span>
               )}
@@ -492,7 +492,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 italic">
+              <p className="text-xs text-muted-foreground italic">
                 Hints will unlock every 3 minutes as you work on the problem
               </p>
             )}
@@ -501,8 +501,8 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
         {/* Workspace Files Section - Only show for non-DSA scenarios */}
         {scenario.type !== "dsa" && (
-          <div className="mt-3 border-t border-gray-700 pt-3">
-            <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
+          <div className="mt-3 border-t border-border pt-3">
+            <h3 className="mb-2 font-semibold text-foreground">Workspace Files</h3>
             {scenario.type === "bugfix" && workspaceContext.length > 0 ? (
               <div className="mb-2">
                 <p className="mb-2 text-xs text-blue-400">
@@ -525,7 +525,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
-                  className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
+                  className="h-7 w-full border-border bg-transparent text-xs text-muted-foreground hover:bg-muted"
                   aria-label="Upload code files to workspace"
                 >
                   <Code className="mr-1 h-3 w-3" aria-hidden="true" />
@@ -537,7 +537,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                       <button
                         key={idx}
                         onClick={() => onFileSelect(file)}
-                        className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
+                        className="w-full cursor-pointer rounded bg-muted/30 px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/30 hover:text-blue-400"
                       >
                         <div className="flex items-center gap-1 truncate">
                           <Code className="h-3 w-3 flex-shrink-0" />

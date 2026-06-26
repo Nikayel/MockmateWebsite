@@ -75,7 +75,7 @@ export function TestResultsPanel({
 
   if (results.length === 0 && !isRunning) {
     return (
-      <div className={cn('text-center py-4 text-gray-500 text-sm', className)}>
+      <div className={cn('text-center py-4 text-muted-foreground text-sm', className)}>
         <AlertCircle className="h-5 w-5 mx-auto mb-2 opacity-50" />
         <p>Run tests to see results</p>
       </div>
@@ -116,9 +116,9 @@ export function TestResultsPanel({
       )}
 
       {/* Summary */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-muted/50 rounded">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">Tests:</span>
+          <span className="text-xs text-muted-foreground">Tests:</span>
           <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
             {passed} passed
           </Badge>
@@ -151,7 +151,7 @@ export function TestResultsPanel({
             {/* Test header */}
             <button
               onClick={() => toggleExpand(index)}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-800/30"
+              className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-muted/30"
             >
               <div className="flex items-center gap-2">
                 {result.passed ? (
@@ -159,14 +159,14 @@ export function TestResultsPanel({
                 ) : (
                   <XCircle className="h-3.5 w-3.5 text-red-400" />
                 )}
-                <span className="text-xs text-gray-300 truncate max-w-[200px]">
+                <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                   {result.description}
                 </span>
               </div>
               {expandedTests.has(index) ? (
-                <ChevronUp className="h-3 w-3 text-gray-500" />
+                <ChevronUp className="h-3 w-3 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-3 w-3 text-gray-500" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
               )}
             </button>
 
@@ -174,21 +174,21 @@ export function TestResultsPanel({
             {expandedTests.has(index) && (
               <div className="px-2 pb-2 space-y-1 text-xs">
                 <div className="flex gap-2">
-                  <span className="text-gray-500 w-16">Input:</span>
-                  <code className="text-gray-300 bg-gray-800/50 px-1 rounded">
+                  <span className="text-muted-foreground w-16">Input:</span>
+                  <code className="text-muted-foreground bg-muted/50 px-1 rounded">
                     {JSON.stringify(result.input)}
                   </code>
                 </div>
                 <div className="flex gap-2">
-                  <span className="text-gray-500 w-16">Expected:</span>
-                  <code className="text-green-400 bg-gray-800/50 px-1 rounded">
+                  <span className="text-muted-foreground w-16">Expected:</span>
+                  <code className="text-green-400 bg-muted/50 px-1 rounded">
                     {JSON.stringify(result.expected)}
                   </code>
                 </div>
                 {!result.passed && (
                   <div className="flex gap-2">
-                    <span className="text-gray-500 w-16">Actual:</span>
-                    <code className="text-red-400 bg-gray-800/50 px-1 rounded">
+                    <span className="text-muted-foreground w-16">Actual:</span>
+                    <code className="text-red-400 bg-muted/50 px-1 rounded">
                       {JSON.stringify(result.actual)}
                     </code>
                   </div>
@@ -205,8 +205,8 @@ export function TestResultsPanel({
       </div>
 
       {isRunning && (
-        <div className="flex items-center justify-center py-2 text-gray-400 text-xs">
-          <div className="h-3 w-3 border border-gray-400/30 border-t-gray-400 rounded-full animate-spin mr-2" />
+        <div className="flex items-center justify-center py-2 text-muted-foreground text-xs">
+          <div className="h-3 w-3 border border-border/30 border-t-gray-400 rounded-full animate-spin mr-2" />
           Running tests...
         </div>
       )}

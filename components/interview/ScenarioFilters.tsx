@@ -210,9 +210,9 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   }
 
   return (
-    <div className="mb-6 space-y-4 rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4 shadow-2xl backdrop-blur-2xl">
+    <div className="mb-6 space-y-4 rounded-2xl border border-border/[0.05] bg-card/[0.02] p-4 shadow-2xl backdrop-blur-2xl">
       {/* Search & Actions Row */}
-      <div className="flex flex-col gap-4 border-b border-white/[0.04] pb-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 border-b border-border/[0.04] pb-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Left side: Search input + Stats */}
         <div className="max-w-xl flex-1">
           <ScenarioSearchBar
@@ -228,7 +228,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
         <div className="flex flex-wrap items-center gap-4">
           {/* Difficulty Selection */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+            <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Difficulty
             </span>
             <div className="flex gap-1.5">
@@ -241,7 +241,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 ${
                       isActive
                         ? `${diff.id === "easy" ? "border-transparent bg-emerald-500/20 text-emerald-300" : diff.id === "medium" ? "border-transparent bg-amber-500/20 text-amber-200" : "border-transparent bg-red-500/20 text-red-300"} font-semibold`
-                        : "border-transparent bg-white/[0.025] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                        : "border-transparent bg-card/[0.025] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
                     } `}
                     aria-pressed={isActive}
                   >
@@ -259,8 +259,8 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
               className={`focus-visible:ring-accent flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                 filterCompanies.length > 0
-                  ? "border-transparent bg-white/10 text-white"
-                  : "border-transparent bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                  ? "border-transparent bg-foreground/10 text-foreground"
+                  : "border-transparent bg-card/[0.03] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
               } `}
               aria-haspopup="menu"
               aria-expanded={showCompanyDropdown}
@@ -291,21 +291,21 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   tabIndex={-1}
                   aria-label="Filter by company"
                   onKeyDown={handleCompanyMenuKeyDown}
-                  className="absolute top-full right-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border border-white/[0.06] bg-zinc-950/90 shadow-2xl backdrop-blur-xl"
+                  className="absolute top-full right-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border border-border/[0.06] bg-background/90 shadow-2xl backdrop-blur-xl"
                 >
-                  <div className="border-b border-white/[0.06] p-2">
+                  <div className="border-b border-border/[0.06] p-2">
                     <input
                       ref={companySearchRef}
                       value={companyQuery}
                       onChange={(e) => setCompanyQuery(e.target.value)}
                       placeholder="Search companies"
                       aria-label="Search companies"
-                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-white/15 focus:outline-none"
+                      className="w-full rounded-lg border border-border/[0.06] bg-card/[0.03] px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-border focus:outline-none"
                     />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {visibleCompanies.length === 0 && (
-                      <p className="px-3 py-2 text-sm text-zinc-600">No matches</p>
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No matches</p>
                     )}
                     {visibleCompanies.map((company) => {
                       const isActive = filterCompanies.includes(company as Company)
@@ -315,17 +315,17 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                           role="menuitemcheckbox"
                           aria-checked={isActive}
                           onClick={() => onToggleCompany(company as Company)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06] focus-visible:bg-white/[0.08] focus-visible:outline-none"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-card/[0.06] focus-visible:bg-card/[0.08] focus-visible:outline-none"
                         >
-                          <span className={isActive ? "text-white" : "text-zinc-400"}>
+                          <span className={isActive ? "text-foreground" : "text-muted-foreground"}>
                             {company}
                           </span>
                           <span className="flex items-center gap-2">
-                            <span className="text-xs text-zinc-600">
+                            <span className="text-xs text-muted-foreground">
                               {COMPANY_COUNTS[company] ?? 0}
                             </span>
                             {isActive && (
-                              <Check className="h-3.5 w-3.5 text-zinc-200" aria-hidden="true" />
+                              <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />
                             )}
                           </span>
                         </button>
@@ -334,11 +334,11 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   </div>
                   {filterCompanies.length > 0 && (
                     <>
-                      <div className="my-1 border-t border-white/10" role="separator" />
+                      <div className="my-1 border-t border-border" role="separator" />
                       <button
                         role="menuitem"
                         onClick={onClearCompanies}
-                        className="w-full px-3 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:bg-white/[0.08] focus-visible:outline-none"
+                        className="w-full px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-card/[0.06] hover:text-foreground focus-visible:bg-card/[0.08] focus-visible:outline-none"
                       >
                         Clear selection
                       </button>
@@ -364,15 +364,15 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                 onClick={() => onToggleType(type.id as ScenarioType)}
                 className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "border-transparent bg-white text-zinc-950 shadow-sm"
-                    : "border-transparent bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                    ? "border-transparent bg-card text-zinc-950 shadow-sm"
+                    : "border-transparent bg-card/[0.03] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
                 } `}
                 aria-pressed={isActive}
                 title={type.description}
               >
                 <Icon className="h-3.5 w-3.5" />
                 {type.label}
-                <span className={`text-xs ${isActive ? "text-zinc-500" : "text-zinc-500"}`}>
+                <span className={`text-xs ${isActive ? "text-muted-foreground" : "text-muted-foreground"}`}>
                   {count}
                 </span>
                 {isActive && <Check className="h-3 w-3" />}
@@ -384,8 +384,8 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 
       {/* Active Filters Summary */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-          <span className="text-xs text-zinc-400">Active:</span>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/[0.06] pt-3">
+          <span className="text-xs text-muted-foreground">Active:</span>
           {filterType.map((t) => {
             const type = EXERCISE_TYPES.find((et) => et.id === t)
             if (!type) return null
@@ -393,7 +393,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             return (
               <span
                 key={t}
-                className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300"
+                className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-card/[0.05] px-2.5 py-1 text-xs text-muted-foreground"
               >
                 <Icon className="h-3 w-3" />
                 {type.label}
@@ -431,7 +431,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {filterCompanies.map((c) => (
             <span
               key={c}
-              className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300"
+              className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-card/[0.05] px-2.5 py-1 text-xs text-muted-foreground"
             >
               {c}
               <button
@@ -444,7 +444,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             </span>
           ))}
           {searchQuery && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-white/[0.05] px-2.5 py-1 text-xs text-zinc-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-card/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
               "{searchQuery}"
               <button
                 onClick={() => onSearchChange("")}

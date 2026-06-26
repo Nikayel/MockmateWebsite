@@ -124,15 +124,15 @@ export function HintsPanel({
   }
 
   return (
-    <div className={cn("rounded-lg border border-gray-700 bg-gray-900/50", className)}>
+    <div className={cn("rounded-lg border border-border bg-card/50", className)}>
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center justify-between px-3 py-2 hover:bg-gray-800/30"
+        className="flex w-full items-center justify-between px-3 py-2 hover:bg-muted/30"
       >
         <div className="flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-yellow-500" />
-          <span className="text-sm font-medium text-gray-300">Hints</span>
+          <span className="text-sm font-medium text-muted-foreground">Hints</span>
           <Badge className="border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-400">
             {totalRevealed}/{totalHints}
           </Badge>
@@ -144,9 +144,9 @@ export function HintsPanel({
           )}
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-gray-500" />
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-gray-500" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
 
@@ -165,7 +165,7 @@ export function HintsPanel({
                   "rounded-lg border transition-colors",
                   isRevealed
                     ? "border-yellow-500/20 bg-yellow-500/5"
-                    : "border-gray-700 bg-gray-800/30 opacity-50"
+                    : "border-border bg-muted/30 opacity-50"
                 )}
               >
                 <div className="flex items-start justify-between p-2">
@@ -175,18 +175,18 @@ export function HintsPanel({
                       {isRevealed ? (
                         <>
                           {isVisible ? (
-                            <p className="text-xs leading-relaxed text-gray-300">{hint}</p>
+                            <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
                           ) : (
                             <button
                               onClick={() => toggleHintVisibility(index)}
                               className="group w-full text-left"
                             >
                               <div className="relative">
-                                <p className="text-xs text-gray-400 blur-sm select-none">
+                                <p className="text-xs text-muted-foreground blur-sm select-none">
                                   {hint.substring(0, 50)}...
                                 </p>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="flex items-center gap-1 text-xs text-gray-500 group-hover:text-gray-300">
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-muted-foreground">
                                     <Eye className="h-3 w-3" />
                                     Click to reveal
                                   </span>
@@ -196,7 +196,7 @@ export function HintsPanel({
                           )}
                         </>
                       ) : (
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Lock className="h-3 w-3" />
                           <span>Unlocks after {(index + 1) * 3} minutes</span>
                         </div>
@@ -208,7 +208,7 @@ export function HintsPanel({
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleHintVisibility(index)}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                     >
                       <EyeOff className="h-3 w-3" />
                     </Button>
@@ -244,18 +244,18 @@ export function HintsPanel({
                         </Badge>
                         <div className="flex-1">
                           {isVisible ? (
-                            <p className="text-xs leading-relaxed text-gray-300">{ragHint.hint}</p>
+                            <p className="text-xs leading-relaxed text-muted-foreground">{ragHint.hint}</p>
                           ) : (
                             <button
                               onClick={() => toggleRagHintVisibility(index)}
                               className="group w-full text-left"
                             >
                               <div className="relative">
-                                <p className="text-xs text-gray-400 blur-sm select-none">
+                                <p className="text-xs text-muted-foreground blur-sm select-none">
                                   {ragHint.hint.substring(0, 50)}...
                                 </p>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="flex items-center gap-1 text-xs text-gray-500 group-hover:text-gray-300">
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-muted-foreground">
                                     <Eye className="h-3 w-3" />
                                     Click to reveal
                                   </span>
@@ -270,7 +270,7 @@ export function HintsPanel({
                           variant="ghost"
                           size="sm"
                           onClick={() => toggleRagHintVisibility(index)}
-                          className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                         >
                           <EyeOff className="h-3 w-3" />
                         </Button>
@@ -284,7 +284,7 @@ export function HintsPanel({
 
           {/* Loading state for RAG hints */}
           {isLoadingRagHints && (
-            <div className="flex items-center gap-2 p-2 text-xs text-gray-500">
+            <div className="flex items-center gap-2 p-2 text-xs text-muted-foreground">
               <RefreshCw className="h-3 w-3 animate-spin" />
               <span>Generating personalized hints...</span>
             </div>
@@ -296,7 +296,7 @@ export function HintsPanel({
               variant="ghost"
               size="sm"
               onClick={onRequestRagHints}
-              className="mt-2 w-full text-xs text-gray-500 hover:text-white"
+              className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground"
             >
               <Sparkles className="mr-1 h-3 w-3" />
               Get AI hints
@@ -306,7 +306,7 @@ export function HintsPanel({
           {/* Progress indicator */}
           {revealedCount < hints.length && (
             <div className="pt-1 text-center">
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-muted-foreground">
                 Next hint unlocks at {(revealedCount + 1) * 3} minutes
               </p>
             </div>

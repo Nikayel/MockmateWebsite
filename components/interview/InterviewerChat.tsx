@@ -258,9 +258,9 @@ export function InterviewerChat({
   }
 
   return (
-    <Card className="glass-effect flex h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50">
+    <Card className="glass-effect flex h-full flex-col overflow-hidden border-border bg-card/50">
       <CardHeader className="flex-shrink-0 pb-2">
-        <CardTitle className="flex items-center space-x-2 text-sm text-white">
+        <CardTitle className="flex items-center space-x-2 text-sm text-foreground">
           <div className="relative">
             <Brain className="animate-neural-pulse h-4 w-4 text-[#c4703f]" />
             <div className="absolute inset-0 rounded-full bg-[#c4703f] opacity-30 blur-md"></div>
@@ -283,7 +283,7 @@ export function InterviewerChat({
             aria-relevant="additions"
           >
             {interviewerMessages.length === 0 ? (
-              <div className="py-8 text-center text-gray-400">
+              <div className="py-8 text-center text-muted-foreground">
                 <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
                 <p className="text-xs">Interview will begin when you start...</p>
               </div>
@@ -296,7 +296,7 @@ export function InterviewerChat({
                   >
                     <div
                       className={`max-w-[90%] rounded-lg p-2 ${
-                        msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                        msg.type === "user" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
                       }`}
                     >
                       <div className="mb-1 flex items-center space-x-1">
@@ -327,7 +327,7 @@ export function InterviewerChat({
                 {/* Thinking indicator - shows when AI is processing */}
                 {(isLoadingInterviewer || isGeneratingDiscussion) && (
                   <div className="flex justify-start">
-                    <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
+                    <div className="max-w-[90%] rounded-lg border border-border/50 bg-muted/50 p-2 text-muted-foreground">
                       <div className="flex items-center space-x-2">
                         <Brain className="h-3 w-3 animate-pulse text-[#c4703f]" />
                         <span className="text-xs">
@@ -359,7 +359,7 @@ export function InterviewerChat({
           {(hasNewMessages || !isAtBottom) && interviewerMessages.length > 0 && (
             <button
               onClick={() => scrollToBottom("smooth")}
-              className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-gray-600 bg-gray-800/95 px-3 py-1.5 text-xs text-gray-300 shadow-lg backdrop-blur-sm transition-all hover:bg-gray-700 hover:text-white"
+              className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-muted/95 px-3 py-1.5 text-xs text-muted-foreground shadow-lg backdrop-blur-sm transition-all hover:bg-muted hover:text-foreground"
               aria-label="Scroll to latest messages"
             >
               <ChevronDown className="h-3 w-3" />
@@ -368,7 +368,7 @@ export function InterviewerChat({
           )}
         </div>
         {(isInterviewStarted || showPostInterviewDiscussion) && (
-          <div className="flex flex-shrink-0 space-x-1 border-t border-gray-700 pt-2">
+          <div className="flex flex-shrink-0 space-x-1 border-t border-border pt-2">
             <Input
               value={inputValue}
               onChange={(e) => onInputChange(e.target.value)}
@@ -379,7 +379,7 @@ export function InterviewerChat({
                     ? "Ask about optimization or improvements..."
                     : "Ask a question..."
               }
-              className="h-7 flex-1 border-gray-600 bg-gray-800 text-xs text-white placeholder-gray-400"
+              className="h-7 flex-1 border-border bg-muted text-xs text-foreground placeholder-gray-400"
               onKeyPress={handleKeyPress}
               disabled={isLoadingInterviewer || isGeneratingDiscussion}
               aria-label="Chat with interviewer"
@@ -388,8 +388,8 @@ export function InterviewerChat({
             <Button
               onClick={isRecording ? onStopRecording || onToggleRecording : onToggleRecording}
               className={cn(
-                "h-7 px-2 text-white",
-                isRecording ? "bg-red-500 hover:bg-red-600" : "bg-gray-700 hover:bg-gray-600"
+                "h-7 px-2 text-foreground",
+                isRecording ? "bg-red-500 hover:bg-red-600" : "bg-muted hover:bg-gray-600"
               )}
               aria-label={isRecording ? "Stop recording" : "Start voice input"}
               disabled={isLoadingInterviewer || isGeneratingDiscussion}
@@ -404,7 +404,7 @@ export function InterviewerChat({
             <Button
               onClick={handleSubmit}
               className={cn(
-                "h-7 px-2 text-white",
+                "h-7 px-2 text-foreground",
                 isRecording && inputValue.trim()
                   ? "animate-pulse bg-green-500 hover:bg-green-600"
                   : "bg-[#c4703f] hover:bg-[#c4703f]/80"
@@ -418,7 +418,7 @@ export function InterviewerChat({
                 <Send className="h-3 w-3" aria-hidden="true" />
               )}
               {(isLoadingInterviewer || isGeneratingDiscussion) && (
-                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-white" />
               )}
             </Button>
           </div>
@@ -502,17 +502,17 @@ export function AIChatPartner({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col border-t border-gray-700 pt-2">
+    <div className="flex min-h-0 flex-1 flex-col border-t border-border pt-2">
       <div className="mb-1 flex flex-shrink-0 items-center space-x-1">
         <Brain className="h-3 w-3 text-[#c4703f]" />
-        <span className="text-xs font-medium text-white">AI Partner</span>
+        <span className="text-xs font-medium text-foreground">AI Partner</span>
       </div>
       {/* Chat container with smart scroll */}
       <div className="relative mb-2 min-h-0 flex-1">
         <div
           ref={chatContainerRef}
           onScroll={handleScroll}
-          className="absolute inset-0 space-y-1 overflow-y-auto scroll-smooth rounded bg-gray-800/30 p-2"
+          className="absolute inset-0 space-y-1 overflow-y-auto scroll-smooth rounded bg-muted/30 p-2"
         >
           {chatMessages.map((msg, index) => (
             <div
@@ -521,7 +521,7 @@ export function AIChatPartner({
             >
               <div
                 className={`max-w-[85%] rounded p-1.5 text-xs ${
-                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
+                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
                 }`}
               >
                 <div className="mb-0.5 flex items-center space-x-1">
@@ -548,7 +548,7 @@ export function AIChatPartner({
           {/* Thinking indicator for AI Partner */}
           {isLoadingChat && (
             <div className="flex justify-start">
-              <div className="max-w-[85%] rounded border border-gray-600/50 bg-gray-700/50 p-1.5 text-gray-400">
+              <div className="max-w-[85%] rounded border border-border/50 bg-muted/50 p-1.5 text-muted-foreground">
                 <div className="flex items-center space-x-1.5">
                   <Brain className="h-2.5 w-2.5 animate-pulse text-[#c4703f]" />
                   <span className="text-xs">{SABLE_THINKING_MESSAGES[thinkingMessageIndex]}</span>
@@ -576,7 +576,7 @@ export function AIChatPartner({
         {(hasNewMessages || !isAtBottom) && chatMessages.length > 0 && (
           <button
             onClick={() => scrollToBottom("smooth")}
-            className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-gray-600 bg-gray-700/95 px-2 py-1 text-xs text-gray-300 shadow-lg backdrop-blur-sm transition-all hover:bg-gray-600 hover:text-white"
+            className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-muted/95 px-2 py-1 text-xs text-muted-foreground shadow-lg backdrop-blur-sm transition-all hover:bg-gray-600 hover:text-foreground"
             aria-label="Scroll to latest messages"
           >
             <ChevronDown className="h-2.5 w-2.5" />
@@ -589,7 +589,7 @@ export function AIChatPartner({
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
           placeholder={isRecording ? "Listening... click Send when ready" : "Ask for help..."}
-          className="h-7 flex-1 border-gray-600 bg-gray-800 text-xs text-white placeholder-gray-400"
+          className="h-7 flex-1 border-border bg-muted text-xs text-foreground placeholder-gray-400"
           onKeyPress={handleKeyPress}
           disabled={isLoadingChat}
           aria-label="Chat with AI partner"
@@ -598,8 +598,8 @@ export function AIChatPartner({
         <Button
           onClick={isRecording ? onStopRecording || onToggleRecording : onToggleRecording}
           className={cn(
-            "h-7 px-2 text-white",
-            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-gray-700 hover:bg-gray-600"
+            "h-7 px-2 text-foreground",
+            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-muted hover:bg-gray-600"
           )}
           aria-label={isRecording ? "Stop recording" : "Start voice input"}
           disabled={isLoadingChat}
@@ -614,7 +614,7 @@ export function AIChatPartner({
         <Button
           onClick={handleSubmit}
           className={cn(
-            "h-7 px-2 text-white",
+            "h-7 px-2 text-foreground",
             isRecording && inputValue.trim()
               ? "animate-pulse bg-green-500 hover:bg-green-600"
               : "bg-[#c4703f] hover:bg-[#c4703f]/80"
@@ -624,7 +624,7 @@ export function AIChatPartner({
         >
           {!isLoadingChat && <Send className="h-3 w-3" aria-hidden="true" />}
           {isLoadingChat && (
-            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-border border-t-white" />
           )}
         </Button>
       </div>

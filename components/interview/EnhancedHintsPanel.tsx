@@ -213,15 +213,15 @@ export function EnhancedHintsPanel({
   }
 
   return (
-    <div className={cn("rounded-lg border border-gray-700 bg-gray-900/50", className)}>
+    <div className={cn("rounded-lg border border-border bg-card/50", className)}>
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center justify-between px-3 py-2 hover:bg-gray-800/30"
+        className="flex w-full items-center justify-between px-3 py-2 hover:bg-muted/30"
       >
         <div className="flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-yellow-500" />
-          <span className="text-sm font-medium text-gray-300">Hints</span>
+          <span className="text-sm font-medium text-muted-foreground">Hints</span>
           <Badge className="border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-400">
             {revealedCount}/{totalHints}
           </Badge>
@@ -240,9 +240,9 @@ export function EnhancedHintsPanel({
         <div className="flex items-center gap-2">
           {getStruggleBadge()}
           {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-gray-500" />
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
           )}
         </div>
       </button>
@@ -253,7 +253,7 @@ export function EnhancedHintsPanel({
           {/* Category filter */}
           {totalHints > 3 && (
             <div className="flex items-center gap-2 pt-1">
-              <Filter className="h-3 w-3 text-gray-500" />
+              <Filter className="h-3 w-3 text-muted-foreground" />
               <div className="flex flex-wrap gap-1">
                 {categories.map((cat) => (
                   <button
@@ -262,8 +262,8 @@ export function EnhancedHintsPanel({
                     className={cn(
                       "rounded px-2 py-0.5 text-xs transition-colors",
                       filterCategory === cat.value
-                        ? "bg-gray-700 text-white"
-                        : "bg-gray-800/50 text-gray-500 hover:text-gray-300"
+                        ? "bg-muted text-foreground"
+                        : "bg-muted/50 text-muted-foreground hover:text-muted-foreground"
                     )}
                   >
                     {cat.label}
@@ -282,7 +282,7 @@ export function EnhancedHintsPanel({
 
           {/* Loading state */}
           {isLoadingHints && (
-            <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span>Generating personalized hints...</span>
             </div>
@@ -304,14 +304,14 @@ export function EnhancedHintsPanel({
                   <span
                     className={cn(
                       "text-xs font-medium",
-                      isRecommended ? "text-yellow-400" : "text-gray-500"
+                      isRecommended ? "text-yellow-400" : "text-muted-foreground"
                     )}
                   >
                     Level {level}
                     {isRecommended && <span className="ml-1 text-yellow-500">(Recommended)</span>}
                   </span>
                   {!isUnlocked && (
-                    <span className="text-[10px] text-gray-600">Unlocks at {unlockTime} min</span>
+                    <span className="text-[10px] text-muted-foreground">Unlocks at {unlockTime} min</span>
                   )}
                 </div>
 
@@ -337,7 +337,7 @@ export function EnhancedHintsPanel({
               variant="ghost"
               size="sm"
               onClick={onRequestMoreHints}
-              className="w-full text-xs text-gray-500 hover:text-white"
+              className="w-full text-xs text-muted-foreground hover:text-foreground"
             >
               <Sparkles className="mr-1 h-3 w-3" />
               Generate more hints
@@ -345,8 +345,8 @@ export function EnhancedHintsPanel({
           )}
 
           {/* Progress indicator */}
-          <div className="border-t border-gray-700 pt-2">
-            <div className="flex items-center justify-between text-[10px] text-gray-500">
+          <div className="border-t border-border pt-2">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
               <span>{elapsedMinutes} min elapsed</span>
               <span>
                 Next level unlocks at{" "}
@@ -357,7 +357,7 @@ export function EnhancedHintsPanel({
                 min
               </span>
             </div>
-            <div className="mt-1 h-1 overflow-hidden rounded-full bg-gray-700">
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-blue-500 via-yellow-500 to-red-500 transition-all duration-300"
                 style={{

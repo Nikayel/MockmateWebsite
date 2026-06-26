@@ -66,26 +66,26 @@ export function RoadmapModal({
       onClick={onClose}
     >
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
+        className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cleaner Header */}
-        <div className="p-4 border-b border-zinc-800">
+        <div className="p-4 border-b border-border">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-lg font-semibold text-white">{node.name}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{node.name}</h2>
                 {stats.isComplete && (
                   <span className="bg-emerald-500 rounded-full p-0.5">
                     <Check className="h-3 w-3 text-black" />
                   </span>
                 )}
               </div>
-              <p className="text-zinc-400 text-sm">{node.description}</p>
+              <p className="text-muted-foreground text-sm">{node.description}</p>
 
               {/* Tier + Difficulty info (moved here from cards) */}
               <div className="flex items-center gap-3 mt-3">
-                <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                   {tierLabel}
                 </span>
                 <div className="flex items-center gap-1.5 text-xs">
@@ -103,7 +103,7 @@ export function RoadmapModal({
             </div>
             <button
               onClick={onClose}
-              className="text-zinc-500 hover:text-white p-1 -mr-1 -mt-1"
+              className="text-muted-foreground hover:text-foreground p-1 -mr-1 -mt-1"
             >
               <ChevronUp className="h-5 w-5" />
             </button>
@@ -111,21 +111,21 @@ export function RoadmapModal({
 
           {/* Progress bar */}
           <div className="mt-3 flex items-center gap-3">
-            <Progress value={stats.progress} className="flex-1 h-1.5 bg-zinc-800" />
-            <span className="text-xs text-zinc-400">{stats.completed}/{stats.total}</span>
+            <Progress value={stats.progress} className="flex-1 h-1.5 bg-muted" />
+            <span className="text-xs text-muted-foreground">{stats.completed}/{stats.total}</span>
           </div>
 
           {/* Prerequisites - only show if not all complete */}
           {prerequisites.length > 0 && !prerequisites.every(p => nodeStats[p.id]?.isComplete) && (
             <div className="mt-3 flex items-center gap-2 text-xs">
-              <span className="text-zinc-500">Requires:</span>
+              <span className="text-muted-foreground">Requires:</span>
               {prerequisites.map(p => (
                 <span
                   key={p.id}
                   className={`px-1.5 py-0.5 rounded ${
                     nodeStats[p.id]?.isComplete
                       ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-zinc-800 text-zinc-400'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   {p.name}
@@ -137,8 +137,8 @@ export function RoadmapModal({
 
         {/* Pattern Tips - Collapsed by default, expandable */}
         {metadata && (
-          <details className="border-b border-zinc-800 group">
-            <summary className="p-3 cursor-pointer text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-2 select-none">
+          <details className="border-b border-border group">
+            <summary className="p-3 cursor-pointer text-xs text-muted-foreground hover:text-muted-foreground flex items-center gap-2 select-none">
               <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
               Pattern tips & common questions
             </summary>
@@ -146,14 +146,14 @@ export function RoadmapModal({
               {/* Key techniques as simple tags */}
               <div className="flex flex-wrap gap-1">
                 {metadata.keyTechniques.slice(0, 4).map((tech, i) => (
-                  <span key={i} className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+                  <span key={i} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
                     {tech}
                   </span>
                 ))}
               </div>
               {/* One complexity hint */}
               {metadata.timeComplexityHints[0] && (
-                <p className="text-xs text-zinc-500">{metadata.timeComplexityHints[0]}</p>
+                <p className="text-xs text-muted-foreground">{metadata.timeComplexityHints[0]}</p>
               )}
             </div>
           </details>
@@ -174,7 +174,7 @@ export function RoadmapModal({
                 return (
                   <div
                     key={scenario.id}
-                    className={`flex items-center justify-between p-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors group ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group ${
                       isCompleted ? 'opacity-60' : ''
                     }`}
                   >
@@ -182,13 +182,13 @@ export function RoadmapModal({
                       {isCompleted ? (
                         <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                       ) : (
-                        <Play className="h-4 w-4 text-zinc-500 flex-shrink-0" />
+                        <Play className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm truncate ${isCompleted ? 'text-zinc-500' : 'text-white'}`}>
+                        <p className={`text-sm truncate ${isCompleted ? 'text-muted-foreground' : 'text-foreground'}`}>
                           {scenario.title}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span className={diffColor}>{scenario.difficulty}</span>
                           <span>·</span>
                           <span>{scenario.estimatedTime}m</span>

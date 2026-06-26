@@ -88,7 +88,7 @@ export function MinimalAICompanion({
       <div className={cn('fixed bottom-4 right-4 z-50', className)}>
         <Button
           onClick={() => setIsMinimized(false)}
-          className="h-10 w-10 rounded-full bg-gray-800/90 hover:bg-gray-700 border border-gray-600 shadow-lg backdrop-blur-sm"
+          className="h-10 w-10 rounded-full bg-muted/90 hover:bg-muted border border-border shadow-lg backdrop-blur-sm"
           title="Open AI Assistant"
         >
           <Bot className="h-5 w-5 text-[#c4703f]" />
@@ -105,14 +105,14 @@ export function MinimalAICompanion({
   return (
     <div
       className={cn(
-        'bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg shadow-xl transition-all duration-200',
+        'bg-card/95 backdrop-blur-sm border border-border rounded-lg shadow-xl transition-all duration-200',
         isExpanded ? 'w-80' : 'w-64',
         className
       )}
     >
       {/* Header - Always visible */}
       <div
-        className="flex items-center justify-between px-3 py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-800/50"
+        className="flex items-center justify-between px-3 py-2 border-b border-border cursor-pointer hover:bg-muted/50"
         onClick={() => !isExpanded && setIsExpanded(true)}
       >
         <div className="flex items-center gap-2">
@@ -120,8 +120,8 @@ export function MinimalAICompanion({
             <Bot className="h-4 w-4 text-[#c4703f]" />
             <div className="absolute inset-0 bg-[#c4703f] rounded-full blur-sm opacity-30" />
           </div>
-          <span className="text-xs font-medium text-gray-300">AI Assistant</span>
-          <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
+          <span className="text-xs font-medium text-muted-foreground">AI Assistant</span>
+          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             optional
           </span>
         </div>
@@ -133,7 +133,7 @@ export function MinimalAICompanion({
               e.stopPropagation();
               setIsExpanded(!isExpanded);
             }}
-            className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
           >
             {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           </Button>
@@ -144,7 +144,7 @@ export function MinimalAICompanion({
               e.stopPropagation();
               setIsMinimized(true);
             }}
-            className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
           >
             <Minimize2 className="h-3 w-3" />
           </Button>
@@ -159,7 +159,7 @@ export function MinimalAICompanion({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Quick question..."
-              className="flex-1 bg-gray-800 border-gray-600 text-white text-xs h-7 placeholder:text-gray-500"
+              className="flex-1 bg-muted border-border text-foreground text-xs h-7 placeholder:text-muted-foreground"
               onKeyPress={handleKeyPress}
               disabled={isLoading || disabled}
             />
@@ -174,7 +174,7 @@ export function MinimalAICompanion({
           {messages.length > 0 && (
             <button
               onClick={() => setIsExpanded(true)}
-              className="w-full mt-1 text-[10px] text-gray-500 hover:text-gray-300 text-center"
+              className="w-full mt-1 text-[10px] text-muted-foreground hover:text-muted-foreground text-center"
             >
               View {messages.length} message{messages.length !== 1 ? 's' : ''} ↑
             </button>
@@ -186,11 +186,11 @@ export function MinimalAICompanion({
       {isExpanded && (
         <>
           {/* Reminder about AI usage */}
-          <div className="px-3 py-1.5 bg-gray-800/50 border-b border-gray-700">
-            <p className="text-[10px] text-gray-400 flex items-center gap-1">
+          <div className="px-3 py-1.5 bg-muted/50 border-b border-border">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Sparkles className="h-3 w-3 text-yellow-500" />
               <span>
-                Use AI strategically. You're graded on <span className="text-white">understanding</span>, not AI usage.
+                Use AI strategically. You're graded on <span className="text-foreground">understanding</span>, not AI usage.
               </span>
             </p>
           </div>
@@ -199,11 +199,11 @@ export function MinimalAICompanion({
           <div className="h-48 overflow-y-auto p-2 space-y-2">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <Bot className="h-8 w-8 text-gray-600 mb-2" />
-                <p className="text-xs text-gray-500">
+                <Bot className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-xs text-muted-foreground">
                   Ask for hints, debugging help, or algorithm suggestions.
                 </p>
-                <p className="text-[10px] text-gray-600 mt-1">
+                <p className="text-[10px] text-muted-foreground mt-1">
                   Remember: explain your reasoning to the interviewer!
                 </p>
               </div>
@@ -221,7 +221,7 @@ export function MinimalAICompanion({
                       'max-w-[85%] px-2.5 py-1.5 rounded-lg text-xs',
                       msg.type === 'user'
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-100'
+                        : 'bg-muted text-foreground'
                     )}
                   >
                     <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
@@ -233,13 +233,13 @@ export function MinimalAICompanion({
           </div>
 
           {/* Input */}
-          <div className="p-2 border-t border-gray-700">
+          <div className="p-2 border-t border-border">
             <div className="flex gap-1">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={isRecording ? 'Listening...' : 'Ask for help...'}
-                className="flex-1 bg-gray-800 border-gray-600 text-white text-xs h-7 placeholder:text-gray-500"
+                className="flex-1 bg-muted border-border text-foreground text-xs h-7 placeholder:text-muted-foreground"
                 onKeyPress={handleKeyPress}
                 disabled={isLoading || disabled || isRecording}
               />
@@ -251,7 +251,7 @@ export function MinimalAICompanion({
                     'h-7 w-7 p-0',
                     isRecording
                       ? 'bg-red-500 hover:bg-red-600 animate-pulse'
-                      : 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-muted hover:bg-gray-600'
                   )}
                 >
                   {isRecording ? (
@@ -267,7 +267,7 @@ export function MinimalAICompanion({
                 className="h-7 w-7 p-0 bg-[#c4703f] hover:bg-[#c4703f]/80"
               >
                 {isLoading ? (
-                  <div className="h-3 w-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="h-3 w-3 border border-border border-t-white rounded-full animate-spin" />
                 ) : (
                   <Send className="h-3 w-3" />
                 )}

@@ -110,13 +110,13 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
   const renderDensityToggle = () => (
     <div className="mb-4 flex justify-end">
-      <div className="inline-flex rounded-lg border border-white/[0.06] bg-zinc-900/60 p-0.5">
+      <div className="inline-flex rounded-lg border border-border/[0.06] bg-card/60 p-0.5">
         <button
           onClick={() => updateDensity("cards")}
           aria-pressed={density === "cards"}
           title="Card view"
           className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            density === "cards" ? "bg-white text-zinc-950" : "text-zinc-400 hover:text-zinc-200"
+            density === "cards" ? "bg-card text-zinc-950" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <LayoutGrid className="h-3.5 w-3.5" />
@@ -127,7 +127,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
           aria-pressed={density === "rows"}
           title="List view"
           className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            density === "rows" ? "bg-white text-zinc-950" : "text-zinc-400 hover:text-zinc-200"
+            density === "rows" ? "bg-card text-zinc-950" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <Rows3 className="h-3.5 w-3.5" />
@@ -142,14 +142,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const renderList = (list: Scenario[]) =>
     list.length === 0 ? (
       <div className="py-16 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
-          <Search className="h-6 w-6 text-zinc-600" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border/[0.06] bg-card/[0.03]">
+          <Search className="h-6 w-6 text-muted-foreground" />
         </div>
-        <p className="mb-2 text-zinc-400">No problems match your filters</p>
+        <p className="mb-2 text-muted-foreground">No problems match your filters</p>
         {hasActiveFilters && (
           <button
             onClick={clearAllFilters}
-            className="text-sm text-zinc-500 transition-colors hover:text-white"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             Clear all filters
           </button>
@@ -195,14 +195,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               <div className="mt-6 flex flex-col items-center gap-2">
                 <button
                   onClick={() => setVisibleCount((count) => count + LOAD_MORE_STEP)}
-                  className="rounded-full border border-white/[0.08] bg-white/[0.03] px-5 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  className="rounded-full border border-border/[0.08] bg-card/[0.03] px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card/[0.06] hover:text-foreground"
                 >
                   Show more
-                  <span className="ml-1.5 text-zinc-500">
+                  <span className="ml-1.5 text-muted-foreground">
                     ({Math.min(LOAD_MORE_STEP, remaining)})
                   </span>
                 </button>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Showing {visible.length} of {list.length}
                 </p>
               </div>
@@ -213,7 +213,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     )
 
   return (
-    <section className={`${topPadding} relative overflow-hidden bg-zinc-950 pb-12`}>
+    <section className={`${topPadding} relative overflow-hidden bg-background pb-12`}>
       {/* Single subtle page-level accent — no per-section rainbow glows */}
       <div className="from-accent/5 pointer-events-none absolute top-0 left-1/2 z-0 h-[420px] w-[640px] -translate-x-1/2 rounded-full bg-gradient-to-b to-transparent opacity-40 blur-[120px]" />
 
@@ -223,7 +223,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
           <div
             role="tablist"
             aria-label="Practice category"
-            className="mb-6 inline-flex rounded-full border border-white/[0.07] bg-white/[0.02] p-1"
+            className="mb-6 inline-flex rounded-full border border-border/[0.07] bg-card/[0.02] p-1"
           >
             <button
               role="tab"
@@ -231,8 +231,8 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               onClick={() => switchMainTab("debugging")}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                 mainTab === "debugging"
-                  ? "bg-white text-zinc-950"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  ? "bg-card text-zinc-950"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Bug className="h-4 w-4" />
@@ -243,7 +243,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               aria-selected={mainTab === "dsa"}
               onClick={() => switchMainTab("dsa")}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-                mainTab === "dsa" ? "bg-white text-zinc-950" : "text-zinc-400 hover:text-zinc-200"
+                mainTab === "dsa" ? "bg-card text-zinc-950" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Cpu className="h-4 w-4" />
@@ -279,7 +279,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
           {/* DSA tab — Roadmap / Patterns / All sub-views */}
           {mainTab === "dsa" && (
             <>
-              <div className="mb-6 inline-flex rounded-full border border-white/[0.06] bg-white/[0.02] p-1">
+              <div className="mb-6 inline-flex rounded-full border border-border/[0.06] bg-card/[0.02] p-1">
                 {(
                   [
                     { id: "roadmap", label: "Roadmap", icon: Target },
@@ -293,8 +293,8 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                     aria-pressed={dsaView === id}
                     className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-200 ${
                       dsaView === id
-                        ? "bg-white/10 text-white"
-                        : "text-zinc-400 hover:text-zinc-200"
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />

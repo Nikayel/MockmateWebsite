@@ -309,15 +309,15 @@ export function CodeConsole({
   return (
     <div
       className={cn(
-        "flex flex-shrink-0 flex-col rounded border border-gray-700 bg-[#1e1d1b]",
+        "flex flex-shrink-0 flex-col rounded border border-border bg-[#1e1d1b]",
         className
       )}
     >
       {/* Console Header */}
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-[#232220] px-3 py-1.5">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-[#232220] px-3 py-1.5">
         <div className="flex items-center space-x-2">
-          <Terminal className="h-3.5 w-3.5 text-gray-400" />
-          <span className="text-xs font-medium text-gray-400">Console</span>
+          <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Console</span>
           {hasCodeError && (
             <Badge className="h-4 border-red-500/30 bg-red-500/20 px-1.5 text-[10px] text-red-400">
               Error
@@ -348,7 +348,7 @@ export function CodeConsole({
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0 text-gray-500 hover:text-gray-300"
+              className="h-5 w-5 p-0 text-muted-foreground hover:text-muted-foreground"
               onClick={onClear}
             >
               <Trash2 className="h-3 w-3" />
@@ -365,8 +365,8 @@ export function CodeConsole({
       >
         {/* Empty state */}
         {isEmpty && (
-          <div className="flex items-center gap-2 py-2 text-gray-500">
-            <span className="text-gray-600">{">"}</span>
+          <div className="flex items-center gap-2 py-2 text-muted-foreground">
+            <span className="text-muted-foreground">{">"}</span>
             <span className="italic">Run your code to see output here...</span>
           </div>
         )}
@@ -374,7 +374,7 @@ export function CodeConsole({
         {/* Running state */}
         {isRunning && (
           <div className="flex items-center gap-2 text-blue-400">
-            <span className="text-gray-600">{">"}</span>
+            <span className="text-muted-foreground">{">"}</span>
             <span>Executing code</span>
             <span className="animate-pulse">...</span>
           </div>
@@ -389,11 +389,11 @@ export function CodeConsole({
               output.type === "error" && "text-red-400",
               output.type === "warn" && "text-yellow-400",
               output.type === "info" && "text-blue-400",
-              output.type === "log" && "text-gray-300",
+              output.type === "log" && "text-muted-foreground",
               output.type === "result" && "text-green-400"
             )}
           >
-            <span className="text-gray-600 select-none">{">"}</span>
+            <span className="text-muted-foreground select-none">{">"}</span>
             <span className="break-all whitespace-pre-wrap">{output.message}</span>
           </div>
         ))}
@@ -423,7 +423,7 @@ export function CodeConsole({
 
             {/* Test result header */}
             {!hasCodeError && (
-              <div className="mb-1 border-t border-gray-700/50 pt-1 text-gray-500">
+              <div className="mb-1 border-t border-border/50 pt-1 text-muted-foreground">
                 Test Results:
               </div>
             )}
@@ -445,7 +445,7 @@ export function CodeConsole({
                   ) : (
                     <XCircle className="h-3 w-3 flex-shrink-0" />
                   )}
-                  <span className={result.passed ? "text-gray-300" : "text-gray-400"}>
+                  <span className={result.passed ? "text-muted-foreground" : "text-muted-foreground"}>
                     {result.description}
                   </span>
                 </div>
@@ -455,7 +455,7 @@ export function CodeConsole({
                   <div className="mt-1 ml-5 space-y-0.5 text-[11px]">
                     {result.isHidden ? (
                       <div className="flex items-start gap-2">
-                        <span className="text-gray-500 italic">
+                        <span className="text-muted-foreground italic">
                           This test case is hidden. The implementation failed to meet the required
                           behavior.
                         </span>
@@ -465,7 +465,7 @@ export function CodeConsole({
                         {/* Always show input for debugging */}
                         {result.input && (
                           <div className="flex items-start gap-2">
-                            <span className="w-14 text-gray-500">Input:</span>
+                            <span className="w-14 text-muted-foreground">Input:</span>
                             <span className="break-all text-blue-300">
                               {JSON.stringify(result.input)}
                             </span>
@@ -474,19 +474,19 @@ export function CodeConsole({
                         {/* Show expected/got for wrong output, show error for code errors */}
                         {result.error ? (
                           <div className="flex items-start gap-2">
-                            <span className="w-14 text-gray-500">Error:</span>
+                            <span className="w-14 text-muted-foreground">Error:</span>
                             <span className="break-all text-red-300">{result.error}</span>
                           </div>
                         ) : (
                           <>
                             <div className="flex items-start gap-2">
-                              <span className="w-14 text-gray-500">Expected:</span>
+                              <span className="w-14 text-muted-foreground">Expected:</span>
                               <span className="break-all text-green-300">
                                 {JSON.stringify(result.expected)}
                               </span>
                             </div>
                             <div className="flex items-start gap-2">
-                              <span className="w-14 text-gray-500">Got:</span>
+                              <span className="w-14 text-muted-foreground">Got:</span>
                               <span className="break-all text-red-300">
                                 {JSON.stringify(result.actual)}
                               </span>

@@ -71,7 +71,7 @@ export function InterviewHeader({
 
   return (
     <header className={cn(
-      'flex items-center justify-between px-4 py-2 bg-gray-900/80 backdrop-blur-sm border-b border-gray-800',
+      'flex items-center justify-between px-4 py-2 bg-card/80 backdrop-blur-sm border-b border-border',
       className
     )}>
       {/* Left: Back button and problem info */}
@@ -81,7 +81,7 @@ export function InterviewHeader({
             variant="ghost"
             size="sm"
             onClick={onBack}
-            className="h-8 px-2 text-gray-400 hover:text-white"
+            className="h-8 px-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -91,7 +91,7 @@ export function InterviewHeader({
           <div className="flex items-center gap-1.5 text-[#c4703f]">
             {getTypeIcon(scenario.type)}
           </div>
-          <h1 className="text-sm font-medium text-white truncate max-w-[200px] md:max-w-[400px]">
+          <h1 className="text-sm font-medium text-foreground truncate max-w-[200px] md:max-w-[400px]">
             {scenario.title}
           </h1>
           <Badge className={cn('text-xs capitalize', difficultyColorClass(scenario.difficulty))}>
@@ -126,7 +126,7 @@ export function InterviewHeader({
             variant="ghost"
             size="sm"
             onClick={onReset}
-            className="h-8 px-2 text-gray-400 hover:text-white"
+            className="h-8 px-2 text-muted-foreground hover:text-foreground"
             title="Reset code"
           >
             <RotateCcw className="h-4 w-4" />

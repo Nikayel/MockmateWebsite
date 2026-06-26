@@ -43,8 +43,8 @@ export const ScenarioListRow = memo(function ScenarioListRow({
       }}
       className={`group flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors duration-200 sm:gap-4 sm:px-4 ${
         isSelected
-          ? "border-white/20 bg-white/[0.06]"
-          : "border-white/[0.06] bg-white/[0.02] hover:border-white/12 hover:bg-white/[0.045]"
+          ? "border-border bg-card/[0.06]"
+          : "border-border/[0.06] bg-card/[0.02] hover:border-border hover:bg-card/[0.045]"
       }`}
     >
       {/* Completion status */}
@@ -52,13 +52,13 @@ export const ScenarioListRow = memo(function ScenarioListRow({
         {isCompleted ? (
           <Check className="h-4 w-4 text-emerald-300" />
         ) : (
-          <span className="h-1.5 w-1.5 rounded-full bg-zinc-700" aria-hidden="true" />
+          <span className="h-1.5 w-1.5 rounded-full bg-muted" aria-hidden="true" />
         )}
       </div>
 
       {/* Type icon */}
       <span
-        className="hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-zinc-300 sm:flex"
+        className="hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-card/[0.05] text-muted-foreground sm:flex"
         title={typeConfig.label}
       >
         <typeConfig.icon className="h-3.5 w-3.5" />
@@ -66,8 +66,8 @@ export const ScenarioListRow = memo(function ScenarioListRow({
 
       {/* Title + meta (the flexible, truncating column) */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-medium text-white">{scenario.title}</span>
-        <span className="flex items-center gap-2 truncate text-xs text-zinc-500">
+        <span className="truncate font-medium text-foreground">{scenario.title}</span>
+        <span className="flex items-center gap-2 truncate text-xs text-muted-foreground">
           <span className="sm:hidden">{typeConfig.label}</span>
           <span className="hidden items-center gap-1 sm:inline-flex">
             <Clock className="h-3 w-3" />
@@ -87,7 +87,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
         {scenario.tags.slice(0, 2).map((tag) => (
           <span
             key={tag}
-            className="truncate rounded-full bg-white/[0.03] px-2 py-0.5 text-[10px] text-zinc-400"
+            className="truncate rounded-full bg-card/[0.03] px-2 py-0.5 text-[10px] text-muted-foreground"
           >
             {tag}
           </span>
@@ -100,7 +100,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
           className={`h-2 w-2 rounded-full ${getDifficultyDot(scenario.difficulty)}`}
           aria-hidden="true"
         />
-        <span className="text-xs font-medium text-zinc-300 capitalize">{scenario.difficulty}</span>
+        <span className="text-xs font-medium text-muted-foreground capitalize">{scenario.difficulty}</span>
       </div>
 
       {/* Action */}
@@ -110,7 +110,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 rounded-full border-white/[0.08] bg-white/[0.02] px-3 text-xs text-zinc-300 hover:bg-white/[0.08] hover:text-white"
+              className="h-8 rounded-full border-border/[0.08] bg-card/[0.02] px-3 text-xs text-muted-foreground hover:bg-card/[0.08] hover:text-foreground"
             >
               Upgrade
             </Button>
@@ -122,7 +122,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
               e.stopPropagation()
               onStart(scenario)
             }}
-            className="h-8 rounded-full bg-white px-3 text-xs font-semibold text-zinc-950 hover:bg-zinc-200"
+            className="h-8 rounded-full bg-card px-3 text-xs font-semibold text-zinc-950 hover:bg-zinc-200"
           >
             <Play className="mr-1 h-3 w-3" />
             Start
@@ -135,7 +135,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
               e.stopPropagation()
               onSelect(scenario)
             }}
-            className="h-8 rounded-full border-white/[0.08] bg-white/[0.02] px-3 text-xs text-zinc-300 hover:bg-white/[0.08] hover:text-white"
+            className="h-8 rounded-full border-border/[0.08] bg-card/[0.02] px-3 text-xs text-muted-foreground hover:bg-card/[0.08] hover:text-foreground"
           >
             Select
           </Button>

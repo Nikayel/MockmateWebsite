@@ -95,9 +95,9 @@ function InterviewEditorInner({
   }
 
   return (
-    <Card className="glass-effect flex h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50">
+    <Card className="glass-effect flex h-full flex-col overflow-hidden border-border bg-card/50">
       <CardHeader className="flex-shrink-0 px-6 pb-2">
-        <CardTitle className="flex items-center justify-between text-xs text-white">
+        <CardTitle className="flex items-center justify-between text-xs text-foreground">
           <div className="flex items-center space-x-1">
             <Code className="h-3 w-3 text-[#c4703f]" />
             <span>
@@ -118,7 +118,7 @@ function InterviewEditorInner({
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
         <div
           ref={editorContainerRef}
-          className="editor-wrapper min-h-0 flex-1 rounded border border-gray-700"
+          className="editor-wrapper min-h-0 flex-1 rounded border border-border"
           style={{ minHeight: "250px" }}
         >
           <MonacoEditor
@@ -132,16 +132,16 @@ function InterviewEditorInner({
 
         {/* Terminal/Console Output */}
         {testResults.length > 0 && (
-          <div className="flex max-h-48 min-h-[120px] flex-shrink-0 flex-col rounded border border-gray-700 bg-black">
+          <div className="flex max-h-48 min-h-[120px] flex-shrink-0 flex-col rounded border border-border bg-black">
             {/* Terminal Header */}
-            <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-1.5">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-muted px-3 py-1.5">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1.5">
                   <div className="h-2.5 w-2.5 rounded-full bg-red-500"></div>
                   <div className="h-2.5 w-2.5 rounded-full bg-yellow-500"></div>
                   <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
                 </div>
-                <span className="font-mono text-xs text-gray-400">Terminal</span>
+                <span className="font-mono text-xs text-muted-foreground">Terminal</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Badge
@@ -173,7 +173,7 @@ function InterviewEditorInner({
 
             {/* Terminal Content */}
             <div className="flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs">
-              <div className="mb-2 text-gray-400">
+              <div className="mb-2 text-muted-foreground">
                 <span className="text-[#c4703f]">$</span> Running tests...
               </div>
 
@@ -194,17 +194,17 @@ function InterviewEditorInner({
                   </div>
 
                   {!result.passed && (
-                    <div className="mt-1 ml-5 space-y-0.5 text-gray-300">
+                    <div className="mt-1 ml-5 space-y-0.5 text-muted-foreground">
                       <div className="flex items-start space-x-2">
-                        <span className="text-gray-500">Input:</span>
+                        <span className="text-muted-foreground">Input:</span>
                         <span className="text-blue-300">{JSON.stringify(result.input)}</span>
                       </div>
                       <div className="flex items-start space-x-2">
-                        <span className="text-gray-500">Expected:</span>
+                        <span className="text-muted-foreground">Expected:</span>
                         <span className="text-green-300">{JSON.stringify(result.expected)}</span>
                       </div>
                       <div className="flex items-start space-x-2">
-                        <span className="text-gray-500">Got:</span>
+                        <span className="text-muted-foreground">Got:</span>
                         <span className="text-red-300">{JSON.stringify(result.actual)}</span>
                       </div>
                       {result.error && (
@@ -220,11 +220,11 @@ function InterviewEditorInner({
 
               {/* Efficiency Metrics */}
               {efficiencyMetrics && (
-                <div className="mt-2 space-y-1 border-t border-gray-800 pt-2">
-                  <div className="text-gray-400">Complexity Analysis:</div>
-                  <div className="ml-2 space-y-0.5 text-gray-300">
+                <div className="mt-2 space-y-1 border-t border-border pt-2">
+                  <div className="text-muted-foreground">Complexity Analysis:</div>
+                  <div className="ml-2 space-y-0.5 text-muted-foreground">
                     <div>
-                      <span className="text-gray-500">Time:</span>
+                      <span className="text-muted-foreground">Time:</span>
                       <span
                         className={`ml-2 ${
                           efficiencyMetrics.estimatedTimeComplexity ===
@@ -236,13 +236,13 @@ function InterviewEditorInner({
                         {efficiencyMetrics.estimatedTimeComplexity}
                       </span>
                       {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
-                        <span className="ml-1 text-gray-500">
+                        <span className="ml-1 text-muted-foreground">
                           (optimal: {efficiencyMetrics.optimalTimeComplexity})
                         </span>
                       )}
                     </div>
                     <div>
-                      <span className="text-gray-500">Space:</span>
+                      <span className="text-muted-foreground">Space:</span>
                       <span
                         className={`ml-2 ${
                           efficiencyMetrics.estimatedSpaceComplexity ===
@@ -254,14 +254,14 @@ function InterviewEditorInner({
                         {efficiencyMetrics.estimatedSpaceComplexity}
                       </span>
                       {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
-                        <span className="ml-1 text-gray-500">
+                        <span className="ml-1 text-muted-foreground">
                           (optimal: {efficiencyMetrics.optimalSpaceComplexity})
                         </span>
                       )}
                     </div>
                     <div>
-                      <span className="text-gray-500">Code Quality:</span>
-                      <span className="ml-2 text-gray-300">
+                      <span className="text-muted-foreground">Code Quality:</span>
+                      <span className="ml-2 text-muted-foreground">
                         {efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode}{" "}
                         LOC
                       </span>
@@ -283,7 +283,7 @@ function InterviewEditorInner({
           >
             {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
             {isRunningTests && (
-              <div className="mr-1 h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              <div className="mr-1 h-3 w-3 animate-spin rounded-full border-2 border-border border-t-white" />
             )}
             {isRunningTests ? "Running..." : "Run Tests"}
           </Button>
