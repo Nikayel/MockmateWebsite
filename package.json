@@ -161,5 +161,6 @@
       "protobufjs",
       "sharp"
     ]
-  }
+  },
+  "packageManager": "pnpm@10.18.2+sha1.48588a2735db5f19ffe699240b59891cfac5f316"
 }

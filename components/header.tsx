@@ -13,6 +13,7 @@ import {
   Brain,
   FlaskConical,
   ChevronDown,
+  type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -34,6 +35,58 @@ type MarketingNavItem = {
   href: string
   isActive: (pathname: string, hash: string) => boolean
 }
+
+type AppNavItem = {
+  label: string
+  href: string
+  icon: LucideIcon
+  isActive: (pathname: string) => boolean
+}
+
+// Single source of truth for the logged-in product nav. Desktop renders these as
+// a label-only segmented control (icons read as template-y noise at six items),
+// while mobile keeps the icons to aid vertical scanning — both map from this one
+// list so the two menus, and their active states, can never drift apart.
+const APP_NAV: AppNavItem[] = [
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    isActive: (pathname) => pathname.startsWith("/dashboard"),
+  },
+  {
+    label: "Interview",
+    href: "/interview",
+    icon: Terminal,
+    // Guard against /interview-prep, which is a separate marketing route.
+    isActive: (pathname) =>
+      pathname.startsWith("/interview") && !pathname.startsWith("/interview-prep"),
+  },
+  {
+    label: "Labs",
+    href: "/labs",
+    icon: FlaskConical,
+    isActive: (pathname) => pathname.startsWith("/labs"),
+  },
+  {
+    label: "Sessions",
+    href: "/sessions",
+    icon: Clock,
+    isActive: (pathname) => pathname.startsWith("/sessions"),
+  },
+  {
+    label: "Roadmap",
+    href: "/roadmap",
+    icon: Map,
+    isActive: (pathname) => pathname.startsWith("/roadmap"),
+  },
+  {
+    label: "Review",
+    href: "/practice",
+    icon: Brain,
+    isActive: (pathname) => pathname.startsWith("/practice"),
+  },
+]
 
 // Single source of truth for the marketing (logged-out) nav. Desktop and mobile
 // both render from this list so the two menus can never drift apart, and every
@@ -155,48 +208,25 @@ export function Header() {
               </div>
             ) : user ? (
               <>
-                <Link
-                  href="/dashboard"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </Link>
-                <Link
-                  href="/interview"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <Terminal className="h-4 w-4" />
-                  <span>Interview</span>
-                </Link>
-                <Link
-                  href="/labs"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <FlaskConical className="h-4 w-4" />
-                  <span>Labs</span>
-                </Link>
-                <Link
-                  href="/sessions"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span>Sessions</span>
-                </Link>
-                <Link
-                  href="/roadmap"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <Map className="h-4 w-4" />
-                  <span>Roadmap</span>
-                </Link>
-                <Link
-                  href="/practice"
-                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
-                >
-                  <Brain className="h-4 w-4" />
-                  <span>Review</span>
-                </Link>
+                <div className="flex items-center gap-0.5">
+                  {APP_NAV.map((item) => {
+                    const active = item.isActive(pathname)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                          active
+                            ? "bg-white/10 text-white"
+                            : "text-white/65 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    )
+                  })}
+                </div>
                 <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
                   <NotificationBell />
                   <DropdownMenu>
@@ -284,54 +314,24 @@ export function Header() {
                 </div>
               ) : user ? (
                 <>
-                  <Link
-                    href="/dashboard"
-                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Link>
-                  <Link
-                    href="/interview"
-                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Terminal className="h-4 w-4" />
-                    <span>Interview</span>
-                  </Link>
-                  <Link
-                    href="/labs"
-                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <FlaskConical className="h-4 w-4" />
-                    <span>Labs</span>
-                  </Link>
-                  <Link
-                    href="/sessions"
-                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Clock className="h-4 w-4" />
-                    <span>Sessions</span>
-                  </Link>
-                  <Link
-                    href="/roadmap"
-                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Map className="h-4 w-4" />
-                    <span>Roadmap</span>
-                  </Link>
-                  <Link
-                    href="/practice"
-                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Brain className="h-4 w-4" />
-                    <span>Review</span>
-                  </Link>
+                  {APP_NAV.map((item) => {
+                    const Icon = item.icon
+                    const active = item.isActive(pathname)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex items-center space-x-2 transition-colors duration-300 ${
+                          active ? "text-[#adc6ff]" : "hover:text-accent text-white/90"
+                        }`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    )
+                  })}
                   <Link
                     href="/account"
                     className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"

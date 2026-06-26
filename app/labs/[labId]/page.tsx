@@ -32,13 +32,16 @@ export default function CaseLabPlayPage() {
   const startRun = useCaseLabStore((s) => s.startRun)
   const activeRun = useCaseLabStore((s) => s.activeRun)
   const isLoading = useCaseLabStore((s) => s.isLoading)
+  const loadError = useCaseLabStore((s) => s.error)
+  const setError = useCaseLabStore((s) => s.setError)
 
   useEffect(() => {
     if (lab) setActiveLab(lab)
   }, [lab, setActiveLab])
 
-  // Resume an in-progress run for this lab (if any).
-  useCaseLabRunSync(lab?.id ?? null)
+  // Resume an in-progress run for this lab (if any). `reload` retries after a
+  // failed/timed-out resume load.
+  const { reload } = useCaseLabRunSync(lab?.id ?? null)
 
   const hasRunForLab = Boolean(activeRun && lab && activeRun.caseLabId === lab.id)
 
@@ -119,6 +122,36 @@ export default function CaseLabPlayPage() {
         {isLoading ? (
           <div className="flex min-h-[40vh] items-center justify-center">
             <p className="text-muted-foreground text-sm">Loading your progress…</p>
+          </div>
+        ) : loadError ? (
+          <div
+            className="border-border bg-muted/30 flex min-h-[40vh] flex-col items-center justify-center gap-4 rounded-xl border p-6 text-center"
+            role="alert"
+          >
+            <div className="flex flex-col gap-1">
+              <p className="text-foreground text-sm font-medium">
+                Couldn&apos;t load your saved progress
+              </p>
+              <p className="text-muted-foreground text-sm">
+                The connection timed out. Retry, or start without resuming.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={reload}
+                className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-90"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="border-border text-foreground hover:bg-muted rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                Start without resuming
+              </button>
+            </div>
           </div>
         ) : (
           <CaseLabIntro

@@ -183,16 +183,6 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
       <div className="relative z-10 container mx-auto px-4">
         <div className="mx-auto max-w-7xl">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-              Practice Arena
-            </h1>
-            <p className="mt-1 text-sm text-zinc-400">
-              Debug real codebases or drill algorithm patterns.
-            </p>
-          </div>
-
           {/* Primary split: Debugging vs DSA */}
           <div
             role="tablist"

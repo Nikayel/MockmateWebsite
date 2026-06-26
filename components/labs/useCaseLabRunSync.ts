@@ -9,7 +9,7 @@
  * best-effort: a failure sets a soft error but never blocks the UI.
  */
 
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { fetchActiveCaseLabRun, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
 
@@ -38,12 +38,22 @@ export function useCaseLabRunSync(caseLabId: string | null) {
   const setLoading = useCaseLabStore((s) => s.setLoading)
   const setError = useCaseLabStore((s) => s.setError)
 
-  // Load the in-progress run once per lab.
-  const loadedFor = useRef<string | null>(null)
+  // Bumping this re-runs the load effect for the same lab — that's how a manual
+  // Retry recovers from a timed-out / failed resume without a full remount.
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const reload = useCallback(() => setReloadNonce((n) => n + 1), [])
+
+  // Load the in-progress run once per (lab, retry). The ref guards against the
+  // double-invoke React does in dev StrictMode, keyed so a Retry still fires.
+  const loadedKey = useRef<string | null>(null)
   useEffect(() => {
-    if (!caseLabId || loadedFor.current === caseLabId) return
-    loadedFor.current = caseLabId
+    if (!caseLabId) return
+    const key = `${caseLabId}:${reloadNonce}`
+    if (loadedKey.current === key) return
+    loadedKey.current = key
+
     let cancelled = false
+    setError(null)
     setLoading(true)
     fetchActiveCaseLabRun(caseLabId)
       .then((run) => {
@@ -58,7 +68,7 @@ export function useCaseLabRunSync(caseLabId: string | null) {
     return () => {
       cancelled = true
     }
-  }, [caseLabId, setActiveRun, setLoading, setError])
+  }, [caseLabId, reloadNonce, setActiveRun, setLoading, setError])
 
   // Debounced autosave on meaningful run changes.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,4 +97,6 @@ export function useCaseLabRunSync(caseLabId: string | null) {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
   }, [activeRun, setActiveRun, setError])
+
+  return { reload }
 }

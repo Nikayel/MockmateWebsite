@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_gaps_and_plan_md",
+      "label": "._GAPS_AND_PLAN.md",
+      "file_type": "document",
+      "source_file": "docs/case-labs/._GAPS_AND_PLAN.md",
+      "source_location": "L1"
+    }
+  ],
+  "edges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

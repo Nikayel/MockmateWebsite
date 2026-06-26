@@ -1,0 +1,127 @@
+{
+  "nodes": [
+    {
+      "id": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_gaps_and_plan_md",
+      "label": "GAPS_AND_PLAN.md",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "label": "Case Labs \u2014 Gaps & Plan (CTO / CDO / CSO)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_p0_ship_blockers_do_before_broad_launch",
+      "label": "P0 \u2014 Ship blockers (do before broad launch)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L15"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_cto_technology_reliability",
+      "label": "CTO \u2014 Technology & Reliability",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L27"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_cdo_data_learning_signal",
+      "label": "CDO \u2014 Data & Learning Signal",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L42"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_cso_security_trust",
+      "label": "CSO \u2014 Security & Trust",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L50"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_design_ux_highest_leverage_non_blocker",
+      "label": "Design / UX (highest-leverage non-blocker)",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L58"
+    },
+    {
+      "id": "case_labs_gaps_and_plan_suggested_sequencing",
+      "label": "Suggested sequencing",
+      "file_type": "document",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L68"
+    }
+  ],
+  "edges": [
+    {
+      "source": "volumes_t7_shield_mockmatewebsitet7_docs_case_labs_gaps_and_plan_md",
+      "target": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "target": "case_labs_gaps_and_plan_p0_ship_blockers_do_before_broad_launch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "target": "case_labs_gaps_and_plan_cto_technology_reliability",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "target": "case_labs_gaps_and_plan_cdo_data_learning_signal",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "target": "case_labs_gaps_and_plan_cso_security_trust",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L50",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "target": "case_labs_gaps_and_plan_design_ux_highest_leverage_non_blocker",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L58",
+      "weight": 1.0
+    },
+    {
+      "source": "case_labs_gaps_and_plan_case_labs_gaps_plan_cto_cdo_cso",
+      "target": "case_labs_gaps_and_plan_suggested_sequencing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/case-labs/GAPS_AND_PLAN.md",
+      "source_location": "L68",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

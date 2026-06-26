@@ -1335,8 +1335,8 @@
     "semantic_hash": ""
   },
   "components/header.tsx": {
-    "mtime": 1782435515.98,
-    "ast_hash": "9063881be760f8cc61a427223504b86c",
+    "mtime": 1782444735.29,
+    "ast_hash": "49b0db377c7b191ee765e66b98a9a73b",
     "semantic_hash": ""
   },
   "components/hero-section.tsx": {
@@ -1455,8 +1455,8 @@
     "semantic_hash": ""
   },
   "components/interview/ScenarioBrowser.tsx": {
-    "mtime": 1782402835.45,
-    "ast_hash": "8a24b5d380a26ae350eb36ab6a6c035a",
+    "mtime": 1782444950.76,
+    "ast_hash": "de4820f10062aa8e819a95b617edf9d3",
     "semantic_hash": ""
   },
   "components/interview/ScenarioCard.tsx": {
@@ -5625,8 +5625,8 @@
     "semantic_hash": "cf02edff78e1da2fd6d3d4cd94152497"
   },
   "package.json": {
-    "mtime": 1782347190.52,
-    "ast_hash": "5337a9f2f38bffa97d0a6f5893cf4602",
+    "mtime": 1782444272.0,
+    "ast_hash": "61fda2f2c825686c2b1b031570119d22",
     "semantic_hash": ""
   },
   "patch_runners.py": {
@@ -6575,13 +6575,13 @@
     "semantic_hash": ""
   },
   "components/labs/useCaseLabRunSync.ts": {
-    "mtime": 1782418282.98,
-    "ast_hash": "59e2c83646c1df2e9b6a184a1c50c06a",
+    "mtime": 1782445113.01,
+    "ast_hash": "6ea01ff89ea837b5f94428d77c61ff3e",
     "semantic_hash": ""
   },
   "lib/labs/case-lab-runs-client.ts": {
-    "mtime": 1782419771.4,
-    "ast_hash": "3972bc178e871e751baed994ae33c6bf",
+    "mtime": 1782445081.52,
+    "ast_hash": "d3a280d052c121c2563ad1655fac355f",
     "semantic_hash": ""
   },
   "components/labs/stations/BuildStation.tsx": {
@@ -6620,8 +6620,8 @@
     "semantic_hash": ""
   },
   "lib/labs/case-labs/palantir-911-dispatch.ts": {
-    "mtime": 1782439392.35,
-    "ast_hash": "56e05c48919cb04bebdcfbe86c3c99c2",
+    "mtime": 1782439743.62,
+    "ast_hash": "2a4a3d7faa977bcc58158bbc8bf5be51",
     "semantic_hash": ""
   },
   "lib/labs/__tests__/case-lab-build-wiring.test.ts": {
@@ -6635,8 +6635,8 @@
     "semantic_hash": ""
   },
   "app/labs/[labId]/page.tsx": {
-    "mtime": 1782439561.16,
-    "ast_hash": "03361175ee9fcd7a147eb9bfbc091e99",
+    "mtime": 1782445136.15,
+    "ast_hash": "27bbb2e5ede9a5c11b269bc099f16a00",
     "semantic_hash": ""
   },
   "app/api/labs/chat/route.ts": {
@@ -6662,11 +6662,6 @@
   "app/labs/page.tsx": {
     "mtime": 1782439491.55,
     "ast_hash": "718500217bc094868008ca50bba11841",
-    "semantic_hash": ""
-  },
-  "components/labs/CaseLabCard.tsx": {
-    "mtime": 1782436998.99,
-    "ast_hash": "0f5ebf56db25672cb8129949cb3b6870",
     "semantic_hash": ""
   },
   "components/labs/CaseLabIntro.tsx": {
@@ -6700,8 +6695,8 @@
     "semantic_hash": ""
   },
   "components/labs/CaseLabGallery.tsx": {
-    "mtime": 1782436811.74,
-    "ast_hash": "4bcfb08caeb6f5ed5b4a7b4e0d4558df",
+    "mtime": 1782444679.34,
+    "ast_hash": "56503ff9f1b132c5ebe025b6eacca7a7",
     "semantic_hash": ""
   },
   "components/labs/CaseLabProgressBadge.tsx": {
@@ -6717,6 +6712,21 @@
   "components/labs/CaseLabBrief.tsx": {
     "mtime": 1782439415.78,
     "ast_hash": "a42d69ceb20360379d1a78c5002af302",
+    "semantic_hash": ""
+  },
+  "components/labs/CaseLabRow.tsx": {
+    "mtime": 1782444667.46,
+    "ast_hash": "d428fcee3f928e9dae6453a96aa5859d",
+    "semantic_hash": ""
+  },
+  "docs/case-labs/._GAPS_AND_PLAN.md": {
+    "mtime": 1782440205.05,
+    "ast_hash": "64bd59ee9c36a910b9532f339649b8b3",
+    "semantic_hash": ""
+  },
+  "docs/case-labs/GAPS_AND_PLAN.md": {
+    "mtime": 1782440205.05,
+    "ast_hash": "cbf0c9124e894cd445238dd49d508cb7",
     "semantic_hash": ""
   }
 }

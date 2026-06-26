@@ -25,9 +25,9 @@
     "hash": "3258ce698b297b7fe5c0d102ae353311682a90364766fcf4694a25bca97f2224"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/package.json": {
-    "size": 5160,
-    "mtime_ns": 1782347190520000000,
-    "hash": "8c81fe315535d2ddf087f530e0f1472ae3fbee94866b9587ebec68dec44acd98"
+    "size": 5242,
+    "mtime_ns": 1782444272000000000,
+    "hash": "1757fdf135a34cc08d29b20c4c8fd18bf8dcb9ef94acbc600ad60593db67f3d4"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/patch_runners.py": {
     "size": 2047,
@@ -593,5 +593,15 @@
     "size": 3185,
     "mtime_ns": 1782434585340000000,
     "hash": "5b187aa453aaf32c81279a0b9f4acb333102738abafab65fed83e5905a282160"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/._GAPS_AND_PLAN.md": {
+    "size": 4096,
+    "mtime_ns": 1782440205050000000,
+    "hash": "b6cd91e7a461c056f81397158e15b9adf20b9ea5605c286ce5802b4c26a29bbb"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/case-labs/GAPS_AND_PLAN.md": {
+    "size": 8006,
+    "mtime_ns": 1782440205050000000,
+    "hash": "10a46eafa1b8108794f15c9af9a02a72ae7c90bfbd967437e05e59a308f945ae"
   }
 }

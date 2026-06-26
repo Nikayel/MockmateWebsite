@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
-import { CaseLabCard } from "@/components/labs/CaseLabCard"
+import { CaseLabRow } from "@/components/labs/CaseLabRow"
 import type { CaseLab } from "@/lib/labs/types"
 
 function FilterChip({
@@ -102,9 +102,9 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
       {filtered.length === 0 ? (
         <p className="text-muted-foreground text-sm">No labs match these filters.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="border-border divide-border divide-y overflow-hidden rounded-xl border">
           {filtered.map((lab) => (
-            <CaseLabCard key={lab.id} lab={lab} />
+            <CaseLabRow key={lab.id} lab={lab} />
           ))}
         </div>
       )}
