@@ -391,7 +391,7 @@ export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, c
                               className={`${
                                 isCompleted
                                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                                  : 'bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black'
+                                  : 'bg-[#c4703f] hover:bg-[#c4703f]/80 text-black'
                               }`}
                             >
                               <Play className="h-3 w-3 mr-1" />

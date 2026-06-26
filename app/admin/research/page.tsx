@@ -243,7 +243,7 @@ export default function ResearchDashboard() {
             onClick={backfillData}
             variant="outline"
             disabled={backfilling}
-            className="border-[#00d9ff] text-[#00d9ff] hover:bg-[#00d9ff]/10"
+            className="border-[#c4703f] text-[#c4703f] hover:bg-[#c4703f]/10"
           >
             {backfilling ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -331,7 +331,7 @@ export default function ResearchDashboard() {
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="pt-4">
             <div className="mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+              <BarChart3 className="h-5 w-5 text-[#c4703f]" />
               <span className="font-medium text-white">Research Status</span>
             </div>
             <div className="space-y-2">
@@ -374,7 +374,7 @@ export default function ResearchDashboard() {
         <Card className="border-gray-700 bg-gradient-to-r from-gray-900/80 to-gray-800/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-[#00d9ff]" />
+              <Brain className="h-5 w-5 text-[#c4703f]" />
               Research Insights
             </CardTitle>
           </CardHeader>
@@ -498,7 +498,7 @@ export default function ResearchDashboard() {
         <TabsContent value="overview" className="space-y-4">
           {enhancedLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
               <span className="ml-2 text-gray-400">Loading enhanced analysis...</span>
             </div>
           ) : enhancedData ? (
@@ -549,7 +549,7 @@ export default function ResearchDashboard() {
             />
           ) : usersLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
               <span className="ml-2 text-gray-400">Loading user data...</span>
             </div>
           ) : (
@@ -561,7 +561,7 @@ export default function ResearchDashboard() {
         <TabsContent value="statistics" className="space-y-4">
           {enhancedLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
               <span className="ml-2 text-gray-400">Computing statistical analysis...</span>
             </div>
           ) : enhancedData?.significanceTests ? (
@@ -569,7 +569,7 @@ export default function ResearchDashboard() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-                    <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+                    <BarChart3 className="h-5 w-5 text-[#c4703f]" />
                     Statistical Significance Tests
                   </h3>
                   <p className="text-sm text-gray-400">
@@ -710,7 +710,7 @@ export default function ResearchDashboard() {
         <TabsContent value="predictions" className="space-y-4">
           {enhancedLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
               <span className="ml-2 text-gray-400">Computing prediction metrics...</span>
             </div>
           ) : enhancedData?.predictionAccuracy ? (
@@ -726,7 +726,7 @@ export default function ResearchDashboard() {
                 <Card className="border-gray-800 bg-gray-900/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
-                      <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
+                      <TrendingUp className="h-4 w-4 text-[#c4703f]" />
                       30-Day Trends
                     </CardTitle>
                   </CardHeader>
@@ -892,7 +892,7 @@ export default function ResearchDashboard() {
                   align: "center",
                   render: (value) =>
                     value === true ? (
-                      <CheckCircle className="mx-auto h-4 w-4 text-[#00d9ff]" />
+                      <CheckCircle className="mx-auto h-4 w-4 text-[#c4703f]" />
                     ) : value === false ? (
                       <XCircle className="mx-auto h-4 w-4 text-orange-400" />
                     ) : (
@@ -1095,8 +1095,8 @@ interface InsightSectionProps {
 }
 
 function InsightSection({ title, icon: Icon, items, color }: InsightSectionProps) {
-  const dotColor = color === "green" ? "text-green-400" : "text-[#00d9ff]"
-  const iconColor = color === "green" ? "text-green-400" : "text-[#00d9ff]"
+  const dotColor = color === "green" ? "text-green-400" : "text-[#c4703f]"
+  const iconColor = color === "green" ? "text-green-400" : "text-[#c4703f]"
 
   return (
     <div className="rounded-lg bg-gray-800/50 p-4">

@@ -5267,7 +5267,7 @@ function InterviewPageLoading() {
   return (
     <main className="flex min-h-screen flex-1 items-center justify-center bg-gradient-to-b from-gray-900 via-black to-gray-900">
       <div className="text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
         <p className="text-gray-400">Loading interview...</p>
       </div>
     </main>

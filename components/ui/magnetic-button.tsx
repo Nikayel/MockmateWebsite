@@ -132,8 +132,8 @@ export function MagneticButton({
 
   // Glow styles
   const glowStyles = {
-    accent: 'shadow-[0_0_20px_rgba(0,217,255,0.3)]',
-    neural: 'shadow-[0_0_20px_rgba(0,255,136,0.3)]',
+    accent: 'shadow-[0_0_20px_rgba(196, 112, 63,0.3)]',
+    neural: 'shadow-[0_0_20px_rgba(63, 184, 131,0.3)]',
     none: '',
   };
 

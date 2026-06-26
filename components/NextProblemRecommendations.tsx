@@ -95,13 +95,13 @@ export function NextProblemRecommendations({
       <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-white">
-            <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+            <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-[#00d9ff]" />
+            <Loader2 className="h-6 w-6 animate-spin text-[#c4703f]" />
             <span className="ml-2 text-gray-400">Finding similar problems...</span>
           </div>
         </CardContent>
@@ -114,7 +114,7 @@ export function NextProblemRecommendations({
       <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-white">
-            <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+            <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
@@ -130,7 +130,7 @@ export function NextProblemRecommendations({
       <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-white">
-            <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+            <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
@@ -147,7 +147,7 @@ export function NextProblemRecommendations({
     <Card className="glass-effect mb-8 border-gray-700 bg-gray-900/50">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-white">
-          <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+          <Sparkles className="h-5 w-5 text-[#c4703f]" />
           <span>Similar Problems You Haven't Solved</span>
         </CardTitle>
         <p className="mt-1 text-xs text-gray-500">
@@ -159,14 +159,14 @@ export function NextProblemRecommendations({
           {recommendations.map((rec, index) => (
             <div
               key={rec.problemId || index}
-              className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 transition-colors hover:border-[#00d9ff]/50"
+              className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 transition-colors hover:border-[#c4703f]/50"
             >
               <div className="mb-2 flex items-start justify-between">
                 <div className="flex-1">
                   <h4 className="mb-1 font-medium text-white">{rec.title}</h4>
                   <p className="mb-2 line-clamp-2 text-sm text-gray-400">{rec.text}</p>
                   <div className="flex items-center gap-2">
-                    <Badge className="border-[#00d9ff]/30 bg-[#00d9ff]/20 text-[#00d9ff]">
+                    <Badge className="border-[#c4703f]/30 bg-[#c4703f]/20 text-[#c4703f]">
                       {rec.difficulty}
                     </Badge>
                     <Badge variant="outline" className="border-gray-600 text-gray-400">
@@ -178,7 +178,7 @@ export function NextProblemRecommendations({
               </div>
               <Button
                 onClick={() => handleSelectProblem(rec.problemId)}
-                className="mt-3 w-full bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                className="mt-3 w-full bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                 size="sm"
               >
                 Try This Problem

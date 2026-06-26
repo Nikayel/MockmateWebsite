@@ -143,7 +143,7 @@ export default function SystemHealthPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -219,7 +219,7 @@ export default function SystemHealthPage() {
         <Card className="border-gray-800 bg-gray-900/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
-              <Bell className="h-5 w-5 text-[#00d9ff]" />
+              <Bell className="h-5 w-5 text-[#c4703f]" />
               Active Alerts ({health.alerts.length})
             </CardTitle>
           </CardHeader>
@@ -306,8 +306,8 @@ export default function SystemHealthPage() {
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-[#00d9ff]/20 p-3">
-                <Activity className="h-6 w-6 text-[#00d9ff]" />
+              <div className="rounded-lg bg-[#c4703f]/20 p-3">
+                <Activity className="h-6 w-6 text-[#c4703f]" />
               </div>
               <div>
                 <p className="text-3xl font-bold text-white">
@@ -366,7 +366,7 @@ export default function SystemHealthPage() {
       <Card className="border-gray-800 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
-            <HardDrive className="h-5 w-5 text-[#00d9ff]" />
+            <HardDrive className="h-5 w-5 text-[#c4703f]" />
             Resource Usage
           </CardTitle>
         </CardHeader>
@@ -408,7 +408,7 @@ export default function SystemHealthPage() {
             errors: p.errors,
           }))}
           series={[
-            { key: "latency", name: "Latency (ms)", color: "#00d9ff" },
+            { key: "latency", name: "Latency (ms)", color: "#c4703f" },
             { key: "errors", name: "Errors", color: "#EF4444" },
           ]}
           icon={Activity}

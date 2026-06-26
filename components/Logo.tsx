@@ -20,7 +20,7 @@ export function Logo({ className = "", size = 32 }: LogoProps) {
       {/* Left bracket < - cyan */}
       <path
         d="M11 8L4 16L11 24"
-        stroke="#00d9ff"
+        stroke="#c4703f"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -29,7 +29,7 @@ export function Logo({ className = "", size = 32 }: LogoProps) {
       {/* Right bracket > - green */}
       <path
         d="M21 8L28 16L21 24"
-        stroke="#00ff88"
+        stroke="#3fb883"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -53,8 +53,8 @@ export function Logo({ className = "", size = 32 }: LogoProps) {
           y2="22"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#00d9ff" />
-          <stop offset="1" stopColor="#00ff88" />
+          <stop stopColor="#c4703f" />
+          <stop offset="1" stopColor="#3fb883" />
         </linearGradient>
       </defs>
     </svg>

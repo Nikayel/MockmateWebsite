@@ -104,19 +104,19 @@ export const ChatColumn = memo(function ChatColumn({
                 <div className="flex justify-start">
                   <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
                     <div className="flex items-center space-x-2">
-                      <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
+                      <Brain className="h-3 w-3 animate-pulse text-[#c4703f]" />
                       <span className="text-xs">CodeSparring AI is thinking</span>
                       <span className="flex space-x-0.5">
                         <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                          className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                           style={{ animationDelay: "0ms" }}
                         />
                         <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                          className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                           style={{ animationDelay: "150ms" }}
                         />
                         <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                          className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                           style={{ animationDelay: "300ms" }}
                         />
                       </span>

@@ -86,7 +86,7 @@ export function CompanyHeroCTA({ companyId, careersUrl }: CompanyHeroCTAProps) {
       ) : (
         // Free logged-in user - show upgrade CTA with Pro badge
         <Link href="/upgrade">
-          <Button className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90">
+          <Button className="bg-[#c4703f] text-black hover:bg-[#c4703f]/90">
             <Crown className="mr-2 h-4 w-4" />
             Create study plan
             <span className="ml-2 text-[10px] opacity-80">Pro</span>

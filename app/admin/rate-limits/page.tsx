@@ -216,7 +216,7 @@ export default function RateLimitsPage() {
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors",
                 statusFilter === status
-                  ? "border border-[#00d9ff]/30 bg-[#00d9ff]/20 text-[#00d9ff]"
+                  ? "border border-[#c4703f]/30 bg-[#c4703f]/20 text-[#c4703f]"
                   : "bg-gray-800 text-gray-400 hover:text-white"
               )}
             >
@@ -243,7 +243,7 @@ export default function RateLimitsPage() {
       <div className="overflow-hidden rounded-lg border border-gray-800 bg-gray-900/50">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
           </div>
         ) : feedback.length === 0 ? (
           <div className="py-12 text-center">

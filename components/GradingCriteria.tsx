@@ -25,14 +25,14 @@ const criteria: Criterion[] = [
     label: 'Understanding',
     hint: 'Explain your approach',
     weight: 30,
-    color: '#00d9ff',
+    color: '#c4703f',
   },
   {
     id: 'problem-solving',
     label: 'Problem-Solving',
     hint: 'Break it down, debug it',
     weight: 25,
-    color: '#00ff88',
+    color: '#3fb883',
   },
   {
     id: 'code-quality',

@@ -262,10 +262,10 @@ export function InterviewerChat({
       <CardHeader className="flex-shrink-0 pb-2">
         <CardTitle className="flex items-center space-x-2 text-sm text-white">
           <div className="relative">
-            <Brain className="animate-neural-pulse h-4 w-4 text-[#00d9ff]" />
-            <div className="absolute inset-0 rounded-full bg-[#00d9ff] opacity-30 blur-md"></div>
+            <Brain className="animate-neural-pulse h-4 w-4 text-[#c4703f]" />
+            <div className="absolute inset-0 rounded-full bg-[#c4703f] opacity-30 blur-md"></div>
           </div>
-          <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text font-bold text-transparent">
+          <span className="bg-gradient-to-r from-[#c4703f] to-[#3fb883] bg-clip-text font-bold text-transparent">
             CodeSparring AI
           </span>
         </CardTitle>
@@ -303,7 +303,7 @@ export function InterviewerChat({
                         {msg.type === "user" ? (
                           <User className="h-3 w-3" />
                         ) : (
-                          <Brain className="animate-neural-pulse h-3 w-3 text-[#00d9ff]" />
+                          <Brain className="animate-neural-pulse h-3 w-3 text-[#c4703f]" />
                         )}
                         <span className="text-xs opacity-75">
                           {msg.type === "user" ? "You" : "CodeSparring AI"}
@@ -329,21 +329,21 @@ export function InterviewerChat({
                   <div className="flex justify-start">
                     <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
                       <div className="flex items-center space-x-2">
-                        <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
+                        <Brain className="h-3 w-3 animate-pulse text-[#c4703f]" />
                         <span className="text-xs">
                           {SABLE_THINKING_MESSAGES[thinkingMessageIndex]}
                         </span>
                         <span className="flex space-x-0.5">
                           <span
-                            className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                            className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                             style={{ animationDelay: "0ms" }}
                           />
                           <span
-                            className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                            className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                             style={{ animationDelay: "150ms" }}
                           />
                           <span
-                            className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                            className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                             style={{ animationDelay: "300ms" }}
                           />
                         </span>
@@ -407,7 +407,7 @@ export function InterviewerChat({
                 "h-7 px-2 text-white",
                 isRecording && inputValue.trim()
                   ? "animate-pulse bg-green-500 hover:bg-green-600"
-                  : "bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+                  : "bg-[#c4703f] hover:bg-[#c4703f]/80"
               )}
               disabled={isLoadingInterviewer || isGeneratingDiscussion || !inputValue.trim()}
               aria-label={
@@ -504,7 +504,7 @@ export function AIChatPartner({
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-gray-700 pt-2">
       <div className="mb-1 flex flex-shrink-0 items-center space-x-1">
-        <Brain className="h-3 w-3 text-[#00d9ff]" />
+        <Brain className="h-3 w-3 text-[#c4703f]" />
         <span className="text-xs font-medium text-white">AI Partner</span>
       </div>
       {/* Chat container with smart scroll */}
@@ -528,7 +528,7 @@ export function AIChatPartner({
                   {msg.type === "user" ? (
                     <User className="h-2.5 w-2.5" />
                   ) : (
-                    <Brain className="animate-neural-pulse h-2.5 w-2.5 text-[#00d9ff]" />
+                    <Brain className="animate-neural-pulse h-2.5 w-2.5 text-[#c4703f]" />
                   )}
                   <span className="text-xs opacity-75">
                     {msg.type === "user" ? "You" : "AI Partner"}
@@ -550,19 +550,19 @@ export function AIChatPartner({
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded border border-gray-600/50 bg-gray-700/50 p-1.5 text-gray-400">
                 <div className="flex items-center space-x-1.5">
-                  <Brain className="h-2.5 w-2.5 animate-pulse text-[#00d9ff]" />
+                  <Brain className="h-2.5 w-2.5 animate-pulse text-[#c4703f]" />
                   <span className="text-xs">{SABLE_THINKING_MESSAGES[thinkingMessageIndex]}</span>
                   <span className="flex space-x-0.5">
                     <span
-                      className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                      className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                       style={{ animationDelay: "0ms" }}
                     />
                     <span
-                      className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                      className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                       style={{ animationDelay: "150ms" }}
                     />
                     <span
-                      className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                      className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
                       style={{ animationDelay: "300ms" }}
                     />
                   </span>
@@ -617,7 +617,7 @@ export function AIChatPartner({
             "h-7 px-2 text-white",
             isRecording && inputValue.trim()
               ? "animate-pulse bg-green-500 hover:bg-green-600"
-              : "bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+              : "bg-[#c4703f] hover:bg-[#c4703f]/80"
           )}
           disabled={isLoadingChat || !inputValue.trim()}
           aria-label={isLoadingChat ? "Sending message" : "Send message"}

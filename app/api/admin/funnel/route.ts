@@ -121,9 +121,9 @@ export async function GET(request: NextRequest) {
       {
         name: pageViewsEstimated ? "Page Views (est.)" : "Page Views",
         value: pageViews,
-        color: "#00d9ff",
+        color: "#c4703f",
       },
-      { name: "Sign Ups", value: signups || totalProfiles, color: "#00ff88" },
+      { name: "Sign Ups", value: signups || totalProfiles, color: "#3fb883" },
       { name: "Started Session", value: totalSessions, color: "#FBBF24" },
       { name: "Completed Session", value: completedSessions, color: "#F97316" },
       { name: "Subscribed", value: subscribers, color: "#A855F7" },

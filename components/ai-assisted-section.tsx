@@ -37,7 +37,7 @@ const criteria: Criterion[] = [
     id: "problem-solving",
     label: "Problem-Solving",
     percent: 25,
-    color: "#00ff88",
+    color: "#3fb883",
     summary: "Work through the problem systematically.",
     instruction:
       "Break the task down, compare approaches, debug with evidence, and improve from brute force toward an efficient solution.",
@@ -46,7 +46,7 @@ const criteria: Criterion[] = [
     id: "code-quality",
     label: "Code Quality",
     percent: 20,
-    color: "#00d9ff",
+    color: "#c4703f",
     summary: "Write code that is correct and maintainable.",
     instruction:
       "Pass the tests, keep the algorithm efficient, use readable names, and structure the solution so another engineer can review it.",

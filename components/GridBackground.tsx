@@ -25,10 +25,10 @@ export function GridBackground({ className = '' }: GridBackgroundProps) {
       />
 
       {/* Accent glow - top */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#00d9ff]/[0.04] rounded-full blur-[120px]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#c4703f]/[0.04] rounded-full blur-[120px]" />
 
       {/* Accent glow - bottom left */}
-      <div className="absolute bottom-0 left-0 w-[500px] h-[300px] bg-[#00ff88]/[0.03] rounded-full blur-[100px]" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[300px] bg-[#3fb883]/[0.03] rounded-full blur-[100px]" />
 
       {/* Noise texture overlay */}
       <div

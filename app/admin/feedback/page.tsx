@@ -170,7 +170,7 @@ export default function FeedbackPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -235,7 +235,7 @@ export default function FeedbackPage() {
         </Card>
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#00d9ff]">{stats.npsScore}</p>
+            <p className="text-2xl font-bold text-[#c4703f]">{stats.npsScore}</p>
             <p className="text-xs text-gray-400">NPS Score</p>
           </CardContent>
         </Card>
@@ -303,7 +303,7 @@ export default function FeedbackPage() {
       <Card className="border-gray-800 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
-            <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
+            <MessageSquare className="h-5 w-5 text-[#c4703f]" />
             Feedback ({feedback.length})
           </CardTitle>
         </CardHeader>
@@ -439,7 +439,7 @@ export default function FeedbackPage() {
                         onClick={() => handleUpdateStatus(selectedItem.id, status)}
                         className={
                           selectedItem.status === status
-                            ? "bg-[#00d9ff] text-black"
+                            ? "bg-[#c4703f] text-black"
                             : "border-gray-700"
                         }
                       >
@@ -459,7 +459,7 @@ export default function FeedbackPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveNotes} className="bg-[#00d9ff] text-black">
+            <Button onClick={handleSaveNotes} className="bg-[#c4703f] text-black">
               Save Notes
             </Button>
           </DialogFooter>

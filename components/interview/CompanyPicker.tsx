@@ -86,12 +86,12 @@ export function CompanyPicker({
             <DialogTitle className="flex items-center gap-2">
               {isLocked ? (
                 <>
-                  <MessageSquareMore className="h-5 w-5 text-[#00d9ff]" />
+                  <MessageSquareMore className="h-5 w-5 text-[#c4703f]" />
                   Real Interview Mode Available
                 </>
               ) : (
                 <>
-                  <Target className="h-5 w-5 text-[#00d9ff]" />
+                  <Target className="h-5 w-5 text-[#c4703f]" />
                   Which company are you targeting?
                 </>
               )}
@@ -114,7 +114,7 @@ export function CompanyPicker({
                   <Button
                     variant="default"
                     size="sm"
-                    className="cursor-default gap-2 bg-[#00d9ff] text-black hover:bg-[#00d9ff]"
+                    className="cursor-default gap-2 bg-[#c4703f] text-black hover:bg-[#c4703f]"
                     disabled
                   >
                     <Building2 className="h-4 w-4" />
@@ -160,7 +160,7 @@ export function CompanyPicker({
                         key={companyId}
                         variant={isSelected ? "default" : "outline"}
                         size="sm"
-                        className={`gap-2 ${isSelected ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90" : ""}`}
+                        className={`gap-2 ${isSelected ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/90" : ""}`}
                         onClick={() => setSelected(companyId)}
                       >
                         <Building2 className="h-4 w-4" />
@@ -284,7 +284,7 @@ export function CompanyPicker({
             <Button
               onClick={handleConfirm}
               disabled={!selected}
-              className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90"
+              className="bg-[#c4703f] text-black hover:bg-[#c4703f]/90"
             >
               {isLocked && realInterviewMode ? "Start Real Interview" : "Start Interview"}
             </Button>

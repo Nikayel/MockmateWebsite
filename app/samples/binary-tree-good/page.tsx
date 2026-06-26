@@ -32,7 +32,7 @@ export default function BinaryTreeGoodPage() {
       <section className="pt-24 pb-8 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <Link href="/samples" className="inline-flex items-center text-[#00d9ff] hover:text-[#00d9ff]/80 mb-6">
+            <Link href="/samples" className="inline-flex items-center text-[#c4703f] hover:text-[#c4703f]/80 mb-6">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Samples
             </Link>
@@ -40,14 +40,14 @@ export default function BinaryTreeGoodPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Medium</Badge>
-                  <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Completed</Badge>
+                  <Badge className="bg-[#c4703f]/20 text-[#c4703f] border-[#c4703f]/30">Medium</Badge>
+                  <Badge className="bg-[#c4703f]/20 text-[#c4703f] border-[#c4703f]/30">Completed</Badge>
                 </div>
                 <h1 className="text-4xl font-heading font-bold text-white">Binary Tree Inorder Traversal</h1>
                 <p className="text-gray-300 mt-2">Tree traversal with recursive and iterative approaches</p>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-[#00d9ff] mb-1">B+</div>
+                <div className="text-4xl font-bold text-[#c4703f] mb-1">B+</div>
                 <div className="text-gray-400">Overall Grade</div>
               </div>
             </div>
@@ -70,7 +70,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Time Taken</div>
                       <div className="text-white text-xl font-semibold">25 minutes</div>
                     </div>
-                    <Clock className="h-8 w-8 text-[#00d9ff]" />
+                    <Clock className="h-8 w-8 text-[#c4703f]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -78,7 +78,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Complexity Accuracy</div>
                       <div className="text-white text-xl font-semibold">Good</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
+                    <CheckCircle className="h-8 w-8 text-[#c4703f]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -86,7 +86,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Edge Cases Discussed</div>
                       <div className="text-white text-xl font-semibold">Yes</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
+                    <CheckCircle className="h-8 w-8 text-[#c4703f]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -105,7 +105,7 @@ export default function BinaryTreeGoodPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <Code className="h-5 w-5 text-[#00d9ff]" />
+                    <Code className="h-5 w-5 text-[#c4703f]" />
                     <span>Your Solution</span>
                   </CardTitle>
                 </CardHeader>
@@ -130,12 +130,12 @@ export default function BinaryTreeGoodPage() {
                   </div>
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
-                      <span className="text-[#00d9ff] text-sm">Correct recursive approach</span>
+                      <CheckCircle className="h-4 w-4 text-[#c4703f]" />
+                      <span className="text-[#c4703f] text-sm">Correct recursive approach</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
-                      <span className="text-[#00d9ff] text-sm">Proper base case handling</span>
+                      <CheckCircle className="h-4 w-4 text-[#c4703f]" />
+                      <span className="text-[#c4703f] text-sm">Proper base case handling</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <AlertTriangle className="h-4 w-4 text-gray-400" />
@@ -149,15 +149,15 @@ export default function BinaryTreeGoodPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
+                    <MessageSquare className="h-5 w-5 text-[#c4703f]" />
                     <span>AI Feedback</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
+                  <div className="bg-[#c4703f]/10 border border-[#c4703f]/20 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
-                      <span className="text-[#00d9ff] font-semibold">Strengths</span>
+                      <TrendingUp className="h-4 w-4 text-[#c4703f]" />
+                      <span className="text-[#c4703f] font-semibold">Strengths</span>
                     </div>
                     <ul className="text-gray-300 text-sm space-y-1">
                       <li>• Solid understanding of tree traversal concepts</li>
@@ -179,10 +179,10 @@ export default function BinaryTreeGoodPage() {
                     </ul>
                   </div>
 
-                  <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
+                  <div className="bg-[#c4703f]/5 border border-[#c4703f]/10 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Lightbulb className="h-4 w-4 text-[#00d9ff]" />
-                      <span className="text-[#00d9ff] font-semibold">Next Steps</span>
+                      <Lightbulb className="h-4 w-4 text-[#c4703f]" />
+                      <span className="text-[#c4703f] font-semibold">Next Steps</span>
                     </div>
                     <p className="text-gray-300 text-sm">
                       Practice implementing iterative tree traversals using explicit stacks. This will help you
@@ -197,7 +197,7 @@ export default function BinaryTreeGoodPage() {
             <Card className="mt-8 bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+                  <BarChart3 className="h-5 w-5 text-[#c4703f]" />
                   <span>Detailed Performance Metrics</span>
                 </CardTitle>
               </CardHeader>
@@ -206,7 +206,7 @@ export default function BinaryTreeGoodPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Problem Understanding</span>
-                      <span className="text-[#00d9ff] font-semibold">85%</span>
+                      <span className="text-[#c4703f] font-semibold">85%</span>
                     </div>
                     <Progress value={85} className="h-2 bg-gray-800" />
                   </div>
@@ -214,7 +214,7 @@ export default function BinaryTreeGoodPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Code Quality</span>
-                      <span className="text-[#00d9ff] font-semibold">82%</span>
+                      <span className="text-[#c4703f] font-semibold">82%</span>
                     </div>
                     <Progress value={82} className="h-2 bg-gray-800" />
                   </div>
@@ -222,7 +222,7 @@ export default function BinaryTreeGoodPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Communication</span>
-                      <span className="text-[#00d9ff] font-semibold">78%</span>
+                      <span className="text-[#c4703f] font-semibold">78%</span>
                     </div>
                     <Progress value={78} className="h-2 bg-gray-800" />
                   </div>
@@ -241,11 +241,11 @@ export default function BinaryTreeGoodPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Export Report (JSON)
                   </Button>
-                  <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white flex-1">
+                  <Button className="bg-[#c4703f] hover:bg-[#c4703f]/80 text-white flex-1">
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Retry Session
                   </Button>
-                  <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white flex-1">
+                  <Button className="bg-[#c4703f] hover:bg-[#c4703f]/80 text-white flex-1">
                     <Plus className="mr-2 h-4 w-4" />
                     New Problem
                   </Button>

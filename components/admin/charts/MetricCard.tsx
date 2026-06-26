@@ -37,10 +37,10 @@ export function MetricCard({
   change,
   changeLabel,
   icon: Icon,
-  iconColor = "text-[#00d9ff]",
+  iconColor = "text-[#c4703f]",
   valueColor = "text-white",
   sparklineData,
-  sparklineColor = "#00d9ff",
+  sparklineColor = "#c4703f",
   loading = false,
   className,
 }: MetricCardProps) {

@@ -215,7 +215,7 @@ export default function GrowthPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#c4703f]" />
       </div>
     )
   }
@@ -256,7 +256,7 @@ export default function GrowthPage() {
       {/* NPS Section */}
       <div className={spacing.sectionGap}>
         <h2 className={typography.sectionTitle}>
-          <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
+          <MessageSquare className="h-5 w-5 text-[#c4703f]" />
           Net Promoter Score (NPS)
         </h2>
 
@@ -279,7 +279,7 @@ export default function GrowthPage() {
             value={(npsData?.stats.averageScore || 0).toFixed(1)}
             subtitle="Out of 10"
             icon={ThumbsUp}
-            valueColor="text-[#00d9ff]"
+            valueColor="text-[#c4703f]"
           />
           <MetricCard
             title="7-Day NPS"

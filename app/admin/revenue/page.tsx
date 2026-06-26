@@ -148,7 +148,7 @@ export default function RevenuePage() {
   }
 
   const typeDistribution = metrics ? [
-    { name: "Monthly", value: metrics.byType.monthly.subscribers, color: "#00d9ff" },
+    { name: "Monthly", value: metrics.byType.monthly.subscribers, color: "#c4703f" },
     { name: "Yearly", value: metrics.byType.yearly.subscribers, color: "#A855F7" },
   ] : []
 
@@ -190,7 +190,7 @@ export default function RevenuePage() {
               valueColor="text-green-400"
               iconColor="text-green-400"
               sparklineData={metrics.timeSeries?.slice(-7).map((r) => r.revenue)}
-              sparklineColor="#00ff88"
+              sparklineColor="#3fb883"
             />
             <MetricCard
               title="MRR (Actual)"
@@ -204,7 +204,7 @@ export default function RevenuePage() {
               value={totalSubscribers}
               subtitle={`${metrics.byType.monthly.subscribers} monthly, ${metrics.byType.yearly.subscribers} yearly`}
               icon={Users}
-              iconColor="text-[#00d9ff]"
+              iconColor="text-[#c4703f]"
             />
             <MetricCard
               title="Refunds"
@@ -221,7 +221,7 @@ export default function RevenuePage() {
             <Card className="bg-gray-900/50 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-[#00d9ff]" />
+                  <Calendar className="h-5 w-5 text-[#c4703f]" />
                   Monthly Subscriptions
                 </CardTitle>
                 <CardDescription>$25/month recurring</CardDescription>
@@ -278,7 +278,7 @@ export default function RevenuePage() {
               subtitle="Daily revenue from actual payments"
               data={metrics.timeSeries}
               series={[
-                { key: "revenue", name: "Revenue", color: "#00ff88" },
+                { key: "revenue", name: "Revenue", color: "#3fb883" },
                 { key: "refunds", name: "Refunds", color: "#ef4444" },
               ]}
               icon={DollarSign}
@@ -410,7 +410,7 @@ export default function RevenuePage() {
                           <Badge variant="outline" className={
                             payment.type === "one_time"
                               ? "border-purple-500 text-purple-400"
-                              : "border-[#00d9ff] text-[#00d9ff]"
+                              : "border-[#c4703f] text-[#c4703f]"
                           }>
                             {payment.type === "one_time" ? "Yearly" : "Monthly"}
                           </Badge>

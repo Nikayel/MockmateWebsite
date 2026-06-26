@@ -35,9 +35,9 @@ export function LandingPageTemplate({
 
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-white/5 pt-32 pb-16 md:pt-40 md:pb-24">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(0,217,255,0.1)_0%,rgba(0,0,0,0)_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(196, 112, 63,0.1)_0%,rgba(0,0,0,0)_70%)]" />
         <div className="relative z-10 container mx-auto max-w-4xl px-4 text-center">
-          <span className="mb-6 inline-block rounded-full bg-[#00d9ff]/10 px-4 py-1.5 text-sm font-semibold text-[#00d9ff]">
+          <span className="mb-6 inline-block rounded-full bg-[#c4703f]/10 px-4 py-1.5 text-sm font-semibold text-[#c4703f]">
             {subtitle}
           </span>
           <h1 className="font-heading mb-6 text-4xl font-extrabold tracking-tight text-white md:text-6xl lg:text-7xl">
@@ -50,7 +50,7 @@ export function LandingPageTemplate({
             <Link href="/interview">
               <Button
                 size="lg"
-                className="h-14 bg-[#00d9ff] px-8 text-lg font-bold text-black hover:bg-[#00d9ff]/90"
+                className="h-14 bg-[#c4703f] px-8 text-lg font-bold text-black hover:bg-[#c4703f]/90"
               >
                 Start Practicing Free
                 <Terminal className="ml-2 h-5 w-5" />
@@ -63,7 +63,7 @@ export function LandingPageTemplate({
       {/* Main Content */}
       <section className="py-16 md:py-24">
         <div className="container mx-auto max-w-3xl px-4">
-          <article className="prose prose-invert prose-lg prose-headings:font-heading prose-a:text-[#00d9ff] hover:prose-a:text-[#00d9ff]/80 max-w-none">
+          <article className="prose prose-invert prose-lg prose-headings:font-heading prose-a:text-[#c4703f] hover:prose-a:text-[#c4703f]/80 max-w-none">
             {contentSections.map((section, index) => (
               <div key={index} className="mb-12">
                 <h2 className="mb-6 text-3xl font-bold text-white">{section.heading}</h2>
@@ -85,21 +85,21 @@ export function LandingPageTemplate({
           </p>
           <div className="mb-10 grid grid-cols-1 gap-6 text-left md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black p-6">
-              <CheckCircle2 className="mb-4 h-8 w-8 text-[#00d9ff]" />
+              <CheckCircle2 className="mb-4 h-8 w-8 text-[#c4703f]" />
               <h3 className="mb-2 text-lg font-bold text-white">Voice & Text Practice</h3>
               <p className="text-sm text-gray-400">
                 Practice communicating your thoughts out loud, just like a real interview.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black p-6">
-              <CheckCircle2 className="mb-4 h-8 w-8 text-[#00d9ff]" />
+              <CheckCircle2 className="mb-4 h-8 w-8 text-[#c4703f]" />
               <h3 className="mb-2 text-lg font-bold text-white">Instant AI Feedback</h3>
               <p className="text-sm text-gray-400">
                 Get scored on problem-solving, communication, and coding efficiency.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black p-6">
-              <CheckCircle2 className="mb-4 h-8 w-8 text-[#00d9ff]" />
+              <CheckCircle2 className="mb-4 h-8 w-8 text-[#c4703f]" />
               <h3 className="mb-2 text-lg font-bold text-white">15+ DSA Patterns</h3>
               <p className="text-sm text-gray-400">
                 Comprehensive coverage of all patterns tested by FAANG companies.

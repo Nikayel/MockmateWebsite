@@ -54,7 +54,7 @@ export default function LimitReachedPage() {
   if (loading || authLoading || !initialized) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </main>
     )
   }

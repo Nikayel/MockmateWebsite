@@ -141,7 +141,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <aside className="fixed top-0 left-0 z-40 h-screen w-64 border-r border-gray-800 bg-gray-900/95">
           <div className="flex h-14 items-center justify-between border-b border-gray-800 px-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88]">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883]">
                 <Shield className="h-4 w-4 text-black" />
               </div>
               <div>
@@ -159,7 +159,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Main content skeleton */}
         <main className="ml-64 flex-1 p-6 lg:p-8">
           <div className="flex min-h-[60vh] items-center justify-center">
-            <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
+            <Loader2 className="h-10 w-10 animate-spin text-[#c4703f]" />
           </div>
         </main>
       </div>
@@ -177,7 +177,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </p>
           <Button
             onClick={() => router.push("/")}
-            className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+            className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
           >
             Return to Home
           </Button>
@@ -210,7 +210,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex h-14 items-center justify-between border-b border-gray-800/80 px-3">
           {!collapsed && (
             <Link href="/admin" className="group flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88] shadow-lg shadow-[#00d9ff]/20 transition-shadow group-hover:shadow-[#00d9ff]/30">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883] shadow-lg shadow-[#c4703f]/20 transition-shadow group-hover:shadow-[#c4703f]/30">
                 <Shield className="h-4 w-4 text-black" />
               </div>
               <div>
@@ -221,7 +221,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           )}
           {collapsed && (
             <Link href="/admin" className="mx-auto">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88] shadow-lg shadow-[#00d9ff]/20">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883] shadow-lg shadow-[#c4703f]/20">
                 <Shield className="h-4 w-4 text-black" />
               </div>
             </Link>
@@ -283,7 +283,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         className={cn(
                           "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                           isActive
-                            ? "border-l-2 border-[#00d9ff] bg-gradient-to-r from-[#00d9ff]/15 to-[#00d9ff]/5 text-[#00d9ff] shadow-sm"
+                            ? "border-l-2 border-[#c4703f] bg-gradient-to-r from-[#c4703f]/15 to-[#c4703f]/5 text-[#c4703f] shadow-sm"
                             : "text-gray-400 hover:translate-x-0.5 hover:bg-gray-800/60 hover:text-white",
                           collapsed && "justify-center px-2"
                         )}
@@ -292,14 +292,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <item.icon
                           className={cn(
                             "h-[18px] w-[18px] flex-shrink-0 transition-transform group-hover:scale-110",
-                            isActive && "text-[#00d9ff]"
+                            isActive && "text-[#c4703f]"
                           )}
                         />
                         {!collapsed && (
                           <>
                             <span className="truncate">{item.name}</span>
                             {item.badge && (
-                              <span className="ml-auto rounded-full border border-[#00d9ff]/30 bg-[#00d9ff]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[#00d9ff]">
+                              <span className="ml-auto rounded-full border border-[#c4703f]/30 bg-[#c4703f]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[#c4703f]">
                                 {item.badge}
                               </span>
                             )}
@@ -318,7 +318,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="border-t border-gray-800/80 bg-gray-900/50 p-3">
           {!collapsed && firebaseUser && (
             <div className="mb-3 flex items-center gap-2.5 rounded-lg border border-gray-700/50 bg-gradient-to-r from-gray-800/50 to-gray-800/30 p-2.5">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00d9ff] to-[#00ff88] shadow-lg shadow-[#00d9ff]/20">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#c4703f] to-[#3fb883] shadow-lg shadow-[#c4703f]/20">
                 <span className="text-sm font-bold text-black">
                   {firebaseUser.email?.[0].toUpperCase()}
                 </span>

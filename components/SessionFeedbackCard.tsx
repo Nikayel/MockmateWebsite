@@ -372,8 +372,8 @@ export default function SessionFeedbackCard({
                       <Radar
                         name="Score"
                         dataKey="value"
-                        stroke="#00d9ff"
-                        fill="#00d9ff"
+                        stroke="#c4703f"
+                        fill="#c4703f"
                         fillOpacity={0.6}
                       />
                     </RadarChart>

@@ -65,7 +65,7 @@ export function MetricsMarketingSection() {
     <section className="py-24 bg-gradient-to-b from-black to-gray-900 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#00d9ff]/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#c4703f]/5 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
       </div>
 
@@ -78,14 +78,14 @@ export function MetricsMarketingSection() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#00d9ff]/10 border border-[#00d9ff]/20 mb-6">
-            <Sparkles className="w-4 h-4 text-[#00d9ff]" />
-            <span className="text-sm text-[#00d9ff] font-medium">Performance Analytics</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#c4703f]/10 border border-[#c4703f]/20 mb-6">
+            <Sparkles className="w-4 h-4 text-[#c4703f]" />
+            <span className="text-sm text-[#c4703f] font-medium">Performance Analytics</span>
           </div>
 
           <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4">
             See exactly where you stand —{" "}
-            <span className="bg-gradient-to-r from-[#00d9ff] to-purple-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#c4703f] to-purple-500 bg-clip-text text-transparent">
               and why
             </span>
           </h2>
@@ -108,7 +108,7 @@ export function MetricsMarketingSection() {
               className={`group rounded-2xl p-6 transition-colors ${
                 metric.featured
                   ? "bg-[#1a1428] border-[1.5px] border-[#7c3aed] hover:border-[#8b5cf6]"
-                  : "bg-white/5 border-[0.5px] border-white/10 hover:border-[#00d9ff]/30"
+                  : "bg-white/5 border-[0.5px] border-white/10 hover:border-[#c4703f]/30"
               }`}
             >
               {metric.featured && (
@@ -121,12 +121,12 @@ export function MetricsMarketingSection() {
                 className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
                   metric.featured
                     ? "bg-[#2d1f52] group-hover:bg-[#35245f]"
-                    : "bg-[#00d9ff]/10 group-hover:bg-[#00d9ff]/20"
+                    : "bg-[#c4703f]/10 group-hover:bg-[#c4703f]/20"
                 }`}
               >
                 <metric.icon
                   className={`w-6 h-6 ${
-                    metric.featured ? "text-[#a78bfa]" : "text-[#00d9ff]"
+                    metric.featured ? "text-[#a78bfa]" : "text-[#c4703f]"
                   }`}
                 />
               </div>
@@ -149,14 +149,14 @@ export function MetricsMarketingSection() {
         >
           {/* Left: Dashboard Preview */}
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-[#00d9ff]/20 to-purple-500/20 rounded-3xl blur-xl" />
-            <div className="relative p-1 rounded-3xl bg-gradient-to-r from-[#00d9ff]/50 to-purple-500/50">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#c4703f]/20 to-purple-500/20 rounded-3xl blur-xl" />
+            <div className="relative p-1 rounded-3xl bg-gradient-to-r from-[#c4703f]/50 to-purple-500/50">
               <div className="rounded-[22px] bg-gray-900 p-5 sm:p-6">
                 {/* Mock Dashboard */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#00d9ff]/20 flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-[#00d9ff]" />
+                    <div className="w-10 h-10 rounded-full bg-[#c4703f]/20 flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-[#c4703f]" />
                     </div>
                     <div>
                       <div className="text-sm text-white font-medium">Your Metrics</div>
@@ -195,7 +195,7 @@ export function MetricsMarketingSection() {
                       />
                       <defs>
                         <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#00d9ff" />
+                          <stop offset="0%" stopColor="#c4703f" />
                           <stop offset="100%" stopColor="#a855f7" />
                         </linearGradient>
                       </defs>
@@ -232,7 +232,7 @@ export function MetricsMarketingSection() {
                         />
                         <div className="h-2 rounded-full bg-gray-700 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-[#00d9ff] to-purple-500"
+                            className="h-full rounded-full bg-gradient-to-r from-[#c4703f] to-purple-500"
                             style={{ width: `${pattern.score}%` }}
                           />
                         </div>
@@ -260,7 +260,7 @@ export function MetricsMarketingSection() {
                   key={feature.label}
                   className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10"
                 >
-                  <div className="w-2 h-2 rounded-full bg-[#00d9ff]" />
+                  <div className="w-2 h-2 rounded-full bg-[#c4703f]" />
                   <div>
                     <div className="text-sm text-white">{feature.label}</div>
                     <div className="text-xs text-gray-400">{feature.value}</div>
@@ -270,7 +270,7 @@ export function MetricsMarketingSection() {
             </div>
 
             <Link href="/signup">
-              <MagneticButton className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-6 py-3 rounded-lg font-medium">
+              <MagneticButton className="bg-[#c4703f] hover:bg-[#c4703f]/80 text-white px-6 py-3 rounded-lg font-medium">
                 Start Tracking Your Progress
                 <Zap className="w-4 h-4 ml-2 inline-block" />
               </MagneticButton>

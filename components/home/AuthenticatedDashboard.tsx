@@ -102,7 +102,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
   if (isLoading) {
     return (
       <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </main>
     )
   }
@@ -173,7 +173,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                   className="mb-2 h-2"
                 />
                 {(usage?.freeOpensRemaining || 0) > 0 ? (
-                  <p className="text-xs text-[#00ff88]">
+                  <p className="text-xs text-[#3fb883]">
                     {usage?.freeOpensRemaining} free opens remaining
                   </p>
                 ) : (
@@ -216,7 +216,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                   <Link href="/upgrade" className="mt-3 block">
                     <Button
                       size="sm"
-                      className="w-full bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
+                      className="w-full bg-[#c4703f] text-white hover:bg-[#c4703f]/80"
                     >
                       Upgrade
                     </Button>
@@ -234,7 +234,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
               </CardHeader>
               <CardContent>
                 <Link href="/interview">
-                  <Button className="w-full bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80">
+                  <Button className="w-full bg-[#c4703f] text-white hover:bg-[#c4703f]/80">
                     Start Practice
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -247,7 +247,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-white">
                 <span className="flex items-center">
-                  <Terminal className="mr-2 h-5 w-5 text-[#00d9ff]" />
+                  <Terminal className="mr-2 h-5 w-5 text-[#c4703f]" />
                   Coding Practice
                 </span>
                 {!usage?.allowed && (
@@ -265,7 +265,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                     problems with AI guidance.
                   </p>
                   <Link href="/interview">
-                    <Button className="w-full bg-[#00d9ff] py-6 text-lg text-white hover:bg-[#00d9ff]/80">
+                    <Button className="w-full bg-[#c4703f] py-6 text-lg text-white hover:bg-[#c4703f]/80">
                       <Terminal className="mr-2 h-5 w-5" />
                       Start New Practice Session
                       <ArrowRight className="ml-2 h-5 w-5" />

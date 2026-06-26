@@ -220,7 +220,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
       <CardHeader className="flex-shrink-0 border-b border-gray-700/50 pb-3">
         <CardTitle className="flex items-center justify-between text-white">
           <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-[#00d9ff]" />
+            <Target className="h-5 w-5 text-[#c4703f]" />
             <span className="truncate text-base font-semibold">{scenario.title}</span>
           </div>
           <Badge
@@ -239,8 +239,8 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
       <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
         {/* Problem Description - IMPROVED: Larger font, better spacing */}
         <div className="space-y-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[#00d9ff] uppercase">
-            <span className="h-4 w-1 rounded-full bg-[#00d9ff]"></span>
+          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[#c4703f] uppercase">
+            <span className="h-4 w-1 rounded-full bg-[#c4703f]"></span>
             Description
             {realInterviewMode && (scenario as any).fuzzyStatement && (
               <Badge className="border-purple-500/30 bg-purple-500/20 text-[10px] text-purple-300">
@@ -261,8 +261,8 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
         {/* Examples (DSA only) - IMPROVED: Better visual hierarchy */}
         {scenario.type === "dsa" && scenario.examples && scenario.examples.length > 0 && (
           <div className="space-y-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[#00d9ff] uppercase">
-              <span className="h-4 w-1 rounded-full bg-[#00d9ff]"></span>
+            <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[#c4703f] uppercase">
+              <span className="h-4 w-1 rounded-full bg-[#c4703f]"></span>
               Examples
             </h3>
             <div className="space-y-3">
@@ -292,14 +292,14 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
         {/* Constraints (DSA only) - IMPROVED: Better styling */}
         {scenario.type === "dsa" && scenario.constraints && scenario.constraints.length > 0 && (
           <div className="space-y-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[#00d9ff] uppercase">
-              <span className="h-4 w-1 rounded-full bg-[#00d9ff]"></span>
+            <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[#c4703f] uppercase">
+              <span className="h-4 w-1 rounded-full bg-[#c4703f]"></span>
               Constraints
             </h3>
             <ul className="space-y-1.5 text-gray-300">
               {scenario.constraints.slice(0, 4).map((c, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
-                  <span className="mt-0.5 text-[#00d9ff]">•</span>
+                  <span className="mt-0.5 text-[#c4703f]">•</span>
                   <code className="font-mono text-gray-300">{c}</code>
                 </li>
               ))}
@@ -315,7 +315,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
               className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-gray-700/30"
             >
               <div className="flex items-center gap-2">
-                <span className="h-4 w-1 rounded-full bg-[#00d9ff]"></span>
+                <span className="h-4 w-1 rounded-full bg-[#c4703f]"></span>
                 <span className="text-sm font-medium text-gray-200">Target complexity</span>
               </div>
               {showOptimalApproach ? (
@@ -330,13 +330,13 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
                   <span className="flex items-center gap-1.5 text-gray-400">
                     <Clock className="h-3.5 w-3.5 text-gray-500" />
-                    <code className="font-mono text-[#00d9ff]">
+                    <code className="font-mono text-[#c4703f]">
                       {(scenario as DSAScenario).optimalComplexity.time}
                     </code>
                   </span>
                   <span className="flex items-center gap-1.5 text-gray-400">
                     <HardDrive className="h-3.5 w-3.5 text-gray-500" />
-                    <code className="font-mono text-[#00d9ff]">
+                    <code className="font-mono text-[#c4703f]">
                       {(scenario as DSAScenario).optimalComplexity.space}
                     </code>
                   </span>
@@ -352,12 +352,12 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
           <div className="mt-3 border-t border-gray-700 pt-3">
             <button
               onClick={() => setShowAnalysis(!showAnalysis)}
-              className="mb-2 flex w-full items-center justify-between font-semibold text-white transition-colors hover:text-[#00d9ff]"
+              className="mb-2 flex w-full items-center justify-between font-semibold text-white transition-colors hover:text-[#c4703f]"
             >
               <span className="flex items-center gap-1.5 text-xs">
-                <BookOpen className="h-3 w-3 text-[#00d9ff]" />
+                <BookOpen className="h-3 w-3 text-[#c4703f]" />
                 Pattern Analysis
-                <Badge className="border-[#00d9ff]/50 bg-[#00d9ff]/20 px-1.5 text-[10px] text-[#00d9ff]">
+                <Badge className="border-[#c4703f]/50 bg-[#c4703f]/20 px-1.5 text-[10px] text-[#c4703f]">
                   {patternMetadata.name}
                 </Badge>
               </span>
@@ -371,7 +371,7 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
             {showAnalysis && (
               <div className="animate-in slide-in-from-top-2 space-y-3 duration-200">
                 {/* Pattern Description */}
-                <div className="rounded-lg border border-[#00d9ff]/30 bg-[#00d9ff]/10 p-2">
+                <div className="rounded-lg border border-[#c4703f]/30 bg-[#c4703f]/10 p-2">
                   <p className="text-xs leading-relaxed text-gray-300">
                     {patternMetadata.description}
                   </p>

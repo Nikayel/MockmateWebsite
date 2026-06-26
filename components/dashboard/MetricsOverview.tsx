@@ -209,7 +209,7 @@ export function MetricsOverview() {
             <Sparkles className="mx-auto mb-2 h-8 w-8 text-gray-600" />
             <p className="mb-3 text-sm text-gray-400">Start practicing to see your insights</p>
             <Link href="/interview">
-              <Button size="sm" className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80">
+              <Button size="sm" className="bg-[#c4703f] text-white hover:bg-[#c4703f]/80">
                 Begin Practice
               </Button>
             </Link>
@@ -241,7 +241,7 @@ export function MetricsOverview() {
             Performance Insights
           </span>
           <Link href="/metrics">
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[#00d9ff] hover:text-white">
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-[#c4703f] hover:text-white">
               View All
               <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
@@ -286,10 +286,10 @@ export function MetricsOverview() {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setShowOverallScore(!showOverallScore)}
-                    className="text-gray-500 transition-colors hover:text-[#00d9ff]"
+                    className="text-gray-500 transition-colors hover:text-[#c4703f]"
                   >
                     {showOverallScore ? (
-                      <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
+                      <ToggleRight className="h-4 w-4 text-[#c4703f]" />
                     ) : (
                       <ToggleLeft className="h-4 w-4" />
                     )}

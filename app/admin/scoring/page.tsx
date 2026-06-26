@@ -55,8 +55,8 @@ import type {
 } from "@/lib/scoring/analytics-types"
 
 const ASPECT_COLORS: Record<CritiqueAspect, string> = {
-  fairness: "#00d9ff",
-  tone: "#00ff88",
+  fairness: "#c4703f",
+  tone: "#3fb883",
   accuracy: "#ff6b6b",
   actionability: "#ffd93d",
 }
@@ -329,7 +329,7 @@ export default function ScoringPage() {
   if (loading && !data) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -398,28 +398,28 @@ export default function ScoringPage() {
           <TabsList className="border border-gray-700 bg-gray-800/50 p-1">
             <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+              className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
             >
               <Scale className="mr-2 h-4 w-4" />
               Overview
             </TabsTrigger>
             <TabsTrigger
               value="interventions"
-              className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+              className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
             >
               <Brain className="mr-2 h-4 w-4" />
               Interventions
             </TabsTrigger>
             <TabsTrigger
               value="conflicts"
-              className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+              className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
             >
               <AlertTriangle className="mr-2 h-4 w-4" />
               Conflicts
             </TabsTrigger>
             <TabsTrigger
               value="trends"
-              className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+              className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
             >
               <Activity className="mr-2 h-4 w-4" />
               Trends
@@ -507,7 +507,7 @@ export default function ScoringPage() {
               <Card className="border-gray-800 bg-gray-900/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg text-white">
-                    <Shield className="h-5 w-5 text-[#00d9ff]" />
+                    <Shield className="h-5 w-5 text-[#c4703f]" />
                     Violations by Aspect
                   </CardTitle>
                   <CardDescription className="text-gray-400">
@@ -559,7 +559,7 @@ export default function ScoringPage() {
             <Card className="border-gray-800 bg-gray-900/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-white">
-                  <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+                  <BarChart3 className="h-5 w-5 text-[#c4703f]" />
                   Adjustments by Category
                 </CardTitle>
                 <CardDescription className="text-gray-400">
@@ -581,7 +581,7 @@ export default function ScoringPage() {
                         }}
                         labelStyle={{ color: "#fff" }}
                       />
-                      <Bar dataKey="increases" fill="#00ff88" name="Increases" />
+                      <Bar dataKey="increases" fill="#3fb883" name="Increases" />
                       <Bar dataKey="decreases" fill="#ff6b6b" name="Decreases" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -650,9 +650,9 @@ export default function ScoringPage() {
                           <Line
                             type="monotone"
                             dataKey="accuracyRate"
-                            stroke="#00ff88"
+                            stroke="#3fb883"
                             strokeWidth={2}
-                            dot={{ fill: "#00ff88" }}
+                            dot={{ fill: "#3fb883" }}
                             name="Accuracy %"
                           />
                         </LineChart>
@@ -685,7 +685,7 @@ export default function ScoringPage() {
                             labelStyle={{ color: "#fff" }}
                           />
                           <Bar dataKey="totalSessions" fill="#374151" name="Total Sessions" />
-                          <Bar dataKey="scoreCritiqueChanges" fill="#00d9ff" name="Score Changes" />
+                          <Bar dataKey="scoreCritiqueChanges" fill="#c4703f" name="Score Changes" />
                           <Bar
                             dataKey="feedbackCritiqueChanges"
                             fill="#ffd93d"
@@ -723,9 +723,9 @@ export default function ScoringPage() {
                           <Line
                             type="monotone"
                             dataKey="avgScoreDelta"
-                            stroke="#00d9ff"
+                            stroke="#c4703f"
                             strokeWidth={2}
-                            dot={{ fill: "#00d9ff" }}
+                            dot={{ fill: "#c4703f" }}
                             name="Avg Delta"
                           />
                         </LineChart>

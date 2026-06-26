@@ -220,7 +220,7 @@ export default function FeatureFlagsPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -247,7 +247,7 @@ export default function FeatureFlagsPage() {
           </Button>
           <Button
             onClick={handleOpenCreate}
-            className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+            className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
           >
             <Plus className="mr-2 h-4 w-4" />
             New Flag
@@ -260,8 +260,8 @@ export default function FeatureFlagsPage() {
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-[#00d9ff]/20 p-3">
-                <Flag className="h-6 w-6 text-[#00d9ff]" />
+              <div className="rounded-lg bg-[#c4703f]/20 p-3">
+                <Flag className="h-6 w-6 text-[#c4703f]" />
               </div>
               <div>
                 <p className="text-3xl font-bold text-white">{stats.total}</p>
@@ -318,7 +318,7 @@ export default function FeatureFlagsPage() {
       <Card className="border-gray-800 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
-            <Flag className="h-5 w-5 text-[#00d9ff]" />
+            <Flag className="h-5 w-5 text-[#c4703f]" />
             All Feature Flags
           </CardTitle>
         </CardHeader>
@@ -538,7 +538,7 @@ export default function FeatureFlagsPage() {
             <Button
               onClick={handleSave}
               disabled={saving || !formData.key || !formData.name}
-              className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+              className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
             >
               {saving ? "Saving..." : editingFlag ? "Update" : "Create"}
             </Button>

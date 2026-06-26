@@ -70,13 +70,13 @@ export function ProblemTeaser() {
                   <defs>
                     {/* Gradient for the forgetting curve */}
                     <linearGradient id="forgetGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#00d9ff" stopOpacity="0.8" />
+                      <stop offset="0%" stopColor="#c4703f" stopOpacity="0.8" />
                       <stop offset="100%" stopColor="#ff6b6b" stopOpacity="0.6" />
                     </linearGradient>
                     {/* Gradient for the retention curve */}
                     <linearGradient id="retainGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#00ff88" />
-                      <stop offset="100%" stopColor="#00ff88" />
+                      <stop offset="0%" stopColor="#3fb883" />
+                      <stop offset="100%" stopColor="#3fb883" />
                     </linearGradient>
                     {/* Glow filter */}
                     <filter id="glow">
@@ -144,7 +144,7 @@ export function ProblemTeaser() {
                       cx={point.cx}
                       cy={point.cy}
                       r="4"
-                      fill="#00ff88"
+                      fill="#3fb883"
                       initial={{ scale: 0, opacity: 0 }}
                       whileInView={{ scale: 1, opacity: 1 }}
                       viewport={{ once: true }}
@@ -171,7 +171,7 @@ export function ProblemTeaser() {
                   <motion.text
                     x="390"
                     y="50"
-                    fill="#00ff88"
+                    fill="#3fb883"
                     fontSize="12"
                     fontWeight="600"
                     initial={{ opacity: 0 }}

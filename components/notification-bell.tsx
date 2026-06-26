@@ -172,7 +172,7 @@ export function NotificationBell() {
                       layout
                       initial={false}
                       animate={{
-                        backgroundColor: isHovered ? "rgba(255,255,255,0.08)" : (!notification.read ? "rgba(0,217,255,0.05)" : "transparent")
+                        backgroundColor: isHovered ? "rgba(255,255,255,0.08)" : (!notification.read ? "rgba(196, 112, 63,0.05)" : "transparent")
                       }}
                       className={`relative px-4 py-3 border-b border-gray-800/50 cursor-pointer transition-all duration-200`}
                       onMouseEnter={() => setHoveredNotificationId(notification.id)}

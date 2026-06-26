@@ -95,7 +95,7 @@ export function UserAlgorithmBreakdown({
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-white">
-                <Users className="h-5 w-5 text-[#00d9ff]" />
+                <Users className="h-5 w-5 text-[#c4703f]" />
                 Users by Algorithm
               </CardTitle>
               <CardDescription>
@@ -158,7 +158,7 @@ export function UserAlgorithmBreakdown({
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
             </div>
           ) : users.length === 0 ? (
             <div className="py-12 text-center text-gray-400">No users found</div>
@@ -331,7 +331,7 @@ function PatternComparisonCard({ patternStats }: PatternComparisonCardProps) {
       <Card className="border-gray-800 bg-gray-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base text-white">
-            <BarChart3 className="h-4 w-4 text-[#00d9ff]" />
+            <BarChart3 className="h-4 w-4 text-[#c4703f]" />
             Pattern Performance by Algorithm
           </CardTitle>
           <CardDescription>No pattern data available yet</CardDescription>
@@ -363,7 +363,7 @@ function PatternComparisonCard({ patternStats }: PatternComparisonCardProps) {
     <Card className="border-gray-800 bg-gray-900/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base text-white">
-          <BarChart3 className="h-4 w-4 text-[#00d9ff]" />
+          <BarChart3 className="h-4 w-4 text-[#c4703f]" />
           Pattern Performance by Algorithm
         </CardTitle>
         <CardDescription>Average scores and mastery rates across patterns</CardDescription>

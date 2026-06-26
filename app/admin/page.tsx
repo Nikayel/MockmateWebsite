@@ -178,7 +178,7 @@ export default function AdminDashboard() {
     ([name, value]) => ({
       name: name.charAt(0).toUpperCase() + name.slice(1),
       value,
-      color: name === "easy" ? "#00ff88" : name === "medium" ? "#FBBF24" : "#EF4444",
+      color: name === "easy" ? "#3fb883" : name === "medium" ? "#FBBF24" : "#EF4444",
     })
   )
 
@@ -202,7 +202,7 @@ export default function AdminDashboard() {
           subtitle={`${metrics.users.byTier.pro} Pro (${conversionRate}%)`}
           icon={Users}
           sparklineData={metrics.timeSeries?.users.slice(-7).map((u) => u.total)}
-          sparklineColor="#00d9ff"
+          sparklineColor="#c4703f"
         />
         <MetricCard
           title="MRR"
@@ -212,7 +212,7 @@ export default function AdminDashboard() {
           valueColor="text-green-400"
           iconColor="text-green-400"
           sparklineData={metrics.timeSeries?.revenue.slice(-7).map((r) => r.mrr)}
-          sparklineColor="#00ff88"
+          sparklineColor="#3fb883"
         />
         <MetricCard
           title="Sessions"
@@ -227,7 +227,7 @@ export default function AdminDashboard() {
           value={`${metrics.sessions.avgPerformanceScore}%`}
           subtitle="Across all sessions"
           icon={TrendingUp}
-          valueColor="text-[#00d9ff]"
+          valueColor="text-[#c4703f]"
         />
       </div>
 
@@ -255,7 +255,7 @@ export default function AdminDashboard() {
             title="Revenue Trend"
             subtitle="MRR over time"
             data={metrics.timeSeries.revenue}
-            series={[{ key: "mrr", name: "MRR", color: "#00ff88" }]}
+            series={[{ key: "mrr", name: "MRR", color: "#3fb883" }]}
             icon={DollarSign}
             valueFormatter={(v) => `$${v.toLocaleString()}`}
           />
@@ -296,8 +296,8 @@ export default function AdminDashboard() {
               subtitle="Sessions started vs completed"
               data={metrics.timeSeries.sessions}
               series={[
-                { key: "total", name: "Started", color: "#00d9ff" },
-                { key: "completed", name: "Completed", color: "#00ff88" },
+                { key: "total", name: "Started", color: "#c4703f" },
+                { key: "completed", name: "Completed", color: "#3fb883" },
               ]}
               icon={Activity}
             />
@@ -321,7 +321,7 @@ export default function AdminDashboard() {
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <Zap className="h-5 w-5 text-[#00d9ff]" />
+              <Zap className="h-5 w-5 text-[#c4703f]" />
               Code Executions
             </CardTitle>
           </CardHeader>
@@ -348,7 +348,7 @@ export default function AdminDashboard() {
                       style={{ width: `${metrics.analytics.codeExecutions.passRate}%` }}
                     />
                   </div>
-                  <span className="text-[#00d9ff] font-semibold">
+                  <span className="text-[#c4703f] font-semibold">
                     {metrics.analytics.codeExecutions.passRate}%
                   </span>
                 </div>
@@ -361,7 +361,7 @@ export default function AdminDashboard() {
         <Card className="bg-gray-900/50 border-gray-800 lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <Activity className="h-5 w-5 text-[#00d9ff]" />
+              <Activity className="h-5 w-5 text-[#c4703f]" />
               Analytics Events ({metrics.analytics.totalEvents.toLocaleString()} total)
             </CardTitle>
           </CardHeader>

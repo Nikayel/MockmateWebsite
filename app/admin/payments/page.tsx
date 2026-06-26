@@ -121,7 +121,7 @@ export default function PaymentsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#c4703f]" />
       </div>
     )
   }
@@ -174,7 +174,7 @@ export default function PaymentsPage() {
           value={`$${(data?.netRevenue || 0).toFixed(2)}`}
           subtitle="Revenue - Refunds"
           icon={CreditCard}
-          valueColor="text-[#00d9ff]"
+          valueColor="text-[#c4703f]"
         />
         <MetricCard
           title="Refund Rate"

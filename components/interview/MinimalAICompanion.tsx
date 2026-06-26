@@ -91,10 +91,10 @@ export function MinimalAICompanion({
           className="h-10 w-10 rounded-full bg-gray-800/90 hover:bg-gray-700 border border-gray-600 shadow-lg backdrop-blur-sm"
           title="Open AI Assistant"
         >
-          <Bot className="h-5 w-5 text-[#00d9ff]" />
+          <Bot className="h-5 w-5 text-[#c4703f]" />
         </Button>
         {messages.length > 0 && (
-          <span className="absolute -top-1 -right-1 h-4 w-4 bg-[#00d9ff] rounded-full text-[10px] flex items-center justify-center text-black font-medium">
+          <span className="absolute -top-1 -right-1 h-4 w-4 bg-[#c4703f] rounded-full text-[10px] flex items-center justify-center text-black font-medium">
             {messages.length}
           </span>
         )}
@@ -117,8 +117,8 @@ export function MinimalAICompanion({
       >
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Bot className="h-4 w-4 text-[#00d9ff]" />
-            <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-sm opacity-30" />
+            <Bot className="h-4 w-4 text-[#c4703f]" />
+            <div className="absolute inset-0 bg-[#c4703f] rounded-full blur-sm opacity-30" />
           </div>
           <span className="text-xs font-medium text-gray-300">AI Assistant</span>
           <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
@@ -166,7 +166,7 @@ export function MinimalAICompanion({
             <Button
               onClick={handleSend}
               disabled={!input.trim() || isLoading || disabled}
-              className="h-7 w-7 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+              className="h-7 w-7 p-0 bg-[#c4703f] hover:bg-[#c4703f]/80"
             >
               <Send className="h-3 w-3" />
             </Button>
@@ -264,7 +264,7 @@ export function MinimalAICompanion({
               <Button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading || disabled}
-                className="h-7 w-7 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+                className="h-7 w-7 p-0 bg-[#c4703f] hover:bg-[#c4703f]/80"
               >
                 {isLoading ? (
                   <div className="h-3 w-3 border border-white/30 border-t-white rounded-full animate-spin" />

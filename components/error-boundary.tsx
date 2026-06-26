@@ -47,7 +47,7 @@ export class ErrorBoundary extends React.Component<
                   this.setState({ hasError: false, error: null })
                   window.location.href = "/"
                 }}
-                className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
+                className="bg-[#c4703f] text-white hover:bg-[#c4703f]/80"
               >
                 Go Home
               </Button>

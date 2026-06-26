@@ -24,7 +24,7 @@ export function StatCard({
   icon: Icon,
   color = "text-white",
   badge,
-  badgeColor = "bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30",
+  badgeColor = "bg-[#c4703f]/20 text-[#c4703f] border-[#c4703f]/30",
 }: StatCardProps) {
   return (
     <div className="flex items-center gap-2 p-3 bg-gray-800/30 rounded-lg">
@@ -59,7 +59,7 @@ export function MetricCard({
   subtitle,
   description,
   icon: Icon,
-  iconColor = "text-[#00d9ff]",
+  iconColor = "text-[#c4703f]",
   valueColor = "text-white",
   className = "",
 }: MetricCardProps) {

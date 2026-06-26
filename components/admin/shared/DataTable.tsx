@@ -84,7 +84,7 @@ export function DataTable<T>({
             <div className="flex-1">
               {title && (
                 <CardTitle className="text-white flex items-center gap-2">
-                  {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+                  {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
                   {title}
                 </CardTitle>
               )}
@@ -132,7 +132,7 @@ export function DataTable<T>({
       <CardContent>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
           </div>
         ) : data.length === 0 ? (
           <div className="text-center py-12 text-gray-400">{emptyMessage}</div>
@@ -158,7 +158,7 @@ export function DataTable<T>({
                         <div className="flex items-center gap-1">
                           {column.label}
                           {column.sortable && sortColumn === column.key && (
-                            <span className="text-[#00d9ff]">
+                            <span className="text-[#c4703f]">
                               {sortDirection === "asc" ? "↑" : "↓"}
                             </span>
                           )}

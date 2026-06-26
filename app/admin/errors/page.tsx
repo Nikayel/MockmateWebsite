@@ -108,7 +108,7 @@ export default function ErrorsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -132,7 +132,7 @@ export default function ErrorsPage() {
                 onClick={() => setTimeRange(range)}
                 className={
                   timeRange === range
-                    ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                    ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                     : "text-gray-400 hover:text-white hover:bg-gray-800"
                 }
               >

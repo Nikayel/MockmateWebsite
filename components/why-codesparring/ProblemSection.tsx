@@ -35,12 +35,12 @@ export function ProblemSection() {
               >
                 <defs>
                   <linearGradient id="forgetGradientWhy" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#00d9ff" stopOpacity="0.8" />
+                    <stop offset="0%" stopColor="#c4703f" stopOpacity="0.8" />
                     <stop offset="100%" stopColor="#ff6b6b" stopOpacity="0.6" />
                   </linearGradient>
                   <linearGradient id="retainGradientWhy" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#00ff88" />
-                    <stop offset="100%" stopColor="#00ff88" />
+                    <stop offset="0%" stopColor="#3fb883" />
+                    <stop offset="100%" stopColor="#3fb883" />
                   </linearGradient>
                   <filter id="glowWhy">
                     <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
@@ -101,7 +101,7 @@ export function ProblemSection() {
                     cx={point.cx}
                     cy={point.cy}
                     r="4"
-                    fill="#00ff88"
+                    fill="#3fb883"
                     initial={{ scale: 0, opacity: 0 }}
                     whileInView={{ scale: 1, opacity: 1 }}
                     viewport={{ once: true }}
@@ -126,7 +126,7 @@ export function ProblemSection() {
                 <motion.text
                   x="385"
                   y="50"
-                  fill="#00ff88"
+                  fill="#3fb883"
                   fontSize="11"
                   fontWeight="600"
                   initial={{ opacity: 0 }}

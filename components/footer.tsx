@@ -10,7 +10,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Logo size={24} className="text-[#00d9ff]" />
+              <Logo size={24} className="text-[#c4703f]" />
               <span className="font-heading text-xl font-bold tracking-tight">
                 <span className="text-white">Code</span>
                 <span className="text-accent">Sparring</span>

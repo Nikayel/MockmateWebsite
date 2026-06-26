@@ -99,7 +99,7 @@ function InterviewEditorInner({
       <CardHeader className="flex-shrink-0 px-6 pb-2">
         <CardTitle className="flex items-center justify-between text-xs text-white">
           <div className="flex items-center space-x-1">
-            <Code className="h-3 w-3 text-[#00d9ff]" />
+            <Code className="h-3 w-3 text-[#c4703f]" />
             <span>
               {selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.
               {getFileExtension(selectedLanguage)}
@@ -174,7 +174,7 @@ function InterviewEditorInner({
             {/* Terminal Content */}
             <div className="flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs">
               <div className="mb-2 text-gray-400">
-                <span className="text-[#00d9ff]">$</span> Running tests...
+                <span className="text-[#c4703f]">$</span> Running tests...
               </div>
 
               {/* Individual Test Results */}

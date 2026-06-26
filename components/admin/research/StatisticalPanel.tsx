@@ -165,7 +165,7 @@ export function PredictionAccuracyPanel({
     <Card className="border-gray-700 bg-gradient-to-r from-gray-900/80 to-gray-800/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+          <BarChart3 className="h-5 w-5 text-[#c4703f]" />
           Prediction Accuracy Comparison
         </CardTitle>
         <CardDescription>How well each algorithm predicts user recall</CardDescription>
@@ -273,7 +273,7 @@ export function SampleSizeAnalysisPanel({ analysis }: SampleSizeAnalysisPanelPro
     <Card className="border-gray-800 bg-gray-900/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <BarChart3 className="h-4 w-4 text-[#00d9ff]" />
+          <BarChart3 className="h-4 w-4 text-[#c4703f]" />
           Sample Size Analysis
         </CardTitle>
       </CardHeader>
@@ -377,7 +377,7 @@ export function QualityScorePanel({ qualityScore }: QualityScorePanelProps) {
     <Card className="border-gray-800 bg-gray-900/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+          <CheckCircle className="h-4 w-4 text-[#c4703f]" />
           Research Quality Score
         </CardTitle>
       </CardHeader>
@@ -451,7 +451,7 @@ export function RecommendationsPanel({ recommendations }: RecommendationsPanelPr
     <Card className="border-gray-700 bg-gradient-to-r from-gray-900/80 to-gray-800/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-[#00d9ff]" />
+          <TrendingUp className="h-5 w-5 text-[#c4703f]" />
           Research Recommendations
         </CardTitle>
         <CardDescription>Actionable insights based on current data</CardDescription>
@@ -468,7 +468,7 @@ export function RecommendationsPanel({ recommendations }: RecommendationsPanelPr
               </div>
               <p className="text-sm text-gray-300">{rec.description}</p>
               {rec.action && (
-                <p className="mt-2 text-sm text-[#00d9ff]">
+                <p className="mt-2 text-sm text-[#c4703f]">
                   <strong>Action:</strong> {rec.action}
                 </p>
               )}

@@ -127,7 +127,7 @@ function Section({
         className="flex w-full items-center justify-between bg-gray-800 p-3 transition-colors hover:bg-gray-700"
       >
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-[#00d9ff]" />
+          <Icon className="h-4 w-4 text-[#c4703f]" />
           <span className="font-medium text-white">{title}</span>
         </div>
         {isOpen ? (
@@ -172,7 +172,7 @@ function StatItem({
 function ProgressBar({
   value,
   max = 100,
-  color = "bg-[#00d9ff]",
+  color = "bg-[#c4703f]",
 }: {
   value: number
   max?: number
@@ -255,7 +255,7 @@ export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfil
             <div className="space-y-4 p-4">
               {loading && (
                 <div className="flex items-center justify-center py-20">
-                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#00d9ff]" />
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#c4703f]" />
                 </div>
               )}
 
@@ -264,7 +264,7 @@ export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfil
                   <p className="text-red-400">{error}</p>
                   <button
                     onClick={loadProfile}
-                    className="mt-2 text-sm text-[#00d9ff] hover:underline"
+                    className="mt-2 text-sm text-[#c4703f] hover:underline"
                   >
                     Retry
                   </button>

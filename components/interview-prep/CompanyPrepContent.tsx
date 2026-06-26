@@ -395,7 +395,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-medium text-white">Get a {company.name} study plan</h3>
             {isLoggedIn && !isProLoading && !isPro && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00d9ff]/10 border border-[#00d9ff]/30 text-[10px] font-medium text-[#00d9ff]">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#c4703f]/10 border border-[#c4703f]/30 text-[10px] font-medium text-[#c4703f]">
                 <Crown className="h-2.5 w-2.5" />
                 Pro
               </span>
@@ -431,7 +431,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
           ) : (
             // Free user - show upgrade CTA
             <Link href="/upgrade">
-              <Button size="sm" className="w-full bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90 text-xs">
+              <Button size="sm" className="w-full bg-[#c4703f] text-black hover:bg-[#c4703f]/90 text-xs">
                 <Crown className="mr-1.5 h-3 w-3" />
                 Upgrade to Pro
               </Button>

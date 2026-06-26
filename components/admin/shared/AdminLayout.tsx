@@ -32,7 +32,7 @@ export function AdminLayout({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-[#00d9ff]" />
+        <Loader2 className="h-12 w-12 animate-spin text-[#c4703f]" />
       </div>
     )
   }
@@ -58,7 +58,7 @@ export function AdminLayout({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-heading font-bold text-white flex items-center gap-2">
-            {Icon && <Icon className="h-8 w-8 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-8 w-8 text-[#c4703f]" />}
             {title}
           </h1>
           {description && <p className="text-gray-400 mt-1">{description}</p>}
@@ -141,7 +141,7 @@ export function TimeRangeSelector({
           onClick={() => onChange(range)}
           className={
             value === range
-              ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+              ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
               : "text-gray-400 hover:text-white hover:bg-gray-800"
           }
         >

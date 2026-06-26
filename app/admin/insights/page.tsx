@@ -142,7 +142,7 @@ export default function InsightsEffectivenessPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#c4703f]" />
       </div>
     )
   }
@@ -179,7 +179,7 @@ export default function InsightsEffectivenessPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-3 text-2xl font-bold text-white">
-            <Lightbulb className="h-7 w-7 text-[#00d9ff]" />
+            <Lightbulb className="h-7 w-7 text-[#c4703f]" />
             Insight Effectiveness
           </h1>
           <p className="mt-1 text-sm text-gray-400">
@@ -316,7 +316,7 @@ export default function InsightsEffectivenessPage() {
                           {/* Progress bar */}
                           <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-700">
                             <div
-                              className="h-full bg-gradient-to-r from-[#00d9ff] to-[#00ff88]"
+                              className="h-full bg-gradient-to-r from-[#c4703f] to-[#3fb883]"
                               style={{ width: `${Math.min(completionRate, 100)}%` }}
                             />
                           </div>
@@ -353,7 +353,7 @@ export default function InsightsEffectivenessPage() {
                     <div key={day.date} className="flex flex-1 flex-col items-center gap-1">
                       <span className="text-xs text-gray-400">{day.interactions}</span>
                       <div
-                        className="w-full rounded-t bg-gradient-to-t from-[#00d9ff] to-[#00ff88]"
+                        className="w-full rounded-t bg-gradient-to-t from-[#c4703f] to-[#3fb883]"
                         style={{ height: `${Math.max(height, 4)}%` }}
                       />
                       <span className="text-[10px] text-gray-500">

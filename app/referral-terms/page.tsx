@@ -219,7 +219,7 @@ export default function ReferralTermsPage() {
         <div className="text-center text-gray-400 text-sm">
           <p>
             Questions about the referral program?{" "}
-            <Link href="/contact" className="text-[#00d9ff] hover:underline">
+            <Link href="/contact" className="text-[#c4703f] hover:underline">
               Contact us
             </Link>
           </p>

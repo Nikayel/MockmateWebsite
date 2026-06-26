@@ -66,12 +66,12 @@ export default function DocsPage() {
             transition={{ duration: 0.6 }}
             className="max-w-3xl"
           >
-            <Badge className="bg-[#00d9ff]/10 text-[#00d9ff] border-[#00d9ff]/20 mb-6">
+            <Badge className="bg-[#c4703f]/10 text-[#c4703f] border-[#c4703f]/20 mb-6">
               Documentation
             </Badge>
             <h1 className="text-5xl md:text-7xl font-heading font-bold text-white mb-6 leading-tight">
               Get
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#00d9ff] to-[#00ff88]">
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#c4703f] to-[#3fb883]">
                 Started
               </span>
             </h1>
@@ -106,7 +106,7 @@ export default function DocsPage() {
               >
                 <div className="text-6xl font-bold text-gray-900 mb-4">{item.step}</div>
                 <div className="flex items-center gap-3 mb-2">
-                  <item.icon className="h-5 w-5 text-[#00d9ff]" />
+                  <item.icon className="h-5 w-5 text-[#c4703f]" />
                   <h3 className="text-lg font-semibold text-white">{item.title}</h3>
                 </div>
                 <p className="text-gray-500 text-sm">{item.desc}</p>
@@ -141,12 +141,12 @@ export default function DocsPage() {
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <feature.icon className="h-8 w-8 text-[#00d9ff] mb-4" />
+                  <feature.icon className="h-8 w-8 text-[#c4703f] mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-4">{feature.title}</h3>
                   <ul className="space-y-2">
                     {feature.items.map((item) => (
                       <li key={item} className="text-gray-500 flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-[#00ff88]" />
+                        <span className="w-1 h-1 rounded-full bg-[#3fb883]" />
                         {item}
                       </li>
                     ))}

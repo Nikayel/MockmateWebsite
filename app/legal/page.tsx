@@ -21,7 +21,7 @@ export default function LegalPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Legal Information</Badge>
+            <Badge className="bg-[#c4703f]/20 text-[#c4703f] border-[#c4703f]/30 mb-6">Legal Information</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               Legal &<span className="text-gradient"> Privacy</span>
             </h1>
@@ -40,15 +40,15 @@ export default function LegalPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <nav className="flex flex-wrap justify-center gap-4 text-sm">
-              <a href="#privacy-policy" className="text-[#00d9ff] hover:underline">Privacy Policy</a>
+              <a href="#privacy-policy" className="text-[#c4703f] hover:underline">Privacy Policy</a>
               <span className="text-gray-600">|</span>
-              <a href="#terms-of-service" className="text-[#00d9ff] hover:underline">Terms of Service</a>
+              <a href="#terms-of-service" className="text-[#c4703f] hover:underline">Terms of Service</a>
               <span className="text-gray-600">|</span>
-              <a href="#cookie-policy" className="text-[#00d9ff] hover:underline">Cookie Policy</a>
+              <a href="#cookie-policy" className="text-[#c4703f] hover:underline">Cookie Policy</a>
               <span className="text-gray-600">|</span>
-              <a href="#data-processing" className="text-[#00d9ff] hover:underline">Data Processing</a>
+              <a href="#data-processing" className="text-[#c4703f] hover:underline">Data Processing</a>
               <span className="text-gray-600">|</span>
-              <a href="#contact" className="text-[#00d9ff] hover:underline">Contact</a>
+              <a href="#contact" className="text-[#c4703f] hover:underline">Contact</a>
             </nav>
           </div>
         </div>
@@ -62,7 +62,7 @@ export default function LegalPage() {
             <Card id="privacy-policy" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Eye className="h-6 w-6 text-[#00d9ff]" />
+                  <Eye className="h-6 w-6 text-[#c4703f]" />
                   <span>Privacy Policy</span>
                 </CardTitle>
               </CardHeader>
@@ -71,8 +71,8 @@ export default function LegalPage() {
                   <strong>Last updated:</strong> {lastUpdated} | <strong>Effective:</strong> {effectiveDate}
                 </p>
 
-                <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
-                  <p className="text-[#00d9ff] text-sm">
+                <div className="bg-[#c4703f]/10 border border-[#c4703f]/20 rounded-lg p-4">
+                  <p className="text-[#c4703f] text-sm">
                     <strong>Summary:</strong> We collect data to provide AI-powered interview practice. Your code and conversations are processed by AI providers to generate feedback. We never sell your data. You can delete your account and all data at any time.
                   </p>
                 </div>
@@ -86,7 +86,7 @@ export default function LegalPage() {
                 {/* Information We Collect */}
                 <div>
                   <h4 className="text-white font-semibold mt-6 mb-3 flex items-center">
-                    <Database className="h-4 w-4 mr-2 text-[#00d9ff]" />
+                    <Database className="h-4 w-4 mr-2 text-[#c4703f]" />
                     Information We Collect
                   </h4>
 
@@ -156,7 +156,7 @@ export default function LegalPage() {
                 {/* Third-Party Service Providers */}
                 <div>
                   <h4 className="text-white font-semibold mt-6 mb-3 flex items-center">
-                    <Globe className="h-4 w-4 mr-2 text-[#00d9ff]" />
+                    <Globe className="h-4 w-4 mr-2 text-[#c4703f]" />
                     Third-Party Service Providers
                   </h4>
                   <p className="text-sm mb-4">
@@ -240,7 +240,7 @@ export default function LegalPage() {
                 {/* International Data Transfers */}
                 <div>
                   <h4 className="text-white font-semibold mt-6 mb-3 flex items-center">
-                    <Globe className="h-4 w-4 mr-2 text-[#00d9ff]" />
+                    <Globe className="h-4 w-4 mr-2 text-[#c4703f]" />
                     International Data Transfers
                   </h4>
                   <p className="text-sm mb-3">
@@ -286,7 +286,7 @@ export default function LegalPage() {
                 {/* Data Security */}
                 <div>
                   <h4 className="text-white font-semibold mt-6 mb-3 flex items-center">
-                    <Lock className="h-4 w-4 mr-2 text-[#00d9ff]" />
+                    <Lock className="h-4 w-4 mr-2 text-[#c4703f]" />
                     Data Security
                   </h4>
                   <p className="text-sm mb-3">We implement industry-standard security measures:</p>
@@ -306,7 +306,7 @@ export default function LegalPage() {
             <Card id="terms-of-service" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <FileText className="h-6 w-6 text-[#00d9ff]" />
+                  <FileText className="h-6 w-6 text-[#c4703f]" />
                   <span>Terms of Service</span>
                 </CardTitle>
               </CardHeader>
@@ -429,7 +429,7 @@ export default function LegalPage() {
                 {/* Limitation of Liability */}
                 <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                   <h4 className="text-white font-semibold mb-3 flex items-center">
-                    <Scale className="h-4 w-4 mr-2 text-[#00d9ff]" />
+                    <Scale className="h-4 w-4 mr-2 text-[#c4703f]" />
                     Limitation of Liability
                   </h4>
                   <p className="text-sm mb-3">
@@ -510,7 +510,7 @@ export default function LegalPage() {
             <Card id="cookie-policy" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Cookie className="h-6 w-6 text-[#00d9ff]" />
+                  <Cookie className="h-6 w-6 text-[#c4703f]" />
                   <span>Cookie Policy</span>
                 </CardTitle>
               </CardHeader>
@@ -593,7 +593,7 @@ export default function LegalPage() {
             <Card id="data-processing" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Lock className="h-6 w-6 text-[#00d9ff]" />
+                  <Lock className="h-6 w-6 text-[#c4703f]" />
                   <span>Your Data Rights (GDPR & CCPA)</span>
                 </CardTitle>
               </CardHeader>
@@ -634,8 +634,8 @@ export default function LegalPage() {
                 </div>
 
                 {/* How to Exercise Rights */}
-                <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
-                  <h4 className="text-[#00d9ff] font-semibold mb-3">How to Exercise Your Rights</h4>
+                <div className="bg-[#c4703f]/10 border border-[#c4703f]/20 rounded-lg p-4">
+                  <h4 className="text-[#c4703f] font-semibold mb-3">How to Exercise Your Rights</h4>
                   <ul className="list-disc list-inside space-y-2 text-sm">
                     <li><strong className="text-white">Access & Export:</strong> Go to Account Settings &rarr; &quot;Export My Data&quot;</li>
                     <li><strong className="text-white">Delete Account:</strong> Go to Account Settings &rarr; &quot;Delete My Account&quot;</li>
@@ -664,7 +664,7 @@ export default function LegalPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Bell className="h-6 w-6 text-[#00d9ff]" />
+                  <Bell className="h-6 w-6 text-[#c4703f]" />
                   <span>Data Breach Notification Policy</span>
                 </CardTitle>
               </CardHeader>
@@ -692,7 +692,7 @@ export default function LegalPage() {
                   <h4 className="text-white font-semibold mt-4 mb-3">Report a Security Concern</h4>
                   <p className="text-sm">
                     If you discover a security vulnerability or suspect unauthorized access to your account,
-                    please report it immediately to <strong className="text-[#00d9ff]">security@codesparring.dev</strong>.
+                    please report it immediately to <strong className="text-[#c4703f]">security@codesparring.dev</strong>.
                     We take all reports seriously and will investigate promptly.
                   </p>
                 </div>
@@ -702,7 +702,7 @@ export default function LegalPage() {
             <Card id="contact" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Shield className="h-6 w-6 text-[#00d9ff]" />
+                  <Shield className="h-6 w-6 text-[#c4703f]" />
                   <span>Contact & Compliance</span>
                 </CardTitle>
               </CardHeader>
@@ -715,21 +715,21 @@ export default function LegalPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">General Legal Inquiries</h5>
-                    <p className="text-sm text-[#00d9ff]">legal@codesparring.dev</p>
+                    <p className="text-sm text-[#c4703f]">legal@codesparring.dev</p>
                   </div>
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">Privacy & Data Requests</h5>
-                    <p className="text-sm text-[#00d9ff]">privacy@codesparring.dev</p>
+                    <p className="text-sm text-[#c4703f]">privacy@codesparring.dev</p>
                     <p className="text-xs text-gray-400 mt-1">Response within 72 hours</p>
                   </div>
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">Security Concerns</h5>
-                    <p className="text-sm text-[#00d9ff]">security@codesparring.dev</p>
+                    <p className="text-sm text-[#c4703f]">security@codesparring.dev</p>
                     <p className="text-xs text-gray-400 mt-1">For vulnerability reports</p>
                   </div>
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">Customer Support</h5>
-                    <p className="text-sm text-[#00d9ff]">support@codesparring.dev</p>
+                    <p className="text-sm text-[#c4703f]">support@codesparring.dev</p>
                   </div>
                 </div>
 

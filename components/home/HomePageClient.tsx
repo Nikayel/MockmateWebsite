@@ -40,7 +40,7 @@ export function HomePageClient({ header, footer, marketingContent }: HomePageCli
   if (user) {
     return (
       <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </main>
     )
   }

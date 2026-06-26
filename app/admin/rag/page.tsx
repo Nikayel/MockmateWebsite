@@ -334,7 +334,7 @@ export default function RAGHealthPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -360,7 +360,7 @@ export default function RAGHealthPage() {
           <Button
             onClick={runQuickEval}
             disabled={runningEval}
-            className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+            className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
           >
             {runningEval ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -443,7 +443,7 @@ export default function RAGHealthPage() {
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white">
-                <TrendingUp className="h-5 w-5 text-[#00d9ff]" />
+                <TrendingUp className="h-5 w-5 text-[#c4703f]" />
                 Component Health
               </CardTitle>
             </CardHeader>
@@ -478,7 +478,7 @@ export default function RAGHealthPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-white">
-                    <BookOpen className="h-5 w-5 text-[#00d9ff]" />
+                    <BookOpen className="h-5 w-5 text-[#c4703f]" />
                     Knowledge Base
                     {healthData.knowledgeBaseStatus?.needsSync && (
                       <Badge className="ml-2 border-yellow-600/30 bg-yellow-600/20 text-yellow-400">
@@ -513,7 +513,7 @@ export default function RAGHealthPage() {
                     disabled={seeding}
                     variant="outline"
                     size="sm"
-                    className="border-[#00d9ff]/30 text-[#00d9ff] hover:bg-[#00d9ff]/10"
+                    className="border-[#c4703f]/30 text-[#c4703f] hover:bg-[#c4703f]/10"
                   >
                     {seeding && seedingCategories.length === 0 ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -568,7 +568,7 @@ export default function RAGHealthPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div
-                            className={category.needsSync ? "text-yellow-400" : "text-[#00d9ff]"}
+                            className={category.needsSync ? "text-yellow-400" : "text-[#c4703f]"}
                           >
                             {getCategoryIcon(category.category)}
                           </div>
@@ -643,7 +643,7 @@ export default function RAGHealthPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-white">
-                    <FileCode className="h-5 w-5 text-[#00d9ff]" />
+                    <FileCode className="h-5 w-5 text-[#c4703f]" />
                     Interview Scenarios
                   </CardTitle>
                   <CardDescription className="text-gray-400">
@@ -653,7 +653,7 @@ export default function RAGHealthPage() {
                 <Button
                   onClick={vectorizeScenarios}
                   disabled={vectorizingScenarios}
-                  className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                  className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                   size="sm"
                 >
                   {vectorizingScenarios ? (
@@ -668,7 +668,7 @@ export default function RAGHealthPage() {
             <CardContent>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-4">
-                  <div className="flex items-center gap-2 text-[#00d9ff]">
+                  <div className="flex items-center gap-2 text-[#c4703f]">
                     <FileCode className="h-4 w-4" />
                     <span className="text-sm font-medium text-white">DSA Problems</span>
                   </div>
@@ -678,7 +678,7 @@ export default function RAGHealthPage() {
                   <p className="text-xs text-gray-500">vectors in Pinecone</p>
                 </div>
                 <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-4">
-                  <div className="flex items-center gap-2 text-[#00d9ff]">
+                  <div className="flex items-center gap-2 text-[#c4703f]">
                     <Server className="h-4 w-4" />
                     <span className="text-sm font-medium text-white">System Design</span>
                   </div>
@@ -688,7 +688,7 @@ export default function RAGHealthPage() {
                   <p className="text-xs text-gray-500">vectors in Pinecone</p>
                 </div>
                 <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-4">
-                  <div className="flex items-center gap-2 text-[#00d9ff]">
+                  <div className="flex items-center gap-2 text-[#c4703f]">
                     <Bug className="h-4 w-4" />
                     <span className="text-sm font-medium text-white">Bug Fix</span>
                   </div>
@@ -708,7 +708,7 @@ export default function RAGHealthPage() {
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white">
-                <Search className="h-5 w-5 text-[#00d9ff]" />
+                <Search className="h-5 w-5 text-[#c4703f]" />
                 Retrieval Metrics (24h)
               </CardTitle>
             </CardHeader>
@@ -772,7 +772,7 @@ export default function RAGHealthPage() {
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white">
-                <Cpu className="h-5 w-5 text-[#00d9ff]" />
+                <Cpu className="h-5 w-5 text-[#c4703f]" />
                 Embedding Provider Usage
               </CardTitle>
             </CardHeader>
@@ -802,7 +802,7 @@ export default function RAGHealthPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <Search className="h-5 w-5 text-[#00d9ff]" />
+                  <Search className="h-5 w-5 text-[#c4703f]" />
                   Quick Evaluation Results
                 </CardTitle>
                 <CardDescription className="text-gray-400">
@@ -904,19 +904,19 @@ export default function RAGHealthPage() {
             <div className="rounded bg-gray-800 p-3">
               <span className="text-gray-400"># Full RAG evaluation (more test cases)</span>
               <br />
-              <span className="text-[#00d9ff]">npx tsx scripts/eval-rag.ts</span>
+              <span className="text-[#c4703f]">npx tsx scripts/eval-rag.ts</span>
             </div>
             <div className="rounded bg-gray-800 p-3">
               <span className="text-gray-400">
                 # Vectorize all problems (or use &quot;Vectorize All&quot; button above)
               </span>
               <br />
-              <span className="text-[#00d9ff]">npx tsx scripts/vectorize-problems.ts</span>
+              <span className="text-[#c4703f]">npx tsx scripts/vectorize-problems.ts</span>
             </div>
             <div className="rounded bg-gray-800 p-3">
               <span className="text-gray-400"># Setup Pinecone index</span>
               <br />
-              <span className="text-[#00d9ff]">npx tsx scripts/setup-pinecone.ts</span>
+              <span className="text-[#c4703f]">npx tsx scripts/setup-pinecone.ts</span>
             </div>
           </div>
         </CardContent>

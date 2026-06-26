@@ -117,7 +117,7 @@ export const InterviewDialogs = memo(function InterviewDialogs({
                 onShowCloseDialogChange(false)
                 onCloseInterview()
               }}
-              className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
+              className="bg-[#c4703f] text-white hover:bg-[#c4703f]/80"
             >
               Close Interview
             </AlertDialogAction>

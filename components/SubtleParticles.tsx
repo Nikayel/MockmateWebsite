@@ -22,7 +22,7 @@ interface ParticleFieldProps {
   speed?: number;
 }
 
-function ParticleField({ count = 30, color = '#00d9ff', speed = 0.3 }: ParticleFieldProps) {
+function ParticleField({ count = 30, color = '#c4703f', speed = 0.3 }: ParticleFieldProps) {
   const pointsRef = useRef<THREE.Points>(null);
 
   // Generate random positions
@@ -82,8 +82,8 @@ export interface SubtleParticlesProps {
 export const SubtleParticles = React.memo(function SubtleParticles({
   className = '',
   particleCount = 25,
-  primaryColor = '#00d9ff',
-  secondaryColor = '#00ff88',
+  primaryColor = '#c4703f',
+  secondaryColor = '#3fb883',
 }: SubtleParticlesProps) {
   const [isClient, setIsClient] = useState(false);
   const [shouldRender, setShouldRender] = useState(true);

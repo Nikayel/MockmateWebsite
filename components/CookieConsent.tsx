@@ -122,13 +122,13 @@ export function CookieConsent() {
           // Main Banner
           <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
             <div className="flex items-start gap-3 flex-1">
-              <Cookie className="h-6 w-6 text-[#00d9ff] flex-shrink-0 mt-1" />
+              <Cookie className="h-6 w-6 text-[#c4703f] flex-shrink-0 mt-1" />
               <div>
                 <h3 className="text-white font-semibold mb-1">We value your privacy</h3>
                 <p className="text-gray-400 text-sm">
                   We use cookies and similar technologies to improve your experience, analyze traffic, and personalize content.
                   By clicking "Accept All", you consent to our use of cookies.{" "}
-                  <Link href="/legal" className="text-[#00d9ff] hover:underline">
+                  <Link href="/legal" className="text-[#c4703f] hover:underline">
                     Learn more
                   </Link>
                 </p>
@@ -154,7 +154,7 @@ export function CookieConsent() {
               <Button
                 onClick={acceptAll}
                 size="sm"
-                className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90"
+                className="bg-[#c4703f] text-black hover:bg-[#c4703f]/90"
               >
                 Accept All
               </Button>
@@ -165,7 +165,7 @@ export function CookieConsent() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-[#00d9ff]" />
+                <Shield className="h-5 w-5 text-[#c4703f]" />
                 <h3 className="text-white font-semibold">Cookie Preferences</h3>
               </div>
               <button
@@ -196,7 +196,7 @@ export function CookieConsent() {
                   type="checkbox"
                   checked={preferences.analytics}
                   onChange={(e) => setPreferences({ ...preferences, analytics: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-[#00d9ff] focus:ring-[#00d9ff] focus:ring-offset-gray-900"
+                  className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-[#c4703f] focus:ring-[#c4703f] focus:ring-offset-gray-900"
                 />
               </label>
 
@@ -210,7 +210,7 @@ export function CookieConsent() {
                   type="checkbox"
                   checked={preferences.functional}
                   onChange={(e) => setPreferences({ ...preferences, functional: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-[#00d9ff] focus:ring-[#00d9ff] focus:ring-offset-gray-900"
+                  className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-[#c4703f] focus:ring-[#c4703f] focus:ring-offset-gray-900"
                 />
               </label>
             </div>
@@ -227,7 +227,7 @@ export function CookieConsent() {
               <Button
                 onClick={saveCustomPreferences}
                 size="sm"
-                className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90"
+                className="bg-[#c4703f] text-black hover:bg-[#c4703f]/90"
               >
                 Save Preferences
               </Button>

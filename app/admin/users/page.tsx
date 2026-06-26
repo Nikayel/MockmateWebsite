@@ -206,7 +206,7 @@ export default function UsersPage() {
               value={metrics.users.total}
               icon={Users}
               sparklineData={metrics.timeSeries?.users.slice(-7).map((u: any) => u.total)}
-              sparklineColor="#00d9ff"
+              sparklineColor="#c4703f"
             />
             <MetricCard
               title="Pro Users"
@@ -340,7 +340,7 @@ export default function UsersPage() {
         <CardContent>
           {usersLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
             </div>
           ) : users.length === 0 ? (
             <div className="py-12 text-center text-gray-400">No users found</div>
@@ -430,7 +430,7 @@ export default function UsersPage() {
                                 setSelectedUserId(user.id)
                                 setProfileDrawerOpen(true)
                               }}
-                              className="text-[#00d9ff] hover:bg-[#00d9ff]/10 hover:text-[#00d9ff]/80"
+                              className="text-[#c4703f] hover:bg-[#c4703f]/10 hover:text-[#c4703f]/80"
                               title="View Profile"
                             >
                               <Eye className="h-4 w-4" />

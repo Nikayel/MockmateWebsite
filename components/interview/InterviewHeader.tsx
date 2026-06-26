@@ -88,7 +88,7 @@ export function InterviewHeader({
         )}
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-[#00d9ff]">
+          <div className="flex items-center gap-1.5 text-[#c4703f]">
             {getTypeIcon(scenario.type)}
           </div>
           <h1 className="text-sm font-medium text-white truncate max-w-[200px] md:max-w-[400px]">
@@ -138,7 +138,7 @@ export function InterviewHeader({
             size="sm"
             onClick={onSubmit}
             disabled={isSubmitting}
-            className="h-8 bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black font-medium"
+            className="h-8 bg-[#c4703f] hover:bg-[#c4703f]/80 text-black font-medium"
           >
             {isSubmitting ? (
               <div className="h-4 w-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />

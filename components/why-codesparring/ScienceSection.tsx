@@ -38,8 +38,8 @@ export function ScienceSection({ sciencePrinciples }: ScienceSectionProps) {
     <section className="py-24 bg-gradient-to-b from-black via-gray-950 to-black relative overflow-hidden">
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-0 left-0 w-full h-full" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #00d9ff 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #00ff88 1px, transparent 1px)`,
+          backgroundImage: `radial-gradient(circle at 25% 25%, #c4703f 1px, transparent 1px),
+                           radial-gradient(circle at 75% 75%, #3fb883 1px, transparent 1px)`,
           backgroundSize: '60px 60px'
         }} />
       </div>

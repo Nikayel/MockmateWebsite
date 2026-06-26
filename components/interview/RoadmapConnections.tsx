@@ -21,8 +21,8 @@ export function RoadmapConnections({ connections }: RoadmapConnectionsProps) {
     >
       <defs>
         <linearGradient id="activeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#00d9ff" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#00d9ff" stopOpacity="0.4" />
+          <stop offset="0%" stopColor="#c4703f" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#c4703f" stopOpacity="0.4" />
         </linearGradient>
         <linearGradient id="inactiveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#374151" stopOpacity="0.6" />

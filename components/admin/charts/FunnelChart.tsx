@@ -30,7 +30,7 @@ export function FunnelChart({
       <Card className="bg-gray-900/50 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
             {title}
           </CardTitle>
         </CardHeader>
@@ -50,7 +50,7 @@ export function FunnelChart({
       <Card className="bg-gray-900/50 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
             {title}
           </CardTitle>
         </CardHeader>
@@ -65,8 +65,8 @@ export function FunnelChart({
 
   const maxValue = Math.max(...stages.map((s) => s.value))
   const defaultColors = [
-    "#00d9ff", // cyan
-    "#00ff88", // green
+    "#c4703f", // cyan
+    "#3fb883", // green
     "#FBBF24", // yellow
     "#F97316", // orange
     "#EF4444", // red
@@ -77,7 +77,7 @@ export function FunnelChart({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center gap-2">
-            {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
             {title}
           </CardTitle>
           {subtitle && (

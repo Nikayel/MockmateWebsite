@@ -79,7 +79,7 @@ export default function FunnelPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -103,7 +103,7 @@ export default function FunnelPage() {
                 onClick={() => setTimeRange(range)}
                 className={
                   timeRange === range
-                    ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                    ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                     : "text-gray-400 hover:text-white hover:bg-gray-800"
                 }
               >
@@ -154,10 +154,10 @@ export default function FunnelPage() {
           ].map((rate) => (
             <Card
               key={rate.label}
-              className={`border-gray-800 ${rate.highlight ? "bg-[#00d9ff]/10 border-[#00d9ff]/30" : "bg-gray-900/50"}`}
+              className={`border-gray-800 ${rate.highlight ? "bg-[#c4703f]/10 border-[#c4703f]/30" : "bg-gray-900/50"}`}
             >
               <CardContent className="p-4 text-center">
-                <div className={`text-2xl font-bold ${rate.highlight ? "text-[#00d9ff]" : "text-white"}`}>
+                <div className={`text-2xl font-bold ${rate.highlight ? "text-[#c4703f]" : "text-white"}`}>
                   {rate.value.toFixed(1)}%
                 </div>
                 <p className="text-xs text-gray-400 mt-1">{rate.label}</p>
@@ -174,9 +174,9 @@ export default function FunnelPage() {
           subtitle="Daily signups, sessions, and completions"
           data={funnel.trend}
           series={[
-            { key: "signups", name: "Signups", color: "#00d9ff" },
+            { key: "signups", name: "Signups", color: "#c4703f" },
             { key: "sessions", name: "Sessions", color: "#FBBF24" },
-            { key: "completed", name: "Completed", color: "#00ff88" },
+            { key: "completed", name: "Completed", color: "#3fb883" },
           ]}
           icon={TrendingUp}
         />
@@ -194,7 +194,7 @@ export default function FunnelPage() {
               onClick={() => setCohortType(type)}
               className={
                 cohortType === type
-                  ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                  ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                   : "text-gray-400 hover:text-white hover:bg-gray-800"
               }
             >

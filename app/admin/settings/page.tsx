@@ -257,7 +257,7 @@ export default function AdminSettingsPage() {
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
             className={
               activeTab === tab.id
-                ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                 : "text-gray-400 hover:text-white hover:bg-gray-800"
             }
           >
@@ -276,7 +276,7 @@ export default function AdminSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-white flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-[#00d9ff]" />
+                    <Shield className="h-5 w-5 text-[#c4703f]" />
                     Admin Users
                   </CardTitle>
                   <CardDescription className="text-gray-400">
@@ -285,7 +285,7 @@ export default function AdminSettingsPage() {
                 </div>
                 <Button
                   onClick={() => setShowAddForm(!showAddForm)}
-                  className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                  className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Admin
@@ -341,7 +341,7 @@ export default function AdminSettingsPage() {
                     <Button
                       onClick={handleAddAdmin}
                       disabled={addingAdmin || !newAdminEmail || !newAdminUserId}
-                      className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                      className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
                     >
                       {addingAdmin ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -369,7 +369,7 @@ export default function AdminSettingsPage() {
                       className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg border border-gray-700/50 hover:border-gray-600/50 transition-colors"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#00d9ff] to-[#00ff88]">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#c4703f] to-[#3fb883]">
                           <User className="h-5 w-5 text-black" />
                         </div>
                         <div>
@@ -476,7 +476,7 @@ export default function AdminSettingsPage() {
               <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-blue-300 text-sm">
-                  Pricing is currently managed in <code className="bg-blue-900/30 px-1.5 py-0.5 rounded text-[#00d9ff]">lib/config.ts</code>.
+                  Pricing is currently managed in <code className="bg-blue-900/30 px-1.5 py-0.5 rounded text-[#c4703f]">lib/config.ts</code>.
                   Changes require a code deployment.
                 </p>
                 <p className="text-blue-400/70 text-xs mt-1">
@@ -520,7 +520,7 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-800">
                       <span className="text-gray-400">AI Budget Cap</span>
-                      <span className="text-[#00d9ff] font-medium">${tier.aiBudgetCap}/month</span>
+                      <span className="text-[#c4703f] font-medium">${tier.aiBudgetCap}/month</span>
                     </div>
                     <div className="flex justify-between py-2">
                       <span className="text-gray-400">Sessions/Month</span>
@@ -538,7 +538,7 @@ export default function AdminSettingsPage() {
           <Card className="bg-gray-900/50 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-[#00d9ff]" />
+                <Cpu className="h-5 w-5 text-[#c4703f]" />
                 AI Budget Caps
               </CardTitle>
               <CardDescription className="text-gray-400">
@@ -569,7 +569,7 @@ export default function AdminSettingsPage() {
           <Card className="bg-gray-900/50 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-[#00d9ff]" />
+                <Cpu className="h-5 w-5 text-[#c4703f]" />
                 AI Provider Costs
               </CardTitle>
               <CardDescription className="text-gray-400">
@@ -584,8 +584,8 @@ export default function AdminSettingsPage() {
                     className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg border border-gray-700/50"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#00d9ff]/20 to-[#00ff88]/20 flex items-center justify-center">
-                        <Cpu className="h-5 w-5 text-[#00d9ff]" />
+                      <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[#c4703f]/20 to-[#3fb883]/20 flex items-center justify-center">
+                        <Cpu className="h-5 w-5 text-[#c4703f]" />
                       </div>
                       <div>
                         <span className="text-white font-medium">
@@ -597,7 +597,7 @@ export default function AdminSettingsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[#00ff88] font-mono text-lg">
+                      <span className="text-[#3fb883] font-mono text-lg">
                         ${provider.costPer1kTokens.toFixed(6)}
                       </span>
                       <span className="text-gray-500 text-sm block">/1K tokens</span>
@@ -654,7 +654,7 @@ export default function AdminSettingsPage() {
                     key={env.key}
                     className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg"
                   >
-                    <code className="text-[#00d9ff] font-mono text-sm">{env.key}</code>
+                    <code className="text-[#c4703f] font-mono text-sm">{env.key}</code>
                     <span className="text-gray-500 text-sm">{env.provider}</span>
                   </div>
                 ))}

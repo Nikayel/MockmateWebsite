@@ -374,7 +374,7 @@ export default function MetricsPage() {
                       className="flex items-center gap-1.5 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
                     >
                       {showOverallScore ? (
-                        <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
+                        <ToggleRight className="h-4 w-4 text-[#c4703f]" />
                       ) : (
                         <ToggleLeft className="h-4 w-4" />
                       )}

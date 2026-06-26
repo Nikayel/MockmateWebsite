@@ -153,7 +153,7 @@ function NeuralNetworkScene({ nodeCount = 50, mousePosition }: NeuralNetworkScen
       <Points ref={pointsRef} positions={positions} stride={3} frustumCulled={false}>
         <PointMaterial
           transparent
-          color="#00d9ff"
+          color="#c4703f"
           size={0.1}
           sizeAttenuation={true}
           depthWrite={false}
@@ -168,7 +168,7 @@ function NeuralNetworkScene({ nodeCount = 50, mousePosition }: NeuralNetworkScen
           <Line
             key={`connection-${i}`}
             points={[conn.start, conn.end]}
-            color="#00ff88"
+            color="#3fb883"
             lineWidth={1}
             transparent
             opacity={0.3}
@@ -179,7 +179,7 @@ function NeuralNetworkScene({ nodeCount = 50, mousePosition }: NeuralNetworkScen
 
       {/* Ambient lighting */}
       <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} intensity={0.8} color="#00d9ff" />
+      <pointLight position={[10, 10, 10]} intensity={0.8} color="#c4703f" />
     </group>
   );
 }

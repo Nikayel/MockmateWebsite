@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
             style={{
               fontSize: 180,
               fontWeight: 900,
-              color: '#00d9ff',
+              color: '#c4703f',
             }}
           >
             {'<'}
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
             style={{
               fontSize: 120,
               fontWeight: 900,
-              color: '#00d9ff',
+              color: '#c4703f',
             }}
           >
             ⚡
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
             style={{
               fontSize: 180,
               fontWeight: 900,
-              color: '#00ff88',
+              color: '#3fb883',
             }}
           >
             {'>'}

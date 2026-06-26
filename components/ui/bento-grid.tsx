@@ -75,7 +75,7 @@ export function BentoCard({
         'bg-card p-6 md:p-8',
         'transition-all duration-500',
         'hover:border-accent/30',
-        glow && 'hover:shadow-[0_0_30px_rgba(0,217,255,0.1)]',
+        glow && 'hover:shadow-[0_0_30px_rgba(196, 112, 63,0.1)]',
         spanStyles[span],
         className
       )}

@@ -71,7 +71,7 @@ export default function SessionsPage() {
     ? Object.entries(metrics.sessions.byDifficulty).map(([name, value]) => ({
         name: name.charAt(0).toUpperCase() + name.slice(1),
         value: value as number,
-        color: name === "easy" ? "#00ff88" : name === "medium" ? "#FBBF24" : "#EF4444",
+        color: name === "easy" ? "#3fb883" : name === "medium" ? "#FBBF24" : "#EF4444",
       }))
     : []
 
@@ -95,7 +95,7 @@ export default function SessionsPage() {
               value={metrics.sessions.total}
               icon={Terminal}
               sparklineData={metrics.timeSeries?.sessions.slice(-7).map((s: any) => s.total)}
-              sparklineColor="#00d9ff"
+              sparklineColor="#c4703f"
             />
             <MetricCard
               title="Completed"
@@ -115,7 +115,7 @@ export default function SessionsPage() {
               title="Avg Score"
               value={`${metrics.sessions.avgPerformanceScore}%`}
               icon={TrendingUp}
-              valueColor="text-[#00d9ff]"
+              valueColor="text-[#c4703f]"
             />
           </div>
 
@@ -126,8 +126,8 @@ export default function SessionsPage() {
               subtitle="Sessions started vs completed"
               data={metrics.timeSeries.sessions}
               series={[
-                { key: "total", name: "Started", color: "#00d9ff" },
-                { key: "completed", name: "Completed", color: "#00ff88" },
+                { key: "total", name: "Started", color: "#c4703f" },
+                { key: "completed", name: "Completed", color: "#3fb883" },
               ]}
               icon={Terminal}
             />
@@ -158,7 +158,7 @@ export default function SessionsPage() {
           <Card className="bg-gray-900/50 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Zap className="h-5 w-5 text-[#00d9ff]" />
+                <Zap className="h-5 w-5 text-[#c4703f]" />
                 Code Execution Statistics
               </CardTitle>
             </CardHeader>
@@ -177,7 +177,7 @@ export default function SessionsPage() {
                   <p className="text-gray-400 text-sm mt-1">Passed</p>
                 </div>
                 <div className="text-center p-4 bg-gray-800/50 rounded-lg">
-                  <div className="text-3xl font-bold text-[#00d9ff]">
+                  <div className="text-3xl font-bold text-[#c4703f]">
                     {metrics.analytics.codeExecutions.passRate}%
                   </div>
                   <p className="text-gray-400 text-sm mt-1">Pass Rate</p>

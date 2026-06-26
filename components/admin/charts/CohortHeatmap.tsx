@@ -46,7 +46,7 @@ export function CohortHeatmap({
       <Card className="bg-gray-900/50 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
             {title}
           </CardTitle>
         </CardHeader>
@@ -64,7 +64,7 @@ export function CohortHeatmap({
       <Card className="bg-gray-900/50 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
             {title}
           </CardTitle>
         </CardHeader>
@@ -86,7 +86,7 @@ export function CohortHeatmap({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center gap-2">
-            {Icon && <Icon className="h-5 w-5 text-[#00d9ff]" />}
+            {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
             {title}
           </CardTitle>
           {subtitle && (

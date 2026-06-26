@@ -405,7 +405,7 @@ export default function AIUsagePage() {
       key: "tokens",
       label: "Tokens",
       align: "right",
-      render: (value) => <span className="font-mono text-[#00d9ff]">{formatTokens(value)}</span>,
+      render: (value) => <span className="font-mono text-[#c4703f]">{formatTokens(value)}</span>,
     },
     {
       key: "cost",
@@ -458,7 +458,7 @@ export default function AIUsagePage() {
       key: "tokens",
       label: "Total Tokens",
       align: "right",
-      render: (value) => <span className="font-mono text-[#00d9ff]">{formatTokens(value)}</span>,
+      render: (value) => <span className="font-mono text-[#c4703f]">{formatTokens(value)}</span>,
     },
     {
       key: "avgTokensPerRequest",
@@ -483,7 +483,7 @@ export default function AIUsagePage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
       </div>
     )
   }
@@ -547,35 +547,35 @@ export default function AIUsagePage() {
         <TabsList className="border border-gray-700 bg-gray-800/50 p-1">
           <TabsTrigger
             value="overview"
-            className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+            className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
           >
             <Zap className="mr-2 h-4 w-4" />
             Overview
           </TabsTrigger>
           <TabsTrigger
             value="sessions"
-            className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+            className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
           >
             <FileText className="mr-2 h-4 w-4" />
             Sessions
           </TabsTrigger>
           <TabsTrigger
             value="scenarios"
-            className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+            className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
           >
             <Target className="mr-2 h-4 w-4" />
             Problems
           </TabsTrigger>
           <TabsTrigger
             value="users"
-            className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+            className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
           >
             <Users className="mr-2 h-4 w-4" />
             Users
           </TabsTrigger>
           <TabsTrigger
             value="providers"
-            className="data-[state=active]:bg-[#00d9ff] data-[state=active]:text-black"
+            className="data-[state=active]:bg-[#c4703f] data-[state=active]:text-black"
           >
             <Cpu className="mr-2 h-4 w-4" />
             Providers
@@ -622,7 +622,7 @@ export default function AIUsagePage() {
                 <Card className="border-gray-800 bg-gray-900/50">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg text-white">
-                      <Zap className="h-5 w-5 text-[#00d9ff]" />
+                      <Zap className="h-5 w-5 text-[#c4703f]" />
                       Cost by Service
                     </CardTitle>
                   </CardHeader>
@@ -676,7 +676,7 @@ export default function AIUsagePage() {
                   <Card className="border-gray-800 bg-gray-900/50">
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-lg text-white">
-                        <Target className="h-5 w-5 text-[#00d9ff]" />
+                        <Target className="h-5 w-5 text-[#c4703f]" />
                         Top Patterns by Cost
                       </CardTitle>
                     </CardHeader>
@@ -795,7 +795,7 @@ export default function AIUsagePage() {
             <Card className="border-gray-800 bg-gray-900/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <Users className="h-5 w-5 text-[#00d9ff]" />
+                  <Users className="h-5 w-5 text-[#c4703f]" />
                   User AI Costs
                 </CardTitle>
                 <CardDescription className="text-gray-400">
@@ -833,7 +833,7 @@ export default function AIUsagePage() {
                                 ? "bg-red-500"
                                 : user.budgetUsedPercent > 50
                                   ? "bg-yellow-500"
-                                  : "bg-[#00ff88]"
+                                  : "bg-[#3fb883]"
                             }`}
                             style={{ width: `${Math.min(100, user.budgetUsedPercent)}%` }}
                           />
@@ -858,7 +858,7 @@ export default function AIUsagePage() {
             <Card className="border-gray-800 bg-gray-900/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <Cpu className="h-5 w-5 text-[#00d9ff]" />
+                  <Cpu className="h-5 w-5 text-[#c4703f]" />
                   Provider Pricing
                 </CardTitle>
                 <CardDescription className="text-gray-400">
@@ -873,7 +873,7 @@ export default function AIUsagePage() {
                       className="flex items-center justify-between rounded-lg bg-gray-800/30 p-3"
                     >
                       <span className="text-white">{provider.displayName}</span>
-                      <span className="font-mono text-[#00ff88]">
+                      <span className="font-mono text-[#3fb883]">
                         ${provider.costPer1kTokens.toFixed(6)}/1K
                       </span>
                     </div>
@@ -886,7 +886,7 @@ export default function AIUsagePage() {
             <Card className="border-gray-800 bg-gray-900/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <DollarSign className="h-5 w-5 text-[#00d9ff]" />
+                  <DollarSign className="h-5 w-5 text-[#c4703f]" />
                   Budget Caps by Tier
                 </CardTitle>
               </CardHeader>
@@ -953,7 +953,7 @@ export default function AIUsagePage() {
             <div className="space-y-4 p-4">
               {loadingUserDetails ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
                 </div>
               ) : userDetails ? (
                 <>
@@ -1083,7 +1083,7 @@ export default function AIUsagePage() {
             <AlertDialogAction
               onClick={handleSetBudget}
               disabled={settingBudget || !newBudget}
-              className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+              className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
             >
               {settingBudget ? "Setting..." : "Set Budget"}
             </AlertDialogAction>
