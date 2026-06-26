@@ -140,10 +140,10 @@ export function AIAssistedSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <p className="mb-4 text-sm tracking-widest text-gray-500 uppercase">
+            <p className="text-muted-foreground mb-4 text-sm tracking-widest uppercase">
               How our AI grades you
             </p>
-            <h2 className="font-heading text-3xl font-bold tracking-tight text-white md:text-4xl">
+            <h2 className="font-heading text-foreground text-3xl font-bold tracking-tight md:text-4xl">
               Real Interview Scoring
             </h2>
           </motion.div>
@@ -157,7 +157,7 @@ export function AIAssistedSection() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            <p className="mb-7 text-center text-xs tracking-widest text-gray-500 uppercase">
+            <p className="text-muted-foreground mb-7 text-center text-xs tracking-widest uppercase">
               What you&apos;re evaluated on
             </p>
 
@@ -203,10 +203,12 @@ export function AIAssistedSection() {
                       className="mx-auto mb-2 h-2 w-2 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
-                    <div className="text-[11px] leading-tight font-semibold tracking-wide text-gray-400">
+                    <div className="text-muted-foreground text-[11px] leading-tight font-semibold tracking-wide">
                       {item.label}
                     </div>
-                    <div className="text-[10px] font-medium text-gray-600">{item.percent}%</div>
+                    <div className="text-muted-foreground/70 text-[10px] font-medium">
+                      {item.percent}%
+                    </div>
                   </div>
                 ))}
               </div>
@@ -222,10 +224,10 @@ export function AIAssistedSection() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            <p className="mb-4 text-lg leading-relaxed text-gray-300">
-              The goal: Can you <span className="font-medium text-white">solve problems</span>,{" "}
-              <span className="font-medium text-white">explain your thinking</span>, and{" "}
-              <span className="font-medium text-white">write clean code</span>?
+            <p className="text-muted-foreground mb-4 text-lg leading-relaxed">
+              The goal: Can you <span className="text-foreground font-medium">solve problems</span>,{" "}
+              <span className="text-foreground font-medium">explain your thinking</span>, and{" "}
+              <span className="text-foreground font-medium">write clean code</span>?
             </p>
           </motion.div>
         </ScrollReveal>
