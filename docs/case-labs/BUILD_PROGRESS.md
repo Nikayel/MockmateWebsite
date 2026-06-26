@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 5
-**Last updated by loop:** Phase 5 — interviewer chat wired into the shell (AI spine live)
+**Last updated by loop:** Phase 5 — `/labs` gallery + CaseLabCard
 
 ---
 
@@ -39,7 +39,7 @@
 
 ## Phase 5 — AI spine + browse + polish (spec §7, §8; only after 0–4 solid)
 - [x] Pass `currentMilestone` into chat; milestone-aware reactions + company persona
-- [ ] `/labs` gallery (filter by company/skill; show progress)
+- [x] `/labs` gallery (basic listing + CaseLabCard; filter-by-company/skill + progress = later polish)
 - [ ] `CaseLabIntro` start screen + Practice/Onsite mode toggle
 - [ ] Loading / empty / error / unauthorized states on all new surfaces
 - [ ] Analytics events (lab started, milestone completed, lab completed, mode used)
@@ -81,3 +81,4 @@
 - Phase 4 (complete — playable): `app/labs/[labId]/page.tsx` — loads the lab via `getCaseLabById`, resumes via `useCaseLabRunSync` or starts a fresh run (new store `startRun` action: client uuid id, clarify active, rest locked), renders `CaseLabShell`. Lab-not-found + back-to-/labs handled. The 911 Dispatch lab is now playable end-to-end Clarify→Decompose→Design→Build(codebase)→Review with autosave/resume and AI feedback. typecheck + lint clean; graph updated.
 - Phase 5 (AI spine, server): `lib/labs/case-lab-chat.ts` — pure `buildCaseLabChatSystemPrompt` (company persona + per-milestone coaching + optional answer context) + `generateCaseLabChatReply` (reuses `generateAIResponse`, `chat_message` event). Decision: a dedicated `/api/labs/chat` endpoint rather than threading the 864-line interview `/api/chat` (it's tightly coupled to interview scenarios/phases) — same persona/milestone goal, far less risk. Added `case-lab-chat.test.ts` (3 tests, pass). Chat UI in `chatSlot` next. typecheck + lint + tests clean; graph updated.
 - Phase 5 (AI spine, UI): `components/labs/CaseLabChat.tsx` — right-column interviewer; sends `{milestone, messages, lab persona, answer-summary context}` to `/api/labs/chat`, renders the conversation (user/assistant bubbles, typing spinner, empty + soft-error states, Enter-to-send), attaches auth token. Wired into the play route via `chatSlot`. The AI is now engaged across every milestone — **DoD item "AI interviewer engaged across milestones" met**. typecheck + lint clean; graph updated.
+- Phase 5 (browse): `app/labs/page.tsx` gallery + `components/labs/CaseLabCard.tsx` (company/role, difficulty badge via shared `difficultyColorClass`, why-this-company teaser, skills, est. minutes, Start → play route). Empty state handled; fixes the play route's previously-dangling `/labs` back-link. Filter-by-company/skill + progress badges deferred to polish. typecheck + lint clean; graph updated.
