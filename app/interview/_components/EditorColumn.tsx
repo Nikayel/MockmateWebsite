@@ -4,7 +4,6 @@ import { memo, type RefObject } from "react"
 import {
   BookOpen,
   Bot,
-  CheckCircle,
   ChevronDown,
   ChevronUp,
   Code,
@@ -15,14 +14,12 @@ import {
   RotateCcw,
   Send,
 } from "lucide-react"
-import { toast } from "sonner"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { CodeMirrorEditor, type CodeMirrorEditorRef } from "@/components/editor"
 import {
-  CodeConsole,
   type ConsoleOutput,
   type TestResult,
   type TestSummary,
@@ -30,8 +27,9 @@ import {
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import type { Scenario } from "@/lib/scenarios"
 import type { EditorLanguage, WorkspaceContextFile } from "../_types"
-import { isLanguageSupported } from "../_utils/language"
 import { isWorkspaceScenario } from "../_utils/workspace"
+import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
+import { TestResultsPanel } from "./_sub/TestResultsPanel"
 
 interface MiniChatMessage {
   type: "user" | "ai"
@@ -115,27 +113,9 @@ export const EditorColumn = memo(function EditorColumn({
   editorRef,
   onGoToLine,
 }: EditorColumnProps) {
-  const runWithLanguageGuard = (action: () => void, actionName: "run tests" | "submit") => {
-    if (!isLanguageSupported(selectedLanguage)) {
-      toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
-        description:
-          actionName === "run tests"
-            ? "Switch to JavaScript or Python to run tests."
-            : "Switch to JavaScript or Python to submit.",
-        duration: 6000,
-        action: {
-          label: "Use JavaScript",
-          onClick: () => onSelectedLanguageChange("javascript"),
-        },
-      })
-      return
-    }
-    action()
-  }
-
   return (
     <Card
-      className={`editor-panel-card glass-effect order-2 h-full flex-col gap-0 overflow-hidden border-border bg-card/50 py-0 ${
+      className={`editor-panel-card glass-effect border-border bg-card/50 order-2 h-full flex-col gap-0 overflow-hidden py-0 ${
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
@@ -144,7 +124,7 @@ export const EditorColumn = memo(function EditorColumn({
         workspaceContext &&
         workspaceContext.length > 0 ? (
           <div
-            className="flex w-full items-center justify-between border-b border-border bg-card/80 pr-4"
+            className="border-border bg-card/80 flex w-full items-center justify-between border-b pr-4"
             data-bugfix-tour={selectedScenario?.type === "bugfix" ? "workspace-files" : undefined}
           >
             <div className="workspace-tabs-container no-scrollbar flex flex-1 overflow-x-auto">
@@ -190,10 +170,10 @@ export const EditorColumn = memo(function EditorColumn({
                     onClick={() => onFileSelect && onFileSelect(file)}
                     title={`${roleDescription}: ${file.path}`}
                     aria-label={`Open ${roleDescription.toLowerCase()} ${file.path}`}
-                    className={`workspace-tab-button flex items-center gap-1.5 border-r border-border px-3 py-2 text-xs whitespace-nowrap transition-colors ${
+                    className={`workspace-tab-button border-border flex items-center gap-1.5 border-r px-3 py-2 text-xs whitespace-nowrap transition-colors ${
                       isActive
                         ? `border-b-2 ${activeBorderClass} bg-muted text-foreground`
-                        : "border-b-2 border-b-transparent bg-card/50 text-muted-foreground hover:bg-muted/80 hover:text-muted-foreground"
+                        : "bg-card/50 text-muted-foreground hover:bg-muted/80 hover:text-muted-foreground border-b-2 border-b-transparent"
                     }`}
                   >
                     <RoleIcon className={`h-3.5 w-3.5 ${iconColor}`} />
@@ -222,7 +202,7 @@ export const EditorColumn = memo(function EditorColumn({
                   type="button"
                   variant="outline"
                   onClick={onResetActiveFile}
-                  className="h-8 border-border bg-card px-2 text-xs text-muted-foreground hover:bg-muted"
+                  className="border-border bg-card text-muted-foreground hover:bg-muted h-8 px-2 text-xs"
                   title="Reset active file"
                   aria-label="Reset active file"
                 >
@@ -234,7 +214,7 @@ export const EditorColumn = memo(function EditorColumn({
                   type="button"
                   variant="outline"
                   onClick={onResetWorkspace}
-                  className="h-8 border-border bg-card px-2 text-xs text-muted-foreground hover:bg-muted"
+                  className="border-border bg-card text-muted-foreground hover:bg-muted h-8 px-2 text-xs"
                   title="Reset workspace"
                   aria-label="Reset workspace"
                 >
@@ -253,7 +233,7 @@ export const EditorColumn = memo(function EditorColumn({
           </div>
         ) : (
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <CardTitle className="flex w-full items-center justify-between text-xs text-foreground">
+            <CardTitle className="text-foreground flex w-full items-center justify-between text-xs">
               <div className="flex items-center space-x-1">
                 <Code className="text-accent h-3 w-3" />
                 {selectedScenario?.type === "system-design" ? (
@@ -284,7 +264,7 @@ export const EditorColumn = memo(function EditorColumn({
       </CardHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
-        <div className="relative min-h-0 flex-1 overflow-auto rounded border border-border">
+        <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
           <ErrorBoundary>
             <CodeMirrorEditor
               ref={editorRef}
@@ -300,13 +280,13 @@ export const EditorColumn = memo(function EditorColumn({
             />
           </ErrorBoundary>
           {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm">
+            <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm">
               <div className="max-h-full max-w-md p-2 text-center sm:p-6">
                 <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
                   <PlayCircle className="text-accent h-8 w-8" />
                 </div>
-                <h3 className="mb-2 text-xl font-bold text-foreground">Ready to Start?</h3>
-                <p className="mb-4 text-sm text-muted-foreground">
+                <h3 className="text-foreground mb-2 text-xl font-bold">Ready to Start?</h3>
+                <p className="text-muted-foreground mb-4 text-sm">
                   Review the problem on the left, then start your interview when ready. The timer
                   will begin once you start.
                 </p>
@@ -317,7 +297,7 @@ export const EditorColumn = memo(function EditorColumn({
                   <PlayCircle className="mr-2 h-5 w-5" />
                   Start Interview
                 </Button>
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className="text-muted-foreground mt-3 text-xs">
                   Estimated time: {selectedScenario.estimatedTime || 30} minutes
                 </p>
               </div>
@@ -326,105 +306,65 @@ export const EditorColumn = memo(function EditorColumn({
         </div>
 
         {isInterviewStarted && selectedScenario?.type !== "system-design" && (
-          <CodeConsole
-            outputs={editorConsoleOutputs}
+          <ConsoleOutputPanel
+            editorConsoleOutputs={editorConsoleOutputs}
             testResults={testResults}
             testSummary={testSummary}
-            isRunning={isRunningTests}
-            className="max-h-[32vh] min-h-[140px]"
-            onClear={onClearConsole}
+            isRunningTests={isRunningTests}
+            onClearConsole={onClearConsole}
             onGoToLine={onGoToLine}
           />
         )}
 
-        {selectedScenario?.type === "system-design" ? (
-          <div className="flex flex-shrink-0 flex-col gap-2">
-            <div className="text-right text-xs text-muted-foreground">
-              Document your design decisions above, then submit when ready
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                onClick={onSubmitSystemDesign}
-                disabled={showFeedback || showPostInterviewDiscussion}
-                loading={isRunningTests}
-                className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold"
-                aria-label={isRunningTests ? "Submitting design..." : "Submit Design"}
-              >
-                {!isRunningTests && <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
-                {isRunningTests ? "Submitting..." : "Submit Design"}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-shrink-0 items-center justify-end gap-2">
-            {!isLanguageSupported(selectedLanguage) && (
-              <span className="mr-1 text-xs text-amber-300">Use JS/Python to run tests</span>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => runWithLanguageGuard(onRunCode, "run tests")}
-              disabled={showFeedback || isRunningTests}
-              className={`${
-                isLanguageSupported(selectedLanguage)
-                  ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
-                  : "border-border bg-muted text-muted-foreground hover:bg-muted"
-              }`}
-              aria-label={isRunningTests ? "Running tests" : "Run tests"}
-              data-bugfix-tour={selectedScenario?.type === "bugfix" ? "run-tests" : undefined}
-            >
-              {!isRunningTests && <PlayCircle className="mr-1 h-4 w-4" aria-hidden="true" />}
-              {isRunningTests ? "Running..." : "Run Tests"}
-            </Button>
-            <Button
-              onClick={() => runWithLanguageGuard(onSubmitCode, "submit")}
-              disabled={showFeedback || isRunningTests}
-              className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold"
-              aria-label={selectedScenario?.type === "bugfix" ? "Submit fix" : "Submit solution"}
-            >
-              <Send className="mr-1 h-4 w-4" aria-hidden="true" />
-              {selectedScenario?.type === "bugfix" ? "Submit Fix" : "Submit"}
-            </Button>
-          </div>
-        )}
+        <TestResultsPanel
+          selectedScenario={selectedScenario}
+          selectedLanguage={selectedLanguage}
+          isRunningTests={isRunningTests}
+          showFeedback={showFeedback}
+          showPostInterviewDiscussion={showPostInterviewDiscussion}
+          onSubmitSystemDesign={onSubmitSystemDesign}
+          onRunCode={onRunCode}
+          onSubmitCode={onSubmitCode}
+          onSelectedLanguageChange={onSelectedLanguageChange}
+        />
 
         {selectedScenario && selectedScenario.type !== "dsa" && (
-          <div className="flex-shrink-0 border-t border-border pt-2">
+          <div className="border-border flex-shrink-0 border-t pt-2">
             {!isAIPartnerExpanded ? (
               <button
                 type="button"
-                className="focus:ring-accent/60 flex w-full cursor-pointer items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted focus:ring-2 focus:outline-none"
+                className="focus:ring-accent/60 bg-muted/50 hover:bg-muted flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-left transition-colors focus:ring-2 focus:outline-none"
                 onClick={() => onAIPartnerExpandedChange(true)}
                 data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
               >
                 <div className="flex items-center gap-2">
                   <Bot className="text-accent h-4 w-4" />
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {selectedScenario.type === "bugfix" ? "Debugging Partner" : "Interview Partner"}
                   </span>
-                  <span className="text-xs text-muted-foreground">· optional</span>
+                  <span className="text-muted-foreground text-xs">· optional</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {chatMessages.length > 0 && (
-                    <span className="text-xs text-muted-foreground">{chatMessages.length} msg</span>
+                    <span className="text-muted-foreground text-xs">{chatMessages.length} msg</span>
                   )}
-                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                  <ChevronUp className="text-muted-foreground h-3 w-3" />
                 </div>
               </button>
             ) : (
               <div
-                className="rounded-md border border-border/60 bg-muted/30 p-3"
+                className="border-border/60 bg-muted/30 rounded-md border p-3"
                 data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Bot className="text-accent h-4 w-4" />
-                    <span className="text-xs font-medium text-foreground">
+                    <span className="text-foreground text-xs font-medium">
                       {selectedScenario.type === "bugfix"
                         ? "Debugging Partner"
                         : "Interview Partner"}
                     </span>
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[11px]">
                       optional
                     </span>
                   </div>
@@ -432,7 +372,7 @@ export const EditorColumn = memo(function EditorColumn({
                     variant="ghost"
                     size="sm"
                     onClick={() => onAIPartnerExpandedChange(false)}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
                     aria-label="Collapse debugging partner"
                   >
                     <ChevronDown className="h-4 w-4" />
@@ -441,7 +381,7 @@ export const EditorColumn = memo(function EditorColumn({
 
                 <div className="mb-2 max-h-[120px] space-y-1 overflow-y-auto">
                   {chatMessages.length === 0 ? (
-                    <p className="py-2 text-center text-xs text-muted-foreground">
+                    <p className="text-muted-foreground py-2 text-center text-xs">
                       {selectedScenario.type === "bugfix"
                         ? "Ask for a debugging nudge after you inspect the files"
                         : "Ask for hints, not solutions"}
@@ -453,7 +393,7 @@ export const EditorColumn = memo(function EditorColumn({
                         className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded px-2 py-1 text-xs ${msg.type === "user" ? "bg-cyan-700/80 text-foreground" : "bg-muted text-foreground"}`}
+                          className={`max-w-[85%] rounded px-2 py-1 text-xs ${msg.type === "user" ? "text-foreground bg-cyan-700/80" : "bg-muted text-foreground"}`}
                         >
                           <MarkdownRenderer content={msg.message} className="text-xs break-words" />
                         </div>
@@ -472,7 +412,7 @@ export const EditorColumn = memo(function EditorColumn({
                         ? "Ask for a debugging nudge..."
                         : "Quick question..."
                     }
-                    className="h-8 flex-1 rounded-md border border-border bg-card px-3 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-cyan-300 focus:outline-none"
+                    className="border-border bg-card text-foreground placeholder:text-muted-foreground h-8 flex-1 rounded-md border px-3 py-1 text-xs focus:ring-2 focus:ring-cyan-300 focus:outline-none"
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && !isLoadingChat) {
                         onSendPartnerMessage()
@@ -487,7 +427,7 @@ export const EditorColumn = memo(function EditorColumn({
                     aria-label="Send debugging partner message"
                   >
                     {isLoadingChat ? (
-                      <div className="h-3 w-3 animate-spin rounded-full border border-border border-t-white" />
+                      <div className="border-border h-3 w-3 animate-spin rounded-full border border-t-white" />
                     ) : (
                       <Send className="h-3.5 w-3.5" />
                     )}
