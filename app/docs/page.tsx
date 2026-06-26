@@ -53,7 +53,7 @@ const shortcuts = [
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section */}
@@ -69,13 +69,13 @@ export default function DocsPage() {
             <Badge className="bg-[#c4703f]/10 text-[#c4703f] border-[#c4703f]/20 mb-6">
               Documentation
             </Badge>
-            <h1 className="text-5xl md:text-7xl font-heading font-bold text-white mb-6 leading-tight">
+            <h1 className="text-5xl md:text-7xl font-heading font-bold text-foreground mb-6 leading-tight">
               Get
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#c4703f] to-[#3fb883]">
                 Started
               </span>
             </h1>
-            <p className="text-xl text-gray-400 max-w-xl leading-relaxed">
+            <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
               Everything you need to master coding interviews with CodeSparring.
             </p>
           </motion.div>
@@ -83,13 +83,13 @@ export default function DocsPage() {
       </section>
 
       {/* Quick Start - Horizontal flow */}
-      <section className="py-24 bg-black">
+      <section className="py-24 bg-background">
         <div className="container mx-auto px-4">
           <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="text-gray-500 text-sm uppercase tracking-widest mb-12"
+            className="text-muted-foreground text-sm uppercase tracking-widest mb-12"
           >
             Quick Start
           </motion.p>
@@ -104,14 +104,14 @@ export default function DocsPage() {
                 transition={{ delay: index * 0.1 }}
                 className="relative"
               >
-                <div className="text-6xl font-bold text-gray-900 mb-4">{item.step}</div>
+                <div className="text-6xl font-bold text-foreground mb-4">{item.step}</div>
                 <div className="flex items-center gap-3 mb-2">
                   <item.icon className="h-5 w-5 text-[#c4703f]" />
-                  <h3 className="text-lg font-semibold text-white">{item.title}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{item.title}</h3>
                 </div>
-                <p className="text-gray-500 text-sm">{item.desc}</p>
+                <p className="text-muted-foreground text-sm">{item.desc}</p>
                 {index < quickStart.length - 1 && (
-                  <ArrowRight className="hidden md:block absolute top-8 -right-3 h-4 w-4 text-gray-800" />
+                  <ArrowRight className="hidden md:block absolute top-8 -right-3 h-4 w-4 text-foreground" />
                 )}
               </motion.div>
             ))}
@@ -120,14 +120,14 @@ export default function DocsPage() {
       </section>
 
       {/* Features - Clean list */}
-      <section className="py-24 bg-black border-t border-gray-900">
+      <section className="py-24 bg-background border-t border-border">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <motion.p
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-gray-500 text-sm uppercase tracking-widest mb-12"
+              className="text-muted-foreground text-sm uppercase tracking-widest mb-12"
             >
               Core Features
             </motion.p>
@@ -142,10 +142,10 @@ export default function DocsPage() {
                   transition={{ delay: index * 0.1 }}
                 >
                   <feature.icon className="h-8 w-8 text-[#c4703f] mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-4">{feature.title}</h3>
+                  <h3 className="text-xl font-semibold text-foreground mb-4">{feature.title}</h3>
                   <ul className="space-y-2">
                     {feature.items.map((item) => (
-                      <li key={item} className="text-gray-500 flex items-center gap-2">
+                      <li key={item} className="text-muted-foreground flex items-center gap-2">
                         <span className="w-1 h-1 rounded-full bg-[#3fb883]" />
                         {item}
                       </li>
@@ -159,7 +159,7 @@ export default function DocsPage() {
       </section>
 
       {/* Keyboard Shortcuts */}
-      <section className="py-24 bg-black border-t border-gray-900">
+      <section className="py-24 bg-background border-t border-border">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto">
             <motion.div
@@ -168,8 +168,8 @@ export default function DocsPage() {
               viewport={{ once: true }}
               className="flex items-center gap-3 mb-12"
             >
-              <Keyboard className="h-5 w-5 text-gray-500" />
-              <p className="text-gray-500 text-sm uppercase tracking-widest">
+              <Keyboard className="h-5 w-5 text-muted-foreground" />
+              <p className="text-muted-foreground text-sm uppercase tracking-widest">
                 Keyboard Shortcuts
               </p>
             </motion.div>
@@ -182,10 +182,10 @@ export default function DocsPage() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between py-3 border-b border-gray-900"
+                  className="flex items-center justify-between py-3 border-b border-border"
                 >
-                  <span className="text-gray-400">{shortcut.action}</span>
-                  <kbd className="px-3 py-1 rounded bg-gray-900 text-gray-300 font-mono text-sm">
+                  <span className="text-muted-foreground">{shortcut.action}</span>
+                  <kbd className="px-3 py-1 rounded bg-card text-muted-foreground font-mono text-sm">
                     {shortcut.key}
                   </kbd>
                 </motion.div>
@@ -196,28 +196,28 @@ export default function DocsPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-24 bg-black border-t border-gray-900">
+      <section className="py-24 bg-background border-t border-border">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl font-heading font-bold text-white mb-4">
+            <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
               Ready to practice?
             </h2>
-            <p className="text-gray-400 mb-8 max-w-md mx-auto">
+            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
               Start your first mock interview and get AI-powered feedback instantly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/interview">
-                <Button size="lg" className="bg-white text-black hover:bg-gray-100 rounded-full px-8">
+                <Button size="lg" className="bg-card text-foreground hover:bg-muted rounded-full px-8">
                   Start Practicing
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/samples">
-                <Button size="lg" variant="outline" className="border-gray-800 text-white hover:bg-gray-900 rounded-full px-8 bg-transparent">
+                <Button size="lg" variant="outline" className="border-border text-foreground hover:bg-card rounded-full px-8 bg-transparent">
                   View Samples
                   <ExternalLink className="ml-2 h-4 w-4" />
                 </Button>

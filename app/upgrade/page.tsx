@@ -212,14 +212,14 @@ function UpgradePageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <Header />
 
       <div className="pt-20 pb-6">
         <div className="container mx-auto max-w-4xl px-4">
           {/* Minimal Header */}
           <div className="mb-4 text-center">
-            <h1 className="text-2xl font-bold text-white md:text-3xl">Choose Your Plan</h1>
+            <h1 className="text-2xl font-bold text-foreground md:text-3xl">Choose Your Plan</h1>
           </div>
 
           {/* Billing Toggle - Inline */}
@@ -230,8 +230,8 @@ function UpgradePageContent() {
                   onClick={() => setBillingPeriod("monthly")}
                   className={`rounded-full px-3 py-1 transition-all ${
                     billingPeriod === "monthly"
-                      ? "bg-white/10 text-white"
-                      : "text-gray-500 hover:text-white"
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Monthly
@@ -240,8 +240,8 @@ function UpgradePageContent() {
                   onClick={() => setBillingPeriod("yearly")}
                   className={`rounded-full px-3 py-1 transition-all ${
                     billingPeriod === "yearly"
-                      ? "bg-white/10 text-white"
-                      : "text-gray-500 hover:text-white"
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Annually
@@ -258,7 +258,7 @@ function UpgradePageContent() {
             <div className="mx-auto mb-4 grid max-w-xl grid-cols-1 gap-4">
               {/* Pro Plan */}
               <div className="from-accent/5 border-accent/50 rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
-                <h3 className="mb-3 text-base font-semibold text-white">Pro</h3>
+                <h3 className="mb-3 text-base font-semibold text-foreground">Pro</h3>
 
                 <div className="mb-2 flex items-baseline gap-1">
                   <span className="text-accent text-4xl font-bold">
@@ -268,7 +268,7 @@ function UpgradePageContent() {
                       ? currentPrice.totalDisplay
                       : currentPrice.priceDisplay}
                   </span>
-                  <span className="text-sm text-gray-400">
+                  <span className="text-sm text-muted-foreground">
                     {billingPeriod === "yearly" ? "/year" : currentPrice.period}
                   </span>
                 </div>
@@ -276,15 +276,15 @@ function UpgradePageContent() {
                 <Button
                   onClick={() => handleUpgrade(billingPeriod)}
                   disabled={loading === billingPeriod}
-                  className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-black"
+                  className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-foreground"
                 >
                   {loading === billingPeriod ? "Processing..." : "Subscribe"}
                 </Button>
 
-                <p className="mb-2 text-xs text-gray-400">Everything you need to get hired.</p>
+                <p className="mb-2 text-xs text-muted-foreground">Everything you need to get hired.</p>
 
-                <p className="mb-2 text-xs text-gray-500">Everything in Free, plus...</p>
-                <ul className="space-y-1.5 text-sm text-gray-300">
+                <p className="mb-2 text-xs text-muted-foreground">Everything in Free, plus...</p>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />
                     350+ problems/month
@@ -308,7 +308,7 @@ function UpgradePageContent() {
 
           {/* Trust - Single line */}
           {!isProUser && (
-            <p className="text-center text-xs text-gray-600">
+            <p className="text-center text-xs text-muted-foreground">
               30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta,
               Amazon
             </p>
@@ -325,12 +325,12 @@ function UpgradePageContent() {
                 <Button
                   onClick={() => router.push("/account")}
                   size="lg"
-                  className="bg-gray-100 px-8 font-semibold text-black hover:bg-white"
+                  className="bg-muted px-8 font-semibold text-foreground hover:bg-card"
                 >
                   Manage subscription
                 </Button>
               </div>
-              <p className="text-sm text-gray-400">Need help? Contact support@codesparring.dev</p>
+              <p className="text-sm text-muted-foreground">Need help? Contact support@codesparring.dev</p>
             </div>
           )}
         </div>
@@ -346,7 +346,7 @@ export default function UpgradePage() {
     <ErrorBoundary>
       <Suspense
         fallback={
-          <main className="flex min-h-screen items-center justify-center bg-black">
+          <main className="flex min-h-screen items-center justify-center bg-background">
             <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
           </main>
         }

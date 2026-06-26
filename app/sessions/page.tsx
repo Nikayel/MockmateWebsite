@@ -88,9 +88,9 @@ export default function SessionsPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-600" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-500 delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-400 delay-150" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
         </div>
       </main>
     )
@@ -128,7 +128,7 @@ export default function SessionsPage() {
               <p className="text-sm text-muted-foreground">Your practice history</p>
             </div>
             <Link href="/interview">
-              <Button className="bg-card font-medium text-zinc-900 hover:bg-zinc-200">
+              <Button className="bg-card font-medium text-foreground hover:bg-muted">
                 <Terminal className="mr-2 h-4 w-4" />
                 New Session
               </Button>
@@ -146,7 +146,7 @@ export default function SessionsPage() {
                 Start practicing to see your history here
               </p>
               <Link href="/interview">
-                <Button className="bg-card font-medium text-zinc-900 hover:bg-zinc-200">
+                <Button className="bg-card font-medium text-foreground hover:bg-muted">
                   <Terminal className="mr-2 h-4 w-4" />
                   Start First Session
                 </Button>
@@ -154,7 +154,7 @@ export default function SessionsPage() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
-              <div className="divide-y divide-zinc-800/50">
+              <div className="divide-y divide-border">
                 {sessions.map((session) => {
                   const isInProgress = !session.completed_at
                   const scenarioExists = session.scenario_id
@@ -288,7 +288,7 @@ export default function SessionsPage() {
                               )
                             }
                             size="sm"
-                            className="h-8 bg-card text-xs text-zinc-900 hover:bg-zinc-200"
+                            className="h-8 bg-card text-xs text-foreground hover:bg-muted"
                           >
                             <Play className="mr-1.5 h-3 w-3" />
                             Continue

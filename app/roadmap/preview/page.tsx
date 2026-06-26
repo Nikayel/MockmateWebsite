@@ -169,7 +169,7 @@ export default function RoadmapPreviewPage() {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/login?redirect=/roadmap/new" className="flex-1">
-                  <Button className="w-full bg-card text-black hover:bg-zinc-200">
+                  <Button className="w-full bg-card text-foreground hover:bg-muted">
                     Create my roadmap
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

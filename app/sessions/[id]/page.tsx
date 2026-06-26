@@ -118,9 +118,9 @@ export default function SessionDetailPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-600" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-500 delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-400 delay-150" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
         </div>
       </main>
     )
@@ -166,7 +166,7 @@ export default function SessionDetailPage() {
       case "hard":
         return "text-red-400 bg-red-500/10"
       default:
-        return "text-muted-foreground bg-zinc-500/10"
+        return "text-muted-foreground bg-muted/10"
     }
   }
 
@@ -314,7 +314,7 @@ export default function SessionDetailPage() {
                   onClick={() =>
                     router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)
                   }
-                  className="bg-card text-zinc-900 hover:bg-zinc-200"
+                  className="bg-card text-foreground hover:bg-muted"
                 >
                   <Terminal className="mr-2 h-4 w-4" />
                   Retry Submission
@@ -334,7 +334,7 @@ export default function SessionDetailPage() {
                   onClick={() =>
                     router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)
                   }
-                  className="bg-card text-zinc-900 hover:bg-zinc-200"
+                  className="bg-card text-foreground hover:bg-muted"
                 >
                   <Terminal className="mr-2 h-4 w-4" />
                   Continue Session
