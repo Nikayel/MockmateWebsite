@@ -37,7 +37,7 @@ type ScenarioPanelDetails = Scenario & {
   visibleLogs?: string[]
 }
 
-interface ProblemColumnCtx {
+export interface ProblemColumnCtx {
   activePanel: "problem" | "editor" | "chat"
   bugfixReflection?: {
     hypothesis: string

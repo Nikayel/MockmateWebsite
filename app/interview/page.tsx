@@ -6,12 +6,9 @@ import nextDynamic from "next/dynamic"
 import { useShallow } from "zustand/react/shallow"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
-import { ErrorBoundary } from "@/components/error-boundary"
 import { useVoiceInput } from "@/lib/voice"
 import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, getDocs, query, where } from "firebase/firestore"
-import { ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import {
@@ -47,14 +44,10 @@ import {
   type LLMComplexityResult,
 } from "@/lib/interview"
 // Local page components
-import { PostInterviewView, FeedbackLoadingState } from "./_components"
+import { GuestModeBanner, InterviewLayoutGrid, InterviewFeedbackView } from "./_components"
 import { InterviewDialogs } from "./_components/InterviewDialogs"
-import { ChatColumn } from "./_components/ChatColumn"
-import { EditorColumn } from "./_components/EditorColumn"
-import { ProblemColumn } from "./_components/ProblemColumn"
-import { FocusProblemPeek } from "./_components/FocusProblemPeek"
 import { InterviewTopBar } from "./_components/InterviewTopBar"
-import { BugfixOnboardingTour } from "./_components/BugfixOnboardingTour"
+import type { ProblemColumnCtx } from "./_components/ProblemColumn"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
@@ -100,15 +93,6 @@ const ScenarioBrowser = nextDynamic(
     ),
   }
 )
-
-const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center p-8">
-      <div className="text-muted-foreground text-sm">Loading feedback...</div>
-    </div>
-  ),
-})
 
 function InterviewPageContent() {
   const router = useRouter()
@@ -3744,29 +3728,96 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
   const isInterviewMode = !showScenarioBrowser && (isInterviewStarted || selectedScenario !== null)
   const isResultView = showFeedback || showPostInterviewDiscussion
 
+  // Guest banner visibility guard (kept in page).
+  const hasGuestBanner = isGuestMode && !showFeedback
+
+  // Feedback loading condition (kept in page so streamingFeedback need not be
+  // passed into InterviewFeedbackView).
+  const isFeedbackLoading =
+    isGeneratingFeedback ||
+    (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
+    (streamingFeedback.state.phase !== "idle" &&
+      streamingFeedback.state.phase !== "complete" &&
+      streamingFeedback.state.phase !== "error")
+
+  // Bugfix onboarding tour enabled condition (kept in page).
+  const bugfixTourEnabled =
+    selectedScenario?.type === "bugfix" &&
+    isInterviewStarted &&
+    workspaceContext.length > 0 &&
+    !showFeedback &&
+    !showPostInterviewDiscussion
+
+  // ProblemColumn context literal (verbatim from the previous inline literal).
+  const problemCtx: ProblemColumnCtx = {
+    activePanel,
+    bugfixReflection: {
+      hypothesis: bugfixHypothesis,
+      rootCause: bugfixRootCause,
+      prevention: bugfixPrevention,
+    },
+    elapsedTime,
+    fetchRAGHints,
+    fileInputRef,
+    focusMode,
+    handleFileUpload,
+    hintAgent,
+    hintFeedback,
+    hintFetchStatus,
+    isInterviewStarted,
+    ragHints,
+    realInterviewMode,
+    revealedAIHintIndices,
+    revealedHintIndices,
+    revealedHints,
+    selectedScenario,
+    setIsCodeViewerOpen,
+    onBugfixReflectionChange: handleBugfixReflectionChange,
+    onBugfixReflectionCommit: handleBugfixReflectionCommit,
+    setRevealedAIHintIndices,
+    setRevealedHintIndices,
+    setSelectedFile,
+    setShowOptimalApproach,
+    showOptimalApproach,
+    submitHintFeedback,
+    workspaceContext,
+  }
+
+  // Inline closures pre-built in page (recreated each render today — preserved
+  // verbatim; intentionally NOT wrapped in useCallback).
+  const handleEditorFileSelect = (file: WorkspaceContextFile) => {
+    if (file.path !== activeWorkspacePath) {
+      setActiveWorkspacePath(file.path)
+      setCode(file.content || "")
+    }
+    if (selectedScenario?.type === "bugfix") {
+      recordBugfixEvidence({
+        type: file.role === "test" || file.role === "docs" ? "test_or_doc_opened" : "file_opened",
+        filePath: file.path,
+        fileRole: file.role,
+      })
+    }
+  }
+  const onStartInterviewClick = () => startInterview()
+  const onSendPartnerMessage = () => handleSendMessage(false)
+  const onToggleInterviewerRecording = () => toggleVoiceRecording(true)
+  const onCancelInterviewerRecording = () => {
+    interviewerVoice.cancelCountdown()
+    interviewerVoice.stopRecording()
+    interviewerVoice.resetTranscript()
+    setInterviewerInput("")
+  }
+  const onCancelInterviewerCountdown = () => interviewerVoice.cancelCountdown()
+  const onSendInterviewerMessage = () => handleSendMessage(true)
+
   return (
     <main className="bg-background min-h-screen">
       <h1 className="sr-only">Mock Interview Environment</h1>
       {!isInterviewMode && <Header />}
 
       {/* Guest Mode Banner - Sticky below header */}
-      {isGuestMode && !showFeedback && (
-        <div className="from-accent/20 border-accent/30 to-accent/5 fixed top-[64px] right-0 left-0 z-40 border-b bg-gradient-to-r backdrop-blur-sm">
-          <div className="container mx-auto flex items-center justify-between px-4 py-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-accent font-medium">Free Trial</span>
-              <span className="text-muted-foreground hidden sm:inline">
-                Complete this interview to see your AI-powered feedback
-              </span>
-            </div>
-            <button
-              onClick={() => router.push("/login?redirect=interview")}
-              className="text-accent hover:text-accent/80 font-medium transition-colors"
-            >
-              Sign up for unlimited access
-            </button>
-          </div>
-        </div>
+      {hasGuestBanner && (
+        <GuestModeBanner onSignUp={() => router.push("/login?redirect=interview")} />
       )}
 
       {/* Scenario Browser (Pattern / basket style) */}
@@ -3838,153 +3889,74 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   - Reduces simultaneous information processing
               ═══════════════════════════════════════════════════════════════ */}
               {!showFeedback && !showPostInterviewDiscussion ? (
-                <div
-                  className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden transition-all duration-300 sm:gap-2 ${
-                    focusMode
-                      ? "grid-cols-1" // Focus mode: editor only
-                      : "grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_240px] xl:grid-cols-[360px_minmax(0,1fr)_260px] 2xl:grid-cols-[400px_minmax(0,1fr)_280px]"
-                  }`}
-                >
-                  {focusMode && (
-                    <FocusProblemPeek
-                      scenario={selectedScenario}
-                      realInterviewMode={realInterviewMode}
-                      showProblemPeek={showProblemPeek}
-                      onShowProblemPeekChange={setShowProblemPeek}
-                    />
-                  )}
-                  <ProblemColumn
-                    ctx={{
-                      activePanel,
-                      bugfixReflection: {
-                        hypothesis: bugfixHypothesis,
-                        rootCause: bugfixRootCause,
-                        prevention: bugfixPrevention,
-                      },
-                      elapsedTime,
-                      fetchRAGHints,
-                      fileInputRef,
-                      focusMode,
-                      handleFileUpload,
-                      hintAgent,
-                      hintFeedback,
-                      hintFetchStatus,
-                      isInterviewStarted,
-                      ragHints,
-                      realInterviewMode,
-                      revealedAIHintIndices,
-                      revealedHintIndices,
-                      revealedHints,
-                      selectedScenario,
-                      setIsCodeViewerOpen,
-                      onBugfixReflectionChange: handleBugfixReflectionChange,
-                      onBugfixReflectionCommit: handleBugfixReflectionCommit,
-                      setRevealedAIHintIndices,
-                      setRevealedHintIndices,
-                      setSelectedFile,
-                      setShowOptimalApproach,
-                      showOptimalApproach,
-                      submitHintFeedback,
-                      workspaceContext,
-                    }}
-                  />
-
-                  <EditorColumn
-                    activePanel={activePanel}
-                    selectedScenario={selectedScenario}
-                    activeWorkspaceFile={activeWorkspaceFile}
-                    selectedLanguage={selectedLanguage}
-                    editorLanguage={editorLanguage}
-                    code={code}
-                    onCodeChange={handleEditorChange}
-                    isInterviewStarted={isInterviewStarted}
-                    showScenarioBrowser={showScenarioBrowser}
-                    showFeedback={showFeedback}
-                    showPostInterviewDiscussion={showPostInterviewDiscussion}
-                    isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
-                    onStartInterview={() => startInterview()}
-                    editorConsoleOutputs={editorConsoleOutputs}
-                    testResults={testResults}
-                    testSummary={testSummary}
-                    isRunningTests={isRunningTests}
-                    onClearConsole={handleClearConsole}
-                    onSubmitSystemDesign={submitSystemDesign}
-                    onRunCode={runCode}
-                    onSubmitCode={submitCode}
-                    onSelectedLanguageChange={setSelectedLanguage}
-                    onResetActiveFile={resetActiveWorkspaceFile}
-                    onResetWorkspace={resetEditableWorkspaceFiles}
-                    isAIPartnerExpanded={isAIPartnerExpanded}
-                    onAIPartnerExpandedChange={setIsAIPartnerExpanded}
-                    chatMessages={chatMessages}
-                    chatEndRef={chatEndRef}
-                    chatInput={chatInput}
-                    onChatInputChange={setChatInput}
-                    isLoadingChat={isLoadingChat}
-                    onSendPartnerMessage={() => handleSendMessage(false)}
-                    workspaceContext={workspaceContext}
-                    onFileSelect={(file) => {
-                      if (file.path !== activeWorkspacePath) {
-                        setActiveWorkspacePath(file.path)
-                        setCode(file.content || "")
-                      }
-                      if (selectedScenario?.type === "bugfix") {
-                        recordBugfixEvidence({
-                          type:
-                            file.role === "test" || file.role === "docs"
-                              ? "test_or_doc_opened"
-                              : "file_opened",
-                          filePath: file.path,
-                          fileRole: file.role,
-                        })
-                      }
-                    }}
-                  />
-
-                  <ChatColumn
-                    focusMode={focusMode}
-                    activePanel={activePanel}
-                    interviewerMessages={interviewerMessages}
-                    isLoadingInterviewer={isLoadingInterviewer}
-                    isGeneratingDiscussion={isGeneratingDiscussion}
-                    interviewerEndRef={interviewerEndRef}
-                    isInterviewStarted={isInterviewStarted}
-                    showPostInterviewDiscussion={showPostInterviewDiscussion}
-                    isRecordingInterviewer={isRecordingInterviewer}
-                    onToggleRecording={() => toggleVoiceRecording(true)}
-                    onCancelRecording={() => {
-                      interviewerVoice.cancelCountdown()
-                      interviewerVoice.stopRecording()
-                      interviewerVoice.resetTranscript()
-                      setInterviewerInput("")
-                    }}
-                    onCancelCountdown={() => interviewerVoice.cancelCountdown()}
-                    onSendMessage={() => handleSendMessage(true)}
-                    countdownActive={interviewerVoice.countdownActive}
-                    interviewerInput={interviewerInput}
-                    onInterviewerInputChange={setInterviewerInput}
-                  />
-                  <BugfixOnboardingTour
-                    activePanel={activePanel}
-                    enabled={
-                      selectedScenario?.type === "bugfix" &&
-                      isInterviewStarted &&
-                      workspaceContext.length > 0 &&
-                      !showFeedback &&
-                      !showPostInterviewDiscussion
-                    }
-                    hypothesis={bugfixHypothesis}
-                    isAIPartnerExpanded={isAIPartnerExpanded}
-                    onAIPartnerExpandedChange={setIsAIPartnerExpanded}
-                    onActivePanelChange={setActivePanel}
-                    scenarioId={selectedScenario?.id}
-                    testResultsCount={testResults.length}
-                    userId={user?.id}
-                    userProfile={cachedUserProfile}
-                  />
-                </div>
-              ) : showPostInterviewDiscussion ? (
-                <PostInterviewView
+                <InterviewLayoutGrid
+                  focusMode={focusMode}
+                  selectedScenario={selectedScenario}
+                  realInterviewMode={realInterviewMode}
+                  showProblemPeek={showProblemPeek}
+                  onShowProblemPeekChange={setShowProblemPeek}
+                  problemCtx={problemCtx}
+                  activePanel={activePanel}
+                  activeWorkspaceFile={activeWorkspaceFile}
+                  selectedLanguage={selectedLanguage}
+                  editorLanguage={editorLanguage}
+                  code={code}
+                  onCodeChange={handleEditorChange}
+                  isInterviewStarted={isInterviewStarted}
+                  showScenarioBrowser={showScenarioBrowser}
+                  showFeedback={showFeedback}
+                  showPostInterviewDiscussion={showPostInterviewDiscussion}
+                  isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
+                  onStartInterview={onStartInterviewClick}
+                  editorConsoleOutputs={editorConsoleOutputs}
+                  testResults={testResults}
+                  testSummary={testSummary}
+                  isRunningTests={isRunningTests}
+                  onClearConsole={handleClearConsole}
+                  onSubmitSystemDesign={submitSystemDesign}
+                  onRunCode={runCode}
+                  onSubmitCode={submitCode}
+                  onSelectedLanguageChange={setSelectedLanguage}
+                  onResetActiveFile={resetActiveWorkspaceFile}
+                  onResetWorkspace={resetEditableWorkspaceFiles}
+                  isAIPartnerExpanded={isAIPartnerExpanded}
+                  onAIPartnerExpandedChange={setIsAIPartnerExpanded}
+                  chatMessages={chatMessages}
+                  chatEndRef={chatEndRef}
+                  chatInput={chatInput}
+                  onChatInputChange={setChatInput}
+                  isLoadingChat={isLoadingChat}
+                  onSendPartnerMessage={onSendPartnerMessage}
+                  workspaceContext={workspaceContext}
+                  onEditorFileSelect={handleEditorFileSelect}
+                  interviewerMessages={interviewerMessages}
+                  isLoadingInterviewer={isLoadingInterviewer}
+                  isGeneratingDiscussion={isGeneratingDiscussion}
+                  interviewerEndRef={interviewerEndRef}
+                  isRecordingInterviewer={isRecordingInterviewer}
+                  onToggleInterviewerRecording={onToggleInterviewerRecording}
+                  onCancelInterviewerRecording={onCancelInterviewerRecording}
+                  onCancelInterviewerCountdown={onCancelInterviewerCountdown}
+                  onSendInterviewerMessage={onSendInterviewerMessage}
+                  countdownActive={interviewerVoice.countdownActive}
+                  interviewerInput={interviewerInput}
+                  onInterviewerInputChange={setInterviewerInput}
+                  bugfixTourEnabled={bugfixTourEnabled}
+                  bugfixHypothesis={bugfixHypothesis}
+                  bugfixScenarioId={selectedScenario?.id}
+                  testResultsCount={testResults.length}
+                  userId={user?.id}
+                  userProfile={cachedUserProfile}
+                  onActivePanelChange={setActivePanel}
+                />
+              ) : (
+                <InterviewFeedbackView
+                  showPostInterviewDiscussion={showPostInterviewDiscussion}
+                  isFeedbackLoading={isFeedbackLoading}
+                  isFromRoadmap={isFromRoadmap}
+                  activeRoadmap={activeRoadmap}
+                  onGoToDashboard={() => router.push("/dashboard")}
+                  onBackToRoadmap={() => router.push("/roadmap")}
                   testSummary={testSummary}
                   efficiencyMetrics={efficiencyMetrics}
                   code={code}
@@ -4003,65 +3975,35 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   setShowCodeInDiscussion={setShowCodeInDiscussion}
                   setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
                   proceedToFinalFeedback={proceedToFinalFeedback}
-                  onClose={() => router.push("/dashboard")}
-                />
-              ) : isGeneratingFeedback ||
-                (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
-                (streamingFeedback.state.phase !== "idle" &&
-                  streamingFeedback.state.phase !== "complete" &&
-                  streamingFeedback.state.phase !== "error") ? (
-                <FeedbackLoadingState
-                  onGoToDashboard={() => router.push("/dashboard")}
-                  interviewStats={{
+                  feedbackStats={{
                     testsPassed: testSummary.passed,
                     totalTests: testSummary.total,
                     timeSpentMinutes: Math.round(elapsedTime / 60),
                     messagesExchanged: interviewerMessages.length,
                     codeLines: code.split("\n").filter((line) => line.trim()).length,
                   }}
-                  // Pass streaming phase for better UX messaging
                   streamingPhase={streamingFeedback.state.phase}
                   phaseMessage={streamingFeedback.state.phaseMessage}
+                  feedback={comprehensiveFeedback || ""}
+                  performanceScore={performanceScore ?? 0}
+                  technicalScore={technicalScore ?? undefined}
+                  scoreBreakdown={scoreBreakdown || undefined}
+                  constitutionalAICritique={constitutionalAICritique}
+                  structuredFeedback={structuredFeedback || undefined}
+                  testsPassed={testSummary.passed}
+                  testsTotal={testSummary.total}
+                  timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
+                  spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
+                  efficiencyScore={efficiencyMetrics?.efficiencyScore}
+                  elapsedTime={elapsedTime}
+                  userId={user?.id}
+                  problemType={selectedScenario?.type}
+                  difficulty={selectedScenario?.difficulty}
+                  problemTitle={selectedScenario?.title}
+                  language={selectedLanguage}
+                  onNewProblem={resetInterview}
+                  clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
                 />
-              ) : (
-                <>
-                  <ErrorBoundary>
-                    <PracticeFeedback
-                      feedback={comprehensiveFeedback || ""}
-                      performanceScore={performanceScore ?? 0}
-                      technicalScore={technicalScore ?? undefined}
-                      scoreBreakdown={scoreBreakdown || undefined}
-                      constitutionalAICritique={constitutionalAICritique}
-                      structuredFeedback={structuredFeedback || undefined}
-                      testsPassed={testSummary.passed}
-                      testsTotal={testSummary.total}
-                      timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
-                      spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
-                      efficiencyScore={efficiencyMetrics?.efficiencyScore}
-                      elapsedTime={elapsedTime}
-                      userId={user?.id}
-                      problemType={selectedScenario?.type}
-                      difficulty={selectedScenario?.difficulty}
-                      problemTitle={selectedScenario?.title}
-                      code={code}
-                      language={selectedLanguage}
-                      onNewProblem={resetInterview}
-                      onClose={() => router.push("/dashboard")}
-                      clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
-                    />
-                  </ErrorBoundary>
-                  {isFromRoadmap && activeRoadmap && (
-                    <div className="mt-6 flex justify-center">
-                      <Button
-                        onClick={() => router.push("/roadmap")}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                      >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Roadmap
-                      </Button>
-                    </div>
-                  )}
-                </>
               )}
             </div>
           </div>
