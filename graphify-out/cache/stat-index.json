@@ -25,9 +25,9 @@
     "hash": "3258ce698b297b7fe5c0d102ae353311682a90364766fcf4694a25bca97f2224"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/package.json": {
-    "size": 5242,
-    "mtime_ns": 1782445405210000000,
-    "hash": "1757fdf135a34cc08d29b20c4c8fd18bf8dcb9ef94acbc600ad60593db67f3d4"
+    "size": 5276,
+    "mtime_ns": 1782450866230000000,
+    "hash": "41e6f010e4fa2074092e1e06bb9945e8afff6abfbfa08c5372b97e8dcb51bdb7"
   },
   "/Volumes/T7 Shield/MockmateWebsiteT7/patch_runners.py": {
     "size": 2047,
@@ -603,5 +603,150 @@
     "size": 8006,
     "mtime_ns": 1782440205050000000,
     "hash": "10a46eafa1b8108794f15c9af9a02a72ae7c90bfbd967437e05e59a308f945ae"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/README.md": {
+    "size": 1444,
+    "mtime_ns": 1782447849840000000,
+    "hash": "86a8766b061ea5fa5c9d98c041651234eb3d3949792cc8c91246cc5f0bf4761d"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/archive/INTERVIEW_PAGE_REFACTORING-guide.md": {
+    "size": 13550,
+    "mtime_ns": 1782447665630000000,
+    "hash": "cdc9d4820b6cc05378328472674da84f7f55fa4004463c5b2a14fc5cf1abc4fc"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/archive/constitution-refactorPlan.md": {
+    "size": 6428,
+    "mtime_ns": 1782446862720000000,
+    "hash": "6161fb3c8fc5ed0b42ab482548a6424ceb5a8613eb77e3d9a9cfff001e0efb44"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/interview-page-progress.md": {
+    "size": 10915,
+    "mtime_ns": 1782497217670000000,
+    "hash": "6b47e07c0fddf6f92619b96715fac9514c93656e4896aca8e85bb97adedd8fb2"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/interview-page-refactor-loop.md": {
+    "size": 6409,
+    "mtime_ns": 1782447823260000000,
+    "hash": "05d5df5e289ec78ff1a061f357a61f7db628ec9886bb5579d8209acc50678db2"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/interview-page-refactor.md": {
+    "size": 10611,
+    "mtime_ns": 1782447726220000000,
+    "hash": "38be16c882b70b854e987ad0fcee21b16676c1d2077d9671898e80b80d1e3036"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/interview-page-test-plan.md": {
+    "size": 5994,
+    "mtime_ns": 1782447782920000000,
+    "hash": "6d1466be52ce7142fe608b261a6bd3c2ebdbe8f43a2850f4746e43f235374dfc"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/test-results/.last-run.json": {
+    "size": 96,
+    "mtime_ns": 1782448447410000000,
+    "hash": "de2ac4c9125503577878dc4134a39898da81b5b2863f99f7289f7232838fe35a"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/refactor/._interview-page-progress.md": {
+    "size": 4096,
+    "mtime_ns": 1782497217660000000,
+    "hash": "0c5891995c520e191fe64af5bf0b1d836c6f90e3f55ffc531b1322f909471212"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/playwright-report/data/56a30a290167536c7b779d8bde046ac547225bdb.md": {
+    "size": 4833,
+    "mtime_ns": 1782448447370000000,
+    "hash": "cedeb0e4369b9b3d94691be7badec350a853da6e4a6374f487ff9b765991c30e"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/test-results/bugfix-journey-Evidence-dr-92a85-for-the-onboarding-scenario-chromium/error-context.md": {
+    "size": 4833,
+    "mtime_ns": 1782448447300000000,
+    "hash": "97c8e764d098678870d256712ee350c9b1e0c29b8bdc3e75d7637ec0c3fbeeff"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._01-duplicated-constants-and-config.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744070000000,
+    "hash": "fc99052dc682cc72fe166e8734dd3ddcd105e178f3d3c48342f2a4461f7e2ca2"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._02-entitlements-and-billing.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744070000000,
+    "hash": "f95cb769728a0fd8d3b5920e5f89b18445342d45a555631a085d0517d019345b"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._03-api-route-plumbing.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744070000000,
+    "hash": "3096cdd77e49ebd3903bcc1c17b281d3697abb8d3f2092156ae7d9a13da66ca9"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._04-content-registries.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744080000000,
+    "hash": "b0ad553ed220c1ba699b5d76db2e29f849f7f71109e4dce81d5e8f9cdb707d0f"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._05-firestore-data-access.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744080000000,
+    "hash": "f0f8f76129498b6873fd0a6fd2ebde403db76e132b09c6a66a60676d34f49d80"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._06-ai-llm-layer.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744080000000,
+    "hash": "c86f51077cfe23ca84b697185d36d2bc6dd120f03815731cb35a645b591aff1c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._07-frontend-reusability.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744090000000,
+    "hash": "6524f0cac50c8e44e5fad4b86ed34f1c22ae9f8f364861c1e152644f770fa30c"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._08-critical-bugs.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744090000000,
+    "hash": "a398cf7199e7c96a18cb6f6191f2367390738f2ad08351c9a3dfdd210e0d4061"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/._README.md": {
+    "size": 4096,
+    "mtime_ns": 1782449744100000000,
+    "hash": "4d3573a32803ab849a7f8377f00d0b223b65ecc3b8ddcbccb6aaeee3989c82c3"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/01-duplicated-constants-and-config.md": {
+    "size": 5523,
+    "mtime_ns": 1782449744070000000,
+    "hash": "1642fc22713e475dbf33a1b9e6c527b915ca9362985798ebef080ff492a3e13a"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/02-entitlements-and-billing.md": {
+    "size": 4030,
+    "mtime_ns": 1782449744070000000,
+    "hash": "8db7d6b2d7a73695941b2d28347ccc1898596193e5d9849812f6d84f94f2d837"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/03-api-route-plumbing.md": {
+    "size": 4977,
+    "mtime_ns": 1782449744070000000,
+    "hash": "53806b4dae6120f7c168029bff7057b4701267205ecdc7deb32bb4f27942c2f6"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/04-content-registries.md": {
+    "size": 3729,
+    "mtime_ns": 1782449744080000000,
+    "hash": "75129f044b959b7403158fd502132fbbc1655a21f381320ec02207dc3dd80748"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/05-firestore-data-access.md": {
+    "size": 2922,
+    "mtime_ns": 1782449744080000000,
+    "hash": "c8d83b3560722b9a4a2fa0c44ed31082b85476374b1360c9685b8eb71063e1e5"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/06-ai-llm-layer.md": {
+    "size": 4847,
+    "mtime_ns": 1782449744090000000,
+    "hash": "b87754de4de9286dafd23be4f1a380cbccff9816c981a2af4b8b12a9f1cb9df7"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/07-frontend-reusability.md": {
+    "size": 4843,
+    "mtime_ns": 1782449744090000000,
+    "hash": "fc256924e9fda0c89e1d6a2a706c24e4151c3257294effc38bbf31bfa7d3cdba"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/08-critical-bugs.md": {
+    "size": 2895,
+    "mtime_ns": 1782449744100000000,
+    "hash": "0bea626f2df7624e03492fecc25c50d23a8615fdb11f90495cc566cdb4a8bffe"
+  },
+  "/Volumes/T7 Shield/MockmateWebsiteT7/docs/plans/reconciliation-refactor/README.md": {
+    "size": 3620,
+    "mtime_ns": 1782449744100000000,
+    "hash": "3569311d71b35d14c00b76ab87af4f237c2a1e36d1ee1723795b758dffebbbb4"
   }
 }
