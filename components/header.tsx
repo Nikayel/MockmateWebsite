@@ -282,15 +282,9 @@ export function Header() {
                     {item.label}
                   </Link>
                 ))}
-                <Link
-                  href="/login"
-                  className="ml-6 cursor-pointer text-xs font-bold tracking-[0.08em] text-[#c2c6d6] uppercase transition-colors duration-300 hover:text-white lg:ml-10"
-                >
-                  Login
-                </Link>
-                <Link href="/interview">
+                <Link href="/login" className="ml-6 lg:ml-10">
                   <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff]">
-                    Get Started
+                    Sign in
                   </span>
                 </Link>
               </>
@@ -379,16 +373,8 @@ export function Header() {
                     Join us
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                    <Button
-                      size="sm"
-                      className="bg-accent/10 hover:bg-accent/20 text-accent w-fit border-0 transition-all duration-300"
-                    >
-                      Login
-                    </Button>
-                  </Link>
-                  <Link href="/interview" onClick={() => setIsMobileMenuOpen(false)}>
                     <span className="inline-flex rounded-full bg-[#adc6ff] px-5 py-2 text-xs font-extrabold tracking-[0.12em] text-[#001a42] uppercase shadow-[0_0_26px_rgba(173,198,255,0.22)] transition-all duration-300 hover:bg-[#c1d3ff]">
-                      Get Started
+                      Sign in
                     </span>
                   </Link>
                 </>
