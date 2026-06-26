@@ -26,6 +26,11 @@ export const palantir911Dispatch: CaseLab = {
   ],
   buildScenarioId: "palantir-911-dispatch-build",
   buildScenarioType: "add-functionality",
+  buildCurveball: {
+    title: "Curveball: the GPS feed just went stale",
+    prompt:
+      "Dispatch reports the responder GPS feed is now delayed by ~30 seconds during peak load. Your recommender still trusts live coordinates. How does your ranking hold up when the closest unit on paper may already be blocks away — and what would you change to stay safe?",
+  },
   milestones: [
     {
       kind: "clarify",

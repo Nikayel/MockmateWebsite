@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Loader2, Lock, Play, XCircle } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Loader2, Lock, Play, XCircle } from "lucide-react"
 import { getScenarioById } from "@/lib/scenarios"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { Button } from "@/components/ui/button"
@@ -43,6 +43,7 @@ function Workspace({
   scenarioId: string
 }) {
   const run = useCaseLabStore((s) => s.activeRun)
+  const lab = useCaseLabStore((s) => s.activeLab)
   const setBuild = useCaseLabStore((s) => s.setBuild)
 
   const files = workspace.files
@@ -126,8 +127,27 @@ function Workspace({
   const passedCount = testResults.filter((r) => r.passed).length
   const activeFile = files.find((f) => f.path === activePath)
 
+  // §7.4 Onsite-only curveball: inject the mid-build constraint change once the
+  // candidate is partway through — i.e. after they've run the tests at least
+  // once. Practice mode never surfaces it.
+  const curveball =
+    run?.mode === "onsite" && testResults.length > 0 ? lab?.buildCurveball : undefined
+
   return (
     <div className="flex h-full flex-col gap-2">
+      {curveball && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-foreground font-semibold">{curveball.title}</span>
+            <span className="text-muted-foreground">{curveball.prompt}</span>
+          </span>
+        </div>
+      )}
+
       {/* File tabs */}
       <div className="flex flex-wrap gap-1" role="tablist" aria-label="Workspace files">
         {files.map((file) => {

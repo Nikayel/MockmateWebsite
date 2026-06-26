@@ -21,6 +21,18 @@ export type MilestoneKind = "clarify" | "decompose" | "design" | "build" | "revi
 /** The Build milestone may only reuse a multi-file codebase scenario — never DSA. */
 export type BuildScenarioType = "bugfix" | "add-functionality" | "system-design"
 
+/**
+ * §7.4 Onsite-only Build curveball: a mid-build constraint change ("GPS feed is
+ * now delayed 30s — how does your design hold up?") injected partway through the
+ * Build milestone to pressure-test the design. Practice mode never surfaces it.
+ */
+export interface CaseLabCurveball {
+  /** Short label shown on the callout, e.g. "Curveball: stale GPS". */
+  title: string
+  /** The constraint change posed to the candidate. */
+  prompt: string
+}
+
 export interface CaseLabMilestone {
   kind: MilestoneKind
   title: string
@@ -49,6 +61,8 @@ export interface CaseLab {
   /** Build milestone reuses an existing multi-file codebase scenario by id. */
   buildScenarioId: string
   buildScenarioType: BuildScenarioType
+  /** §7.4 Onsite-only: a mid-build constraint change. Omit to skip the curveball. */
+  buildCurveball?: CaseLabCurveball
 }
 
 // ============================================================
