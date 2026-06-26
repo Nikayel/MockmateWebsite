@@ -346,7 +346,7 @@ Phased so an engineer can ship incrementally and demo at each phase.
 ## 13. Open decisions
 
 1. **Surface:** dedicated `/labs` browse page reusing the `/interview` session shell (recommended) vs a mode flag inside `/interview`.
-2. **Gating default:** soft/open with Onsite as opt-in strict (recommended) vs always-mandatory structure.
+2. ~~Gating default~~ **RESOLVED (Phase 6):** Case Labs ships **public** — no feature flag. It's reachable from the primary nav and the dashboard for any signed-in user. Gating is **soft/open**: milestones are softly navigable (no hard sequential lock) and **Onsite is an opt-in mode** chosen on the intro screen, not a separate entitlement or paywall. The repo has no general feature-flag layer (env vars are infra-only), so adding one purely to hide a finished, tested surface would be dead complexity; if a kill switch is ever needed it can be introduced then.
 3. **Store:** extend `interview-store` vs a separate `case-lab-store` (recommended for separation of concerns).
 4. ~~Build scenario coupling~~ **RESOLVED:** Build always embeds a multi-file `bugfix`/`add-functionality` codebase scenario, never DSA (see §1). Open sub-question: reuse existing codebase scenario IDs for v1 (recommended) vs author bespoke ones per lab.
 5. **Voice mode:** include the existing `VoiceModeToggle` in Case Labs v1, or defer?

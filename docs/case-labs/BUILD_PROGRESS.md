@@ -4,9 +4,9 @@
 > The loop reads this each iteration to find the next unchecked task, and checks items off as it ships them.
 > Spec detail lives in `CASE_LABS.md` (§ references below). Keep notes terse.
 
-**Status:** in progress — Phase 6 (wiring & integration). v1 core shipped; feature is still URL-only and needs wiring into the app.
-**Current phase:** Phase 6
-**Last updated by loop:** Phase 5 — unauthorized state + v1 core sign-off
+**Status:** ✅ COMPLETE — all phases (0–6) shipped; Case Labs wired into the app and DoD met.
+**Current phase:** Done
+**Last updated by loop:** Phase 6 — gating decision (public); build complete
 
 ---
 
@@ -50,47 +50,50 @@
 - [x] Update mastery / roadmap on lab completion (map the completed Build scenario into `lib/spaced-repetition`, §7.5)
 - [x] Onsite mode: inject a Build curveball partway through when `mode === "onsite"` (§7.4)
 - [x] `/labs` gallery: filter by company/skill + per-lab progress (resume state) — filters (`CaseLabGallery`) + per-lab resume badges (`CaseLabProgressBadge`)
-- [ ] Gating decision: feature flag if it should stay hidden until launch, else document it's public
+- [x] Gating decision: feature flag if it should stay hidden until launch, else document it's public — DECIDED public (no flag); soft/open gating, Onsite opt-in. Documented in CASE_LABS §13.2.
 
 ---
 
 ## Definition of Done
 - [x] 911 Dispatch lab fully playable: Clarify → Decompose → Design → Build (multi-file codebase drop) → Review
 - [x] AI interviewer engaged across milestones; structured feedback at the end
-- [ ] Wired into the app: reachable from primary nav + a dashboard/practice entry point (NOT URL-only); completion updates mastery/roadmap; Onsite injects a curveball (Phase 6)
-- [~] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass — typecheck ✅ repo-wide; all Case Labs code lints clean + 20 Case Labs tests pass. Repo has PRE-EXISTING, unrelated failures NOT introduced by Case Labs: 2 `real-world.test.ts` cases (stale expected list for `bugfix-temperature-alert-regression`, added 06-22 before this work) + 40 lint errors in `proxy.ts`/`public/workers`/`scratch.ts` etc. (none in labs files). Verified via git history.
+- [x] Wired into the app: reachable from primary nav (`components/header.tsx`) + dashboard entry point (`app/dashboard/page.tsx`) — NOT URL-only; completion updates mastery via `recordCaseLabMastery` (§7.5); Onsite injects a Build curveball (§7.4). (Phase 6)
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass for Case Labs — typecheck ✅ repo-wide; all Case Labs code lints clean + 22 Case Labs tests pass. Repo has PRE-EXISTING, unrelated failures NOT introduced by Case Labs: 2 `real-world.test.ts` cases (stale expected list for `bugfix-temperature-alert-regression`, added 06-22 before this work) + ~40 lint errors in `proxy.ts`/`public/workers`/`scratch.ts` etc. (none in labs files). Verified via git history.
 - [x] New surfaces handle loading/empty/error/unauthorized
 - [x] `graphify update .` run; graph current
 
 ---
 
-## v1 core shipped — Phase 6 (wiring) IN PROGRESS
-
-> NOT a completion marker. The build is not done until Phase 6 + the Definition of Done above are met.
-> The feature works end-to-end but is currently **URL-only** — it must be wired into the app.
+## CASE LABS BUILD COMPLETE
 
 The Palantir 911 Dispatch Case Lab is fully playable end-to-end at `/labs/palantir-911-dispatch`:
 Clarify → Decompose → Design → Build (multi-file codebase drop on `/api/execute`) → Review, with a
 milestone-aware AI interviewer across all stations, structured feedback at the end, autosave/resume,
-a `/labs` gallery, an intro + Practice/Onsite toggle, analytics, and loading/empty/error/unauthorized
-states. All Case Labs code passes `pnpm typecheck`, `eslint`, and its 20 tests; graph current.
+a `/labs` gallery (company/skill filters + per-lab resume badges), an intro + Practice/Onsite toggle,
+analytics, and loading/empty/error/unauthorized states.
 
-### Now in scope (Phase 6 — was deferred, now required for DoD)
-- **App wiring / discoverability**: `/labs` nav link + dashboard/practice entry point (URL-only is not enough).
-- **Mastery / roadmap update on completion** (§7.5): map the completed Build scenario into `lib/spaced-repetition`.
-- **`/labs` filters (company/skill) + per-lab progress badges**.
-- **Onsite curveball injection** during Build (§7.4): mode is captured/persisted; the curveball is the remaining piece.
+**Phase 6 wiring/integration — DONE:**
+- **Discoverable in-app:** `/labs` link in the primary nav (`components/header.tsx`) + a "Case Labs"
+  entry point on the dashboard (`app/dashboard/page.tsx`). No longer URL-only.
+- **Mastery on completion (§7.5):** `lib/labs/case-lab-mastery.ts` maps the completed Build scenario
+  into `lib/spaced-repetition` via the shared `completeSessionWithMastery`, wired into the feedback route.
+- **Onsite curveball (§7.4):** authored `buildCurveball` surfaced in `BuildStation` partway through Build
+  when `mode === "onsite"`.
+- **Gating (spec §13.2):** ships **public** — no feature flag; soft/open gating, Onsite opt-in.
+
+All Case Labs code passes `pnpm typecheck` (repo-wide), `eslint`, and its **22 tests**; graph current.
 
 ### Caveat (pre-existing, NOT introduced here)
 Repo-wide `pnpm test`/`pnpm lint` are not fully green due to issues that predate this work and live in
 files Case Labs never touched: 2 `real-world.test.ts` cases (stale expected list for
-`bugfix-temperature-alert-regression`, added 2026-06-22) and 40 lint errors in
+`bugfix-temperature-alert-regression`, added 2026-06-22) and ~40 lint errors in
 `proxy.ts`/`public/workers`/`scratch.ts` etc. Verified via git history.
 
 ---
 
 ## Decision log (loop appends new choices here)
 - `lib/labs/types.ts` is the single home for all Case Labs domain types (lab definition + milestone answers + `CaseLabRun`). The Firestore-shape task (next) documents the same `CaseLabRun` in `FIREBASE_STRUCTURE.md`; the store imports these types rather than redefining them.
+- **Gating (Phase 6, resolves spec §13.2):** Case Labs ships **public, no feature flag**. Reachable from primary nav + dashboard for any signed-in user; soft/open milestone gating; Onsite is an opt-in mode (intro toggle), not an entitlement/paywall. Rationale: the repo has no general feature-flag layer (env vars are infra-only), so a flag purely to hide a finished, tested surface would be dead complexity — add a kill switch later only if needed.
 
 ## Iteration notes (loop appends one line per increment)
 - Phase 0: `lib/labs/types.ts` — full Case Labs type module (CaseLab/CaseLabMilestone/MilestoneKind, per-milestone answer shapes, resumable `CaseLabRun`). Reuses `DifficultyLevel`, `WorkspaceScenarioLanguage`, and `InterviewSession.structured_feedback` to stay DRY. typecheck + lint clean.
@@ -118,6 +121,7 @@ files Case Labs never touched: 2 `real-world.test.ts` cases (stale expected list
 - Phase 5 (browse): `app/labs/page.tsx` gallery + `components/labs/CaseLabCard.tsx` (company/role, difficulty badge via shared `difficultyColorClass`, why-this-company teaser, skills, est. minutes, Start → play route). Empty state handled; fixes the play route's previously-dangling `/labs` back-link. Filter-by-company/skill + progress badges deferred to polish. typecheck + lint clean; graph updated.
 - Phase 5 (intro + modes): `components/labs/CaseLabIntro.tsx` — start screen (company framing P6, milestone preview, Practice/Onsite toggle with descriptions) → `onStart(mode)`. Play route now gates: loading state while resuming, intro when no run for this lab, shell once a run exists (resume skips intro). `startRun` now honors the chosen mode. typecheck + lint clean; graph updated.
 - Phase 5 (analytics): `lib/labs/case-lab-analytics.ts` — typed wrappers over shared `trackEvent` (`case_lab_started` w/ mode, `case_lab_milestone_completed`, `case_lab_completed`). Wired: play route `onStart` (started + mode), `MilestoneNav` Next (milestone completed, soft), ReviewStation `handleComplete` (completed). typecheck + lint clean; graph updated.
+- Phase 6 (gating decision): resolved spec §13.2 — Case Labs ships PUBLIC, no feature flag (soft/open gating, Onsite opt-in). Documented the resolution in `CASE_LABS.md` §13 + the decision log above. Docs-only; no code change (the repo has no feature-flag layer and adding one to hide a finished surface would be dead complexity). Last Phase 6 task — wiring/integration now complete.
 - Phase 6 (gallery resume badges): `components/labs/CaseLabProgressBadge.tsx` — client component per card that fetches the signed-in user's in-progress run via the existing `fetchActiveCaseLabRun` helper and shows "Resume · {milestone} (done/5)". Renders nothing when signed out / no run / on error (best-effort), so the card still reads "Start" for fresh labs. Reuses `MILESTONE_ORDER` + `DEFAULT_MILESTONE_META` (no duplicated milestone copy). Wired into `CaseLabCard`. Completes the `/labs` gallery Phase 6 item (filters + progress). typecheck + lint clean; graph updated.
 - Phase 6 (gallery filters): `components/labs/CaseLabGallery.tsx` — client component rendering company + skill filter chips over the authored lab list (passed from the server page as plain serializable objects, so no fetch). Derives unique companies/skills, hides a filter row when there's ≤1 value (single-lab catalog needs no chips), accessible `aria-pressed` chips, "no labs match" empty state. `app/labs/page.tsx` now delegates the grid to it. Per-lab progress/resume badges are the next increment (needs client run lookup). typecheck + lint clean; graph updated.
 - Phase 6 (Onsite curveball, §7.4): added authored `CaseLabCurveball` ({title, prompt}) as an optional `buildCurveball` on `CaseLab`; populated the 911 lab with a stale-GPS constraint change. `BuildStation` surfaces it as an amber `role="alert"` callout above the workspace ONLY when `run.mode === "onsite"` AND the candidate is partway through (has run tests ≥1×) — practice mode never shows it; trigger is deterministic (no timer) and persists across reload via testResults. Reused the existing store selectors (activeLab/activeRun) — no new state. typecheck + lint clean; all 22 labs tests pass; graph updated.
