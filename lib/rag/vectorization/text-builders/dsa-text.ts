@@ -34,6 +34,7 @@ export function scenarioToEmbeddingText(scenario: DSAScenario): string {
     `Pattern: ${scenario.pattern}`,
     `Difficulty: ${scenario.difficulty}`,
     `Companies: ${scenario.companies.join(", ")}`,
+    ...(scenario.roles?.length ? [`Roles: ${scenario.roles.join(", ")}`] : []),
     `Tags: ${scenario.tags.join(", ")}`,
     ``,
     `## Problem Statement`,

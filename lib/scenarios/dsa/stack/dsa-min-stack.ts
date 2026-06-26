@@ -6,7 +6,8 @@ export const dsaMinStackScenario: DSAScenario = {
   type: "dsa",
   pattern: "stack",
   difficulty: "medium",
-  companies: ["Amazon", "Microsoft", "Apple", "Meta", "ZipRecruiter"],
+  companies: ["Amazon", "Microsoft", "Apple", "Meta", "ZipRecruiter", "Palantir"],
+  roles: ["new-grad", "junior", "senior", "swe"],
   description:
     "Design a stack that supports push, pop, top, and retrieving the minimum element in constant time",
   tags: ["stack", "design"],

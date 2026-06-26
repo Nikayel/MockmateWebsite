@@ -12,7 +12,8 @@ export const intervalsScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "intervals",
     difficulty: "medium",
-    companies: ["Meta", "Google", "Amazon", "Microsoft"],
+    companies: ["Meta", "Google", "Amazon", "Microsoft", "Palantir"],
+    roles: ["new-grad", "junior", "senior", "swe", "fdse"],
     description: "Merge all overlapping intervals",
     tags: ["array", "sorting", "intervals"],
     estimatedTime: 25,
@@ -113,8 +114,7 @@ export const intervalsScenarios: DSAScenario[] = [
     // ==========================================
     // Real Interview Mode (Fuzzy Mode) Fields
     // ==========================================
-    fuzzyStatement:
-      "Given a list of intervals, merge all the overlapping ones.",
+    fuzzyStatement: "Given a list of intervals, merge all the overlapping ones.",
 
     clarifyingQuestions: [
       {
@@ -127,15 +127,13 @@ export const intervalsScenarios: DSAScenario[] = [
       {
         topic: "input_sorted",
         question: "Are the intervals sorted?",
-        answer:
-          "No, the intervals are not necessarily sorted. You may need to sort them.",
+        answer: "No, the intervals are not necessarily sorted. You may need to sort them.",
         required: true,
       },
       {
         topic: "interval_format",
         question: "What format is each interval?",
-        answer:
-          "Each interval is [start, end] where start <= end. Both are integers.",
+        answer: "Each interval is [start, end] where start <= end. Both are integers.",
         required: false,
       },
       {
@@ -165,31 +163,19 @@ export const intervalsScenarios: DSAScenario[] = [
     commonWrongApproaches: [
       {
         description: "Not sorting first - comparing non-adjacent intervals incorrectly",
-        codeSignals: [
-          "no sort",
-          "comparing without sorting",
-          "nested loops without sort",
-        ],
+        codeSignals: ["no sort", "comparing without sorting", "nested loops without sort"],
         intervention:
           "How are you handling intervals that aren't adjacent in the array but should merge? For example, [[3,4],[1,2],[2,3]]?",
       },
       {
         description: "Checking overlap incorrectly - missing edge cases",
-        codeSignals: [
-          "start < end",
-          "wrong overlap condition",
-          "missing equality check",
-        ],
+        codeSignals: ["start < end", "wrong overlap condition", "missing equality check"],
         intervention:
           "Let's trace through [1,4] and [4,5]. Do they overlap? Make sure your condition handles the boundary case.",
       },
       {
         description: "Modifying array while iterating",
-        codeSignals: [
-          "splice inside loop",
-          "removing while iterating",
-          "index issues",
-        ],
+        codeSignals: ["splice inside loop", "removing while iterating", "index issues"],
         intervention:
           "I see you're modifying the array while iterating. That can cause issues. Consider building a new result array instead.",
       },
@@ -205,8 +191,7 @@ export const intervalsScenarios: DSAScenario[] = [
     midCodingProbes: [
       {
         trigger: "sorting intervals",
-        question:
-          "Good, you're sorting. What are you sorting by - start time, end time, or both?",
+        question: "Good, you're sorting. What are you sorting by - start time, end time, or both?",
       },
       {
         trigger: "comparing current with last merged",

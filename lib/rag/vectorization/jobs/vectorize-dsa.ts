@@ -25,6 +25,7 @@ export function dsaScenarioToVectorDocument(
       pattern: scenario.pattern,
       difficulty: scenario.difficulty,
       companies: scenario.companies,
+      roles: scenario.roles,
       tags: scenario.tags,
       estimatedTime: scenario.estimatedTime,
       timeComplexity: scenario.optimalComplexity.time,

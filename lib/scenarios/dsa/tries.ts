@@ -15,7 +15,8 @@ export const triesScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "trie",
     difficulty: "medium",
-    companies: ["Google", "Amazon", "Meta", "Microsoft"],
+    companies: ["Google", "Amazon", "Meta", "Microsoft", "Palantir"],
+    roles: ["new-grad", "junior", "senior", "swe"],
     description:
       "Design and implement a trie data structure with insert, search, and startsWith operations",
     tags: ["trie", "design", "string", "hash-table"],
