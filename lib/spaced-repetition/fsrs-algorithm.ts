@@ -165,10 +165,17 @@ export function createFSRSCard(now: Date = new Date()): FSRSCard {
 
 /**
  * Calculate retrievability (probability of recall).
+ *
+ * Accepts the FSRS weights so callers using tuned (non-default) parameters get
+ * a forgetting curve consistent with how the card was actually scheduled.
  */
-export function calculateRetrievability(stability: number, elapsedDays: number): number {
+export function calculateRetrievability(
+  stability: number,
+  elapsedDays: number,
+  weights: number[] = DEFAULT_FSRS_WEIGHTS
+): number {
   if (stability <= 0) return 0
-  return forgetting_curve(DEFAULT_FSRS_WEIGHTS, elapsedDays, stability)
+  return forgetting_curve(weights, elapsedDays, stability)
 }
 
 /**
