@@ -17,20 +17,20 @@ import Link from "next/link"
 
 export function ProblemTeaser() {
   return (
-    <section className="relative py-20 bg-background overflow-hidden">
+    <section className="bg-background relative overflow-hidden py-20">
       {/* Subtle gradient flow - guides eye downward */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-950/20 to-transparent" />
 
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="relative z-10 container mx-auto px-4">
         <ScrollReveal>
-          <div className="max-w-3xl mx-auto">
+          <div className="mx-auto max-w-3xl">
             {/* Single clear message */}
-            <div className="text-center mb-10">
+            <div className="mb-10 text-center">
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="text-gray-500 text-sm uppercase tracking-widest mb-4"
+                className="text-muted-foreground mb-4 text-sm tracking-widest uppercase"
               >
                 The hidden problem
               </motion.p>
@@ -39,11 +39,9 @@ export function ProblemTeaser() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
-                className="text-3xl md:text-4xl font-heading font-bold text-white"
+                className="font-heading text-foreground text-3xl font-bold md:text-4xl"
               >
-                You forget{" "}
-                <span className="text-red-400">80%</span>{" "}
-                within a week
+                You forget <span className="text-red-400">80%</span> within a week
               </motion.h2>
             </div>
 
@@ -56,16 +54,16 @@ export function ProblemTeaser() {
               className="relative"
             >
               {/* Subtle glow behind the chart */}
-              <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-transparent to-neural/5 rounded-2xl blur-2xl" />
+              <div className="from-accent/5 to-neural/5 absolute inset-0 rounded-2xl bg-gradient-to-r via-transparent blur-2xl" />
 
-              <div className="relative bg-gray-950/60 backdrop-blur-sm rounded-2xl border border-gray-800/40 p-6 md:p-8">
+              <div className="relative rounded-2xl border border-white/10 bg-[#1a1917] p-6 backdrop-blur-sm md:p-8">
                 {/* SVG Visualization - responsive with proper aspect ratio */}
                 <svg
                   viewBox="0 0 420 160"
-                  className="w-full h-auto"
+                  className="h-auto w-full"
                   preserveAspectRatio="xMidYMid meet"
                   aria-label="Forgetting curve comparison"
-                  style={{ maxHeight: '180px', minHeight: '120px' }}
+                  style={{ maxHeight: "180px", minHeight: "120px" }}
                 >
                   <defs>
                     {/* Gradient for the forgetting curve */}
@@ -80,28 +78,59 @@ export function ProblemTeaser() {
                     </linearGradient>
                     {/* Glow filter */}
                     <filter id="glow">
-                      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
                       <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
                       </feMerge>
                     </filter>
                   </defs>
 
                   {/* Axis lines - subtle */}
-                  <line x1="40" y1="130" x2="380" y2="130" stroke="#333" strokeWidth="1" opacity="0.5" />
-                  <line x1="40" y1="20" x2="40" y2="130" stroke="#333" strokeWidth="1" opacity="0.5" />
+                  <line
+                    x1="40"
+                    y1="130"
+                    x2="380"
+                    y2="130"
+                    stroke="#333"
+                    strokeWidth="1"
+                    opacity="0.5"
+                  />
+                  <line
+                    x1="40"
+                    y1="20"
+                    x2="40"
+                    y2="130"
+                    stroke="#333"
+                    strokeWidth="1"
+                    opacity="0.5"
+                  />
 
                   {/* Y-axis label */}
-                  <text x="20" y="75" fill="#666" fontSize="10" textAnchor="middle" transform="rotate(-90, 20, 75)">
+                  <text
+                    x="20"
+                    y="75"
+                    fill="#666"
+                    fontSize="10"
+                    textAnchor="middle"
+                    transform="rotate(-90, 20, 75)"
+                  >
                     Memory
                   </text>
 
                   {/* X-axis labels */}
-                  <text x="40" y="145" fill="#666" fontSize="9">Day 1</text>
-                  <text x="150" y="145" fill="#666" fontSize="9">Day 3</text>
-                  <text x="260" y="145" fill="#666" fontSize="9">Day 7</text>
-                  <text x="360" y="145" fill="#666" fontSize="9">Day 30</text>
+                  <text x="40" y="145" fill="#666" fontSize="9">
+                    Day 1
+                  </text>
+                  <text x="150" y="145" fill="#666" fontSize="9">
+                    Day 3
+                  </text>
+                  <text x="260" y="145" fill="#666" fontSize="9">
+                    Day 7
+                  </text>
+                  <text x="360" y="145" fill="#666" fontSize="9">
+                    Day 30
+                  </text>
 
                   {/* Forgetting curve (without spaced repetition) - animated */}
                   <motion.path
@@ -184,14 +213,14 @@ export function ProblemTeaser() {
                 </svg>
 
                 {/* Legend - responsive stacking on mobile */}
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-8 mt-4 text-xs">
+                <div className="mt-4 flex flex-col items-center justify-center gap-3 text-xs sm:flex-row sm:gap-8">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-0.5 bg-gradient-to-r from-accent to-red-400 rounded-full" />
-                    <span className="text-gray-500">Random practice</span>
+                    <div className="from-accent h-0.5 w-6 rounded-full bg-gradient-to-r to-red-400" />
+                    <span className="text-gray-400">Random practice</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-0.5 bg-neural rounded-full" />
-                    <span className="text-gray-500">With CodeSparring</span>
+                    <div className="bg-neural h-0.5 w-6 rounded-full" />
+                    <span className="text-gray-400">With CodeSparring</span>
                   </div>
                 </div>
               </div>
@@ -203,18 +232,19 @@ export function ProblemTeaser() {
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4 }}
-              className="text-center mt-8"
+              className="mt-8 text-center"
             >
-              <p className="text-gray-400 mb-4">
-                Our algorithm times your reviews at the{" "}
-                <span className="text-white">optimal moment</span>—right before you forget.
+              <p className="text-muted-foreground mb-4">
+                We bring each problem back at the{" "}
+                <span className="text-foreground">right moment</span>, just before you&apos;d forget
+                it.
               </p>
               <Link
                 href="/why-codesparring"
-                className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 transition-colors group"
+                className="text-accent hover:text-accent/80 group inline-flex items-center gap-1.5 text-sm transition-colors"
               >
                 Learn the science
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
           </div>
