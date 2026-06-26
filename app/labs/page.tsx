@@ -4,7 +4,7 @@
 
 import type { Metadata } from "next"
 import { listCaseLabs } from "@/lib/labs/case-labs"
-import { CaseLabCard } from "@/components/labs/CaseLabCard"
+import { CaseLabGallery } from "@/components/labs/CaseLabGallery"
 
 export const metadata: Metadata = {
   title: "Case Labs",
@@ -28,11 +28,7 @@ export default function CaseLabsGalleryPage() {
       {labs.length === 0 ? (
         <p className="text-muted-foreground text-sm">No labs yet — check back soon.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {labs.map((lab) => (
-            <CaseLabCard key={lab.id} lab={lab} />
-          ))}
-        </div>
+        <CaseLabGallery labs={labs} />
       )}
     </main>
   )
