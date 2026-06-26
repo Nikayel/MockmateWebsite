@@ -41,6 +41,9 @@ import {
   recordReviewEvent,
   // Mastery Score (code-focused scoring for SR)
   quickMasteryScore,
+  // Quality mapping (shared with the schedulers so research logs match reality)
+  mapScoreToQuality,
+  mapPerformanceToFSRSRating,
 } from "@/lib/spaced-repetition"
 import { updateLearningStateAfterSession } from "@/lib/learning-state"
 import { triggerSessionNotifications } from "@/lib/services/session-notifications"
@@ -293,35 +296,16 @@ export async function POST(request: NextRequest) {
 
       // Record research event for first review
       try {
-        // Use consistent quality mapping based on algorithm
-        // SM-2 quality (0-5): maps performance to quality via mapScoreToQuality
-        // FSRS rating (1-4): maps via mapPerformanceToFSRSRating
+        // Use the same quality mapping the schedulers use, on the same
+        // mastery_score they schedule from, so research logs match reality.
+        // SM-2 quality (0-5): mapScoreToQuality. FSRS rating (1-4): mapPerformanceToFSRSRating.
+        const expectedMinutes = difficulty === "easy" ? 10 : difficulty === "medium" ? 20 : 30
+        const timeRatio =
+          time_spent_minutes > 0 ? time_spent_minutes / expectedMinutes : 1.0
         const qualityRating =
           userAlgorithm === "fsrs"
-            ? performance_score >= 85
-              ? 4
-              : performance_score >= 60
-                ? 3
-                : performance_score >= 40
-                  ? 2
-                  : 1
-            : Math.min(
-                5,
-                Math.max(
-                  0,
-                  performance_score <= 20
-                    ? 0
-                    : performance_score <= 40
-                      ? 1
-                      : performance_score <= 55
-                        ? 2
-                        : performance_score <= 70
-                          ? 3
-                          : performance_score <= 85
-                            ? 4
-                            : 5
-                )
-              )
+            ? mapPerformanceToFSRSRating(masteryScore, hints_used, timeRatio)
+            : mapScoreToQuality(masteryScore)
 
         await recordReviewEvent({
           userId,
