@@ -1,6 +1,7 @@
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { ProblemTeaser } from "@/components/problem-teaser"
+import { RelevanceGapSection } from "@/components/relevance-gap-section"
 import { CompanyRoadmapSection } from "@/components/company-roadmap-section"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
@@ -34,10 +35,11 @@ export default function HomePage() {
       <main className="bg-background min-h-screen">
         <Header />
         <HeroSection />
-        <ProblemTeaser />
+        <RelevanceGapSection />
         <CompanyRoadmapSection />
         <AIAssistedSection />
         <FeaturesSection />
+        <ProblemTeaser />
         <MetricsMarketingSection />
         <ComparisonSection />
         <Footer />

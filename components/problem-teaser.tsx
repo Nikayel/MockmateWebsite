@@ -32,7 +32,7 @@ export function ProblemTeaser() {
                 viewport={{ once: true }}
                 className="text-muted-foreground mb-4 text-sm tracking-widest uppercase"
               >
-                The hidden problem
+                The pattern-retention problem
               </motion.p>
               <motion.h2
                 initial={{ opacity: 0, y: 10 }}
@@ -235,7 +235,7 @@ export function ProblemTeaser() {
               className="mt-8 text-center"
             >
               <p className="text-muted-foreground mb-4">
-                We bring each problem back at the{" "}
+                The DSA patterns you drill fade fast. We resurface each one at the{" "}
                 <span className="text-foreground">right moment</span>, just before you&apos;d forget
                 it.
               </p>
