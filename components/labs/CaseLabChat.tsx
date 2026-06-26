@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
+import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { CaseLabRun } from "@/lib/labs/types"
 import type { CaseLabChatMessage } from "@/lib/labs/case-lab-chat"
@@ -40,6 +42,8 @@ export function CaseLabChat({ className }: { className?: string }) {
   const lab = useCaseLabStore((s) => s.activeLab)
   const run = useCaseLabStore((s) => s.activeRun)
   const milestone = useCaseLabStore((s) => s.getCurrentMilestone())
+  const { user, initialized } = useAuth()
+  const signedOut = initialized && !user
 
   const [messages, setMessages] = useState<CaseLabChatMessage[]>([])
   const [input, setInput] = useState("")
@@ -54,6 +58,10 @@ export function CaseLabChat({ className }: { className?: string }) {
   const send = async () => {
     const text = input.trim()
     if (!text || sending || !milestone) return
+    if (signedOut) {
+      setError("Please sign in to use the interviewer.")
+      return
+    }
     const next: CaseLabChatMessage[] = [...messages, { role: "user", content: text }]
     setMessages(next)
     setInput("")
@@ -144,26 +152,38 @@ export function CaseLabChat({ className }: { className?: string }) {
         </p>
       )}
 
-      <div className="flex items-end gap-2">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Message the interviewer…"
-          rows={2}
-          className="min-h-0 resize-none text-xs"
-          aria-label="Message the interviewer"
-        />
-        <Button
-          type="button"
-          size="sm"
-          onClick={send}
-          disabled={sending || !input.trim()}
-          aria-label="Send"
-        >
-          <Send className="h-4 w-4" aria-hidden />
-        </Button>
-      </div>
+      {signedOut ? (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] px-3 py-2.5 text-[12px] text-[var(--wb-text-secondary)]">
+          <span>Sign in to chat with the interviewer.</span>
+          <Link
+            href={`/login?redirect=/labs/${lab?.id ?? ""}`}
+            className="font-medium text-[var(--wb-accent)] underline"
+          >
+            Sign in
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-end gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Message the interviewer…"
+            rows={2}
+            className="min-h-0 resize-none text-xs"
+            aria-label="Message the interviewer"
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={send}
+            disabled={sending || !input.trim()}
+            aria-label="Send"
+          >
+            <Send className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

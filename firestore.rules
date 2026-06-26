@@ -353,6 +353,33 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // CASE LAB RUNS (Labs workbook)
+    // ============================================================================
+
+    // Owner-only access. Authoritative writes go through the Firebase Admin SDK
+    // in app/api/labs/* (which bypasses these rules and already verifies the
+    // token + ownership), so this block is defense-in-depth for any future
+    // direct-client SDK access. CaseLabRun docs carry a server-derived `userId`
+    // field that the client cannot set/spoof.
+    match /caseLabRuns/{runId} {
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+
+      allow update: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.userId == request.auth.uid;
+    }
+
+    // ============================================================================
     // DEFAULT DENY ALL
     // ============================================================================
 

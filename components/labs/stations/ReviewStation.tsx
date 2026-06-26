@@ -10,10 +10,12 @@
  */
 
 import { useState } from "react"
+import Link from "next/link"
 import { Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { StationHeader } from "./station-kit"
 import { requestCaseLabFeedback, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
@@ -45,12 +47,18 @@ export function ReviewStation() {
   const setReview = useCaseLabStore((s) => s.setReview)
   const setActiveRun = useCaseLabStore((s) => s.setActiveRun)
   const completeRun = useCaseLabStore((s) => s.completeRun)
+  const { user, initialized } = useAuth()
+  const signedOut = initialized && !user
 
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
 
   const handleComplete = async () => {
     if (!run) return
+    if (signedOut) {
+      setGenError("Sign in to generate interviewer feedback.")
+      return
+    }
     setGenerating(true)
     setGenError(null)
     trackCaseLabCompleted({ labId: run.caseLabId, company: lab?.company ?? "" })
@@ -198,12 +206,28 @@ export function ReviewStation() {
         </p>
       )}
 
-      {!isCompleted && (
-        <Button type="button" onClick={handleComplete} disabled={generating} className="self-start">
-          {generating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-          {generating ? "Completing…" : "Complete lab"}
-        </Button>
-      )}
+      {!isCompleted &&
+        (signedOut ? (
+          <div className="border-border bg-muted/40 text-muted-foreground flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-xs">
+            <span>Sign in to finish and get interviewer feedback.</span>
+            <Link
+              href={`/login?redirect=/labs/${lab?.id ?? ""}`}
+              className="text-primary font-medium underline"
+            >
+              Sign in
+            </Link>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            onClick={handleComplete}
+            disabled={generating}
+            className="self-start"
+          >
+            {generating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {generating ? "Completing…" : "Complete lab"}
+          </Button>
+        ))}
     </section>
   )
 }
