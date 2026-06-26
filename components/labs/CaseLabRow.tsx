@@ -11,14 +11,18 @@ import { ChevronRight, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { CaseLabProgressBadge } from "@/components/labs/CaseLabProgressBadge"
+import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import type { CaseLab } from "@/lib/labs/types"
 
 export function CaseLabRow({ lab }: { lab: CaseLab }) {
   return (
     <Link
       href={`/labs/${lab.id}`}
-      className="group hover:bg-muted/40 flex items-center gap-4 px-3 py-3.5 transition-colors sm:px-4"
+      className="group flex items-center gap-4 px-3 py-3.5 transition-colors hover:bg-black/[0.03] sm:px-4"
     >
+      {/* Company logo anchors the row visually. */}
+      <CompanyLogo company={lab.company} size="md" className="shrink-0" />
+
       {/* Identity — title + company/role + any resume hint. Grows to fill. */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">

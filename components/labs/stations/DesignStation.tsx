@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { ApiField, DesignAnswer, DesignTradeoff } from "@/lib/labs/types"
-import { CollapsiblePanel, RemoveRowButton } from "./station-kit"
+import { CollapsiblePanel, RemoveRowButton, StationHeader } from "./station-kit"
 
 type PanelId = "api" | "tradeoffs" | "fallback"
 
@@ -150,14 +150,12 @@ export function DesignStation() {
 
   return (
     <section aria-labelledby="design-title" className="flex flex-col gap-3">
-      <header className="flex flex-col gap-1">
-        <h2 id="design-title" className="text-foreground text-lg font-semibold">
-          Design
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          Commit to a contract, then defend the calls you made along the way.
-        </p>
-      </header>
+      <StationHeader
+        tag="Design"
+        title="Design"
+        titleId="design-title"
+        description="Commit to a contract, then defend the calls you made along the way."
+      />
 
       {/* 1. API contract */}
       <CollapsiblePanel

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { CaseLabBrief } from "@/components/labs/CaseLabBrief"
+import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import type { CaseLab, CaseLabMode } from "@/lib/labs/types"
 
 const MODES: { id: CaseLabMode; label: string; description: string }[] = [
@@ -41,9 +42,8 @@ export function CaseLabIntro({
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs capitalize">
-            {lab.company} · {lab.role}
-          </span>
+          <CompanyLogo company={lab.company} size="sm" showLabel />
+          <span className="text-muted-foreground text-xs capitalize">· {lab.role}</span>
           <span
             className={cn(
               "rounded-md px-2 py-0.5 text-xs font-medium capitalize",

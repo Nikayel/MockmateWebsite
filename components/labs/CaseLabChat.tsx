@@ -101,28 +101,30 @@ export function CaseLabChat({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn("flex h-full flex-col gap-2", className)}>
-      <h2 className="text-foreground text-sm font-semibold">Interviewer</h2>
+    <div className={cn("flex h-full flex-col gap-2.5", className)}>
+      <h2 className="text-[11px] font-medium tracking-[0.08em] text-[var(--wb-faint)] uppercase">
+        Interviewer
+      </h2>
 
       <div
         ref={scrollRef}
-        className="border-border flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-lg border p-2"
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
         role="log"
         aria-live="polite"
       >
         {messages.length === 0 && !sending ? (
-          <p className="text-muted-foreground m-auto px-2 text-center text-xs">
-            Ask the interviewer anything, or share your thinking out loud.
+          <p className="px-1 text-[12px] leading-relaxed text-[var(--wb-disabled)]">
+            Ask anything or share your thinking.
           </p>
         ) : (
           messages.map((m, i) => (
             <div
               key={i}
               className={cn(
-                "max-w-[90%] rounded-lg px-2.5 py-1.5 text-xs whitespace-pre-wrap",
+                "max-w-[92%] rounded-lg px-3 py-2 text-[12px] leading-[1.55] whitespace-pre-wrap",
                 m.role === "user"
-                  ? "bg-primary text-primary-foreground self-end"
-                  : "bg-muted text-foreground self-start"
+                  ? "self-end bg-[var(--wb-accent)] text-white"
+                  : "self-start border border-[var(--wb-border)] bg-[var(--wb-main)] text-[var(--wb-text-secondary)]"
               )}
             >
               {m.content}
@@ -130,8 +132,8 @@ export function CaseLabChat({ className }: { className?: string }) {
           ))
         )}
         {sending && (
-          <div className="bg-muted self-start rounded-lg px-2.5 py-1.5">
-            <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" aria-hidden />
+          <div className="self-start rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] px-3 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--wb-muted)]" aria-hidden />
           </div>
         )}
       </div>

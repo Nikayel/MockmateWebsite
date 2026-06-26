@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
+import { StationHeader } from "./station-kit"
 import { requestCaseLabFeedback, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
 import { trackCaseLabCompleted } from "@/lib/labs/case-lab-analytics"
 import type { CaseLabRubricDimension } from "@/lib/labs/types"
@@ -114,15 +115,13 @@ export function ReviewStation() {
 
   return (
     <section aria-labelledby="review-title" className="flex flex-col gap-4">
-      <header className="flex items-center justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <h2 id="review-title" className="text-foreground text-lg font-semibold">
-            Review
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            Look back at the whole run, grade yourself, then close it out.
-          </p>
-        </div>
+      <header className="flex items-start justify-between gap-2">
+        <StationHeader
+          tag="Review"
+          title="Review"
+          titleId="review-title"
+          description="Look back at the whole run, grade yourself, then close it out."
+        />
         {isCompleted && <Badge variant="secondary">Completed</Badge>}
       </header>
 

@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { ClarifyAnswer } from "@/lib/labs/types"
+import { StationHeader } from "./station-kit"
 
 interface ClarifyDimension {
   id: string
@@ -100,15 +101,12 @@ export function ClarifyStation() {
 
   return (
     <section aria-labelledby="clarify-title" className="flex flex-col gap-3">
-      <header className="flex flex-col gap-1">
-        <h2 id="clarify-title" className="text-foreground text-lg font-semibold">
-          Clarify
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          What would you ask before writing a line? Capture the question and the assumption
-          you&apos;d proceed on.
-        </p>
-      </header>
+      <StationHeader
+        tag="Clarify"
+        title="Clarify"
+        titleId="clarify-title"
+        description="What would you ask before writing a line? Capture the question and the assumption you'd proceed on."
+      />
 
       <ol className="flex flex-col gap-2">
         {CLARIFY_DIMENSIONS.map((d, i) => {

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { DecomposeAnswer, DecomposeEntity, StateTransition } from "@/lib/labs/types"
-import { CollapsiblePanel, RemoveRowButton } from "./station-kit"
+import { CollapsiblePanel, RemoveRowButton, StationHeader } from "./station-kit"
 
 type PanelId = "workflow" | "entities" | "state"
 
@@ -69,14 +69,12 @@ export function DecomposeStation() {
 
   return (
     <section aria-labelledby="decompose-title" className="flex flex-col gap-3">
-      <header className="flex flex-col gap-1">
-        <h2 id="decompose-title" className="text-foreground text-lg font-semibold">
-          Decompose
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          Break the system into its moving parts before you design the contract.
-        </p>
-      </header>
+      <StationHeader
+        tag="Decompose"
+        title="Decompose"
+        titleId="decompose-title"
+        description="Break the system into its moving parts before you design the contract."
+      />
 
       {/* 1. Legacy workflow */}
       <CollapsiblePanel

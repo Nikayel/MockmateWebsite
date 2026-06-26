@@ -20,6 +20,7 @@ import { usePathname } from "next/navigation"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
 import { NotificationBell } from "@/components/notification-bell"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -228,6 +229,7 @@ export function Header() {
                   })}
                 </div>
                 <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
+                  <ThemeToggle />
                   <NotificationBell />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

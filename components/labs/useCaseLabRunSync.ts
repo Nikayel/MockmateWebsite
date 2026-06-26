@@ -64,7 +64,11 @@ export function useCaseLabRunSync(caseLabId: string | null) {
     setLoading(true)
     fetchActiveCaseLabRun(caseLabId)
       .then((run) => {
-        if (loadedKey.current === key && run) setActiveRun(run)
+        // Only auto-resume an in-progress run. A completed run is still saved in
+        // the user's session (the gallery surfaces it), but reopening the lab
+        // lands on the intro so they can review the brief or start fresh rather
+        // than dropping straight back into a finished run.
+        if (loadedKey.current === key && run?.status === "in_progress") setActiveRun(run)
       })
       .catch(() => {
         if (loadedKey.current === key) setError("Couldn't load your saved progress.")

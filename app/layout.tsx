@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
+import { ThemeProvider } from "@/components/theme-provider"
 import { RateLimitProvider } from "@/lib/contexts/rate-limit-context"
 import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-provider"
 import { AnnouncementProvider } from "@/components/announcements"
@@ -180,7 +181,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* JSON-LD Structured Data for SEO */}
         <WebSiteJsonLd />
@@ -229,18 +230,25 @@ html {
         <PerformancePolyfill />
         <ReferralCapture />
         <AttributionCapture />
-        <ErrorBoundaryProvider>
-          <AuthProvider>
-            <RateLimitProvider>
-              <AnnouncementProvider>
-                <div id="main-content">{children}</div>
-                <Toaster position="top-right" richColors closeButton duration={4000} />
-                <CookieConsent />
-                <ConsentAnalytics />
-              </AnnouncementProvider>
-            </RateLimitProvider>
-          </AuthProvider>
-        </ErrorBoundaryProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <ErrorBoundaryProvider>
+            <AuthProvider>
+              <RateLimitProvider>
+                <AnnouncementProvider>
+                  <div id="main-content">{children}</div>
+                  <Toaster position="top-right" richColors closeButton duration={4000} />
+                  <CookieConsent />
+                  <ConsentAnalytics />
+                </AnnouncementProvider>
+              </RateLimitProvider>
+            </AuthProvider>
+          </ErrorBoundaryProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

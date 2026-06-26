@@ -30,9 +30,9 @@ export function StationSwitcher({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn("flex h-full flex-col gap-3", className)}>
+    <div className={cn("flex h-full flex-col", className)}>
       <div className="min-h-0 flex-1 overflow-y-auto">{renderStation(current)}</div>
-      <MilestoneNav />
+      <MilestoneNav className="shrink-0" />
     </div>
   )
 }

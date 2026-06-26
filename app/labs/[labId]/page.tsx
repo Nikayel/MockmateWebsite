@@ -14,11 +14,13 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { getCaseLabById } from "@/lib/labs/case-labs"
 import { useAuth } from "@/lib/auth-context"
-import { useCaseLabStore } from "@/lib/stores/case-lab-store"
+import { MILESTONE_ORDER, useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
 import { CaseLabChat } from "@/components/labs/CaseLabChat"
 import { CaseLabIntro } from "@/components/labs/CaseLabIntro"
+import { CompanyLogo } from "@/components/labs/CompanyLogo"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { Header } from "@/components/header"
 import { trackCaseLabStarted } from "@/lib/labs/case-lab-analytics"
 
@@ -76,93 +78,106 @@ export default function CaseLabPlayPage() {
   // Focused workspace: full-height shell, compact in-app header, no global nav
   // (mirrors /interview hiding the marketing Header during an active session).
   if (hasRunForLab) {
+    const current = activeRun?.currentMilestone ?? null
+    const milestoneNumber = current ? MILESTONE_ORDER.indexOf(current) + 1 : 1
     return (
-      <main className="flex h-screen flex-col gap-3 p-3 sm:p-4">
-        <header className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+      <main className="case-lab-workbook flex h-screen flex-col bg-[var(--wb-page)] text-[var(--wb-text)]">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-[var(--wb-border)] bg-[var(--wb-topbar)] px-4">
+          <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/labs"
               aria-label="Back to labs"
-              className="text-muted-foreground hover:text-foreground"
+              className="shrink-0 text-[var(--wb-muted)] hover:text-[var(--wb-text)]"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden />
             </Link>
-            <div className="flex flex-col">
-              <h1 className="text-foreground text-sm font-semibold">{lab.title}</h1>
-              <p className="text-muted-foreground text-xs capitalize">
-                {lab.company} · {lab.role}
-              </p>
-            </div>
+            <CompanyLogo company={lab.company} size="sm" className="shrink-0" />
+            <h1 className="truncate text-[14px] font-medium text-[var(--wb-text)]">{lab.title}</h1>
+            <span className="shrink-0 text-[11px] text-[var(--wb-muted)] capitalize">
+              {lab.role}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="text-[12px] text-[var(--wb-muted)]">
+              Milestone {milestoneNumber} of {MILESTONE_ORDER.length}
+            </span>
+            <ThemeToggle />
           </div>
         </header>
 
-        {signedOutBanner}
+        {signedOutBanner && <div className="shrink-0 px-4 pt-2">{signedOutBanner}</div>}
 
-        <CaseLabShell className="flex-1" chatSlot={<CaseLabChat />} />
+        <CaseLabShell className="min-h-0 flex-1" chatSlot={<CaseLabChat />} />
       </main>
     )
   }
 
-  // Setup screen (intro / loading): show the global nav, like the interview
-  // scenario-browse screen.
+  // Setup screen (intro / loading): the global nav stays outside the workbook
+  // scope (so it keeps the app's dark chrome), while the content surface itself
+  // is the light-by-default workbook — the "first window" the candidate sees.
   return (
-    <main className="bg-background min-h-screen">
+    <>
       <Header />
-      <div className="container mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-24 pb-12 sm:pt-28">
-        <Link
-          href="/labs"
-          className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-sm"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to labs
-        </Link>
-
-        {signedOutBanner}
-
-        {isLoading ? (
-          <div className="flex min-h-[40vh] items-center justify-center">
-            <p className="text-muted-foreground text-sm">Loading your progress…</p>
+      <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
+        <div className="container mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-24 pb-12 sm:pt-28">
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              href="/labs"
+              className="flex w-fit items-center gap-1 text-sm text-[var(--wb-muted)] hover:text-[var(--wb-text)]"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Back to labs
+            </Link>
+            <ThemeToggle />
           </div>
-        ) : loadError ? (
-          <div
-            className="border-border bg-muted/30 flex min-h-[40vh] flex-col items-center justify-center gap-4 rounded-xl border p-6 text-center"
-            role="alert"
-          >
-            <div className="flex flex-col gap-1">
-              <p className="text-foreground text-sm font-medium">
-                Couldn&apos;t load your saved progress
-              </p>
-              <p className="text-muted-foreground text-sm">
-                The connection timed out. Retry, or start without resuming.
-              </p>
+
+          {signedOutBanner}
+
+          {isLoading ? (
+            <div className="flex min-h-[40vh] items-center justify-center">
+              <p className="text-muted-foreground text-sm">Loading your progress…</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={reload}
-                className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-90"
-              >
-                Retry
-              </button>
-              <button
-                type="button"
-                onClick={() => setError(null)}
-                className="border-border text-foreground hover:bg-muted rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
-              >
-                Start without resuming
-              </button>
+          ) : loadError ? (
+            <div
+              className="border-border bg-muted/30 flex min-h-[40vh] flex-col items-center justify-center gap-4 rounded-xl border p-6 text-center"
+              role="alert"
+            >
+              <div className="flex flex-col gap-1">
+                <p className="text-foreground text-sm font-medium">
+                  Couldn&apos;t load your saved progress
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  The connection timed out. Retry, or start without resuming.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-90"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="border-border text-foreground hover:bg-muted rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
+                >
+                  Start without resuming
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <CaseLabIntro
-            lab={lab}
-            onStart={(mode) => {
-              trackCaseLabStarted({ labId: lab.id, company: lab.company, mode })
-              startRun(lab, mode)
-            }}
-          />
-        )}
-      </div>
-    </main>
+          ) : (
+            <CaseLabIntro
+              lab={lab}
+              onStart={(mode) => {
+                trackCaseLabStarted({ labId: lab.id, company: lab.company, mode })
+                startRun(lab, mode)
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </>
   )
 }

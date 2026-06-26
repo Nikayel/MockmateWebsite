@@ -12,6 +12,37 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+/**
+ * Shared station header — a context tag (the milestone kind), the prompt as an
+ * 18px H1, and an optional one-line description. Keeps every station's heading
+ * typography identical to the workbook spec.
+ */
+export function StationHeader({
+  tag,
+  title,
+  titleId,
+  description,
+}: {
+  tag: string
+  title: string
+  titleId: string
+  description?: ReactNode
+}) {
+  return (
+    <header className="flex flex-col gap-1.5">
+      <span className="text-[10px] font-medium tracking-[0.08em] text-[var(--wb-faint)] uppercase">
+        {tag}
+      </span>
+      <h2 id={titleId} className="text-[18px] leading-tight font-medium text-[var(--wb-text)]">
+        {title}
+      </h2>
+      {description ? (
+        <p className="text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">{description}</p>
+      ) : null}
+    </header>
+  )
+}
+
 /** A titled, collapsible panel — the unit of progressive disclosure (P2). */
 export function CollapsiblePanel({
   title,
@@ -27,16 +58,23 @@ export function CollapsiblePanel({
   children: ReactNode
 }) {
   return (
-    <Collapsible open={open} onOpenChange={onToggle} className="border-border rounded-lg border">
+    <Collapsible
+      open={open}
+      onOpenChange={onToggle}
+      className="rounded-lg border border-[var(--wb-border)]"
+    >
       <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left">
-        <span className="text-foreground text-sm font-medium">{title}</span>
+        <span className="text-[13px] font-medium text-[var(--wb-text)]">{title}</span>
         <ChevronDown
-          className={cn("text-muted-foreground h-4 w-4 transition-transform", open && "rotate-180")}
+          className={cn(
+            "h-4 w-4 text-[var(--wb-muted)] transition-transform",
+            open && "rotate-180"
+          )}
           aria-hidden
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-3 px-3 pb-3">
-        {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
+        {hint ? <p className="text-[11px] text-[var(--wb-faint)]">{hint}</p> : null}
         {children}
       </CollapsibleContent>
     </Collapsible>

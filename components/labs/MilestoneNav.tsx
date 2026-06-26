@@ -35,21 +35,32 @@ export function MilestoneNav({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn("flex items-center justify-between gap-2", className)}>
+    <div
+      className={cn(
+        "mt-5 flex items-center justify-between gap-2 border-t border-[var(--wb-border)] pt-3.5",
+        className
+      )}
+    >
       <Button
         type="button"
         variant="outline"
         size="sm"
         onClick={goToPreviousMilestone}
         disabled={isFirst}
+        className="border-[var(--wb-border-strong)] bg-transparent text-[13px] font-medium text-[var(--wb-text-secondary)] hover:bg-black/[0.03]"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
         Back
       </Button>
-      <Button type="button" size="sm" onClick={handleNext} disabled={isLast}>
+      <button
+        type="button"
+        onClick={handleNext}
+        disabled={isLast}
+        className="flex items-center gap-1 rounded-md bg-[var(--wb-button-bg)] px-[18px] py-2 text-[13px] font-medium text-white transition-colors hover:bg-[var(--wb-button-hover)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+      >
         Next
         <ChevronRight className="h-4 w-4" aria-hidden />
-      </Button>
+      </button>
     </div>
   )
 }

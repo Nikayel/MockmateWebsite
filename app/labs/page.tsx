@@ -17,25 +17,15 @@ export const metadata: Metadata = {
 export default function CaseLabsGalleryPage() {
   const labs = listCaseLabs()
 
+  // The global nav stays outside the workbook scope (keeps the app's dark
+  // chrome); CaseLabGallery owns the light-by-default themed surface + heading.
   return (
-    <main className="bg-background min-h-screen">
+    <>
       <Header />
-      <div className="container mx-auto max-w-5xl px-4 pt-24 pb-16 sm:pt-28">
-        <header className="mb-6 flex flex-col gap-1">
-          <h1 className="text-foreground text-2xl font-bold">Case Labs</h1>
-          <p className="text-muted-foreground text-sm">
-            Company-style problems you carry end to end — clarify, decompose, design, then build the
-            fix inside a real codebase.
-          </p>
-        </header>
-
-        {labs.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No labs yet — check back soon.</p>
-        ) : (
-          <CaseLabGallery labs={labs} />
-        )}
-      </div>
+      <main className="min-h-screen">
+        <CaseLabGallery labs={labs} />
+      </main>
       <Footer />
-    </main>
+    </>
   )
 }

@@ -6,28 +6,28 @@
 
 :root {
   /* Neural Minimalism Light Theme (rarely used, dark is primary) */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0 0 0);
-  --card: oklch(0.98 0 0);
-  --card-foreground: oklch(0 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0 0 0);
-  --primary: oklch(0 0 0);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.73 0.134 210.86);
-  /* Electric Cyan #00d9ff */
-  --accent-foreground: oklch(0 0 0);
-  --neural: oklch(0.87 0.184 157.04);
-  /* Success Green #00ff88 */
+  --background: #f9f8f5;
+  --foreground: #292824;
+  --card: #ffffff;
+  --card-foreground: #292824;
+  --popover: #ffffff;
+  --popover-foreground: #292824;
+  --primary: #2c2b28;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f2ee;
+  --secondary-foreground: #292824;
+  --muted: #f3f2ee;
+  --muted-foreground: #706d65;
+  --accent: #c4703f;
+  /* Brand clay (terracotta) */
+  --accent-foreground: #ffffff;
+  --neural: #1d9e75;
+  /* Success green */
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.96 0 0);
-  --ring: oklch(0.73 0.134 210.86);
+  --destructive-foreground: #ffffff;
+  --border: #e2dfd6;
+  --input: #ddd9d0;
+  --ring: #c4703f;
   --chart-1: oklch(0.73 0.134 210.86);
   /* Cyan */
   --chart-2: oklch(0.87 0.184 157.04);
@@ -39,14 +39,14 @@
   --chart-5: oklch(0.45 0.15 270);
   /* Purple */
   --radius: 0.625rem;
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0 0 0);
-  --sidebar-primary: oklch(0.73 0.134 210.86);
-  --sidebar-primary-foreground: oklch(0 0 0);
-  --sidebar-accent: oklch(0.96 0 0);
-  --sidebar-accent-foreground: oklch(0 0 0);
-  --sidebar-border: oklch(0.9 0 0);
-  --sidebar-ring: oklch(0.73 0.134 210.86);
+  --sidebar: #f3f2ee;
+  --sidebar-foreground: #292824;
+  --sidebar-primary: #c4703f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f2ee;
+  --sidebar-accent-foreground: #292824;
+  --sidebar-border: #e2dfd6;
+  --sidebar-ring: #c4703f;
 
   /* Light mode editor colors */
   --editor-bg: oklch(0.99 0 0);
@@ -65,38 +65,32 @@
    * - Better contrast ratios for readability
    * Sources: NN/G Dark Mode Study, ACM Eye Tracking 2025
    */
-  --background: oklch(0.14 0.005 260);
-  /* Soft charcoal with slight blue warmth #1c1c1e */
-  --foreground: oklch(0.92 0 0);
-  /* Soft white #e8e8e8 */
-  --card: oklch(0.18 0.003 260);
-  /* Visible card with warmth #282830 */
-  --card-foreground: oklch(0.92 0 0);
-  --popover: oklch(0.18 0.003 260);
-  --popover-foreground: oklch(0.92 0 0);
-  --primary: oklch(0.94 0 0);
-  /* Slightly softer primary */
-  --primary-foreground: oklch(0.14 0 0);
-  --secondary: oklch(0.22 0.003 260);
-  /* #333338 */
-  --secondary-foreground: oklch(0.92 0 0);
-  --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  /* WCAG AA compliant: ~5:1 contrast ratio against dark background */
+  --background: #1a1917;
+  /* Warm charcoal — unified with the labs surface */
+  --foreground: #ece9e1;
+  --card: #232220;
+  --card-foreground: #ece9e1;
+  --popover: #232220;
+  --popover-foreground: #ece9e1;
+  --primary: #ece9e1;
+  --primary-foreground: #1a1917;
+  --secondary: #232220;
+  --secondary-foreground: #ece9e1;
+  --muted: #232220;
+  --muted-foreground: #b3afa4;
+  /* WCAG AA compliant against the warm charcoal background */
 
-  /* Calmer accent colors - 40% desaturated per research */
-  --accent: oklch(0.7 0.08 210);
-  /* Calmer Cyan #5fb4d9 - reduced from 0.134 to 0.08 saturation */
-  --accent-foreground: oklch(0.14 0 0);
-  --neural: oklch(0.75 0.11 157);
-  /* Calmer Success Green #5fd99a - reduced from 0.184 to 0.11 */
+  /* Brand clay accent (brightened for dark) */
+  --accent: #d0824f;
+  --accent-foreground: #1a1917;
+  --neural: #4cc79b;
+  /* Success green */
   --destructive: oklch(0.62 0.16 15);
-  /* Calmer Error #d96666 - reduced from 0.27 to 0.16 */
-  --destructive-foreground: oklch(0.92 0 0);
-  --border: oklch(0.3 0.003 260);
-  /* Warmer border #444450 */
-  --input: oklch(0.22 0.003 260);
-  --ring: oklch(0.7 0.08 210);
+  /* Calmer Error #d96666 */
+  --destructive-foreground: #ece9e1;
+  --border: #38362f;
+  --input: #45423a;
+  --ring: #d0824f;
 
   /* Editor-specific colors - slightly lighter than background per research */
   --editor-bg: oklch(0.16 0.003 260);
@@ -118,14 +112,14 @@
   --chart-5: oklch(0.5 0.1 270);
   /* Calmer Purple */
 
-  --sidebar: oklch(0.14 0.005 260);
-  --sidebar-foreground: oklch(0.92 0 0);
-  --sidebar-primary: oklch(0.7 0.08 210);
-  --sidebar-primary-foreground: oklch(0.14 0 0);
-  --sidebar-accent: oklch(0.22 0.003 260);
-  --sidebar-accent-foreground: oklch(0.92 0 0);
-  --sidebar-border: oklch(0.3 0.003 260);
-  --sidebar-ring: oklch(0.7 0.08 210);
+  --sidebar: #1f1e1b;
+  --sidebar-foreground: #ece9e1;
+  --sidebar-primary: #d0824f;
+  --sidebar-primary-foreground: #1a1917;
+  --sidebar-accent: #232220;
+  --sidebar-accent-foreground: #ece9e1;
+  --sidebar-border: #38362f;
+  --sidebar-ring: #d0824f;
 }
 
 /*
@@ -267,6 +261,103 @@
     0 0 0 1px oklch(0.4 0.02 210 / 0.3);
 }
 
+/* ===== CASE LAB WORKBOOK THEME =====
+   Single source of truth for the /labs/[labId] play surface palette. The
+   workbook is reading/writing work (long briefs, structured answers), which is
+   faster and more accurate on light backgrounds — so this surface is ALWAYS
+   light, warm clay, regardless of the app's dark-first theme.
+
+   The `--wb-*` tokens add the extra surface roles the global palette doesn't
+   model (distinct sidebar / topbar / panel / field backgrounds). They follow
+   the global theme: light values here, dark values under `.dark`. The workbook
+   no longer overrides the app's semantic tokens — those now come from the
+   unified global palette (`:root` / `.dark`), so the labs surface and the rest
+   of the app stay in lockstep. */
+.case-lab-workbook {
+  /* Surfaces */
+  --wb-page: #f9f8f5;
+  --wb-topbar: #fdfcf9;
+  --wb-sidebar: #f3f2ee;
+  --wb-main: #ffffff;
+  --wb-panel: #f3f2ee;
+  --wb-field-bg: #f8f7f3;
+  /* Borders */
+  --wb-border: #e2dfd6;
+  --wb-border-strong: #d0ccc2;
+  --wb-input-border: #ddd9d0;
+  /* Text */
+  --wb-text: #292824;
+  --wb-text-secondary: #706d65;
+  --wb-muted: #a8a49c;
+  --wb-faint: #a8a49c;
+  --wb-placeholder: #c0bdb5;
+  --wb-disabled: #c0bdb5;
+  --wb-field-text: #292824;
+  /* Brand clay */
+  --wb-accent: #c4703f;
+  --wb-accent-hover: #ad6035;
+  --wb-accent-soft: #f5eee8;
+  --wb-accent-strong: #7c4a2d;
+  /* Primary action (near-black) */
+  --wb-button-bg: #2c2b28;
+  --wb-button-hover: #1f1e1c;
+  /* Misc */
+  --wb-success: #1d9e75;
+  --wb-track: #e7e4db;
+  --wb-focus-ring: rgba(196, 112, 63, 0.18);
+}
+
+/* Dark workbook surface — follows the global `.dark` class so /labs tracks the
+   platform theme. A warm, low-glare dark that keeps the clay accent. */
+.dark .case-lab-workbook {
+  /* Surfaces */
+  --wb-page: #1a1917;
+  --wb-topbar: #1f1e1b;
+  --wb-sidebar: #232220;
+  --wb-main: #1a1917;
+  --wb-panel: #232220;
+  --wb-field-bg: #232220;
+  /* Borders */
+  --wb-border: #38362f;
+  --wb-border-strong: #45423a;
+  --wb-input-border: #45423a;
+  /* Text */
+  --wb-text: #ece9e1;
+  --wb-text-secondary: #b3afa4;
+  --wb-muted: #8a8780;
+  --wb-faint: #8a8780;
+  --wb-placeholder: #6a675f;
+  --wb-disabled: #6a675f;
+  --wb-field-text: #ece9e1;
+  /* Brand clay (brightened for dark) */
+  --wb-accent: #d0824f;
+  --wb-accent-hover: #c4703f;
+  --wb-accent-soft: #2e2620;
+  --wb-accent-strong: #e0a074;
+  /* Primary action — clay on dark (near-black would vanish) */
+  --wb-button-bg: #c4703f;
+  --wb-button-hover: #ad6035;
+  /* Misc */
+  --wb-success: #4cc79b;
+  --wb-track: #38362f;
+  --wb-focus-ring: rgba(208, 130, 79, 0.22);
+}
+
+/* Scope the spec's form-control look to the workbook so the shared ui/textarea
+   and ui/input primitives stay untouched everywhere else in the app. */
+.case-lab-workbook :is(textarea, input):not([type="checkbox"]):not([type="radio"]) {
+  background-color: var(--wb-field-bg);
+  border-color: var(--wb-input-border);
+  color: var(--wb-field-text);
+}
+.case-lab-workbook :is(textarea, input):not([type="checkbox"]):not([type="radio"]):focus-visible {
+  border-color: var(--wb-accent);
+  box-shadow: 0 0 0 3px var(--wb-focus-ring);
+}
+.case-lab-workbook ::placeholder {
+  color: var(--wb-placeholder);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -384,15 +475,15 @@
   0%,
   100% {
     box-shadow:
-      0 0 8px rgba(95, 180, 217, 0.25),
-      0 0 16px rgba(95, 180, 217, 0.08);
+      0 0 8px rgba(196, 112, 63, 0.25),
+      0 0 16px rgba(196, 112, 63, 0.08);
     transform: scale(1);
   }
 
   50% {
     box-shadow:
-      0 0 16px rgba(95, 180, 217, 0.4),
-      0 0 32px rgba(95, 180, 217, 0.2);
+      0 0 16px rgba(196, 112, 63, 0.4),
+      0 0 32px rgba(196, 112, 63, 0.2);
     transform: scale(1.02);
   }
 }
@@ -401,13 +492,13 @@
 @keyframes glow-pulse {
   0%,
   100% {
-    box-shadow: 0 0 16px rgba(95, 180, 217, 0.3);
+    box-shadow: 0 0 16px rgba(196, 112, 63, 0.3);
   }
 
   50% {
     box-shadow:
-      0 0 28px rgba(95, 180, 217, 0.5),
-      0 0 40px rgba(95, 180, 217, 0.25);
+      0 0 28px rgba(196, 112, 63, 0.5),
+      0 0 40px rgba(196, 112, 63, 0.25);
   }
 }
 
@@ -560,7 +651,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(95, 180, 217, 0.08) 50%,
+    rgba(196, 112, 63, 0.08) 50%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -586,8 +677,8 @@
 /* Text Effects - Calmer glows for reduced visual stress */
 .text-glow {
   text-shadow:
-    0 0 8px rgba(95, 180, 217, 0.4),
-    0 0 16px rgba(95, 180, 217, 0.2);
+    0 0 8px rgba(196, 112, 63, 0.4),
+    0 0 16px rgba(196, 112, 63, 0.2);
 }
 
 .text-neural-glow {
@@ -614,8 +705,8 @@
 
 .interview-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(95, 180, 217, 0.25);
-  box-shadow: 0 8px 24px rgba(95, 180, 217, 0.08);
+  border-color: rgba(196, 112, 63, 0.25);
+  box-shadow: 0 8px 24px rgba(196, 112, 63, 0.08);
 }
 
 /* Chat Messages */
@@ -632,13 +723,13 @@
 
 .scenario-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(95, 180, 217, 0.18);
-  box-shadow: 0 6px 20px rgba(95, 180, 217, 0.06);
+  border-color: rgba(196, 112, 63, 0.18);
+  box-shadow: 0 6px 20px rgba(196, 112, 63, 0.06);
 }
 
 .scenario-card.selected {
-  border-color: rgba(95, 180, 217, 0.35);
-  box-shadow: 0 0 24px rgba(95, 180, 217, 0.12);
+  border-color: rgba(196, 112, 63, 0.35);
+  box-shadow: 0 0 24px rgba(196, 112, 63, 0.12);
   transform: translateY(-2px);
 }
 
@@ -801,10 +892,10 @@
 @keyframes new-message-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(0, 217, 255, 0.4);
+    box-shadow: 0 0 0 0 rgba(196, 112, 63, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(0, 217, 255, 0);
+    box-shadow: 0 0 0 4px rgba(196, 112, 63, 0);
   }
 }
 

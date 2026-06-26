@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react"
-import { History } from "lucide-react"
+import { CheckCircle2, History } from "lucide-react"
 import { fetchActiveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
 import { MILESTONE_ORDER } from "@/lib/stores/case-lab-store"
 import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
@@ -33,6 +33,17 @@ export function CaseLabProgressBadge({ labId }: { labId: string }) {
   }, [labId])
 
   if (!run) return null
+
+  // A completed run reads as "Completed" — finished work stays visible in the
+  // gallery instead of silently reverting to "Start".
+  if (run.status === "completed") {
+    return (
+      <span className="inline-flex w-fit items-center gap-1 rounded-md border border-[var(--wb-success)]/40 px-2 py-0.5 text-xs font-medium text-[var(--wb-success)]">
+        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+        Completed
+      </span>
+    )
+  }
 
   const doneCount = MILESTONE_ORDER.filter((kind) => run.milestoneStatus[kind] === "done").length
   const currentLabel = DEFAULT_MILESTONE_META[run.currentMilestone].title

@@ -13,7 +13,6 @@
 import { useMemo, useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { MILESTONE_ORDER, useCaseLabProgress, useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
@@ -34,23 +33,16 @@ function useRailMilestones(): CaseLabMilestone[] {
 
 function StatusMarker({ status }: { status: MilestoneStatus }) {
   if (status === "done") {
-    return (
-      <span className="bg-primary text-primary-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full">
-        <Check className="h-3.5 w-3.5" aria-hidden />
-      </span>
-    )
-  }
-  if (status === "active") {
-    return (
-      <span className="border-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2">
-        <span className="bg-primary h-2 w-2 rounded-full" />
-      </span>
-    )
+    return <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--wb-success)]" aria-hidden />
   }
   return (
-    <span className="border-muted-foreground/30 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2">
-      <span className="bg-muted-foreground/30 h-2 w-2 rounded-full" />
-    </span>
+    <span
+      className={cn(
+        "mt-[5px] h-2 w-2 shrink-0 rounded-full",
+        status === "active" ? "bg-[var(--wb-accent)]" : "bg-[var(--wb-disabled)]"
+      )}
+      aria-hidden
+    />
   )
 }
 
@@ -77,16 +69,28 @@ export function MilestoneRail({ className }: { className?: string }) {
       className={cn("flex flex-col gap-3", className)}
     >
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-foreground text-sm font-semibold">Milestones</h2>
-          <span className="text-muted-foreground text-xs">
-            {progress.completed}/{progress.total}
+        <span className="text-[10px] font-medium tracking-[0.08em] text-[var(--wb-faint)] uppercase">
+          Milestones
+        </span>
+        <div className="flex flex-col gap-1.5">
+          <div className="h-[3px] w-full overflow-hidden rounded-[2px] bg-[var(--wb-track)]">
+            <div
+              className="h-full rounded-[2px] bg-[var(--wb-accent)] transition-[width]"
+              style={{ width: `${progress.percentage}%` }}
+              role="progressbar"
+              aria-label="Lab progress"
+              aria-valuenow={progress.completed}
+              aria-valuemin={0}
+              aria-valuemax={progress.total}
+            />
+          </div>
+          <span className="text-[11px] text-[var(--wb-faint)]">
+            {progress.completed} of {progress.total} complete
           </span>
         </div>
-        <Progress value={progress.percentage} aria-label="Lab progress" />
         {/* Small-screen toggle; the rail stays open on large screens. */}
         <CollapsibleTrigger
-          className="border-border text-foreground flex items-center justify-between rounded-md border px-3 py-2 text-sm lg:hidden"
+          className="flex items-center justify-between rounded-md border border-[var(--wb-border)] px-3 py-2 text-[12px] text-[var(--wb-text)] lg:hidden"
           aria-label="Toggle milestone list"
         >
           <span className="truncate">{currentMeta?.title ?? "Milestones"}</span>
@@ -103,32 +107,39 @@ export function MilestoneRail({ className }: { className?: string }) {
             const status = statusOf(m.kind)
             const isCurrent = m.kind === current
             const isNext = m.kind === nextKind
+            const isDone = status === "done"
+            const isLocked = status === "locked"
             return (
               <li key={m.kind}>
+                {/* Navigation stays soft (P1): even "locked" rows are reachable —
+                    the lock styling is a visual cue, not a hard gate. */}
                 <button
                   type="button"
                   onClick={() => goToMilestone(m.kind)}
                   aria-current={isCurrent ? "step" : undefined}
                   className={cn(
-                    "group flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    "flex w-full items-start gap-2.5 rounded-md border-l-2 px-2.5 py-2 text-left transition-colors",
                     isCurrent
-                      ? "border-primary/40 bg-primary/5"
-                      : "hover:bg-muted border-transparent"
+                      ? "border-[var(--wb-accent)] bg-[var(--wb-accent-soft)]"
+                      : "border-transparent hover:bg-black/[0.03]"
                   )}
                 >
                   <StatusMarker status={status} />
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span
                       className={cn(
-                        "text-sm font-medium",
-                        isCurrent ? "text-foreground" : "text-foreground/80"
+                        "text-[12px]",
+                        isCurrent && "font-medium text-[var(--wb-accent-strong)]",
+                        isDone && "text-[var(--wb-success)] line-through",
+                        isLocked && "text-[var(--wb-disabled)]",
+                        !isCurrent && !isDone && !isLocked && "text-[var(--wb-muted)]"
                       )}
                     >
                       {m.title}
                     </span>
                     {/* P3: the "why" line. For the next milestone, frame it as
                         what you'll do. */}
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-[11px] leading-[1.4] text-[var(--wb-faint)]">
                       {isNext ? `Next: ${m.purpose}` : m.purpose}
                     </span>
                   </span>

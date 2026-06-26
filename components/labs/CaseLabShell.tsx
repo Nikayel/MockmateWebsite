@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 
 function ChatPlaceholder() {
   return (
-    <div className="border-border text-muted-foreground flex h-full items-center justify-center rounded-lg border border-dashed p-4 text-center text-xs">
+    <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--wb-border)] p-4 text-center text-xs text-[var(--wb-faint)]">
       AI interviewer — coming soon
     </div>
   )
@@ -38,23 +38,31 @@ export function CaseLabShell({
   return (
     <div
       className={cn(
-        "relative grid min-h-0 flex-1 gap-1.5 overflow-hidden sm:gap-2",
-        "grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_240px] xl:grid-cols-[360px_minmax(0,1fr)_260px] 2xl:grid-cols-[400px_minmax(0,1fr)_280px]",
+        "relative grid min-h-0 flex-1 overflow-hidden",
+        "grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_220px]",
         className
       )}
     >
-      <aside className="min-h-0 overflow-y-auto" aria-label="Milestones">
+      <aside
+        className="min-h-0 overflow-y-auto border-b border-[var(--wb-border)] bg-[var(--wb-sidebar)] px-3 py-4 lg:border-r lg:border-b-0"
+        aria-label="Milestones"
+      >
         <MilestoneRail />
       </aside>
-      {/* Center: the problem brief stays pinned above the morphing station so the
-          candidate never loses the context for what they're clarifying/building. */}
-      <main className="flex min-h-0 flex-col gap-2 overflow-hidden" aria-label="Active station">
-        {brief && <CaseLabBriefPanel brief={brief} className="shrink-0" />}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <StationSwitcher className="h-full" />
-        </div>
+      {/* Center: the brief collapses to a "View brief" toggle (the spec's
+          progressive-disclosure default) so the active station owns the space,
+          but context stays one click away on every milestone. */}
+      <main
+        className="flex min-h-0 flex-col overflow-hidden bg-[var(--wb-main)] px-7 py-6"
+        aria-label="Active station"
+      >
+        {brief && <CaseLabBriefPanel brief={brief} className="mb-4 shrink-0" />}
+        <StationSwitcher className="min-h-0 flex-1" />
       </main>
-      <aside className="min-h-0 overflow-y-auto" aria-label="AI interviewer">
+      <aside
+        className="min-h-0 overflow-y-auto border-t border-[var(--wb-border)] bg-[var(--wb-panel)] px-3.5 py-4 lg:border-t-0 lg:border-l"
+        aria-label="AI interviewer"
+      >
         {chatSlot ?? <ChatPlaceholder />}
       </aside>
     </div>

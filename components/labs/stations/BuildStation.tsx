@@ -20,6 +20,7 @@ import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { WorkspaceScenarioConfig, WorkspaceScenarioFile } from "@/lib/scenarios/types"
 import type { BuildAnswer, BuildTestResult } from "@/lib/labs/types"
+import { StationHeader } from "./station-kit"
 
 interface ExecuteResponse {
   results?: { description: string; passed: boolean; error?: string | null }[]
@@ -261,14 +262,12 @@ export function BuildStation() {
 
   return (
     <section aria-labelledby="build-title" className="flex h-full flex-col gap-3">
-      <header className="flex flex-col gap-1">
-        <h2 id="build-title" className="text-foreground text-lg font-semibold">
-          Build
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          Work inside the real system you just designed — extend it or fix it.
-        </p>
-      </header>
+      <StationHeader
+        tag="Build"
+        title="Build"
+        titleId="build-title"
+        description="Work inside the real system you just designed — extend it or fix it."
+      />
 
       <div className="min-h-0 flex-1">
         {!lab?.buildScenarioId ? (
