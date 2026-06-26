@@ -19,6 +19,7 @@ import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
 import { CaseLabChat } from "@/components/labs/CaseLabChat"
 import { CaseLabIntro } from "@/components/labs/CaseLabIntro"
+import { Header } from "@/components/header"
 import { trackCaseLabStarted } from "@/lib/labs/case-lab-analytics"
 
 export default function CaseLabPlayPage() {
@@ -43,57 +44,83 @@ export default function CaseLabPlayPage() {
 
   if (!lab) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <p className="text-muted-foreground text-sm">Lab not found.</p>
-          <Link href="/labs" className="text-primary text-sm underline">
-            Back to labs
-          </Link>
+      <main className="bg-background min-h-screen">
+        <Header />
+        <div className="flex min-h-screen items-center justify-center p-6">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p className="text-muted-foreground text-sm">Lab not found.</p>
+            <Link href="/labs" className="text-primary text-sm underline">
+              Back to labs
+            </Link>
+          </div>
         </div>
       </main>
     )
   }
 
-  return (
-    <main className="flex h-screen flex-col gap-3 p-3 sm:p-4">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/labs"
-            aria-label="Back to labs"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-          </Link>
-          <div className="flex flex-col">
-            <h1 className="text-foreground text-sm font-semibold">{lab.title}</h1>
-            <p className="text-muted-foreground text-xs capitalize">
-              {lab.company} · {lab.role}
-            </p>
+  const signedOutBanner = initialized && !user && (
+    <div
+      className="border-border bg-muted/40 text-muted-foreground flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
+      role="status"
+    >
+      <span>You&apos;re not signed in — your progress and feedback won&apos;t be saved.</span>
+      <Link href="/login" className="text-primary font-medium underline">
+        Sign in
+      </Link>
+    </div>
+  )
+
+  // Focused workspace: full-height shell, compact in-app header, no global nav
+  // (mirrors /interview hiding the marketing Header during an active session).
+  if (hasRunForLab) {
+    return (
+      <main className="flex h-screen flex-col gap-3 p-3 sm:p-4">
+        <header className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/labs"
+              aria-label="Back to labs"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+            </Link>
+            <div className="flex flex-col">
+              <h1 className="text-foreground text-sm font-semibold">{lab.title}</h1>
+              <p className="text-muted-foreground text-xs capitalize">
+                {lab.company} · {lab.role}
+              </p>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {initialized && !user && (
-        <div
-          className="border-border bg-muted/40 text-muted-foreground flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
-          role="status"
-        >
-          <span>You&apos;re not signed in — your progress and feedback won&apos;t be saved.</span>
-          <Link href="/login" className="text-primary font-medium underline">
-            Sign in
-          </Link>
-        </div>
-      )}
+        {signedOutBanner}
 
-      {isLoading && !hasRunForLab ? (
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground text-sm">Loading your progress…</p>
-        </div>
-      ) : hasRunForLab ? (
         <CaseLabShell className="flex-1" chatSlot={<CaseLabChat />} />
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
+      </main>
+    )
+  }
+
+  // Setup screen (intro / loading): show the global nav, like the interview
+  // scenario-browse screen.
+  return (
+    <main className="bg-background min-h-screen">
+      <Header />
+      <div className="container mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-24 pb-12 sm:pt-28">
+        <Link
+          href="/labs"
+          className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-sm"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Back to labs
+        </Link>
+
+        {signedOutBanner}
+
+        {isLoading ? (
+          <div className="flex min-h-[40vh] items-center justify-center">
+            <p className="text-muted-foreground text-sm">Loading your progress…</p>
+          </div>
+        ) : (
           <CaseLabIntro
             lab={lab}
             onStart={(mode) => {
@@ -101,8 +128,8 @@ export default function CaseLabPlayPage() {
               startRun(lab, mode)
             }}
           />
-        </div>
-      )}
+        )}
+      </div>
     </main>
   )
 }

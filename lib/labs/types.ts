@@ -33,6 +33,18 @@ export interface CaseLabCurveball {
   prompt: string
 }
 
+/**
+ * The problem brief shown before and during the lab — the context a candidate
+ * needs to understand WHAT they're solving. Without it the milestones ("Clarify
+ * what 'best' means") have nothing to anchor to.
+ */
+export interface CaseLabBrief {
+  /** The scenario set-up: the system, who runs it, and where it hurts today. */
+  situation: string
+  /** The candidate's mandate — what they're being asked to deliver across the lab. */
+  task: string
+}
+
 export interface CaseLabMilestone {
   kind: MilestoneKind
   title: string
@@ -53,6 +65,8 @@ export interface CaseLab {
   role: string
   difficulty: DifficultyLevel
   estimatedMinutes: number
+  /** The problem context shown on the intro and persistently during the lab. */
+  brief: CaseLabBrief
   /** P6: copy explaining why this maps to the company's real interview bar. */
   whyThisCompany: string
   /** Skills surfaced for browse filtering. */

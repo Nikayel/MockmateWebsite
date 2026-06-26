@@ -13,6 +13,8 @@
 import type { ReactNode } from "react"
 import { MilestoneRail } from "./MilestoneRail"
 import { StationSwitcher } from "./StationSwitcher"
+import { CaseLabBriefPanel } from "./CaseLabBrief"
+import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { cn } from "@/lib/utils"
 
 function ChatPlaceholder() {
@@ -31,6 +33,8 @@ export function CaseLabShell({
   /** Right column content; defaults to a placeholder until the AI is wired. */
   chatSlot?: ReactNode
 }) {
+  const brief = useCaseLabStore((s) => s.activeLab?.brief)
+
   return (
     <div
       className={cn(
@@ -42,8 +46,13 @@ export function CaseLabShell({
       <aside className="min-h-0 overflow-y-auto" aria-label="Milestones">
         <MilestoneRail />
       </aside>
-      <main className="min-h-0 overflow-y-auto" aria-label="Active station">
-        <StationSwitcher className="h-full" />
+      {/* Center: the problem brief stays pinned above the morphing station so the
+          candidate never loses the context for what they're clarifying/building. */}
+      <main className="flex min-h-0 flex-col gap-2 overflow-hidden" aria-label="Active station">
+        {brief && <CaseLabBriefPanel brief={brief} className="shrink-0" />}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <StationSwitcher className="h-full" />
+        </div>
       </main>
       <aside className="min-h-0 overflow-y-auto" aria-label="AI interviewer">
         {chatSlot ?? <ChatPlaceholder />}

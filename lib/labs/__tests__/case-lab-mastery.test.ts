@@ -13,6 +13,7 @@ const lab: CaseLab = {
   role: "FDSE",
   difficulty: "medium",
   estimatedMinutes: 45,
+  brief: { situation: "a 911 dispatch system", task: "build a responder recommender" },
   whyThisCompany: "mirrors the FDSE bar",
   skills: ["decomposition", "systems"],
   milestones: [],

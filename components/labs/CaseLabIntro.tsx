@@ -12,6 +12,7 @@ import { Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import { CaseLabBrief } from "@/components/labs/CaseLabBrief"
 import type { CaseLab, CaseLabMode } from "@/lib/labs/types"
 
 const MODES: { id: CaseLabMode; label: string; description: string }[] = [
@@ -37,7 +38,7 @@ export function CaseLabIntro({
   const [mode, setMode] = useState<CaseLabMode>("practice")
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 overflow-y-auto p-6">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground text-xs capitalize">
@@ -58,6 +59,8 @@ export function CaseLabIntro({
         </div>
         <h1 className="text-foreground text-2xl font-bold">{lab.title}</h1>
       </header>
+
+      <CaseLabBrief brief={lab.brief} />
 
       <section className="flex flex-col gap-1">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
