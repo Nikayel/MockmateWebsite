@@ -10,18 +10,14 @@ import { FieldValue } from "firebase-admin/firestore"
 import type { DSAPattern } from "../types/dsa-patterns"
 import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from "../types"
 import { getScenarioById, scenarios } from "../scenarios"
-import {
-  calculateReviewPriority,
-  estimateRetention,
-  type Difficulty,
-  type MasteryLevel,
-} from "./sm2-algorithm"
+import { calculateReviewPriority, type Difficulty, type MasteryLevel } from "./sm2-algorithm"
 import {
   getUserAlgorithm,
   calculateNextReview,
   createInitialState,
   prepareStateForStorage,
   reconstructState,
+  estimateRetentionForAlgorithm,
 } from "./algorithm-router"
 
 /**
@@ -228,11 +224,27 @@ export async function getDueProblems(
       data.mastery_level
     )
 
-    const retention = estimateRetention(
-      daysOverdue > 0 ? daysOverdue : 0,
-      data.interval_days,
-      data.review_count
-    )
+    // Estimate retention using the user's own algorithm curve (FSRS power-law vs
+    // SM-2 exponential), based on days since the problem was last reviewed.
+    const lastReviewedAt = data.last_reviewed_at ? new Date(data.last_reviewed_at) : null
+    const daysSinceReview = lastReviewedAt
+      ? Math.max(0, Math.floor((now.getTime() - lastReviewedAt.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0
+    const retentionState = reconstructState(userAlgorithm, {
+      interval_days: data.interval_days,
+      next_review_at: data.next_review_at,
+      review_count: data.review_count,
+      mastery_level: data.mastery_level as any,
+      confidence: data.confidence,
+      ease_factor: data.ease_factor,
+      fsrs_difficulty: (data as any).fsrs_difficulty,
+      fsrs_stability: (data as any).fsrs_stability,
+      fsrs_state: (data as any).fsrs_state,
+      fsrs_lapses: (data as any).fsrs_lapses,
+      last_reviewed_at: data.last_reviewed_at,
+      scores_history: data.scores_history,
+    })
+    const retention = estimateRetentionForAlgorithm(userAlgorithm, retentionState, daysSinceReview)
 
     // Use canonical difficulty from scenario definition to fix any data inconsistencies
     const canonicalDifficulty = getCanonicalDifficulty(
