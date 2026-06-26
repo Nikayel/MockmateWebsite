@@ -13,6 +13,7 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { getCaseLabById } from "@/lib/labs/case-labs"
+import { useAuth } from "@/lib/auth-context"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
@@ -25,6 +26,7 @@ export default function CaseLabPlayPage() {
   const labId = params?.labId ?? ""
   const lab = useMemo(() => getCaseLabById(labId), [labId])
 
+  const { user, initialized } = useAuth()
   const setActiveLab = useCaseLabStore((s) => s.setActiveLab)
   const startRun = useCaseLabStore((s) => s.startRun)
   const activeRun = useCaseLabStore((s) => s.activeRun)
@@ -71,6 +73,18 @@ export default function CaseLabPlayPage() {
           </div>
         </div>
       </header>
+
+      {initialized && !user && (
+        <div
+          className="border-border bg-muted/40 text-muted-foreground flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs"
+          role="status"
+        >
+          <span>You&apos;re not signed in — your progress and feedback won&apos;t be saved.</span>
+          <Link href="/login" className="text-primary font-medium underline">
+            Sign in
+          </Link>
+        </div>
+      )}
 
       {isLoading && !hasRunForLab ? (
         <div className="flex flex-1 items-center justify-center">

@@ -4,9 +4,9 @@
 > The loop reads this each iteration to find the next unchecked task, and checks items off as it ships them.
 > Spec detail lives in `CASE_LABS.md` (§ references below). Keep notes terse.
 
-**Status:** in progress
-**Current phase:** Phase 5
-**Last updated by loop:** Phase 5 — analytics events (started/milestone/completed)
+**Status:** CASE LABS BUILD COMPLETE (v1)
+**Current phase:** Phase 5 (done; non-DoD follow-ups deferred — see below)
+**Last updated by loop:** Phase 5 — unauthorized state + v1 sign-off
 
 ---
 
@@ -41,17 +41,42 @@
 - [x] Pass `currentMilestone` into chat; milestone-aware reactions + company persona
 - [x] `/labs` gallery (basic listing + CaseLabCard; filter-by-company/skill + progress = later polish)
 - [x] `CaseLabIntro` start screen + Practice/Onsite mode toggle
-- [ ] Loading / empty / error / unauthorized states on all new surfaces
+- [x] Loading / empty / error / unauthorized states on all new surfaces
 - [x] Analytics events (lab started, milestone completed, lab completed, mode used)
 
 ---
 
 ## Definition of Done (v1)
-- [ ] 911 Dispatch lab fully playable: Clarify → Decompose → Design → Build (multi-file codebase drop) → Review
+- [x] 911 Dispatch lab fully playable: Clarify → Decompose → Design → Build (multi-file codebase drop) → Review
 - [x] AI interviewer engaged across milestones; structured feedback at the end
-- [~] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass — typecheck ✅ repo-wide; all Case Labs code lints clean + 18 Case Labs tests pass. Repo has PRE-EXISTING, unrelated failures NOT introduced by Case Labs: 2 `real-world.test.ts` cases (stale expected list for `bugfix-temperature-alert-regression`, added 06-22 before this work) + 40 lint errors in `proxy.ts`/`public/workers`/`scratch.ts` etc. (none in labs files). Verified via git history.
-- [ ] New surfaces handle loading/empty/error/unauthorized
-- [ ] `graphify update .` run; graph current
+- [~] `pnpm typecheck`, `pnpm lint`, `pnpm test` pass — typecheck ✅ repo-wide; all Case Labs code lints clean + 20 Case Labs tests pass. Repo has PRE-EXISTING, unrelated failures NOT introduced by Case Labs: 2 `real-world.test.ts` cases (stale expected list for `bugfix-temperature-alert-regression`, added 06-22 before this work) + 40 lint errors in `proxy.ts`/`public/workers`/`scratch.ts` etc. (none in labs files). Verified via git history.
+- [x] New surfaces handle loading/empty/error/unauthorized
+- [x] `graphify update .` run; graph current
+
+---
+
+## ✅ CASE LABS BUILD COMPLETE (v1)
+
+The Palantir 911 Dispatch Case Lab is fully playable end-to-end at `/labs/palantir-911-dispatch`:
+Clarify → Decompose → Design → Build (multi-file codebase drop on `/api/execute`) → Review, with a
+milestone-aware AI interviewer across all stations, structured feedback at the end, autosave/resume,
+a `/labs` gallery, an intro + Practice/Onsite toggle, analytics, and loading/empty/error/unauthorized
+states. All Case Labs code passes `pnpm typecheck`, `eslint`, and its 20 tests; graph current.
+
+### Deferred (post-v1, non-DoD — intentionally not done)
+- **Mastery / roadmap update on completion** (Phase 3): the Run is marked `completed`, but wiring the
+  spaced-repetition mastery update needs careful mapping to that system (keyed on interview-session
+  shapes) — out of the v1 DoD and risky to bolt on. Follow-on run.
+- **`/labs` filters (company/skill) + per-lab progress badges** (Phase 5): low value with one lab; add
+  when the catalog grows.
+- **Onsite curveball injection** during Build (Phase 5): the mode is captured/persisted; the curveball
+  itself is a follow-on.
+
+### Caveat (pre-existing, NOT introduced here)
+Repo-wide `pnpm test`/`pnpm lint` are not fully green due to issues that predate this work and live in
+files Case Labs never touched: 2 `real-world.test.ts` cases (stale expected list for
+`bugfix-temperature-alert-regression`, added 2026-06-22) and 40 lint errors in
+`proxy.ts`/`public/workers`/`scratch.ts` etc. Verified via git history.
 
 ---
 
