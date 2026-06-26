@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { requestCaseLabFeedback, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
+import { trackCaseLabCompleted } from "@/lib/labs/case-lab-analytics"
 import type { CaseLabRubricDimension } from "@/lib/labs/types"
 
 const RUBRIC: { key: CaseLabRubricDimension; label: string }[] = [
@@ -39,6 +40,7 @@ function RecapRow({ label, value }: { label: string; value: string }) {
 
 export function ReviewStation() {
   const run = useCaseLabStore((s) => s.activeRun)
+  const lab = useCaseLabStore((s) => s.activeLab)
   const setReview = useCaseLabStore((s) => s.setReview)
   const setActiveRun = useCaseLabStore((s) => s.setActiveRun)
   const completeRun = useCaseLabStore((s) => s.completeRun)
@@ -50,6 +52,7 @@ export function ReviewStation() {
     if (!run) return
     setGenerating(true)
     setGenError(null)
+    trackCaseLabCompleted({ labId: run.caseLabId, company: lab?.company ?? "" })
     try {
       // Persist the latest answers (and obtain a server id) before generating.
       const saved = await saveCaseLabRun(run)

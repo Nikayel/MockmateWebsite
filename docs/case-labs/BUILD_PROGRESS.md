@@ -6,7 +6,7 @@
 
 **Status:** in progress
 **Current phase:** Phase 5
-**Last updated by loop:** Phase 5 — full verification; fixed own test regression
+**Last updated by loop:** Phase 5 — analytics events (started/milestone/completed)
 
 ---
 
@@ -42,7 +42,7 @@
 - [x] `/labs` gallery (basic listing + CaseLabCard; filter-by-company/skill + progress = later polish)
 - [x] `CaseLabIntro` start screen + Practice/Onsite mode toggle
 - [ ] Loading / empty / error / unauthorized states on all new surfaces
-- [ ] Analytics events (lab started, milestone completed, lab completed, mode used)
+- [x] Analytics events (lab started, milestone completed, lab completed, mode used)
 
 ---
 
@@ -83,4 +83,5 @@
 - Phase 5 (AI spine, UI): `components/labs/CaseLabChat.tsx` — right-column interviewer; sends `{milestone, messages, lab persona, answer-summary context}` to `/api/labs/chat`, renders the conversation (user/assistant bubbles, typing spinner, empty + soft-error states, Enter-to-send), attaches auth token. Wired into the play route via `chatSlot`. The AI is now engaged across every milestone — **DoD item "AI interviewer engaged across milestones" met**. typecheck + lint clean; graph updated.
 - Phase 5 (browse): `app/labs/page.tsx` gallery + `components/labs/CaseLabCard.tsx` (company/role, difficulty badge via shared `difficultyColorClass`, why-this-company teaser, skills, est. minutes, Start → play route). Empty state handled; fixes the play route's previously-dangling `/labs` back-link. Filter-by-company/skill + progress badges deferred to polish. typecheck + lint clean; graph updated.
 - Phase 5 (intro + modes): `components/labs/CaseLabIntro.tsx` — start screen (company framing P6, milestone preview, Practice/Onsite toggle with descriptions) → `onStart(mode)`. Play route now gates: loading state while resuming, intro when no run for this lab, shell once a run exists (resume skips intro). `startRun` now honors the chosen mode. typecheck + lint clean; graph updated.
+- Phase 5 (analytics): `lib/labs/case-lab-analytics.ts` — typed wrappers over shared `trackEvent` (`case_lab_started` w/ mode, `case_lab_milestone_completed`, `case_lab_completed`). Wired: play route `onStart` (started + mode), `MilestoneNav` Next (milestone completed, soft), ReviewStation `handleComplete` (completed). typecheck + lint clean; graph updated.
 - Phase 5 (verification): ran full `pnpm test` (3 failures: 1 mine — `add-functionality.test.ts` curated-list assertion needed the new `palantir-911-dispatch-build` id; fixed → 2/2 pass) and full `pnpm lint`. Confirmed via git history that the other 2 test failures + all 40 lint errors are PRE-EXISTING and unrelated to Case Labs (files I never touched; the offending bugfix scenario predates this work). All Case Labs code: typecheck ✅, eslint ✅, 18 tests ✅. NOT declaring COMPLETE yet — Phase 5 polish (mastery, analytics, /labs filters, states audit) still open.

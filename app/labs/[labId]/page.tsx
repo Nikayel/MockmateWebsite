@@ -18,6 +18,7 @@ import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
 import { CaseLabChat } from "@/components/labs/CaseLabChat"
 import { CaseLabIntro } from "@/components/labs/CaseLabIntro"
+import { trackCaseLabStarted } from "@/lib/labs/case-lab-analytics"
 
 export default function CaseLabPlayPage() {
   const params = useParams<{ labId: string }>()
@@ -79,7 +80,13 @@ export default function CaseLabPlayPage() {
         <CaseLabShell className="flex-1" chatSlot={<CaseLabChat />} />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <CaseLabIntro lab={lab} onStart={(mode) => startRun(lab, mode)} />
+          <CaseLabIntro
+            lab={lab}
+            onStart={(mode) => {
+              trackCaseLabStarted({ labId: lab.id, company: lab.company, mode })
+              startRun(lab, mode)
+            }}
+          />
         </div>
       )}
     </main>
