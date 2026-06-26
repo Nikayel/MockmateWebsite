@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 import type { Scenario } from "@/lib/scenarios"
-import { getInitialInterviewerMessage } from "./interview-copy"
+import {
+  getInitialInterviewerMessage,
+  getInitialPartnerMessage,
+  getProblemTypeLabel,
+} from "./interview-messages"
 import { getBugfixScenarioLanguage, isLanguageSupported } from "./language"
 import { formatTime } from "./time"
 import {
@@ -112,6 +116,25 @@ describe("interview page helpers", () => {
   it("builds initial interviewer copy", () => {
     expect(getInitialInterviewerMessage("Two Sum", "easy", "dsa")).toContain(
       "Today we're working on **Two Sum**"
+    )
+  })
+
+  it("labels problem types for display", () => {
+    expect(getProblemTypeLabel("bugfix")).toBe("BUG FIX")
+    expect(getProblemTypeLabel("add-functionality")).toBe("ADD FUNCTIONALITY")
+    expect(getProblemTypeLabel("dsa")).toBe("DSA")
+  })
+
+  it("omits the AI partner message for DSA scenarios", () => {
+    expect(getInitialPartnerMessage({ type: "dsa", title: "Two Sum" })).toBeNull()
+  })
+
+  it("builds an AI partner message for non-DSA scenarios", () => {
+    expect(getInitialPartnerMessage({ type: "bugfix", title: "Rate Limiter" })).toContain(
+      "AI coding partner for Rate Limiter"
+    )
+    expect(getInitialPartnerMessage({ type: "add-functionality", title: "Search" })).toContain(
+      "hints for Search"
     )
   })
 })

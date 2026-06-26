@@ -68,7 +68,11 @@ import { BugfixOnboardingTour } from "./_components/BugfixOnboardingTour"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
-import { getInitialInterviewerMessage } from "./_utils/interview-copy"
+import {
+  getInitialInterviewerMessage,
+  getInitialPartnerMessage,
+  getProblemTypeLabel,
+} from "./_utils/interview-messages"
 import { EDITOR_LANGUAGES, getBugfixScenarioLanguage, type EditorLanguage } from "./_utils/language"
 import {
   isWorkspaceScenario,
@@ -76,13 +80,8 @@ import {
   toWorkspaceScenarioFiles,
 } from "./_utils/workspace"
 import type { WorkspaceContextFile } from "./_types"
-import {
-  createBugfixEvidenceEvent,
-  summarizeBugfixEvidence,
-  calculateBugfixEvidenceScore,
-  type BugfixEvidenceEvent,
-} from "@/lib/bugfix"
-import { calculateUserScore } from "@/lib/scoring"
+import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
+import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -700,42 +699,7 @@ function InterviewPageContent() {
   const applyFallbackFeedback = useCallback(
     async (request: any) => {
       try {
-        const isBugfix = request.scenarioType === "bugfix"
-        let mappedBreakdown: any
-        let performanceScore: number
-
-        if (isBugfix) {
-          const evidenceSummary = summarizeBugfixEvidence({
-            events: request.bugfixEvidenceEvents || [],
-            expectedTouchedFiles: request.bugfixExpectedTouchedFiles || [],
-          })
-          const bugfixScores = calculateBugfixEvidenceScore(evidenceSummary)
-          performanceScore = bugfixScores.overall
-          mappedBreakdown = {
-            understandingScore: bugfixScores.rootCauseUnderstanding,
-            problemSolvingScore: bugfixScores.evidenceGathering,
-            codeQualityScore: bugfixScores.minimalFixQuality,
-            communicationScore: bugfixScores.communication,
-          }
-        } else {
-          const interactionMetrics: any = {
-            hintsUsed: request.hintsUsed || 0,
-            timeSpent: request.elapsedTimeSeconds || 0,
-            testCasesPassed: request.testsPassed || 0,
-            testCasesTotal: request.testsTotal || 0,
-            problemDifficulty: request.scenarioDifficulty || "medium",
-            problemType: request.scenarioType || "dsa",
-          }
-
-          const dsaScores = calculateUserScore(interactionMetrics)
-          performanceScore = dsaScores.overallScore
-          mappedBreakdown = {
-            understandingScore: dsaScores.understandingScore,
-            problemSolvingScore: dsaScores.problemSolvingScore,
-            codeQualityScore: dsaScores.codeQualityScore,
-            communicationScore: dsaScores.communicationScore,
-          }
-        }
+        const { scoreBreakdown: mappedBreakdown, performanceScore } = computeFallbackScores(request)
 
         setScoreBreakdown(mappedBreakdown)
         setPerformanceScore(performanceScore)
@@ -2998,14 +2962,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setProtectedElements(protectedElementsData)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
-    const problemType =
-      scenario.type === "bugfix"
-        ? "BUG FIX"
-        : scenario.type === "add-functionality"
-          ? "ADD FUNCTIONALITY"
-          : scenario.type.toUpperCase()
-    // Different initial message for DSA vs other scenarios
-    const isDSA = scenario.type === "dsa"
+    const problemType = getProblemTypeLabel(scenario.type)
     const initialMessage = getInitialInterviewerMessage(
       scenario.title,
       scenario.difficulty,
@@ -3015,16 +2972,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
     setRecentNudgeTopics([]) // Reset tracked topics for new interview
     // Only set chat messages for non-DSA scenarios (DSA has no AI partner)
-    if (!isDSA) {
-      setChatMessages([
-        {
-          type: "ai",
-          message:
-            scenario.type === "bugfix"
-              ? `Hi! I'm your AI coding partner for ${scenario.title}. Share what you have checked and I can nudge you toward the next useful file, test, or hypothesis.`
-              : `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-        },
-      ])
+    const partnerMessage = getInitialPartnerMessage(scenario)
+    if (partnerMessage) {
+      setChatMessages([{ type: "ai", message: partnerMessage }])
     } else {
       setChatMessages([]) // Clear chat messages for DSA
     }
@@ -5034,7 +4984,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       {/* Guest Mode Banner - Sticky below header */}
       {isGuestMode && !showFeedback && (
-        <div className="from-accent/20 border-accent/30 fixed top-[64px] right-0 left-0 z-40 border-b bg-gradient-to-r to-accent/5 backdrop-blur-sm">
+        <div className="from-accent/20 border-accent/30 to-accent/5 fixed top-[64px] right-0 left-0 z-40 border-b bg-gradient-to-r backdrop-blur-sm">
           <div className="container mx-auto flex items-center justify-between px-4 py-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-accent font-medium">Free Trial</span>
