@@ -14,7 +14,7 @@ Live checklist for the loop agent. Update the status + metrics after each slice.
 | # | Slice | Status | page.tsx after | Notes |
 |---|---|---|---|---|
 | 0 | Baseline + payload snapshots | DONE | 5,414 | AST payload-contract oracle added; baseline caveats below |
-| 1 | Delete dead hooks (useInterviewState/UI, useTestExecution) | TODO | | |
+| 1 | Delete dead hooks (useInterviewState/UI, useTestExecution) | DONE | 5,414 | Files already deleted by prior commit; removed 3 dangling re-exports from lib/hooks/index.ts. Commit 500a356. typecheck GREEN; lint clean in touched file; vitest = 2 pre-existing baseline failures only. |
 | 2 | Pure helpers (interview-messages, fallback-feedback) | TODO | | |
 | 3 | useInterviewTimer | TODO | | |
 | 4 | useInterviewModes | TODO | | |
