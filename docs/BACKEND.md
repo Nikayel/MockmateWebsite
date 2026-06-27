@@ -104,12 +104,15 @@ Routes are grouped under `app/api/`. The following mirrors the product domains; 
 
 ### Scheduled jobs
 
-| Route prefix | Purpose |
-|--------------|---------|
-| `cron/subscription-expiry/` | Subscription lifecycle |
-| `cron/email-notifications/` | Spaced repetition / engagement email |
+| Route prefix | Purpose | Schedule |
+|--------------|---------|----------|
+| `cron/subscription-expiry/` | Subscription lifecycle | daily |
+| `cron/email-notifications/` | Spaced repetition / engagement email | every 3h |
+| `cron/aggregate-usage/` | Pre-compute hourly cost averages into `config/cost_averages` so request-time anomaly checks read 1 doc instead of scanning up to 10k `usage_events` | **hourly** |
 
-Cron routes are invoked by Vercel Cron (or external scheduler); protect with `CRON_SECRET` or equivalent pattern used in the codebase.
+Cron routes are invoked by an external scheduler (cron-job.org — the Vercel Hobby plan only allows daily Vercel Crons); protect with `CRON_SECRET` or equivalent pattern used in the codebase.
+
+> **Operational note — `cron/aggregate-usage`:** the route is implemented and tested, but the cost-anomaly fallback only stays fresh if this runs on schedule. `getAverageHourlyCost()` treats the cached doc as stale after 2h and returns `0` (fail-safe) rather than re-running the expensive query. Add a cron-job.org job that `POST`s to `/api/cron/aggregate-usage` **every hour** with header `Authorization: Bearer ${CRON_SECRET}`. Without it the averages go stale and anomaly detection degrades to a no-op.
 
 ---
 
