@@ -263,8 +263,10 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
-  // Enforce quota limits (session & budget) and get user tier
-  const quotaResult = await enforceQuota(request)
+  // Enforce quota limits (session & budget) and get user tier.
+  // requireAuth: code execution is a cost-bearing operation — signed-out
+  // callers are rejected with 401 "please sign in" before reaching Piston.
+  const quotaResult = await enforceQuota(request, { requireAuth: true })
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
   }
@@ -289,9 +291,13 @@ export async function POST(request: NextRequest) {
       scenarioId,
       language = "javascript",
       sessionId,
-      userId,
       workspaceFiles,
     } = (await request.json()) as ExecuteRequestBody
+
+    // SECURITY: attribute usage to the VERIFIED user (from the auth token),
+    // never the client-supplied body field — that would let a caller spoof
+    // another user's identity. requireAuth guarantees this is a real uid.
+    const userId = rateLimitUserId
 
     logger.info("Execute API called", { scenarioId, language, codeLength: code?.length })
 

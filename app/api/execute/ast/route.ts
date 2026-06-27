@@ -36,7 +36,7 @@ def twoSum(nums: list[int], target: int) -> list[int]:
             return [seen[target - n], i]
         seen[n] = i
     return []
-`
+`,
   },
   "valid-palindrome": {
     functionName: "isPalindrome",
@@ -45,7 +45,7 @@ def isPalindrome(s: str) -> bool:
     """Check if string is a valid palindrome."""
     s = ''.join(c.lower() for c in s if c.isalnum())
     return s == s[::-1]
-`
+`,
   },
   "reverse-string": {
     functionName: "reverseString",
@@ -58,7 +58,7 @@ def reverseString(s: list[str]) -> list[str]:
         left += 1
         right -= 1
     return s
-`
+`,
   },
   "contains-duplicate": {
     functionName: "containsDuplicate",
@@ -66,7 +66,7 @@ def reverseString(s: list[str]) -> list[str]:
 def containsDuplicate(nums: list[int]) -> bool:
     """Check if array contains any duplicates."""
     return len(nums) != len(set(nums))
-`
+`,
   },
   "maximum-subarray": {
     functionName: "maxSubArray",
@@ -78,8 +78,8 @@ def maxSubArray(nums: list[int]) -> int:
         current_sum = max(n, current_sum + n)
         max_sum = max(max_sum, current_sum)
     return max_sum
-`
-  }
+`,
+  },
 }
 
 export async function POST(request: NextRequest) {
@@ -89,8 +89,9 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
-  // Enforce quota
-  const quotaResult = await enforceQuota(request)
+  // Enforce quota — requireAuth: AST execution runs code via Piston (cost-bearing),
+  // so signed-out callers are rejected with 401 "please sign in".
+  const quotaResult = await enforceQuota(request, { requireAuth: true })
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
   }
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
       // Optional: provide custom reference solution
       referenceSolution,
       functionName: customFunctionName,
-      testCount = 5
+      testCount = 5,
     } = await request.json()
 
     logger.info("AST Execute API called", { scenarioId, language })
@@ -132,9 +133,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Extract signature from reference (for debugging/info)
-    const signature = await extractSignature(refSolution, language as 'python' | 'javascript', funcName)
+    const signature = await extractSignature(
+      refSolution,
+      language as "python" | "javascript",
+      funcName
+    )
 
-    if ('error' in signature) {
+    if ("error" in signature) {
       return NextResponse.json(
         { error: `Failed to parse reference solution: ${signature.error}` },
         { status: 400 }
@@ -147,7 +152,7 @@ export async function POST(request: NextRequest) {
     const validationResult = await validateWithAST(
       code,
       refSolution,
-      language as 'python' | 'javascript' | 'typescript',
+      language as "python" | "javascript" | "typescript",
       funcName,
       testCount
     )
@@ -159,10 +164,10 @@ export async function POST(request: NextRequest) {
       expected: r.expected,
       actual: r.actual,
       passed: r.passed,
-      error: r.error || null
+      error: r.error || null,
     }))
 
-    const passedCount = results.filter(r => r.passed).length
+    const passedCount = results.filter((r) => r.passed).length
     const totalCount = results.length
     const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0
 
@@ -173,7 +178,7 @@ export async function POST(request: NextRequest) {
         total: totalCount,
         passed: passedCount,
         failed: totalCount - passedCount,
-        passRate
+        passRate,
       },
       // AST-specific info
       ast: {
@@ -181,13 +186,13 @@ export async function POST(request: NextRequest) {
         userSignature: validationResult.userSignature,
         signatureMatch: validationResult.signatureMatch,
         // Show what types were detected
-        detectedParams: funcSignature?.params?.map(p => ({
+        detectedParams: funcSignature?.params?.map((p) => ({
           name: p.name,
-          type: p.type?.name || 'unknown',
-          kind: p.type?.kind || 'unknown'
-        }))
+          type: p.type?.name || "unknown",
+          kind: p.type?.kind || "unknown",
+        })),
       },
-      error: null
+      error: null,
     })
   } catch (error) {
     logger.error("AST Execute API error", { error })
@@ -203,22 +208,22 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const scenarioId = searchParams.get('scenarioId')
+  const scenarioId = searchParams.get("scenarioId")
 
   if (!scenarioId || !REFERENCE_SOLUTIONS[scenarioId]) {
     return NextResponse.json({
       availableScenarios: Object.keys(REFERENCE_SOLUTIONS),
-      message: "Provide ?scenarioId=two-sum to see signature"
+      message: "Provide ?scenarioId=two-sum to see signature",
     })
   }
 
   const ref = REFERENCE_SOLUTIONS[scenarioId]
-  const signature = await extractSignature(ref.code, 'python', ref.functionName)
+  const signature = await extractSignature(ref.code, "python", ref.functionName)
 
   return NextResponse.json({
     scenarioId,
     functionName: ref.functionName,
     signature,
-    referenceSolution: ref.code
+    referenceSolution: ref.code,
   })
 }
