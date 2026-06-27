@@ -13,6 +13,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css}\"",
     "typecheck": "tsc --noEmit",
+    "check:theme": "node scripts/check-theme-tokens.mjs",
     "start": "next start",
     "test": "vitest run",
     "audit:bugfix": "tsx scripts/audit-bugfix-scenarios.ts",
