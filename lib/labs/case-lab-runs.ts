@@ -94,9 +94,15 @@ export async function getCaseLabRun(userId: string, runId: string): Promise<Case
 }
 
 /**
- * Most-recently-updated in-progress run for a user + lab (for resume).
- * Queries by `userId` only (an auto single-field index) and filters/sorts in
- * memory to avoid requiring a composite index.
+ * The user's latest meaningful run for a lab — an in-progress one to resume, or
+ * failing that the most recent completed one so finished work isn't lost from
+ * their session (the gallery can show "Completed", and the play page can decide
+ * whether to resume or offer a fresh start). Abandoned runs are ignored.
+ *
+ * In-progress always wins over completed regardless of timestamp; within a
+ * status, the most-recently-updated run is returned. Queries by `userId` only
+ * (an auto single-field index) and filters/sorts in memory to avoid requiring a
+ * composite index.
  */
 export async function getActiveCaseLabRun(
   userId: string,
@@ -105,8 +111,16 @@ export async function getActiveCaseLabRun(
   const query = await adminDb.collection(COLLECTION).where("userId", "==", userId).get()
   const runs = query.docs
     .map((doc) => ({ ...(doc.data() as CaseLabRun), id: doc.id }))
-    .filter((run) => run.caseLabId === caseLabId && run.status === "in_progress")
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .filter(
+      (run) =>
+        run.caseLabId === caseLabId &&
+        (run.status === "in_progress" || run.status === "completed")
+    )
+    .sort((a, b) => {
+      // In-progress first, then newest within the same status.
+      if (a.status !== b.status) return a.status === "in_progress" ? -1 : 1
+      return b.updatedAt.localeCompare(a.updatedAt)
+    })
   return runs[0] ?? null
 }
 
