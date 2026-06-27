@@ -72,8 +72,10 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
-  // Enforce quota limits (session & budget) and get user tier
-  const quotaResult = await enforceQuota(request)
+  // Enforce quota limits (session & budget) and get user tier.
+  // requireAuth: feedback generation runs paid LLM calls — signed-out callers
+  // are rejected with 401 "please sign in".
+  const quotaResult = await enforceQuota(request, { requireAuth: true })
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
   }
@@ -126,12 +128,16 @@ export async function POST(request: NextRequest) {
       partnerMessages,
       phaseTracking,
       sessionId,
-      userId,
       silentNotes, // Things the interviewer noticed but didn't correct (shown as "What You Missed")
       // Real Interview Mode (fuzzy problem statements)
       scenarioClarifyingQuestions, // Clarifying questions from scenario
       realInterviewMode, // Whether Real Interview Mode was active
     } = validation.data
+
+    // SECURITY: attribute cost/usage to the VERIFIED user (from the auth token),
+    // never the client-supplied body field, to prevent identity spoofing /
+    // budget-poisoning. requireAuth guarantees rateLimitUserId is a real uid.
+    const userId = rateLimitUserId
 
     // Calculate collaboration message count
     const collaborationMessages =
