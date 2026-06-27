@@ -10,50 +10,65 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Logo size={24} className="text-[#c4703f]" />
+              <Logo size={24} className="text-accent" />
               <span className="font-heading text-xl font-bold tracking-tight">
-                <span className="text-white">Code</span>
+                <span className="text-foreground">Code</span>
                 <span className="text-accent">Sparring</span>
               </span>
             </div>
-            <p className="text-sm text-gray-400">
+            <p className="text-muted-foreground text-sm">
               CodeSparring.dev is the premier AI technical interview practice platform. Master your
               next software engineering interview with realistic coding, system design, and bug-fix
               simulations.
             </p>
             <div className="flex space-x-4">
-              <Github className="h-5 w-5 cursor-pointer text-gray-400 transition-colors hover:text-white" />
-              <Twitter className="h-5 w-5 cursor-pointer text-gray-400 transition-colors hover:text-white" />
-              <Mail className="h-5 w-5 cursor-pointer text-gray-400 transition-colors hover:text-white" />
+              <Github className="text-muted-foreground hover:text-foreground h-5 w-5 cursor-pointer transition-colors" />
+              <Twitter className="text-muted-foreground hover:text-foreground h-5 w-5 cursor-pointer transition-colors" />
+              <Mail className="text-muted-foreground hover:text-foreground h-5 w-5 cursor-pointer transition-colors" />
             </div>
           </div>
 
           {/* Product Links */}
           <div>
-            <h3 className="mb-4 font-semibold text-white">Product</h3>
+            <h3 className="text-foreground mb-4 font-semibold">Product</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="/pricing" className="text-gray-400 transition-colors hover:text-white">
+                <a
+                  href="/pricing"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Pricing
                 </a>
               </li>
               <li>
-                <a href="/interview" className="text-gray-400 transition-colors hover:text-white">
+                <a
+                  href="/interview"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Try It Free
                 </a>
               </li>
               <li>
-                <a href="/samples" className="text-gray-400 transition-colors hover:text-white">
+                <a
+                  href="/samples"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Sample Reports
                 </a>
               </li>
               <li>
-                <Link href="/blog" className="text-gray-400 transition-colors hover:text-white">
+                <Link
+                  href="/blog"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Blog
                 </Link>
               </li>
               <li>
-                <a href="/docs" className="text-gray-400 transition-colors hover:text-white">
+                <a
+                  href="/docs"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Documentation
                 </a>
               </li>
@@ -62,12 +77,12 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <h3 className="mb-4 font-semibold text-white">Legal</h3>
+            <h3 className="text-foreground mb-4 font-semibold">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <a
                   href="/legal#privacy-policy"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Privacy Policy
                 </a>
@@ -75,7 +90,7 @@ export function Footer() {
               <li>
                 <a
                   href="/legal#terms-of-service"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Terms of Service
                 </a>
@@ -83,7 +98,7 @@ export function Footer() {
               <li>
                 <a
                   href="/legal#cookie-policy"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Cookie Policy
                 </a>
@@ -91,7 +106,7 @@ export function Footer() {
               <li>
                 <a
                   href="/legal#data-processing"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Your Data Rights
                 </a>
@@ -99,7 +114,7 @@ export function Footer() {
               <li>
                 <a
                   href="mailto:security@codesparring.dev"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Security
                 </a>
@@ -109,17 +124,20 @@ export function Footer() {
 
           {/* Support */}
           <div>
-            <h3 className="mb-4 font-semibold text-white">Support</h3>
+            <h3 className="text-foreground mb-4 font-semibold">Support</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="/docs" className="text-gray-400 transition-colors hover:text-white">
+                <a
+                  href="/docs"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Help Center
                 </a>
               </li>
               <li>
                 <a
                   href="mailto:support@codesparring.dev"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Contact Support
                 </a>
@@ -127,13 +145,16 @@ export function Footer() {
               <li>
                 <a
                   href="https://github.com/nikayel/codesparring/issues"
-                  className="text-gray-400 transition-colors hover:text-white"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Report Issues
                 </a>
               </li>
               <li>
-                <a href="/careers" className="text-gray-400 transition-colors hover:text-white">
+                <a
+                  href="/careers"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Careers
                 </a>
               </li>
@@ -141,14 +162,14 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 border-t border-gray-800 pt-8 text-center">
-          <p className="text-sm text-gray-500">
+        <div className="border-border mt-8 border-t pt-8 text-center">
+          <p className="text-muted-foreground text-sm">
             © 2025 CodeSparring. Built with care by{" "}
             <a
               href="https://linkedin.com/in/nikayel-ali"
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-gray-400"
+              className="hover:text-foreground transition-colors"
               title="Nikayel Ali - Founder of CodeSparring"
             >
               Nikayel Ali

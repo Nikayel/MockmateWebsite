@@ -93,7 +93,7 @@ function ScoreTooltip({ active }: { active: ActiveTooltip | null }) {
             transition={{ duration: 0.2 }}
           />
           <motion.div
-            className="pointer-events-none fixed z-[91] w-[min(280px,80vw)] -translate-x-1/2 -translate-y-full overflow-hidden rounded-2xl border border-white/15 bg-gray-950/70 p-4 text-left shadow-[0_8px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl backdrop-saturate-150"
+            className="text-popover-foreground border-border bg-popover/95 pointer-events-none fixed z-[91] w-[min(280px,80vw)] -translate-x-1/2 -translate-y-full overflow-hidden rounded-2xl border p-4 text-left shadow-[0_8px_40px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150"
             style={{ left: active.x, top: active.top - 16 }}
             initial={{ opacity: 0, y: 6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -103,13 +103,15 @@ function ScoreTooltip({ active }: { active: ActiveTooltip | null }) {
             {/* Top inner highlight for the glass edge */}
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-white">{active.item.label}</p>
+              <p className="text-popover-foreground text-sm font-semibold">{active.item.label}</p>
               <span className="text-xs font-semibold" style={{ color: active.item.color }}>
                 {active.item.percent}%
               </span>
             </div>
-            <p className="mt-1 text-xs text-gray-300">{active.item.summary}</p>
-            <p className="mt-3 text-sm leading-relaxed text-gray-100">{active.item.instruction}</p>
+            <p className="text-muted-foreground mt-1 text-xs">{active.item.summary}</p>
+            <p className="text-foreground mt-3 text-sm leading-relaxed">
+              {active.item.instruction}
+            </p>
           </motion.div>
         </>
       )}
@@ -176,7 +178,7 @@ export function AIAssistedSection() {
                     onMouseLeave={() => setActive(null)}
                     onFocus={(e) => showTooltip(item, e.currentTarget)}
                     onBlur={() => setActive(null)}
-                    className="group focus-visible:ring-offset-background relative rounded-full transition-[transform,box-shadow] duration-300 ease-out outline-none hover:-translate-y-0.5 focus-visible:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2"
+                    className="group focus-visible:ring-offset-background focus-visible:ring-ring relative rounded-full transition-[transform,box-shadow] duration-300 ease-out outline-none hover:-translate-y-0.5 focus-visible:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{
                       width: `${item.percent}%`,
                       backgroundColor: item.color,
@@ -236,7 +238,7 @@ export function AIAssistedSection() {
         <div className="text-center">
           <Link
             href="/interview"
-            className="group inline-flex items-center gap-2.5 rounded-full bg-[#adc6ff] px-7 py-3.5 text-sm font-semibold tracking-wide text-[#1a1917] shadow-[0_0_30px_rgba(173,198,255,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#c1d3ff] hover:shadow-[0_0_40px_rgba(173,198,255,0.4)]"
+            className="group bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-sm font-semibold tracking-wide shadow-[0_0_30px_rgba(196,112,63,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_40px_rgba(196,112,63,0.4)]"
           >
             <Zap className="h-4 w-4" />
             Practice Like the Real Thing

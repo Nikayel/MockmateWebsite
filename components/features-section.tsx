@@ -177,7 +177,7 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      className="relative flex items-center overflow-hidden bg-[#121110] px-4 py-12 font-[var(--font-geist)] sm:px-6 sm:py-16 lg:px-12 lg:py-20 xl:px-16"
+      className="bg-background relative flex items-center overflow-hidden px-4 py-12 font-[var(--font-geist)] sm:px-6 sm:py-16 lg:px-12 lg:py-20 xl:px-16"
     >
       {/* Dynamic Background Noise / Grid */}
       <div
@@ -187,7 +187,7 @@ export function FeaturesSection() {
             'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")',
         }}
       />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(167,139,250,0.06),transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(196,112,63,0.05),transparent_60%)]" />
 
       <div className="relative z-10 mx-auto w-full max-w-5xl">
         {/* Header */}
@@ -198,15 +198,15 @@ export function FeaturesSection() {
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <div className="mb-4 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 shadow-sm backdrop-blur-md">
-            <span className="text-xs font-semibold tracking-wider text-zinc-300 uppercase">
+          <div className="border-border bg-muted mb-4 inline-flex items-center rounded-full border px-3 py-1 shadow-sm backdrop-blur-md">
+            <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
               The practice system
             </span>
           </div>
-          <h2 className="font-heading text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.04em] text-white">
+          <h2 className="font-heading text-foreground text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.04em]">
             Every format. One feedback loop.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-[clamp(0.9rem,1.4vw,1.05rem)] leading-relaxed font-medium text-zinc-400">
+          <p className="text-muted-foreground mx-auto mt-4 max-w-xl text-[clamp(0.9rem,1.4vw,1.05rem)] leading-relaxed font-medium">
             From raw algorithm optimization to full FAANG loops — click any node to explore the
             journey, then drill into each format below.
           </p>
@@ -236,20 +236,18 @@ export function FeaturesSection() {
                   onClick={() => setActiveIndex(index)}
                   onMouseEnter={() => setActiveIndex(index)}
                   className={`group relative flex items-center justify-between rounded-2xl px-5 py-4 text-left transition-all duration-300 ${
-                    isActive
-                      ? "bg-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] backdrop-blur-md"
-                      : "hover:bg-white/[0.03]"
+                    isActive ? "bg-muted shadow-sm" : "hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-inner transition-colors duration-300 ${isActive ? type.textColor + " border border-white/[0.1] bg-white/[0.08]" : "border border-transparent bg-white/[0.02] text-zinc-500 group-hover:text-zinc-300"}`}
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-inner transition-colors duration-300 ${isActive ? type.textColor + " border-border bg-muted border" : "bg-muted/40 text-muted-foreground group-hover:text-muted-foreground border border-transparent"}`}
                     >
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
                       <h3
-                        className={`text-lg font-semibold tracking-tight transition-colors duration-300 ${isActive ? "text-white" : "text-zinc-400 group-hover:text-zinc-200"}`}
+                        className={`text-lg font-semibold tracking-tight transition-colors duration-300 ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}
                       >
                         {type.title}
                       </h3>
@@ -258,7 +256,7 @@ export function FeaturesSection() {
                   {isActive && (
                     <motion.div
                       layoutId="activeIndicator"
-                      className="flex items-center justify-center text-white/50"
+                      className="text-foreground/50 flex items-center justify-center"
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     >
                       <ChevronRight className="h-5 w-5" />
@@ -270,7 +268,7 @@ export function FeaturesSection() {
           </div>
 
           {/* Right Column: Stage */}
-          <div className="relative flex min-h-[360px] w-full items-center overflow-hidden rounded-3xl border border-white/[0.08] bg-zinc-900/40 shadow-2xl backdrop-blur-2xl lg:w-[55%]">
+          <div className="border-border bg-card relative flex min-h-[360px] w-full items-center overflow-hidden rounded-3xl border shadow-2xl backdrop-blur-2xl lg:w-[55%]">
             {/* Dynamic Background Glow mapped to active item */}
             <div
               className="absolute inset-0 opacity-20 transition-all duration-700 ease-in-out"
@@ -295,7 +293,7 @@ export function FeaturesSection() {
                 className="relative flex h-full w-full flex-col justify-center p-6 sm:p-10 lg:p-12"
               >
                 <div
-                  className={`mb-8 inline-flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/[0.1] bg-white/[0.05] shadow-inner ${activeType.textColor}`}
+                  className={`border-border bg-muted mb-8 inline-flex h-16 w-16 items-center justify-center rounded-[18px] border shadow-inner ${activeType.textColor}`}
                 >
                   <ActiveIcon
                     className="h-8 w-8 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]"
@@ -303,17 +301,17 @@ export function FeaturesSection() {
                   />
                 </div>
 
-                <h3 className="font-heading mb-3 text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                <h3 className="font-heading text-foreground mb-3 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">
                   {activeType.title}
                 </h3>
 
-                <p className="text-base leading-relaxed font-medium text-zinc-300 sm:text-lg">
+                <p className="text-muted-foreground text-base leading-relaxed font-medium sm:text-lg">
                   {activeType.description}
                 </p>
 
                 <ul className="mt-8 space-y-4">
                   {activeType.features.map((feature, i) => (
-                    <li key={i} className="flex items-center gap-3 text-zinc-400">
+                    <li key={i} className="text-muted-foreground flex items-center gap-3">
                       <CheckCircle2
                         className={`h-5 w-5 flex-shrink-0 ${activeType.textColor} opacity-80`}
                       />

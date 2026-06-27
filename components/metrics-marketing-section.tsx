@@ -13,7 +13,12 @@ import { MagneticButton } from "@/components/ui/magnetic-button"
  * dashboard mock + a 6-item "what gets tracked" grid, each with its own
  * gradients) with ONE calm bento: a single focal readiness ring, three quiet
  * supporting cells, and a compact tracked-signals strip. One accent (clay),
- * one soft wash, dark surface — low cognitive load, high scannability.
+ * one soft wash — low cognitive load, high scannability.
+ *
+ * Theme-aware: every surface/text/stroke maps through semantic tokens so it
+ * reads in both light and dark. The ring + bars are intentionally simple
+ * (accent fill on a neutral track) pending the Tremor data-surface rebuild
+ * (LPUI-401/402) — kept token-only so they survive the theme until then.
  */
 
 const PATTERN_BARS = [
@@ -36,7 +41,7 @@ const CIRCUMFERENCE = 2 * Math.PI * 56
 
 export function MetricsMarketingSection() {
   return (
-    <section className="relative overflow-hidden bg-[#1a1917] py-24">
+    <section className="bg-background relative overflow-hidden py-24">
       {/* One soft clay wash — no competing glows. */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(196,112,63,0.06),transparent_65%)]" />
 
@@ -49,16 +54,16 @@ export function MetricsMarketingSection() {
           transition={{ duration: 0.5 }}
           className="mx-auto mb-12 max-w-2xl text-center"
         >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
-            <BarChart3 className="h-3.5 w-3.5 text-[#d0824f]" />
-            <span className="text-xs font-semibold tracking-wide text-[#c5c1b6] uppercase">
+          <div className="border-border bg-muted mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1">
+            <BarChart3 className="text-accent h-3.5 w-3.5" />
+            <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
               Performance analytics
             </span>
           </div>
-          <h2 className="font-heading text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.03em] text-[#ece9e1]">
+          <h2 className="font-heading text-foreground text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.03em]">
             See exactly where you stand.
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-[#c5c1b6]">
+          <p className="text-muted-foreground mx-auto mt-3 max-w-xl text-base leading-relaxed">
             Every session becomes one readiness score, your weakest patterns, and the next move for
             your practice.
           </p>
@@ -76,7 +81,7 @@ export function MetricsMarketingSection() {
                   r="56"
                   strokeWidth="8"
                   fill="none"
-                  className="stroke-white/10"
+                  className="stroke-foreground/10"
                 />
                 <circle
                   cx="64"
@@ -85,17 +90,17 @@ export function MetricsMarketingSection() {
                   strokeWidth="8"
                   fill="none"
                   strokeLinecap="round"
-                  className="stroke-[#d0824f]"
+                  className="stroke-accent"
                   strokeDasharray={`${CIRCUMFERENCE * (READINESS / 100)} ${CIRCUMFERENCE}`}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-bold text-[#ece9e1]">{READINESS}%</span>
-                <span className="text-xs text-[#c5c1b6]">Ready</span>
+                <span className="text-foreground text-4xl font-bold">{READINESS}%</span>
+                <span className="text-muted-foreground text-xs">Ready</span>
               </div>
             </div>
-            <h3 className="mt-5 text-lg font-semibold text-[#ece9e1]">Interview readiness</h3>
-            <p className="mt-1 max-w-xs text-sm text-[#c5c1b6]">
+            <h3 className="text-foreground mt-5 text-lg font-semibold">Interview readiness</h3>
+            <p className="text-muted-foreground mt-1 max-w-xs text-sm">
               One score, calibrated to real FAANG rubrics, updated after every session.
             </p>
           </BentoCell>
@@ -107,33 +112,35 @@ export function MetricsMarketingSection() {
               {PATTERN_BARS.map((p) => (
                 <div key={p.name}>
                   <div className="mb-1 flex justify-between text-xs">
-                    <span className="text-[#c5c1b6]">{p.name}</span>
-                    <span className="text-[#ece9e1]">{p.score}%</span>
+                    <span className="text-muted-foreground">{p.name}</span>
+                    <span className="text-foreground">{p.score}%</span>
                   </div>
-                  <div className="relative h-1.5 rounded-full bg-white/10">
+                  <div className="bg-foreground/10 relative h-1.5 rounded-full">
                     <div
-                      className="h-full rounded-full bg-[#d0824f]"
+                      className="bg-accent h-full rounded-full"
                       style={{ width: `${p.score}%` }}
                     />
                     <div
-                      className="absolute top-1/2 h-3 w-px -translate-y-1/2 bg-[#c5c1b6]/60"
+                      className="bg-muted-foreground/60 absolute top-1/2 h-3 w-px -translate-y-1/2"
                       style={{ left: `${p.benchmark}%` }}
                     />
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[11px] text-[#c5c1b6]/60">Bar = you · tick = FAANG average</p>
+            <p className="text-muted-foreground/60 mt-3 text-[11px]">
+              Bar = you · tick = FAANG average
+            </p>
           </BentoCell>
 
           {/* Progress trend */}
           <BentoCell>
             <CellLabel icon={TrendingUp} title="Progress" />
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-[#ece9e1]">+12%</span>
-              <span className="text-xs text-[#c5c1b6]">this month</span>
+              <span className="text-foreground text-3xl font-bold">+12%</span>
+              <span className="text-muted-foreground text-xs">this month</span>
             </div>
-            <p className="mt-2 text-sm text-[#c5c1b6]">
+            <p className="text-muted-foreground mt-2 text-sm">
               Week-over-week, so real gains stand out from a one-session spike.
             </p>
           </BentoCell>
@@ -141,21 +148,24 @@ export function MetricsMarketingSection() {
           {/* Cognitive profiling */}
           <BentoCell>
             <CellLabel icon={Brain} title="Adapts to you" />
-            <p className="mt-3 text-sm text-[#c5c1b6]">
+            <p className="text-muted-foreground mt-3 text-sm">
               Detects whether you stall on setup, edge cases, or explaining, then targets it.
             </p>
           </BentoCell>
         </div>
 
         {/* Tracked signals — one compact strip instead of a 6-card grid */}
-        <div className="mx-auto mt-4 max-w-5xl rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="border-border bg-card mx-auto mt-4 max-w-5xl rounded-2xl border p-5">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <span className="text-xs font-semibold tracking-wide text-[#c5c1b6]/70 uppercase">
+            <span className="text-muted-foreground/70 text-xs font-semibold tracking-wide uppercase">
               What gets tracked
             </span>
             {TRACKED.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1.5 text-sm text-[#c5c1b6]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d0824f]" />
+              <span
+                key={t}
+                className="text-muted-foreground inline-flex items-center gap-1.5 text-sm"
+              >
+                <span className="bg-accent h-1.5 w-1.5 rounded-full" />
                 {t}
               </span>
             ))}
@@ -165,7 +175,7 @@ export function MetricsMarketingSection() {
         {/* CTA */}
         <div className="mt-10 text-center">
           <Link href="/signup">
-            <MagneticButton className="rounded-lg bg-[#c4703f] px-6 py-3 font-medium text-white transition-colors hover:bg-[#c4703f]/90">
+            <MagneticButton className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-lg px-6 py-3 font-medium transition-colors">
               Start tracking your progress
             </MagneticButton>
           </Link>
@@ -182,7 +192,7 @@ function BentoCell({ className, children }: { className?: string; children: Reac
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4 }}
-      className={`rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-[#d0824f]/30 ${className ?? ""}`}
+      className={`border-border bg-card hover:border-accent/30 rounded-2xl border p-6 transition-colors ${className ?? ""}`}
     >
       {children}
     </motion.div>
@@ -198,10 +208,10 @@ function CellLabel({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#d0824f]/10">
-        <Icon className="h-4 w-4 text-[#d0824f]" />
+      <span className="bg-accent/10 flex h-8 w-8 items-center justify-center rounded-lg">
+        <Icon className="text-accent h-4 w-4" />
       </span>
-      <h3 className="text-sm font-semibold text-[#ece9e1]">{title}</h3>
+      <h3 className="text-foreground text-sm font-semibold">{title}</h3>
     </div>
   )
 }

@@ -13,13 +13,19 @@ import Link from "next/link"
  * - Minimal text (one stat, one insight)
  * - Progressive disclosure (link to deep-dive)
  * - Visual > text for memory retention concept
+ *
+ * Theme-aware: panel surface, axis lines, axis labels and value callouts map
+ * through semantic tokens so the chart reads in light and dark. The two curve
+ * gradients keep their brand hues (clay→coral loss, neural retention) which
+ * read on both surfaces; the hand-rolled SVG is slated for the Tremor rebuild
+ * (LPUI-401), so it is kept token-driven only where contrast matters.
  */
 
 export function ProblemTeaser() {
   return (
     <section className="bg-background relative overflow-hidden py-20">
       {/* Subtle gradient flow - guides eye downward */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-950/20 to-transparent" />
+      <div className="via-foreground/[0.03] absolute inset-0 bg-gradient-to-b from-transparent to-transparent" />
 
       <div className="relative z-10 container mx-auto px-4">
         <ScrollReveal>
@@ -41,7 +47,7 @@ export function ProblemTeaser() {
                 transition={{ delay: 0.1 }}
                 className="font-heading text-foreground text-3xl font-bold md:text-4xl"
               >
-                You forget <span className="text-red-400">80%</span> within a week
+                You forget <span className="text-destructive">80%</span> within a week
               </motion.h2>
             </div>
 
@@ -56,7 +62,7 @@ export function ProblemTeaser() {
               {/* Subtle glow behind the chart */}
               <div className="from-accent/5 to-neural/5 absolute inset-0 rounded-2xl bg-gradient-to-r via-transparent blur-2xl" />
 
-              <div className="relative rounded-2xl border border-white/10 bg-[#1a1917] p-6 backdrop-blur-sm md:p-8">
+              <div className="border-border bg-card relative rounded-2xl border p-6 backdrop-blur-sm md:p-8">
                 {/* SVG Visualization - responsive with proper aspect ratio */}
                 <svg
                   viewBox="0 0 420 160"
@@ -92,25 +98,23 @@ export function ProblemTeaser() {
                     y1="130"
                     x2="380"
                     y2="130"
-                    stroke="#333"
+                    className="stroke-border"
                     strokeWidth="1"
-                    opacity="0.5"
                   />
                   <line
                     x1="40"
                     y1="20"
                     x2="40"
                     y2="130"
-                    stroke="#333"
+                    className="stroke-border"
                     strokeWidth="1"
-                    opacity="0.5"
                   />
 
                   {/* Y-axis label */}
                   <text
                     x="20"
                     y="75"
-                    fill="#666"
+                    className="fill-muted-foreground"
                     fontSize="10"
                     textAnchor="middle"
                     transform="rotate(-90, 20, 75)"
@@ -119,16 +123,16 @@ export function ProblemTeaser() {
                   </text>
 
                   {/* X-axis labels */}
-                  <text x="40" y="145" fill="#666" fontSize="9">
+                  <text x="40" y="145" className="fill-muted-foreground" fontSize="9">
                     Day 1
                   </text>
-                  <text x="150" y="145" fill="#666" fontSize="9">
+                  <text x="150" y="145" className="fill-muted-foreground" fontSize="9">
                     Day 3
                   </text>
-                  <text x="260" y="145" fill="#666" fontSize="9">
+                  <text x="260" y="145" className="fill-muted-foreground" fontSize="9">
                     Day 7
                   </text>
-                  <text x="360" y="145" fill="#666" fontSize="9">
+                  <text x="360" y="145" className="fill-muted-foreground" fontSize="9">
                     Day 30
                   </text>
 
@@ -173,7 +177,7 @@ export function ProblemTeaser() {
                       cx={point.cx}
                       cy={point.cy}
                       r="4"
-                      fill="#3fb883"
+                      className="fill-neural"
                       initial={{ scale: 0, opacity: 0 }}
                       whileInView={{ scale: 1, opacity: 1 }}
                       viewport={{ once: true }}
@@ -185,7 +189,7 @@ export function ProblemTeaser() {
                   <motion.text
                     x="390"
                     y="125"
-                    fill="#ff6b6b"
+                    className="fill-destructive"
                     fontSize="12"
                     fontWeight="600"
                     initial={{ opacity: 0 }}
@@ -200,7 +204,7 @@ export function ProblemTeaser() {
                   <motion.text
                     x="390"
                     y="50"
-                    fill="#3fb883"
+                    className="fill-neural"
                     fontSize="12"
                     fontWeight="600"
                     initial={{ opacity: 0 }}
@@ -216,11 +220,11 @@ export function ProblemTeaser() {
                 <div className="mt-4 flex flex-col items-center justify-center gap-3 text-xs sm:flex-row sm:gap-8">
                   <div className="flex items-center gap-2">
                     <div className="from-accent h-0.5 w-6 rounded-full bg-gradient-to-r to-red-400" />
-                    <span className="text-gray-400">Random practice</span>
+                    <span className="text-muted-foreground">Random practice</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="bg-neural h-0.5 w-6 rounded-full" />
-                    <span className="text-gray-400">With CodeSparring</span>
+                    <span className="text-muted-foreground">With CodeSparring</span>
                   </div>
                 </div>
               </div>
