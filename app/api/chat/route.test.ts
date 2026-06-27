@@ -50,6 +50,11 @@ vi.mock("@/lib/interview/response-validation", () => ({
   validateWithRetry: vi.fn(),
 }))
 
+vi.mock("@/lib/interview/conversation-extraction", () => ({
+  extractConversationState: vi.fn(),
+  shouldRunExtraction: vi.fn(),
+}))
+
 function createRequest(body: unknown) {
   const request = new NextRequest("http://localhost/api/chat", {
     method: "POST",
@@ -314,5 +319,54 @@ describe("/api/chat route", () => {
     expect(response.status).toBe(500)
     expect(response.data).toEqual({ error: "Failed to process chat message. Please try again." })
     expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+  })
+
+  it("returns the chat response without waiting on background conversation extraction", async () => {
+    await setupMocks()
+    const { shouldRunExtraction, extractConversationState } = await import(
+      "@/lib/interview/conversation-extraction"
+    )
+
+    // Force the deferred extraction to actually run for this request...
+    vi.mocked(shouldRunExtraction).mockReturnValue(true)
+
+    // ...but make the extraction LLM call hang forever. If the route ever awaits
+    // extraction in the request-critical path again, this never-resolving promise
+    // would block POST and time the test out — exactly the regression we want to
+    // catch. The response must come back while extraction is still pending.
+    let releaseExtraction: () => void = () => {}
+    const hangingExtraction = new Promise<Record<string, never>>((resolve) => {
+      releaseExtraction = () => resolve({})
+    })
+    vi.mocked(extractConversationState).mockReturnValue(
+      hangingExtraction as ReturnType<typeof extractConversationState>
+    )
+
+    const { createEmptyTracker } = await import("@/lib/interview/phases/tracker")
+    const { POST } = await import("./route")
+
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        message: "Here is my approach to the problem.",
+        context: [{ type: "user", message: "I am thinking about a hash map." }],
+        conversationTracker: createEmptyTracker(),
+        currentCode: "function twoSum(nums, target) { return [] }",
+        scenarioTitle: "Two Sum",
+        scenarioType: "dsa",
+        scenarioPattern: "arrays-hashing",
+        sessionId: "session-1",
+        userId: "user-1",
+      })
+    )
+
+    // The response is returned even though extraction is still pending.
+    expect(response.status).toBe(200)
+    // Extraction was triggered in the background (deferred after the response),
+    // proving it ran but did not block the request-critical path.
+    expect(extractConversationState).toHaveBeenCalledTimes(1)
+
+    // Let the background promise settle so it does not leak across tests.
+    releaseExtraction()
   })
 })
