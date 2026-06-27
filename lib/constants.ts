@@ -299,8 +299,28 @@ export const CIRCUIT_BREAKER = {
   FAILURE_THRESHOLD: 5,
   /** Reset circuit after this duration of no failures (ms) */
   RESET_MS: 60 * 1000,
-  /** Max requests allowed per user when circuit is open */
-  MAX_FAIL_OPEN_REQUESTS: 10,
+  /**
+   * Max requests allowed per user when the circuit is open (Firestore outage).
+   * NOTE: this counter is per warm serverless instance, so the effective
+   * allowance is this value times the number of warm instances. Kept low so
+   * the worst-case fail-open spend during an outage stays bounded; the
+   * aggregate backstop is COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD.
+   */
+  MAX_FAIL_OPEN_REQUESTS: 5,
+} as const
+
+// =============================================================================
+// Cost Protection (aggregate AI spend guardrails)
+// =============================================================================
+
+export const COST_PROTECTION = {
+  /**
+   * Hard ceiling on total AI spend (USD) across ALL users in a single UTC day.
+   * Acts as a global kill-switch backstop independent of per-user budgets so a
+   * surge (or many free accounts) cannot run an unbounded bill. Override at
+   * runtime with GLOBAL_DAILY_SPEND_CEILING_USD. Set to 0 to disable the gate.
+   */
+  GLOBAL_DAILY_SPEND_CEILING_USD: 50,
 } as const
 
 // =============================================================================
