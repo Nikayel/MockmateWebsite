@@ -15,6 +15,10 @@ yarn.lock
 /.next/
 /out/
 
+# test artifacts
+/playwright-report/
+/test-results/
+
 # production
 /build
 
@@ -56,6 +60,9 @@ next-env.d.ts
 !CONTRIBUTING.md
 !CHANGELOG.md
 !docs/*.md
+# ...but the `!docs/*.md` rule above re-includes macOS AppleDouble files like
+# docs/._BACKEND.md (they match docs/*.md). Re-exclude them explicitly.
+docs/._*
 
 # Local generated docs
 /docs/ai-engineer-intern-interview-guide.html
