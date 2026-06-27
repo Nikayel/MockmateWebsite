@@ -7,17 +7,17 @@ import { staggerContainer, staggerItem } from "@/lib/motion"
 import { trackEvent } from "@/lib/analytics"
 
 /**
- * Hero Section — differentiator-led, cognitive-load-reduced.
+ * Hero Section — premium minimal (Apple dark mode, not SaaS template).
  *
- * One focal column (single-accent headline → subhead → one clay CTA), then a
- * calm "product strip" of twin panels discovered on a short scroll as quiet
- * proof. The wedge is stated once in words (headline + subhead) and shown once
- * in product (panels), removing the prior 4x repetition of "Case Labs / Bug
- * fixes". Background collapsed to two layers (flat warm wash + one soft clay
- * glow): no particles, grid, noise, green glow, or double radial.
+ * One focal column (mono off-white headline → one-line subhead → asymmetric
+ * white CTA + ghost link), then a calm "product strip" of twin panels as quiet
+ * proof. Surface is a single flat #0A0A0A — no glow, no gradient on the dark
+ * surface; only a barely-there dot texture (~4% opacity) for depth. Orange is
+ * gone from the chrome; the cool blue (#5E8BFF) appears on hover/interaction
+ * only, never as a fill on a large surface.
  *
  * Note: GridBackground is intentionally NOT imported here — it is shared by
- * several other pages, so the hero inlines its own 2-layer background instead.
+ * several other pages, so the hero inlines its own flat background instead.
  */
 
 // Case Lab milestone flow shown in the right showcase panel.
@@ -33,11 +33,10 @@ export function HeroSection() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section className="relative flex min-h-[100svh] flex-col items-center overflow-hidden bg-[#1a1917] px-4 pt-[clamp(8rem,18vh,13rem)] pb-16 text-center font-[var(--font-geist)] md:px-16">
-      {/* Background — two layers only: a flat warm wash + one soft clay glow
-          anchored low enough to light both the headline and the panel strip. */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-[#1a1917] via-[#161513] to-[#1a1917]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[720px] bg-[radial-gradient(circle_at_50%_30%,rgba(196,112,63,0.07),rgba(26,25,23,0)_70%)]" />
+    <section className="font-ui relative flex min-h-[100svh] flex-col items-center overflow-hidden bg-[#0A0A0A] px-4 pt-[clamp(8rem,18vh,13rem)] pb-16 text-center md:px-16">
+      {/* Background — one flat surface. No glow, no gradient. A single barely-there
+          dot texture (~4% opacity) carries depth without reading as decoration. */}
+      <div className="pointer-events-none absolute inset-0 z-0 [background-image:radial-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:22px_22px] opacity-60" />
 
       {/* Content */}
       <motion.div
@@ -47,70 +46,66 @@ export function HeroSection() {
         animate={reduceMotion ? false : "animate"}
       >
         <motion.div variants={staggerItem} className="mx-auto flex max-w-4xl flex-col items-center">
-          {/* Eyebrow: calm, sentence-case product descriptor */}
-          <span className="text-accent mb-8 inline-flex rounded-full border border-white/10 bg-[#232220]/80 px-4 py-1.5 text-[12px] font-semibold tracking-[0.04em] lg:mb-9">
-            AI mock interviews for real engineering work
+          {/* Eyebrow: no-fill, hairline border, specific social proof — not a slogan */}
+          <span className="mb-8 inline-flex rounded-full border border-white/15 px-4 py-1.5 text-[12px] font-medium tracking-[0.02em] text-white/70 lg:mb-9">
+            Used by Palantir &amp; FAANG candidates
           </span>
 
-          {/* Focal point: single-accent, single-line wedge headline.
-              Swap-ready fallback if naming a competitor in the H1 needs review:
-              Practice the engineering rounds <span className="text-accent">others skip.</span> */}
+          {/* Focal point: one mono off-white wedge headline. No inline accent —
+              the copy carries itself. Geometric sans, weight 600, tight tracking. */}
           <motion.h1
             variants={staggerItem}
-            className="font-heading mb-6 text-[clamp(2.75rem,6.5vw,4.25rem)] leading-[1.05] font-extrabold tracking-[-0.04em] text-[#ece9e1]"
+            className="mb-6 text-[clamp(2.75rem,6.5vw,4.25rem)] leading-[1.05] font-semibold tracking-[-0.03em] text-[#f5f5f5]"
           >
-            Practice the interview rounds <span className="text-accent">LeetCode skips.</span>
+            Practice the interview rounds LeetCode skips.
           </motion.h1>
 
-          {/* One subhead — the single place both rounds are named */}
+          {/* One subhead — one sentence, no filler */}
           <motion.p
             variants={staggerItem}
-            className="mx-auto mb-8 max-w-2xl text-base leading-7 font-medium text-[#c5c1b6] sm:text-lg md:text-xl md:leading-8"
+            className="mx-auto mb-9 max-w-xl text-base leading-7 text-white/55 sm:text-lg md:text-xl md:leading-8"
           >
-            Carry a company-style case from clarify to build, or fix a failing test in a real repo,
-            with an AI interviewer that reacts as you work.
+            Carry a case from clarify to build — with an AI interviewer that reacts as you work.
           </motion.p>
 
-          {/* One loud primary CTA + one quiet secondary text link */}
+          {/* Asymmetric CTA: one solid white primary, one inline ghost text link.
+              Blue (#5E8BFF) is reserved for hover/interaction only. */}
           <motion.div
             variants={staggerItem}
-            className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4"
+            className="flex flex-col items-center gap-x-6 gap-y-4 sm:flex-row sm:justify-center"
           >
-            <Link
-              href="/interview"
-              onClick={() =>
-                trackEvent("cta_click", { location: "hero_primary", destination: "/interview" })
-              }
-              className="bg-accent inline-flex rounded-[14px] px-10 py-4 text-base font-extrabold text-[#1a1917] shadow-[0_0_32px_rgba(196,112,63,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-95 hover:shadow-[0_0_46px_rgba(196,112,63,0.34)]"
-            >
-              Try free
-            </Link>
+            <div className="flex flex-col items-center">
+              <Link
+                href="/interview"
+                onClick={() =>
+                  trackEvent("cta_click", { location: "hero_primary", destination: "/interview" })
+                }
+                className="inline-flex rounded-[8px] bg-white px-8 py-3.5 text-base font-semibold text-[#0A0A0A] transition-colors duration-200 hover:bg-white/90"
+              >
+                Try free
+              </Link>
+              {/* Microcopy lives directly under the primary button */}
+              <span className="mt-2.5 text-[12px] text-white/40">No credit card required.</span>
+            </div>
             <Link
               href="/labs"
               onClick={() =>
                 trackEvent("cta_click", { location: "hero_secondary", destination: "/labs" })
               }
-              className="hover:text-accent inline-flex items-center gap-1 px-2 py-4 text-base font-semibold text-[#e3ded3] transition-colors duration-200"
+              className="inline-flex items-center gap-1 text-base font-medium text-white/80 transition-colors duration-200 hover:text-[#5E8BFF]"
             >
               Explore Case Labs
               <ChevronRight className="h-4 w-4" />
             </Link>
           </motion.div>
-
-          <motion.p
-            variants={staggerItem}
-            className="mt-5 text-[13px] font-medium text-[#c5c1b6]/70"
-          >
-            No credit card required.
-          </motion.p>
         </motion.div>
 
         {/* Product strip: the twin rounds as quiet proof, below the focal column */}
         <motion.div
           variants={staggerItem}
-          className="mx-auto mt-[clamp(4rem,12vh,7rem)] w-full max-w-[1000px] px-2"
+          className="mx-auto mt-[clamp(5rem,14vh,8rem)] w-full max-w-[1000px] px-2"
         >
-          <p className="mb-5 text-[12px] font-semibold tracking-[0.1em] text-[#c5c1b6]/70 uppercase">
+          <p className="mb-8 text-[13px] font-semibold tracking-[0.14em] text-white/45 uppercase">
             Two rounds, one session
           </p>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
