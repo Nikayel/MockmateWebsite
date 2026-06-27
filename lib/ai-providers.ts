@@ -20,6 +20,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
 import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
+import { recordGlobalSpend } from "./global-spend-guard"
 import {
   checkRateLimit,
   recordRequestStart,
@@ -580,6 +581,11 @@ export async function generateAIResponse(
         const outputTokens = Math.ceil(text.length / 4)
         const totalTokens = inputTokens + outputTokens
         const cost = calculateCost(inputTokens, outputTokens, provider)
+
+        // Always feed the global daily spend ceiling, even if the call is not
+        // attributed to a user — this is the aggregate cost kill-switch and
+        // must see every dollar of LLM spend. Fire-and-forget (never throws).
+        void recordGlobalSpend(cost)
 
         // 4. Track usage
         if (userId) {
