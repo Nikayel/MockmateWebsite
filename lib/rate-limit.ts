@@ -428,27 +428,52 @@ function getStore(): RateLimitStore {
 }
 
 /**
- * Get client identifier (IP address or user ID)
+ * Get client identifier (trusted client IP) for rate limiting.
+ *
+ * SECURITY: We must derive the IP from a source the client cannot forge,
+ * otherwise an attacker can rotate the spoofed value to mint unlimited
+ * rate-limit buckets. On Vercel, `x-vercel-forwarded-for` and `x-real-ip`
+ * are written by the platform edge and overwrite any client-supplied value,
+ * so they are trustworthy. The plain `x-forwarded-for` header is a
+ * client-controlled, comma-separated chain whose LEFTMOST entries are
+ * attacker-supplied — so we only ever trust its RIGHTMOST (nearest-proxy)
+ * entry as a self-hosted fallback, never the leftmost.
+ *
+ * We deliberately do NOT trust `cf-connecting-ip` here: this app runs on
+ * Vercel (not behind Cloudflare), so that header is fully attacker-controlled.
+ *
+ * Exported (at the bottom of this file) for unit testing.
  */
 function getClientIdentifier(request: NextRequest): string {
-  // Try to get IP from headers (works with proxies/load balancers)
-  const forwarded = request.headers.get("x-forwarded-for")
-  const realIp = request.headers.get("x-real-ip")
-  const cfConnectingIp = request.headers.get("cf-connecting-ip") // Cloudflare
-
-  if (cfConnectingIp) {
-    return cfConnectingIp
+  // 1. Vercel-trusted client IP (cannot be spoofed by the client).
+  const vercelForwarded = request.headers.get("x-vercel-forwarded-for")
+  if (vercelForwarded) {
+    const ip = vercelForwarded.split(",")[0]?.trim()
+    if (ip) return ip
   }
 
-  if (forwarded) {
-    return forwarded.split(",")[0].trim()
-  }
-
+  // 2. x-real-ip is also set by the Vercel edge to the real client IP.
+  const realIp = request.headers.get("x-real-ip")?.trim()
   if (realIp) {
     return realIp
   }
 
-  // Fallback to a generic identifier
+  // 3. Self-hosted/proxy fallback: trust ONLY the rightmost x-forwarded-for
+  // entry (appended by the nearest trusted proxy). Leftmost entries are
+  // client-spoofable and must never be used as the identifier.
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) {
+    const parts = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+    if (parts.length > 0) {
+      return parts[parts.length - 1]
+    }
+  }
+
+  // Fallback to a generic identifier (shared bucket — fails toward stricter
+  // limiting rather than minting a fresh bucket per request).
   return "unknown"
 }
 
