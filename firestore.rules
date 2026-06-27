@@ -380,6 +380,33 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // AI USAGE & COST DATA (server-only — Admin SDK writes; no client access)
+    // ============================================================================
+    // These collections drive per-user budget enforcement and the global daily
+    // spend ceiling. They MUST never be client-writable: a client write could
+    // zero out recorded usage to bypass budget caps, or tamper with the global
+    // cost kill-switch. All legitimate writes happen server-side via the Admin
+    // SDK (which bypasses these rules). Reads of budget state also go through
+    // server API routes, never direct client SDK. Explicit here (rather than
+    // relying on the default-deny below) so the posture is auditable.
+
+    // Per-call usage events (collection) used for cost aggregation.
+    match /usage_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    // Aggregate global daily spend counter (global cost kill-switch backstop).
+    match /global_usage/{dayId} {
+      allow read, write: if false;
+    }
+
+    // Per-user usage summaries live at users/{uid}/usage_summaries/{period};
+    // the whole users/* tree is server-only (budget state is read via API).
+    match /users/{userId}/{document=**} {
+      allow read, write: if false;
+    }
+
+    // ============================================================================
     // DEFAULT DENY ALL
     // ============================================================================
 
