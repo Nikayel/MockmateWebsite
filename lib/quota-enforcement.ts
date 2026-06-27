@@ -17,6 +17,19 @@ import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
 import { PRICING_CONFIG } from "./config"
 import { CIRCUIT_BREAKER } from "./constants"
+import { isGlobalCeilingExceeded } from "./global-spend-guard"
+
+/**
+ * Options for quota enforcement.
+ */
+export interface QuotaOptions {
+  /**
+   * When true, requests without a verified Firebase auth token are rejected
+   * with 401 "please sign in" — used for cost-bearing AI/execution routes so
+   * signed-out (anonymous OR guest-header-only) callers cannot drive spend.
+   */
+  requireAuth?: boolean
+}
 
 // Circuit breaker state for fail-open protection
 // Tracks consecutive failures to prevent unlimited access during extended outages
@@ -304,10 +317,39 @@ async function getUserQuota(userId: string): Promise<UserQuota | null> {
  * Check if user has exceeded their quota
  */
 export async function checkQuota(
-  request: NextRequest
+  request: NextRequest,
+  options: QuotaOptions = {}
 ): Promise<QuotaCheckResult & { response?: NextResponse }> {
   // Get user ID from auth header only (never from body for security)
   const userId = await getUserIdFromRequest(request)
+
+  // Cost-bearing routes require a signed-in user. Reject anonymous AND
+  // guest-header-only callers up front so they cannot reach paid AI/execution.
+  if (!userId && options.requireAuth) {
+    const response = NextResponse.json(
+      {
+        error: "Authentication required",
+        message: "Please sign in to continue.",
+        code: "AUTH_REQUIRED",
+      },
+      { status: 401 }
+    )
+
+    logger.info("Blocked unauthenticated request to cost-bearing route")
+
+    return {
+      allowed: false,
+      userId: "anonymous",
+      tier: "free",
+      sessionsUsed: 0,
+      sessionsLimit: 0,
+      budgetUsed: 0,
+      budgetLimit: 0,
+      message: "Please sign in to continue.",
+      code: "AUTH_REQUIRED",
+      response,
+    }
+  }
 
   // If no user ID, check for guest ID and enforce guest quota
   if (!userId) {
@@ -509,6 +551,35 @@ export async function checkQuota(
       }
     }
 
+    // Global aggregate kill-switch: bound total platform AI spend per day
+    // regardless of how many individual (within-budget) users are active.
+    if (await isGlobalCeilingExceeded()) {
+      const response = NextResponse.json(
+        {
+          error: "Service temporarily unavailable",
+          message:
+            "AI features are temporarily paused due to unusually high usage. Please try again later.",
+          code: "GLOBAL_CAPACITY_LIMIT",
+        },
+        { status: 503 }
+      )
+
+      logger.error("Blocked request: global daily spend ceiling reached", { userId, tier })
+
+      return {
+        allowed: false,
+        userId,
+        tier,
+        sessionsUsed: quota.sessionsUsed,
+        sessionsLimit: quota.sessionsLimit,
+        budgetUsed: quota.budgetUsed,
+        budgetLimit: quota.budgetLimit,
+        message: "Service temporarily unavailable",
+        code: "GLOBAL_CAPACITY_LIMIT",
+        response,
+      }
+    }
+
     // All checks passed
     recordCircuitSuccess()
     return {
@@ -569,9 +640,10 @@ export async function checkQuota(
  *   // Continue with request processing...
  */
 export async function enforceQuota(
-  request: NextRequest
+  request: NextRequest,
+  options: QuotaOptions = {}
 ): Promise<{ allowed: boolean; response?: NextResponse; userId?: string; tier?: string }> {
-  const result = await checkQuota(request)
+  const result = await checkQuota(request, options)
 
   if (!result.allowed && result.response) {
     return { allowed: false, response: result.response }
