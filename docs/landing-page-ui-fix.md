@@ -35,16 +35,34 @@ Bring the landing page and its supporting surfaces to a premium, Apple-calm, low
 | Section reorder (comparison as closer) | ✅ Done |
 | Labs anon gating + `caseLabRuns` Firestore rule | ✅ Done |
 | `/pricing` 500 fix (unsplash host allowlist) | ✅ Done |
+| **Theme-aware conversion — Features, Metrics, Problem-teaser, AI-assisted, Footer** (LPUI-201/202 + extras) | ✅ Done (2026-06-26) |
+| **Periwinkle CTA (`#adc6ff`) → clay accent** (one-accent, AI-assisted "Practice Like the Real Thing") | ✅ Done (2026-06-26) |
+| **Token guard `pnpm check:theme`** (LPUI-103, report-only + `--strict`) | ✅ Done (2026-06-26) |
 
 ### Known-open (this plan covers these)
-- Typography/fonts not yet consolidated into one intentional system.
-- Always-dark marketing sections (features, comparison, metrics) are not theme-aware → light mode alternates dark/light bands.
-- Data surfaces still hand-rolled SVG (readiness ring, pattern bars).
+- Typography/fonts: **decision deferred** — keep Work Sans/Open Sans for now and run an A/B UX experiment before committing to a swap (see LPUI-101).
+- **Comparison section** ([`comparison-section.tsx`](../components/comparison-section.tsx)) self-declares an intentional full-bleed dark tile (`#232220`, "not theme-reactive by design"). The ratified rhythm (below) wants it theme-aware → **open decision: confirm-as-tile or convert (LPUI-203).**
+- Data surfaces still hand-rolled SVG (readiness ring, pattern bars) — kept token-only for now; real rebuild is LPUI-401/402 (Tremor).
 - No component-library tooling wired (Tremor, shadcn/21st.dev MCP).
 - Pricing comparison uses mislabeled stock photos, not real screenshots.
 - Unverifiable marketing stats ("+18 pts", "10k+ outcomes") still present.
 - No signature interaction (pinned Case Lab milestone scroll).
 - No `/features` deep page.
+
+> **Inventory correction (2026-06-26):** the original "always-dark = features, comparison, metrics" line was wrong on two counts. Ground-truth from the code: the hardcoded-dark sections were **Hero, Features, Metrics, Problem-teaser, AI-assisted** (+ Footer hardcoding light text); **Comparison is a *deliberate* dark tile**, not an accidental one. All of the accidental offenders are now theme-aware; Hero and Comparison are the only intentional dark tiles.
+
+### 2.1 Dark-tile manifest (ratified 2026-06-26)
+The keystone decision (was buried in LPUI-204, now pulled up-front so theming doesn't get redone): in **light mode**, the page is light/theme-aware **except** for deliberately-pinned dark tiles.
+
+| Section | Light-mode treatment | Status |
+|---|---|---|
+| Hero | **Intentional dark anchor** (single dramatic dark band) | ✅ Kept dark |
+| Relevance gap, Roadmap, AI-assisted, Features, Problem-teaser, Metrics, Footer | Theme-aware (flip with theme) | ✅ Converted |
+| Comparison (closer) | Currently an intentional dark tile; **pending confirm-or-convert** | ⏳ LPUI-203 |
+
+Rule: any new intentional dark tile must be added to this table **and** to the allow-list in `scripts/check-theme-tokens.mjs`; everything else must pass `pnpm check:theme`.
+
+**Page heroes (cross-page, 2026-06-27):** the homepage hero and the `/why-codesparring` hero are both intentional dark tiles, unified to brand warm charcoal `#1a1917` (not the cooler `#0A0A0A`), with **clay (`--accent`) as the only accent** — a stray `#5E8BFF` blue hover was removed from the why-codesparring hero, and its bouncing scroll-chevron cliché was cut. Keep any new page hero on `#1a1917` if it's dark.
 
 ---
 
@@ -126,7 +144,8 @@ Bring the landing page and its supporting surfaces to a premium, Apple-calm, low
 ### LPUI-E1 · Design system & typography
 
 #### LPUI-101 — [Spike/Decision] Ratify typography system
-**Status:** To Do · **P0 · 2pts · Depends:** —
+**Status:** Deferred — UX experiment · **P0 · 2pts · Depends:** —
+Decision (2026-06-26): **do not swap typefaces yet.** `--font-sans` is global (blog/docs/guides/legal read on it), so a Geist swap has whole-app blast radius. Keep Work Sans/Open Sans, run an A/B readability experiment, then commit. The canonical *type scale* (sizes/tracking/line-height) can still be enforced independently (LPUI-102) without changing fonts.
 Decide heading/body/code pairing and the canonical type scale; document in `globals.css` comments + this doc.
 - [ ] Pairing chosen and approved (Geist-led recommended)
 - [ ] Type scale tokens defined (display/H2/H3/body/eyebrow sizes, tracking, line-height)
@@ -140,32 +159,37 @@ Decide heading/body/code pairing and the canonical type scale; document in `glob
 - [ ] Eyebrows standardized (size, tracking, case)
 
 #### LPUI-103 — [Task] Token/lint guard against hardcoded colors
-**Status:** To Do · **P1 · 2pts · Depends:** —
-- [ ] ESLint/stylelint rule (or CI grep) flags `text-white`, `text-zinc-*`, `bg-black` on theme surfaces
-- [ ] Documented exceptions list (intentional dark tiles)
+**Status:** ✅ Done (2026-06-26) · **P1 · 2pts · Depends:** —
+- [x] CI grep flags `text-white`, `text-zinc/gray/slate-*`, `bg-black`, `border-white/`, theme-locked hexes on theme surfaces → `scripts/check-theme-tokens.mjs` (`pnpm check:theme`; `--strict` to gate CI)
+- [x] Documented exceptions list (intentional dark tiles): Hero + Comparison excluded; `bg-black/55` scrim allow-listed
+- [ ] _Follow-up:_ wire `pnpm check:theme --strict` into CI / pre-commit (currently report-only; baseline is clean so it can be flipped to blocking now)
 
 ### LPUI-E2 · Finish theme-aware light mode
 
 #### LPUI-201 — [Task] Make Features section theme-aware
-**Status:** To Do · **P0 · 3pts**
-- [ ] `#121110` pinned bg → semantic surface (or intentional dark tile, documented)
-- [ ] All `text-zinc-*`/`text-white` → tokens; readable in light mode
-- [ ] Orbital timeline + selector legible in both themes
+**Status:** ✅ Done (2026-06-26) · **P0 · 3pts**
+- [x] `#121110` pinned bg → `bg-background`; stray violet glow → clay wash (one-accent)
+- [x] All `text-zinc-*`/`text-white`/glass `bg-white/*` → tokens; readable in light mode
+- [x] Orbital timeline + selector/stage legible in both themes (`bg-muted`/`bg-card`/`border-border`)
+- [ ] _Follow-up:_ demote per-format glow colors (sky/violet/rose…) to one-accent in a dedicated pass
 
 #### LPUI-202 — [Task] Make Metrics bento theme-aware
-**Status:** To Do · **P1 · 2pts**
-- [ ] Bento cells use `bg-card`/`border-border`; ring + bars legible in light
-- [ ] One accent retained (clay)
+**Status:** ✅ Done (2026-06-26) · **P1 · 2pts**
+- [x] Bento cells use `bg-card`/`border-border`; ring track `stroke-foreground/10`, fill `stroke-accent`; bars `bg-accent` on `bg-foreground/10` → legible in light
+- [x] One accent retained (clay)
+- [ ] _Note (Flaw 3):_ ring/bars kept token-only (not re-styled) since LPUI-401/402 replaces them with Tremor — avoids double work
 
-#### LPUI-203 — [Task] Comparison section light-mode review
-**Status:** To Do · **P1 · 1pt**
-- [ ] Confirm the intentional dark tile is the desired choice in light mode, or convert
+#### LPUI-203 — [Task] Comparison section light-mode review  ← **the one open keystone decision**
+**Status:** To Do (needs design call) · **P1 · 1pt**
+[`comparison-section.tsx`](../components/comparison-section.tsx) self-declares a fixed dark tile (`#232220`, white price cards, dark text — readable in both modes by design). The ratified rhythm (§2.1) makes everything but Hero theme-aware, which would convert this. **Decision needed:**
+- [ ] **Option A — keep as intentional closer tile** (1 dark anchor at top + 1 dark closer; add it to the manifest as permanent). Zero risk; loses pure single-anchor rhythm.
+- [ ] **Option B — convert to theme-aware** (~40 inline-style hexes → `var(--card)/--card-foreground/--muted-foreground/--border/--accent`; section bg → `bg-background`). Straightforward token swap, but it's a redesign of a working, deliberately-styled section — do it knowingly, not silently.
 - [ ] Add the "real codebase" differentiator row (carried from earlier plan)
 
 #### LPUI-204 — [Task] Whole-page light/dark rhythm audit
-**Status:** To Do · **P1 · 2pts · Depends:** LPUI-201, LPUI-202
-- [ ] Decide uniform vs intentional alternating band rhythm; apply consistently
-- [ ] Screenshot every section in both themes
+**Status:** Decision made up-front · **P1 · 2pts · Depends:** — _(was: LPUI-201/202 — inverted; the rhythm **decision** is now §2.1, ratified before theming so sections weren't re-done)_
+- [x] Decide uniform vs intentional alternating band rhythm → **dark anchor (Hero) + theme-aware body**, see §2.1 manifest
+- [ ] Screenshot every section in both themes (375/768/1024/1440) — remaining QA, folds into LPUI-901
 
 ### LPUI-E3 · Component-library tooling
 
