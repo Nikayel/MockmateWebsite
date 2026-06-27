@@ -189,7 +189,19 @@ export async function getDueProblems(
     query = query.where("difficulty", "==", difficulty)
   }
 
-  // Get all problems with their review dates
+  // Only fetch problems whose next review falls inside the window we actually
+  // surface — today when includeUpcoming is false, otherwise the upcoming
+  // horizon. next_review_at is stored as an ISO-8601 string, which sorts
+  // chronologically, so an upper-bound string comparison lets Firestore filter
+  // and sort server-side instead of pulling the user's entire problem history
+  // into memory. There is no lower bound, so overdue items (next_review_at in
+  // the past) are still returned. Composite indexes for the pattern/difficulty
+  // + next_review_at combinations live in firestore.indexes.json.
+  const reviewWindowEnd = includeUpcoming ? upcomingEnd : todayEnd
+  query = query
+    .where("next_review_at", "<=", reviewWindowEnd.toISOString())
+    .orderBy("next_review_at", "asc")
+
   const snapshot = await query.get()
 
   const dueInMinutes: DueItem[] = [] // FSRS learning steps
