@@ -12,15 +12,17 @@ import { ChevronRight } from "lucide-react"
  * problem, you have a forgetting problem. We map your weak DSA patterns into a
  * roadmap and resurface each one right before you'd forget it.
  *
- * Premium-minimal styling (shared with the homepage hero): flat #0A0A0A surface
+ * Premium-minimal styling (shared with the homepage hero): flat #1a1917 surface
  * with a barely-there dot texture — no glow blobs, no gradient on the dark
  * surface — a no-fill pill, one mono off-white headline (geometric sans, weight
  * 600, tight tracking), one subhead, a compact 3-step "system" line, and an
- * asymmetric white CTA + ghost link. Blue (#5E8BFF) is hover-only.
+ * asymmetric white CTA + ghost link. Clay (--accent) is hover-only. This is an
+ * intentional dark tile (not theme-reactive), unified to the homepage hero's
+ * #1a1917 warm charcoal — see the dark-tile manifest in landing-page-ui-fix.md.
  */
 export function HeroSection() {
   return (
-    <section className="font-ui relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-[#0A0A0A] pt-20">
+    <section className="font-ui relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-[#1a1917] pt-20">
       {/* One flat surface + a barely-there dot texture (~4%). No blobs, no glow,
           no gradient on the dark surface. */}
       <div className="pointer-events-none absolute inset-0 z-0 [background-image:radial-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:22px_22px] opacity-60" />
@@ -78,7 +80,7 @@ export function HeroSection() {
             <div className="flex flex-col items-center">
               <Link
                 href="/roadmap"
-                className="inline-flex rounded-[8px] bg-white px-8 py-3.5 text-base font-semibold text-[#0A0A0A] transition-colors duration-200 hover:bg-white/90"
+                className="inline-flex rounded-[8px] bg-white px-8 py-3.5 text-base font-semibold text-[#1a1917] transition-colors duration-200 hover:bg-white/90"
               >
                 Create your roadmap
               </Link>
@@ -86,22 +88,13 @@ export function HeroSection() {
             </div>
             <Link
               href="/interview"
-              className="inline-flex items-center gap-1 text-base font-medium text-white/80 transition-colors duration-200 hover:text-[#5E8BFF]"
+              className="hover:text-accent inline-flex items-center gap-1 text-base font-medium text-white/80 transition-colors duration-200"
             >
               Try free practice
               <ChevronRight className="h-4 w-4" />
             </Link>
           </motion.div>
         </div>
-      </motion.div>
-
-      {/* Scroll indicator — neutral, calm */}
-      <motion.div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2"
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <ChevronRight className="h-6 w-6 rotate-90 text-white/25" />
       </motion.div>
     </section>
   )
