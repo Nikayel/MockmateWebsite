@@ -220,9 +220,17 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             : "\n\n[POST-INTERVIEW DISCUSSION: Continue discussing their solution. If they indicate they're done or have no questions, wrap up gracefully.]"
         }
 
+        if (!firebaseUser) {
+          setMessages((prev) => [...prev, { type: "ai", message: "Please sign in to continue." }])
+          return
+        }
+        const idToken = await firebaseUser.getIdToken()
         const response = await fetch("/api/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             message: userMessage + additionalContext,
             context: messages,
