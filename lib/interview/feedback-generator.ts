@@ -11,6 +11,7 @@
 
 import { User as FirebaseUser } from "firebase/auth"
 import { Scenario } from "@/lib/scenarios"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { getUserProfile, updateInterviewSession } from "@/lib/firestore-helpers"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
@@ -187,9 +188,12 @@ export async function generateFeedback({
         interviewerMessages
       )
 
+      const token = await getCurrentUserToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
       const feedbackResponse = await fetch("/api/generate-feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           code,
           scenarioTitle: scenario.title,
@@ -319,9 +323,12 @@ export async function generateSystemDesignFeedback({
         interviewerMessages
       )
 
+      const token = await getCurrentUserToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
       const feedbackResponse = await fetch("/api/generate-feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           code: code || "// Design notes completed via discussion",
           scenarioTitle: scenario.title,
@@ -436,9 +443,12 @@ Do NOT reintroduce yourself. Continue as if we're in the middle of a discussion 
 
 Be conversational and thorough - like a real interviewer debriefing after a coding interview.`
 
+    const token = await getCurrentUserToken()
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (token) headers.Authorization = `Bearer ${token}`
     const response = await fetch("/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         message: discussionPrompt,
         context: interviewerMessages,

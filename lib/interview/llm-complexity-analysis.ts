@@ -28,6 +28,8 @@ export interface LLMComplexityRequest {
   problemDescription?: string
   optimalTimeComplexity?: string
   optimalSpaceComplexity?: string
+  /** Firebase ID token for the authenticated `/api/analyze-complexity` call (null for guests). */
+  authToken?: string | null
 }
 
 /**
@@ -37,7 +39,8 @@ export interface LLMComplexityRequest {
 export async function analyzeComplexityWithLLM(
   request: LLMComplexityRequest
 ): Promise<LLMComplexityResult> {
-  const { code, language, problemTitle, optimalTimeComplexity, optimalSpaceComplexity } = request
+  const { code, language, problemTitle, optimalTimeComplexity, optimalSpaceComplexity, authToken } =
+    request
 
   const systemPrompt = `You are an expert algorithm analyst. Analyze the given code and determine its time and space complexity.
 
@@ -82,9 +85,11 @@ ${optimalSpaceComplexity ? `Known optimal space complexity: ${optimalSpaceComple
 Return ONLY valid JSON, no markdown code blocks.`
 
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (authToken) headers.Authorization = `Bearer ${authToken}`
     const response = await fetch("/api/analyze-complexity", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         systemPrompt,
         userPrompt,

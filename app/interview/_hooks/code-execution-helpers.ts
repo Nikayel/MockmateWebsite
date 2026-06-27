@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { isExecutionServiceError } from "@/lib/piston"
 import { executeScenarioInBrowser } from "@/lib/workspace-execution"
 import type { Scenario } from "@/lib/scenarios"
@@ -59,9 +60,12 @@ export async function executeScenario({
     return { ok: !browserResult.error, status: 200, data: browserResult }
   }
 
+  const token = await getCurrentUserToken()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers.Authorization = `Bearer ${token}`
   const response = await fetch("/api/execute", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       code,
       scenarioId: selectedScenario.id,
