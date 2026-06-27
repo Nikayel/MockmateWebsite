@@ -1,5 +1,6 @@
 import { toast } from "sonner"
 import type { Dispatch, SetStateAction } from "react"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import type { User, Profile } from "@/lib/types"
 import {
   analyzeCodeEfficiency,
@@ -64,6 +65,9 @@ export function usePostInterviewDiscussion(
 
       const optimalComplexity = (opts.selectedScenario as any)?.optimalComplexity
 
+      // Firebase ID token for authenticated API calls (null for guests)
+      const authToken = await getCurrentUserToken()
+
       // Use LLM-based complexity analysis for accurate semantic understanding
       // Falls back to regex-based analysis if LLM fails
       let llmComplexity: LLMComplexityResult | null = null
@@ -75,6 +79,7 @@ export function usePostInterviewDiscussion(
           problemDescription: opts.selectedScenario.description,
           optimalTimeComplexity: optimalComplexity?.time,
           optimalSpaceComplexity: optimalComplexity?.space,
+          authToken,
         })
       } catch (llmError) {
         console.warn("LLM complexity analysis failed, using regex fallback:", llmError)
@@ -132,9 +137,11 @@ Do NOT reintroduce yourself. Continue as if we're in the middle of a discussion 
 
 Be conversational and thorough - like a real interviewer debriefing after a coding interview. The candidate's responses during this discussion will be factored into their final score.`
 
+      const chatHeaders: Record<string, string> = { "Content-Type": "application/json" }
+      if (authToken) chatHeaders.Authorization = `Bearer ${authToken}`
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: chatHeaders,
         body: JSON.stringify({
           message: discussionPrompt,
           context: opts.interviewerMessages,

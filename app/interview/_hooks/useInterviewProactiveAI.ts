@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { extractTopicsFromMessage } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
 import type { ChatMessage } from "../_types"
@@ -241,9 +242,12 @@ Interviews are conversations, not just coding exercises.`
           contextPrompt = analyzeCodeForProactiveFeedback(code)
       }
 
+      const token = await getCurrentUserToken()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           message: contextPrompt,
           context: interviewerMessages,

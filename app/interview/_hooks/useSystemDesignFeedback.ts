@@ -1,6 +1,7 @@
 import { toast } from "sonner"
 import type { Dispatch, SetStateAction } from "react"
 import type { User } from "@/lib/types"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { markSessionEvaluating, updateInterviewSession } from "@/lib/firestore-helpers"
 import type { Scenario } from "@/lib/scenarios"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
@@ -104,6 +105,9 @@ export function useSystemDesignFeedback(
         return
       }
 
+      // Firebase ID token for authenticated API calls (null for guests)
+      const authToken = await getCurrentUserToken()
+
       const partnerMessagesSent = opts.chatMessages.filter((msg) => msg.type === "user").length
       const partnerMessagesReceived = opts.chatMessages.filter((msg) => msg.type === "ai").length
       const interviewerUserMessages = opts.interviewerMessages.filter((msg) => msg.type === "user")
@@ -182,9 +186,11 @@ export function useSystemDesignFeedback(
       ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
 
       // Generate feedback using the feedback API
+      const feedbackHeaders: Record<string, string> = { "Content-Type": "application/json" }
+      if (authToken) feedbackHeaders.Authorization = `Bearer ${authToken}`
       const feedbackResponse = await fetch("/api/generate-feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: feedbackHeaders,
         body: JSON.stringify({
           code: opts.code || "// Design notes completed via discussion",
           scenarioTitle: opts.selectedScenario.title,
@@ -404,9 +410,11 @@ export function useSystemDesignFeedback(
       // Trigger interviewer to provide final feedback
       const finalMessage = `The candidate has submitted their design. Please provide a brief summary of their performance, highlighting strengths and areas for improvement. Keep it concise (2-3 sentences).`
 
+      const chatHeaders: Record<string, string> = { "Content-Type": "application/json" }
+      if (authToken) chatHeaders.Authorization = `Bearer ${authToken}`
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: chatHeaders,
         body: JSON.stringify({
           message: finalMessage,
           context: opts.interviewerMessages,
