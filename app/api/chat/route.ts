@@ -140,8 +140,10 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
-  // Enforce quota limits (session & budget) and get user tier
-  const quotaResult = await enforceQuota(request)
+  // Enforce quota limits (session & budget) and get user tier.
+  // requireAuth: chat hits a paid LLM — signed-out callers are rejected with
+  // 401 "please sign in" before any model call.
+  const quotaResult = await enforceQuota(request, { requireAuth: true })
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
   }
@@ -196,7 +198,6 @@ export async function POST(request: NextRequest) {
       scenarioCompany,
       elapsedTime,
       sessionId,
-      userId,
       partnerMessagesCount,
       lastPartnerExchange,
       recentNudgeTopics,
@@ -218,6 +219,12 @@ export async function POST(request: NextRequest) {
       testsHaveRun,
       currentCodeLength,
     } = requestContext
+
+    // SECURITY: attribute cost/usage to the VERIFIED user (from the auth token
+    // via enforceQuota), never the client-supplied body field — passing a body
+    // userId would let a caller spoof another user's identity and drain their
+    // budget. requireAuth guarantees rateLimitUserId is a real uid here.
+    const userId = rateLimitUserId
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
