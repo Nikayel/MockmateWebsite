@@ -151,6 +151,25 @@ export const EditorColumn = memo(function EditorColumn({
       }
     : testSummary
 
+  // Guided-lab reveal signpost: once a later suite is unlocked (more than one
+  // suite revealed) and some suite passes while another fails, the failing row
+  // is the next bug — not a regression. Tell the learner so the "discovery"
+  // moment doesn't read as self-inflicted breakage.
+  const revealNotice = (() => {
+    if (!guideFiltered || revealedSuites.length <= 1) return undefined
+    const suitePassed = new Map<string, boolean>()
+    for (const result of visibleTestResults) {
+      const suite = String((result as { input?: unknown }).input ?? "")
+      suitePassed.set(suite, (suitePassed.get(suite) ?? true) && result.passed)
+    }
+    const states = Array.from(suitePassed.values())
+    const hasPassingSuite = states.some(Boolean)
+    const hasFailingSuite = states.some((ok) => !ok)
+    return hasPassingSuite && hasFailingSuite
+      ? "A new check unlocked when you fixed the first bug — and it's already failing. That's the next bug to fix, not a regression you caused."
+      : undefined
+  })()
+
   // Block Submit while a guided lab for this scenario is unfinished, so the user
   // can't submit before discovering and fixing the later bug.
   const guidedLabComplete = useGuidedLabComplete()
@@ -380,6 +399,7 @@ export const EditorColumn = memo(function EditorColumn({
             isRunningTests={isRunningTests}
             onClearConsole={onClearConsole}
             onGoToLine={onGoToLine}
+            notice={revealNotice}
           />
         )}
 

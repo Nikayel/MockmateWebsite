@@ -52,6 +52,8 @@ interface CodeConsoleProps {
   language?: "python" | "javascript" | "typescript"
   userCodeLineCount?: number // Total lines in user's code for validation
   onGoToLine?: (lineNum: number) => void
+  /** Optional info banner (e.g. guided-lab "a new check just unlocked"). */
+  notice?: string
 }
 
 /**
@@ -184,7 +186,6 @@ function getErrorType(
     lowerError.includes("division by zero") ||
     lowerError.includes("overflowerror") ||
     lowerError.includes("memoryerror") ||
-    lowerError.includes("assertionerror") ||
     lowerError.includes("index out of") ||
     lowerError.includes("list index") ||
     lowerError.includes("undefined") ||
@@ -269,6 +270,7 @@ export function CodeConsole({
   onClear,
   language = "python",
   userCodeLineCount,
+  notice,
 }: CodeConsoleProps) {
   const consoleRef = useRef<HTMLDivElement>(null)
   const userScrolledUpRef = useRef(false)
@@ -304,20 +306,32 @@ export function CodeConsole({
   const firstError = errorResults[0]?.error || null
   const errorInfo = firstError ? formatErrorMessage(firstError, language, userCodeLineCount) : null
 
+  // A one-line "here's what's wrong" lead so the learner doesn't scan rows to
+  // find the single failure. The message comes from the assert (expected X, got Y).
+  const failingVisibleTests = testResults.filter((result) => !result.passed && !result.isHidden)
+  const failureSummary =
+    !hasCodeError && failingVisibleTests.length > 0
+      ? `${failingVisibleTests.length} ${
+          failingVisibleTests.length === 1 ? "test" : "tests"
+        } failing — ${failingVisibleTests[0].description}${
+          failingVisibleTests[0].error ? `: ${failingVisibleTests[0].error}` : ""
+        }`
+      : null
+
   const isEmpty = outputs.length === 0 && testResults.length === 0 && !isRunning
 
   return (
     <div
       className={cn(
-        "flex flex-shrink-0 flex-col rounded border border-border bg-[#1e1d1b]",
+        "border-border flex flex-shrink-0 flex-col rounded border bg-[#1e1d1b]",
         className
       )}
     >
       {/* Console Header */}
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-[#232220] px-3 py-1.5">
+      <div className="border-border flex flex-shrink-0 items-center justify-between border-b bg-[#232220] px-3 py-1.5">
         <div className="flex items-center space-x-2">
-          <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">Console</span>
+          <Terminal className="text-muted-foreground h-3.5 w-3.5" />
+          <span className="text-muted-foreground text-xs font-medium">Console</span>
           {hasCodeError && (
             <Badge className="h-4 border-red-500/30 bg-red-500/20 px-1.5 text-[10px] text-red-400">
               Error
@@ -348,7 +362,7 @@ export function CodeConsole({
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0 text-muted-foreground hover:text-muted-foreground"
+              className="text-muted-foreground hover:text-muted-foreground h-5 w-5 p-0"
               onClick={onClear}
             >
               <Trash2 className="h-3 w-3" />
@@ -363,9 +377,17 @@ export function CodeConsole({
         onScroll={handleScroll}
         className="max-h-[200px] min-h-[100px] flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs"
       >
+        {/* Optional info banner (e.g. guided-lab reveal signpost) */}
+        {notice && (
+          <div className="border-accent/30 bg-accent/10 text-foreground mb-1 flex items-start gap-2 rounded border p-2 text-[11px]">
+            <span aria-hidden="true">💡</span>
+            <span className="break-words">{notice}</span>
+          </div>
+        )}
+
         {/* Empty state */}
         {isEmpty && (
-          <div className="flex items-center gap-2 py-2 text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2 py-2">
             <span className="text-muted-foreground">{">"}</span>
             <span className="italic">Run your code to see output here...</span>
           </div>
@@ -413,7 +435,7 @@ export function CodeConsole({
                         💡 {errorInfo.hint}
                       </div>
                     )}
-                    <div className="rounded bg-background/20 p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-red-300/80">
+                    <div className="bg-background/20 rounded p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-red-300/80">
                       {errorInfo.details}
                     </div>
                   </div>
@@ -421,10 +443,17 @@ export function CodeConsole({
               </div>
             )}
 
-            {/* Test result header */}
+            {/* Test result header + one-line failure lead */}
             {!hasCodeError && (
-              <div className="mb-1 border-t border-border/50 pt-1 text-muted-foreground">
-                Test Results:
+              <div className="border-border/50 mb-1 border-t pt-1">
+                {failureSummary ? (
+                  <div className="flex items-start gap-1.5 text-red-300">
+                    <XCircle className="mt-0.5 h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                    <span className="break-words">{failureSummary}</span>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Test Results:</span>
+                )}
               </div>
             )}
 
@@ -445,7 +474,9 @@ export function CodeConsole({
                   ) : (
                     <XCircle className="h-3 w-3 flex-shrink-0" />
                   )}
-                  <span className={result.passed ? "text-muted-foreground" : "text-muted-foreground"}>
+                  <span
+                    className={result.passed ? "text-muted-foreground" : "text-muted-foreground"}
+                  >
                     {result.description}
                   </span>
                 </div>
@@ -462,10 +493,12 @@ export function CodeConsole({
                       </div>
                     ) : (
                       <>
-                        {/* Always show input for debugging */}
-                        {result.input && (
+                        {/* Show input only when it's structured data (DSA test
+                            cases). Workspace results carry the suite name in
+                            `input` as a tag, which is noise to display here. */}
+                        {result.input != null && typeof result.input === "object" && (
                           <div className="flex items-start gap-2">
-                            <span className="w-14 text-muted-foreground">Input:</span>
+                            <span className="text-muted-foreground w-14">Input:</span>
                             <span className="break-all text-blue-300">
                               {JSON.stringify(result.input)}
                             </span>
@@ -474,19 +507,19 @@ export function CodeConsole({
                         {/* Show expected/got for wrong output, show error for code errors */}
                         {result.error ? (
                           <div className="flex items-start gap-2">
-                            <span className="w-14 text-muted-foreground">Error:</span>
+                            <span className="text-muted-foreground w-14">Error:</span>
                             <span className="break-all text-red-300">{result.error}</span>
                           </div>
                         ) : (
                           <>
                             <div className="flex items-start gap-2">
-                              <span className="w-14 text-muted-foreground">Expected:</span>
+                              <span className="text-muted-foreground w-14">Expected:</span>
                               <span className="break-all text-green-300">
                                 {JSON.stringify(result.expected)}
                               </span>
                             </div>
                             <div className="flex items-start gap-2">
-                              <span className="w-14 text-muted-foreground">Got:</span>
+                              <span className="text-muted-foreground w-14">Got:</span>
                               <span className="break-all text-red-300">
                                 {JSON.stringify(result.actual)}
                               </span>

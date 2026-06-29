@@ -377,6 +377,7 @@ export async function POST(request: NextRequest) {
           expected: "pass",
           actual: result.passed ? "pass" : "fail",
           error: result.error,
+          isHidden: result.isHidden,
         })),
       })
     }

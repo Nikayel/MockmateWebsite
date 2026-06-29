@@ -14,6 +14,7 @@ interface ConsoleOutputProps {
   isRunningTests: boolean
   onClearConsole: () => void
   onGoToLine?: (lineNum: number) => void
+  notice?: string
 }
 
 export function ConsoleOutput({
@@ -23,6 +24,7 @@ export function ConsoleOutput({
   isRunningTests,
   onClearConsole,
   onGoToLine,
+  notice,
 }: ConsoleOutputProps) {
   return (
     <CodeConsole
@@ -33,6 +35,7 @@ export function ConsoleOutput({
       className="max-h-[32vh] min-h-[140px]"
       onClear={onClearConsole}
       onGoToLine={onGoToLine}
+      notice={notice}
     />
   )
 }
