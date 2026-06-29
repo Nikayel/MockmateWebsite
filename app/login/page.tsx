@@ -1,9 +1,7 @@
 "use client"
 
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Github, Terminal, ArrowRight } from "lucide-react"
+import { Github, Terminal } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { useState, useEffect, Suspense } from "react"
@@ -11,7 +9,6 @@ import { toast } from "sonner"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { motion } from "framer-motion"
-import { GridBackground } from "@/components/GridBackground"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import Link from "next/link"
 import { getGuestId, confirmGuestSessionMigration, getGuestSessionData } from "@/lib/guest-session"
@@ -36,7 +33,6 @@ function LoginPageContent() {
     "idle" | "authenticating" | "creating-profile" | "complete"
   >("idle")
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
-  const [email, setEmail] = useState("")
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
@@ -296,21 +292,8 @@ function LoginPageContent() {
     }
   }
 
-  // Email sign-in is visual-only for now — OAuth (GitHub/Google) is the live path.
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast.info("Email sign-in is coming soon", {
-      description: "For now, continue with GitHub or Google.",
-    })
-  }
-
   return (
-    <main className="bg-background relative min-h-screen overflow-hidden">
-      {/* Subtle grid background like landing page */}
-      <GridBackground />
-
-      <Header />
-
+    <main className="bg-background relative min-h-screen">
       {/* Clean Loading Overlay */}
       {(authStatus === "authenticating" ||
         authStatus === "creating-profile" ||
@@ -368,15 +351,82 @@ function LoginPageContent() {
         </motion.div>
       )}
 
-      {/* Single focused section - Apple style */}
-      <section className="relative z-10 flex min-h-screen items-center justify-center pt-20 pb-16">
-        <motion.div
-          className="container mx-auto px-4"
-          variants={staggerContainer}
-          initial="initial"
-          animate="animate"
-        >
-          <div className="mx-auto max-w-sm">
+      {/* Split screen: testimonial (left) · sign-in (right) */}
+      <div className="grid min-h-screen lg:grid-cols-2">
+        {/* Left — testimonial pane */}
+        <div className="border-border bg-secondary/20 relative hidden flex-col justify-between overflow-hidden border-r p-12 lg:flex">
+          {/* warm radial glow */}
+          <div
+            className="pointer-events-none absolute -top-24 left-1/4 h-96 w-96 rounded-full opacity-40 blur-3xl"
+            style={{ background: "radial-gradient(circle, var(--accent) 0%, transparent 70%)" }}
+            aria-hidden="true"
+          />
+
+          {/* brand */}
+          <div className="relative z-10 flex items-center gap-2">
+            <span className="bg-accent h-2 w-2 rounded-full" />
+            <span className="text-foreground text-sm font-semibold tracking-tight">
+              CodeSparring
+            </span>
+          </div>
+
+          {/* quote */}
+          <div className="relative z-10 max-w-md">
+            <blockquote className="text-foreground text-3xl leading-snug font-semibold tracking-tight">
+              &ldquo;Walked into the Palantir onsite and the bug-fix round felt like a
+              warm-up.&rdquo;
+            </blockquote>
+            <div className="mt-6 flex items-center gap-3">
+              <div className="bg-accent/15 text-accent flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold">
+                MR
+              </div>
+              <div>
+                <div className="text-foreground text-sm font-medium">Maya R.</div>
+                <div className="text-muted-foreground text-xs">New-grad SWE · now at Palantir</div>
+              </div>
+            </div>
+          </div>
+
+          {/* stats */}
+          <div className="relative z-10 flex gap-10">
+            <div>
+              <div className="text-foreground text-2xl font-semibold">4</div>
+              <div className="text-muted-foreground text-xs">scored beats</div>
+            </div>
+            <div>
+              <div className="text-foreground text-2xl font-semibold">24/7</div>
+              <div className="text-muted-foreground text-xs">interviewer</div>
+            </div>
+            <div>
+              <div className="text-foreground text-2xl font-semibold">∞</div>
+              <div className="text-muted-foreground text-xs">follow-ups</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right — sign-in pane */}
+        <div className="relative flex items-center justify-center px-6 py-12">
+          <Link
+            href="/"
+            className="text-muted-foreground hover:text-foreground absolute top-6 right-6 text-xs transition-colors"
+          >
+            ← Back to site
+          </Link>
+
+          <motion.div
+            className="w-full max-w-sm"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            {/* brand (mobile only — left pane hidden on small screens) */}
+            <motion.div variants={staggerItem} className="mb-8 flex items-center gap-2 lg:hidden">
+              <span className="bg-accent h-2 w-2 rounded-full" />
+              <span className="text-foreground text-sm font-semibold tracking-tight">
+                CodeSparring
+              </span>
+            </motion.div>
+
             {/* Headline */}
             <motion.div variants={staggerItem} className="mb-8">
               <h1 className="text-foreground mb-2 text-3xl font-bold tracking-tight">
@@ -441,57 +491,8 @@ function LoginPageContent() {
               </Button>
             </motion.div>
 
-            {/* OR divider */}
-            <motion.div variants={staggerItem} className="my-6 flex items-center gap-4">
-              <div className="bg-border h-px flex-1" />
-              <span className="text-muted-foreground/70 text-xs font-medium tracking-[0.2em]">
-                OR
-              </span>
-              <div className="bg-border h-px flex-1" />
-            </motion.div>
-
-            {/* Email sign-in */}
-            <motion.form variants={staggerItem} onSubmit={handleEmailSubmit} className="space-y-3">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="text-muted-foreground mb-2 block text-xs font-medium"
-                >
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@email.com"
-                  disabled={isLoading}
-                  className="bg-secondary/40 border-border focus:border-accent focus:ring-accent/20 text-foreground placeholder:text-muted-foreground/50 h-12 w-full rounded-xl border px-4 text-sm transition outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="bg-accent hover:bg-accent/90 h-12 w-full rounded-xl text-sm font-semibold text-white transition-all duration-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Sign in
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </motion.form>
-
-            {/* Create account */}
-            <motion.div variants={staggerItem} className="mt-6 text-center">
-              <p className="text-muted-foreground text-sm">
-                New to CodeSparring?{" "}
-                <Link href="/login" className="text-accent font-medium hover:underline">
-                  Create an account
-                </Link>
-              </p>
-            </motion.div>
-
             {/* Terms */}
-            <motion.div variants={staggerItem} className="mt-4 text-center">
+            <motion.div variants={staggerItem} className="mt-6">
               <p className="text-muted-foreground/60 text-xs">
                 By continuing you agree to our{" "}
                 <Link
@@ -510,9 +511,9 @@ function LoginPageContent() {
                 .
               </p>
             </motion.div>
-          </div>
-        </motion.div>
-      </section>
+          </motion.div>
+        </div>
+      </div>
     </main>
   )
 }
