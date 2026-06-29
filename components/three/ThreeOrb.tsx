@@ -108,10 +108,11 @@ export function ThreeOrb({ variant = "hero" }: { variant?: OrbVariant }) {
     const field = new THREE.Points(fieldGeo, fieldMat)
     scene.add(field)
 
-    // Hero sits to the right and is offset; centered variants run larger.
+    // Hero copy is centered, so the orb is centered behind it (a slight upward
+    // lift keeps the densest part above the CTA row). Centered variants run larger.
     if (variant === "hero") {
-      group.position.x = 1.5
-      field.position.x = 1.2
+      group.position.y = 0.35
+      field.position.y = 0.2
     }
     if (variant === "geo") group.scale.setScalar(1.04)
 

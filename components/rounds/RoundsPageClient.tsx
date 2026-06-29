@@ -31,18 +31,20 @@ export function RoundsPageClient() {
       <section data-orb-section className="relative" style={{ height: "160vh" }}>
         <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
           <ThreeOrb variant="knot" />
-          {/* Radial scrim keeps the heading legible over the orb. */}
+          {/* Soft scrim — lifts heading contrast without hiding the orb. */}
           <div
             className="pointer-events-none absolute inset-0 z-[1]"
             style={{
               background:
-                "radial-gradient(ellipse 62% 52% at 50% 50%, var(--bg) 30%, transparent 100%)",
+                "radial-gradient(ellipse 58% 50% at 50% 50%, var(--bg) 10%, transparent 72%)",
+              opacity: 0.7,
             }}
           />
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
+            style={{ textShadow: "0 1px 24px var(--bg)" }}
             className="relative z-10 mx-auto max-w-2xl px-4 text-center"
           >
             <p className="text-accent mb-4 text-sm font-medium tracking-[0.14em] uppercase">

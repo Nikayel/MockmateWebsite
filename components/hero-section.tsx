@@ -35,12 +35,13 @@ export function HeroSection() {
           backgroundSize: "23px 23px",
         }}
       />
-      {/* Radial scrim — keeps the centered copy legible where it overlaps the orb. */}
+      {/* Soft radial scrim — lifts copy contrast a touch without hiding the orb
+          (text legibility is mainly carried by the token text-shadow below). */}
       <div
         className="pointer-events-none absolute inset-0 z-[1]"
         style={{
-          background:
-            "radial-gradient(ellipse 70% 60% at 50% 42%, var(--bg) 32%, transparent 100%)",
+          background: "radial-gradient(ellipse 58% 52% at 50% 44%, var(--bg) 8%, transparent 70%)",
+          opacity: 0.7,
         }}
       />
 
@@ -60,6 +61,7 @@ export function HeroSection() {
           {/* Focal point: one mono headline. No inline accent — the copy carries itself. */}
           <motion.h1
             variants={staggerItem}
+            style={{ textShadow: "0 1px 28px var(--bg), 0 1px 3px var(--bg)" }}
             className="text-foreground mb-6 text-[clamp(2.75rem,6.5vw,4.25rem)] leading-[1.05] font-semibold tracking-[-0.03em]"
           >
             Practice the interview rounds LeetCode skips.
@@ -68,6 +70,7 @@ export function HeroSection() {
           {/* One subhead — one sentence, no filler */}
           <motion.p
             variants={staggerItem}
+            style={{ textShadow: "0 1px 20px var(--bg)" }}
             className="text-muted-foreground mx-auto mb-9 max-w-xl text-base leading-7 sm:text-lg md:text-xl md:leading-8"
           >
             Carry a case from clarify to build — with an AI interviewer that reacts as you work.

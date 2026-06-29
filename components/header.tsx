@@ -283,10 +283,11 @@ export function Header() {
                       {item.label}
                     </Link>
                   ))}
+                  <ThemeToggle />
                   {/* Join us — neutral pill, distinct from the accent Sign-in CTA. */}
                   <Link
                     href="/careers"
-                    className="border-border text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:ring-accent/50 ml-2 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+                    className="border-border text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
                   >
                     Join us
                   </Link>
@@ -376,6 +377,10 @@ export function Header() {
                         {item.label}
                       </Link>
                     ))}
+                    <div className="flex items-center gap-3 py-1">
+                      <span className="text-muted-foreground text-sm">Theme</span>
+                      <ThemeToggle />
+                    </div>
                     <Link
                       href="/careers"
                       className="hover:text-accent text-muted-foreground cursor-pointer text-sm transition-colors duration-300"
