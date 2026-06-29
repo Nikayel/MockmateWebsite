@@ -258,7 +258,7 @@ function InterviewPageContent() {
   const isRecordingInterviewer = interviewerVoice.isRecording
 
   // AI hints states
-  const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(true) // Expanded by default
+  const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
   const hintAgent = useHintAgent({
     userId: user?.id || "",
     problemId: selectedScenario?.id || "",
