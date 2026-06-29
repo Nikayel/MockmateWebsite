@@ -31,6 +31,7 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "context",
       "currentCode",
       "edgeCases",
+      "guidedLab",
       "isEndingSession",
       "isPostInterview",
       "isProactive",
