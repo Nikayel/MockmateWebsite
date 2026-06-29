@@ -24,6 +24,7 @@ import {
 } from "@/components/interview/CodeConsole"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { cn } from "@/lib/utils"
+import { useRevealedTestSuites } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
 import type { EditorLanguage, WorkspaceContextFile } from "../_types"
 import {
@@ -123,6 +124,28 @@ export const EditorColumn = memo(function EditorColumn({
     ? getWorkspaceFileRoleStyle(activeWorkspaceFile.role)
     : null
   const ActiveRoleIcon = activeRoleStyle?.Icon
+
+  // Guided labs reveal a later bug's test suite only once its milestone unlocks,
+  // so the candidate discovers Bug 2 by verifying rather than seeing it up front.
+  // An empty revealed set means "no guided lab active → show everything".
+  const revealedSuites = useRevealedTestSuites()
+  const guideFiltered = revealedSuites.length > 0
+  const visibleTestResults = guideFiltered
+    ? testResults.filter((result) =>
+        revealedSuites.includes(String((result as { input?: unknown }).input ?? ""))
+      )
+    : testResults
+  const visiblePassed = visibleTestResults.filter((result) => result.passed).length
+  const visibleTestSummary = guideFiltered
+    ? {
+        total: visibleTestResults.length,
+        passed: visiblePassed,
+        failed: visibleTestResults.length - visiblePassed,
+        passRate: visibleTestResults.length
+          ? Math.round((visiblePassed / visibleTestResults.length) * 100)
+          : 0,
+      }
+    : testSummary
 
   const handleFileSelect = (file: WorkspaceContextFile) => {
     onFileSelect?.(file)
@@ -340,8 +363,8 @@ export const EditorColumn = memo(function EditorColumn({
         {isInterviewStarted && selectedScenario?.type !== "system-design" && (
           <ConsoleOutputPanel
             editorConsoleOutputs={editorConsoleOutputs}
-            testResults={testResults}
-            testSummary={testSummary}
+            testResults={visibleTestResults}
+            testSummary={visibleTestSummary}
             isRunningTests={isRunningTests}
             onClearConsole={onClearConsole}
             onGoToLine={onGoToLine}
