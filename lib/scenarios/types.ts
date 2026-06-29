@@ -5,6 +5,7 @@
 
 import { DSAPattern } from "../types/dsa-patterns"
 import type { ValidatorConfig, ReferenceSolution } from "../validators/types"
+import type { GuidedLabConfig } from "../bugfix/guided-lab/types"
 
 export type ScenarioType =
   | "dsa"
@@ -255,6 +256,11 @@ export interface BugFixScenario extends BaseScenario {
     validation?: ValidatorConfig
   }[]
   referenceSolution?: ReferenceSolution
+  /**
+   * Optional guided-lab overlay (sequential milestones, knowledge cards, quizzes).
+   * Present only on curated multi-bug labs like the BookClub reading-tracker lab.
+   */
+  guidedLab?: GuidedLabConfig
 }
 
 export interface SystemDesignScenario extends BaseScenario {

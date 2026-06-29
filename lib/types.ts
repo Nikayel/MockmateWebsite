@@ -2,6 +2,8 @@
  * Shared TypeScript types for the application
  */
 
+import type { GuidedLabProgress } from "./bugfix/guided-lab/types"
+
 export interface User {
   id: string
   email: string
@@ -196,6 +198,8 @@ export interface InterviewSession {
     chat_messages?: ChatMessage[]
     interviewer_messages?: ChatMessage[]
     is_post_interview_discussion?: boolean
+    /** Guided bug-fix lab progress (milestone gating), present only for guided labs. */
+    guided_lab_progress?: GuidedLabProgress
   }
   // Clarifying questions assessment (Real Interview Mode)
   clarifying_questions_assessment?: {
