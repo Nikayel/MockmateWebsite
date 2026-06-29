@@ -14,6 +14,33 @@ import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 
+type SetTheme = (value: string) => void
+
+/**
+ * Switch theme with a GPU-composited View Transitions crossfade.
+ *
+ * next-themes (0.4.6) applies the `.dark` class in a passive effect that runs
+ * after React commits — too late for the View Transition snapshot. So we toggle
+ * `.dark` imperatively inside the transition callback (the snapshot then sees
+ * the new theme), then call setTheme to sync next-themes' state + storage (its
+ * effect re-applies the same class idempotently). Falls back to an instant swap
+ * when the API is unavailable or the user prefers reduced motion.
+ */
+function applyTheme(setTheme: SetTheme, value: string) {
+  const root = document.documentElement
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  if (prefersReduced || typeof document.startViewTransition !== "function") {
+    setTheme(value)
+    return
+  }
+
+  document.startViewTransition(() => {
+    root.classList.toggle("dark", value === "dark")
+    setTheme(value)
+  })
+}
+
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -44,7 +71,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             role="radio"
             aria-checked={active}
             aria-label={label}
-            onClick={() => setTheme(value)}
+            onClick={() => applyTheme(setTheme, value)}
             className={cn(
               "flex h-6 w-6 items-center justify-center rounded transition-colors",
               active

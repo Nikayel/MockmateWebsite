@@ -230,9 +230,9 @@ html {
         <PerformancePolyfill />
         <ReferralCapture />
         <AttributionCapture />
-        {/* disableTransitionOnChange intentionally omitted: it injects
-            `transition: none` during the theme swap, which would kill the
-            light↔dark color crossfade defined in globals.css (@layer base). */}
+        {/* disableTransitionOnChange intentionally omitted. The light↔dark
+            crossfade is handled by the View Transitions API in
+            components/ThemeToggle.tsx, not a per-element CSS transition. */}
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <ErrorBoundaryProvider>
             <AuthProvider>

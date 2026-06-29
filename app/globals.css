@@ -137,26 +137,37 @@
  * Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
  */
 
-/* Smooth light↔dark crossfade — animates the color tokens when the .dark class
-   flips on <html>. Requires disableTransitionOnChange to be OFF on the
-   next-themes provider (see app/layout.tsx), otherwise next-themes injects a
-   `transition: none` during the swap and kills this effect. */
-@layer base {
-  *,
-  *::before,
-  *::after {
-    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
-    transition-duration: 0.45s;
-    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
+/* Light↔dark crossfade via the View Transitions API (triggered in
+   components/ThemeToggle.tsx). The browser snapshots the page and crossfades
+   old→new as a single GPU-composited layer, so the cost is independent of DOM
+   size — unlike a universal per-element color transition, which animated six
+   paint-heavy properties (incl. box-shadow + backdrop-blur re-rasterization) on
+   every node and caused the theme-toggle jank. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      transition-duration: 0s;
-    }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
   }
+}
+
+/* The blog uses a separate [data-blog-theme] system (not the .dark class on
+   <html>), so its toggle doesn't ride the root View Transition. Give that
+   subtree a lightweight, scoped color crossfade — confined to blog content, so
+   far cheaper than the old universal rule. (Reduced-motion is already
+   neutralized by the global * !important rule further down this file.) */
+[data-blog-theme],
+[data-blog-theme] *,
+[data-blog-theme] *::before,
+[data-blog-theme] *::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .dark.calm {
