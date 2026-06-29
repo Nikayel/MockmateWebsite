@@ -7,7 +7,7 @@
 :root {
   /* Neural Minimalism Light Theme (rarely used, dark is primary) */
   --background: #f9f8f5;
-  --foreground: #292824;
+  --foreground: #26241f;
   --card: #ffffff;
   --card-foreground: #292824;
   --popover: #ffffff;
@@ -17,17 +17,21 @@
   --secondary: #f3f2ee;
   --secondary-foreground: #292824;
   --muted: #f3f2ee;
-  --muted-foreground: #706d65;
-  --accent: #c4703f;
-  /* Brand clay (terracotta) */
+  --muted-foreground: #6c685f;
+  --accent: #bd6a39;
+  /* Brand clay (terracotta) — aligned to design handoff */
   --accent-foreground: #ffffff;
+  --accent-soft: rgba(189, 106, 57, 0.1);
+  --glow: rgba(189, 106, 57, 0.2);
+  --line: rgba(38, 36, 31, 0.08);
+  --faint: #a8a39a;
   --neural: #1d9e75;
   /* Success green */
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: #ffffff;
-  --border: #e2dfd6;
+  --border: #e6e2d8;
   --input: #ddd9d0;
-  --ring: #c4703f;
+  --ring: #bd6a39;
   --chart-1: oklch(0.73 0.134 210.86);
   /* Cyan */
   --chart-2: oklch(0.87 0.184 157.04);
@@ -41,12 +45,12 @@
   --radius: 0.625rem;
   --sidebar: #f3f2ee;
   --sidebar-foreground: #292824;
-  --sidebar-primary: #c4703f;
+  --sidebar-primary: #bd6a39;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f3f2ee;
   --sidebar-accent-foreground: #292824;
-  --sidebar-border: #e2dfd6;
-  --sidebar-ring: #c4703f;
+  --sidebar-border: #e6e2d8;
+  --sidebar-ring: #bd6a39;
 
   /* Light mode editor colors */
   --editor-bg: oklch(0.99 0 0);
@@ -83,6 +87,10 @@
   /* Brand clay accent (brightened for dark) */
   --accent: #d0824f;
   --accent-foreground: #1a1917;
+  --accent-soft: rgba(208, 130, 79, 0.14);
+  --glow: rgba(208, 130, 79, 0.45);
+  --line: rgba(236, 233, 225, 0.08);
+  --faint: #8a8780;
   --neural: #4cc79b;
   /* Success green */
   --destructive: oklch(0.62 0.16 15);
@@ -129,11 +137,26 @@
  * Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
  */
 
-/* Smooth transition for all color changes */
-.dark {
-  transition:
-    background-color 0.5s ease,
-    border-color 0.3s ease;
+/* Smooth light↔dark crossfade — animates the color tokens when the .dark class
+   flips on <html>. Requires disableTransitionOnChange to be OFF on the
+   next-themes provider (see app/layout.tsx), otherwise next-themes injects a
+   `transition: none` during the swap and kills this effect. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-duration: 0.45s;
+    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0s;
+    }
+  }
 }
 
 .dark.calm {

@@ -230,12 +230,10 @@ html {
         <PerformancePolyfill />
         <ReferralCapture />
         <AttributionCapture />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
+        {/* disableTransitionOnChange intentionally omitted: it injects
+            `transition: none` during the theme swap, which would kill the
+            light↔dark color crossfade defined in globals.css (@layer base). */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <ErrorBoundaryProvider>
             <AuthProvider>
               <RateLimitProvider>
