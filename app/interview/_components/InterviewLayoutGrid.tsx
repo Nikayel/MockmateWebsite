@@ -1,6 +1,7 @@
 "use client"
 
-import type { ComponentProps } from "react"
+import { useRef, type ComponentProps, type CSSProperties } from "react"
+import { useWorkspaceRails } from "../_hooks/useWorkspaceRails"
 import { FocusProblemPeek } from "./FocusProblemPeek"
 import { ProblemColumn, type ProblemColumnCtx } from "./ProblemColumn"
 import { EditorColumn } from "./EditorColumn"
@@ -143,14 +144,53 @@ export function InterviewLayoutGrid({
   userProfile,
   onActivePanelChange,
 }: InterviewLayoutGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { labWidth, intWidth, isDragging, startLabDrag, startIntDrag } =
+    useWorkspaceRails(containerRef)
+
   return (
     <div
-      className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden transition-all duration-300 sm:gap-2 ${
+      ref={containerRef}
+      className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 ${
+        isDragging ? "transition-none select-none" : "transition-all duration-300"
+      } ${
         focusMode
           ? "grid-cols-1" // Focus mode: editor only
-          : "grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_240px] xl:grid-cols-[360px_minmax(0,1fr)_260px] 2xl:grid-cols-[400px_minmax(0,1fr)_280px]"
+          : "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)_var(--w-int)]"
       }`}
+      style={
+        focusMode
+          ? undefined
+          : ({ "--w-lab": `${labWidth}px`, "--w-int": `${intWidth}px` } as CSSProperties)
+      }
     >
+      {/* Desktop-only resize handles — drag to give the code panel more room.
+          The center editor column is 1fr, so it absorbs whatever the rails give
+          up. Pointer-capture drag works for mouse + touch; widths persist. */}
+      {!focusMode && (
+        <>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize problem panel"
+            onPointerDown={startLabDrag}
+            className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
+            style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
+          >
+            <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize interviewer panel"
+            onPointerDown={startIntDrag}
+            className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
+            style={{ right: "calc(var(--w-int) + 0.25rem)" }}
+          >
+            <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
+          </div>
+        </>
+      )}
       {focusMode && (
         <FocusProblemPeek
           scenario={selectedScenario}
