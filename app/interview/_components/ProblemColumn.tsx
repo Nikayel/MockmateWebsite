@@ -16,10 +16,12 @@ import { Badge } from "@/components/ui/badge"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
+import type { GuidedLabConfig } from "@/lib/bugfix/guided-lab/types"
 import type { WorkspaceContextFile } from "../_types"
 import { ProblemHintSection } from "./_sub/ProblemHintSection"
 import { BugfixReflectionPanel } from "./_sub/BugfixReflectionPanel"
 import { WorkspaceFileViewer } from "./_sub/WorkspaceFileViewer"
+import { GuidedLabRail } from "./guided-lab/GuidedLabRail"
 
 export type BugfixReflectionField = "hypothesis" | "rootCause" | "prevention"
 
@@ -35,6 +37,7 @@ type ScenarioPanelDetails = Scenario & {
   successCriteria?: string[]
   userReport?: string
   visibleLogs?: string[]
+  guidedLab?: GuidedLabConfig
 }
 
 export interface ProblemColumnCtx {
@@ -110,6 +113,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
   const reproductionSteps = scenarioDetails?.reproductionSteps ?? []
   const successCriteria = scenarioDetails?.successCriteria ?? []
   const visibleLogs = scenarioDetails?.visibleLogs ?? []
+  const guidedLab = scenarioDetails?.guidedLab
 
   return (
     <>
@@ -148,6 +152,11 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
         </CardHeader>
         {/* IMPROVED: Better spacing and typography for readability */}
         <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+          {guidedLab && selectedScenario && (
+            <div className="border-border/60 bg-muted/20 rounded-lg border p-3">
+              <GuidedLabRail config={guidedLab} scenarioId={selectedScenario.id} />
+            </div>
+          )}
           {selectedScenario && (
             <>
               {/* IMPROVED: Description with larger font and visual hierarchy */}
