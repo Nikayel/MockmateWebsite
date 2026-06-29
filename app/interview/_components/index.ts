@@ -9,3 +9,4 @@ export { FeedbackLoadingState, type FeedbackLoadingStateProps } from "./Feedback
 export { GuestModeBanner } from "./GuestModeBanner"
 export { InterviewLayoutGrid } from "./InterviewLayoutGrid"
 export { InterviewFeedbackView } from "./InterviewFeedbackView"
+export { FileTreeSidebar } from "./FileTreeSidebar"
