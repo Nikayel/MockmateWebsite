@@ -4,98 +4,116 @@ import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
+import { MemoryBrain } from "@/components/three/MemoryBrain"
 
 /**
- * why-codesparring hero — the DSA retention / forgetting-curve story.
+ * why-codesparring hero — the DSA retention / forgetting-curve story, led by a
+ * 3D "memory brain" instead of a centered-text-in-void hero.
  *
- * The wedge here is memory, not problem count: you don't have a practice
- * problem, you have a forgetting problem. We map your weak DSA patterns into a
- * roadmap and resurface each one right before you'd forget it.
+ * Two columns: copy left, the {@link MemoryBrain} right (a swaying, cursor-reactive
+ * synapse cloud whose nodes fade then fire back to clay — recall kept alive). One
+ * idea, one action: a single headline, one subtitle, one primary CTA + a quiet
+ * ghost link, one trust line. No eyebrow pill, no multi-step strip — that stacked
+ * read generic and high-cognitive-load.
  *
- * Premium-minimal styling (shared with the homepage hero): flat #1a1917 surface
- * with a barely-there dot texture — no glow blobs, no gradient on the dark
- * surface — a no-fill pill, one mono off-white headline (geometric sans, weight
- * 600, tight tracking), one subhead, a compact 3-step "system" line, and an
- * asymmetric white CTA + ghost link. Clay (--accent) is hover-only. This is an
- * intentional dark tile (not theme-reactive), unified to the homepage hero's
- * #1a1917 warm charcoal — see the dark-tile manifest in landing-page-ui-fix.md.
+ * Fully theme-aware: surface, text, overlays, and the brain (faded-node + mote
+ * colors and the clay accent) all swap on light/dark via the design tokens, so
+ * the hero crossfades in step with the rest of the page.
  */
 export function HeroSection() {
   return (
-    <section className="font-ui relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-[#1a1917] pt-20">
-      {/* One flat surface + a barely-there dot texture (~4%). No blobs, no glow,
-          no gradient on the dark surface. */}
-      <div className="pointer-events-none absolute inset-0 z-0 [background-image:radial-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:22px_22px] opacity-60" />
+    <section className="font-ui bg-background relative overflow-hidden pt-20">
+      {/* One flat surface + a barely-there dot texture; dots invert per theme. */}
+      <div className="pointer-events-none absolute inset-0 z-0 [background-image:radial-gradient(rgba(38,36,31,0.05)_1px,transparent_1px)] [background-size:22px_22px] opacity-60 dark:[background-image:radial-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)]" />
 
-      <motion.div
-        className="relative z-10 container mx-auto px-4 text-center"
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-      >
-        <div className="mx-auto max-w-4xl">
-          <motion.div variants={staggerItem}>
-            <span className="mb-8 inline-flex rounded-full border border-white/15 px-4 py-1.5 text-[12px] font-medium tracking-[0.02em] text-white/70">
-              Spaced repetition, built for DSA
-            </span>
-          </motion.div>
-
-          <motion.h1
-            variants={staggerItem}
-            className="mb-6 text-[clamp(2.75rem,6.5vw,4.25rem)] leading-[1.05] font-semibold tracking-[-0.03em] text-[#f5f5f5]"
-          >
-            You don&apos;t forget interviews. You forget the patterns.
-          </motion.h1>
-
-          <motion.p
-            variants={staggerItem}
-            className="mx-auto mb-9 max-w-xl text-base leading-7 text-white/55 sm:text-lg md:text-xl md:leading-8"
-          >
-            We map your weak DSA patterns into a personalized roadmap and resurface each one right
-            before the forgetting curve takes it — so practice actually sticks by interview day.
-          </motion.p>
-
-          {/* The system, in three calm steps */}
-          <motion.ol
-            variants={staggerItem}
-            className="mx-auto mb-10 flex max-w-2xl flex-col items-center justify-center gap-2 text-[13px] text-white/45 sm:flex-row sm:gap-5"
-          >
-            <li className="flex items-center gap-2">
-              <span className="font-mono text-white/30">01</span> Map your weak patterns
-            </li>
-            <ChevronRight className="hidden h-3.5 w-3.5 text-white/20 sm:block" />
-            <li className="flex items-center gap-2">
-              <span className="font-mono text-white/30">02</span> Get a spaced roadmap
-            </li>
-            <ChevronRight className="hidden h-3.5 w-3.5 text-white/20 sm:block" />
-            <li className="flex items-center gap-2">
-              <span className="font-mono text-white/30">03</span> Review right before you forget
-            </li>
-          </motion.ol>
-
+      <div className="relative z-10 container mx-auto flex min-h-[86vh] items-center px-4 py-16">
+        <div className="grid w-full items-center gap-12 lg:grid-cols-2 lg:gap-8">
+          {/* Copy */}
           <motion.div
-            variants={staggerItem}
-            className="flex flex-col items-center gap-x-6 gap-y-4 sm:flex-row sm:justify-center"
+            className="max-w-xl"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
           >
-            <div className="flex flex-col items-center">
+            <motion.h1
+              variants={staggerItem}
+              className="text-foreground text-[clamp(2.5rem,5.5vw,4rem)] leading-[1.05] font-semibold tracking-[-0.03em]"
+            >
+              You don&apos;t forget interviews. You forget the patterns.
+            </motion.h1>
+
+            <motion.p
+              variants={staggerItem}
+              className="text-muted-foreground mt-6 max-w-lg text-base leading-7 md:text-lg md:leading-8"
+            >
+              We resurface each weak DSA pattern right before the forgetting curve takes it — so
+              your practice still holds on interview day.
+            </motion.p>
+
+            <motion.div
+              variants={staggerItem}
+              className="mt-9 flex flex-col items-start gap-x-6 gap-y-4 sm:flex-row sm:items-center"
+            >
               <Link
                 href="/roadmap"
-                className="inline-flex rounded-[8px] bg-white px-8 py-3.5 text-base font-semibold text-[#1a1917] transition-colors duration-200 hover:bg-white/90"
+                className="bg-foreground text-background hover:bg-foreground/90 inline-flex rounded-[8px] px-8 py-3.5 text-base font-semibold transition-colors duration-200"
               >
                 Create your roadmap
               </Link>
-              <span className="mt-2.5 text-[12px] text-white/40">No credit card required.</span>
+              <Link
+                href="/interview"
+                className="text-foreground/80 hover:text-accent inline-flex items-center gap-1 text-base font-medium transition-colors duration-200"
+              >
+                Try free practice
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </motion.div>
+
+            <motion.p variants={staggerItem} className="text-muted-foreground mt-5 text-[12px]">
+              No credit card required.
+            </motion.p>
+          </motion.div>
+
+          {/* The 3D memory brain */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.22, 0.61, 0.36, 1] }}
+            className="relative mx-auto aspect-square w-full max-w-[520px]"
+          >
+            {/* Canvas, masked so it fades into the panel edges. */}
+            <div className="absolute inset-0 [mask-image:radial-gradient(circle_at_center,black_55%,transparent_82%)] [-webkit-mask-image:radial-gradient(circle_at_center,black_55%,transparent_82%)]">
+              <MemoryBrain />
             </div>
-            <Link
-              href="/interview"
-              className="hover:text-accent inline-flex items-center gap-1 text-base font-medium text-white/80 transition-colors duration-200"
-            >
-              Try free practice
-              <ChevronRight className="h-4 w-4" />
-            </Link>
+
+            {/* Caption */}
+            <span className="text-muted-foreground pointer-events-none absolute top-5 left-5 font-mono text-[11px] tracking-wide">
+              Your recall, kept sharp
+            </span>
+
+            {/* LIVE chip */}
+            <div className="border-border bg-foreground/5 pointer-events-none absolute top-5 right-5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="bg-accent absolute inline-flex h-full w-full animate-ping rounded-full opacity-70" />
+                <span className="bg-accent relative inline-flex h-1.5 w-1.5 rounded-full" />
+              </span>
+              <span className="text-muted-foreground font-mono text-[10px] tracking-[0.15em]">
+                LIVE
+              </span>
+            </div>
+
+            {/* Legend */}
+            <div className="text-muted-foreground pointer-events-none absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 text-[11px]">
+              <span className="flex items-center gap-1.5">
+                <span className="bg-foreground/30 h-1.5 w-1.5 rounded-full" /> Fading
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="bg-accent h-1.5 w-1.5 rounded-full" /> Refreshed
+              </span>
+            </div>
           </motion.div>
         </div>
-      </motion.div>
+      </div>
     </section>
   )
 }
