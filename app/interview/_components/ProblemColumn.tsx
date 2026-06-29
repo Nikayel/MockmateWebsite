@@ -144,7 +144,7 @@ export const ProblemColumn = memo(function ProblemColumn({
       >
         {/* IMPROVED: Enhanced header with title and difficulty badge */}
         <CardHeader className="border-border/50 flex-shrink-0 border-b px-4 pt-3 pb-2">
-          <CardTitle className="text-foreground flex items-center justify-between">
+          <CardTitle className="text-foreground flex w-full min-w-0 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <Target className="text-accent h-5 w-5 flex-shrink-0" />
               <span className="truncate text-base font-semibold">

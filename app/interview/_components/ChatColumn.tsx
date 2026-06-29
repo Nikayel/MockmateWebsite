@@ -68,7 +68,7 @@ export const ChatColumn = memo(function ChatColumn({
       }`}
     >
       <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
-        <CardTitle className="flex items-center justify-between text-sm text-foreground">
+        <CardTitle className="flex w-full min-w-0 items-center justify-between gap-2 text-sm text-foreground">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="relative flex-shrink-0">
               <div className="bg-accent/15 text-accent ring-accent/30 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ring-1">
