@@ -350,13 +350,16 @@ TODAY = date(2026, 6, 28)
 
 def run_tests(record):
     def current_streak_counts_consecutive_finished_days():
-        assert calculate_streak(1, TODAY) == 3
+        actual = calculate_streak(1, TODAY)
+        assert actual == 3, f"expected a 3-day reading streak, got {actual}"
 
     def books_finished_this_month_unchanged():
-        assert books_this_month(1, TODAY) == 3
+        actual = books_this_month(1, TODAY)
+        assert actual == 3, f"expected 3 books finished this month, got {actual}"
 
     def total_pages_read_unchanged():
-        assert total_pages_read(1) == 950
+        actual = total_pages_read(1)
+        assert actual == 950, f"expected 950 total pages read, got {actual}"
 
     record(
         "current streak counts consecutive finished days",
@@ -372,7 +375,8 @@ const testHistoryOrder = `from app.services.reading_service import get_reading_h
 def run_tests(record):
     def history_is_most_recently_finished_first():
         history = get_reading_history(1)
-        assert [event.book_id for event in history] == [3, 2, 1]
+        got = [event.book_id for event in history]
+        assert got == [3, 2, 1], f"expected book order [3, 2, 1] (most recently finished first), got {got}"
 
     record(
         "history is ordered most recently finished first",
@@ -389,13 +393,16 @@ TODAY = date(2026, 6, 28)
 
 def run_tests(record):
     def in_progress_only_user_has_no_streak():
-        assert calculate_streak(3, TODAY) == 0
+        actual = calculate_streak(3, TODAY)
+        assert actual == 0, f"expected streak 0 for an in-progress-only reader, got {actual}"
 
     def no_finish_today_means_no_current_streak():
-        assert calculate_streak(2, TODAY) == 0
+        actual = calculate_streak(2, TODAY)
+        assert actual == 0, f"expected streak 0 when nothing was finished today, got {actual}"
 
     def a_gap_truncates_the_streak():
-        assert calculate_streak(4, TODAY) == 2
+        actual = calculate_streak(4, TODAY)
+        assert actual == 2, f"expected streak 2 (a missed day truncates it), got {actual}"
 
     record("in-progress-only user has no streak", in_progress_only_user_has_no_streak)
     record("no finish today means no current streak", no_finish_today_means_no_current_streak)
@@ -408,14 +415,16 @@ const testHistoryHidden = `from app.services.reading_service import get_reading_
 def run_tests(record):
     def in_progress_books_excluded_from_history():
         history = get_reading_history(1)
-        assert all(event.finished_at is not None for event in history)
-        assert len(history) == 3
+        assert all(event.finished_at is not None for event in history), "history should exclude in-progress books"
+        assert len(history) == 3, f"expected 3 finished books in history, got {len(history)}"
 
     def history_order_holds_for_other_users():
-        assert [event.book_id for event in get_reading_history(2)] == [5, 6]
+        got = [event.book_id for event in get_reading_history(2)]
+        assert got == [5, 6], f"expected book order [5, 6] for the second reader, got {got}"
 
     def in_progress_only_user_has_empty_history():
-        assert get_reading_history(3) == []
+        got = get_reading_history(3)
+        assert got == [], f"expected an empty history, got {[event.book_id for event in got]}"
 
     record("in-progress books excluded from history", in_progress_books_excluded_from_history)
     record("history order holds for other users", history_order_holds_for_other_users)
@@ -439,6 +448,18 @@ def record_factory(suite):
             fn()
             results.append(
                 {"suite": suite, "name": name, "passed": True, "error": None, "isHidden": "hidden" in suite.lower()}
+            )
+        except AssertionError as exc:
+            # A failed check should read as a clear "expected X, got Y", never a
+            # raw stack trace. Asserts carry messages; this is the safety net.
+            results.append(
+                {
+                    "suite": suite,
+                    "name": name,
+                    "passed": False,
+                    "error": str(exc) or (name + " failed"),
+                    "isHidden": "hidden" in suite.lower(),
+                }
             )
         except Exception as exc:
             results.append(
