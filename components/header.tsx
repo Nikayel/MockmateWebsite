@@ -147,13 +147,13 @@ export function Header() {
     return () => window.removeEventListener("hashchange", syncHash)
   }, [pathname])
 
-  // 12px (up from 11px) and slightly looser tracking for legibility; uppercase
-  // is kept to match the brand wordmark/CTA treatment.
-  // Apple-calm marketing links: sentence case, light weight, no tracking, no
-  // periwinkle. Active reads via weight + brightness, not a heavy underline.
+  // Apple-calm marketing links: sentence case, light weight, no tracking.
+  // Active reads via weight + brightness (theme tokens, so it tracks light/dark).
   const marketingTabClass = (active: boolean) =>
-    `cursor-pointer rounded-sm text-[13px] tracking-normal transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-      active ? "font-medium text-white" : "font-normal text-white/55 hover:text-white"
+    `focus-visible:ring-accent/50 cursor-pointer rounded-sm text-[13px] tracking-normal transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+      active
+        ? "text-foreground font-medium"
+        : "text-muted-foreground hover:text-foreground font-normal"
     }`
 
   const handleSignOut = async () => {
@@ -170,13 +170,13 @@ export function Header() {
       style={{ top: "var(--announcement-banner-height, 0px)" }}
       className="fixed inset-x-0 z-50 transition-colors duration-300"
     >
-      {/* Edge-to-edge translucent bar — blends into the dark hero, then a
-          hairline materializes on scroll. Apple-slim 56px row. */}
+      {/* Edge-to-edge translucent bar — blends into the hero in both themes,
+          then a hairline materializes on scroll. Apple-slim 56px row. */}
       <div
         className={`border-b backdrop-blur-xl transition-colors duration-300 ${
           isScrolled
-            ? "border-white/10 bg-[#1a1917]/85 shadow-lg shadow-black/20"
-            : "border-transparent bg-[#1a1917]/70"
+            ? "border-border bg-background/85 shadow-lg shadow-black/10"
+            : "bg-background/70 border-transparent"
         }`}
       >
         <div className={`mx-auto px-4 sm:px-6 ${user ? "max-w-7xl" : "max-w-6xl"}`}>
@@ -197,7 +197,7 @@ export function Header() {
                 }
               }}
             >
-              <span className="text-lg font-semibold tracking-[-0.02em] text-[#f1f2f7] transition-colors group-hover:text-white">
+              <span className="text-foreground text-lg font-semibold tracking-[-0.02em] transition-colors">
                 CodeSparring
               </span>
             </Link>
@@ -206,7 +206,7 @@ export function Header() {
             <nav className={`hidden items-center md:flex ${user ? "space-x-5" : "gap-8"}`}>
               {!initialized ? (
                 <div className="flex h-10 items-center">
-                  <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-white opacity-50"></div>
+                  <div className="border-foreground h-5 w-5 animate-spin rounded-full border-b-2 opacity-50"></div>
                 </div>
               ) : user ? (
                 <>
@@ -220,8 +220,8 @@ export function Header() {
                           aria-current={active ? "page" : undefined}
                           className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
                             active
-                              ? "bg-white/10 text-white"
-                              : "text-white/65 hover:bg-white/5 hover:text-white"
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                           }`}
                         >
                           {item.label}
@@ -229,7 +229,7 @@ export function Header() {
                       )
                     })}
                   </div>
-                  <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
+                  <div className="border-border flex items-center space-x-3 border-l pl-4">
                     <ThemeToggle />
                     <NotificationBell />
                     <DropdownMenu>
@@ -237,7 +237,7 @@ export function Header() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-accent max-w-[210px] gap-2 rounded-full px-3 text-white/90 hover:bg-white/10"
+                          className="hover:text-accent text-foreground/90 hover:bg-foreground/10 max-w-[210px] gap-2 rounded-full px-3"
                         >
                           <User className="h-4 w-4" />
                           <span className="max-w-[140px] truncate">{userDisplayName}</span>
@@ -246,16 +246,16 @@ export function Header() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-56 border-white/10 bg-[#1a1917] text-white shadow-xl shadow-black/30"
+                        className="border-border bg-popover text-popover-foreground w-56 shadow-xl shadow-black/20"
                       >
                         <DropdownMenuLabel className="font-normal">
-                          <span className="block text-xs text-white/50">Signed in as</span>
-                          <span className="block truncate text-sm text-white/90">
+                          <span className="text-muted-foreground block text-xs">Signed in as</span>
+                          <span className="text-foreground/90 block truncate text-sm">
                             {userDisplayName}
                           </span>
                         </DropdownMenuLabel>
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <DropdownMenuItem asChild className="cursor-pointer focus:bg-white/10">
+                        <DropdownMenuSeparator className="bg-border" />
+                        <DropdownMenuItem asChild className="focus:bg-foreground/10 cursor-pointer">
                           <Link href="/account" className="flex items-center gap-2">
                             <User className="h-4 w-4" />
                             Account
@@ -263,7 +263,7 @@ export function Header() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleSignOut}
-                          className="cursor-pointer gap-2 text-[#adc6ff] focus:bg-[#adc6ff] focus:text-[#1a1917]"
+                          className="text-muted-foreground focus:bg-foreground/10 focus:text-foreground cursor-pointer gap-2"
                         >
                           <LogOut className="h-4 w-4" />
                           Sign Out
@@ -283,9 +283,16 @@ export function Header() {
                       {item.label}
                     </Link>
                   ))}
+                  {/* Join us — neutral pill, distinct from the accent Sign-in CTA. */}
+                  <Link
+                    href="/careers"
+                    className="border-border text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:ring-accent/50 ml-2 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    Join us
+                  </Link>
                   <Link
                     href="/login"
-                    className="border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 ml-2 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+                    className="border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
                   >
                     Sign in
                   </Link>
@@ -295,7 +302,7 @@ export function Header() {
 
             {/* Mobile Menu Button */}
             <button
-              className="cursor-pointer text-white md:hidden"
+              className="text-foreground cursor-pointer md:hidden"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -304,11 +311,11 @@ export function Header() {
 
           {/* Mobile Navigation */}
           {isMobileMenuOpen && (
-            <nav className="mt-4 border-t border-white/10 pb-4 md:hidden">
+            <nav className="border-border mt-4 border-t pb-4 md:hidden">
               <div className="flex flex-col space-y-4 pt-4">
                 {!initialized ? (
                   <div className="flex justify-center py-4">
-                    <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-white opacity-50"></div>
+                    <div className="border-foreground h-6 w-6 animate-spin rounded-full border-b-2 opacity-50"></div>
                   </div>
                 ) : user ? (
                   <>
@@ -321,7 +328,7 @@ export function Header() {
                           href={item.href}
                           aria-current={active ? "page" : undefined}
                           className={`flex items-center space-x-2 transition-colors duration-300 ${
-                            active ? "text-[#adc6ff]" : "hover:text-accent text-white/90"
+                            active ? "text-accent" : "hover:text-accent text-foreground/90"
                           }`}
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -332,21 +339,21 @@ export function Header() {
                     })}
                     <Link
                       href="/account"
-                      className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
+                      className="hover:text-accent text-foreground/90 flex items-center space-x-2 transition-colors duration-300"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       <User className="h-4 w-4" />
                       <span>Account</span>
                     </Link>
-                    <div className="border-t border-white/10 pt-4">
-                      <p className="mb-2 text-sm text-gray-400">{userDisplayName}</p>
+                    <div className="border-border border-t pt-4">
+                      <p className="text-muted-foreground mb-2 text-sm">{userDisplayName}</p>
                       <Button
                         onClick={() => {
                           handleSignOut()
                           setIsMobileMenuOpen(false)
                         }}
                         variant="outline"
-                        className="border-accent/50 text-accent hover:bg-accent w-fit bg-transparent transition-all duration-300 hover:text-black"
+                        className="border-accent/50 text-accent hover:bg-accent hover:text-accent-foreground w-fit bg-transparent transition-all duration-300"
                       >
                         <LogOut className="mr-2 h-4 w-4" />
                         Sign Out
@@ -361,8 +368,8 @@ export function Header() {
                         href={item.href}
                         className={`focus-visible:ring-accent/50 cursor-pointer rounded-sm text-[15px] transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                           item.isActive(pathname, hash)
-                            ? "font-medium text-white"
-                            : "font-normal text-white/60 hover:text-white"
+                            ? "text-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground font-normal"
                         }`}
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
@@ -371,7 +378,7 @@ export function Header() {
                     ))}
                     <Link
                       href="/careers"
-                      className="hover:text-accent cursor-pointer text-sm text-white/60 transition-colors duration-300"
+                      className="hover:text-accent text-muted-foreground cursor-pointer text-sm transition-colors duration-300"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Join us
