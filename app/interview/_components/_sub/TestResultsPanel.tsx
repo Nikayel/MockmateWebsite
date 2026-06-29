@@ -71,39 +71,43 @@ export function TestResultsPanel({
       </div>
     </div>
   ) : (
-    <div className="flex flex-shrink-0 items-center justify-end gap-2">
-      {!isLanguageSupported(selectedLanguage) && (
-        <span className="mr-1 text-xs text-amber-300">Use JS/Python to run tests</span>
-      )}
-      {guidedLabBlocksSubmit && (
-        <span className="mr-1 text-xs text-amber-300">Finish all lab milestones to submit</span>
-      )}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => runWithLanguageGuard(onRunCode, "run tests")}
-        disabled={showFeedback || isRunningTests}
-        className={`${
-          isLanguageSupported(selectedLanguage)
-            ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
-            : "border-border bg-muted text-muted-foreground hover:bg-muted"
-        }`}
-        aria-label={isRunningTests ? "Running tests" : "Run tests"}
-        data-bugfix-tour={selectedScenario?.type === "bugfix" ? "run-tests" : undefined}
-      >
-        {!isRunningTests && <PlayCircle className="mr-1 h-4 w-4" aria-hidden="true" />}
-        {isRunningTests ? "Running..." : "Run Tests"}
-      </Button>
-      <Button
-        onClick={() => runWithLanguageGuard(onSubmitCode, "submit")}
-        disabled={showFeedback || isRunningTests || guidedLabBlocksSubmit}
-        title={guidedLabBlocksSubmit ? "Finish all lab milestones before submitting" : undefined}
-        className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold"
-        aria-label={selectedScenario?.type === "bugfix" ? "Submit fix" : "Submit solution"}
-      >
-        <Send className="mr-1 h-4 w-4" aria-hidden="true" />
-        {selectedScenario?.type === "bugfix" ? "Submit Fix" : "Submit"}
-      </Button>
+    <div className="flex flex-shrink-0 items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-xs text-amber-300">
+        {!isLanguageSupported(selectedLanguage) && (
+          <span className="truncate">Use JS/Python to run tests</span>
+        )}
+        {guidedLabBlocksSubmit && (
+          <span className="truncate">Finish all lab milestones to submit</span>
+        )}
+      </div>
+      <div className="flex flex-shrink-0 items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => runWithLanguageGuard(onRunCode, "run tests")}
+          disabled={showFeedback || isRunningTests}
+          className={`border-border h-9 ${
+            isLanguageSupported(selectedLanguage)
+              ? "text-foreground hover:bg-muted bg-transparent"
+              : "bg-muted text-muted-foreground hover:bg-muted"
+          }`}
+          aria-label={isRunningTests ? "Running tests" : "Run tests"}
+          data-bugfix-tour={selectedScenario?.type === "bugfix" ? "run-tests" : undefined}
+        >
+          {!isRunningTests && <PlayCircle className="mr-1 h-4 w-4" aria-hidden="true" />}
+          {isRunningTests ? "Running..." : "Run Tests"}
+        </Button>
+        <Button
+          onClick={() => runWithLanguageGuard(onSubmitCode, "submit")}
+          disabled={showFeedback || isRunningTests || guidedLabBlocksSubmit}
+          title={guidedLabBlocksSubmit ? "Finish all lab milestones before submitting" : undefined}
+          className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold shadow-[0_4px_20px_-4px_var(--glow)] disabled:opacity-[.55] disabled:shadow-none"
+          aria-label={selectedScenario?.type === "bugfix" ? "Submit fix" : "Submit solution"}
+        >
+          <Send className="mr-1 h-4 w-4" aria-hidden="true" />
+          {selectedScenario?.type === "bugfix" ? "Submit Fix" : "Submit"}
+        </Button>
+      </div>
     </div>
   )
 }
