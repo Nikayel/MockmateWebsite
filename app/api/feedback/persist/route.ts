@@ -22,6 +22,7 @@ import {
   type MasteryScoreInput,
 } from "@/lib/spaced-repetition/mastery-score"
 import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
+import { getScenarioById } from "@/lib/scenarios"
 import type { BugfixEvidenceSummary, BugfixScoreBreakdown } from "@/lib/bugfix/types"
 
 // Vercel Hobby plan has 10 second timeout for serverless functions
@@ -73,6 +74,17 @@ interface PersistRequest {
   bugfixScoreBreakdown?: BugfixScoreBreakdown
   bugfixPostSessionReport?: Record<string, unknown>
 
+  // Guided bug-fix lab: scaffolded teaching run. Client may flag it and send a
+  // restraint-resistant understanding signal (quiz accuracy / milestone completion).
+  isGuidedLab?: boolean
+  guidedLabMastery?: {
+    quizAccuracy?: number
+    quizzesCorrect?: number
+    quizzesTotal?: number
+    milestonesCompleted?: number
+    milestonesTotal?: number
+  }
+
   // Optional context (no longer used for AI generation, kept for logging)
   conversationTranscript?: Array<{
     role: string
@@ -107,6 +119,8 @@ export async function POST(request: NextRequest) {
       bugfixEvidenceSummary,
       bugfixScoreBreakdown,
       bugfixPostSessionReport,
+      isGuidedLab,
+      guidedLabMastery,
       conversationTranscript,
       efficiencyMetrics,
     } = body
@@ -145,6 +159,20 @@ export async function POST(request: NextRequest) {
     const technicalScore = Math.round(
       (scores.understanding + scores.problemSolving + scores.codeQuality) / 3
     )
+
+    // Guided bug-fix labs are scaffolded teaching runs. The interview-style score
+    // is not a valid debugging-skill measure for them, so we detect the run
+    // (server-side via the scenario, or a client flag), keep that score out of the
+    // readiness fields, and store a labeled mastery/practice signal instead. The
+    // mastery NUMBER is the test-pass-rate mastery (same basis as Case Labs).
+    const passRate = testsTotal > 0 ? Math.round((testsPassed / testsTotal) * 100) : 0
+    const scenarioForRun = scenarioId ? getScenarioById(scenarioId) : undefined
+    const isGuidedLabRun =
+      Boolean(isGuidedLab) ||
+      (scenarioForRun?.type === "bugfix" && Boolean(scenarioForRun.guidedLab))
+    const guidedLabMasterySummary = isGuidedLabRun
+      ? { masteryScore, passRate, testsPassed, testsTotal, ...(guidedLabMastery ?? {}) }
+      : undefined
 
     logger.info("[Feedback Persist] Scores calculated", {
       sessionId,
@@ -194,10 +222,11 @@ export async function POST(request: NextRequest) {
       feedback: feedback.raw,
       feedback_status: "complete" as const,
 
-      // Scores
-      performance_score: scores.overall,
+      // Scores — guided labs keep the (invalid) interview score out of the
+      // readiness fields and surface a labeled practice/mastery number instead.
+      performance_score: isGuidedLabRun ? masteryScore : scores.overall,
       mastery_score: masteryScore,
-      technical_score: technicalScore,
+      technical_score: isGuidedLabRun ? null : technicalScore,
       efficiency_score: masteryResult.components.timeEfficiencyScore,
 
       // Score breakdown (for detailed display)
@@ -224,8 +253,14 @@ export async function POST(request: NextRequest) {
 
       ...(scenarioType === "bugfix" && {
         bugfix_evidence_summary: bugfixEvidenceSummary || null,
-        bugfix_score_breakdown: bugfixScoreBreakdown || null,
+        // Guided labs do not emit the interview-style 11-dimension breakdown.
+        bugfix_score_breakdown: isGuidedLabRun ? null : bugfixScoreBreakdown || null,
         bugfix_post_session_report: bugfixPostSessionReport || null,
+      }),
+
+      ...(isGuidedLabRun && {
+        is_guided_lab: true,
+        guided_lab_mastery: guidedLabMasterySummary,
       }),
 
       // Mastery breakdown (for analytics/debugging)

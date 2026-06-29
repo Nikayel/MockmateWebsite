@@ -164,6 +164,22 @@ export interface InterviewSession {
     aiCollaborationQuality?: number
     communication?: number
   }
+  // Guided bug-fix lab: marks a scaffolded teaching run so it is kept OUT of the
+  // interview-readiness aggregate and shown as a labeled practice/mastery signal
+  // rather than an (invalid) interview score.
+  is_guided_lab?: boolean
+  guided_lab_mastery?: {
+    masteryScore: number
+    passRate: number
+    testsPassed: number
+    testsTotal: number
+    // Optional client-enriched understanding signal (restraint-resistant).
+    quizAccuracy?: number
+    quizzesCorrect?: number
+    quizzesTotal?: number
+    milestonesCompleted?: number
+    milestonesTotal?: number
+  }
   // Constitutional AI critique metadata (only present if adjustments were made)
   constitutional_ai_critique?: {
     scoreCritique?: {

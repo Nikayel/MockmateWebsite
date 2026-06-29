@@ -49,10 +49,10 @@ const MetricsOverview = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+      <div className="border-border/50 bg-card/50 rounded-xl border p-4">
         <div className="animate-pulse space-y-2">
-          <div className="h-3 w-1/3 rounded bg-muted"></div>
-          <div className="h-3 w-1/2 rounded bg-muted"></div>
+          <div className="bg-muted h-3 w-1/3 rounded"></div>
+          <div className="bg-muted h-3 w-1/2 rounded"></div>
         </div>
       </div>
     ),
@@ -64,10 +64,10 @@ const ReferralWidget = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+      <div className="border-border/50 bg-card/50 rounded-xl border p-4">
         <div className="animate-pulse space-y-3">
-          <div className="h-4 w-1/3 rounded bg-muted"></div>
-          <div className="h-8 w-full rounded bg-muted"></div>
+          <div className="bg-muted h-4 w-1/3 rounded"></div>
+          <div className="bg-muted h-8 w-full rounded"></div>
         </div>
       </div>
     ),
@@ -257,11 +257,11 @@ export default function DashboardPage() {
 
   if (authLoading || !initialized || !authCheckComplete || dataLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
+      <main className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
         </div>
       </main>
     )
@@ -295,7 +295,11 @@ export default function DashboardPage() {
     }
   }
 
-  const bugfixSessions = completedSessions.filter((session) => session.type === "bugfix")
+  // Guided teaching labs are excluded from interview-readiness — they carry a
+  // separate practice/mastery signal, not a valid interview score.
+  const bugfixSessions = completedSessions.filter(
+    (session) => session.type === "bugfix" && !session.is_guided_lab
+  )
   const latestBugfixSession = bugfixSessions[0]
   const latestBugfixEvidence = latestBugfixSession?.bugfix_evidence_summary
   const latestBugfixScore =
@@ -317,7 +321,7 @@ export default function DashboardPage() {
       (latestBugfixEvidence.inspectedTestOrDocs?.length || 0) === 0)
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <OnboardingModal
         isOpen={showOnboarding}
         userId={firebaseUser?.uid || ""}
@@ -367,14 +371,14 @@ export default function DashboardPage() {
             <Link href="/labs">
               <Button
                 variant="outline"
-                className="w-full border-border font-medium text-muted-foreground hover:bg-muted sm:w-auto"
+                className="border-border text-muted-foreground hover:bg-muted w-full font-medium sm:w-auto"
               >
                 <FlaskConical className="mr-2 h-4 w-4" />
                 Case Labs
               </Button>
             </Link>
             <Link href="/interview" data-tour="start-practice-btn">
-              <Button className="w-full bg-card font-medium text-foreground hover:bg-muted sm:w-auto">
+              <Button className="bg-card text-foreground hover:bg-muted w-full font-medium sm:w-auto">
                 <Terminal className="mr-2 h-4 w-4" />
                 Start Practice
               </Button>
@@ -385,21 +389,21 @@ export default function DashboardPage() {
           <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 lg:grid-cols-4">
             {/* Sessions Used */}
             <div
-              className="rounded-xl border border-border/50 bg-card/50 p-4"
+              className="border-border/50 bg-card/50 rounded-xl border p-4"
               data-tour="sessions-card"
             >
               <div className="mb-2 flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Sessions</span>
+                <BarChart3 className="text-muted-foreground h-4 w-4" />
+                <span className="text-muted-foreground text-xs">Sessions</span>
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-light text-foreground sm:text-3xl">
+                <span className="text-foreground text-2xl font-light sm:text-3xl">
                   {usage?.used || 0}
                 </span>
-                <span className="text-sm text-muted-foreground">/ {usage?.limit || 8}</span>
+                <span className="text-muted-foreground text-sm">/ {usage?.limit || 8}</span>
               </div>
-              <Progress value={usagePercentage} className="mt-2 h-1 bg-muted" />
-              <p className="mt-1.5 text-[10px] text-muted-foreground">
+              <Progress value={usagePercentage} className="bg-muted mt-2 h-1" />
+              <p className="text-muted-foreground mt-1.5 text-[10px]">
                 Resets{" "}
                 {usage?.periodEnd
                   ? new Date(usage.periodEnd).toLocaleDateString("en-US", {
@@ -412,12 +416,12 @@ export default function DashboardPage() {
 
             {/* Plan */}
             <div
-              className="rounded-xl border border-border/50 bg-card/50 p-4"
+              className="border-border/50 bg-card/50 rounded-xl border p-4"
               data-tour="subscription-card"
             >
               <div className="mb-2 flex items-center gap-2">
-                <Crown className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Plan</span>
+                <Crown className="text-muted-foreground h-4 w-4" />
+                <span className="text-muted-foreground text-xs">Plan</span>
               </div>
               <div className="mb-2 flex items-center gap-2">
                 <span
@@ -432,7 +436,7 @@ export default function DashboardPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="mt-1 h-7 w-full border-border text-xs text-muted-foreground hover:bg-muted"
+                    className="border-border text-muted-foreground hover:bg-muted mt-1 h-7 w-full text-xs"
                   >
                     Upgrade
                   </Button>
@@ -443,11 +447,11 @@ export default function DashboardPage() {
             {/* Due for Review */}
             <Link
               href="/practice"
-              className="rounded-xl border border-border/50 bg-card/50 p-4 transition-colors hover:border-border hover:bg-muted/50"
+              className="border-border/50 bg-card/50 hover:border-border hover:bg-muted/50 rounded-xl border p-4 transition-colors"
             >
               <div className="mb-2 flex items-center gap-2">
-                <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
+                <RefreshCw className="text-muted-foreground h-4 w-4" />
+                <span className="text-muted-foreground text-xs">
                   {reviewStats.overdueCount > 0 ? "Overdue" : "Next Review"}
                 </span>
               </div>
@@ -456,7 +460,7 @@ export default function DashboardPage() {
                   <span className="text-2xl font-light text-red-400 sm:text-3xl">
                     {reviewStats.overdueCount}
                   </span>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">
                     {reviewStats.overdueCount === 1 ? "Problem overdue" : "Problems overdue"}
                   </p>
                 </>
@@ -465,33 +469,33 @@ export default function DashboardPage() {
                   <span className="text-2xl font-light text-amber-400 sm:text-3xl">
                     {reviewStats.totalDue}
                   </span>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">Due today</p>
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">Due today</p>
                 </>
               ) : reviewStats.daysUntilNext !== null ? (
                 <>
-                  <span className="text-2xl font-light text-foreground sm:text-3xl">
+                  <span className="text-foreground text-2xl font-light sm:text-3xl">
                     {reviewStats.daysUntilNext}d
                   </span>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">Until next review</p>
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">Until next review</p>
                 </>
               ) : (
                 <>
                   <span className="text-2xl font-light text-emerald-400 sm:text-3xl">—</span>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">No reviews scheduled</p>
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">No reviews scheduled</p>
                 </>
               )}
             </Link>
 
             {/* Recent Avg Score */}
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <div className="border-border/50 bg-card/50 rounded-xl border p-4">
               <div className="mb-2 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Recent Avg</span>
+                <TrendingUp className="text-muted-foreground h-4 w-4" />
+                <span className="text-muted-foreground text-xs">Recent Avg</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <HelpCircle className="h-3 w-3 cursor-help text-muted-foreground" />
+                    <HelpCircle className="text-muted-foreground h-3 w-3 cursor-help" />
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs bg-muted text-foreground">
+                  <TooltipContent className="bg-muted text-foreground max-w-xs">
                     <p>
                       Interview Score: Your overall performance including code quality (30%),
                       problem solving (25%), understanding (25%), and communication (20%)
@@ -515,14 +519,14 @@ export default function DashboardPage() {
                     )}
                     %
                   </span>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">
                     Last {completedSessions.length} completed sessions
                   </p>
                 </>
               ) : (
                 <>
-                  <span className="text-2xl font-light text-muted-foreground sm:text-3xl">—</span>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">No data yet</p>
+                  <span className="text-muted-foreground text-2xl font-light sm:text-3xl">—</span>
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">No data yet</p>
                 </>
               )}
             </div>
@@ -534,19 +538,21 @@ export default function DashboardPage() {
             <div className="space-y-4 lg:col-span-3">
               {/* Recent Activity */}
               <div
-                className="rounded-xl border border-border/50 bg-card/50"
+                className="border-border/50 bg-card/50 rounded-xl border"
                 data-tour="recent-activity"
               >
-                <div className="flex items-center justify-between border-b border-border/50 p-4">
+                <div className="border-border/50 flex items-center justify-between border-b p-4">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Recent Activity</span>
+                    <Clock className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground text-sm font-medium">
+                      Recent Activity
+                    </span>
                   </div>
                   <Link href="/sessions">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      className="text-muted-foreground hover:text-foreground h-7 text-xs"
                     >
                       View All
                       <ChevronRight className="ml-1 h-3 w-3" />
@@ -556,11 +562,11 @@ export default function DashboardPage() {
 
                 {sessions.length === 0 ? (
                   <div className="p-8 text-center sm:p-12">
-                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                      <Calendar className="h-6 w-6 text-muted-foreground" />
+                    <div className="bg-muted mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl">
+                      <Calendar className="text-muted-foreground h-6 w-6" />
                     </div>
-                    <p className="mb-1 text-sm text-muted-foreground">No sessions yet</p>
-                    <p className="mb-4 text-xs text-muted-foreground">
+                    <p className="text-muted-foreground mb-1 text-sm">No sessions yet</p>
+                    <p className="text-muted-foreground mb-4 text-xs">
                       Start practicing to track your progress
                     </p>
                     <Link href="/interview">
@@ -571,7 +577,7 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="divide-y divide-border">
+                  <div className="divide-border divide-y">
                     {sessions.map((session) => {
                       // Determine session state: completed, evaluating, or in-progress
                       // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
@@ -591,7 +597,7 @@ export default function DashboardPage() {
                         <Link
                           key={session.id}
                           href={href}
-                          className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/30 sm:p-4"
+                          className="hover:bg-muted/30 flex items-center gap-3 p-3 transition-colors sm:p-4"
                         >
                           {/* Score indicator */}
                           <div
@@ -621,7 +627,7 @@ export default function DashboardPage() {
                           {/* Content */}
                           <div className="min-w-0 flex-1">
                             <div className="mb-0.5 flex items-center gap-2">
-                              <span className="truncate text-sm font-medium text-foreground">
+                              <span className="text-foreground truncate text-sm font-medium">
                                 {session.topic}
                               </span>
                               <span
@@ -630,7 +636,7 @@ export default function DashboardPage() {
                                 {session.difficulty}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="text-muted-foreground flex items-center gap-2 text-xs">
                               <span>
                                 {new Date(session.started_at).toLocaleDateString("en-US", {
                                   month: "short",
@@ -650,7 +656,7 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
                         </Link>
                       )
                     })}
@@ -664,11 +670,11 @@ export default function DashboardPage() {
 
             {/* Metrics Overview - 2 cols on lg */}
             <div className="space-y-4 lg:col-span-2" data-tour="quick-start">
-              <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+              <div className="border-border/50 bg-card/50 rounded-xl border p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    <span className="truncate text-sm font-medium text-muted-foreground">
+                    <span className="text-muted-foreground truncate text-sm font-medium">
                       Bugfix Readiness
                     </span>
                   </div>
@@ -681,14 +687,14 @@ export default function DashboardPage() {
 
                 {bugfixReadiness === null ? (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Practice production incidents and build a separate debugging signal.
                     </p>
                     <Link href="/interview?practice=true&type=bugfix">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 w-full border-border text-xs text-muted-foreground hover:bg-muted"
+                        className="border-border text-muted-foreground hover:bg-muted h-8 w-full text-xs"
                       >
                         <Terminal className="mr-1.5 h-3.5 w-3.5" />
                         Start Bugfix
@@ -698,29 +704,31 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-lg bg-background/60 p-2">
+                      <div className="bg-background/60 rounded-lg p-2">
                         <p className="text-muted-foreground">Last Score</p>
                         <p
                           className={
-                            latestBugfixScore ? getScoreColor(latestBugfixScore) : "text-muted-foreground"
+                            latestBugfixScore
+                              ? getScoreColor(latestBugfixScore)
+                              : "text-muted-foreground"
                           }
                         >
                           {latestBugfixScore ? `${Math.round(latestBugfixScore)}%` : "—"}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-background/60 p-2">
+                      <div className="bg-background/60 rounded-lg p-2">
                         <p className="text-muted-foreground">Files Opened</p>
                         <p className="text-muted-foreground">
                           {latestBugfixEvidence?.inspectedFiles?.length || 0}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-background/60 p-2">
+                      <div className="bg-background/60 rounded-lg p-2">
                         <p className="text-muted-foreground">Tests Run</p>
                         <p className="text-muted-foreground">
                           {latestBugfixEvidence?.visibleTestsRun || 0}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-background/60 p-2">
+                      <div className="bg-background/60 rounded-lg p-2">
                         <p className="text-muted-foreground">AI Shortcut</p>
                         <p
                           className={
@@ -739,7 +747,7 @@ export default function DashboardPage() {
                         <p className="text-xs font-medium text-emerald-300">
                           Beginner Debugger track recommended
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="text-muted-foreground mt-1 text-xs">
                           Focus on reproducing before editing and opening the visible test first.
                         </p>
                       </div>
@@ -749,7 +757,7 @@ export default function DashboardPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 w-full border-border text-xs text-muted-foreground hover:bg-muted"
+                        className="border-border text-muted-foreground hover:bg-muted h-8 w-full text-xs"
                       >
                         <Terminal className="mr-1.5 h-3.5 w-3.5" />
                         Practice Bugfix
@@ -772,7 +780,7 @@ export default function DashboardPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-amber-400">Running low on sessions</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Upgrade to Pro for unlimited access
                   </p>
                 </div>
