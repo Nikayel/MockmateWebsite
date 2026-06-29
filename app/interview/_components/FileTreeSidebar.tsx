@@ -155,7 +155,7 @@ function FileTreeNodeRow({
         )}
         aria-hidden="true"
       />
-      <span className="truncate">{file.name}</span>
+      <span className="truncate">{node.name}</span>
       {hasWorkspaceFileEdits(file) && (
         <span
           className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"

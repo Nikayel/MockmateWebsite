@@ -1,21 +1,19 @@
 "use client"
 
-import { memo, type RefObject } from "react"
+import { memo, useState, type RefObject } from "react"
 import {
-  BookOpen,
   Bot,
   ChevronDown,
   ChevronUp,
   Code,
-  FileCode,
-  FlaskConical,
-  Lock,
+  PanelLeft,
   PlayCircle,
   RotateCcw,
   Send,
 } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { CodeMirrorEditor, type CodeMirrorEditorRef } from "@/components/editor"
@@ -25,9 +23,15 @@ import {
   type TestSummary,
 } from "@/components/interview/CodeConsole"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
+import { cn } from "@/lib/utils"
 import type { Scenario } from "@/lib/scenarios"
 import type { EditorLanguage, WorkspaceContextFile } from "../_types"
-import { isWorkspaceScenario } from "../_utils/workspace"
+import {
+  getWorkspaceFileRoleStyle,
+  hasWorkspaceFileEdits,
+  isWorkspaceScenario,
+} from "../_utils/workspace"
+import { FileTreeSidebar } from "./FileTreeSidebar"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
 
@@ -113,6 +117,61 @@ export const EditorColumn = memo(function EditorColumn({
   editorRef,
   onGoToLine,
 }: EditorColumnProps) {
+  const [showFilesDrawer, setShowFilesDrawer] = useState(false)
+  const isWorkspace = isWorkspaceScenario(selectedScenario) && workspaceContext.length > 0
+  const activeRoleStyle = activeWorkspaceFile
+    ? getWorkspaceFileRoleStyle(activeWorkspaceFile.role)
+    : null
+  const ActiveRoleIcon = activeRoleStyle?.Icon
+
+  const handleFileSelect = (file: WorkspaceContextFile) => {
+    onFileSelect?.(file)
+    setShowFilesDrawer(false)
+  }
+
+  const editorSurface = (
+    <>
+      <ErrorBoundary>
+        <CodeMirrorEditor
+          ref={editorRef}
+          height="100%"
+          language={editorLanguage}
+          value={code}
+          onChange={onCodeChange}
+          readOnly={
+            !isInterviewStarted ||
+            showFeedback ||
+            (isWorkspaceScenario(selectedScenario) && !isActiveWorkspaceFileEditable)
+          }
+        />
+      </ErrorBoundary>
+      {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
+        <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm">
+          <div className="max-h-full max-w-md p-2 text-center sm:p-6">
+            <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
+              <PlayCircle className="text-accent h-8 w-8" />
+            </div>
+            <h3 className="text-foreground mb-2 text-xl font-bold">Ready to Start?</h3>
+            <p className="text-muted-foreground mb-4 text-sm">
+              Review the problem on the left, then start your interview when ready. The timer will
+              begin once you start.
+            </p>
+            <Button
+              onClick={onStartInterview}
+              className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-base font-semibold"
+            >
+              <PlayCircle className="mr-2 h-5 w-5" />
+              Start Interview
+            </Button>
+            <p className="text-muted-foreground mt-3 text-xs">
+              Estimated time: {selectedScenario.estimatedTime || 30} minutes
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  )
+
   return (
     <Card
       className={`editor-panel-card glass-effect border-border bg-card/50 order-2 h-full flex-col gap-0 overflow-hidden py-0 ${
@@ -120,81 +179,48 @@ export const EditorColumn = memo(function EditorColumn({
       }`}
     >
       <CardHeader className="flex-shrink-0 px-0 pt-0 pb-2">
-        {isWorkspaceScenario(selectedScenario) &&
-        workspaceContext &&
-        workspaceContext.length > 0 ? (
-          <div
-            className="border-border bg-card/80 flex w-full items-center justify-between border-b pr-4"
-            data-bugfix-tour={selectedScenario?.type === "bugfix" ? "workspace-files" : undefined}
-          >
-            <div className="workspace-tabs-container no-scrollbar flex flex-1 overflow-x-auto">
-              {workspaceContext.map((file) => {
-                const isActive = activeWorkspaceFile?.path === file.path
-                // Only show hidden files if they are the active file (though usually hidden files aren't in context, just to be safe)
-                if (file.hidden && !isActive) return null
-
-                let iconColor = "text-muted-foreground"
-                let activeBorderClass = "border-b-cyan-400"
-                let roleBadgeClass = "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                let RoleIcon = FileCode
-                let roleLabel = "Edit"
-                let roleDescription = "Editable file"
-                if (file.role === "test") {
-                  iconColor = isActive ? "text-emerald-300" : "text-emerald-400/70"
-                  activeBorderClass = "border-b-emerald-400"
-                  roleBadgeClass = "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-                  RoleIcon = FlaskConical
-                  roleLabel = "Test"
-                  roleDescription = "Test file"
-                } else if (file.role === "readonly") {
-                  iconColor = isActive ? "text-amber-300" : "text-amber-400/70"
-                  activeBorderClass = "border-b-amber-400"
-                  roleBadgeClass = "border-amber-400/25 bg-amber-400/10 text-amber-200"
-                  RoleIcon = Lock
-                  roleLabel = "Read-only"
-                  roleDescription = "Read-only file"
-                } else if (file.role === "editable") {
-                  iconColor = isActive ? "text-cyan-300" : "text-cyan-400/70"
-                } else if (file.role === "docs") {
-                  iconColor = isActive ? "text-foreground" : "text-muted-foreground"
-                  activeBorderClass = "border-b-gray-400"
-                  roleBadgeClass = "border-border/30 bg-muted/10 text-muted-foreground"
-                  RoleIcon = BookOpen
-                  roleLabel = "Docs"
-                  roleDescription = "Documentation file"
-                }
-
-                return (
-                  <button
-                    key={file.path}
-                    onClick={() => onFileSelect && onFileSelect(file)}
-                    title={`${roleDescription}: ${file.path}`}
-                    aria-label={`Open ${roleDescription.toLowerCase()} ${file.path}`}
-                    className={`workspace-tab-button border-border flex items-center gap-1.5 border-r px-3 py-2 text-xs whitespace-nowrap transition-colors ${
-                      isActive
-                        ? `border-b-2 ${activeBorderClass} bg-muted text-foreground`
-                        : "bg-card/50 text-muted-foreground hover:bg-muted/80 hover:text-muted-foreground border-b-2 border-b-transparent"
-                    }`}
+        {isWorkspace ? (
+          <div className="border-border bg-card/80 flex w-full items-center justify-between border-b pr-4">
+            <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowFilesDrawer((open) => !open)}
+                className="border-border bg-card text-muted-foreground hover:bg-muted h-8 px-2 text-xs md:hidden"
+                title="Toggle file list"
+                aria-label="Toggle file list"
+                aria-expanded={showFilesDrawer}
+              >
+                <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+              {activeWorkspaceFile && activeRoleStyle && ActiveRoleIcon ? (
+                <>
+                  <ActiveRoleIcon
+                    className={cn("h-3.5 w-3.5 shrink-0", activeRoleStyle.iconColorActive)}
+                    aria-hidden="true"
+                  />
+                  <span className="text-foreground truncate text-xs">
+                    {activeWorkspaceFile.path}
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded border px-1.5 py-0.5 text-[11px] leading-none",
+                      activeRoleStyle.badgeClass
+                    )}
                   >
-                    <RoleIcon className={`h-3.5 w-3.5 ${iconColor}`} />
-                    <span className="workspace-tab-filename">{file.path}</span>
+                    {activeRoleStyle.label}
+                  </span>
+                  {hasWorkspaceFileEdits(activeWorkspaceFile) && (
                     <span
-                      className={`rounded border px-1.5 py-0.5 text-[11px] leading-none ${roleBadgeClass}`}
-                    >
-                      {roleLabel}
-                    </span>
-                    {file.role === "editable" &&
-                      file.originalContent !== undefined &&
-                      file.content !== file.originalContent && (
-                        <span
-                          className="h-1.5 w-1.5 rounded-full bg-amber-300"
-                          title="Unsaved edit"
-                          aria-label="Unsaved edit"
-                        />
-                      )}
-                  </button>
-                )
-              })}
+                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
+                      title="Unsaved edit"
+                      aria-label="Unsaved edit"
+                    />
+                  )}
+                </>
+              ) : (
+                <span className="text-muted-foreground truncate text-xs">Workspace files</span>
+              )}
             </div>
             <div className="flex items-center gap-2 pl-4">
               {activeWorkspaceFile?.role === "editable" && onResetActiveFile && (
@@ -264,46 +290,52 @@ export const EditorColumn = memo(function EditorColumn({
       </CardHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
-        <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
-          <ErrorBoundary>
-            <CodeMirrorEditor
-              ref={editorRef}
-              height="100%"
-              language={editorLanguage}
-              value={code}
-              onChange={onCodeChange}
-              readOnly={
-                !isInterviewStarted ||
-                showFeedback ||
-                (isWorkspaceScenario(selectedScenario) && !isActiveWorkspaceFileEditable)
-              }
-            />
-          </ErrorBoundary>
-          {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-            <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm">
-              <div className="max-h-full max-w-md p-2 text-center sm:p-6">
-                <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
-                  <PlayCircle className="text-accent h-8 w-8" />
+        {isWorkspace ? (
+          <div
+            className="border-border relative min-h-0 flex-1 overflow-hidden rounded border"
+            data-bugfix-tour={selectedScenario?.type === "bugfix" ? "workspace-files" : undefined}
+          >
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              <ResizablePanel
+                defaultSize={24}
+                minSize={14}
+                maxSize={42}
+                className="hidden md:block"
+              >
+                <FileTreeSidebar
+                  files={workspaceContext}
+                  activePath={activeWorkspaceFile?.path}
+                  onFileSelect={handleFileSelect}
+                />
+              </ResizablePanel>
+              <ResizableHandle withHandle className="hidden md:flex" />
+              <ResizablePanel className="min-h-0">
+                <div className="relative h-full min-h-0 overflow-auto">{editorSurface}</div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+            {showFilesDrawer && (
+              <div className="absolute inset-0 z-20 flex md:hidden">
+                <div className="bg-card border-border w-3/4 max-w-xs overflow-y-auto border-r shadow-xl">
+                  <FileTreeSidebar
+                    files={workspaceContext}
+                    activePath={activeWorkspaceFile?.path}
+                    onFileSelect={handleFileSelect}
+                  />
                 </div>
-                <h3 className="text-foreground mb-2 text-xl font-bold">Ready to Start?</h3>
-                <p className="text-muted-foreground mb-4 text-sm">
-                  Review the problem on the left, then start your interview when ready. The timer
-                  will begin once you start.
-                </p>
-                <Button
-                  onClick={onStartInterview}
-                  className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-base font-semibold"
-                >
-                  <PlayCircle className="mr-2 h-5 w-5" />
-                  Start Interview
-                </Button>
-                <p className="text-muted-foreground mt-3 text-xs">
-                  Estimated time: {selectedScenario.estimatedTime || 30} minutes
-                </p>
+                <button
+                  type="button"
+                  className="bg-background/60 flex-1"
+                  aria-label="Close file list"
+                  onClick={() => setShowFilesDrawer(false)}
+                />
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
+            {editorSurface}
+          </div>
+        )}
 
         {isInterviewStarted && selectedScenario?.type !== "system-design" && (
           <ConsoleOutputPanel
