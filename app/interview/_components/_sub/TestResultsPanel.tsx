@@ -17,6 +17,9 @@ interface TestResultsPanelProps {
   onRunCode: () => void
   onSubmitCode: () => void
   onSelectedLanguageChange: (language: EditorLanguage) => void
+  /** Guided labs block Submit until every milestone is done (so the user can't
+   * finish before discovering the later bug). */
+  guidedLabBlocksSubmit?: boolean
 }
 
 export function TestResultsPanel({
@@ -29,6 +32,7 @@ export function TestResultsPanel({
   onRunCode,
   onSubmitCode,
   onSelectedLanguageChange,
+  guidedLabBlocksSubmit = false,
 }: TestResultsPanelProps) {
   const runWithLanguageGuard = (action: () => void, actionName: "run tests" | "submit") => {
     if (!isLanguageSupported(selectedLanguage)) {
@@ -71,6 +75,9 @@ export function TestResultsPanel({
       {!isLanguageSupported(selectedLanguage) && (
         <span className="mr-1 text-xs text-amber-300">Use JS/Python to run tests</span>
       )}
+      {guidedLabBlocksSubmit && (
+        <span className="mr-1 text-xs text-amber-300">Finish all lab milestones to submit</span>
+      )}
       <Button
         variant="outline"
         size="sm"
@@ -89,7 +96,8 @@ export function TestResultsPanel({
       </Button>
       <Button
         onClick={() => runWithLanguageGuard(onSubmitCode, "submit")}
-        disabled={showFeedback || isRunningTests}
+        disabled={showFeedback || isRunningTests || guidedLabBlocksSubmit}
+        title={guidedLabBlocksSubmit ? "Finish all lab milestones before submitting" : undefined}
         className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold"
         aria-label={selectedScenario?.type === "bugfix" ? "Submit fix" : "Submit solution"}
       >

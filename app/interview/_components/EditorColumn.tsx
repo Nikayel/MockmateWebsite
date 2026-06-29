@@ -24,7 +24,11 @@ import {
 } from "@/components/interview/CodeConsole"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { cn } from "@/lib/utils"
-import { useRevealedTestSuites } from "@/lib/stores/guided-lab-store"
+import {
+  useGuidedLabComplete,
+  useGuidedLabStore,
+  useRevealedTestSuites,
+} from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
 import type { EditorLanguage, WorkspaceContextFile } from "../_types"
 import {
@@ -146,6 +150,14 @@ export const EditorColumn = memo(function EditorColumn({
           : 0,
       }
     : testSummary
+
+  // Block Submit while a guided lab for this scenario is unfinished, so the user
+  // can't submit before discovering and fixing the later bug.
+  const guidedLabComplete = useGuidedLabComplete()
+  const guidedLabActiveForScenario = useGuidedLabStore(
+    (state) => Boolean(state.config) && state.scenarioId === selectedScenario?.id
+  )
+  const guidedLabBlocksSubmit = guidedLabActiveForScenario && !guidedLabComplete
 
   const handleFileSelect = (file: WorkspaceContextFile) => {
     onFileSelect?.(file)
@@ -381,6 +393,7 @@ export const EditorColumn = memo(function EditorColumn({
           onRunCode={onRunCode}
           onSubmitCode={onSubmitCode}
           onSelectedLanguageChange={onSelectedLanguageChange}
+          guidedLabBlocksSubmit={guidedLabBlocksSubmit}
         />
 
         {selectedScenario && selectedScenario.type !== "dsa" && (
