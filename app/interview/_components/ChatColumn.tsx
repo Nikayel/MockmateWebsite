@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { Brain, MessageSquare, Send, User } from "lucide-react"
+import { Brain, MessageSquare, PanelRightClose, Send, User } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,8 @@ interface ChatColumnProps {
   countdownActive: boolean
   interviewerInput: string
   onInterviewerInputChange: (value: string) => void
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 export const ChatColumn = memo(function ChatColumn({
@@ -45,24 +47,48 @@ export const ChatColumn = memo(function ChatColumn({
   countdownActive,
   interviewerInput,
   onInterviewerInputChange,
+  collapsed = false,
+  onToggleCollapse,
 }: ChatColumnProps) {
   const isBusy = isLoadingInterviewer || isGeneratingDiscussion
 
   return (
     <Card
       className={`glass-effect order-3 h-full flex-col gap-0 overflow-hidden border-border bg-card/50 py-0 ${
-        focusMode ? "hidden" : activePanel === "chat" ? "flex" : "hidden lg:flex"
+        focusMode
+          ? "hidden"
+          : collapsed
+            ? // Collapsed is a desktop affordance: hide at lg, still tab-able on mobile
+              activePanel === "chat"
+              ? "flex lg:hidden"
+              : "hidden"
+            : activePanel === "chat"
+              ? "flex"
+              : "hidden lg:flex"
       }`}
     >
       <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
-        <CardTitle className="flex items-center space-x-2 text-sm text-foreground">
-          <div className="relative">
-            <Brain className="text-accent animate-neural-pulse h-4 w-4" />
-            <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
+        <CardTitle className="flex items-center justify-between text-sm text-foreground">
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <Brain className="text-accent animate-neural-pulse h-4 w-4" />
+              <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
+            </div>
+            <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
+              CodeSparring AI
+            </span>
           </div>
-          <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
-            CodeSparring AI
-          </span>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-6 w-6 items-center justify-center rounded transition-colors lg:inline-flex"
+              title="Collapse panel"
+              aria-label="Collapse interviewer panel"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">

@@ -9,6 +9,7 @@ import {
   HardDrive,
   HelpCircle,
   Lightbulb,
+  PanelLeftClose,
   Target,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -76,9 +77,15 @@ export interface ProblemColumnCtx {
 
 interface ProblemColumnProps {
   ctx: ProblemColumnCtx
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
-export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnProps) {
+export const ProblemColumn = memo(function ProblemColumn({
+  ctx,
+  collapsed = false,
+  onToggleCollapse,
+}: ProblemColumnProps) {
   const {
     activePanel,
     bugfixReflection,
@@ -125,9 +132,14 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
         className={`glass-effect border-border bg-card/50 order-1 h-full flex-col gap-0 overflow-hidden py-0 ${
           focusMode
             ? "hidden" // Always hidden in focus mode - no responsive override
-            : activePanel === "problem"
-              ? "flex"
-              : "hidden lg:flex"
+            : collapsed
+              ? // Collapsed is a desktop affordance: hide at lg, still tab-able on mobile
+                activePanel === "problem"
+                ? "flex lg:hidden"
+                : "hidden"
+              : activePanel === "problem"
+                ? "flex"
+                : "hidden lg:flex"
         }`}
       >
         {/* IMPROVED: Enhanced header with title and difficulty badge */}
@@ -139,15 +151,26 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 {selectedScenario?.title || "Problem"}
               </span>
             </div>
-            {selectedScenario && (
-              <Badge
-                className={`ml-2 flex-shrink-0 text-xs ${difficultyColorClass(
-                  selectedScenario.difficulty
-                )}`}
-              >
-                {selectedScenario.difficulty}
-              </Badge>
-            )}
+            <div className="flex flex-shrink-0 items-center gap-1.5">
+              {selectedScenario && (
+                <Badge
+                  className={`text-xs ${difficultyColorClass(selectedScenario.difficulty)}`}
+                >
+                  {selectedScenario.difficulty}
+                </Badge>
+              )}
+              {onToggleCollapse && (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-6 w-6 items-center justify-center rounded transition-colors lg:inline-flex"
+                  title="Collapse panel"
+                  aria-label="Collapse problem panel"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         {/* IMPROVED: Better spacing and typography for readability */}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, type ComponentProps, type CSSProperties } from "react"
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react"
 import { useWorkspaceRails } from "../_hooks/useWorkspaceRails"
 import { FocusProblemPeek } from "./FocusProblemPeek"
 import { ProblemColumn, type ProblemColumnCtx } from "./ProblemColumn"
@@ -145,8 +146,17 @@ export function InterviewLayoutGrid({
   onActivePanelChange,
 }: InterviewLayoutGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { labWidth, intWidth, isDragging, startLabDrag, startIntDrag } =
-    useWorkspaceRails(containerRef)
+  const {
+    labWidth,
+    intWidth,
+    labCollapsed,
+    intCollapsed,
+    isDragging,
+    startLabDrag,
+    startIntDrag,
+    toggleLab,
+    toggleInt,
+  } = useWorkspaceRails(containerRef)
 
   return (
     <div
@@ -161,34 +171,70 @@ export function InterviewLayoutGrid({
       style={
         focusMode
           ? undefined
-          : ({ "--w-lab": `${labWidth}px`, "--w-int": `${intWidth}px` } as CSSProperties)
+          : ({
+              "--w-lab": labCollapsed ? "0px" : `${labWidth}px`,
+              "--w-int": intCollapsed ? "0px" : `${intWidth}px`,
+            } as CSSProperties)
       }
     >
       {/* Desktop-only resize handles — drag to give the code panel more room.
           The center editor column is 1fr, so it absorbs whatever the rails give
-          up. Pointer-capture drag works for mouse + touch; widths persist. */}
+          up. Pointer-capture drag works for mouse + touch; widths persist.
+          A collapsed rail hides its handle and shows a slim re-open tab. */}
       {!focusMode && (
         <>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize problem panel"
-            onPointerDown={startLabDrag}
-            className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
-            style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
-          >
-            <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize interviewer panel"
-            onPointerDown={startIntDrag}
-            className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
-            style={{ right: "calc(var(--w-int) + 0.25rem)" }}
-          >
-            <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
-          </div>
+          {!labCollapsed && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize problem panel"
+              onPointerDown={startLabDrag}
+              className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
+              style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
+            >
+              <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
+            </div>
+          )}
+          {!intCollapsed && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize interviewer panel"
+              onPointerDown={startIntDrag}
+              className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
+              style={{ right: "calc(var(--w-int) + 0.25rem)" }}
+            >
+              <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
+            </div>
+          )}
+          {labCollapsed && (
+            <button
+              type="button"
+              onClick={toggleLab}
+              aria-label="Expand problem panel"
+              title="Expand problem panel"
+              className="bg-card/80 border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 left-0 z-20 hidden flex-col items-center gap-2 rounded-r-md border border-l-0 py-3 pr-1 pl-0.5 shadow-sm backdrop-blur transition-colors lg:flex"
+            >
+              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+              <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
+                PROBLEM
+              </span>
+            </button>
+          )}
+          {intCollapsed && (
+            <button
+              type="button"
+              onClick={toggleInt}
+              aria-label="Expand interviewer panel"
+              title="Expand interviewer panel"
+              className="bg-card/80 border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 right-0 z-20 hidden flex-col items-center gap-2 rounded-l-md border border-r-0 py-3 pr-0.5 pl-1 shadow-sm backdrop-blur transition-colors lg:flex"
+            >
+              <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+              <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
+                SABLE
+              </span>
+            </button>
+          )}
         </>
       )}
       {focusMode && (
@@ -199,7 +245,7 @@ export function InterviewLayoutGrid({
           onShowProblemPeekChange={onShowProblemPeekChange}
         />
       )}
-      <ProblemColumn ctx={problemCtx} />
+      <ProblemColumn ctx={problemCtx} collapsed={labCollapsed} onToggleCollapse={toggleLab} />
 
       <EditorColumn
         activePanel={activePanel}
@@ -255,6 +301,8 @@ export function InterviewLayoutGrid({
         countdownActive={countdownActive}
         interviewerInput={interviewerInput}
         onInterviewerInputChange={onInterviewerInputChange}
+        collapsed={intCollapsed}
+        onToggleCollapse={toggleInt}
       />
       <BugfixOnboardingTour
         activePanel={activePanel}

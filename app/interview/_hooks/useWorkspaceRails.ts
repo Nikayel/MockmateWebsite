@@ -24,6 +24,8 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 interface StoredRails {
   lab: number
   int: number
+  labCollapsed: boolean
+  intCollapsed: boolean
 }
 
 function readStoredRails(): StoredRails | null {
@@ -36,6 +38,8 @@ function readStoredRails(): StoredRails | null {
     return {
       lab: clamp(parsed.lab, LAB_MIN, LAB_MAX),
       int: clamp(parsed.int, INT_MIN, INT_MAX),
+      labCollapsed: parsed.labCollapsed === true,
+      intCollapsed: parsed.intCollapsed === true,
     }
   } catch {
     return null
@@ -45,14 +49,20 @@ function readStoredRails(): StoredRails | null {
 export interface WorkspaceRails {
   labWidth: number
   intWidth: number
+  labCollapsed: boolean
+  intCollapsed: boolean
   isDragging: boolean
   startLabDrag: (event: ReactPointerEvent<HTMLElement>) => void
   startIntDrag: (event: ReactPointerEvent<HTMLElement>) => void
+  toggleLab: () => void
+  toggleInt: () => void
 }
 
 export function useWorkspaceRails(containerRef: RefObject<HTMLElement | null>): WorkspaceRails {
   const [labWidth, setLabWidth] = useState(LAB_DEFAULT)
   const [intWidth, setIntWidth] = useState(INT_DEFAULT)
+  const [labCollapsed, setLabCollapsed] = useState(false)
+  const [intCollapsed, setIntCollapsed] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
 
   // Hydrate from localStorage after mount (kept out of the useState initializer
@@ -62,18 +72,26 @@ export function useWorkspaceRails(containerRef: RefObject<HTMLElement | null>): 
     if (stored) {
       setLabWidth(stored.lab)
       setIntWidth(stored.int)
+      setLabCollapsed(stored.labCollapsed)
+      setIntCollapsed(stored.intCollapsed)
     }
   }, [])
 
-  // Persist whenever a width settles.
+  // Persist whenever a width or collapsed flag settles.
   useEffect(() => {
     if (typeof window === "undefined") return
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ lab: labWidth, int: intWidth }))
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ lab: labWidth, int: intWidth, labCollapsed, intCollapsed })
+      )
     } catch {
       // ignore quota / privacy-mode write failures
     }
-  }, [labWidth, intWidth])
+  }, [labWidth, intWidth, labCollapsed, intCollapsed])
+
+  const toggleLab = useCallback(() => setLabCollapsed((value) => !value), [])
+  const toggleInt = useCallback(() => setIntCollapsed((value) => !value), [])
 
   // Shared pointer-capture drag loop; `apply` maps the pointer's x to a new width.
   const startDrag = useCallback(
@@ -116,5 +134,15 @@ export function useWorkspaceRails(containerRef: RefObject<HTMLElement | null>): 
     [startDrag]
   )
 
-  return { labWidth, intWidth, isDragging, startLabDrag, startIntDrag }
+  return {
+    labWidth,
+    intWidth,
+    labCollapsed,
+    intCollapsed,
+    isDragging,
+    startLabDrag,
+    startIntDrag,
+    toggleLab,
+    toggleInt,
+  }
 }
