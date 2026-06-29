@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { Brain, MessageSquare, PanelRightClose, Send, User } from "lucide-react"
+import { Brain, MessageSquare, PanelRightClose, Send } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,14 +69,35 @@ export const ChatColumn = memo(function ChatColumn({
     >
       <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
         <CardTitle className="flex items-center justify-between text-sm text-foreground">
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <Brain className="text-accent animate-neural-pulse h-4 w-4" />
-              <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="relative flex-shrink-0">
+              <div className="bg-accent/15 text-accent ring-accent/30 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ring-1">
+                S
+              </div>
+              <span
+                className="bg-neural border-card absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2"
+                aria-hidden="true"
+              />
             </div>
-            <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
-              CodeSparring AI
-            </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-foreground truncate leading-tight font-semibold">
+                CodeSparring AI
+              </span>
+              <span className="text-muted-foreground flex items-center gap-1.5 text-[11px] leading-tight font-normal">
+                Sable · reacting live
+                <span className="flex items-end gap-0.5" aria-hidden="true">
+                  <span className="bg-accent/70 h-1.5 w-0.5 animate-pulse rounded-full" />
+                  <span
+                    className="bg-accent/70 h-2.5 w-0.5 animate-pulse rounded-full"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <span
+                    className="bg-accent/70 h-1 w-0.5 animate-pulse rounded-full"
+                    style={{ animationDelay: "300ms" }}
+                  />
+                </span>
+              </span>
+            </div>
           </div>
           {onToggleCollapse && (
             <button
@@ -103,25 +124,17 @@ export const ChatColumn = memo(function ChatColumn({
               {interviewerMessages.map((msg, index) => (
                 <div
                   key={`interviewer-${msg.type}-${index}`}
-                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+                  className={`animate-in slide-in-from-bottom-2 flex duration-300 ${
+                    msg.type === "user" ? "justify-end" : "justify-start"
+                  }`}
                 >
                   <div
-                    className={`max-w-[90%] rounded-lg p-2 ${
+                    className={`max-w-[88%] px-3 py-2 ${
                       msg.type === "user"
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted text-foreground"
+                        ? "bg-secondary text-foreground rounded-[14px_14px_4px_14px]"
+                        : "border-accent/20 bg-accent/10 text-foreground rounded-[14px_14px_14px_4px] border"
                     }`}
                   >
-                    <div className="mb-1 flex items-center space-x-1">
-                      {msg.type === "user" ? (
-                        <User className="h-3 w-3" />
-                      ) : (
-                        <Brain className="text-accent animate-neural-pulse h-3 w-3" />
-                      )}
-                      <span className="text-xs opacity-75">
-                        {msg.type === "user" ? "You" : "CodeSparring AI"}
-                      </span>
-                    </div>
                     <MarkdownRenderer content={msg.message} className="text-xs leading-relaxed" />
                   </div>
                 </div>
