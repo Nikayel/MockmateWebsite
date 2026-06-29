@@ -19,6 +19,10 @@ import {
   revealedTestSuites,
   type SuiteResult,
 } from "@/lib/bugfix/guided-lab/gating"
+import {
+  summarizeGuidedLabProgress,
+  type GuidedLabProgressSummary,
+} from "@/lib/bugfix/guided-lab/mastery"
 
 const nowIso = () => new Date().toISOString()
 
@@ -126,6 +130,19 @@ export function getGuidedChatState(
     activeBugId: progress.activeBugId,
     aiRestraint,
   }
+}
+
+/**
+ * Restraint-resistant understanding signal for scoring a guided lab as practice
+ * mastery (first-try quiz accuracy + milestone completion). Returns undefined
+ * unless a guided lab for `scenarioId` is active. Read imperatively at submit.
+ */
+export function getGuidedLabMasterySummary(
+  scenarioId: string | undefined
+): GuidedLabProgressSummary | undefined {
+  const { config, progress, scenarioId: storeScenarioId } = useGuidedLabStore.getState()
+  if (!config || !progress || !scenarioId || storeScenarioId !== scenarioId) return undefined
+  return summarizeGuidedLabProgress(config, progress)
 }
 
 /** True once every milestone is done. */

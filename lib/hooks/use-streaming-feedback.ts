@@ -22,6 +22,7 @@
 
 import { useState, useCallback, useRef } from "react"
 import { logger } from "@/lib/logger"
+import { getGuidedLabMasterySummary } from "@/lib/stores/guided-lab-store"
 
 export interface StreamingScores {
   understanding: number
@@ -182,6 +183,10 @@ export function useStreamingFeedback() {
             scenarioType: request.scenarioType || "dsa",
             scenarioTitle: request.scenarioTitle || "Unknown",
             scenarioId: request.scenarioId,
+            // Guided-lab practice signal (quiz accuracy / milestone completion);
+            // undefined for non-guided runs. Server also detects guided runs via
+            // scenarioId, so this only ENRICHES the mastery summary.
+            guidedLabMastery: getGuidedLabMasterySummary(request.scenarioId),
             scenarioPattern: request.scenarioPattern,
             conversationTranscript: request.conversationTranscript,
             efficiencyMetrics: request.efficiencyMetrics,
