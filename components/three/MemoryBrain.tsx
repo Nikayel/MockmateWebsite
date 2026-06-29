@@ -104,7 +104,7 @@ export function MemoryBrain() {
       uniforms: {
         uColor: { value: new THREE.Color("#d0824f") },
         uFaded: { value: new THREE.Color("#5c574e") },
-        uSize: { value: 13.0 },
+        uSize: { value: 16.5 },
         uDpr: { value: dpr },
       },
       vertexShader: /* glsl */ `
@@ -115,7 +115,7 @@ export function MemoryBrain() {
         void main() {
           vBright = aBright;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = uSize * uDpr * (0.5 + aBright * 1.1) * (1.0 / -mv.z);
+          gl_PointSize = uSize * uDpr * (0.72 + aBright * 1.0) * (1.0 / -mv.z);
           gl_Position = projectionMatrix * mv;
         }
       `,
@@ -129,8 +129,8 @@ export function MemoryBrain() {
           float d = length(c);
           if (d > 0.5) discard;
           float soft = smoothstep(0.5, 0.0, d);
-          vec3 col = mix(uFaded, uColor, vBright);
-          float a = soft * (0.22 + 0.78 * vBright);
+          vec3 col = mix(uFaded, uColor, 0.3 + 0.7 * vBright);
+          float a = soft * (0.4 + 0.6 * vBright);
           gl_FragColor = vec4(col, a);
         }
       `,
