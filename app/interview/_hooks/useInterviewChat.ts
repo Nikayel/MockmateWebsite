@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import { extractTopicsFromMessage } from "@/lib/interview"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
+import { getGuidedChatState } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import type { ChatMessage } from "../_types"
@@ -248,6 +249,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             currentCode: code,
             scenarioTitle: selectedScenario?.title,
             scenarioType: selectedScenario?.type,
+            guidedLab: getGuidedChatState(selectedScenario?.id),
             bugfixReflection:
               selectedScenario?.type === "bugfix"
                 ? {

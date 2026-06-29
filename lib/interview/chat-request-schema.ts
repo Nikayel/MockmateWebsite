@@ -62,6 +62,14 @@ export const chatRequestSchema = z
     scenarioClarifyingQuestions: z.unknown().optional(),
     scenarioFuzzyStatement: z.string().optional(),
     starterCodeLength: z.number().optional(),
+    guidedLab: z
+      .object({
+        milestoneId: z.string().optional(),
+        milestoneTitle: z.string().optional(),
+        activeBugId: z.string().optional(),
+        aiRestraint: z.boolean().optional(),
+      })
+      .optional(),
   })
   .passthrough()
 

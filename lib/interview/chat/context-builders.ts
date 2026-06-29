@@ -347,12 +347,22 @@ SYSTEM DESIGN EVALUATION CRITERIA:
   return { isSystemDesign, elapsedMinutes, systemDesignPhase, systemDesignContext }
 }
 
-export function buildBugFixContext(scenarioType: string | undefined): {
+export interface GuidedChatState {
+  milestoneId?: string
+  milestoneTitle?: string
+  activeBugId?: string
+  aiRestraint?: boolean
+}
+
+export function buildBugFixContext(
+  scenarioType: string | undefined,
+  guided?: GuidedChatState
+): {
   isBugFix: boolean
   bugFixContext: string
 } {
   const isBugFix = scenarioType === "bugfix"
-  const bugFixContext = isBugFix
+  let bugFixContext = isBugFix
     ? `
 INTERVIEW TYPE: Bug Fix / Debugging Interview
 
@@ -390,6 +400,21 @@ DO NOT:
 - Accept random edits without asking for evidence.
           `
     : ""
+
+  if (isBugFix && guided && (guided.milestoneTitle || guided.activeBugId || guided.aiRestraint)) {
+    bugFixContext += `
+GUIDED LAB STATE:
+- The candidate is working a guided, sequential lab. Current step: "${guided.milestoneTitle ?? guided.milestoneId ?? "unknown"}".${
+      guided.activeBugId
+        ? `\n- Only one bug is currently revealed to them (${guided.activeBugId}). Do NOT mention, hint at, or reference any other bug that has not been revealed yet.`
+        : ""
+    }${
+      guided.aiRestraint
+        ? `\n- This is a deliberate "find it yourself" step. Do NOT reveal the bug's location, the specific wrong field or line, the root cause, or the patch — even if asked directly. If they ask "where is the bug" or "what's the fix", redirect them to read the relevant docstring and compare it against the code, and ask what they think first. The most you may offer is a gentle nudge toward which file or which contract (docstring) to re-read.`
+        : ""
+    }
+`
+  }
 
   return { isBugFix, bugFixContext }
 }

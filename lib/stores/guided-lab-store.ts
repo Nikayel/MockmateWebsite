@@ -102,6 +102,32 @@ export const useGuidedLabStore = create<GuidedLabState>()(
   )
 )
 
+/**
+ * Snapshot of the guided-lab state for the chat request: which milestone is
+ * active, which bug is revealed, and whether this is an AI-restraint step.
+ * Returns undefined unless a guided lab for `scenarioId` is active. Read
+ * imperatively (not a hook) so it can be called inside chat send handlers.
+ */
+export function getGuidedChatState(
+  scenarioId: string | undefined
+):
+  | { milestoneId: string; milestoneTitle: string; activeBugId?: string; aiRestraint: boolean }
+  | undefined {
+  const { config, progress, scenarioId: storeScenarioId } = useGuidedLabStore.getState()
+  if (!config || !progress || !scenarioId || storeScenarioId !== scenarioId) return undefined
+  const active = config.milestones.find((m) => progress.milestoneStatus[m.id] === "active")
+  if (!active) return undefined
+  const aiRestraint = active.blocks.some(
+    (block) => block.kind === "instruction" && block.aiRestraint === true
+  )
+  return {
+    milestoneId: active.id,
+    milestoneTitle: active.title,
+    activeBugId: progress.activeBugId,
+    aiRestraint,
+  }
+}
+
 /** True once every milestone is done. */
 export const useGuidedLabComplete = (): boolean =>
   useGuidedLabStore((state) =>

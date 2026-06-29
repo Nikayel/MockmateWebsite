@@ -315,8 +315,8 @@ export async function POST(request: NextRequest) {
       elapsedTime
     )
 
-    // Build bug fix specific context
-    const { isBugFix, bugFixContext } = buildBugFixContext(scenarioType)
+    // Build bug fix specific context (incl. guided-lab milestone / AI-restraint state)
+    const { isBugFix, bugFixContext } = buildBugFixContext(scenarioType, parseResult.data.guidedLab)
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
