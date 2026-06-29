@@ -34,7 +34,7 @@ import {
 type MarketingNavItem = {
   label: string
   href: string
-  isActive: (pathname: string, hash: string) => boolean
+  isActive: (pathname: string) => boolean
 }
 
 type AppNavItem = {
@@ -101,11 +101,6 @@ const MARKETING_NAV: MarketingNavItem[] = [
     isActive: (pathname) => pathname.startsWith("/why-codesparring"),
   },
   {
-    label: "Features",
-    href: "/#features",
-    isActive: (pathname, hash) => pathname === "/" && hash === "#features",
-  },
-  {
     label: "Interviews",
     href: "/interview-prep",
     isActive: (pathname) => pathname.startsWith("/interview-prep"),
@@ -115,17 +110,11 @@ const MARKETING_NAV: MarketingNavItem[] = [
     href: "/pricing",
     isActive: (pathname) => pathname.startsWith("/pricing"),
   },
-  {
-    label: "Blog",
-    href: "/blog",
-    isActive: (pathname) => pathname.startsWith("/blog"),
-  },
 ]
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [hash, setHash] = useState("")
   const { user, initialized } = useAuth()
   const pathname = usePathname()
   const userDisplayName = user?.user_metadata?.full_name || user?.email || "Account"
@@ -137,15 +126,6 @@ export function Header() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
-
-  // Track the URL hash so "Features" lights up when viewing /#features,
-  // and "Platform" only when on the bare home route.
-  useEffect(() => {
-    const syncHash = () => setHash(window.location.hash)
-    syncHash()
-    window.addEventListener("hashchange", syncHash)
-    return () => window.removeEventListener("hashchange", syncHash)
-  }, [pathname])
 
   // Apple-calm marketing links: sentence case, light weight, no tracking.
   // Active reads via weight + brightness (theme tokens, so it tracks light/dark).
@@ -187,11 +167,10 @@ export function Header() {
               onClick={() => {
                 // For logged-out users already on the home route, scroll back to
                 // the hero (Next.js won't re-navigate to the same path, and a
-                // lingering #features hash would otherwise keep us scrolled down).
+                // lingering in-page hash would otherwise keep us scrolled down).
                 if (!user && pathname === "/") {
                   if (window.location.hash) {
                     history.replaceState(null, "", "/")
-                    setHash("")
                   }
                   window.scrollTo({ top: 0, behavior: "smooth" })
                 }
@@ -278,17 +257,14 @@ export function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={marketingTabClass(item.isActive(pathname, hash))}
+                      className={marketingTabClass(item.isActive(pathname))}
                     >
                       {item.label}
                     </Link>
                   ))}
                   <ThemeToggle />
-                  {/* Join us — neutral pill, distinct from the accent Sign-in CTA. */}
-                  <Link
-                    href="/careers"
-                    className="border-border text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
-                  >
+                  {/* Join us — quiet text link, de-emphasized vs the accent Sign-in CTA. */}
+                  <Link href="/careers" className={marketingTabClass(false)}>
                     Join us
                   </Link>
                   <Link
@@ -368,7 +344,7 @@ export function Header() {
                         key={item.href}
                         href={item.href}
                         className={`focus-visible:ring-accent/50 cursor-pointer rounded-sm text-[15px] transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
-                          item.isActive(pathname, hash)
+                          item.isActive(pathname)
                             ? "text-foreground font-medium"
                             : "text-muted-foreground hover:text-foreground font-normal"
                         }`}
