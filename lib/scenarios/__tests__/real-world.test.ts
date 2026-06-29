@@ -20,6 +20,7 @@ describe("real-world scenario modules", () => {
     "bugfix-feature-pipeline-nan-workspace",
     "bugfix-temperature-alert-regression",
     "bugfix-onboarding",
+    "bugfix-bookclub-reading-streak-workspace",
   ]
 
   it("keeps the legacy export order and IDs", () => {

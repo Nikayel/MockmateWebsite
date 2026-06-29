@@ -8,6 +8,7 @@ import type { BugFixScenario } from "../../types"
 import { withBugfixIncidentDefaults } from "../../bugfix-quality"
 import { bugfixApiRateLimiterWorkspaceScenario } from "./bugfix-api-rate-limiter-workspace"
 import { bugfixBillingWebhookIdempotencyScenario } from "./bugfix-billing-webhook-idempotency"
+import { bugfixBookclubReadingStreakWorkspaceScenario } from "./bugfix-bookclub-reading-streak-workspace"
 import { bugfixCommentThreadMergeScenario } from "./bugfix-comment-thread-merge"
 import { bugfixEventAggregationRetriesScenario } from "./bugfix-event-aggregation-retries"
 import { bugfixFeaturePipelineNanWorkspaceScenario } from "./bugfix-feature-pipeline-nan-workspace"
@@ -24,6 +25,7 @@ export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixFeaturePipelineNanWorkspaceScenario,
   bugfixTemperatureAlertRegressionScenario,
   bugfixOnboardingScenario,
+  bugfixBookclubReadingStreakWorkspaceScenario,
 ].map(withBugfixIncidentDefaults)
 
 export default realWorldBugFixScenarios
