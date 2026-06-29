@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { InterviewTimer } from "@/components/interview"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
@@ -243,6 +244,8 @@ export const InterviewTopBar = memo(function InterviewTopBar({
           )}
           <span className="hidden xl:inline">{focusMode ? "Exit Focus" : "Focus"}</span>
         </button>
+
+        <ThemeToggle />
 
         <Button
           onClick={onCloseClick}
