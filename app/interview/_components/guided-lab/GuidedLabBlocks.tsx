@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { BookOpen, Check, CheckCircle2, Circle, Lightbulb, XCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
@@ -35,27 +34,26 @@ export function GuidedInstruction({ body, aiRestraint }: { body: string; aiRestr
   )
 }
 
-export function GuidedCheckpoint({ block }: { block: CheckpointBlock }) {
-  const [checked, setChecked] = useState<Set<number>>(() => new Set())
-  const toggle = (index: number) =>
-    setChecked((prev) => {
-      const next = new Set(prev)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
-      return next
-    })
-
+export function GuidedCheckpoint({
+  block,
+  ackedIndices,
+  onAck,
+}: {
+  block: CheckpointBlock
+  ackedIndices: Set<number>
+  onAck: (index: number) => void
+}) {
   return (
     <div className="border-border bg-card/60 rounded-lg border p-3">
       <div className="text-foreground mb-2 text-xs font-semibold">{block.title}</div>
       <ul className="space-y-1.5">
         {block.items.map((item, index) => {
-          const isChecked = checked.has(index)
+          const isChecked = ackedIndices.has(index)
           return (
             <li key={item}>
               <button
                 type="button"
-                onClick={() => toggle(index)}
+                onClick={() => onAck(index)}
                 className="text-muted-foreground hover:text-foreground flex w-full items-start gap-2 text-left text-xs"
                 aria-pressed={isChecked}
               >

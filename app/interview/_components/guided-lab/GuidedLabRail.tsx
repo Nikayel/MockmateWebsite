@@ -4,7 +4,11 @@ import { useEffect } from "react"
 import { ArrowRight, CheckCircle2, CircleDot, Lock, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { GuidedLabConfig, GuidedLabProgress } from "@/lib/bugfix/guided-lab/types"
+import type {
+  GuidedLabBlock,
+  GuidedLabConfig,
+  GuidedLabProgress,
+} from "@/lib/bugfix/guided-lab/types"
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
 import { GuidedCheckpoint, GuidedInstruction, GuidedQuiz, KnowledgeCard } from "./GuidedLabBlocks"
 
@@ -20,6 +24,7 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
   const initGuidedLab = useGuidedLabStore((state) => state.initGuidedLab)
   const ackMilestone = useGuidedLabStore((state) => state.ackMilestone)
   const answerQuiz = useGuidedLabStore((state) => state.answerQuiz)
+  const ackCheckpoint = useGuidedLabStore((state) => state.ackCheckpoint)
 
   useEffect(() => {
     if (storeScenarioId !== scenarioId) {
@@ -35,6 +40,24 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
   ).length
   const activeMilestone = config.milestones.find((m) => progress.milestoneStatus[m.id] === "active")
   const isComplete = doneCount === total
+
+  // A manual-ack milestone only advances once its formative work is engaged:
+  // every quiz answered and every checkpoint item ticked.
+  const quizBlocks = activeMilestone?.blocks.filter((block) => block.kind === "quiz") ?? []
+  const checkpointBlocks =
+    activeMilestone?.blocks.filter(
+      (block): block is Extract<GuidedLabBlock, { kind: "checkpoint" }> =>
+        block.kind === "checkpoint"
+    ) ?? []
+  const allQuizzesAnswered = quizBlocks.every((quiz) =>
+    progress.quizAnswers.some((answer) => answer.quizId === quiz.id)
+  )
+  const allCheckpointsAcked = checkpointBlocks.every((checkpoint) =>
+    checkpoint.items.every((_, index) =>
+      progress.checkpointAcks.includes(`${checkpoint.id}#${index}`)
+    )
+  )
+  const canContinue = allQuizzesAnswered && allCheckpointsAcked
 
   return (
     <div className="space-y-3" data-guided-lab="rail">
@@ -103,7 +126,22 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
                   />
                 )
               case "checkpoint":
-                return <GuidedCheckpoint key={block.id} block={block} />
+                return (
+                  <GuidedCheckpoint
+                    key={block.id}
+                    block={block}
+                    ackedIndices={
+                      new Set(
+                        block.items
+                          .map((_, index) => index)
+                          .filter((index) =>
+                            progress.checkpointAcks.includes(`${block.id}#${index}`)
+                          )
+                      )
+                    }
+                    onAck={(index) => ackCheckpoint(`${block.id}#${index}`)}
+                  />
+                )
               case "quiz":
                 return (
                   <GuidedQuiz
@@ -122,14 +160,24 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
           })}
 
           {activeMilestone.gate.kind === "manual-ack" ? (
-            <Button
-              type="button"
-              onClick={() => ackMilestone(activeMilestone.id)}
-              className="bg-accent hover:bg-accent/80 text-accent-foreground h-8 w-full text-xs"
-            >
-              Continue
-              <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                onClick={() => ackMilestone(activeMilestone.id)}
+                disabled={!canContinue}
+                className="bg-accent hover:bg-accent/80 text-accent-foreground h-8 w-full text-xs disabled:opacity-50"
+              >
+                Continue
+                <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+              {!canContinue && (
+                <p className="text-muted-foreground text-center text-[11px]">
+                  {allQuizzesAnswered
+                    ? "Tick each checkpoint item to continue."
+                    : "Answer the question to continue."}
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-muted-foreground border-border rounded-md border border-dashed px-2.5 py-2 text-[11px]">
               Make your fix, then <span className="text-foreground font-medium">Run Tests</span>.
