@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { ArrowRight, CheckCircle2, CircleDot, Lock, Trophy } from "lucide-react"
+import { ArrowRight, CheckCircle2, Lock, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type {
@@ -93,21 +93,31 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
             <li
               key={milestone.id}
               className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1 text-xs",
-                status === "active" && "bg-accent/10 text-foreground font-medium",
-                status === "done" && "text-muted-foreground",
-                status === "locked" && "text-muted-foreground/50"
+                "flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors",
+                status === "active" && "border-accent/40 bg-accent/10 text-foreground font-medium",
+                status === "done" && "border-transparent text-muted-foreground",
+                status === "locked" && "border-transparent text-muted-foreground/55"
               )}
             >
-              {status === "done" ? (
-                <CheckCircle2 className="text-accent h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              ) : status === "active" ? (
-                <CircleDot className="text-accent h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              ) : (
-                <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              )}
+              <span
+                className={cn(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                  status === "active" && "bg-accent text-accent-foreground",
+                  status === "done" && "bg-accent/15 text-accent",
+                  status === "locked" && "bg-muted text-muted-foreground/70"
+                )}
+                aria-hidden="true"
+              >
+                {status === "done" ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : status === "locked" ? (
+                  <Lock className="h-3 w-3" />
+                ) : (
+                  index + 1
+                )}
+              </span>
               <span className="truncate">
-                {index + 1}. {status === "locked" ? "Locked" : milestone.title}
+                {status === "locked" ? "Locked" : milestone.title}
               </span>
             </li>
           )
