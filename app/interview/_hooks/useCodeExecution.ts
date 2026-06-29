@@ -15,6 +15,20 @@ import type {
   WorkspaceContextFile,
 } from "../_types"
 import { applyExecutionApiError, executeScenario } from "./code-execution-helpers"
+import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
+
+/**
+ * Feed workspace test results into the guided-lab gating store. For workspace
+ * scenarios the execute API encodes each result's suite as `input`, so we map
+ * that to {suite, passed}. No-op unless a guided lab is active.
+ */
+function applyGuidedLabGating(scenarioId: string | undefined, results: TestResult[]): void {
+  const store = useGuidedLabStore.getState()
+  if (!store.config || !scenarioId || store.scenarioId !== scenarioId) return
+  store.applyTestResults(
+    results.map((result) => ({ suite: String(result.input ?? ""), passed: result.passed }))
+  )
+}
 
 /**
  * Inputs/dependencies for {@link useCodeExecution}. The interview page owns the
@@ -159,6 +173,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
+        applyGuidedLabGating(selectedScenario.id, data.results)
         updateTrackerOnTestsRun()
         if (selectedScenario.type === "bugfix") {
           recordBugfixEvidence({
@@ -289,6 +304,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
+        applyGuidedLabGating(selectedScenario.id, data.results)
         updateTrackerOnTestsRun()
         if (selectedScenario.type === "bugfix") {
           recordBugfixEvidence({
