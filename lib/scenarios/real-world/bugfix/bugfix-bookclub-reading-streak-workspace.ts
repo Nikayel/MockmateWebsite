@@ -489,8 +489,9 @@ The code is layered:
 A \`ReadingEvent\` always has a \`started_at\` date; its \`finished_at\` date is set
 only once the member marks the book complete (so it is \`None\` while in progress).
 
-> The \`reference/\` folder is the original Flask + SQLAlchemy app, kept for
-> reading. The runnable copy you edit and test lives under \`app/\`.
+> The \`reference/\` folder is the original Flask + SQLAlchemy app **as shipped** —
+> kept for reading, so it still contains the same defects. Read it to learn the
+> structure, not to copy. The runnable copy you edit and test lives under \`app/\`.
 `
 
 export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
@@ -702,7 +703,7 @@ Work through it in order: first get the reading streak correct, then fix the rea
             kind: "quiz",
             id: "q-why",
             question:
-              "Why is the finish date the right field for a streak, even though the start date is also always set and would run without error?",
+              "After you've fixed the streak: why was the finish date the right field, even though the start date is also always set and would run without error?",
             options: [
               {
                 text: "started_at is nullable and would crash",
@@ -780,7 +781,7 @@ Work through it in order: first get the reading streak correct, then fix the rea
             ],
             correctIndex: 1,
             explanation:
-              "Same wrong field, but a logic error (wrong value) and a display error (wrong order) are different categories of mistake with different diagnosis paths.",
+              "Same wrong field — and that shared confusion (start vs finish date) is worth grepping for elsewhere. But here it surfaced as two different bug CLASSES: a logic error (wrong value) and a display error (wrong order), each needing its own diagnosis path.",
           },
           {
             kind: "checkpoint",
