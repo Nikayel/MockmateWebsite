@@ -3,7 +3,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Github, Terminal, CheckCircle } from "lucide-react"
+import { Github, Terminal, ArrowRight } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { useState, useEffect, Suspense } from "react"
@@ -36,6 +36,7 @@ function LoginPageContent() {
     "idle" | "authenticating" | "creating-profile" | "complete"
   >("idle")
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
+  const [email, setEmail] = useState("")
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
@@ -295,6 +296,14 @@ function LoginPageContent() {
     }
   }
 
+  // Email sign-in is visual-only for now — OAuth (GitHub/Google) is the live path.
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    toast.info("Email sign-in is coming soon", {
+      description: "For now, continue with GitHub or Google.",
+    })
+  }
+
   return (
     <main className="bg-background relative min-h-screen overflow-hidden">
       {/* Subtle grid background like landing page */}
@@ -367,37 +376,30 @@ function LoginPageContent() {
           initial="initial"
           animate="animate"
         >
-          <div className="mx-auto max-w-md">
-            {/* Headline - personal touch */}
-            <motion.div variants={staggerItem} className="mb-10 text-center">
-              <h1 className="text-foreground mb-4 text-4xl font-bold tracking-tight sm:text-5xl">
-                Let's get you in
+          <div className="mx-auto max-w-sm">
+            {/* Headline */}
+            <motion.div variants={staggerItem} className="mb-8">
+              <h1 className="text-foreground mb-2 text-3xl font-bold tracking-tight">
+                Welcome back
               </h1>
-              <p className="text-muted-foreground mb-6 text-lg">
-                Ready to crush that next interview?
-              </p>
-
-              {/* Personal note - adds character */}
-              <div className="bg-accent/5 border-accent/10 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm">
-                <span className="text-accent">~2 min</span>
-                <span>daily practice goes a long way</span>
-              </div>
+              <p className="text-muted-foreground text-sm">Sign in to sit your next round.</p>
             </motion.div>
 
-            {/* Login buttons - ONE CLICK signup */}
-            <motion.div variants={staggerItem} className="space-y-4">
-              {/* GitHub - Primary */}
+            {/* OAuth buttons */}
+            <motion.div variants={staggerItem} className="space-y-3">
+              {/* GitHub */}
               <Button
                 onClick={handleGitHubLogin}
                 disabled={isLoading}
-                className="bg-foreground hover:bg-foreground/90 text-background h-14 w-full rounded-xl text-base font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                variant="outline"
+                className="bg-secondary/40 hover:bg-secondary/60 text-foreground border-border hover:border-border/80 h-12 w-full rounded-xl border text-sm font-medium transition-all duration-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Continue with GitHub"
               >
                 {isLoading && authProvider === "github" ? (
-                  <div className="border-background/30 border-t-background h-5 w-5 animate-spin rounded-full border-2" />
+                  <div className="border-foreground/30 border-t-foreground h-5 w-5 animate-spin rounded-full border-2" />
                 ) : (
                   <>
-                    <Github className="mr-3 h-5 w-5" />
+                    <Github className="mr-2.5 h-5 w-5" />
                     Continue with GitHub
                   </>
                 )}
@@ -408,14 +410,14 @@ function LoginPageContent() {
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
                 variant="outline"
-                className="hover:bg-secondary/50 text-foreground border-border hover:border-border/80 h-14 w-full rounded-xl bg-transparent text-base font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+                className="bg-secondary/40 hover:bg-secondary/60 text-foreground border-border hover:border-border/80 h-12 w-full rounded-xl border text-sm font-medium transition-all duration-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Continue with Google"
               >
                 {isLoading && authProvider === "google" ? (
                   <div className="border-muted-foreground/30 border-t-muted-foreground h-5 w-5 animate-spin rounded-full border-2" />
                 ) : (
                   <>
-                    <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                    <svg className="mr-2.5 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                       <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -439,44 +441,74 @@ function LoginPageContent() {
               </Button>
             </motion.div>
 
-            {/* Implicit terms - no friction */}
+            {/* OR divider */}
+            <motion.div variants={staggerItem} className="my-6 flex items-center gap-4">
+              <div className="bg-border h-px flex-1" />
+              <span className="text-muted-foreground/70 text-xs font-medium tracking-[0.2em]">
+                OR
+              </span>
+              <div className="bg-border h-px flex-1" />
+            </motion.div>
+
+            {/* Email sign-in */}
+            <motion.form variants={staggerItem} onSubmit={handleEmailSubmit} className="space-y-3">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="text-muted-foreground mb-2 block text-xs font-medium"
+                >
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@email.com"
+                  disabled={isLoading}
+                  className="bg-secondary/40 border-border focus:border-accent focus:ring-accent/20 text-foreground placeholder:text-muted-foreground/50 h-12 w-full rounded-xl border px-4 text-sm transition outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="bg-accent hover:bg-accent/90 h-12 w-full rounded-xl text-sm font-semibold text-white transition-all duration-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Sign in
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </motion.form>
+
+            {/* Create account */}
             <motion.div variants={staggerItem} className="mt-6 text-center">
-              <p className="text-muted-foreground/70 text-xs">
-                By signing up, you confirm you're 16+ and agree to our{" "}
+              <p className="text-muted-foreground text-sm">
+                New to CodeSparring?{" "}
+                <Link href="/login" className="text-accent font-medium hover:underline">
+                  Create an account
+                </Link>
+              </p>
+            </motion.div>
+
+            {/* Terms */}
+            <motion.div variants={staggerItem} className="mt-4 text-center">
+              <p className="text-muted-foreground/60 text-xs">
+                By continuing you agree to our{" "}
                 <Link
                   href="/legal#terms-of-service"
-                  className="text-accent/70 hover:text-accent hover:underline"
+                  className="hover:text-foreground hover:underline"
                 >
                   Terms
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/legal#privacy-policy"
-                  className="text-accent/70 hover:text-accent hover:underline"
+                  className="hover:text-foreground hover:underline"
                 >
                   Privacy Policy
                 </Link>
+                .
               </p>
-            </motion.div>
-
-            {/* Free to start */}
-            <motion.div variants={staggerItem} className="mt-4 text-center">
-              <p className="text-muted-foreground text-sm">Free to start. No credit card needed.</p>
-            </motion.div>
-
-            {/* Trust - super minimal */}
-            <motion.div
-              variants={staggerItem}
-              className="text-muted-foreground/60 mt-6 flex justify-center gap-6 text-xs"
-            >
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="h-3.5 w-3.5" />
-                No repo access
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Cancel anytime
-              </span>
             </motion.div>
           </div>
         </motion.div>
@@ -489,7 +521,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-background">
+        <main className="bg-background flex min-h-screen items-center justify-center">
           <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
         </main>
       }
