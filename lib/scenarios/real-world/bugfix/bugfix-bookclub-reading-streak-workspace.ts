@@ -590,6 +590,214 @@ Work through it in order: first get the reading streak correct, then fix the rea
     "Explains why the finish date (not the start date) defines both a completion streak and a most-recently-finished ordering.",
     "Confirms in-progress books are excluded and the monthly/total stats are unaffected.",
   ],
+  guidedLab: {
+    version: "bookclub-guided-v1",
+    milestones: [
+      {
+        id: "m1-read",
+        title: "Read the codebase",
+        purpose: "Build a mental map before you touch anything.",
+        blocks: [
+          {
+            kind: "knowledge-card",
+            id: "kc-layers",
+            title: "Layered architecture",
+            body: "This app has three layers. **Routes** receive requests and format responses — they don't compute values. **Services** hold the logic: the stat calculations and the history query. **Models** define the data shape. When an API value is wrong, it's almost always a *service* problem — not a route or a model problem.",
+          },
+          {
+            kind: "knowledge-card",
+            id: "kc-docstrings",
+            title: "Docstrings are contracts",
+            body: 'Every function here has a docstring describing what it *should* do. When a function has a bug, the docstring is usually still correct — the code drifted from it. So don\'t ask "what does this code do?" Ask "does this code do what the docstring says?" A mismatch is your bug.',
+          },
+          {
+            kind: "knowledge-card",
+            id: "kc-model",
+            title: "Two dates on every event",
+            body: "A `ReadingEvent` has `started_at` (always set — the day a book was opened) and `finished_at` (set only when the book is completed; `None` while in progress). `get_reading_history` returns only finished events.",
+          },
+          {
+            kind: "checkpoint",
+            id: "cp-read",
+            title: "Before you move on",
+            items: [
+              "Name the two date fields on ReadingEvent and which one can be None.",
+              "Say what get_reading_history guarantees about the events it returns.",
+              "Find the three functions in stats_service.py and the one in reading_service.py.",
+            ],
+          },
+        ],
+        gate: { kind: "manual-ack" },
+        revealTestSuites: [],
+      },
+      {
+        id: "m2-reproduce",
+        title: "Reproduce it",
+        purpose: "A bug you haven't reproduced is a bug you haven't understood.",
+        blocks: [
+          {
+            kind: "instruction",
+            id: "inst-run",
+            body: "Click **Run Tests**. The streak check fails while books-this-month and total-pages pass. Read the output yourself before reasoning about what it implies.",
+          },
+          {
+            kind: "knowledge-card",
+            id: "kc-shared",
+            title: "One shared dependency",
+            body: "All three stats call `get_reading_history()`. If that were broken, all three would be wrong. Two of them are correct — so the shared input is fine, and the bug lives inside the one function whose output is wrong.",
+          },
+          {
+            kind: "quiz",
+            id: "q-which",
+            question:
+              "The streak returns 0, but books-this-month and total-pages are correct. What does that tell you?",
+            options: [
+              {
+                text: "get_reading_history returns the wrong events, but only the streak is affected",
+                rationale:
+                  "If the shared dependency were broken, all three stats would be affected — not just one.",
+              },
+              {
+                text: "The bug is inside calculate_streak — the only function whose output is wrong",
+                rationale:
+                  "Two correct outputs from the shared dependency prove the input is fine, which isolates the bug to calculate_streak.",
+              },
+              {
+                text: "It's inconclusive — the bug could be anywhere",
+                rationale:
+                  "The two correct values rule out the shared dependency, so it isn't inconclusive.",
+              },
+              {
+                text: "The bug must be in the route layer",
+                rationale: "Routes format service output; they don't compute the streak.",
+              },
+            ],
+            correctIndex: 1,
+            explanation:
+              "All three stats share get_reading_history(). Two correct values prove the shared input is fine, isolating the bug to calculate_streak().",
+          },
+        ],
+        gate: { kind: "manual-ack" },
+        revealTestSuites: ["visible streak"],
+      },
+      {
+        id: "m3-streak",
+        title: "Fix the streak",
+        purpose: "Diagnose the mismatch, then make the one-word change.",
+        bugId: "bug-1-streak",
+        blocks: [
+          {
+            kind: "knowledge-card",
+            id: "kc-diagnose",
+            title: "Diagnose before you fix",
+            body: "Before changing anything, write the mismatch in plain language: what the docstring says, what the code does, and the one line where they disagree. A diagnosed fix tells you *why* it's right; a guessed fix only tells you the symptom moved.",
+          },
+          {
+            kind: "instruction",
+            id: "inst-streak",
+            aiRestraint: true,
+            body: "Read calculate_streak's docstring as a contract, then read the line that builds its set of days. Which field is it using — and is that the field the docstring describes? Make the one-word change in `app/services/stats_service.py`, then Run Tests. Try to spot it yourself before asking the debugging partner.",
+          },
+          {
+            kind: "quiz",
+            id: "q-why",
+            question:
+              "Why is the finish date the right field for a streak, even though the start date is also always set and would run without error?",
+            options: [
+              {
+                text: "started_at is nullable and would crash",
+                rationale:
+                  "started_at is always set — it wouldn't crash. That is what makes this bug subtle.",
+              },
+              {
+                text: "A streak measures days you completed a book; when you started is irrelevant to whether you finished one that day",
+                rationale: "The streak counts completion days, so it must use finished_at.",
+              },
+              {
+                text: "started_at and finished_at are always equal anyway",
+                rationale:
+                  "They're usually different — a book is started days before it is finished.",
+              },
+              {
+                text: "Either field works since get_reading_history already filters to finished books",
+                rationale:
+                  "Both dates exist on finished events, but started_at is the wrong day — it's when the book was opened, not completed.",
+              },
+            ],
+            correctIndex: 1,
+            explanation:
+              "A reading streak is a measure of completion. It must count the days books were finished, so calculate_streak must aggregate by finished_at.",
+          },
+        ],
+        gate: { kind: "tests-pass", testSuites: ["visible streak", "hidden streak"] },
+        revealTestSuites: ["visible streak"],
+      },
+      {
+        id: "m4-history",
+        title: "Fix the history order",
+        purpose: "Verifying thoroughly is how you find the second bug.",
+        bugId: "bug-2-history",
+        dependsOn: ["m3-streak"],
+        blocks: [
+          {
+            kind: "knowledge-card",
+            id: "kc-logic-vs-display",
+            title: "Logic bugs vs display bugs",
+            body: "Bug 1 was a *logic* bug — the computed value was wrong. This one is a *display* bug — the values are all correct, but they come back in the wrong order. Different category, different diagnosis: don't trace the calculation, look at the sort.",
+          },
+          {
+            kind: "instruction",
+            id: "inst-history",
+            aiRestraint: true,
+            body: 'The history should be "most recently finished first." Read get_reading_history\'s docstring, then look only at its `sorted(...)` key. Which field is it ordering by? Make the one-word change in `app/services/reading_service.py`, then Run Tests.',
+          },
+          {
+            kind: "quiz",
+            id: "q-rootcause",
+            question:
+              "Both bugs used the wrong field (started_at instead of finished_at). Do they have the same root cause?",
+            options: [
+              {
+                text: "Yes — one find-and-replace would fix both, so it's one root cause",
+                rationale:
+                  "Same fix is not the same root cause — these are two independent mistakes in two functions.",
+              },
+              {
+                text: "No — one is a wrong computed value (logic), the other is correct data in the wrong order (display); different categories needing different diagnosis",
+                rationale:
+                  "Same wrong field, but structurally different mistakes in different functions.",
+              },
+              {
+                text: "Yes — the developer was confused about the fields, which is a single cause",
+                rationale:
+                  'A shared pattern is worth noting, but "same root cause" means one thing caused both — here each is independently present.',
+              },
+              {
+                text: "No — they're in different files, so by definition different causes",
+                rationale:
+                  "Different files don't define root cause; the real distinction is logic vs display.",
+              },
+            ],
+            correctIndex: 1,
+            explanation:
+              "Same wrong field, but a logic error (wrong value) and a display error (wrong order) are different categories of mistake with different diagnosis paths.",
+          },
+          {
+            kind: "checkpoint",
+            id: "cp-done",
+            title: "Verify everything",
+            items: [
+              "Streak, history, books-this-month, and total-pages all pass.",
+              "You can explain each fix in one sentence.",
+              "You verified rather than assuming — that's how you found the second bug.",
+            ],
+          },
+        ],
+        gate: { kind: "tests-pass", testSuites: ["visible history order", "hidden history"] },
+        revealTestSuites: ["visible history order"],
+      },
+    ],
+  },
   workspace: {
     language: "python",
     primaryFilePath: "app/services/stats_service.py",
