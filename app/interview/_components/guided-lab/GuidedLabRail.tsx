@@ -10,6 +10,7 @@ import type {
   GuidedLabProgress,
 } from "@/lib/bugfix/guided-lab/types"
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
+import { loadGuidedLabProgress, saveGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
 import { GuidedCheckpoint, GuidedInstruction, GuidedQuiz, KnowledgeCard } from "./GuidedLabBlocks"
 
 interface GuidedLabRailProps {
@@ -28,9 +29,17 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
 
   useEffect(() => {
     if (storeScenarioId !== scenarioId) {
-      initGuidedLab(scenarioId, config, savedProgress)
+      // Resume from the explicit prop, else from local persistence, else fresh.
+      initGuidedLab(scenarioId, config, savedProgress ?? loadGuidedLabProgress(scenarioId))
     }
   }, [storeScenarioId, scenarioId, config, savedProgress, initGuidedLab])
+
+  // Persist progress so a reload doesn't reset a long lab to milestone 1.
+  useEffect(() => {
+    if (progress && storeScenarioId === scenarioId) {
+      saveGuidedLabProgress(scenarioId, progress)
+    }
+  }, [progress, storeScenarioId, scenarioId])
 
   if (!progress || storeScenarioId !== scenarioId) return null
 
