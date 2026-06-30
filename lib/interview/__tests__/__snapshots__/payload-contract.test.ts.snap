@@ -119,14 +119,6 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "workspaceContext",
     ],
   ],
-  "fetch POST /api/execute": [
-    [
-      "code",
-      "language",
-      "scenarioId",
-      "workspaceFiles",
-    ],
-  ],
   "fetch POST /api/feedback/persist": [
     [
       "bugfixEvidenceSummary",

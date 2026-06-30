@@ -185,17 +185,15 @@ describe("interview payload contract (Slice 0 oracle)", () => {
     const contract = scanContract()
     // Spot-checks that fail loudly if a whole endpoint disappears during refactor.
     const labels = Object.keys(contract)
-    expect(labels.some((l) => l === "fetch POST /api/execute")).toBe(true)
     expect(labels.some((l) => l === "fetch POST /api/generate-feedback")).toBe(true)
     expect(labels.some((l) => l.startsWith("fetch POST /api/chat"))).toBe(true)
+  })
 
-    const execute = contract["fetch POST /api/execute"]
-    expect(execute).toBeDefined()
-    // Every /api/execute call sends these fields.
-    for (const keys of execute) {
-      expect(keys).toContain("code")
-      expect(keys).toContain("scenarioId")
-      expect(keys).toContain("language")
-    }
+  it("no longer POSTs /api/execute from the interview — code runs client-side (Piston deprecated)", () => {
+    // Intentional contract change: `executeScenario` runs the in-browser sandbox
+    // (`executeScenarioInBrowser`) and the server-side Piston `/api/execute` fallback was removed.
+    // See lib/piston.ts (@deprecated) and code-execution-helpers.ts.
+    const contract = scanContract()
+    expect(Object.keys(contract).some((l) => l === "fetch POST /api/execute")).toBe(false)
   })
 })
