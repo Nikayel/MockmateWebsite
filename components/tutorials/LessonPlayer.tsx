@@ -68,6 +68,15 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
     rememberLevel(level.id)
   }, [level.id])
 
+  // This route is a Client Component (no generateMetadata), so set the tab title from the lesson.
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${lesson.title} — Learn Python`
+    return () => {
+      document.title = previous
+    }
+  }, [lesson.title])
+
   // Position within the level + the cross-curriculum "Up next" list (completion hydrated best-effort).
   const completedIds = useCompletedLessons()
 
