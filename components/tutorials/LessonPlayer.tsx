@@ -10,7 +10,7 @@ import {
   LESSON_SECTION_ORDER,
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
-import { getLessonLocation, listAllLessons } from "@/lib/tutorials/registry"
+import { getLessonLocation, getNextLesson, listAllLessons } from "@/lib/tutorials/registry"
 import { fetchAllProgress } from "@/lib/tutorials/progress-client"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
@@ -99,6 +99,12 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
       }))
     return { lessonNumber: idx + 1, totalInLevel: inLevel.length, upNext: next }
   }, [level, lesson.id, completedIds])
+
+  const nextLesson = useMemo(() => {
+    const next = getNextLesson(lesson.id)
+    if (!next) return null
+    return { id: next.id, title: next.title, slug: getLessonLocation(next.id)?.level.slug }
+  }, [lesson.id])
 
   // Resume: once saved progress loads, open the first not-completed section (once).
   const didResume = useRef(false)
@@ -214,7 +220,13 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
               <LessonHeader lesson={lesson} />
 
               {active === "teach" && (
-                <TeachPanel teach={lesson.teach} onContinue={() => goToSection("apply")} />
+                <TeachPanel
+                  teach={lesson.teach}
+                  onContinue={() => {
+                    markComplete("teach")
+                    goToSection("apply")
+                  }}
+                />
               )}
 
               {active === "apply" && (
@@ -240,10 +252,22 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                     onPass: () => markComplete("practice"),
                   })}
                   {sections.practice === "completed" && (
-                    <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                      Lesson complete — nice work. This idea resurfaces in 3 days for spaced
-                      practice.
-                    </p>
+                    <div className="flex flex-col gap-3">
+                      <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                        Lesson complete — nice work. This idea resurfaces in 3 days for spaced
+                        practice.
+                      </p>
+                      {nextLesson?.slug && (
+                        <div>
+                          <Button asChild className="gap-2">
+                            <Link href={`/learn/python/${nextLesson.slug}/${nextLesson.id}`}>
+                              Next lesson: {nextLesson.title}
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
