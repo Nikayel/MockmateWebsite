@@ -1,11 +1,11 @@
-import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+import { Check } from "lucide-react"
 import type { PythonLevel, PythonLevelId } from "@/lib/tutorials/types"
 
 /**
- * One level on the Python Path. Models the loop deepening across levels (Read → Apply →
- * Practice → Files). Links to the level's module list. Presentational + a Link, so it renders
- * fine in a Server Component.
+ * One node on the Python Path (HANDOFF §B). A clickable card that *selects* its level — the sticky
+ * preview reacts; the preview's CTA does the navigation. Models the loop deepening across levels via
+ * phase badges, and overlays completion (a clay-filled check + an "n / total done" line) hydrated
+ * from saved progress. The numbered spine + connector live in `LevelSelector`.
  */
 const LEVEL_PHASES: Record<PythonLevelId, string[]> = {
   1: ["Read"],
@@ -14,40 +14,73 @@ const LEVEL_PHASES: Record<PythonLevelId, string[]> = {
   4: ["Read", "Apply", "Practice", "Files"],
 }
 
-export function LevelCard({ level }: { level: PythonLevel }) {
+export function LevelCard({
+  level,
+  isSelected,
+  isCompleted,
+  completedCount,
+  onSelect,
+}: {
+  level: PythonLevel
+  isSelected: boolean
+  isCompleted: boolean
+  completedCount: number
+  onSelect: (level: PythonLevel) => void
+}) {
   const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
   const phases = LEVEL_PHASES[level.id]
+  const hasProgress = completedCount > 0
 
   return (
-    <Link
-      href={`/learn/python/${level.slug}`}
-      className="group border-border bg-card hover:border-primary/40 hover:bg-primary/[0.03] flex items-start gap-4 rounded-xl border p-5 transition-colors"
+    <button
+      type="button"
+      onClick={() => onSelect(level)}
+      aria-pressed={isSelected}
+      className={[
+        "group w-full rounded-xl border p-5 text-left transition-colors",
+        isSelected
+          ? "border-accent/50 bg-accent/[0.06] shadow-sm"
+          : "border-border bg-card hover:border-accent/30 hover:bg-accent/[0.03]",
+      ].join(" ")}
     >
-      <span className="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
-        {level.id}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <h3 className="text-foreground font-semibold">{level.title}</h3>
-        <p className="text-muted-foreground mt-1 text-sm">{level.tagline}</p>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {phases.map((phase) => (
-            <span
-              key={phase}
-              className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-xs"
-            >
-              {phase}
-            </span>
-          ))}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-foreground font-semibold">{level.title}</h3>
+          <p className="text-muted-foreground mt-1 text-sm">{level.tagline}</p>
         </div>
-
-        <p className="text-muted-foreground mt-3 text-xs">
-          {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · ~{level.estimatedHours}h
-        </p>
+        {isCompleted && (
+          <span
+            className="bg-accent text-accent-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+            aria-label="Level complete"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </span>
+        )}
       </div>
 
-      <ArrowRight className="text-muted-foreground group-hover:text-foreground mt-1 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
-    </Link>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {phases.map((phase) => (
+          <span
+            key={phase}
+            className={[
+              "rounded-full border px-2 py-0.5 text-xs",
+              isSelected ? "border-accent/30 text-accent" : "border-border text-muted-foreground",
+            ].join(" ")}
+          >
+            {phase}
+          </span>
+        ))}
+      </div>
+
+      <p className="text-muted-foreground mt-3 text-xs">
+        {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · ~{level.estimatedHours}h
+        {hasProgress && (
+          <span className="text-accent font-medium">
+            {" · "}
+            {completedCount}/{lessonCount} done
+          </span>
+        )}
+      </p>
+    </button>
   )
 }
