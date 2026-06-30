@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { LevelCard } from "./LevelCard"
 import { LevelPreviewPanel } from "./LevelPreviewPanel"
 import { Reveal } from "./Reveal"
-import { fetchAllProgress } from "@/lib/tutorials/progress-client"
+import { useCompletedLessons } from "./useCompletedLessons"
 import { recallLevel, rememberLevel } from "@/lib/tutorials/level-preference"
 import type { PythonLevel } from "@/lib/tutorials/types"
 
@@ -19,29 +19,13 @@ import type { PythonLevel } from "@/lib/tutorials/types"
 export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState<PythonLevel["id"]>(levels[0]?.id ?? 1)
-  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set())
+  const completedLessonIds = useCompletedLessons()
 
   // Preselect the level the learner last started, if any.
   useEffect(() => {
     const stored = recallLevel()
     if (stored && levels.some((l) => l.id === stored)) setSelectedId(stored)
   }, [levels])
-
-  // Best-effort completion overlay (null/[] when signed out — never blocks the path).
-  useEffect(() => {
-    let active = true
-    fetchAllProgress()
-      .then((items) => {
-        if (!active) return
-        setCompletedLessonIds(
-          new Set(items.filter((p) => p.lessonStatus === "completed").map((p) => p.lessonId))
-        )
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
 
   const selected = useMemo(
     () => levels.find((l) => l.id === selectedId) ?? levels[0],

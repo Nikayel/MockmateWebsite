@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { ModuleList } from "./ModuleList"
-import { fetchAllProgress } from "@/lib/tutorials/progress-client"
+import { useCompletedLessons } from "./useCompletedLessons"
 import type { PythonLevel } from "@/lib/tutorials/types"
 
 /**
@@ -11,22 +11,7 @@ import type { PythonLevel } from "@/lib/tutorials/types"
  * module-list PAGE stay a Server Component (HANDOFF §C hard rule) while still overlaying progress.
  */
 export function LevelModules({ level }: { level: PythonLevel }) {
-  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    let active = true
-    fetchAllProgress()
-      .then((items) => {
-        if (active)
-          setCompletedLessonIds(
-            new Set(items.filter((p) => p.lessonStatus === "completed").map((p) => p.lessonId))
-          )
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
+  const completedLessonIds = useCompletedLessons()
 
   const { total, done } = useMemo(() => {
     const lessons = level.modules.flatMap((mod) => mod.lessons)

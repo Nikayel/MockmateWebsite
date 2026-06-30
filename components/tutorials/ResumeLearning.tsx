@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
-import { fetchAllProgress } from "@/lib/tutorials/progress-client"
+import { useCompletedLessons } from "./useCompletedLessons"
 import { recallLevel } from "@/lib/tutorials/level-preference"
 import type { PythonLevel } from "@/lib/tutorials/types"
 
@@ -14,34 +14,20 @@ import type { PythonLevel } from "@/lib/tutorials/types"
  * fully done. Best-effort: degrades to silent when signed out.
  */
 export function ResumeLearning({ levels }: { levels: PythonLevel[] }) {
-  const [target, setTarget] = useState<{ levelId: number; slug: string; lessonId: string } | null>(
-    null
-  )
+  const completed = useCompletedLessons()
 
-  useEffect(() => {
+  const target = useMemo(() => {
     const levelId = recallLevel()
-    if (!levelId) return
+    if (!levelId) return null
     const level = levels.find((l) => l.id === levelId)
-    if (!level) return
-
-    let active = true
-    fetchAllProgress()
-      .then((items) => {
-        if (!active) return
-        const completed = new Set(
-          items.filter((p) => p.lessonStatus === "completed").map((p) => p.lessonId)
-        )
-        const lessons = level.modules.flatMap((mod) => mod.lessons)
-        const next = lessons.find((l) => !completed.has(l.id))
-        // Only offer a resume when there's real, partially-done progress left in the level.
-        if (next && completed.size > 0)
-          setTarget({ levelId: level.id, slug: level.slug, lessonId: next.id })
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [levels])
+    if (!level) return null
+    const lessons = level.modules.flatMap((mod) => mod.lessons)
+    const next = lessons.find((l) => !completed.has(l.id))
+    // Only offer a resume when there's real, partially-done progress left in the level.
+    if (next && completed.size > 0)
+      return { levelId: level.id, slug: level.slug, lessonId: next.id }
+    return null
+  }, [levels, completed])
 
   if (!target) return null
 

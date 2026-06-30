@@ -11,7 +11,7 @@ import {
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
 import { getLessonLocation, getNextLesson, listAllLessons } from "@/lib/tutorials/registry"
-import { fetchAllProgress } from "@/lib/tutorials/progress-client"
+import { useCompletedLessons } from "./useCompletedLessons"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
 import { ExerciseRunner } from "./ExerciseRunner"
@@ -68,21 +68,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
   }, [level.id])
 
   // Position within the level + the cross-curriculum "Up next" list (completion hydrated best-effort).
-  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set())
-  useEffect(() => {
-    let active = true
-    fetchAllProgress()
-      .then((items) => {
-        if (active)
-          setCompletedIds(
-            new Set(items.filter((p) => p.lessonStatus === "completed").map((p) => p.lessonId))
-          )
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
+  const completedIds = useCompletedLessons()
 
   const { lessonNumber, totalInLevel, upNext } = useMemo(() => {
     const inLevel = level.modules.flatMap((mod) => mod.lessons)
