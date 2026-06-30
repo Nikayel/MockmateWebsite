@@ -78,7 +78,7 @@ Legend: **SF** = single-file, **WS** = workspace.
 
 ### Module L3-M2 — Type Hints & Static Typing
 - [x] **PY-L3-02 · `py-l3-type-hints`** (WS, medium) — *annotations on functions/classes.* Objective: add precise type hints to a module.
-- **PY-L3-03 · `py-l3-typing-module`** (WS, medium) — *`typing`: Optional/Union, generics, Protocols (+ mypy/ty mindset).* Objective: type a small generic/Protocol-based API.
+- [x] **PY-L3-03 · `py-l3-typing-module`** (WS, medium) — *`typing`: Optional/Union, generics, Protocols (+ mypy/ty mindset).* Objective: type a small generic/Protocol-based API.
 
 ### Module L3-M3 — Testing with pytest
 - **PY-L3-04 · `py-l3-pytest-basics`** (WS, medium) — *pytest assertions & structure.* Objective: write/pass `pytest` tests for a module.

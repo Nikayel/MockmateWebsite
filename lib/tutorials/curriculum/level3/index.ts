@@ -866,6 +866,264 @@ the mean rounded with the read-only \`round2\` helper imported from \`stats.roun
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// py-l3-typing-module — typing: Optional/Union, generics, Protocols
+// ───────────────────────────────────────────────────────────────────────────
+
+const TM_README = `# Typed user lookup
+
+Type a small lookup API. \`directory/users.py\` (read-only) holds a list of user dicts; implement
+\`find_user(user_id)\` in \`directory/lookup.py\`.
+
+It should return the matching user dict, or \`None\` when no user has that id. Annotate the return as
+\`-> dict | None\` (an **Optional**: a dict *or* None). Some tests are hidden.
+`
+
+const TM_USERS = String.raw`USERS = [
+    {"id": 1, "name": "Ada"},
+    {"id": 2, "name": "Sam"},
+    {"id": 3, "name": "Mo"},
+]
+`
+
+const TM_LOOKUP_STARTER = String.raw`from directory.users import USERS
+
+
+def find_user(user_id: int) -> dict | None:
+    """Return the user dict with this id, or None if absent (see README.md)."""
+    # TODO: scan USERS and return the match, else None.
+    return None
+`
+
+const TM_LOOKUP_REFERENCE = String.raw`from directory.users import USERS
+
+
+def find_user(user_id: int) -> dict | None:
+    for user in USERS:
+        if user["id"] == user_id:
+            return user
+    return None
+`
+
+const TM_TEST = String.raw`from directory.lookup import find_user
+
+
+def run_tests(record):
+    def finds_existing_user():
+        assert find_user(1) == {"id": 1, "name": "Ada"}, f"got {find_user(1)!r}"
+
+    def finds_another_user():
+        assert find_user(2) == {"id": 2, "name": "Sam"}, f"got {find_user(2)!r}"
+
+    def missing_user_is_none():
+        assert find_user(99) is None, f"expected None, got {find_user(99)!r}"
+
+    record("finds an existing user", finds_existing_user)
+    record("finds another user", finds_another_user)
+    record("missing id returns None", missing_user_is_none)
+`
+
+const TM_TEST_HIDDEN = String.raw`from directory.lookup import find_user
+
+
+def run_tests(record):
+    def finds_last_user():
+        assert find_user(3) == {"id": 3, "name": "Mo"}, f"got {find_user(3)!r}"
+
+    def zero_is_none():
+        assert find_user(0) is None, f"expected None, got {find_user(0)!r}"
+
+    record("finds the last user", finds_last_user)
+    record("id 0 returns None", zero_is_none)
+`
+
+const typingModuleLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-typing-module",
+  title: "typing: Optional, Union, generics & Protocols",
+  summary: "Type a small API with Optional/Union, a TypeVar generic, and a structural Protocol.",
+  estimatedMinutes: 18,
+  difficulty: "medium",
+  skills: ["typing", "optional", "generics", "protocols"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Precise types for real APIs
+
+### Optional and Union
+
+A value that might be missing is **Optional** — written \`X | None\` (older code uses
+\`Optional[X]\`). A value that can be one of several types is a **Union** — \`int | str\`.
+
+\`\`\`python
+def find_user(user_id: int) -> dict | None:
+    ...        # returns a dict, or None when not found
+\`\`\`
+
+Returning \`None\` from a function annotated \`-> dict\` is a lie a type checker will catch — annotate
+the real contract, \`-> dict | None\`, and callers know to handle the \`None\`.
+
+### Generics with TypeVar
+
+A **generic** keeps the relationship between input and output types. \`TypeVar\` is the placeholder:
+
+\`\`\`python
+from typing import TypeVar
+T = TypeVar("T")
+
+def first(items: list[T]) -> T | None:
+    return items[0] if items else None   # list[int] in -> int | None out
+\`\`\`
+
+### Protocols (structural typing)
+
+A **Protocol** describes the *shape* an object must have — any object with the right attributes or
+methods satisfies it, no inheritance required:
+
+\`\`\`python
+from typing import Protocol
+
+class Named(Protocol):
+    name: str
+
+def greet(who: Named) -> str:
+    return "Hi, " + who.name     # anything with a .name works
+\`\`\`
+
+### The mypy / ty mindset
+
+Type checkers (\`mypy\`, \`ty\`) read these hints and flag mismatches before you run. Think of hints
+as a contract the checker proves for you.
+
+### Recap
+
+\`X | None\` marks optional values, \`TypeVar\` keeps generics honest, and \`Protocol\` types by shape.
+You'll implement a user lookup that returns \`dict | None\` — first standalone, then across the
+\`directory\` package.`,
+    demoCode: `def first(items: list) -> object | None:
+    return items[0] if items else None
+
+
+print(first([10, 20]))   # 10
+print(first([]))         # None`,
+  },
+  apply: {
+    id: "py-l3-typing-module-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`find_by_id(rows, target)\` — return the first dict in \`rows\` whose
+\`"id"\` equals \`target\`, or \`None\` if none match.
+
+Annotate the return as \`-> dict | None\`.`,
+    starterCode: `def find_by_id(rows, target) -> dict | None:
+    # Return the first row whose "id" == target, else None.
+    pass`,
+    hints: [
+      "Loop the rows and check `row[\"id\"] == target`.",
+      "Return the row as soon as it matches.",
+      "If the loop finishes with no match, `return None`.",
+    ],
+    referenceSolution: `def find_by_id(rows, target) -> dict | None:
+    for row in rows:
+        if row["id"] == target:
+            return row
+    return None`,
+    testCases: [
+      {
+        input: {
+          rows: [
+            { id: 1, name: "Ada" },
+            { id: 2, name: "Sam" },
+          ],
+          target: 2,
+        },
+        expected: { id: 2, name: "Sam" },
+        description: "finds a match",
+      },
+      {
+        input: {
+          rows: [
+            { id: 1, name: "Ada" },
+            { id: 2, name: "Sam" },
+          ],
+          target: 9,
+        },
+        expected: null,
+        description: "no match -> None",
+      },
+      { input: { rows: [], target: 1 }, expected: null, description: "empty rows -> None" },
+    ],
+  },
+  practice: {
+    id: "py-l3-typing-module-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`find_user(user_id)\` in \`directory/lookup.py\`: return the matching user dict from the
+read-only \`USERS\` list, or \`None\` when no user has that id. Annotate the return as \`-> dict | None\`.
+Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "`USERS` is imported for you — loop over it.",
+      'Compare ids: `if user["id"] == user_id: return user`.',
+      "Return `None` after the loop when nothing matched.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "directory/lookup.py",
+      editableFilePaths: ["directory/lookup.py"],
+      visibleTestPaths: ["tests/test_lookup.py"],
+      hiddenTestPaths: ["tests/test_lookup_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: TM_README },
+        { path: "directory/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "directory/users.py",
+          role: "readonly",
+          language: "python",
+          content: TM_USERS,
+          description: "User records (read-only)",
+        },
+        {
+          path: "directory/lookup.py",
+          role: "editable",
+          language: "python",
+          content: TM_LOOKUP_STARTER,
+          description: "Implement find_user here",
+        },
+        { path: "tests/__init__.py", role: "test", language: "python", content: EMPTY_INIT, hidden: true },
+        {
+          path: "tests/test_lookup.py",
+          role: "test",
+          language: "python",
+          content: TM_TEST,
+          description: "Visible lookup tests",
+        },
+        {
+          path: "tests/test_lookup_hidden.py",
+          role: "test",
+          language: "python",
+          content: TM_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_lookup", "test_lookup_hidden", "visible lookup", "hidden lookup"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "directory/lookup.py",
+          role: "editable",
+          language: "python",
+          content: TM_LOOKUP_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level3: PythonLevel = {
   id: 3,
   slug: "applied",
@@ -890,7 +1148,7 @@ export const level3: PythonLevel = {
       id: "py-l3-type-hints",
       title: "Type Hints & Static Typing",
       description: "Annotate functions and classes for clarity and static checking.",
-      lessons: [typeHintsLesson],
+      lessons: [typeHintsLesson, typingModuleLesson],
     },
   ],
 }
