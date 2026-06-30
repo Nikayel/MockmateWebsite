@@ -6,8 +6,14 @@ import { Button } from "@/components/ui/button"
 import { LESSON_SECTION_ORDER, useTutorialStore } from "@/lib/stores/tutorial-store"
 import { TeachPanel } from "./TeachPanel"
 import { ExerciseRunner } from "./ExerciseRunner"
+import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
-import type { LessonSection, PythonLesson, PythonLevel } from "@/lib/tutorials/types"
+import type {
+  LessonSection,
+  PythonExercise,
+  PythonLesson,
+  PythonLevel,
+} from "@/lib/tutorials/types"
 
 const SECTION_LABEL: Record<LessonSection, string> = {
   teach: "Read",
@@ -56,6 +62,31 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const setCode = (exerciseId: string, value: string) =>
     setCodeByExercise((prev) => ({ ...prev, [exerciseId]: value }))
+
+  // Single-file vs workspace exercises use different editor surfaces but the same grading path.
+  const renderExercise = (
+    exercise: PythonExercise,
+    opts: { canRevealReference?: boolean; onPass: () => void }
+  ) => {
+    if (exercise.executionMode === "workspace" && exercise.workspace) {
+      return (
+        <WorkspaceExerciseRunner
+          exercise={exercise}
+          workspace={exercise.workspace}
+          onPass={opts.onPass}
+        />
+      )
+    }
+    return (
+      <ExerciseRunner
+        exercise={exercise}
+        code={codeByExercise[exercise.id] ?? exercise.starterCode}
+        onCodeChange={(value) => setCode(exercise.id, value)}
+        canRevealReference={opts.canRevealReference}
+        onPass={opts.onPass}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -108,13 +139,10 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
       {active === "apply" && (
         <div className="flex flex-col gap-4">
-          <ExerciseRunner
-            exercise={lesson.apply}
-            code={codeByExercise[lesson.apply.id] ?? lesson.apply.starterCode}
-            onCodeChange={(value) => setCode(lesson.apply.id, value)}
-            canRevealReference
-            onPass={() => markComplete("apply")}
-          />
+          {renderExercise(lesson.apply, {
+            canRevealReference: true,
+            onPass: () => markComplete("apply"),
+          })}
           {sections.apply === "completed" && (
             <div>
               <Button onClick={() => setActive("practice")} className="gap-2">
@@ -128,12 +156,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
       {active === "practice" && (
         <div className="flex flex-col gap-4">
-          <ExerciseRunner
-            exercise={lesson.practice}
-            code={codeByExercise[lesson.practice.id] ?? lesson.practice.starterCode}
-            onCodeChange={(value) => setCode(lesson.practice.id, value)}
-            onPass={() => markComplete("practice")}
-          />
+          {renderExercise(lesson.practice, { onPass: () => markComplete("practice") })}
           {sections.practice === "completed" && (
             <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
               Lesson complete — nice work. This idea resurfaces in 3 days for spaced practice.

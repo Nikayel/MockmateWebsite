@@ -1,60 +1,29 @@
 "use client"
 
 import { useState } from "react"
-import { Lightbulb, Play, Eye, CheckCircle2 } from "lucide-react"
+import { CheckCircle2, Eye, Lightbulb, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
-import { TestResultsPanel, type TestResult } from "@/components/interview/TestResultsPanel"
-import { executeScenarioInBrowser } from "@/lib/workspace-execution"
-import { getTutorialExerciseScenario } from "@/lib/tutorials/exercise-scenarios"
+import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
+import { useExerciseRun } from "./useExerciseRun"
 import type { PythonExercise } from "@/lib/tutorials/types"
 
 /**
- * Runs a tutorial exercise entirely **client-side** (Pyodide via `executeScenarioInBrowser`) —
- * Piston / `/api/execute` is not used. Adapted from `components/labs/stations/BuildStation.tsx`,
- * but for the single-file lesson path: one editor, keyed test cases, graded in the browser.
- *
- * Handles the states the DoD calls out: empty submission (friendly nudge, no run), Pyodide
- * unavailable (try again), user code errors / wrong answers (shown as result rows by
- * `TestResultsPanel`), and a gated reference reveal for the guided `apply` step.
+ * Single-file exercise runner: one editor, keyed test cases, graded in-browser via
+ * `useExerciseRun` (client-side Pyodide — no Piston/`/api/execute`). Handles the DoD states:
+ * empty submission (friendly nudge, no run), Pyodide unavailable, user code errors / wrong
+ * answers (shown by `TestResultsPanel`), and a gated reference reveal for the guided `apply` step.
  */
 export interface ExerciseRunnerProps {
   exercise: PythonExercise
   code: string
   onCodeChange: (value: string) => void
-  /** Fired once when every test passes. */
   onPass?: () => void
   /** Guided steps (apply) reveal the reference after a few attempts; challenges (practice) never do. */
   canRevealReference?: boolean
   /** Failed attempts before the reference becomes revealable. */
   revealReferenceAfter?: number
-}
-
-type RawResultRow = {
-  description?: string
-  suite?: string
-  name?: string
-  passed: boolean
-  input?: unknown
-  expected?: unknown
-  actual?: unknown
-  error: string | null
-  isHidden?: boolean
-}
-
-/** Map a client-runner result row (single-file or workspace shape) to a `TestResultsPanel` row. */
-function toTestResult(row: RawResultRow): TestResult {
-  const description =
-    row.description ?? (row.suite && row.name ? `${row.suite}: ${row.name}` : (row.name ?? "Test"))
-  return {
-    description,
-    passed: row.passed,
-    input: row.input ?? row.suite ?? null,
-    expected: row.expected ?? "pass",
-    actual: row.actual ?? (row.passed ? "pass" : "fail"),
-    error: row.error,
-  }
 }
 
 export function ExerciseRunner({
@@ -65,63 +34,18 @@ export function ExerciseRunner({
   canRevealReference = false,
   revealReferenceAfter = 2,
 }: ExerciseRunnerProps) {
-  const [running, setRunning] = useState(false)
-  const [results, setResults] = useState<TestResult[]>([])
-  const [runError, setRunError] = useState<string | null>(null)
-  const [attempts, setAttempts] = useState(0)
+  const { running, results, runError, attempts, passed, run } = useExerciseRun(exercise, onPass)
+  const [emptyWarning, setEmptyWarning] = useState(false)
   const [hintsShown, setHintsShown] = useState(0)
   const [showReference, setShowReference] = useState(false)
-  const [passed, setPassed] = useState(false)
 
-  const handleRun = async () => {
+  const handleRun = () => {
     if (!code.trim()) {
-      setRunError("Write your solution first, then run it.")
+      setEmptyWarning(true)
       return
     }
-    setRunning(true)
-    setRunError(null)
-    try {
-      const scenario = getTutorialExerciseScenario(exercise.id)
-      if (!scenario) {
-        setRunError("This exercise could not be loaded. Please refresh and try again.")
-        return
-      }
-
-      const result = await executeScenarioInBrowser({
-        code,
-        scenario,
-        language: "python",
-      })
-
-      if (!result) {
-        setRunError("Python isn't available in this browser right now. Please try again.")
-        return
-      }
-
-      const rows = (result.results as RawResultRow[]) ?? []
-      const mapped = rows.map(toTestResult)
-      setResults(mapped)
-
-      // A service/load failure with no graded rows: surface a retry message rather than a blank panel.
-      if (mapped.length === 0) {
-        setRunError(result.error ?? "No tests ran. Please try again.")
-        return
-      }
-
-      const allPassed = result.success && mapped.every((r) => r.passed)
-      if (allPassed) {
-        if (!passed) onPass?.()
-        setPassed(true)
-      } else {
-        setAttempts((n) => n + 1)
-      }
-    } catch (error) {
-      setRunError(
-        error instanceof Error ? error.message : "Something went wrong running your code."
-      )
-    } finally {
-      setRunning(false)
-    }
+    setEmptyWarning(false)
+    void run({ code })
   }
 
   const hints = exercise.hints ?? []
@@ -181,12 +105,12 @@ export function ExerciseRunner({
         </ul>
       )}
 
-      {runError && (
+      {(emptyWarning || runError) && (
         <p
           role="alert"
           className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300"
         >
-          {runError}
+          {emptyWarning ? "Write your solution first, then run it." : runError}
         </p>
       )}
 
