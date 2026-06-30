@@ -89,9 +89,9 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L3-07 · `py-l3-logging-errors`** (WS, medium) — *logging & exception design.* Objective: structured `logging`; design error boundaries.
 
 ### Module L3-M5 — Real Programs & Tooling
-- **PY-L3-08 · `py-l3-cli`** (WS, medium) — *building a CLI (argparse/typer).* Objective: a runnable CLI with args/subcommands.
-- **PY-L3-09 · `py-l3-rest-pydantic`** (WS, hard) — *consuming a REST API with httpx + pydantic.* Objective: fetch + validate external data into typed models.
-- **PY-L3-10 · `py-l3-uv-pyproject-capstone`** (WS, hard) — *dependencies & packaging (uv/pyproject) + mini capstone.* Objective: understand `pyproject.toml`/uv; extend & test a small multi-file project (capstone).
+- [x] **PY-L3-08 · `py-l3-cli`** (WS, medium) — *building a CLI (argparse/typer).* Objective: a runnable CLI with args/subcommands.
+- [x] **PY-L3-09 · `py-l3-rest-pydantic`** (WS, hard) — *consuming a REST API with httpx + pydantic.* Objective: fetch + validate external data into typed models.
+- [x] **PY-L3-10 · `py-l3-uv-pyproject-capstone`** (WS, hard) — *dependencies & packaging (uv/pyproject) + mini capstone.* Objective: understand `pyproject.toml`/uv; extend & test a small multi-file project (capstone).
 
 ---
 

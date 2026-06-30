@@ -2112,6 +2112,765 @@ are hidden.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L3-M5 — Real Programs & Tooling
+// ───────────────────────────────────────────────────────────────────────────
+
+const CLI_README = `# A tiny command dispatcher
+
+A CLI maps a command name to a function. \`cli/commands.py\` (read-only) has \`add\` and \`mul\`;
+implement \`run(argv)\` in \`cli/app.py\` so it reads a command and two integer arguments from the
+\`argv\` list and returns the result.
+
+Example: \`run(["add", "2", "3"])\` is \`5\`; \`run(["mul", "4", "5"])\` is \`20\`. Some tests are
+hidden.
+`
+
+const CLI_COMMANDS = String.raw`def add(a, b):
+    return a + b
+
+
+def mul(a, b):
+    return a * b
+`
+
+const CLI_APP_STARTER = String.raw`from cli.commands import add, mul
+
+
+def run(argv):
+    """Dispatch ["add", "2", "3"] -> 5 using add/mul (see README.md)."""
+    # TODO: read argv[0] as the command and argv[1], argv[2] as int args.
+    return 0
+`
+
+const CLI_APP_REFERENCE = String.raw`from cli.commands import add, mul
+
+
+def run(argv):
+    command = argv[0]
+    a, b = int(argv[1]), int(argv[2])
+    if command == "add":
+        return add(a, b)
+    if command == "mul":
+        return mul(a, b)
+    raise ValueError(f"unknown command: {command}")
+`
+
+const CLI_TEST = String.raw`from cli.app import run
+
+
+def run_tests(record):
+    def add_command():
+        assert run(["add", "2", "3"]) == 5, f"got {run(['add', '2', '3'])!r}"
+
+    def mul_command():
+        assert run(["mul", "4", "5"]) == 20, f"got {run(['mul', '4', '5'])!r}"
+
+    record("add command", add_command)
+    record("mul command", mul_command)
+`
+
+const CLI_TEST_HIDDEN = String.raw`from cli.app import run
+
+
+def run_tests(record):
+    def negative_args():
+        assert run(["add", "10", "-3"]) == 7
+
+    def multiply_by_zero():
+        assert run(["mul", "0", "9"]) == 0
+
+    record("negative args", negative_args)
+    record("multiply by zero", multiply_by_zero)
+`
+
+const cliLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-cli",
+  title: "Building a CLI (argparse / typer)",
+  summary: "Turn argument lists into commands with a testable dispatcher.",
+  estimatedMinutes: 18,
+  difficulty: "medium",
+  skills: ["cli", "argparse", "typer", "dispatch"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Command-line tools
+
+A CLI reads arguments and runs the right command. The stdlib **argparse** builds one declaratively:
+
+\`\`\`python
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("command")
+parser.add_argument("a", type=int)
+parser.add_argument("b", type=int)
+args = parser.parse_args()      # reads sys.argv
+\`\`\`
+
+Modern projects often use **typer** (built on click), where a function's type hints become the CLI:
+
+\`\`\`python
+import typer
+app = typer.Typer()
+
+@app.command()
+def add(a: int, b: int):
+    print(a + b)
+\`\`\`
+
+### Dispatching
+
+At heart, a CLI maps a command name to a function:
+
+\`\`\`python
+def run(argv):
+    command, a, b = argv[0], int(argv[1]), int(argv[2])
+    if command == "add":
+        return add(a, b)
+    ...
+\`\`\`
+
+Writing it as \`run(argv)\` (instead of reading \`sys.argv\` directly) makes the logic **testable**
+without spawning a process.
+
+### Recap
+
+argparse/typer turn arguments into typed values; underneath, a CLI dispatches a command name to a
+function. You'll write a \`run(argv)\` dispatcher — first inline, then over a \`cli\` package.`,
+    demoCode: `def run(argv):
+    command, a, b = argv[0], int(argv[1]), int(argv[2])
+    if command == "add":
+        return a + b
+    if command == "mul":
+        return a * b
+    return 0
+
+
+print(run(["add", "2", "3"]))   # 5`,
+  },
+  apply: {
+    id: "py-l3-cli-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`run(argv)\` — \`argv\` is a list like \`["add", "2", "3"]\`. Read the
+command and two integer arguments and return \`add\` or \`mul\` of them.
+
+\`run(["add", "2", "3"])\` is \`5\`; \`run(["mul", "4", "5"])\` is \`20\`.`,
+    starterCode: `def run(argv):
+    # argv looks like ["add", "2", "3"]. Dispatch to add or mul.
+    pass`,
+    hints: [
+      "The command is `argv[0]`; the numbers are `int(argv[1])` and `int(argv[2])`.",
+      'Branch: `if command == "add": return a + b`.',
+      'Add a `mul` branch returning `a * b`.',
+    ],
+    referenceSolution: `def run(argv):
+    command = argv[0]
+    a, b = int(argv[1]), int(argv[2])
+    if command == "add":
+        return a + b
+    if command == "mul":
+        return a * b
+    return 0`,
+    testCases: [
+      { input: { argv: ["add", "2", "3"] }, expected: 5, description: "add" },
+      { input: { argv: ["mul", "4", "5"] }, expected: 20, description: "mul" },
+      { input: { argv: ["add", "10", "-3"] }, expected: 7, description: "add with a negative" },
+      { input: { argv: ["mul", "0", "9"] }, expected: 0, description: "mul by zero" },
+    ],
+  },
+  practice: {
+    id: "py-l3-cli-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`run(argv)\` in \`cli/app.py\`: read the command name and two integer arguments from
+\`argv\`, dispatch to the read-only \`add\`/\`mul\` commands, and return the result. Some tests are
+hidden.`,
+    starterCode: "",
+    hints: [
+      "`add` and `mul` are imported for you from `cli.commands`.",
+      "`argv[0]` is the command; `int(argv[1])` and `int(argv[2])` are the operands.",
+      "Dispatch with `if`/`if` and return the call's result.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "cli/app.py",
+      editableFilePaths: ["cli/app.py"],
+      visibleTestPaths: ["tests/test_app.py"],
+      hiddenTestPaths: ["tests/test_app_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: CLI_README },
+        { path: "cli/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "cli/commands.py",
+          role: "readonly",
+          language: "python",
+          content: CLI_COMMANDS,
+          description: "Command functions (read-only)",
+        },
+        {
+          path: "cli/app.py",
+          role: "editable",
+          language: "python",
+          content: CLI_APP_STARTER,
+          description: "Implement run(argv) here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_app.py",
+          role: "test",
+          language: "python",
+          content: CLI_TEST,
+          description: "Visible dispatcher tests",
+        },
+        {
+          path: "tests/test_app_hidden.py",
+          role: "test",
+          language: "python",
+          content: CLI_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_app", "test_app_hidden", "visible app", "hidden app"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        { path: "cli/app.py", role: "editable", language: "python", content: CLI_APP_REFERENCE },
+      ],
+    },
+  },
+}
+
+const API_README = `# Fetch then validate
+
+Never trust raw external data — validate it at the boundary. \`api/client.py\` (read-only) simulates
+an HTTP fetch returning a raw dict. Implement \`parse_user(raw)\` in \`api/models.py\` so it coerces
+the fields into a typed \`User\` dataclass:
+
+- \`id\` -> \`int\`
+- \`name\` -> \`str\`
+- \`active\` -> \`bool\`
+
+A missing field should raise (a \`KeyError\` is fine). Some tests are hidden.
+`
+
+const API_CLIENT = String.raw`def fetch_user(user_id):
+    """Pretend to GET /users/{id} and return the raw JSON body (httpx would do this for real)."""
+    data = {
+        "1": {"id": "1", "name": "Ada", "active": 1},
+        "2": {"id": "2", "name": "Sam", "active": 0},
+    }
+    return data[str(user_id)]
+`
+
+const API_MODELS_STARTER = String.raw`from dataclasses import dataclass
+
+
+@dataclass
+class User:
+    id: int
+    name: str
+    active: bool
+
+
+def parse_user(raw):
+    """Validate a raw user dict into a typed User (see README.md)."""
+    # TODO: coerce raw["id"], raw["name"], raw["active"] and build a User.
+    return None
+`
+
+const API_MODELS_REFERENCE = String.raw`from dataclasses import dataclass
+
+
+@dataclass
+class User:
+    id: int
+    name: str
+    active: bool
+
+
+def parse_user(raw):
+    return User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
+`
+
+const API_TEST = String.raw`from api.client import fetch_user
+from api.models import User, parse_user
+
+
+def run_tests(record):
+    def coerces_field_types():
+        result = parse_user({"id": "1", "name": "Ada", "active": 1})
+        assert result == User(1, "Ada", True), f"got {result!r}"
+
+    def parses_inactive_user():
+        result = parse_user({"id": 2, "name": "Sam", "active": 0})
+        assert result == User(2, "Sam", False), f"got {result!r}"
+
+    def validates_fetched_data():
+        assert parse_user(fetch_user(1)) == User(1, "Ada", True)
+
+    record("coerces field types", coerces_field_types)
+    record("parses an inactive user", parses_inactive_user)
+    record("validates fetched data", validates_fetched_data)
+`
+
+const API_TEST_HIDDEN = String.raw`from api.models import User, parse_user
+
+
+def run_tests(record):
+    def coerces_a_string_id():
+        assert parse_user({"id": "99", "name": "Mo", "active": True}) == User(99, "Mo", True)
+
+    def missing_field_raises():
+        try:
+            parse_user({"id": 1, "name": "X"})  # no "active"
+            raised = False
+        except KeyError:
+            raised = True
+        assert raised, "a missing field should raise"
+
+    record("coerces a string id", coerces_a_string_id)
+    record("missing field raises", missing_field_raises)
+`
+
+const restPydanticLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-rest-pydantic",
+  title: "Consuming a REST API with httpx + pydantic",
+  summary: "Fetch external JSON and validate it into a typed model at the boundary.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["httpx", "pydantic", "validation", "dataclasses"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Fetching and validating external data
+
+### httpx: HTTP for humans
+
+\`httpx\` is the modern HTTP client (sync or async):
+
+\`\`\`python
+import httpx
+response = httpx.get("https://api.example.com/users/1")
+raw = response.json()      # a dict from the JSON body
+\`\`\`
+
+### Never trust external data
+
+An API can send missing fields, wrong types, or extra junk. **pydantic** validates raw data into a
+typed model — coercing where sensible, raising where not:
+
+\`\`\`python
+from pydantic import BaseModel
+
+class User(BaseModel):
+    id: int
+    name: str
+    active: bool
+
+User(**raw)    # validates & coerces, or raises ValidationError
+\`\`\`
+
+### The pipeline
+
+\`fetch → validate → use\`. Validate immediately so the rest of your code works with clean, typed
+objects.
+
+> This sandbox has no network and no pydantic, so you'll validate a **pre-fetched** dict into a
+> \`@dataclass\` by coercing each field — the same fetch-then-validate shape.
+
+### Recap
+
+\`httpx\` fetches JSON; pydantic (or a dataclass + explicit coercion) turns untrusted data into a
+typed model at the boundary. You'll parse a raw user dict into a clean record — first as a dict, then
+as a dataclass across an \`api\` package.`,
+    demoCode: `from dataclasses import dataclass
+
+
+@dataclass
+class User:
+    id: int
+    name: str
+    active: bool
+
+
+raw = {"id": "1", "name": "Ada", "active": 1}
+print(User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"])))`,
+  },
+  apply: {
+    id: "py-l3-rest-pydantic-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`parse_user(raw)\` — coerce a raw user dict into a clean dict with
+\`id\` as an \`int\`, \`name\` as a \`str\`, and \`active\` as a \`bool\`.
+
+For \`{"id": "1", "name": "Ada", "active": 1}\` return \`{"id": 1, "name": "Ada", "active": True}\`.`,
+    starterCode: `def parse_user(raw):
+    # Coerce raw["id"] -> int, raw["name"] -> str, raw["active"] -> bool. Return a dict.
+    pass`,
+    hints: [
+      "Coerce each field: `int(raw[\"id\"])`, `str(raw[\"name\"])`, `bool(raw[\"active\"])`.",
+      "Return them in a new dict with the same keys.",
+    ],
+    referenceSolution: `def parse_user(raw):
+    return {"id": int(raw["id"]), "name": str(raw["name"]), "active": bool(raw["active"])}`,
+    testCases: [
+      {
+        input: { raw: { id: "1", name: "Ada", active: 1 } },
+        expected: { id: 1, name: "Ada", active: true },
+        description: "coerces string id and int active",
+      },
+      {
+        input: { raw: { id: 2, name: "Sam", active: 0 } },
+        expected: { id: 2, name: "Sam", active: false },
+        description: "inactive user",
+      },
+      {
+        input: { raw: { id: "99", name: "Mo", active: true } },
+        expected: { id: 99, name: "Mo", active: true },
+        description: "already-bool active",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l3-rest-pydantic-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`parse_user(raw)\` in \`api/models.py\`: validate a raw user dict into the typed \`User\`
+dataclass, coercing \`id\` to \`int\`, \`name\` to \`str\`, and \`active\` to \`bool\`. A missing field
+should raise. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Build the dataclass: `User(id=int(raw[\"id\"]), ...)`.",
+      "Indexing a missing key (`raw[\"active\"]`) already raises `KeyError` — that's the desired behaviour.",
+      "Coerce `active` with `bool(...)`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "api/models.py",
+      editableFilePaths: ["api/models.py"],
+      visibleTestPaths: ["tests/test_models.py"],
+      hiddenTestPaths: ["tests/test_models_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: API_README },
+        { path: "api/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "api/client.py",
+          role: "readonly",
+          language: "python",
+          content: API_CLIENT,
+          description: "Simulated HTTP client (read-only)",
+        },
+        {
+          path: "api/models.py",
+          role: "editable",
+          language: "python",
+          content: API_MODELS_STARTER,
+          description: "Implement parse_user here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_models.py",
+          role: "test",
+          language: "python",
+          content: API_TEST,
+          description: "Visible validation tests",
+        },
+        {
+          path: "tests/test_models_hidden.py",
+          role: "test",
+          language: "python",
+          content: API_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_models", "test_models_hidden", "visible models", "hidden models"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "api/models.py",
+          role: "editable",
+          language: "python",
+          content: API_MODELS_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+const CAP_README = `# Capstone: a todo reporter
+
+Tie Level 3 together. This is a small, real project — a \`todo\` package with sample tasks, tests,
+and a \`pyproject.toml\`. Implement \`summary(tasks)\` in \`todo/report.py\` so it returns the counts a
+CLI or API would report:
+
+\`\`\`python
+{"total": <count>, "done": <completed>, "pending": <not done>}
+\`\`\`
+
+Each task is a dict like \`{"title": "...", "done": True}\`. Some tests are hidden.
+`
+
+const CAP_PYPROJECT = String.raw`[project]
+name = "todo"
+version = "0.1.0"
+description = "A tiny todo reporter"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+todo = "todo.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+`
+
+const CAP_TASKS = String.raw`TASKS = [
+    {"title": "write tests", "done": True},
+    {"title": "ship feature", "done": False},
+    {"title": "review PR", "done": True},
+]
+`
+
+const CAP_REPORT_STARTER = String.raw`def summary(tasks):
+    """Return {"total", "done", "pending"} counts for the tasks (see README.md)."""
+    # TODO: count total, done (task["done"] is True), and pending.
+    return {}
+`
+
+const CAP_REPORT_REFERENCE = String.raw`def summary(tasks):
+    done = sum(1 for task in tasks if task["done"])
+    return {"total": len(tasks), "done": done, "pending": len(tasks) - done}
+`
+
+const CAP_TEST = String.raw`from todo.report import summary
+from todo.tasks import TASKS
+
+
+def run_tests(record):
+    def counts_sample_tasks():
+        assert summary(TASKS) == {"total": 3, "done": 2, "pending": 1}, f"got {summary(TASKS)!r}"
+
+    def empty_is_all_zero():
+        assert summary([]) == {"total": 0, "done": 0, "pending": 0}
+
+    record("counts the sample tasks", counts_sample_tasks)
+    record("empty list is all zero", empty_is_all_zero)
+`
+
+const CAP_TEST_HIDDEN = String.raw`from todo.report import summary
+
+
+def run_tests(record):
+    def all_done():
+        tasks = [{"title": "a", "done": True}, {"title": "b", "done": True}]
+        assert summary(tasks) == {"total": 2, "done": 2, "pending": 0}
+
+    def none_done():
+        tasks = [{"title": "a", "done": False}]
+        assert summary(tasks) == {"total": 1, "done": 0, "pending": 1}
+
+    record("all tasks done", all_done)
+    record("no tasks done", none_done)
+`
+
+const capstoneLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-uv-pyproject-capstone",
+  title: "Dependencies, pyproject & a mini capstone",
+  summary: "Understand pyproject.toml/uv and extend a small, tested multi-file project.",
+  estimatedMinutes: 22,
+  difficulty: "hard",
+  skills: ["pyproject", "uv", "packaging", "capstone"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Dependencies, pyproject.toml & uv
+
+### pyproject.toml
+
+Modern Python projects declare everything in one file, \`pyproject.toml\`:
+
+\`\`\`toml
+[project]
+name = "todo"
+version = "0.1.0"
+dependencies = ["httpx>=0.27"]
+
+[project.scripts]
+todo = "todo.cli:main"
+\`\`\`
+
+It names the project, pins dependencies, and wires console scripts — replacing the old
+\`setup.py\`/\`requirements.txt\` sprawl.
+
+### uv: fast packaging
+
+**uv** is a fast, modern package manager and resolver. Day to day:
+
+\`\`\`bash
+uv add httpx          # add a dependency (updates pyproject.toml + lockfile)
+uv run pytest         # run a command in the project environment
+uv sync               # install exactly what the lockfile pins
+\`\`\`
+
+It replaces pip / virtualenv / pip-tools with one fast tool and a reproducible lockfile.
+
+### Your capstone
+
+You'll extend a small, real project: a \`todo\` package with sample tasks and a \`pyproject.toml\`.
+Implement \`summary(tasks)\` — the kind of reporting function a CLI or API would call — and make its
+test suite pass.
+
+### Recap
+
+\`pyproject.toml\` declares a project and its dependencies; \`uv\` installs and runs them reproducibly.
+Your capstone ties Level 3 together: read the package, implement \`summary\`, and prove it with tests.`,
+    demoCode: `def summary(tasks):
+    done = sum(1 for task in tasks if task["done"])
+    return {"total": len(tasks), "done": done, "pending": len(tasks) - done}
+
+
+print(summary([{"title": "a", "done": True}, {"title": "b", "done": False}]))`,
+  },
+  apply: {
+    id: "py-l3-uv-pyproject-capstone-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`summary(tasks)\` — given a list of task dicts (each with a
+\`"done"\` flag), return \`{"total": n, "done": d, "pending": p}\`.
+
+For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
+\`{"total": 2, "done": 1, "pending": 1}\`.`,
+    starterCode: `def summary(tasks):
+    # Count total, done, and pending tasks. Return the three counts in a dict.
+    pass`,
+    hints: [
+      "`len(tasks)` is the total.",
+      'Count completed with `sum(1 for task in tasks if task["done"])`.',
+      "Pending is `total - done`.",
+    ],
+    referenceSolution: `def summary(tasks):
+    done = sum(1 for task in tasks if task["done"])
+    return {"total": len(tasks), "done": done, "pending": len(tasks) - done}`,
+    testCases: [
+      {
+        input: {
+          tasks: [
+            { title: "a", done: true },
+            { title: "b", done: false },
+          ],
+        },
+        expected: { total: 2, done: 1, pending: 1 },
+        description: "one done, one pending",
+      },
+      { input: { tasks: [] }, expected: { total: 0, done: 0, pending: 0 }, description: "empty" },
+      {
+        input: { tasks: [{ title: "x", done: true }] },
+        expected: { total: 1, done: 1, pending: 0 },
+        description: "all done",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l3-uv-pyproject-capstone-practice",
+    executionMode: "workspace",
+    prompt: `Capstone: implement \`summary(tasks)\` in \`todo/report.py\` so it returns
+\`{"total", "done", "pending"}\` counts for the project's tasks. Read \`pyproject.toml\` and
+\`todo/tasks.py\` for context. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "`len(tasks)` is the total count.",
+      'Completed tasks have `task["done"] == True`; count them with a generator + `sum`.',
+      "Pending is whatever's left: `total - done`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "todo/report.py",
+      editableFilePaths: ["todo/report.py"],
+      visibleTestPaths: ["tests/test_report.py"],
+      hiddenTestPaths: ["tests/test_report_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: CAP_README },
+        { path: "pyproject.toml", role: "docs", language: "text", content: CAP_PYPROJECT },
+        { path: "todo/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "todo/tasks.py",
+          role: "readonly",
+          language: "python",
+          content: CAP_TASKS,
+          description: "Sample task data (read-only)",
+        },
+        {
+          path: "todo/report.py",
+          role: "editable",
+          language: "python",
+          content: CAP_REPORT_STARTER,
+          description: "Implement summary here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_report.py",
+          role: "test",
+          language: "python",
+          content: CAP_TEST,
+          description: "Visible capstone tests",
+        },
+        {
+          path: "tests/test_report_hidden.py",
+          role: "test",
+          language: "python",
+          content: CAP_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden capstone tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_report", "test_report_hidden", "visible report", "hidden report"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "todo/report.py",
+          role: "editable",
+          language: "python",
+          content: CAP_REPORT_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level3: PythonLevel = {
   id: 3,
   slug: "applied",
@@ -2149,6 +2908,12 @@ export const level3: PythonLevel = {
       title: "Files, Data & Robustness",
       description: "Read files with pathlib and design resilient error handling.",
       lessons: [pathlibLesson, loggingErrorsLesson],
+    },
+    {
+      id: "py-l3-real-programs",
+      title: "Real Programs & Tooling",
+      description: "Build a CLI, validate API data, and package a small project with pyproject/uv.",
+      lessons: [cliLesson, restPydanticLesson, capstoneLesson],
     },
   ],
 }
