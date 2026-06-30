@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { executeScenarioInBrowser } from "@/lib/workspace-execution"
 import { getTutorialExerciseScenario } from "@/lib/tutorials/exercise-scenarios"
+import { mapResultRow, type RawResultRow } from "@/lib/tutorials/test-result-mapping"
 import type { TestResult } from "@/components/interview/TestResultsPanel"
 import type { PythonExercise } from "@/lib/tutorials/types"
 
@@ -12,47 +13,6 @@ import type { PythonExercise } from "@/lib/tutorials/types"
  * into `TestResultsPanel`'s shape, and tracks pass/attempt state. The UI components own only the
  * editor surface (one editor vs file tabs) and decide what to pass to `run`.
  */
-type RawResultRow = {
-  description?: string
-  suite?: string
-  name?: string
-  passed: boolean
-  input?: unknown
-  expected?: unknown
-  actual?: unknown
-  error: string | null
-  isHidden?: boolean
-}
-
-/** Map a client-runner row (single-file or workspace shape) to a `TestResultsPanel` row. */
-function toTestResult(row: RawResultRow): TestResult {
-  // Hidden workspace tests still execute, but their source, suite/name, and assertion text must
-  // never reach the UI (HANDOFF §C). Surface only pass/fail behind a generic label.
-  if (row.isHidden) {
-    return {
-      description: "Hidden test",
-      passed: row.passed,
-      input: null,
-      expected: "pass",
-      actual: row.passed ? "pass" : "fail",
-      error: row.passed
-        ? null
-        : "A hidden test failed — your code didn't satisfy a requirement that isn't shown here.",
-    }
-  }
-
-  const description =
-    row.description ?? (row.suite && row.name ? `${row.suite}: ${row.name}` : (row.name ?? "Test"))
-  return {
-    description,
-    passed: row.passed,
-    input: row.input ?? row.suite ?? null,
-    expected: row.expected ?? "pass",
-    actual: row.actual ?? (row.passed ? "pass" : "fail"),
-    error: row.error,
-  }
-}
-
 export interface RunInput {
   /** Single-file: the editor contents. */
   code?: string
@@ -121,7 +81,7 @@ export function useExerciseRun(
       }
 
       const rows = (result.results as RawResultRow[]) ?? []
-      const mapped = rows.map(toTestResult)
+      const mapped = rows.map(mapResultRow)
       setResults(mapped)
 
       // A service/load failure with no graded rows: surface a retry message, not a blank panel.
