@@ -56,6 +56,11 @@ Full module/lesson breakdown lives in [`CONTENT-TICKETS.md`](./CONTENT-TICKETS.m
 - **[`AGENT-2-curriculum-developer.md`](./AGENT-2-curriculum-developer.md)** — the content agent's mission, per-lesson authoring workflow, the authoring contract, and two canonical sample lessons to copy. Starts **after** Agent 1's DoD passes.
 - **[`CONTENT-TICKETS.md`](./CONTENT-TICKETS.md)** — the backlog: one JIRA-style ticket per lesson (~44), pre-filled with id, exec-mode, skills, objective, and acceptance criteria.
 
+> **Both agent specs are `/loop` runbooks.** Run each with Claude Code's `/loop` (dynamic,
+> self-paced) — each iteration does one unit of work, verifies, commits, and ticks a checklist,
+> and the loop ends itself at its terminal condition (Agent 1: Definition of Done green;
+> Agent 2: all CONTENT-TICKETS checked). See the "LOOP CONTRACT" at the top of each file.
+
 **Sequencing rule:** Agent 2 must not author beyond the two sample lessons until Agent 1's
 Definition of Done is green and merged, because the lesson schema and the runner are Agent 1's
 deliverables. The two sample lessons (one single-file, one workspace) are built by Agent 1 as proof
