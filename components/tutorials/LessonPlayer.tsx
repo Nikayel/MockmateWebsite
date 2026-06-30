@@ -208,7 +208,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             />
           </div>
 
-          <div className="overflow-y-auto px-6 py-6">
+          <main className="overflow-y-auto px-6 py-6" aria-label="Lesson content">
             <div className="mx-auto max-w-2xl">
               <LessonHeader lesson={lesson} />
 
@@ -272,7 +272,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                 </div>
               )}
             </div>
-          </div>
+          </main>
 
           <div className="border-border overflow-hidden border-l p-3">
             <SableTutor level={level} lesson={lesson} events={events} />
