@@ -2181,6 +2181,529 @@ and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` 
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L4-M5 — Quality, Packaging & Capstone
+// ───────────────────────────────────────────────────────────────────────────
+
+const MOCK_README = `# Test with a mock, design for testability
+
+Write code that's easy to test by **injecting** its dependency. Implement \`send_all(sender,
+messages)\` in \`notify/service.py\` so it calls \`sender(message)\` for every message and returns how
+many were sent.
+
+The tests pass a \`unittest.mock.Mock\` as \`sender\` and assert how it was called. \`send_all(sender,
+["a", "b"])\` returns \`2\` and calls \`sender\` twice. Some tests are hidden.
+`
+
+const MOCK_SERVICE_STARTER = String.raw`def send_all(sender, messages):
+    """Call sender(message) for each message; return how many were sent (see README.md)."""
+    # TODO: loop messages, call sender(message), count them.
+    return 0
+`
+
+const MOCK_SERVICE_REFERENCE = String.raw`def send_all(sender, messages):
+    count = 0
+    for message in messages:
+        sender(message)
+        count += 1
+    return count
+`
+
+const MOCK_TEST = String.raw`from unittest.mock import Mock
+
+from notify.service import send_all
+
+
+def run_tests(record):
+    def sends_each_message():
+        sender = Mock()
+        result = send_all(sender, ["a", "b"])
+        assert result == 2, f"expected 2, got {result!r}"
+        assert sender.call_count == 2, f"expected 2 calls, got {sender.call_count}"
+
+    def no_messages_sends_nothing():
+        sender = Mock()
+        assert send_all(sender, []) == 0
+        assert sender.call_count == 0
+
+    record("sends each message", sends_each_message)
+    record("no messages sends nothing", no_messages_sends_nothing)
+`
+
+const MOCK_TEST_HIDDEN = String.raw`from unittest.mock import Mock
+
+from notify.service import send_all
+
+
+def run_tests(record):
+    def calls_with_the_right_args():
+        sender = Mock()
+        send_all(sender, ["hello", "world"])
+        sender.assert_any_call("hello")
+        sender.assert_any_call("world")
+
+    def returns_the_count():
+        assert send_all(Mock(), ["x", "y", "z"]) == 3
+
+    record("calls sender with each message", calls_with_the_right_args)
+    record("returns the number sent", returns_the_count)
+`
+
+const testingToolingLesson: PythonLesson = {
+  id: "py-l4-testing-tooling",
+  title: "Mocking, coverage & modern tooling",
+  summary: "Design code for testability, mock its dependencies, and know the modern tool stack.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["mocking", "testing", "ruff", "mypy"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Robust tests & clean tooling
+
+### Mocking dependencies
+
+Tests shouldn't hit the network, a database, or the clock. **Inject** the dependency so a test can
+pass a stand-in — \`unittest.mock.Mock\` records how it was called:
+
+\`\`\`python
+from unittest.mock import Mock
+
+def send_all(sender, messages):     # sender is injected
+    for m in messages:
+        sender(m)
+    return len(messages)
+
+sender = Mock()
+send_all(sender, ["a", "b"])
+sender.call_count            # 2
+sender.assert_any_call("a")  # was it called with "a"?
+\`\`\`
+
+Designing for injection (passing the dependency in) is what makes code testable in the first place.
+
+### Coverage
+
+\`pytest --cov\` (coverage.py) reports which lines your tests actually exercise. Aim to cover the
+**branches that matter**, not chase 100% for its own sake.
+
+### Modern tooling
+
+- **ruff** — an extremely fast linter + formatter (replaces flake8/isort/black).
+- **mypy** / **ty** — static type checkers that read your hints.
+- **pre-commit** — runs ruff/mypy/tests automatically on \`git commit\`, so problems never land.
+
+\`\`\`toml
+# .pre-commit-config.yaml runs these on every commit
+- ruff check --fix
+- mypy .
+\`\`\`
+
+### Recap
+
+Inject dependencies so you can mock them; measure with coverage; and let ruff/mypy/pre-commit keep
+quality high automatically. You'll build an injectable \`send_all\` that a \`Mock\` can verify.`,
+    demoCode: `from unittest.mock import Mock
+
+
+def send_all(sender, messages):
+    for m in messages:
+        sender(m)
+    return len(messages)
+
+
+sender = Mock()
+print(send_all(sender, ["a", "b"]))   # 2
+print(sender.call_count)              # 2`,
+  },
+  apply: {
+    id: "py-l4-testing-tooling-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`send_all(messages)\` — "send" each message and return how many were
+sent. (The workspace step makes the sender injectable so a mock can verify it.)
+
+\`send_all(["a", "b", "c"])\` is \`3\`.`,
+    starterCode: `def send_all(messages):
+    # "Send" each message and return how many were sent.
+    pass`,
+    hints: [
+      "Count as you go, or just return `len(messages)`.",
+      "An empty list sends nothing — returns 0.",
+    ],
+    referenceSolution: `def send_all(messages):
+    count = 0
+    for message in messages:
+        count += 1
+    return count`,
+    testCases: [
+      { input: { messages: ["a", "b", "c"] }, expected: 3, description: "three messages" },
+      { input: { messages: [] }, expected: 0, description: "none" },
+      { input: { messages: ["only"] }, expected: 1, description: "one message" },
+    ],
+  },
+  practice: {
+    id: "py-l4-testing-tooling-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`send_all(sender, messages)\` in \`notify/service.py\`: call the injected \`sender\` once
+per message and return the number sent. The tests pass a \`Mock\` and assert how it was called — so
+keep \`sender\` as an injected parameter. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Loop the messages and call `sender(message)` for each.",
+      "Keep a running count and return it.",
+      "Because `sender` is a parameter, a test can pass a `Mock()` and inspect `call_count`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "notify/service.py",
+      editableFilePaths: ["notify/service.py"],
+      visibleTestPaths: ["tests/test_service.py"],
+      hiddenTestPaths: ["tests/test_service_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: MOCK_README },
+        { path: "notify/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "notify/service.py",
+          role: "editable",
+          language: "python",
+          content: MOCK_SERVICE_STARTER,
+          description: "Implement send_all here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_service.py",
+          role: "test",
+          language: "python",
+          content: MOCK_TEST,
+          description: "Visible mock-based tests",
+        },
+        {
+          path: "tests/test_service_hidden.py",
+          role: "test",
+          language: "python",
+          content: MOCK_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden mock-call tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_service", "test_service_hidden", "visible service", "hidden service"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "notify/service.py",
+          role: "editable",
+          language: "python",
+          content: MOCK_SERVICE_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+const CAPSTONE_README = `# Capstone: a typed, tested order service
+
+Bring it all together — packages, type hints, dataclasses, validation, and tests. The \`orders\`
+package has a \`pyproject.toml\`, a typed \`Order\` model with \`parse_order\` (read-only), and sample
+data. Implement \`summarize(raw_orders)\` in \`orders/report.py\` so it:
+
+1. parses each raw order with the read-only \`parse_order\`
+2. returns \`{"count": <all>, "paid": <paid only>, "revenue": <sum of paid amounts, rounded to 2>}\`
+
+Only **paid** orders count toward revenue. Some tests are hidden.
+`
+
+const CAPSTONE_PYPROJECT = String.raw`[project]
+name = "orders"
+version = "1.0.0"
+description = "A typed, tested order-summary service"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+`
+
+const CAPSTONE_MODELS = String.raw`from dataclasses import dataclass
+
+
+@dataclass
+class Order:
+    id: int
+    amount: float
+    paid: bool
+
+
+def parse_order(raw):
+    """Validate a raw order dict into a typed Order (coercing field types)."""
+    return Order(id=int(raw["id"]), amount=float(raw["amount"]), paid=bool(raw["paid"]))
+`
+
+const CAPSTONE_REPORT_STARTER = String.raw`from orders.models import parse_order
+
+
+def summarize(raw_orders):
+    """Parse the raw orders and report count / paid / revenue (see README.md)."""
+    # TODO: parse each raw order, then total count, paid count, and paid revenue (round 2).
+    return {}
+`
+
+const CAPSTONE_REPORT_REFERENCE = String.raw`from orders.models import parse_order
+
+
+def summarize(raw_orders):
+    orders = [parse_order(raw) for raw in raw_orders]
+    paid = [order for order in orders if order.paid]
+    return {
+        "count": len(orders),
+        "paid": len(paid),
+        "revenue": round(sum(order.amount for order in paid), 2),
+    }
+`
+
+const CAPSTONE_TEST = String.raw`from orders.report import summarize
+
+
+def run_tests(record):
+    def summarizes_mixed_orders():
+        raw = [
+            {"id": 1, "amount": "10.0", "paid": True},
+            {"id": 2, "amount": "5.0", "paid": False},
+        ]
+        assert summarize(raw) == {"count": 2, "paid": 1, "revenue": 10.0}, f"got {summarize(raw)!r}"
+
+    def empty_is_zeroed():
+        assert summarize([]) == {"count": 0, "paid": 0, "revenue": 0}
+
+    record("summarizes mixed orders", summarizes_mixed_orders)
+    record("empty input is zeroed", empty_is_zeroed)
+`
+
+const CAPSTONE_TEST_HIDDEN = String.raw`from orders.report import summarize
+
+
+def run_tests(record):
+    def all_paid():
+        raw = [
+            {"id": 1, "amount": "3.0", "paid": True},
+            {"id": 2, "amount": "7.0", "paid": True},
+        ]
+        assert summarize(raw) == {"count": 2, "paid": 2, "revenue": 10.0}
+
+    def none_paid():
+        raw = [{"id": 1, "amount": "9.0", "paid": False}]
+        assert summarize(raw) == {"count": 1, "paid": 0, "revenue": 0}
+
+    record("all orders paid", all_paid)
+    record("no orders paid", none_paid)
+`
+
+const packagingCapstoneLesson: PythonLesson = {
+  id: "py-l4-packaging-capstone",
+  title: "Packaging & a production capstone",
+  summary: "Build a typed, tested, packaged order service that integrates the whole track.",
+  estimatedMinutes: 25,
+  difficulty: "hard",
+  skills: ["packaging", "capstone", "type-hints", "testing"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Packaging & distribution
+
+### From project to package
+
+A library others can install is built from your \`pyproject.toml\` into a **wheel**:
+
+\`\`\`bash
+uv build            # produces dist/orders-1.0.0-py3-none-any.whl
+uv publish          # (or twine upload) to a package index
+\`\`\`
+
+The wheel bundles your code + metadata so \`pip install orders\` just works. \`pyproject.toml\`
+declares the name, version, Python requirement, and dependencies (including a \`dev\` extra for
+\`pytest\`/\`ruff\`/\`mypy\`).
+
+### The production checklist
+
+A library ready to ship is:
+
+- **structured** — a clean package with a clear entry point
+- **typed** — hints on the public API so callers (and mypy) know the contract
+- **validated** — untrusted input parsed into typed models at the boundary
+- **tested** — pytest covering the real cases, run in CI
+
+### Your capstone
+
+This pulls the whole track together: a packaged \`orders\` service with a typed \`Order\` model and
+validation (read-only) and a real \`pyproject.toml\`. Implement \`summarize(raw_orders)\` — parse the
+raw orders and report total count, paid count, and paid revenue — and make the suite green.
+
+### Recap
+
+\`pyproject.toml\` + \`uv build\` turn a project into an installable wheel; a production-ready library
+is structured, typed, validated, and tested. Finish the capstone to complete the Python path.`,
+    demoCode: `from dataclasses import dataclass
+
+
+@dataclass
+class Order:
+    id: int
+    amount: float
+    paid: bool
+
+
+orders = [Order(1, 10.0, True), Order(2, 5.0, False)]
+paid = [o for o in orders if o.paid]
+print({"count": len(orders), "paid": len(paid), "revenue": round(sum(o.amount for o in paid), 2)})`,
+  },
+  apply: {
+    id: "py-l4-packaging-capstone-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`summarize(raw_orders)\` — each raw order is a dict with
+\`"amount"\` (a numeric string) and \`"paid"\` (a bool). Return
+\`{"count": <all>, "paid": <paid>, "revenue": <sum of paid amounts, rounded to 2>}\`.
+
+For one paid \`"10.0"\` and one unpaid \`"5.0"\`, revenue is \`10.0\`.`,
+    starterCode: `def summarize(raw_orders):
+    # count all, count paid, and sum paid amounts (float) rounded to 2 decimals.
+    pass`,
+    hints: [
+      'Filter paid orders: `[o for o in raw_orders if o["paid"]]`.',
+      'Revenue: `round(sum(float(o["amount"]) for o in paid), 2)`.',
+      'Return the three keys: `count`, `paid`, `revenue`.',
+    ],
+    referenceSolution: `def summarize(raw_orders):
+    paid = [o for o in raw_orders if o["paid"]]
+    return {
+        "count": len(raw_orders),
+        "paid": len(paid),
+        "revenue": round(sum(float(o["amount"]) for o in paid), 2),
+    }`,
+    testCases: [
+      {
+        input: {
+          raw_orders: [
+            { id: 1, amount: "10.0", paid: true },
+            { id: 2, amount: "5.0", paid: false },
+          ],
+        },
+        expected: { count: 2, paid: 1, revenue: 10.0 },
+        description: "one paid, one not",
+      },
+      {
+        input: { raw_orders: [] },
+        expected: { count: 0, paid: 0, revenue: 0 },
+        description: "empty",
+      },
+      {
+        input: {
+          raw_orders: [
+            { id: 1, amount: "3.0", paid: true },
+            { id: 2, amount: "7.0", paid: true },
+          ],
+        },
+        expected: { count: 2, paid: 2, revenue: 10.0 },
+        description: "all paid",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l4-packaging-capstone-practice",
+    executionMode: "workspace",
+    prompt: `Capstone: implement \`summarize(raw_orders)\` in \`orders/report.py\`. Parse each raw order with
+the read-only \`parse_order\` (into a typed \`Order\`), then return
+\`{"count", "paid", "revenue"}\` where revenue sums **paid** orders' amounts, rounded to 2 decimals.
+Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Parse first: `[parse_order(raw) for raw in raw_orders]`.",
+      "Paid orders are those with `order.paid` truthy.",
+      "`revenue` is `round(sum(o.amount for o in paid), 2)`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "orders/report.py",
+      editableFilePaths: ["orders/report.py"],
+      visibleTestPaths: ["tests/test_report.py"],
+      hiddenTestPaths: ["tests/test_report_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: CAPSTONE_README },
+        { path: "pyproject.toml", role: "docs", language: "text", content: CAPSTONE_PYPROJECT },
+        { path: "orders/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "orders/models.py",
+          role: "readonly",
+          language: "python",
+          content: CAPSTONE_MODELS,
+          description: "Typed Order model + parse_order (read-only)",
+        },
+        {
+          path: "orders/report.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_REPORT_STARTER,
+          description: "Implement summarize here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_report.py",
+          role: "test",
+          language: "python",
+          content: CAPSTONE_TEST,
+          description: "Visible capstone tests",
+        },
+        {
+          path: "tests/test_report_hidden.py",
+          role: "test",
+          language: "python",
+          content: CAPSTONE_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden capstone tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_report", "test_report_hidden", "visible report", "hidden report"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "orders/report.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_REPORT_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level4: PythonLevel = {
   id: 4,
   slug: "engineering",
@@ -2212,6 +2735,12 @@ export const level4: PythonLevel = {
       title: "Performance & Production Practices",
       description: "Profile and cache hot paths, and load typed config with safe secret handling.",
       lessons: [performanceLesson, configLoggingLesson],
+    },
+    {
+      id: "py-l4-quality-packaging",
+      title: "Quality, Packaging & Capstone",
+      description: "Mock dependencies, use modern tooling, and ship a typed, tested package.",
+      lessons: [testingToolingLesson, packagingCapstoneLesson],
     },
   ],
 }

@@ -114,8 +114,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L4-08 · `py-l4-config-logging`** (WS, hard) — *configuration, secrets & structured logging.* Objective: production-grade config + observability.
 
 ### Module L4-M5 — Quality, Packaging & Capstone
-- **PY-L4-09 · `py-l4-testing-tooling`** (WS, hard) — *mocking, coverage & modern tooling (ruff, mypy/ty, pre-commit).* Objective: robust tests + clean tooling on a real module.
-- **PY-L4-10 · `py-l4-packaging-capstone`** (WS, hard) — *packaging/distribution + production capstone.* Objective: build a typed, tested, packaged service/library (capstone integrating L3–L4).
+- [x] **PY-L4-09 · `py-l4-testing-tooling`** (WS, hard) — *mocking, coverage & modern tooling (ruff, mypy/ty, pre-commit).* Objective: robust tests + clean tooling on a real module.
+- [x] **PY-L4-10 · `py-l4-packaging-capstone`** (WS, hard) — *packaging/distribution + production capstone.* Objective: build a typed, tested, packaged service/library (capstone integrating L3–L4).
 
 ---
 
