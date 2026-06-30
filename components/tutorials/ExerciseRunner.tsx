@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
+import { ColdStartNote } from "./ColdStartNote"
 import { useExerciseRun } from "./useExerciseRun"
 import type { PythonExercise } from "@/lib/tutorials/types"
 
@@ -81,11 +82,7 @@ export function ExerciseRunner({
           <Play className="h-4 w-4" />
           {warming ? "Starting Python…" : running ? "Running…" : "Run & check"}
         </Button>
-        {warming && (
-          <span className="text-muted-foreground text-xs">
-            First run downloads the Python runtime — this only happens once.
-          </span>
-        )}
+        <ColdStartNote warming={warming} />
         {hints.length > 0 && (
           <Button
             variant="outline"
