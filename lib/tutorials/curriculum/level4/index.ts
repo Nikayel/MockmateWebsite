@@ -1222,6 +1222,482 @@ from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidd
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L4-M3 — Concurrency & Async
+// ───────────────────────────────────────────────────────────────────────────
+
+const CONC_README = `# Parallelize a batch with concurrent.futures
+
+\`jobs/worker.py\` (read-only) has \`double(n)\`. Implement \`run_all(numbers)\` in \`jobs/runner.py\`
+so it runs \`double\` over every number using a \`concurrent.futures.ThreadPoolExecutor\` and returns
+the results **in input order**.
+
+\`executor.map(fn, items)\` keeps order for you. \`run_all([1, 2, 3])\` is \`[2, 4, 6]\`. Some tests
+are hidden.
+`
+
+const CONC_WORKER = String.raw`def double(n):
+    """A unit of work (stands in for an I/O-bound task)."""
+    return n * 2
+`
+
+const CONC_RUNNER_STARTER = String.raw`from concurrent.futures import ThreadPoolExecutor
+
+from jobs.worker import double
+
+
+def run_all(numbers):
+    """Run double over every number with a thread pool; return results in order (see README.md)."""
+    # TODO: with ThreadPoolExecutor() as executor: return list(executor.map(double, numbers))
+    return []
+`
+
+const CONC_RUNNER_REFERENCE = String.raw`from concurrent.futures import ThreadPoolExecutor
+
+from jobs.worker import double
+
+
+def run_all(numbers):
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        return list(executor.map(double, numbers))
+`
+
+const CONC_TEST = String.raw`from jobs.runner import run_all
+
+
+def run_tests(record):
+    def maps_in_order():
+        assert run_all([1, 2, 3]) == [2, 4, 6], f"got {run_all([1, 2, 3])!r}"
+
+    def empty_input():
+        assert run_all([]) == []
+
+    record("maps over the batch in order", maps_in_order)
+    record("empty input returns empty", empty_input)
+`
+
+const CONC_TEST_HIDDEN = String.raw`from jobs.runner import run_all
+
+
+def run_tests(record):
+    def single_item():
+        assert run_all([10]) == [20]
+
+    def negatives_and_zero():
+        assert run_all([5, 0, -1]) == [10, 0, -2]
+
+    record("single item", single_item)
+    record("negatives and zero", negatives_and_zero)
+`
+
+const concurrencyLesson: PythonLesson = {
+  id: "py-l4-concurrency",
+  title: "Threads, the GIL & concurrent.futures",
+  summary: "Choose a concurrency model and parallelize a batch with a thread pool.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["concurrency", "threading", "concurrent-futures", "gil"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Doing more than one thing at once
+
+### The GIL
+
+CPython's **Global Interpreter Lock** lets only one thread run Python bytecode at a time. So:
+
+- **I/O-bound** work (network, disk, waiting) — **threads help**: while one thread waits, another
+  runs.
+- **CPU-bound** work (number crunching) — threads *don't* speed it up; use **multiprocessing**
+  (separate processes, separate GILs) or a native library.
+
+### concurrent.futures: one clean API
+
+\`concurrent.futures\` gives the same interface for both pools. The simplest pattern maps a function
+over inputs:
+
+\`\`\`python
+from concurrent.futures import ThreadPoolExecutor
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(fetch, urls))   # results stay in input order
+\`\`\`
+
+Swap \`ThreadPoolExecutor\` for \`ProcessPoolExecutor\` for CPU-bound work — same code. For finer
+control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as
+they finish.
+
+### Safety
+
+Independent tasks (no shared mutable state) are safe to parallelize. If threads share state, guard it
+with a \`Lock\` — but prefer designing the work so they don't.
+
+### Recap
+
+The GIL means threads help I/O-bound but not CPU-bound work; \`concurrent.futures\` maps work over a
+pool with order preserved. You'll run a batch through a \`ThreadPoolExecutor\` — first as a plain
+sequential map, then in parallel across a \`jobs\` package.`,
+    demoCode: `from concurrent.futures import ThreadPoolExecutor
+
+
+def double(n):
+    return n * 2
+
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    print(list(executor.map(double, [1, 2, 3])))   # [2, 4, 6]`,
+  },
+  apply: {
+    id: "py-l4-concurrency-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`run_all(numbers)\` — return a list with each number doubled, in
+order. (This is the sequential baseline; the workspace step parallelizes it.)
+
+\`run_all([1, 2, 3])\` is \`[2, 4, 6]\`.`,
+    starterCode: `def run_all(numbers):
+    # Return each number doubled, in order.
+    pass`,
+    hints: [
+      "A comprehension keeps order: `[n * 2 for n in numbers]`.",
+      "Return the new list.",
+    ],
+    referenceSolution: `def run_all(numbers):
+    return [n * 2 for n in numbers]`,
+    testCases: [
+      { input: { numbers: [1, 2, 3] }, expected: [2, 4, 6], description: "doubles in order" },
+      { input: { numbers: [] }, expected: [], description: "empty input" },
+      { input: { numbers: [10] }, expected: [20], description: "single item" },
+      { input: { numbers: [5, 0, -1] }, expected: [10, 0, -2], description: "negatives and zero" },
+    ],
+  },
+  practice: {
+    id: "py-l4-concurrency-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`run_all(numbers)\` in \`jobs/runner.py\` using a
+\`concurrent.futures.ThreadPoolExecutor\` to map the read-only \`double\` worker over \`numbers\`,
+returning the results in input order. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Open a pool: `with ThreadPoolExecutor(max_workers=4) as executor:`.",
+      "`executor.map(double, numbers)` runs the work and preserves order.",
+      "Materialise it: `return list(executor.map(double, numbers))`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "jobs/runner.py",
+      editableFilePaths: ["jobs/runner.py"],
+      visibleTestPaths: ["tests/test_runner.py"],
+      hiddenTestPaths: ["tests/test_runner_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: CONC_README },
+        { path: "jobs/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "jobs/worker.py",
+          role: "readonly",
+          language: "python",
+          content: CONC_WORKER,
+          description: "The unit of work (read-only)",
+        },
+        {
+          path: "jobs/runner.py",
+          role: "editable",
+          language: "python",
+          content: CONC_RUNNER_STARTER,
+          description: "Implement run_all here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_runner.py",
+          role: "test",
+          language: "python",
+          content: CONC_TEST,
+          description: "Visible concurrency tests",
+        },
+        {
+          path: "tests/test_runner_hidden.py",
+          role: "test",
+          language: "python",
+          content: CONC_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden concurrency tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_runner", "test_runner_hidden", "visible runner", "hidden runner"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "jobs/runner.py",
+          role: "editable",
+          language: "python",
+          content: CONC_RUNNER_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+const AIO_README = `# Concurrent I/O with asyncio
+
+\`aio/fetch.py\` (read-only) has \`async def fetch_one(n)\` (a stand-in for an async network call).
+Implement \`fetch_all(numbers)\` in \`aio/gather.py\` so it runs every \`fetch_one\` **concurrently**
+with \`asyncio.gather\` and returns the results in order.
+
+\`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`. Some tests are hidden.
+`
+
+const AIO_FETCH = String.raw`import asyncio
+
+
+async def fetch_one(n):
+    """Pretend to await some I/O, then return a result."""
+    await asyncio.sleep(0)
+    return n * 10
+`
+
+const AIO_GATHER_STARTER = String.raw`import asyncio
+
+from aio.fetch import fetch_one
+
+
+def fetch_all(numbers):
+    """Run fetch_one for every number concurrently; return results in order (see README.md)."""
+    # TODO: gather fetch_one(n) for all n, then asyncio.run it.
+    return []
+`
+
+const AIO_GATHER_REFERENCE = String.raw`import asyncio
+
+from aio.fetch import fetch_one
+
+
+def fetch_all(numbers):
+    async def main():
+        return await asyncio.gather(*(fetch_one(n) for n in numbers))
+
+    return asyncio.run(main())
+`
+
+const AIO_TEST = String.raw`from aio.gather import fetch_all
+
+
+def run_tests(record):
+    def gathers_in_order():
+        assert fetch_all([1, 2, 3]) == [10, 20, 30], f"got {fetch_all([1, 2, 3])!r}"
+
+    def empty_input():
+        assert fetch_all([]) == []
+
+    record("gathers results in order", gathers_in_order)
+    record("empty input returns empty", empty_input)
+`
+
+const AIO_TEST_HIDDEN = String.raw`from aio.gather import fetch_all
+
+
+def run_tests(record):
+    def single_item():
+        assert fetch_all([5]) == [50]
+
+    def includes_zero():
+        assert fetch_all([0, 2]) == [0, 20]
+
+    record("single item", single_item)
+    record("includes zero", includes_zero)
+`
+
+const asyncioLesson: PythonLesson = {
+  id: "py-l4-asyncio",
+  title: "async / await & asyncio",
+  summary: "Run many I/O tasks concurrently with coroutines and asyncio.gather.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["asyncio", "async-await", "coroutines", "concurrency"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Concurrency without threads
+
+\`asyncio\` runs many I/O-bound tasks on **one** thread by cooperatively switching whenever a task
+*awaits*. No locks, no GIL contention — ideal for thousands of network calls.
+
+### Coroutines
+
+An \`async def\` defines a **coroutine**. Calling it doesn't run it — it returns a coroutine object
+you must \`await\` (or run on the event loop):
+
+\`\`\`python
+import asyncio
+
+async def fetch_one(n):
+    await asyncio.sleep(0.1)   # yields control while "waiting"
+    return n * 10
+\`\`\`
+
+### Running concurrently with gather
+
+\`asyncio.gather\` schedules many coroutines at once and waits for all of them, returning results in
+order:
+
+\`\`\`python
+async def main():
+    return await asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3))
+
+asyncio.run(main())    # [10, 20, 30] — the three "waits" overlap
+\`\`\`
+
+\`asyncio.run(coro)\` starts the event loop, runs the coroutine to completion, and closes the loop —
+it's the one synchronous entry point into async code.
+
+### await vs sequential
+
+Awaiting each call one-by-one would be sequential; \`gather\` overlaps the waiting, so N slow calls
+take about as long as the slowest one.
+
+### Recap
+
+\`async def\` makes a coroutine, \`await\` suspends until it's ready, \`asyncio.gather\` runs many
+concurrently, and \`asyncio.run\` is the entry point. You'll gather a batch of async fetches into an
+ordered result list.`,
+    demoCode: `import asyncio
+
+
+async def fetch_one(n):
+    await asyncio.sleep(0)
+    return n * 10
+
+
+async def main():
+    return await asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3))
+
+
+print(asyncio.run(main()))   # [10, 20, 30]`,
+  },
+  apply: {
+    id: "py-l4-asyncio-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`fetch_all(numbers)\` — run the provided \`fetch_one\` coroutine for
+every number concurrently with \`asyncio.gather\`, returning the results in order. Use
+\`asyncio.run\` to drive it.
+
+\`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`.`,
+    starterCode: `import asyncio
+
+
+async def fetch_one(n):
+    return n * 10
+
+
+def fetch_all(numbers):
+    # TODO: gather fetch_one(n) for all n inside an async main(), then asyncio.run it.
+    pass`,
+    hints: [
+      "Define an inner `async def main():` that returns `await asyncio.gather(*(fetch_one(n) for n in numbers))`.",
+      "`asyncio.gather(*coros)` runs them concurrently and preserves order.",
+      "Return `asyncio.run(main())`.",
+    ],
+    referenceSolution: `import asyncio
+
+
+async def fetch_one(n):
+    return n * 10
+
+
+def fetch_all(numbers):
+    async def main():
+        return await asyncio.gather(*(fetch_one(n) for n in numbers))
+
+    return asyncio.run(main())`,
+    testCases: [
+      { input: { numbers: [1, 2, 3] }, expected: [10, 20, 30], description: "gathers in order" },
+      { input: { numbers: [] }, expected: [], description: "empty input" },
+      { input: { numbers: [5] }, expected: [50], description: "single item" },
+    ],
+  },
+  practice: {
+    id: "py-l4-asyncio-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`fetch_all(numbers)\` in \`aio/gather.py\`: run the read-only \`fetch_one\` coroutine for
+every number concurrently with \`asyncio.gather\`, driven by \`asyncio.run\`, returning results in
+order. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "`fetch_one` is imported — build `fetch_one(n)` coroutines for each number.",
+      "Inside an `async def main():`, `return await asyncio.gather(*(fetch_one(n) for n in numbers))`.",
+      "`return asyncio.run(main())`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "aio/gather.py",
+      editableFilePaths: ["aio/gather.py"],
+      visibleTestPaths: ["tests/test_gather.py"],
+      hiddenTestPaths: ["tests/test_gather_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: AIO_README },
+        { path: "aio/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "aio/fetch.py",
+          role: "readonly",
+          language: "python",
+          content: AIO_FETCH,
+          description: "Async fetch_one coroutine (read-only)",
+        },
+        {
+          path: "aio/gather.py",
+          role: "editable",
+          language: "python",
+          content: AIO_GATHER_STARTER,
+          description: "Implement fetch_all here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_gather.py",
+          role: "test",
+          language: "python",
+          content: AIO_TEST,
+          description: "Visible asyncio tests",
+        },
+        {
+          path: "tests/test_gather_hidden.py",
+          role: "test",
+          language: "python",
+          content: AIO_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden asyncio tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_gather", "test_gather_hidden", "visible gather", "hidden gather"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        { path: "aio/gather.py", role: "editable", language: "python", content: AIO_GATHER_REFERENCE },
+      ],
+    },
+  },
+}
+
 export const level4: PythonLevel = {
   id: 4,
   slug: "engineering",
@@ -1241,6 +1717,12 @@ export const level4: PythonLevel = {
       title: "Decorators & Metaprogramming",
       description: "Parameterized decorators, descriptors, and how classes are created.",
       lessons: [decoratorsAdvancedLesson, descriptorsMetaclassesLesson],
+    },
+    {
+      id: "py-l4-concurrency-async",
+      title: "Concurrency & Async",
+      description: "Parallelize with threads and run concurrent I/O with asyncio.",
+      lessons: [concurrencyLesson, asyncioLesson],
     },
   ],
 }

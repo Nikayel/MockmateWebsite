@@ -106,8 +106,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L4-04 · `py-l4-descriptors-metaclasses`** (WS, hard) — *descriptors & intro to metaclasses.* Objective: customize attribute access; understand class creation.
 
 ### Module L4-M3 — Concurrency & Async
-- **PY-L4-05 · `py-l4-concurrency`** (WS, hard) — *threading, multiprocessing & the GIL (`concurrent.futures`).* Objective: choose the right model; parallelize safely.
-- **PY-L4-06 · `py-l4-asyncio`** (WS, hard) — *async/await & asyncio.* Objective: write concurrent async I/O with `asyncio`.
+- [x] **PY-L4-05 · `py-l4-concurrency`** (WS, hard) — *threading, multiprocessing & the GIL (`concurrent.futures`).* Objective: choose the right model; parallelize safely.
+- [x] **PY-L4-06 · `py-l4-asyncio`** (WS, hard) — *async/await & asyncio.* Objective: write concurrent async I/O with `asyncio`.
 
 ### Module L4-M4 — Performance & Production Practices
 - **PY-L4-07 · `py-l4-performance`** (WS, hard) — *profiling, complexity & caching (`lru_cache`, generators).* Objective: measure and speed up a hot path.
