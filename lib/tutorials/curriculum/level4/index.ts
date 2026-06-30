@@ -1698,6 +1698,489 @@ order. Some tests are hidden.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L4-M4 — Performance & Production Practices
+// ───────────────────────────────────────────────────────────────────────────
+
+const PERF_README = `# Make a slow function fast
+
+\`fib\` computes Fibonacci numbers by naive recursion — which recomputes the same subproblems
+exponentially. Implement \`fib(n)\` in \`perf/compute.py\` with \`functools.lru_cache\` so each \`n\`
+is computed once.
+
+\`fib(0)\` is \`0\`, \`fib(1)\` is \`1\`, \`fib(10)\` is \`55\`. Some tests are hidden.
+`
+
+const PERF_COMPUTE_STARTER = String.raw`from functools import lru_cache
+
+
+def fib(n):
+    """Return the nth Fibonacci number (0, 1, 1, 2, 3, 5, ...) — see README.md."""
+    # TODO: add @lru_cache above this def, and recurse: fib(n-1) + fib(n-2) with a base case.
+    return 0
+`
+
+const PERF_COMPUTE_REFERENCE = String.raw`from functools import lru_cache
+
+
+@lru_cache(maxsize=None)
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+`
+
+const PERF_TEST = String.raw`from perf.compute import fib
+
+
+def run_tests(record):
+    def base_cases():
+        assert fib(0) == 0 and fib(1) == 1, f"got fib(0)={fib(0)}, fib(1)={fib(1)}"
+
+    def small_value():
+        assert fib(10) == 55, f"expected 55, got {fib(10)!r}"
+
+    record("base cases", base_cases)
+    record("fib(10) is 55", small_value)
+`
+
+const PERF_TEST_HIDDEN = String.raw`from perf.compute import fib
+
+
+def run_tests(record):
+    def larger_value():
+        assert fib(20) == 6765, f"expected 6765, got {fib(20)!r}"
+
+    def cached_is_fast():
+        # With lru_cache this returns instantly; the value must still be correct.
+        assert fib(30) == 832040, f"expected 832040, got {fib(30)!r}"
+
+    record("fib(20) is 6765", larger_value)
+    record("fib(30) is 832040", cached_is_fast)
+`
+
+const performanceLesson: PythonLesson = {
+  id: "py-l4-performance",
+  title: "Profiling, complexity & caching",
+  summary: "Find the hot path, fix complexity, and memoize repeated work with lru_cache.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["performance", "lru-cache", "complexity", "profiling"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Making code fast — measure first
+
+### Profile before optimizing
+
+Don't guess where time goes — measure. \`cProfile\` and \`timeit\` show the real hot spots:
+
+\`\`\`python
+import cProfile
+cProfile.run("slow_function()")   # per-call counts and time
+\`\`\`
+
+Optimize the few lines that dominate, not the ones that *look* slow.
+
+### Complexity is the big lever
+
+Algorithmic complexity beats micro-tuning. A set lookup is O(1) vs a list scan's O(n):
+
+\`\`\`python
+if x in big_set:     # O(1)
+if x in big_list:    # O(n)
+\`\`\`
+
+### Caching with lru_cache
+
+Repeated calls with the same arguments? \`functools.lru_cache\` memoizes results — turning an
+exponential recursion into a linear one:
+
+\`\`\`python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+\`\`\`
+
+Without the cache, \`fib(35)\` recomputes the same subproblems billions of times; with it, each \`n\`
+is computed once.
+
+### Generators for memory
+
+A generator streams values instead of building a giant list — constant memory for huge sequences:
+
+\`\`\`python
+total = sum(x * x for x in range(10_000_000))   # no list materialized
+\`\`\`
+
+### Recap
+
+Profile to find the hot path, fix complexity first, memoize repeated work with \`lru_cache\`, and
+stream with generators to save memory. You'll make a slow recursive \`fib\` fast with \`lru_cache\`.`,
+    demoCode: `from functools import lru_cache
+
+
+@lru_cache(maxsize=None)
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+print(fib(30))   # 832040 — instant, thanks to the cache`,
+  },
+  apply: {
+    id: "py-l4-performance-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`fib(n)\` — the nth Fibonacci number — and memoize it with
+\`@lru_cache\` so repeated subproblems are computed once.
+
+\`fib(10)\` is \`55\`.`,
+    starterCode: `from functools import lru_cache
+
+
+def fib(n):
+    # Add @lru_cache above, then recurse with a base case for n < 2.
+    pass`,
+    hints: [
+      "Base case: `if n < 2: return n`.",
+      "Recurse: `return fib(n - 1) + fib(n - 2)`.",
+      "Add `@lru_cache(maxsize=None)` on the line above `def fib` to memoize it.",
+    ],
+    referenceSolution: `from functools import lru_cache
+
+
+@lru_cache(maxsize=None)
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)`,
+    testCases: [
+      { input: { n: 0 }, expected: 0, description: "fib(0)" },
+      { input: { n: 1 }, expected: 1, description: "fib(1)" },
+      { input: { n: 10 }, expected: 55, description: "fib(10)" },
+      { input: { n: 15 }, expected: 610, description: "fib(15)" },
+    ],
+  },
+  practice: {
+    id: "py-l4-performance-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`fib(n)\` in \`perf/compute.py\` with \`functools.lru_cache\` so the recursion is
+memoized (each \`n\` computed once). It must return correct Fibonacci values, including for larger
+\`n\`. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Decorate the function: `@lru_cache(maxsize=None)` above `def fib(n):`.",
+      "Base case `if n < 2: return n`, else `fib(n - 1) + fib(n - 2)`.",
+      "The cache is what keeps `fib(30)` instant instead of exponential.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "perf/compute.py",
+      editableFilePaths: ["perf/compute.py"],
+      visibleTestPaths: ["tests/test_compute.py"],
+      hiddenTestPaths: ["tests/test_compute_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: PERF_README },
+        { path: "perf/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "perf/compute.py",
+          role: "editable",
+          language: "python",
+          content: PERF_COMPUTE_STARTER,
+          description: "Implement a memoized fib here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_compute.py",
+          role: "test",
+          language: "python",
+          content: PERF_TEST,
+          description: "Visible performance tests",
+        },
+        {
+          path: "tests/test_compute_hidden.py",
+          role: "test",
+          language: "python",
+          content: PERF_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden larger-value tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_compute", "test_compute_hidden", "visible compute", "hidden compute"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "perf/compute.py",
+          role: "editable",
+          language: "python",
+          content: PERF_COMPUTE_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+const CFG_README = `# Load typed config from the environment
+
+Twelve-factor apps read config from the **environment**, with defaults and type coercion — and never
+leak secrets. \`config/defaults.py\` (read-only) holds the defaults. Implement \`load_config(env)\` in
+\`config/settings.py\` so it returns:
+
+\`\`\`python
+{"port": <int>, "debug": <bool>, "has_secret": <bool>}
+\`\`\`
+
+- \`port\`: \`int\` of \`env["PORT"]\` or the default
+- \`debug\`: \`True\` only when \`env["DEBUG"]\` is \`"true"\` (case-insensitive), else the default
+- \`has_secret\`: whether \`"SECRET"\` is in \`env\` (record presence, never the value)
+
+Some tests are hidden.
+`
+
+const CFG_DEFAULTS = String.raw`DEFAULTS = {"PORT": "8000", "DEBUG": "false"}
+`
+
+const CFG_SETTINGS_STARTER = String.raw`from config.defaults import DEFAULTS
+
+
+def load_config(env):
+    """Turn an env dict into typed settings (see README.md)."""
+    # TODO: coerce PORT to int, DEBUG to bool, and record whether SECRET is present.
+    return {}
+`
+
+const CFG_SETTINGS_REFERENCE = String.raw`from config.defaults import DEFAULTS
+
+
+def load_config(env):
+    port = int(env.get("PORT", DEFAULTS["PORT"]))
+    debug = env.get("DEBUG", DEFAULTS["DEBUG"]).lower() == "true"
+    return {"port": port, "debug": debug, "has_secret": "SECRET" in env}
+`
+
+const CFG_TEST = String.raw`from config.settings import load_config
+
+
+def run_tests(record):
+    def reads_and_coerces():
+        result = load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "abc"})
+        assert result == {"port": 9000, "debug": True, "has_secret": True}, f"got {result!r}"
+
+    def applies_defaults():
+        result = load_config({})
+        assert result == {"port": 8000, "debug": False, "has_secret": False}, f"got {result!r}"
+
+    record("reads and coerces env", reads_and_coerces)
+    record("applies defaults", applies_defaults)
+`
+
+const CFG_TEST_HIDDEN = String.raw`from config.settings import load_config
+
+
+def run_tests(record):
+    def debug_is_case_insensitive():
+        result = load_config({"DEBUG": "TRUE"})
+        assert result == {"port": 8000, "debug": True, "has_secret": False}, f"got {result!r}"
+
+    def never_exposes_secret_value():
+        result = load_config({"PORT": "3000", "SECRET": "topsecret"})
+        assert result == {"port": 3000, "debug": False, "has_secret": True}, f"got {result!r}"
+        assert "topsecret" not in result.values(), "the secret value must not be in the config"
+
+    record("DEBUG is case-insensitive", debug_is_case_insensitive)
+    record("never exposes the secret value", never_exposes_secret_value)
+`
+
+const configLoggingLesson: PythonLesson = {
+  id: "py-l4-config-logging",
+  title: "Configuration, secrets & structured logging",
+  summary: "Load typed config from the environment, keep secrets safe, and log structured records.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["configuration", "secrets", "structured-logging", "twelve-factor"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Configuration, secrets & logging
+
+### Config from the environment
+
+Twelve-factor apps read config from the **environment**, not hard-coded constants — so the same
+build runs in dev and prod. Provide sensible **defaults** and **coerce** types (env values are
+strings):
+
+\`\`\`python
+port = int(env.get("PORT", "8000"))
+debug = env.get("DEBUG", "false").lower() == "true"
+\`\`\`
+
+### Secrets
+
+Never hard-code or log secret values. Read them from the environment, and when logging, record
+*whether* something is set — not the value:
+
+\`\`\`python
+config = {"has_secret": "SECRET" in env}   # safe to log; the value never is
+\`\`\`
+
+### Structured logging
+
+Log machine-readable records (key/value or JSON), not prose — so logs are searchable and
+aggregatable:
+
+\`\`\`python
+import logging
+logger = logging.getLogger(__name__)
+logger.info("startup", extra={"port": port, "debug": debug})
+\`\`\`
+
+### Recap
+
+Read config from the environment with defaults and type coercion, keep secrets out of code and logs
+(track presence, not value), and log structured records. You'll build a \`load_config\` that turns an
+env dict into typed settings.`,
+    demoCode: `def load_config(env):
+    port = int(env.get("PORT", "8000"))
+    debug = env.get("DEBUG", "false").lower() == "true"
+    return {"port": port, "debug": debug, "has_secret": "SECRET" in env}
+
+
+print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
+  },
+  apply: {
+    id: "py-l4-config-logging-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`load_config(env)\` — turn an env dict into
+\`{"port": int, "debug": bool, "has_secret": bool}\`. Default \`PORT\` to \`8000\` and \`DEBUG\` to off.
+\`debug\` is \`True\` only when \`DEBUG\` is \`"true"\` (any case). \`has_secret\` records whether
+\`"SECRET"\` is present (never its value).
+
+\`load_config({})\` is \`{"port": 8000, "debug": False, "has_secret": False}\`.`,
+    starterCode: `def load_config(env):
+    # Coerce PORT->int (default 8000), DEBUG->bool, and record whether SECRET is present.
+    pass`,
+    hints: [
+      'Port: `int(env.get("PORT", 8000))`.',
+      'Debug: `env.get("DEBUG", "false").lower() == "true"`.',
+      'Secret presence (not value): `"SECRET" in env`.',
+    ],
+    referenceSolution: `def load_config(env):
+    port = int(env.get("PORT", 8000))
+    debug = env.get("DEBUG", "false").lower() == "true"
+    return {"port": port, "debug": debug, "has_secret": "SECRET" in env}`,
+    testCases: [
+      {
+        input: { env: { PORT: "9000", DEBUG: "true", SECRET: "abc" } },
+        expected: { port: 9000, debug: true, has_secret: true },
+        description: "reads and coerces",
+      },
+      {
+        input: { env: {} },
+        expected: { port: 8000, debug: false, has_secret: false },
+        description: "applies defaults",
+      },
+      {
+        input: { env: { DEBUG: "TRUE" } },
+        expected: { port: 8000, debug: true, has_secret: false },
+        description: "case-insensitive debug",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l4-config-logging-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`load_config(env)\` in \`config/settings.py\`: use the read-only \`DEFAULTS\` for \`PORT\`
+and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` case-insensitive), and set
+\`has_secret\` from whether \`"SECRET"\` is present — never its value. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      'Port: `int(env.get("PORT", DEFAULTS["PORT"]))`.',
+      'Debug: `env.get("DEBUG", DEFAULTS["DEBUG"]).lower() == "true"`.',
+      'Record presence only: `"has_secret": "SECRET" in env`.',
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "config/settings.py",
+      editableFilePaths: ["config/settings.py"],
+      visibleTestPaths: ["tests/test_settings.py"],
+      hiddenTestPaths: ["tests/test_settings_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: CFG_README },
+        { path: "config/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "config/defaults.py",
+          role: "readonly",
+          language: "python",
+          content: CFG_DEFAULTS,
+          description: "Default config values (read-only)",
+        },
+        {
+          path: "config/settings.py",
+          role: "editable",
+          language: "python",
+          content: CFG_SETTINGS_STARTER,
+          description: "Implement load_config here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_settings.py",
+          role: "test",
+          language: "python",
+          content: CFG_TEST,
+          description: "Visible config tests",
+        },
+        {
+          path: "tests/test_settings_hidden.py",
+          role: "test",
+          language: "python",
+          content: CFG_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden config/secret tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_settings", "test_settings_hidden", "visible settings", "hidden settings"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "config/settings.py",
+          role: "editable",
+          language: "python",
+          content: CFG_SETTINGS_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level4: PythonLevel = {
   id: 4,
   slug: "engineering",
@@ -1723,6 +2206,12 @@ export const level4: PythonLevel = {
       title: "Concurrency & Async",
       description: "Parallelize with threads and run concurrent I/O with asyncio.",
       lessons: [concurrencyLesson, asyncioLesson],
+    },
+    {
+      id: "py-l4-performance-production",
+      title: "Performance & Production Practices",
+      description: "Profile and cache hot paths, and load typed config with safe secret handling.",
+      lessons: [performanceLesson, configLoggingLesson],
     },
   ],
 }

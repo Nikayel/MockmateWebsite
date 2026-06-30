@@ -110,8 +110,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L4-06 · `py-l4-asyncio`** (WS, hard) — *async/await & asyncio.* Objective: write concurrent async I/O with `asyncio`.
 
 ### Module L4-M4 — Performance & Production Practices
-- **PY-L4-07 · `py-l4-performance`** (WS, hard) — *profiling, complexity & caching (`lru_cache`, generators).* Objective: measure and speed up a hot path.
-- **PY-L4-08 · `py-l4-config-logging`** (WS, hard) — *configuration, secrets & structured logging.* Objective: production-grade config + observability.
+- [x] **PY-L4-07 · `py-l4-performance`** (WS, hard) — *profiling, complexity & caching (`lru_cache`, generators).* Objective: measure and speed up a hot path.
+- [x] **PY-L4-08 · `py-l4-config-logging`** (WS, hard) — *configuration, secrets & structured logging.* Objective: production-grade config + observability.
 
 ### Module L4-M5 — Quality, Packaging & Capstone
 - **PY-L4-09 · `py-l4-testing-tooling`** (WS, hard) — *mocking, coverage & modern tooling (ruff, mypy/ty, pre-commit).* Objective: robust tests + clean tooling on a real module.
