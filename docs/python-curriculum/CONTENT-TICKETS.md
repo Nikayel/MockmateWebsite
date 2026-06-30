@@ -57,9 +57,9 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L2-05 · `py-l2-closures-decorators`** (SF, medium) — *scope, closures & decorators (intro).* Objective: capture state in closures; write a simple decorator.
 
 ### Module L2-M3 — OOP Foundations
-- **PY-L2-06 · `py-l2-classes`** (SF, medium) — *classes, `__init__`, methods & `self`.* Objective: model state + behavior with a class.
-- **PY-L2-07 · `py-l2-inheritance-composition`** (SF, medium) — *inheritance & composition.* Objective: extend a base class; prefer composition when apt.
-- **PY-L2-08 · `py-l2-dunder-properties`** (SF, medium) — *dunder methods & properties.* Objective: `__repr__`/`__eq__`, computed `@property`.
+- [x] **PY-L2-06 · `py-l2-classes`** (SF, medium) — *classes, `__init__`, methods & `self`.* Objective: model state + behavior with a class.
+- [x] **PY-L2-07 · `py-l2-inheritance-composition`** (SF, medium) — *inheritance & composition.* Objective: extend a base class; prefer composition when apt.
+- [x] **PY-L2-08 · `py-l2-dunder-properties`** (SF, medium) — *dunder methods & properties.* Objective: `__repr__`/`__eq__`, computed `@property`.
 
 ### Module L2-M4 — Data Modeling
 - **PY-L2-09 · `py-l2-dataclasses-enums`** (SF, medium) — *dataclasses, enums & typing basics.* Objective: `@dataclass`, `Enum`, `list[int]`/`Optional` annotations.

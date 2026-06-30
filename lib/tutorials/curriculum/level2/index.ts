@@ -594,6 +594,472 @@ function returns, apply it to a function that returns its argument, and return t
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L2-M3 — OOP Foundations
+//
+// The grader runs the single top-level function (the class methods are excluded), so each lesson
+// seeds a small `run(...)` driver that exercises the class the learner implements.
+// ───────────────────────────────────────────────────────────────────────────
+
+const classesLesson: PythonLesson = {
+  id: "py-l2-classes",
+  title: "Classes, __init__, methods & self",
+  summary: "Model state and behaviour together with a class.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["classes", "init", "methods", "self"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Bundling state with behaviour
+
+A **class** is a blueprint that bundles data (**attributes**) with the functions that act on it
+(**methods**). Each object built from the class is an **instance** with its own data.
+
+\`\`\`python
+class BankAccount:
+    def __init__(self, balance):   # the constructor
+        self.balance = balance     # store data on the instance
+
+    def deposit(self, amount):
+        self.balance += amount     # a method changes that data
+\`\`\`
+
+### \`self\` and \`__init__\`
+
+- \`__init__\` runs when you create an instance: \`BankAccount(100)\`.
+- \`self\` is the instance the method is working on. Every method takes it as its first parameter,
+  and you store/read data through \`self.attribute\`.
+
+\`\`\`python
+account = BankAccount(100)   # __init__ sets balance = 100
+account.deposit(50)          # self is 'account'; balance becomes 150
+account.balance              # 150
+\`\`\`
+
+### Recap
+
+A class groups attributes and methods; \`__init__\` sets up each instance and \`self\` is how methods
+reach that instance's data. Next you'll finish a \`BankAccount\`, then build a \`Counter\`.`,
+    demoCode: `class BankAccount:
+    def __init__(self, balance):
+        self.balance = balance
+
+    def deposit(self, amount):
+        self.balance += amount
+
+account = BankAccount(100)
+account.deposit(50)
+print(account.balance)   # 150`,
+  },
+  apply: {
+    id: "py-l2-classes-apply",
+    executionMode: "single-file",
+    prompt: `Finish the \`BankAccount\` class so the provided \`run\` driver works:
+- \`__init__(self, balance)\` stores the starting balance in \`self.balance\`.
+- \`deposit(self, amount)\` adds \`amount\` to \`self.balance\`.
+
+\`run(100, 50)\` should return \`150\`.`,
+    starterCode: `class BankAccount:
+    def __init__(self, balance):
+        # Store the starting balance on self.
+        pass
+
+    def deposit(self, amount):
+        # Add amount to self.balance.
+        pass
+
+
+def run(start, amount):
+    account = BankAccount(start)
+    account.deposit(amount)
+    return account.balance`,
+    hints: [
+      "In `__init__`, write `self.balance = balance`.",
+      "In `deposit`, write `self.balance += amount`.",
+      "`self` carries each account's own balance between method calls.",
+    ],
+    referenceSolution: `class BankAccount:
+    def __init__(self, balance):
+        self.balance = balance
+
+    def deposit(self, amount):
+        self.balance += amount
+
+
+def run(start, amount):
+    account = BankAccount(start)
+    account.deposit(amount)
+    return account.balance`,
+    testCases: [
+      { input: { start: 100, amount: 50 }, expected: 150, description: "deposit into 100" },
+      { input: { start: 0, amount: 25 }, expected: 25, description: "deposit into empty" },
+      { input: { start: 10, amount: 0 }, expected: 10, description: "deposit nothing" },
+    ],
+  },
+  practice: {
+    id: "py-l2-classes-practice",
+    executionMode: "single-file",
+    prompt: `Implement a \`Counter\` class so the provided \`run\` driver works:
+- \`__init__(self)\` starts \`self.count\` at \`0\`.
+- \`increment(self)\` adds \`1\` to \`self.count\`.
+
+\`run(3)\` should return \`3\`.`,
+    starterCode: `class Counter:
+    def __init__(self):
+        # Start count at 0.
+        pass
+
+    def increment(self):
+        # Add 1 to self.count.
+        pass
+
+
+def run(times):
+    counter = Counter()
+    for _ in range(times):
+        counter.increment()
+    return counter.count`,
+    hints: [
+      "`__init__` takes only `self`; set `self.count = 0`.",
+      "`increment` does `self.count += 1`.",
+    ],
+    referenceSolution: `class Counter:
+    def __init__(self):
+        self.count = 0
+
+    def increment(self):
+        self.count += 1
+
+
+def run(times):
+    counter = Counter()
+    for _ in range(times):
+        counter.increment()
+    return counter.count`,
+    testCases: [
+      { input: { times: 3 }, expected: 3, description: "three increments" },
+      { input: { times: 0 }, expected: 0, description: "no increments" },
+      { input: { times: 5 }, expected: 5, description: "five increments" },
+    ],
+  },
+}
+
+const inheritanceCompositionLesson: PythonLesson = {
+  id: "py-l2-inheritance-composition",
+  title: "Inheritance & composition",
+  summary: "Extend a base class with inheritance, and build objects from other objects.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["inheritance", "super", "composition", "classes"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Two ways to reuse classes
+
+### Inheritance (is-a)
+
+A subclass \`class Dog(Animal)\` **is an** Animal and inherits its methods. Override a method to
+specialise it, and call \`super()\` to reuse the parent's version:
+
+\`\`\`python
+class Greeter:
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        return "Hi, " + self.name
+
+class LoudGreeter(Greeter):
+    def greet(self):
+        return super().greet() + "!!!"   # extend the parent's behaviour
+\`\`\`
+
+\`LoudGreeter("Ada").greet()\` → \`"Hi, Ada!!!"\`.
+
+### Composition (has-a)
+
+Instead of inheriting, an object can **hold** other objects. A \`Person\` *has a* \`Wallet\`:
+
+\`\`\`python
+class Person:
+    def __init__(self, name):
+        self.name = name
+        self.wallet = Wallet()   # composed in
+\`\`\`
+
+### Which to use
+
+Prefer **composition** when one thing *contains* another; use **inheritance** only for a genuine
+"is-a" relationship. Composition keeps classes small and swappable.
+
+### Recap
+
+Inheritance shares behaviour down an is-a hierarchy (with \`super()\` to reuse the parent);
+composition builds an object out of other objects. Next you'll extend a greeter, then compose a
+person with a wallet.`,
+    demoCode: `class Greeter:
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        return "Hi, " + self.name
+
+class LoudGreeter(Greeter):
+    def greet(self):
+        return super().greet() + "!!!"
+
+print(LoudGreeter("Ada").greet())   # Hi, Ada!!!`,
+  },
+  apply: {
+    id: "py-l2-inheritance-composition-apply",
+    executionMode: "single-file",
+    prompt: `\`Greeter\` is provided. Implement \`LoudGreeter(Greeter)\` so its \`greet\` calls the parent's
+\`greet\` via \`super()\` and appends \`"!!!"\`.
+
+\`run("Ada")\` should return \`"Hi, Ada!!!"\`.`,
+    starterCode: `class Greeter:
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        return "Hi, " + self.name
+
+
+class LoudGreeter(Greeter):
+    def greet(self):
+        # Call the parent's greet() and add "!!!".
+        pass
+
+
+def run(name):
+    return LoudGreeter(name).greet()`,
+    hints: [
+      "`super().greet()` runs the parent `Greeter.greet`.",
+      'Append the shout: `return super().greet() + "!!!"`.',
+      "`LoudGreeter` inherits `__init__`, so you only override `greet`.",
+    ],
+    referenceSolution: `class Greeter:
+    def __init__(self, name):
+        self.name = name
+
+    def greet(self):
+        return "Hi, " + self.name
+
+
+class LoudGreeter(Greeter):
+    def greet(self):
+        return super().greet() + "!!!"
+
+
+def run(name):
+    return LoudGreeter(name).greet()`,
+    testCases: [
+      {
+        input: { name: "Ada" },
+        expected: "Hi, Ada!!!",
+        description: "extends the parent greeting",
+      },
+      { input: { name: "Sam" }, expected: "Hi, Sam!!!", description: "another name" },
+    ],
+  },
+  practice: {
+    id: "py-l2-inheritance-composition-practice",
+    executionMode: "single-file",
+    prompt: `\`Wallet\` is provided. Finish \`Person.__init__\` so each person stores their \`name\` **and** owns
+a fresh \`Wallet\` as \`self.wallet\` (composition).
+
+\`run(50)\` should return \`50\` (the wallet's balance after adding 50).`,
+    starterCode: `class Wallet:
+    def __init__(self):
+        self.balance = 0
+
+    def add(self, amount):
+        self.balance += amount
+
+
+class Person:
+    def __init__(self, name):
+        # Store the name AND create a Wallet as self.wallet.
+        pass
+
+
+def run(amount):
+    person = Person("Ada")
+    person.wallet.add(amount)
+    return person.wallet.balance`,
+    hints: ["Set `self.name = name` first.", "Then compose in a wallet: `self.wallet = Wallet()`."],
+    referenceSolution: `class Wallet:
+    def __init__(self):
+        self.balance = 0
+
+    def add(self, amount):
+        self.balance += amount
+
+
+class Person:
+    def __init__(self, name):
+        self.name = name
+        self.wallet = Wallet()
+
+
+def run(amount):
+    person = Person("Ada")
+    person.wallet.add(amount)
+    return person.wallet.balance`,
+    testCases: [
+      { input: { amount: 50 }, expected: 50, description: "add 50 to a new wallet" },
+      { input: { amount: 0 }, expected: 0, description: "wallet starts at 0" },
+      { input: { amount: 100 }, expected: 100, description: "add 100" },
+    ],
+  },
+}
+
+const dunderPropertiesLesson: PythonLesson = {
+  id: "py-l2-dunder-properties",
+  title: "Dunder methods & properties",
+  summary: "Give classes natural behaviour with __eq__/__repr__ and computed @property values.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["dunder-methods", "eq", "property", "classes"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Make objects feel built-in
+
+**Dunder** ("double underscore") methods let your objects work with Python's built-in operators and
+functions.
+
+\`\`\`python
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __repr__(self):
+        return f"Point({self.x}, {self.y})"     # how it prints
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y   # how == behaves
+\`\`\`
+
+Now \`Point(1, 2) == Point(1, 2)\` is \`True\`, and printing a point shows \`Point(1, 2)\`.
+
+## Computed attributes with @property
+
+A \`@property\` turns a method into a read-only attribute — accessed **without** parentheses:
+
+\`\`\`python
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @property
+    def area(self):
+        return 3.14159 * self.radius ** 2
+
+Circle(2).area   # 12.56636  — no ()
+\`\`\`
+
+### Recap
+
+Dunder methods (\`__eq__\`, \`__repr__\`) hook objects into operators and printing; \`@property\` exposes
+a computed value as an attribute. Next you'll make two points compare equal, then add an \`area\`
+property.`,
+    demoCode: `class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @property
+    def area(self):
+        return 3.14159 * self.radius ** 2
+
+print(Circle(2).area)   # 12.56636`,
+  },
+  apply: {
+    id: "py-l2-dunder-properties-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`Point.__eq__\` so two points are equal when **both** coordinates match.
+
+\`run(1, 2, 1, 2)\` should return \`True\`; \`run(1, 2, 3, 4)\` should return \`False\`.`,
+    starterCode: `class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        # True when both x and y match the other point.
+        pass
+
+
+def run(x1, y1, x2, y2):
+    return Point(x1, y1) == Point(x2, y2)`,
+    hints: [
+      "Compare both coordinates: `self.x == other.x` and `self.y == other.y`.",
+      "Join them with `and`: `return self.x == other.x and self.y == other.y`.",
+    ],
+    referenceSolution: `class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+
+def run(x1, y1, x2, y2):
+    return Point(x1, y1) == Point(x2, y2)`,
+    testCases: [
+      { input: { x1: 1, y1: 2, x2: 1, y2: 2 }, expected: true, description: "identical points" },
+      { input: { x1: 1, y1: 2, x2: 3, y2: 4 }, expected: false, description: "different points" },
+      {
+        input: { x1: 0, y1: 0, x2: 0, y2: 0 },
+        expected: true,
+        description: "origin equals origin",
+      },
+      { input: { x1: 5, y1: 1, x2: 5, y2: 9 }, expected: false, description: "only x matches" },
+    ],
+  },
+  practice: {
+    id: "py-l2-dunder-properties-practice",
+    executionMode: "single-file",
+    prompt: `Add an \`area\` \`@property\` to \`Circle\` that returns \`π · r²\` (use \`3.14159\` for π).
+
+\`run(2)\` should return \`12.56636\`. Access it as \`circle.area\` (no parentheses).`,
+    starterCode: `class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @property
+    def area(self):
+        # Return 3.14159 * radius squared.
+        pass
+
+
+def run(radius):
+    return Circle(radius).area`,
+    hints: [
+      "Square the radius with `self.radius ** 2`.",
+      "Multiply by π: `return 3.14159 * self.radius ** 2`.",
+      "Keep the `@property` line so `area` is an attribute, not a method call.",
+    ],
+    referenceSolution: `class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @property
+    def area(self):
+        return 3.14159 * self.radius ** 2
+
+
+def run(radius):
+    return Circle(radius).area`,
+    testCases: [
+      { input: { radius: 2 }, expected: 12.56636, description: "radius 2" },
+      { input: { radius: 1 }, expected: 3.14159, description: "unit circle" },
+      { input: { radius: 0 }, expected: 0, description: "zero radius" },
+      { input: { radius: 10 }, expected: 314.159, description: "radius 10" },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -613,6 +1079,12 @@ export const level2: PythonLevel = {
       title: "Functions in Depth",
       description: "Flexible signatures, functions as values, closures, and decorators.",
       lessons: [argsKwargsLesson, lambdasHofLesson, closuresDecoratorsLesson],
+    },
+    {
+      id: "py-l2-oop-foundations",
+      title: "OOP Foundations",
+      description: "Model state and behaviour with classes, inheritance, composition, and dunders.",
+      lessons: [classesLesson, inheritanceCompositionLesson, dunderPropertiesLesson],
     },
   ],
 }
