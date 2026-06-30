@@ -44,6 +44,8 @@ export function CodeWindow({
   return (
     <div
       className={cn("border-border bg-card overflow-hidden rounded-xl border shadow-sm", className)}
+      role="img"
+      aria-label={`Sample Python code: ${filename}`}
     >
       <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-2">
         <span className="flex gap-1.5" aria-hidden="true">
@@ -54,7 +56,10 @@ export function CodeWindow({
         <span className="text-muted-foreground ml-1 font-mono text-xs">{filename}</span>
       </div>
 
-      <pre className="overflow-x-auto px-3 py-3 font-mono text-[12.5px] leading-relaxed">
+      <pre
+        className="overflow-x-auto px-3 py-3 font-mono text-[12.5px] leading-relaxed"
+        aria-hidden="true"
+      >
         <code className="grid grid-cols-[auto_1fr] gap-x-3">
           {lines.map((line, i) => (
             <div key={i} className="contents">

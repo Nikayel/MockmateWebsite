@@ -250,16 +250,23 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                         Lesson complete — nice work. This idea resurfaces in 3 days for spaced
                         practice.
                       </p>
-                      {nextLesson?.slug && (
-                        <div>
+                      <div>
+                        {nextLesson?.slug ? (
                           <Button asChild className="gap-2">
                             <Link href={`/learn/python/${nextLesson.slug}/${nextLesson.id}`}>
                               Next lesson: {nextLesson.title}
                               <ArrowRight className="h-4 w-4" />
                             </Link>
                           </Button>
-                        </div>
-                      )}
+                        ) : (
+                          <Button asChild variant="outline" className="gap-2">
+                            <Link href="/learn/python">
+                              <ArrowLeft className="h-4 w-4" />
+                              You finished the path — back to levels
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
