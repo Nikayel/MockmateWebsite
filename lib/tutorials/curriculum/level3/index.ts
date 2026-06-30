@@ -1847,7 +1847,12 @@ tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_scores", "test_scores_hidden", "visible scores", "hidden scores"),
+          content: buildRunner(
+            "test_scores",
+            "test_scores_hidden",
+            "visible scores",
+            "hidden scores"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -2095,7 +2100,12 @@ are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_totals", "test_totals_hidden", "visible totals", "hidden totals"),
+          content: buildRunner(
+            "test_totals",
+            "test_totals_hidden",
+            "visible totals",
+            "hidden totals"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -2261,7 +2271,7 @@ command and two integer arguments and return \`add\` or \`mul\` of them.
     hints: [
       "The command is `argv[0]`; the numbers are `int(argv[1])` and `int(argv[2])`.",
       'Branch: `if command == "add": return a + b`.',
-      'Add a `mul` branch returning `a * b`.',
+      "Add a `mul` branch returning `a * b`.",
     ],
     referenceSolution: `def run(argv):
     command = argv[0]
@@ -2518,7 +2528,7 @@ For \`{"id": "1", "name": "Ada", "active": 1}\` return \`{"id": 1, "name": "Ada"
     # Coerce raw["id"] -> int, raw["name"] -> str, raw["active"] -> bool. Return a dict.
     pass`,
     hints: [
-      "Coerce each field: `int(raw[\"id\"])`, `str(raw[\"name\"])`, `bool(raw[\"active\"])`.",
+      'Coerce each field: `int(raw["id"])`, `str(raw["name"])`, `bool(raw["active"])`.',
       "Return them in a new dict with the same keys.",
     ],
     referenceSolution: `def parse_user(raw):
@@ -2549,8 +2559,8 @@ dataclass, coercing \`id\` to \`int\`, \`name\` to \`str\`, and \`active\` to \`
 should raise. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Build the dataclass: `User(id=int(raw[\"id\"]), ...)`.",
-      "Indexing a missing key (`raw[\"active\"]`) already raises `KeyError` — that's the desired behaviour.",
+      'Build the dataclass: `User(id=int(raw["id"]), ...)`.',
+      'Indexing a missing key (`raw["active"]`) already raises `KeyError` — that\'s the desired behaviour.',
       "Coerce `active` with `bool(...)`.",
     ],
     workspace: {
@@ -2603,7 +2613,12 @@ should raise. Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_models", "test_models_hidden", "visible models", "hidden models"),
+          content: buildRunner(
+            "test_models",
+            "test_models_hidden",
+            "visible models",
+            "hidden models"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -2854,7 +2869,12 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_report", "test_report_hidden", "visible report", "hidden report"),
+          content: buildRunner(
+            "test_report",
+            "test_report_hidden",
+            "visible report",
+            "hidden report"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },

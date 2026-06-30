@@ -345,7 +345,12 @@ with \`total_area\`. Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_shapes", "test_shapes_hidden", "visible shapes", "hidden shapes"),
+          content: buildRunner(
+            "test_shapes",
+            "test_shapes_hidden",
+            "visible shapes",
+            "hidden shapes"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -520,7 +525,11 @@ is full price, \`member\` is 10% off, \`vip\` is 20% off, and any unknown kind i
       { input: { kind: "regular", amount: 100 }, expected: 100, description: "full price" },
       { input: { kind: "member", amount: 100 }, expected: 90, description: "10% off" },
       { input: { kind: "vip", amount: 100 }, expected: 80, description: "20% off" },
-      { input: { kind: "mystery", amount: 100 }, expected: 100, description: "unknown is full price" },
+      {
+        input: { kind: "mystery", amount: 100 },
+        expected: 100,
+        description: "unknown is full price",
+      },
     ],
   },
   practice: {
@@ -585,7 +594,12 @@ strategy must not require editing \`price_for\`. Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_checkout", "test_checkout_hidden", "visible checkout", "hidden checkout"),
+          content: buildRunner(
+            "test_checkout",
+            "test_checkout_hidden",
+            "visible checkout",
+            "hidden checkout"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -887,7 +901,12 @@ function's name. The read-only \`math_ops.py\` applies it. Some tests are hidden
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_decorators", "test_decorators_hidden", "visible decorators", "hidden decorators"),
+          content: buildRunner(
+            "test_decorators",
+            "test_decorators_hidden",
+            "visible decorators",
+            "hidden decorators"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -1205,7 +1224,12 @@ from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidd
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_account", "test_account_hidden", "visible account", "hidden account"),
+          content: buildRunner(
+            "test_account",
+            "test_account_hidden",
+            "visible account",
+            "hidden account"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -1356,10 +1380,7 @@ order. (This is the sequential baseline; the workspace step parallelizes it.)
     starterCode: `def run_all(numbers):
     # Return each number doubled, in order.
     pass`,
-    hints: [
-      "A comprehension keeps order: `[n * 2 for n in numbers]`.",
-      "Return the new list.",
-    ],
+    hints: ["A comprehension keeps order: `[n * 2 for n in numbers]`.", "Return the new list."],
     referenceSolution: `def run_all(numbers):
     return [n * 2 for n in numbers]`,
     testCases: [
@@ -1431,7 +1452,12 @@ returning the results in input order. Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_runner", "test_runner_hidden", "visible runner", "hidden runner"),
+          content: buildRunner(
+            "test_runner",
+            "test_runner_hidden",
+            "visible runner",
+            "hidden runner"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -1686,13 +1712,23 @@ order. Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_gather", "test_gather_hidden", "visible gather", "hidden gather"),
+          content: buildRunner(
+            "test_gather",
+            "test_gather_hidden",
+            "visible gather",
+            "hidden gather"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
       ],
       referenceFiles: [
-        { path: "aio/gather.py", role: "editable", language: "python", content: AIO_GATHER_REFERENCE },
+        {
+          path: "aio/gather.py",
+          role: "editable",
+          language: "python",
+          content: AIO_GATHER_REFERENCE,
+        },
       ],
     },
   },
@@ -1920,7 +1956,12 @@ memoized (each \`n\` computed once). It must return correct Fibonacci values, in
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_compute", "test_compute_hidden", "visible compute", "hidden compute"),
+          content: buildRunner(
+            "test_compute",
+            "test_compute_hidden",
+            "visible compute",
+            "hidden compute"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -2164,7 +2205,12 @@ and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` 
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_settings", "test_settings_hidden", "visible settings", "hidden settings"),
+          content: buildRunner(
+            "test_settings",
+            "test_settings_hidden",
+            "visible settings",
+            "hidden settings"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -2395,7 +2441,12 @@ keep \`sender\` as an injected parameter. Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_service", "test_service_hidden", "visible service", "hidden service"),
+          content: buildRunner(
+            "test_service",
+            "test_service_hidden",
+            "visible service",
+            "hidden service"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -2586,7 +2637,7 @@ For one paid \`"10.0"\` and one unpaid \`"5.0"\`, revenue is \`10.0\`.`,
     hints: [
       'Filter paid orders: `[o for o in raw_orders if o["paid"]]`.',
       'Revenue: `round(sum(float(o["amount"]) for o in paid), 2)`.',
-      'Return the three keys: `count`, `paid`, `revenue`.',
+      "Return the three keys: `count`, `paid`, `revenue`.",
     ],
     referenceSolution: `def summarize(raw_orders):
     paid = [o for o in raw_orders if o["paid"]]
@@ -2687,7 +2738,12 @@ Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_report", "test_report_hidden", "visible report", "hidden report"),
+          content: buildRunner(
+            "test_report",
+            "test_report_hidden",
+            "visible report",
+            "hidden report"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
