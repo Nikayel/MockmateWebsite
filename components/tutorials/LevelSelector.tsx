@@ -85,21 +85,33 @@ export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
                 )}
               </div>
 
-              <Reveal delayMs={i * 70} className="flex-1 pb-5">
-                <LevelCard
-                  level={level}
-                  isSelected={isSelected}
-                  isCompleted={isCompleted}
-                  completedCount={completedCount}
-                  onSelect={(l) => setSelectedId(l.id)}
-                />
-              </Reveal>
+              <div className="flex-1 pb-5">
+                <Reveal delayMs={i * 70}>
+                  <LevelCard
+                    level={level}
+                    isSelected={isSelected}
+                    isCompleted={isCompleted}
+                    completedCount={completedCount}
+                    onSelect={(l) => setSelectedId(l.id)}
+                  />
+                </Reveal>
+                {/* On mobile there's no sticky panel, so the preview drops in under the open card. */}
+                {isSelected && (
+                  <div className="mt-4 lg:hidden">
+                    <LevelPreviewPanel
+                      level={level}
+                      completedCount={completedCount}
+                      onStart={handleStart}
+                    />
+                  </div>
+                )}
+              </div>
             </li>
           )
         })}
       </ol>
 
-      <div className="lg:sticky lg:top-24">
+      <div className="hidden lg:sticky lg:top-24 lg:block">
         <LevelPreviewPanel
           level={selected}
           completedCount={completedCountFor(selected)}
