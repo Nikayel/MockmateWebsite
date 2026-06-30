@@ -347,6 +347,49 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 `
 }
 
+/**
+ * Build a pytest-flavoured runner: it discovers `test_*` functions in each test module (like
+ * pytest does) and records pass/fail, so lesson test files read as real pytest while still running
+ * under the client Pyodide executor (which has no pytest installed).
+ */
+function buildPytestRunner(
+  visibleModule: string,
+  hiddenModule: string,
+  visibleSuite: string,
+  hiddenSuite: string
+): string {
+  return String.raw`import inspect
+import json
+import os
+import sys
+import traceback
+
+sys.path.insert(0, os.getcwd())
+from tests import ${visibleModule}, ${hiddenModule}
+
+results = []
+
+
+def run_module(module, suite):
+    is_hidden = "hidden" in suite.lower()
+    for name, fn in inspect.getmembers(module, inspect.isfunction):
+        if not name.startswith("test_") or getattr(fn, "__module__", None) != module.__name__:
+            continue
+        try:
+            fn()
+            results.append({"suite": suite, "name": name, "passed": True, "error": None, "isHidden": is_hidden})
+        except AssertionError as exc:
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or (name + " failed"), "isHidden": is_hidden})
+        except Exception as exc:
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc(), "isHidden": is_hidden})
+
+
+run_module(${visibleModule}, "${visibleSuite}")
+run_module(${hiddenModule}, "${hiddenSuite}")
+print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
+`
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // L3-M1 — Project Structure & Packaging  (py-l3-packages)
 // ───────────────────────────────────────────────────────────────────────────
@@ -1016,7 +1059,7 @@ Annotate the return as \`-> dict | None\`.`,
     # Return the first row whose "id" == target, else None.
     pass`,
     hints: [
-      "Loop the rows and check `row[\"id\"] == target`.",
+      'Loop the rows and check `row["id"] == target`.',
       "Return the row as soon as it matches.",
       "If the loop finishes with no match, `return None`.",
     ],
@@ -1072,7 +1115,12 @@ Some tests are hidden.`,
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: TM_README },
-        { path: "directory/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "directory/__init__.py",
+          role: "readonly",
+          language: "python",
+          content: EMPTY_INIT,
+        },
         {
           path: "directory/users.py",
           role: "readonly",
@@ -1087,7 +1135,13 @@ Some tests are hidden.`,
           content: TM_LOOKUP_STARTER,
           description: "Implement find_user here",
         },
-        { path: "tests/__init__.py", role: "test", language: "python", content: EMPTY_INIT, hidden: true },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
         {
           path: "tests/test_lookup.py",
           role: "test",
@@ -1107,7 +1161,12 @@ Some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: buildRunner("test_lookup", "test_lookup_hidden", "visible lookup", "hidden lookup"),
+          content: buildRunner(
+            "test_lookup",
+            "test_lookup_hidden",
+            "visible lookup",
+            "hidden lookup"
+          ),
           hidden: true,
           description: "Workspace test runner",
         },
@@ -1118,6 +1177,456 @@ Some tests are hidden.`,
           role: "editable",
           language: "python",
           content: TM_LOOKUP_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// L3-M3 — Testing with pytest
+// ───────────────────────────────────────────────────────────────────────────
+
+const PT_README = `# TDD a bank balance
+
+The pytest tests already exist — make them pass. Implement \`balance_after(start, transactions)\` in
+\`bank/account.py\` so it applies a list of signed \`transactions\` (deposits are positive,
+withdrawals negative) to a \`start\` balance and returns the new balance.
+
+Example: \`balance_after(100, [10, -30, 5])\` is \`85\`. Some tests are hidden.
+`
+
+const PT_ACCOUNT_STARTER = String.raw`def balance_after(start, transactions):
+    """Apply signed transactions to start and return the new balance (see README.md)."""
+    # TODO: add every transaction to the starting balance.
+    return start
+`
+
+const PT_ACCOUNT_REFERENCE = String.raw`def balance_after(start, transactions):
+    return start + sum(transactions)
+`
+
+const PT_TEST = String.raw`from bank.account import balance_after
+
+
+def test_applies_deposits():
+    assert balance_after(0, [10, 20]) == 30
+
+
+def test_applies_withdrawals():
+    assert balance_after(100, [-30, -20]) == 50
+
+
+def test_empty_transactions_unchanged():
+    assert balance_after(50, []) == 50
+`
+
+const PT_TEST_HIDDEN = String.raw`from bank.account import balance_after
+
+
+def test_mixed_transactions():
+    assert balance_after(100, [10, -30, 5]) == 85
+
+
+def test_overdraft_allowed():
+    assert balance_after(0, [-5]) == -5
+`
+
+const pytestBasicsLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-pytest-basics",
+  title: "pytest assertions & structure",
+  summary: "Make a suite of pytest tests pass by implementing the module they cover.",
+  estimatedMinutes: 16,
+  difficulty: "medium",
+  skills: ["pytest", "testing", "assertions", "tdd"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Testing with pytest
+
+**pytest** runs functions whose names start with \`test_\` and checks plain \`assert\` statements —
+no boilerplate, no class required:
+
+\`\`\`python
+# tests/test_account.py
+from bank.account import balance_after
+
+def test_applies_deposits():
+    assert balance_after(0, [10, 20]) == 30
+\`\`\`
+
+Run \`pytest\` and it finds every \`test_*\` function, runs it, and reports which assertions failed,
+showing actual vs expected.
+
+### Arrange, act, assert
+
+A readable test has three beats:
+
+\`\`\`python
+def test_mixed():
+    start, txns = 100, [10, -30, 5]       # arrange
+    result = balance_after(start, txns)   # act
+    assert result == 85                   # assert
+\`\`\`
+
+### TDD: tests first
+
+Test-driven development writes the test, watches it fail, then writes just enough code to pass. Here
+the tests already exist — your job is to turn them green.
+
+### Recap
+
+pytest discovers \`test_*\` functions and checks \`assert\`s. You'll make a pytest suite pass by
+implementing \`balance_after\` — first in one file, then in a \`bank\` package with real test files.`,
+    demoCode: `def balance_after(start, transactions):
+    return start + sum(transactions)
+
+
+# what a pytest test would assert:
+assert balance_after(100, [10, -30, 5]) == 85
+print("all good")`,
+  },
+  apply: {
+    id: "py-l3-pytest-basics-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`balance_after(start, transactions)\` — add every signed amount in
+\`transactions\` to \`start\` and return the result.
+
+\`balance_after(100, [10, -30, 5])\` is \`85\`.`,
+    starterCode: `def balance_after(start, transactions):
+    # Return start plus the sum of all transactions.
+    pass`,
+    hints: [
+      "`sum(transactions)` adds the deposits and withdrawals (signs included).",
+      "Add it to the starting balance: `start + sum(transactions)`.",
+    ],
+    referenceSolution: `def balance_after(start, transactions):
+    return start + sum(transactions)`,
+    testCases: [
+      { input: { start: 100, transactions: [10, -30, 5] }, expected: 85, description: "mixed" },
+      { input: { start: 0, transactions: [10, 20] }, expected: 30, description: "deposits" },
+      { input: { start: 50, transactions: [] }, expected: 50, description: "no transactions" },
+      { input: { start: 0, transactions: [-5] }, expected: -5, description: "overdraft" },
+    ],
+  },
+  practice: {
+    id: "py-l3-pytest-basics-practice",
+    executionMode: "workspace",
+    prompt: `Make the pytest suite pass: implement \`balance_after(start, transactions)\` in
+\`bank/account.py\` so it applies the signed \`transactions\` to \`start\`. Open the visible test file
+to read the cases; some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Read `tests/test_account.py` to see exactly what's expected.",
+      "`sum(transactions)` handles deposits and withdrawals together.",
+      "`return start + sum(transactions)`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "bank/account.py",
+      editableFilePaths: ["bank/account.py"],
+      visibleTestPaths: ["tests/test_account.py"],
+      hiddenTestPaths: ["tests/test_account_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: PT_README },
+        { path: "bank/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "bank/account.py",
+          role: "editable",
+          language: "python",
+          content: PT_ACCOUNT_STARTER,
+          description: "Implement balance_after here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_account.py",
+          role: "test",
+          language: "python",
+          content: PT_TEST,
+          description: "Visible pytest suite",
+        },
+        {
+          path: "tests/test_account_hidden.py",
+          role: "test",
+          language: "python",
+          content: PT_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden pytest suite",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildPytestRunner(
+            "test_account",
+            "test_account_hidden",
+            "visible account",
+            "hidden account"
+          ),
+          hidden: true,
+          description: "pytest-style test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "bank/account.py",
+          role: "editable",
+          language: "python",
+          content: PT_ACCOUNT_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// py-l3-pytest-fixtures — fixtures & parametrize (TDD a module)
+// ───────────────────────────────────────────────────────────────────────────
+
+const FX_README = `# Restock with fixtures & parametrize
+
+Make a fixture-backed, parametrized pytest suite pass. Implement \`restock(stock, additions)\` in
+\`inventory/store.py\` so it returns a **new** dict that merges \`additions\` into \`stock\`, summing
+quantities for items that appear in both.
+
+Example: \`restock({"apple": 5}, {"apple": 5, "plum": 3})\` is \`{"apple": 10, "plum": 3}\`. Don't
+mutate the input. Some tests are hidden.
+`
+
+const FX_STORE_STARTER = String.raw`def restock(stock, additions):
+    """Merge additions into a NEW dict, summing shared quantities (see README.md)."""
+    # TODO: copy stock, then add each item/qty from additions.
+    return {}
+`
+
+const FX_STORE_REFERENCE = String.raw`def restock(stock, additions):
+    result = dict(stock)
+    for item, qty in additions.items():
+        result[item] = result.get(item, 0) + qty
+    return result
+`
+
+const FX_TEST = String.raw`from inventory.store import restock
+
+
+def base_stock():
+    # A shared starting point. With real pytest this would be a @pytest.fixture
+    # injected into each test; here the tests call it directly.
+    return {"apple": 5, "pear": 2}
+
+
+def test_adds_a_new_item():
+    assert restock(base_stock(), {"plum": 3}) == {"apple": 5, "pear": 2, "plum": 3}
+
+
+def test_increments_existing_item():
+    assert restock(base_stock(), {"apple": 5}) == {"apple": 10, "pear": 2}
+
+
+def test_parametrized_cases():
+    # Stand-in for @pytest.mark.parametrize: one test, a table of cases.
+    cases = [
+        ({"a": 1}, {"a": 1}, {"a": 2}),
+        ({}, {"x": 4}, {"x": 4}),
+        ({"n": 2}, {"m": 3}, {"n": 2, "m": 3}),
+    ]
+    for stock, additions, expected in cases:
+        assert restock(stock, additions) == expected, f"failed for {stock}, {additions}"
+`
+
+const FX_TEST_HIDDEN = String.raw`from inventory.store import restock
+
+
+def test_does_not_mutate_input():
+    original = {"apple": 5}
+    restock(original, {"apple": 1})
+    assert original == {"apple": 5}, "restock must return a new dict, not mutate the input"
+
+
+def test_empty_additions_unchanged():
+    assert restock({"apple": 5}, {}) == {"apple": 5}
+`
+
+const pytestFixturesLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-pytest-fixtures",
+  title: "Fixtures & parametrize",
+  summary:
+    "Share setup with fixtures and cover many cases with parametrize while you TDD a module.",
+  estimatedMinutes: 17,
+  difficulty: "medium",
+  skills: ["pytest", "fixtures", "parametrize", "tdd"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Fixtures and parametrize
+
+### Fixtures: shared setup
+
+A **fixture** builds a value your tests need, so you don't repeat setup. Mark it \`@pytest.fixture\`
+and name it as a parameter — pytest injects it:
+
+\`\`\`python
+import pytest
+
+@pytest.fixture
+def base_stock():
+    return {"apple": 5, "pear": 2}
+
+def test_adds_item(base_stock):          # pytest passes the fixture in
+    assert restock(base_stock, {"plum": 3})["plum"] == 3
+\`\`\`
+
+### Parametrize: one test, many cases
+
+\`@pytest.mark.parametrize\` runs the same test for each row of inputs:
+
+\`\`\`python
+@pytest.mark.parametrize("stock, add, expected", [
+    ({"a": 1}, {"a": 1}, {"a": 2}),
+    ({}, {"x": 4}, {"x": 4}),
+])
+def test_restock(stock, add, expected):
+    assert restock(stock, add) == expected
+\`\`\`
+
+One function, many checks — with a clear per-case report.
+
+> In this sandbox the test files call the setup helper directly and loop over a list of cases (the
+> same patterns, without pytest's fixture injection), so they run without pytest installed.
+
+### Recap
+
+Fixtures remove duplicated setup; \`parametrize\` turns a table of cases into individual checks.
+You'll implement \`restock\` so a fixture-backed, parametrized suite passes — without mutating its
+input.`,
+    demoCode: `def restock(stock, additions):
+    result = dict(stock)
+    for item, qty in additions.items():
+        result[item] = result.get(item, 0) + qty
+    return result
+
+
+print(restock({"apple": 5}, {"apple": 5, "plum": 3}))  # {'apple': 10, 'plum': 3}`,
+  },
+  apply: {
+    id: "py-l3-pytest-fixtures-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`restock(stock, additions)\` — return a **new** dict merging
+\`additions\` into \`stock\`, summing quantities for shared items.
+
+\`restock({"apple": 5}, {"apple": 5, "plum": 3})\` is \`{"apple": 10, "plum": 3}\`.`,
+    starterCode: `def restock(stock, additions):
+    # Copy stock into a new dict, then add each item/qty from additions.
+    pass`,
+    hints: [
+      "Start from a copy so you don't mutate the input: `result = dict(stock)`.",
+      "For each item, add to what's already there: `result.get(item, 0) + qty`.",
+      "Loop `for item, qty in additions.items():`, then return `result`.",
+    ],
+    referenceSolution: `def restock(stock, additions):
+    result = dict(stock)
+    for item, qty in additions.items():
+        result[item] = result.get(item, 0) + qty
+    return result`,
+    testCases: [
+      {
+        input: { stock: { apple: 5 }, additions: { apple: 5, plum: 3 } },
+        expected: { apple: 10, plum: 3 },
+        description: "sum shared, add new",
+      },
+      {
+        input: { stock: {}, additions: { x: 4 } },
+        expected: { x: 4 },
+        description: "into empty stock",
+      },
+      {
+        input: { stock: { n: 2 }, additions: { m: 3 } },
+        expected: { n: 2, m: 3 },
+        description: "no overlap",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l3-pytest-fixtures-practice",
+    executionMode: "workspace",
+    prompt: `Make the fixture-backed, parametrized suite pass: implement \`restock(stock, additions)\` in
+\`inventory/store.py\` to merge \`additions\` into a **new** copy of \`stock\` (summing shared
+quantities, never mutating the input). Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Copy first: `result = dict(stock)` keeps the original untouched.",
+      "Sum shared items with `result.get(item, 0) + qty`.",
+      "The hidden suite checks you did NOT mutate the input dict.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "inventory/store.py",
+      editableFilePaths: ["inventory/store.py"],
+      visibleTestPaths: ["tests/test_store.py"],
+      hiddenTestPaths: ["tests/test_store_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: FX_README },
+        {
+          path: "inventory/__init__.py",
+          role: "readonly",
+          language: "python",
+          content: EMPTY_INIT,
+        },
+        {
+          path: "inventory/store.py",
+          role: "editable",
+          language: "python",
+          content: FX_STORE_STARTER,
+          description: "Implement restock here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_store.py",
+          role: "test",
+          language: "python",
+          content: FX_TEST,
+          description: "Visible fixture/parametrize suite",
+        },
+        {
+          path: "tests/test_store_hidden.py",
+          role: "test",
+          language: "python",
+          content: FX_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden no-mutation tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildPytestRunner(
+            "test_store",
+            "test_store_hidden",
+            "visible store",
+            "hidden store"
+          ),
+          hidden: true,
+          description: "pytest-style test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "inventory/store.py",
+          role: "editable",
+          language: "python",
+          content: FX_STORE_REFERENCE,
         },
       ],
     },
@@ -1149,6 +1658,12 @@ export const level3: PythonLevel = {
       title: "Type Hints & Static Typing",
       description: "Annotate functions and classes for clarity and static checking.",
       lessons: [typeHintsLesson, typingModuleLesson],
+    },
+    {
+      id: "py-l3-testing-pytest",
+      title: "Testing with pytest",
+      description: "Drive a module with pytest assertions, fixtures, and parametrize.",
+      lessons: [pytestBasicsLesson, pytestFixturesLesson],
     },
   ],
 }

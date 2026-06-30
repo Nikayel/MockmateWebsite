@@ -81,8 +81,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L3-03 · `py-l3-typing-module`** (WS, medium) — *`typing`: Optional/Union, generics, Protocols (+ mypy/ty mindset).* Objective: type a small generic/Protocol-based API.
 
 ### Module L3-M3 — Testing with pytest
-- **PY-L3-04 · `py-l3-pytest-basics`** (WS, medium) — *pytest assertions & structure.* Objective: write/pass `pytest` tests for a module.
-- **PY-L3-05 · `py-l3-pytest-fixtures`** (WS, medium) — *fixtures & parametrize (TDD a module).* Objective: share setup with fixtures; cover cases with `parametrize`.
+- [x] **PY-L3-04 · `py-l3-pytest-basics`** (WS, medium) — *pytest assertions & structure.* Objective: write/pass `pytest` tests for a module.
+- [x] **PY-L3-05 · `py-l3-pytest-fixtures`** (WS, medium) — *fixtures & parametrize (TDD a module).* Objective: share setup with fixtures; cover cases with `parametrize`.
 
 ### Module L3-M4 — Files, Data & Robustness
 - **PY-L3-06 · `py-l3-pathlib`** (WS, medium) — *pathlib & file processing in a project.* Objective: read/transform/write files across a small project.
