@@ -1217,6 +1217,385 @@ def run(name):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L2-M5 — Errors, Files & Modules
+// (Single-file mode has no filesystem, so JSON/CSV are parsed from in-memory strings;
+//  real `with open()` file work arrives in Level 3's workspace lessons.)
+// ───────────────────────────────────────────────────────────────────────────
+
+const exceptionsLesson: PythonLesson = {
+  id: "py-l2-exceptions",
+  title: "try / except / finally & custom exceptions",
+  summary: "Handle errors cleanly, raise your own, and define a custom exception.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["exceptions", "try-except", "raise", "custom-exceptions"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Handling things that go wrong
+
+Some operations can fail at runtime — dividing by zero, converting bad text, a missing key. A
+\`try\`/\`except\` lets you **catch** the failure instead of crashing:
+
+\`\`\`python
+try:
+    result = a / b
+except ZeroDivisionError:
+    result = None        # runs only if that error happened
+\`\`\`
+
+Catch the **specific** exception you expect (\`ZeroDivisionError\`, \`ValueError\`, \`KeyError\`),
+not a bare \`except\` — you don't want to hide unrelated bugs.
+
+### finally
+
+A \`finally\` block runs no matter what — success or failure — for cleanup:
+
+\`\`\`python
+try:
+    risky()
+finally:
+    cleanup()            # always runs
+\`\`\`
+
+### Raising and custom exceptions
+
+Use \`raise\` to signal an error yourself, and subclass \`Exception\` to name your own:
+
+\`\`\`python
+class TooSmallError(Exception):
+    pass
+
+if n < 10:
+    raise TooSmallError()
+\`\`\`
+
+### Recap
+
+\`try\`/\`except\` catches a specific error, \`finally\` always runs, \`raise\` signals an error, and
+subclassing \`Exception\` defines your own. Next you'll guard a division, then raise and catch a
+custom exception.`,
+    demoCode: `def safe_divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        return None
+
+print(safe_divide(10, 2))   # 5.0
+print(safe_divide(5, 0))    # None`,
+  },
+  apply: {
+    id: "py-l2-exceptions-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`safe_divide(a, b)\` — return \`a / b\`, but if \`b\` is \`0\` (a \`ZeroDivisionError\`),
+return \`None\` instead of crashing.`,
+    starterCode: `def safe_divide(a, b):
+    # Return a / b, or None if b is 0.
+    pass`,
+    hints: [
+      "Wrap `a / b` in a `try:` block.",
+      "Catch the specific error: `except ZeroDivisionError:`.",
+      "Return `None` from the except branch.",
+    ],
+    referenceSolution: `def safe_divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        return None`,
+    testCases: [
+      { input: { a: 10, b: 2 }, expected: 5, description: "normal division" },
+      { input: { a: 5, b: 0 }, expected: null, description: "divide by zero -> None" },
+      { input: { a: 9, b: 3 }, expected: 3, description: "another division" },
+      { input: { a: 7, b: 0 }, expected: null, description: "zero again -> None" },
+    ],
+  },
+  practice: {
+    id: "py-l2-exceptions-practice",
+    executionMode: "single-file",
+    prompt: `Define a custom \`TooSmallError(Exception)\`. In \`validate(n)\`, **raise** it when \`n < 10\`,
+**catch** it, and return \`"too small"\`; otherwise return \`"ok"\`.
+
+\`validate(5)\` returns \`"too small"\`; \`validate(10)\` returns \`"ok"\`.`,
+    starterCode: `class TooSmallError(Exception):
+    pass
+
+
+def validate(n):
+    # Raise TooSmallError when n < 10, catch it, return "too small"; else "ok".
+    pass`,
+    hints: [
+      'Inside a `try:`, `raise TooSmallError()` when `n < 10`, otherwise `return "ok"`.',
+      'Add `except TooSmallError:` that returns "too small".',
+    ],
+    referenceSolution: `class TooSmallError(Exception):
+    pass
+
+
+def validate(n):
+    try:
+        if n < 10:
+            raise TooSmallError()
+        return "ok"
+    except TooSmallError:
+        return "too small"`,
+    testCases: [
+      { input: { n: 5 }, expected: "too small", description: "below the threshold" },
+      { input: { n: 10 }, expected: "ok", description: "exactly at the threshold" },
+      { input: { n: 100 }, expected: "ok", description: "well above" },
+      { input: { n: 0 }, expected: "too small", description: "zero is too small" },
+    ],
+  },
+}
+
+const filesJsonCsvLesson: PythonLesson = {
+  id: "py-l2-files-json-csv",
+  title: "Context managers, JSON & CSV",
+  summary: "Read structured data with the with-statement, json, and csv.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["context-managers", "json", "csv", "parsing"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Working with structured data
+
+### The with-statement (context managers)
+
+Opening a file with \`with\` guarantees it's closed again, even if an error happens:
+
+\`\`\`python
+with open("data.txt") as fh:
+    text = fh.read()
+# the file is automatically closed here
+\`\`\`
+
+\`with\` is the idiom for any resource that needs cleanup. (In this lesson the data is already a
+string, so you'll skip straight to parsing it.)
+
+### JSON
+
+\`json.loads\` turns a JSON **string** into Python lists/dicts; \`json.dumps\` goes the other way:
+
+\`\`\`python
+import json
+data = json.loads('{"name": "Ada", "age": 30}')
+data["name"]    # "Ada"
+\`\`\`
+
+### CSV
+
+\`csv.reader\` reads comma-separated rows. To read from a string (instead of a file), wrap it in
+\`io.StringIO\`:
+
+\`\`\`python
+import csv, io
+rows = list(csv.reader(io.StringIO("a,b\\nc,d")))   # [["a", "b"], ["c", "d"]]
+\`\`\`
+
+Every CSV value comes back as a **string**.
+
+### Recap
+
+\`with\` safely manages resources, \`json.loads\`/\`dumps\` convert between JSON text and Python
+objects, and \`csv.reader\` parses comma-separated rows. Next you'll pull a field out of JSON, then
+parse CSV into rows.`,
+    demoCode: `import json
+
+data = json.loads('{"name": "Ada", "age": 30}')
+print(data["name"])   # Ada
+print(data["age"])    # 30`,
+  },
+  apply: {
+    id: "py-l2-files-json-csv-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`get_field(raw, field)\` — parse the JSON string \`raw\` and return the value stored at
+\`field\`.
+
+For \`raw = '{"name": "Ada", "age": 30}'\` and \`field = "name"\`, return \`"Ada"\`.`,
+    starterCode: `import json
+
+
+def get_field(raw, field):
+    # Parse the JSON string and return raw[field].
+    pass`,
+    hints: [
+      "Turn the text into a dict with `json.loads(raw)`.",
+      "Then index it: `data[field]`.",
+      "`return json.loads(raw)[field]`.",
+    ],
+    referenceSolution: `import json
+
+
+def get_field(raw, field):
+    return json.loads(raw)[field]`,
+    testCases: [
+      {
+        input: { raw: '{"name": "Ada", "age": 30}', field: "name" },
+        expected: "Ada",
+        description: "a string field",
+      },
+      {
+        input: { raw: '{"name": "Ada", "age": 30}', field: "age" },
+        expected: 30,
+        description: "a numeric field",
+      },
+      {
+        input: { raw: '{"city": "Paris"}', field: "city" },
+        expected: "Paris",
+        description: "a single field",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l2-files-json-csv-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`parse_csv(text)\` — parse the CSV string \`text\` into a list of rows, where each row
+is a list of its string values.
+
+For \`"a,b\\nc,d"\` return \`[["a", "b"], ["c", "d"]]\`. Use \`csv.reader\` over an \`io.StringIO\`.`,
+    starterCode: `import csv
+import io
+
+
+def parse_csv(text):
+    # Return a list of rows (each a list of strings) parsed from the CSV text.
+    pass`,
+    hints: [
+      "Wrap the string so it reads like a file: `io.StringIO(text)`.",
+      "Build a reader: `csv.reader(io.StringIO(text))`.",
+      "Materialise the rows: `return [row for row in csv.reader(io.StringIO(text))]`.",
+    ],
+    referenceSolution: `import csv
+import io
+
+
+def parse_csv(text):
+    return [row for row in csv.reader(io.StringIO(text))]`,
+    testCases: [
+      {
+        input: { text: "a,b\nc,d" },
+        expected: [
+          ["a", "b"],
+          ["c", "d"],
+        ],
+        description: "two rows of two",
+      },
+      {
+        input: { text: "name,age\nAda,30" },
+        expected: [
+          ["name", "age"],
+          ["Ada", "30"],
+        ],
+        description: "header plus a row (values stay strings)",
+      },
+      { input: { text: "1,2,3" }, expected: [["1", "2", "3"]], description: "a single row" },
+    ],
+  },
+}
+
+const modulesLesson: PythonLesson = {
+  id: "py-l2-modules",
+  title: "Modules, imports & the standard library",
+  summary: "Organise code into modules and reach for Python's batteries-included stdlib.",
+  estimatedMinutes: 11,
+  difficulty: "medium",
+  skills: ["modules", "imports", "standard-library", "collections"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Code lives in modules
+
+A **module** is just a \`.py\` file. You pull names in from one with \`import\`:
+
+\`\`\`python
+import math                 # use as math.sqrt(...)
+from math import sqrt       # use as sqrt(...)
+from collections import Counter
+\`\`\`
+
+Splitting code into modules keeps each file focused; \`import\` wires them together.
+
+### Batteries included
+
+Python's **standard library** ships hundreds of ready-made modules — reach for them before writing
+your own:
+
+\`\`\`python
+import math
+math.gcd(12, 8)             # 4   greatest common divisor
+
+from collections import Counter
+Counter("aabbbc")           # Counter({'b': 3, 'a': 2, 'c': 1})
+Counter("aabbbc").most_common(1)   # [('b', 3)]
+\`\`\`
+
+\`Counter\` tallies how often each item appears; \`.most_common(k)\` returns the top \`k\` as
+\`(item, count)\` pairs.
+
+### Recap
+
+\`import module\` / \`from module import name\` brings code in, and the standard library (\`math\`,
+\`collections\`, \`datetime\`, …) saves you from reinventing common tools. Next you'll find the most
+common character with \`Counter\`, then a GCD with \`math\`.`,
+    demoCode: `from collections import Counter
+
+tally = Counter("aabbbc")
+print(tally)                  # Counter({'b': 3, 'a': 2, 'c': 1})
+print(tally.most_common(1))   # [('b', 3)]`,
+  },
+  apply: {
+    id: "py-l2-modules-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`most_common_char(text)\` — return the character that appears most often in \`text\`.
+
+Use \`collections.Counter\`. For \`"aabbbc"\` return \`"b"\`.`,
+    starterCode: `from collections import Counter
+
+
+def most_common_char(text):
+    # Return the single most common character in text.
+    pass`,
+    hints: [
+      "`Counter(text)` tallies each character.",
+      "`.most_common(1)` returns `[(char, count)]` — a list with one pair.",
+      "Reach into it: `Counter(text).most_common(1)[0][0]`.",
+    ],
+    referenceSolution: `from collections import Counter
+
+
+def most_common_char(text):
+    return Counter(text).most_common(1)[0][0]`,
+    testCases: [
+      { input: { text: "aabbbc" }, expected: "b", description: "b appears three times" },
+      { input: { text: "hello" }, expected: "l", description: "l appears twice" },
+      { input: { text: "aaa" }, expected: "a", description: "all the same" },
+    ],
+  },
+  practice: {
+    id: "py-l2-modules-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`gcd_of(a, b)\` — return the greatest common divisor of \`a\` and \`b\`.
+
+Use \`math.gcd\` from the standard library. \`gcd_of(12, 8)\` is \`4\`.`,
+    starterCode: `import math
+
+
+def gcd_of(a, b):
+    # Return the greatest common divisor using math.gcd.
+    pass`,
+    hints: ["The standard library already has this: `math.gcd(a, b)`.", "`return math.gcd(a, b)`."],
+    referenceSolution: `import math
+
+
+def gcd_of(a, b):
+    return math.gcd(a, b)`,
+    testCases: [
+      { input: { a: 12, b: 8 }, expected: 4, description: "gcd(12, 8)" },
+      { input: { a: 17, b: 5 }, expected: 1, description: "coprime numbers" },
+      { input: { a: 100, b: 25 }, expected: 25, description: "one divides the other" },
+      { input: { a: 0, b: 5 }, expected: 5, description: "gcd with zero" },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -1248,6 +1627,12 @@ export const level2: PythonLevel = {
       title: "Data Modeling",
       description: "Model data cleanly with dataclasses, enums, and type hints.",
       lessons: [dataclassesEnumsLesson],
+    },
+    {
+      id: "py-l2-errors-files-modules",
+      title: "Errors, Files & Modules",
+      description: "Handle errors, parse JSON/CSV, and use the standard library.",
+      lessons: [exceptionsLesson, filesJsonCsvLesson, modulesLesson],
     },
   ],
 }

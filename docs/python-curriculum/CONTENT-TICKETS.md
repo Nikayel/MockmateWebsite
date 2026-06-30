@@ -65,9 +65,9 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L2-09 · `py-l2-dataclasses-enums`** (SF, medium) — *dataclasses, enums & typing basics.* Objective: `@dataclass`, `Enum`, `list[int]`/`Optional` annotations.
 
 ### Module L2-M5 — Errors, Files & Modules
-- **PY-L2-10 · `py-l2-exceptions`** (SF, medium) — *try/except/finally, raising, custom exceptions.* Objective: handle and define exceptions cleanly.
-- **PY-L2-11 · `py-l2-files-json-csv`** (SF, medium) — *file I/O, context managers, JSON & CSV.* Objective: read/write files with `with`; parse JSON/CSV.
-- **PY-L2-12 · `py-l2-modules`** (SF, medium) — *modules, imports & the standard library.* Objective: organize/import code; use stdlib (`math`, `collections`, `datetime`).
+- [x] **PY-L2-10 · `py-l2-exceptions`** (SF, medium) — *try/except/finally, raising, custom exceptions.* Objective: handle and define exceptions cleanly.
+- [x] **PY-L2-11 · `py-l2-files-json-csv`** (SF, medium) — *file I/O, context managers, JSON & CSV.* Objective: read/write files with `with`; parse JSON/CSV.
+- [x] **PY-L2-12 · `py-l2-modules`** (SF, medium) — *modules, imports & the standard library.* Objective: organize/import code; use stdlib (`math`, `collections`, `datetime`).
 
 ---
 
