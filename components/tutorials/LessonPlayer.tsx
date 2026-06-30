@@ -185,7 +185,14 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             <span className="text-muted-foreground text-xs whitespace-nowrap">
               Lesson {lessonNumber} / {totalInLevel}
             </span>
-            <span className="bg-muted h-1.5 w-24 overflow-hidden rounded-full">
+            <span
+              className="bg-muted h-1.5 w-24 overflow-hidden rounded-full"
+              role="progressbar"
+              aria-label="Lesson progress"
+              aria-valuenow={progress.percentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
               <span
                 className="bg-accent block h-full rounded-full transition-[width] duration-500"
                 style={{ width: `${progress.percentage}%` }}

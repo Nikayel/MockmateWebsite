@@ -40,7 +40,14 @@ export function LevelModules({ level }: { level: PythonLevel }) {
     <div className="flex flex-col gap-6">
       {total > 0 && done > 0 && (
         <div className="flex items-center gap-3">
-          <span className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+          <span
+            className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full"
+            role="progressbar"
+            aria-label="Level progress"
+            aria-valuenow={Math.round((done / total) * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <span
               className="bg-accent block h-full rounded-full transition-[width] duration-500"
               style={{ width: `${Math.round((done / total) * 100)}%` }}

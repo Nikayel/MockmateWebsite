@@ -33,7 +33,8 @@ export function LevelPreviewPanel({
   level: PythonLevel
   onStart: (level: PythonLevel) => void
 }) {
-  const preview = LEVEL_PREVIEWS[level.id]
+  // Every authored level (1–4) has a preview; guard defensively so a future level id can't crash.
+  const preview = LEVEL_PREVIEWS[level.id] ?? LEVEL_PREVIEWS[1]
   const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
   const activePhases = LEVEL_PHASE_COUNT[level.id]
   const topics = levelTopics(level)
