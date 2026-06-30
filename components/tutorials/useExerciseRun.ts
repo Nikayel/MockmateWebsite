@@ -26,6 +26,21 @@ type RawResultRow = {
 
 /** Map a client-runner row (single-file or workspace shape) to a `TestResultsPanel` row. */
 function toTestResult(row: RawResultRow): TestResult {
+  // Hidden workspace tests still execute, but their source, suite/name, and assertion text must
+  // never reach the UI (HANDOFF §C). Surface only pass/fail behind a generic label.
+  if (row.isHidden) {
+    return {
+      description: "Hidden test",
+      passed: row.passed,
+      input: null,
+      expected: "pass",
+      actual: row.passed ? "pass" : "fail",
+      error: row.passed
+        ? null
+        : "A hidden test failed — your code didn't satisfy a requirement that isn't shown here.",
+    }
+  }
+
   const description =
     row.description ?? (row.suite && row.name ? `${row.suite}: ${row.name}` : (row.name ?? "Test"))
   return {
