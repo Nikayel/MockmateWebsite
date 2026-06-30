@@ -48,7 +48,7 @@ export function WorkspaceExerciseRunner({
   })
   const [activePath, setActivePath] = useState<string>(workspace.primaryFilePath)
 
-  const { running, results, runError, passed, run } = useExerciseRun(exercise, {
+  const { running, warming, results, runError, passed, run } = useExerciseRun(exercise, {
     onPass,
     onResult: onRunResult,
   })
@@ -122,8 +122,13 @@ export function WorkspaceExerciseRunner({
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={handleRun} disabled={running} className="gap-2">
           <Play className="h-4 w-4" />
-          {running ? "Running…" : "Run tests"}
+          {warming ? "Starting Python…" : running ? "Running…" : "Run tests"}
         </Button>
+        {warming && (
+          <span className="text-muted-foreground text-xs">
+            First run downloads the Python runtime — this only happens once.
+          </span>
+        )}
         {passed && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />

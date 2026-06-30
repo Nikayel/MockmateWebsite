@@ -43,7 +43,7 @@ export function ExerciseRunner({
   canRevealReference = false,
   revealReferenceAfter = 2,
 }: ExerciseRunnerProps) {
-  const { running, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
+  const { running, warming, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
     onPass,
     onResult: onRunResult,
   })
@@ -79,8 +79,13 @@ export function ExerciseRunner({
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={handleRun} disabled={running} className="gap-2">
           <Play className="h-4 w-4" />
-          {running ? "Running…" : "Run & check"}
+          {warming ? "Starting Python…" : running ? "Running…" : "Run & check"}
         </Button>
+        {warming && (
+          <span className="text-muted-foreground text-xs">
+            First run downloads the Python runtime — this only happens once.
+          </span>
+        )}
         {hints.length > 0 && (
           <Button
             variant="outline"

@@ -45,8 +45,17 @@ export interface RunInput {
   workspaceFiles?: Array<{ path: string; content: string }>
 }
 
+/**
+ * Pyodide boots once per session (it downloads + starts the WASM runtime on the first Run, which is
+ * multi-second). Module-level so every runner shares the same "has it warmed yet" signal — the first
+ * run anywhere shows a distinct "Starting Python…" state; later runs are fast. See HANDOFF §C.
+ */
+let pyodideWarmed = false
+
 export interface ExerciseRunState {
   running: boolean
+  /** True only while the first run of the session is booting the Python runtime. */
+  warming: boolean
   results: TestResult[]
   runError: string | null
   attempts: number
@@ -67,6 +76,7 @@ export function useExerciseRun(
 ): ExerciseRunState {
   const { onPass, onResult } = callbacks
   const [running, setRunning] = useState(false)
+  const [warming, setWarming] = useState(false)
   const [results, setResults] = useState<TestResult[]>([])
   const [runError, setRunError] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
@@ -74,6 +84,7 @@ export function useExerciseRun(
 
   const run = async (input: RunInput) => {
     setRunning(true)
+    setWarming(!pyodideWarmed)
     setRunError(null)
     try {
       const scenario = getTutorialExerciseScenario(exercise.id)
@@ -117,9 +128,11 @@ export function useExerciseRun(
         error instanceof Error ? error.message : "Something went wrong running your code."
       )
     } finally {
+      pyodideWarmed = true
+      setWarming(false)
       setRunning(false)
     }
   }
 
-  return { running, results, runError, attempts, passed, run }
+  return { running, warming, results, runError, attempts, passed, run }
 }
