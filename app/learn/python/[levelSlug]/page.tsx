@@ -2,7 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { getLevelBySlug } from "@/lib/tutorials/registry"
-import { ModuleList } from "@/components/tutorials/ModuleList"
+import { LevelModules } from "@/components/tutorials/LevelModules"
 import type { PythonLevel } from "@/lib/tutorials/types"
 
 type Props = { params: Promise<{ levelSlug: string }> }
@@ -25,11 +25,16 @@ export default async function LevelModulesPage({ params }: Props) {
       </Link>
 
       <header className="mt-4 mb-8">
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">{level.title}</h1>
+        <p className="text-accent text-xs font-semibold tracking-[0.18em] uppercase">
+          Level {level.id}
+        </p>
+        <h1 className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+          {level.title}
+        </h1>
         <p className="text-muted-foreground mt-1">{level.tagline}</p>
       </header>
 
-      <ModuleList level={level} />
+      <LevelModules level={level} />
     </div>
   )
 }
