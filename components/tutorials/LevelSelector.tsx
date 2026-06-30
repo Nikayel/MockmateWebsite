@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { LevelCard } from "./LevelCard"
 import { LevelPreviewPanel } from "./LevelPreviewPanel"
+import { Reveal } from "./Reveal"
 import { fetchAllProgress } from "@/lib/tutorials/progress-client"
 import { recallLevel, rememberLevel } from "@/lib/tutorials/level-preference"
 import type { PythonLevel } from "@/lib/tutorials/types"
@@ -100,7 +101,7 @@ export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
                 )}
               </div>
 
-              <div className="flex-1 pb-5">
+              <Reveal delayMs={i * 70} className="flex-1 pb-5">
                 <LevelCard
                   level={level}
                   isSelected={isSelected}
@@ -108,7 +109,7 @@ export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
                   completedCount={completedCount}
                   onSelect={(l) => setSelectedId(l.id)}
                 />
-              </div>
+              </Reveal>
             </li>
           )
         })}
