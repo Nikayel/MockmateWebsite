@@ -1,8 +1,24 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Sparkles } from "lucide-react"
 import type { LessonSection, PythonLesson, PythonLevel } from "@/lib/tutorials/types"
+
+/** Tappable FAQ — deterministic answers (no LLM), so Sable can field common questions honestly. */
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: "How do hints work?",
+    a: "Open them one at a time with the Hint button. In Apply, after two failed runs you can also reveal the reference; in Practice the reference stays hidden — that's the challenge.",
+  },
+  {
+    q: "What is Practice?",
+    a: "A harder, real-world variant of what you just learned in Apply — same idea, a shape closer to production code. Passing it completes the lesson.",
+  },
+  {
+    q: "Why 3 days?",
+    a: "Spaced repetition: a concept resurfaces a few days later, right as you'd start to forget it. Re-deriving it then is what moves it into long-term memory.",
+  },
+]
 
 /**
  * Sable — the lesson workspace's AI tutor (HANDOFF §C). Greets with the level + lesson context and
@@ -66,6 +82,9 @@ export function SableTutor({
   events: SableEvent[]
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  // User-asked FAQ exchanges, appended after the reactive thread (the player owns `events`).
+  const [asked, setAsked] = useState<{ id: number; q: string; a: string }[]>([])
+  const askedId = useRef(0)
 
   const greeting = useMemo(
     () =>
@@ -74,11 +93,16 @@ export function SableTutor({
     [level.id, level.title, lesson.title]
   )
 
-  // Keep the latest reaction in view as the thread grows.
+  // Keep the latest message in view as the thread grows.
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [events.length])
+  }, [events.length, asked.length])
+
+  const ask = (item: { q: string; a: string }) =>
+    setAsked((prev) => [...prev, { id: askedId.current++, ...item }])
+
+  const unaskedFaq = FAQ.filter((f) => !asked.some((a) => a.q === f.q))
 
   return (
     <aside
@@ -100,7 +124,30 @@ export function SableTutor({
         {events.map((event) => (
           <SableBubble key={event.id}>{sableLine(event)}</SableBubble>
         ))}
+        {asked.map((item) => (
+          <div key={item.id} className="space-y-3">
+            <div className="bg-accent/10 text-foreground ml-auto w-fit max-w-[85%] rounded-xl rounded-tr-sm px-3 py-2 text-sm">
+              {item.q}
+            </div>
+            <SableBubble>{item.a}</SableBubble>
+          </div>
+        ))}
       </div>
+
+      {unaskedFaq.length > 0 && (
+        <div className="border-border flex flex-wrap gap-1.5 border-t px-3 py-2.5">
+          {unaskedFaq.map((item) => (
+            <button
+              key={item.q}
+              type="button"
+              onClick={() => ask(item)}
+              className="border-border text-muted-foreground hover:border-accent/40 hover:text-accent focus-visible:ring-accent/50 rounded-full border px-2.5 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {item.q}
+            </button>
+          ))}
+        </div>
+      )}
 
       <p className="border-border text-muted-foreground/70 border-t px-4 py-2.5 text-[11px]">
         Sable nudges — it won't hand you the answer.
