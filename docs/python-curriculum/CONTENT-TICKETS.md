@@ -26,8 +26,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L1-02 · `py-l1-variables`** (SF, easy) — *variables & assignment.* Objective: bind names to values, reassign, choose readable names.
 
 ### Module L1-M2 — Data Types
-- **PY-L1-03 · `py-l1-numbers`** (SF, easy) — *ints, floats & arithmetic.* Objective: arithmetic, integer vs float division, modulo.
-- **PY-L1-04 · `py-l1-bool-none-convert`** (SF, easy) — *booleans, None & type conversion.* Objective: `True/False/None`, `int()/float()/str()`, truthiness intro.
+- [x] **PY-L1-03 · `py-l1-numbers`** (SF, easy) — *ints, floats & arithmetic.* Objective: arithmetic, integer vs float division, modulo.
+- [x] **PY-L1-04 · `py-l1-bool-none-convert`** (SF, easy) — *booleans, None & type conversion.* Objective: `True/False/None`, `int()/float()/str()`, truthiness intro.
 
 ### Module L1-M3 — Strings & Formatting
 - **PY-L1-05 · `py-l1-strings-index`** (SF, easy) — *string indexing & slicing.* Objective: index, slice, `len()`, immutability.

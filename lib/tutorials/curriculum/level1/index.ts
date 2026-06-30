@@ -368,6 +368,221 @@ The formula is \`c * 9 / 5 + 32\`. Return the result.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L1-M2 — Data Types
+// ───────────────────────────────────────────────────────────────────────────
+
+const numbersLesson: PythonLesson = {
+  id: "py-l1-numbers",
+  title: "Ints, floats & arithmetic",
+  summary: "Do math with integers and floats, including floor division and modulo.",
+  estimatedMinutes: 9,
+  difficulty: "easy",
+  skills: ["numbers", "arithmetic", "floor-division", "modulo"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Numbers and arithmetic
+
+Python has two everyday number types: **integers** (whole numbers like \`3\`, \`-7\`) and **floats**
+(decimals like \`3.14\`, \`2.0\`). You combine them with the usual operators:
+
+\`\`\`python
+7 + 2     # 9    addition
+7 - 2     # 5    subtraction
+7 * 2     # 14   multiplication
+7 / 2     # 3.5  division — ALWAYS gives a float
+\`\`\`
+
+### Floor division and modulo
+
+Two operators are easy to miss but show up constantly:
+
+\`\`\`python
+17 // 5   # 3   floor division: how many whole 5s fit
+17 % 5    # 2   modulo: the remainder left over
+\`\`\`
+
+Together they split a number into a whole part and a remainder — perfect for "125 minutes is 2
+hours and 5 minutes":
+
+\`\`\`python
+total = 125
+hours = total // 60    # 2
+mins = total % 60      # 5
+\`\`\`
+
+### Powers
+
+\`**\` raises to a power: \`2 ** 10\` is \`1024\`.
+
+### Keep it readable
+
+Reach for \`//\` and \`%\` when you mean "whole groups" and "what's left". Use plain \`/\` when you
+want an exact decimal answer.
+
+### Recap
+
+\`+ - * /\` do the obvious thing (\`/\` returns a float), \`//\` floor-divides, \`%\` gives the
+remainder, and \`**\` is power. Next you'll split minutes into hours and minutes, then average three
+numbers.`,
+    demoCode: `total = 125
+print(total // 60)   # 2  (whole hours)
+print(total % 60)    # 5  (leftover minutes)
+print(7 / 2)         # 3.5
+print(2 ** 10)       # 1024`,
+  },
+  apply: {
+    id: "py-l1-numbers-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`minutes_to_hm(total_minutes)\` — split a number of minutes into hours and minutes.
+
+Return a list \`[hours, minutes]\` where \`hours\` is the whole hours and \`minutes\` is what's left
+over. For \`125\` minutes, return \`[2, 5]\`.`,
+    starterCode: `def minutes_to_hm(total_minutes):
+    # Return [whole hours, leftover minutes].
+    pass`,
+    hints: [
+      "Whole hours come from floor division: `total_minutes // 60`.",
+      "Leftover minutes come from modulo: `total_minutes % 60`.",
+      "Return both in a list: `return [total_minutes // 60, total_minutes % 60]`.",
+    ],
+    referenceSolution: `def minutes_to_hm(total_minutes):
+    return [total_minutes // 60, total_minutes % 60]`,
+    testCases: [
+      { input: { total_minutes: 125 }, expected: [2, 5], description: "2h 5m" },
+      { input: { total_minutes: 60 }, expected: [1, 0], description: "exactly one hour" },
+      { input: { total_minutes: 45 }, expected: [0, 45], description: "under an hour" },
+      { input: { total_minutes: 200 }, expected: [3, 20], description: "3h 20m" },
+    ],
+  },
+  practice: {
+    id: "py-l1-numbers-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`average(a, b, c)\` — return the mean of three numbers.
+
+Add them up and divide by 3. The result may be a decimal (a float), which is fine.`,
+    starterCode: `def average(a, b, c):
+    # Return the mean of the three numbers.
+    pass`,
+    hints: [
+      "Sum first, then divide: `(a + b + c) / 3`.",
+      "Use `/` (not `//`) so you keep the decimal part.",
+    ],
+    referenceSolution: `def average(a, b, c):
+    return (a + b + c) / 3`,
+    testCases: [
+      { input: { a: 1, b: 2, c: 3 }, expected: 2, description: "1, 2, 3 -> 2.0" },
+      { input: { a: 10, b: 20, c: 30 }, expected: 20, description: "tens" },
+      { input: { a: 1, b: 1, c: 1 }, expected: 1, description: "all the same" },
+      { input: { a: 2, b: 3, c: 10 }, expected: 5, description: "2, 3, 10 -> 5.0" },
+    ],
+  },
+}
+
+const boolNoneConvertLesson: PythonLesson = {
+  id: "py-l1-bool-none-convert",
+  title: "Booleans, None & type conversion",
+  summary: "Use True/False and None, convert between types, and reason about truthiness.",
+  estimatedMinutes: 9,
+  difficulty: "easy",
+  skills: ["booleans", "none", "type-conversion", "truthiness"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## True, False, None, and changing types
+
+A **boolean** is one of two values: \`True\` or \`False\`. Comparisons produce booleans:
+
+\`\`\`python
+3 > 2     # True
+3 == 4    # False   (== tests equality; = assigns)
+\`\`\`
+
+\`None\` is Python's "nothing here" value — a deliberate placeholder for "no result yet".
+
+### Converting between types
+
+Input often arrives as text. Convert it with \`int()\`, \`float()\`, or \`str()\`:
+
+\`\`\`python
+int("42")     # 42      text -> integer
+float("3.5")  # 3.5     text -> float
+str(42)       # "42"    number -> text
+\`\`\`
+
+### Truthiness
+
+Every value is either "truthy" or "falsy" when used in a condition. The falsy ones are worth
+memorising: \`0\`, \`""\` (empty string), \`[]\` (empty list), \`None\`, and \`False\`. Everything
+else is truthy.
+
+\`\`\`python
+"yes" if "hello" else "no"   # "yes"  — non-empty string is truthy
+"yes" if "" else "no"        # "no"   — empty string is falsy
+\`\`\`
+
+That \`A if condition else B\` form is a **conditional expression**: it evaluates to \`A\` when the
+condition is truthy, otherwise \`B\`.
+
+### Recap
+
+\`True\`/\`False\` come from comparisons, \`None\` means "nothing", \`int()/float()/str()\` convert
+types, and empty/zero/None values are falsy. Next you'll guard a conversion and branch on
+truthiness.`,
+    demoCode: `print(int("42") + 8)   # 50
+print(str(42) + "!")   # 42!
+print(3 > 2)           # True
+print("yes" if "" else "no")   # no  (empty string is falsy)`,
+  },
+  apply: {
+    id: "py-l1-bool-none-convert-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`parse_or_zero(text)\` — turn a string of digits into an integer, but return \`0\`
+when the string is empty.
+
+For \`"42"\` return \`42\`; for \`""\` return \`0\`.`,
+    starterCode: `def parse_or_zero(text):
+    # Return int(text), or 0 when text is empty.
+    pass`,
+    hints: [
+      'An empty string is falsy, so `if text:` is False for `""`.',
+      "Convert with `int(text)` only when there's something to convert.",
+      "Conditional expression: `return int(text) if text else 0`.",
+    ],
+    referenceSolution: `def parse_or_zero(text):
+    return int(text) if text else 0`,
+    testCases: [
+      { input: { text: "42" }, expected: 42, description: "a normal number" },
+      { input: { text: "5" }, expected: 5, description: "a single digit" },
+      { input: { text: "" }, expected: 0, description: "empty string falls back to 0" },
+      { input: { text: "100" }, expected: 100, description: "a bigger number" },
+    ],
+  },
+  practice: {
+    id: "py-l1-bool-none-convert-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`yes_no(value)\` — return the string \`"yes"\` when \`value\` is truthy, otherwise
+\`"no"\`.
+
+Remember the falsy values: \`0\`, \`""\`, \`None\`, and \`False\`.`,
+    starterCode: `def yes_no(value):
+    # Return "yes" when value is truthy, else "no".
+    pass`,
+    hints: [
+      "You don't need to compare anything — `value` itself is truthy or falsy.",
+      'Conditional expression: `return "yes" if value else "no"`.',
+    ],
+    referenceSolution: `def yes_no(value):
+    return "yes" if value else "no"`,
+    testCases: [
+      { input: { value: 1 }, expected: "yes", description: "non-zero number is truthy" },
+      { input: { value: 0 }, expected: "no", description: "zero is falsy" },
+      { input: { value: "hi" }, expected: "yes", description: "non-empty string is truthy" },
+      { input: { value: "" }, expected: "no", description: "empty string is falsy" },
+      { input: { value: null }, expected: "no", description: "None is falsy" },
+    ],
+  },
+}
+
 export const level1: PythonLevel = {
   id: 1,
   slug: "fundamentals",
@@ -386,7 +601,7 @@ export const level1: PythonLevel = {
       id: "py-l1-data-types",
       title: "Data Types",
       description: "Numbers, booleans, None, and converting between types.",
-      lessons: [],
+      lessons: [numbersLesson, boolNoneConvertLesson],
     },
     {
       id: "py-l1-strings",
