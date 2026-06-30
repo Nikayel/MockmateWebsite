@@ -1,3 +1,10 @@
+/**
+ * @deprecated `POST /api/execute` (server-side **Piston**) is DEPRECATED. Code execution now runs
+ * client-side via `executeScenarioInBrowser` (`lib/workspace-execution`). The interview flow no
+ * longer calls this route; Labs `BuildStation` is the last remaining live caller and is slated to
+ * migrate to the client-side runner, after which this route can be removed. Kept for reference — do
+ * NOT wire new features here.
+ */
 import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
 import { executeRateLimit } from "@/lib/rate-limit"

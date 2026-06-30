@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
-import { getCurrentUserToken } from "@/lib/firebase-lazy"
+// Used only by the deprecated `/api/execute` fallback below (kept commented for reference):
+// import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { isExecutionServiceError } from "@/lib/piston"
 import { executeScenarioInBrowser } from "@/lib/workspace-execution"
 import type { Scenario } from "@/lib/scenarios"
@@ -27,9 +28,10 @@ export interface ExecuteScenarioParams {
 }
 
 /**
- * Run the current scenario: the in-browser sandbox first, falling back to
- * `POST /api/execute`. The request body is byte-identical to the prior inline
- * `executeCurrentScenario`: `{ code, scenarioId, language, workspaceFiles }`.
+ * Run the current scenario entirely in the in-browser sandbox (`executeScenarioInBrowser`:
+ * Pyodide for Python, a JS/TS sandbox). The server-side `POST /api/execute` (Piston) fallback is
+ * DEPRECATED and no longer wired (see `lib/piston.ts`); the client runners cover every supported
+ * language, so an unsupported language now returns a 400 instead of hitting the server.
  */
 export async function executeScenario({
   selectedScenario,
@@ -60,23 +62,36 @@ export async function executeScenario({
     return { ok: !browserResult.error, status: 200, data: browserResult }
   }
 
-  const token = await getCurrentUserToken()
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
-  if (token) headers.Authorization = `Bearer ${token}`
-  const response = await fetch("/api/execute", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      code,
-      scenarioId: selectedScenario.id,
-      language: isWorkspaceScenario(selectedScenario)
-        ? selectedScenario.workspace.language
-        : selectedLanguage,
-      workspaceFiles,
-    }),
-  })
+  // The client-side runners cover every supported language (JavaScript, TypeScript, Python). A
+  // null result means an unsupported language, so there is nothing useful to fall back to.
+  //
+  // DEPRECATED: the server-side `POST /api/execute` (Piston) fallback is retained for reference
+  // only and is no longer wired — see the Piston deprecation note in `lib/piston.ts`.
+  //
+  // const token = await getCurrentUserToken()
+  // const headers: Record<string, string> = { "Content-Type": "application/json" }
+  // if (token) headers.Authorization = `Bearer ${token}`
+  // const response = await fetch("/api/execute", {
+  //   method: "POST",
+  //   headers,
+  //   body: JSON.stringify({
+  //     code,
+  //     scenarioId: selectedScenario.id,
+  //     language: isWorkspaceScenario(selectedScenario)
+  //       ? selectedScenario.workspace.language
+  //       : selectedLanguage,
+  //     workspaceFiles,
+  //   }),
+  // })
+  // return { ok: response.ok, status: response.status, data: await response.json() }
 
-  return { ok: response.ok, status: response.status, data: await response.json() }
+  return {
+    ok: false,
+    status: 400,
+    data: {
+      error: "Unsupported execution language. Supported languages: JavaScript, TypeScript, Python.",
+    },
+  }
 }
 
 export interface ApiErrorContext {

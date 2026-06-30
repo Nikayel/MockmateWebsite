@@ -1,4 +1,13 @@
 /**
+ * @deprecated Server-side **Piston** execution is DEPRECATED in favor of the client-side runners
+ * in `lib/workspace-execution` (`executeScenarioInBrowser` → Pyodide for Python, a JS/TS browser
+ * sandbox). The interview flow already runs client-side-first; this module is retained ONLY because
+ * Labs `BuildStation` (`components/labs/stations/BuildStation.tsx`) and the AST validators
+ * (`lib/validators/ast-validator.ts`, `ast-parser.ts`) still call it. Do NOT add new callers — wire
+ * `executeScenarioInBrowser` instead. Slated for removal once those consumers migrate; kept for
+ * reference. (Pure utilities re-used by live code — `isExecutionServiceError`,
+ * `PYTHON_WRAPPER_LINE_OFFSET`, the `ConsoleLog` type — are NOT deprecated.)
+ *
  * Piston API Integration for Secure Code Execution
  *
  * Piston runs code in isolated Docker containers - no access to:

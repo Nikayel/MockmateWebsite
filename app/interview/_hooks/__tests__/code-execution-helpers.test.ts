@@ -58,31 +58,24 @@ describe("executeScenario", () => {
     expect(result.status).toBe(200)
   })
 
-  it("posts the byte-identical /api/execute body when the sandbox declines", async () => {
+  it("returns a 400 without touching /api/execute when the sandbox declines", async () => {
+    // The Piston `/api/execute` fallback is deprecated and unwired: a null sandbox result
+    // (unsupported language) now resolves to a 400 instead of a server round-trip.
     vi.mocked(executeScenarioInBrowser).mockResolvedValue(null as any)
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ results: [], summary: { total: 0, passed: 0, failed: 0, passRate: 0 } }),
-    })
+    const fetchSpy = vi.fn()
     vi.stubGlobal("fetch", fetchSpy)
 
-    await executeScenario({
+    const result = await executeScenario({
       selectedScenario: dsaScenario,
       code: "function f(){}",
       selectedLanguage: "python",
       workspaceContext: [],
     })
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/execute",
-      expect.objectContaining({ method: "POST" })
-    )
-    const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
-    // Contract: exactly code + scenarioId + language (workspaceFiles is undefined for
-    // non-workspace scenarios and is dropped by JSON.stringify). No testCases/sessionId/userId.
-    expect(Object.keys(body).sort()).toEqual(["code", "language", "scenarioId"])
-    expect(body).toEqual({ code: "function f(){}", scenarioId: "two-sum", language: "python" })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result.ok).toBe(false)
+    expect(result.status).toBe(400)
+    expect(String(result.data.error)).toMatch(/Unsupported execution language/)
   })
 })
 

@@ -4,6 +4,12 @@ import { parseWorkspaceExecutionOutput } from "./result-parser"
 import type { WorkspaceExecutionResult, WorkspaceFileEdit, WorkspaceScenario } from "./types"
 import { validateWorkspaceScenario } from "./validators"
 
+/**
+ * @deprecated Server-side **Piston** workspace execution is DEPRECATED. Workspace scenarios now run
+ * client-side via `executeWorkspaceScenarioPythonClientSide` / `...JsClientSide` (reached through
+ * `executeScenarioInBrowser`). This server path is only reachable via the deprecated `POST
+ * /api/execute` route. Kept for reference — wire the client-side runner instead.
+ */
 export async function executeWorkspaceScenario(options: {
   scenario: WorkspaceScenario
   edits: WorkspaceFileEdit[]
