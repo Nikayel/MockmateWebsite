@@ -1253,11 +1253,14 @@ from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidd
 const CONC_README = `# Parallelize a batch with concurrent.futures
 
 \`jobs/worker.py\` (read-only) has \`double(n)\`. Implement \`run_all(numbers)\` in \`jobs/runner.py\`
-so it runs \`double\` over every number using a \`concurrent.futures.ThreadPoolExecutor\` and returns
+so it maps \`double\` over every number with a \`concurrent.futures.ThreadPoolExecutor\`, returning
 the results **in input order**.
 
-\`executor.map(fn, items)\` keeps order for you. \`run_all([1, 2, 3])\` is \`[2, 4, 6]\`. Some tests
-are hidden.
+Some runtimes have no OS threads (this in-browser sandbox is one), where starting a pool raises
+\`RuntimeError\`. Catch it and **fall back to a sequential map** — the ordered results are identical
+either way.
+
+\`run_all([1, 2, 3])\` is \`[2, 4, 6]\`. Some tests are hidden.
 `
 
 const CONC_WORKER = String.raw`def double(n):
@@ -1272,7 +1275,8 @@ from jobs.worker import double
 
 def run_all(numbers):
     """Run double over every number with a thread pool; return results in order (see README.md)."""
-    # TODO: with ThreadPoolExecutor() as executor: return list(executor.map(double, numbers))
+    # TODO: map the double worker over numbers with a ThreadPoolExecutor, but fall back
+    # to a sequential map if the runtime has no threads (catch RuntimeError).
     return []
 `
 
@@ -1282,8 +1286,12 @@ from jobs.worker import double
 
 
 def run_all(numbers):
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        return list(executor.map(double, numbers))
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            return list(executor.map(double, numbers))
+    except RuntimeError:
+        # No OS threads here (e.g. the browser sandbox) — same ordered results, run sequentially.
+        return [double(n) for n in numbers]
 `
 
 const CONC_TEST = String.raw`from jobs.runner import run_all
@@ -1355,11 +1363,26 @@ they finish.
 Independent tasks (no shared mutable state) are safe to parallelize. If threads share state, guard it
 with a \`Lock\` — but prefer designing the work so they don't.
 
+### When threads aren't available
+
+Some runtimes have no OS threads at all — notably this in-browser sandbox (Pyodide/WASM without
+cross-origin isolation). There, building a pool raises \`RuntimeError: can't start new thread\`. A
+resilient \`run_all\` **tries the pool and falls back to a sequential map**, so it works everywhere
+and the ordered results are identical:
+
+\`\`\`python
+try:
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        return list(executor.map(double, numbers))
+except RuntimeError:
+    return [double(n) for n in numbers]
+\`\`\`
+
 ### Recap
 
 The GIL means threads help I/O-bound but not CPU-bound work; \`concurrent.futures\` maps work over a
-pool with order preserved. You'll run a batch through a \`ThreadPoolExecutor\` — first as a plain
-sequential map, then in parallel across a \`jobs\` package.`,
+pool with order preserved; and capability-detecting a missing feature (here, threads) keeps code
+portable. You'll run a batch through a \`ThreadPoolExecutor\` with a sequential fallback.`,
     demoCode: `from concurrent.futures import ThreadPoolExecutor
 
 
@@ -1367,8 +1390,11 @@ def double(n):
     return n * 2
 
 
-with ThreadPoolExecutor(max_workers=4) as executor:
-    print(list(executor.map(double, [1, 2, 3])))   # [2, 4, 6]`,
+try:
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        print(list(executor.map(double, [1, 2, 3])))   # threads where available
+except RuntimeError:
+    print([double(n) for n in [1, 2, 3]])              # sequential fallback -> [2, 4, 6]`,
   },
   apply: {
     id: "py-l4-concurrency-apply",
@@ -1393,14 +1419,15 @@ order. (This is the sequential baseline; the workspace step parallelizes it.)
   practice: {
     id: "py-l4-concurrency-practice",
     executionMode: "workspace",
-    prompt: `Implement \`run_all(numbers)\` in \`jobs/runner.py\` using a
-\`concurrent.futures.ThreadPoolExecutor\` to map the read-only \`double\` worker over \`numbers\`,
-returning the results in input order. Some tests are hidden.`,
+    prompt: `Implement \`run_all(numbers)\` in \`jobs/runner.py\`: map the read-only \`double\` worker over
+\`numbers\` with a \`concurrent.futures.ThreadPoolExecutor\`, returning the results in input order.
+This sandbox has **no OS threads**, so catch the \`RuntimeError\` and fall back to a sequential map.
+Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Open a pool: `with ThreadPoolExecutor(max_workers=4) as executor:`.",
+      "Open a pool inside a `try:` — `with ThreadPoolExecutor(max_workers=4) as executor: return list(executor.map(double, numbers))`.",
       "`executor.map(double, numbers)` runs the work and preserves order.",
-      "Materialise it: `return list(executor.map(double, numbers))`.",
+      "Add `except RuntimeError: return [double(n) for n in numbers]` so it still works where threads are unavailable.",
     ],
     workspace: {
       language: "python",
@@ -1476,43 +1503,54 @@ returning the results in input order. Some tests are hidden.`,
 
 const AIO_README = `# Concurrent I/O with asyncio
 
-\`aio/fetch.py\` (read-only) has \`async def fetch_one(n)\` (a stand-in for an async network call).
-Implement \`fetch_all(numbers)\` in \`aio/gather.py\` so it runs every \`fetch_one\` **concurrently**
-with \`asyncio.gather\` and returns the results in order.
+\`aio/fetch.py\` (read-only) has \`async def fetch_one(n)\` — a **coroutine** standing in for an async
+network call. Implement \`fetch_all(numbers)\` in \`aio/gather.py\` so it builds a \`fetch_one(n)\`
+coroutine for every number and runs them all, returning the results in order.
+
+Normally you'd write \`asyncio.run(asyncio.gather(*coros))\`. This in-browser sandbox is **already
+inside a running event loop**, so \`asyncio.run\` can't be called here — use the provided
+\`run_coroutines\` helper from \`aio.loop\` to run the coroutines instead.
 
 \`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`. Some tests are hidden.
 `
 
-const AIO_FETCH = String.raw`import asyncio
-
-
-async def fetch_one(n):
-    """Pretend to await some I/O, then return a result."""
-    await asyncio.sleep(0)
+const AIO_FETCH = String.raw`async def fetch_one(n):
+    """A coroutine standing in for an async network call."""
     return n * 10
 `
 
-const AIO_GATHER_STARTER = String.raw`import asyncio
+const AIO_LOOP = String.raw`def run_coroutines(coros):
+    """Run already-created coroutines to completion and collect their results, in order.
 
-from aio.fetch import fetch_one
+    A stand-in for asyncio.run(asyncio.gather(*coros)) for this sandbox, which is already inside a
+    running event loop (so asyncio.run can't be used). The coroutines here don't await real I/O, so
+    each finishes on its first step.
+    """
+    results = []
+    for coro in coros:
+        try:
+            coro.send(None)
+        except StopIteration as done:
+            results.append(done.value)
+    return results
+`
+
+const AIO_GATHER_STARTER = String.raw`from aio.fetch import fetch_one
+from aio.loop import run_coroutines
 
 
 def fetch_all(numbers):
-    """Run fetch_one for every number concurrently; return results in order (see README.md)."""
-    # TODO: gather fetch_one(n) for all n, then asyncio.run it.
+    """Build a fetch_one(n) coroutine per number and run them all in order (see README.md)."""
+    # TODO: pass a fetch_one(n) coroutine for each number to run_coroutines.
     return []
 `
 
-const AIO_GATHER_REFERENCE = String.raw`import asyncio
-
-from aio.fetch import fetch_one
+const AIO_GATHER_REFERENCE = String.raw`from aio.fetch import fetch_one
+from aio.loop import run_coroutines
 
 
 def fetch_all(numbers):
-    async def main():
-        return await asyncio.gather(*(fetch_one(n) for n in numbers))
-
-    return asyncio.run(main())
+    return run_coroutines(fetch_one(n) for n in numbers)
 `
 
 const AIO_TEST = String.raw`from aio.gather import fetch_all
@@ -1585,6 +1623,15 @@ asyncio.run(main())    # [10, 20, 30] — the three "waits" overlap
 \`asyncio.run(coro)\` starts the event loop, runs the coroutine to completion, and closes the loop —
 it's the one synchronous entry point into async code.
 
+### Running it in this sandbox
+
+\`asyncio.run\` only works when **no** loop is already running. This in-browser sandbox runs your code
+*inside* an event loop, so calling \`asyncio.run\` here raises \`RuntimeError: cannot be called from a
+running event loop\`. So the exercise gives you a \`run_coroutines(coros)\` helper that runs
+already-created coroutines and collects their results — the sandbox's stand-in for
+\`asyncio.run(asyncio.gather(*coros))\`. You still build real coroutines with \`fetch_one(n)\`; you
+just hand them to \`run_coroutines\` instead of \`asyncio.run\`.
+
 ### await vs sequential
 
 Awaiting each call one-by-one would be sequential; \`gather\` overlaps the waiting, so N slow calls
@@ -1592,58 +1639,75 @@ take about as long as the slowest one.
 
 ### Recap
 
-\`async def\` makes a coroutine, \`await\` suspends until it's ready, \`asyncio.gather\` runs many
-concurrently, and \`asyncio.run\` is the entry point. You'll gather a batch of async fetches into an
-ordered result list.`,
-    demoCode: `import asyncio
-
-
+\`async def\` makes a coroutine, \`await\` suspends until it's ready, and \`asyncio.gather\` runs many
+concurrently — driven by \`asyncio.run\` in a normal program, or \`run_coroutines\` in this sandbox.
+You'll build a batch of \`fetch_one\` coroutines and collect their ordered results.`,
+    demoCode: `# Normally: asyncio.run(asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3)))
+# This sandbox is already inside an event loop, so we drive the coroutines directly:
 async def fetch_one(n):
-    await asyncio.sleep(0)
     return n * 10
 
 
-async def main():
-    return await asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3))
+def run_coroutines(coros):
+    out = []
+    for coro in coros:
+        try:
+            coro.send(None)
+        except StopIteration as done:
+            out.append(done.value)
+    return out
 
 
-print(asyncio.run(main()))   # [10, 20, 30]`,
+print(run_coroutines(fetch_one(n) for n in [1, 2, 3]))   # [10, 20, 30]`,
   },
   apply: {
     id: "py-l4-asyncio-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`fetch_all(numbers)\` — run the provided \`fetch_one\` coroutine for
-every number concurrently with \`asyncio.gather\`, returning the results in order. Use
-\`asyncio.run\` to drive it.
+    prompt: `Warm-up (one file): implement \`fetch_all(numbers)\` — build a \`fetch_one(n)\` coroutine for each
+number and run them all with the provided \`run_coroutines\` helper, returning the results in order.
+
+(In a normal program you'd write \`asyncio.run(asyncio.gather(*coros))\`; this sandbox is already
+inside an event loop, so \`run_coroutines\` stands in for it.)
 
 \`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`.`,
-    starterCode: `import asyncio
-
-
-async def fetch_one(n):
+    starterCode: `async def fetch_one(n):
     return n * 10
 
 
+def run_coroutines(coros):
+    results = []
+    for coro in coros:
+        try:
+            coro.send(None)
+        except StopIteration as done:
+            results.append(done.value)
+    return results
+
+
 def fetch_all(numbers):
-    # TODO: gather fetch_one(n) for all n inside an async main(), then asyncio.run it.
+    # TODO: build a fetch_one(n) coroutine for each number and pass them to run_coroutines.
     pass`,
     hints: [
-      "Define an inner `async def main():` that returns `await asyncio.gather(*(fetch_one(n) for n in numbers))`.",
-      "`asyncio.gather(*coros)` runs them concurrently and preserves order.",
-      "Return `asyncio.run(main())`.",
+      "Build the coroutines: `fetch_one(n) for n in numbers`.",
+      "Hand them to the provided runner: `run_coroutines(fetch_one(n) for n in numbers)`.",
+      "Return that result.",
     ],
-    referenceSolution: `import asyncio
-
-
-async def fetch_one(n):
+    referenceSolution: `async def fetch_one(n):
     return n * 10
 
 
-def fetch_all(numbers):
-    async def main():
-        return await asyncio.gather(*(fetch_one(n) for n in numbers))
+def run_coroutines(coros):
+    results = []
+    for coro in coros:
+        try:
+            coro.send(None)
+        except StopIteration as done:
+            results.append(done.value)
+    return results
 
-    return asyncio.run(main())`,
+
+def fetch_all(numbers):
+    return run_coroutines(fetch_one(n) for n in numbers)`,
     testCases: [
       { input: { numbers: [1, 2, 3] }, expected: [10, 20, 30], description: "gathers in order" },
       { input: { numbers: [] }, expected: [], description: "empty input" },
@@ -1653,14 +1717,14 @@ def fetch_all(numbers):
   practice: {
     id: "py-l4-asyncio-practice",
     executionMode: "workspace",
-    prompt: `Implement \`fetch_all(numbers)\` in \`aio/gather.py\`: run the read-only \`fetch_one\` coroutine for
-every number concurrently with \`asyncio.gather\`, driven by \`asyncio.run\`, returning results in
-order. Some tests are hidden.`,
+    prompt: `Implement \`fetch_all(numbers)\` in \`aio/gather.py\`: build a \`fetch_one(n)\` coroutine for every
+number and run them with the read-only \`run_coroutines\` helper (imported from \`aio.loop\`),
+returning the results in order. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`fetch_one` is imported — build `fetch_one(n)` coroutines for each number.",
-      "Inside an `async def main():`, `return await asyncio.gather(*(fetch_one(n) for n in numbers))`.",
-      "`return asyncio.run(main())`.",
+      "`fetch_one` and `run_coroutines` are already imported for you.",
+      "Build one coroutine per number: `fetch_one(n) for n in numbers`.",
+      "`return run_coroutines(fetch_one(n) for n in numbers)`.",
     ],
     workspace: {
       language: "python",
@@ -1678,6 +1742,13 @@ order. Some tests are hidden.`,
           language: "python",
           content: AIO_FETCH,
           description: "Async fetch_one coroutine (read-only)",
+        },
+        {
+          path: "aio/loop.py",
+          role: "readonly",
+          language: "python",
+          content: AIO_LOOP,
+          description: "run_coroutines helper — the sandbox's asyncio.run stand-in (read-only)",
         },
         {
           path: "aio/gather.py",
@@ -2117,12 +2188,12 @@ print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
     # Coerce PORT->int (default 8000), DEBUG->bool, and record whether SECRET is present.
     pass`,
     hints: [
-      'Port: `int(env.get("PORT", 8000))`.',
+      'Port: `int(env.get("PORT", "8000"))` (env values are strings).',
       'Debug: `env.get("DEBUG", "false").lower() == "true"`.',
       'Secret presence (not value): `"SECRET" in env`.',
     ],
     referenceSolution: `def load_config(env):
-    port = int(env.get("PORT", 8000))
+    port = int(env.get("PORT", "8000"))
     debug = env.get("DEBUG", "false").lower() == "true"
     return {"port": port, "debug": debug, "has_secret": "SECRET" in env}`,
     testCases: [
@@ -2364,22 +2435,35 @@ print(sender.call_count)              # 2`,
   apply: {
     id: "py-l4-testing-tooling-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`send_all(messages)\` — "send" each message and return how many were
-sent. (The workspace step makes the sender injectable so a mock can verify it.)
+    prompt: `Warm-up (one file): implement \`send_all(sender, messages)\` — call the injected \`sender\` once per
+message and return how many were sent. The provided \`run\` driver passes a recorder in as the
+\`sender\`, so this rehearses the dependency injection the workspace step then verifies with a mock.
 
-\`send_all(["a", "b", "c"])\` is \`3\`.`,
-    starterCode: `def send_all(messages):
-    # "Send" each message and return how many were sent.
-    pass`,
+\`run(["a", "b", "c"])\` is \`3\`.`,
+    starterCode: `def send_all(sender, messages):
+    # Call sender(message) for each message; return how many were sent.
+    pass
+
+
+def run(messages):
+    received = []
+    return send_all(received.append, messages)`,
     hints: [
-      "Count as you go, or just return `len(messages)`.",
-      "An empty list sends nothing — returns 0.",
+      "Loop the messages and call `sender(message)` for each.",
+      "Keep a running count and return it.",
+      "`sender` is whatever the caller injects — here `run` passes a list's `.append`.",
     ],
-    referenceSolution: `def send_all(messages):
+    referenceSolution: `def send_all(sender, messages):
     count = 0
     for message in messages:
+        sender(message)
         count += 1
-    return count`,
+    return count
+
+
+def run(messages):
+    received = []
+    return send_all(received.append, messages)`,
     testCases: [
       { input: { messages: ["a", "b", "c"] }, expected: 3, description: "three messages" },
       { input: { messages: [] }, expected: 0, description: "none" },

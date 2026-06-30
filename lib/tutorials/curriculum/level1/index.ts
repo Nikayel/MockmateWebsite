@@ -1170,15 +1170,6 @@ picked.append("a")
 picked.append("b")   # ["a", "b"]
 \`\`\`
 
-### A peek at iterating
-
-You can walk every item with a \`for\` loop (you'll practise these soon):
-
-\`\`\`python
-for n in nums:
-    print(n)
-\`\`\`
-
 ### Recap
 
 Lists are ordered and mutable: index/slice like strings, \`append\`/\`insert\`/\`remove\` to change
@@ -1380,13 +1371,6 @@ combined = {**prices, **{"fig": 6}}   # merge into a NEW dict
 \`\`\`
 
 When two dicts share a key, the **right-hand** one wins in a merge.
-
-### A peek at iterating
-
-\`\`\`python
-for name, price in prices.items():
-    print(name, price)   # you'll practise loops next
-\`\`\`
 
 ### Recap
 

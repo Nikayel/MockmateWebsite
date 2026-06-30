@@ -28,6 +28,7 @@ implement \`parse_config(text)\` in \`app/config.py\` so it:
 
 - splits \`text\` into lines
 - skips blank lines and lines that start with \`#\`
+- skips any remaining line that has no \`=\`
 - splits each remaining line on the **first** \`=\`
 - trims whitespace around the key and value
 - runs the value through \`coerce\` so numbers become \`int\`
@@ -2200,7 +2201,7 @@ const cliLesson: PythonLevel["modules"][number]["lessons"][number] = {
   summary: "Turn argument lists into commands with a testable dispatcher.",
   estimatedMinutes: 18,
   difficulty: "medium",
-  skills: ["cli", "argparse", "typer", "dispatch"],
+  skills: ["cli", "dispatch", "arguments", "commands"],
   teach: {
     estimatedMinutes: 5,
     markdown: `## Command-line tools
@@ -2460,7 +2461,7 @@ const restPydanticLesson: PythonLevel["modules"][number]["lessons"][number] = {
   summary: "Fetch external JSON and validate it into a typed model at the boundary.",
   estimatedMinutes: 20,
   difficulty: "hard",
-  skills: ["httpx", "pydantic", "validation", "dataclasses"],
+  skills: ["validation", "dataclasses", "data-boundary", "type-coercion"],
   teach: {
     estimatedMinutes: 6,
     markdown: `## Fetching and validating external data
@@ -2900,19 +2901,19 @@ export const level3: PythonLevel = {
   estimatedHours: 6,
   modules: [
     {
-      id: "py-l3-working-across-files",
-      title: "Working across files",
-      description: "Follow imports and change code across a small multi-file Python package.",
-      lessons: [parseConfigLesson],
-    },
-    {
       id: "py-l3-project-structure",
       title: "Project Structure & Packaging",
       description: "Lay out a multi-file package with a clear entry point.",
       lessons: [packagesLesson],
     },
     {
-      id: "py-l3-type-hints",
+      id: "py-l3-working-across-files",
+      title: "Working across files",
+      description: "Follow imports and change code across a small multi-file Python package.",
+      lessons: [parseConfigLesson],
+    },
+    {
+      id: "py-l3-typing",
       title: "Type Hints & Static Typing",
       description: "Annotate functions and classes for clarity and static checking.",
       lessons: [typeHintsLesson, typingModuleLesson],

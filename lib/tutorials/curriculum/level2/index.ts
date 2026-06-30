@@ -312,6 +312,9 @@ print("{name} is {age}".format(**{"name": "Ada", "age": 30}))  # Ada is 30`,
     ],
     referenceSolution: `def total(*nums):
     return sum(nums)`,
+    // The executor passes input values POSITIONALLY in key order, so these keyed objects expand to
+    // total(1, 2, 3) etc. The key names are arbitrary positional fillers for *nums — keep them in
+    // the intended argument order; do not alphabetize or reorder them.
     testCases: [
       { input: { a: 1, b: 2, c: 3 }, expected: 6, description: "three arguments" },
       { input: { a: 5 }, expected: 5, description: "one argument" },
