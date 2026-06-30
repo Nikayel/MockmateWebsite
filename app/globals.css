@@ -58,6 +58,22 @@
   --editor-gutter: oklch(0.97 0 0);
   --editor-line-active: oklch(0.96 0.005 210);
   --editor-selection: oklch(0.7 0.08 210 / 0.2);
+
+  /* Learn-Python faux code-window syntax tokens (light). Theme-aware: these ride
+     the root View Transition, so the Path preview's sample recolors in step with
+     the theme crossfade (HANDOFF §E). */
+  --kw: #a3522a;
+  /* keyword (def/return/import) — clay-brown */
+  --str: #1d7d57;
+  /* string */
+  --com: #a8a39a;
+  /* comment */
+  --fn: #2c6fb5;
+  /* function name */
+  --num: #9a6b00;
+  /* number */
+  --gut: #c9c4ba;
+  /* gutter line number */
 }
 
 .dark {
@@ -107,6 +123,14 @@
   --editor-line-active: oklch(0.2 0.005 260);
   --editor-selection: oklch(0.5 0.06 210 / 0.25);
   /* Calmer selection highlight */
+
+  /* Learn-Python faux code-window syntax tokens (dark) — clay reads brighter. */
+  --kw: #d0824f;
+  --str: #6fcf9f;
+  --com: #6f6b62;
+  --fn: #6fa8dc;
+  --num: #e0b15a;
+  --gut: #56534b;
 
   /* Chart colors - also softened */
   --chart-1: oklch(0.7 0.08 210);
