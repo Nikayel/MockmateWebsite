@@ -48,8 +48,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 ## LEVEL 2 — Python Intermediate (~10h, single-file) — 12 lessons
 
 ### Module L2-M1 — Comprehensions & Generators
-- **PY-L2-01 · `py-l2-comprehensions`** (SF, easy) — *list/dict/set comprehensions.* Objective: transform/filter collections concisely.
-- **PY-L2-02 · `py-l2-generators`** (SF, medium) — *generators, `yield` & iterators.* Objective: lazy sequences, the iterator protocol, when to stream.
+- [x] **PY-L2-01 · `py-l2-comprehensions`** (SF, easy) — *list/dict/set comprehensions.* Objective: transform/filter collections concisely.
+- [x] **PY-L2-02 · `py-l2-generators`** (SF, medium) — *generators, `yield` & iterators.* Objective: lazy sequences, the iterator protocol, when to stream.
 
 ### Module L2-M2 — Functions in Depth
 - **PY-L2-03 · `py-l2-args-kwargs`** (SF, medium) — *`*args`, `**kwargs`, keyword args.* Objective: flexible signatures and argument unpacking.
