@@ -583,6 +583,211 @@ Remember the falsy values: \`0\`, \`""\`, \`None\`, and \`False\`.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L1-M3 — Strings & Formatting
+// ───────────────────────────────────────────────────────────────────────────
+
+const stringsIndexLesson: PythonLesson = {
+  id: "py-l1-strings-index",
+  title: "String indexing & slicing",
+  summary: "Reach into text by position, take slices, and measure length.",
+  estimatedMinutes: 9,
+  difficulty: "easy",
+  skills: ["strings", "indexing", "slicing", "len"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## A string is a sequence of characters
+
+Each character in a string has a **position** (an *index*), counted from \`0\`:
+
+\`\`\`text
+ p  y  t  h  o  n
+ 0  1  2  3  4  5      <- index from the front
+-6 -5 -4 -3 -2 -1      <- index from the back
+\`\`\`
+
+Reach in with square brackets:
+
+\`\`\`python
+word = "python"
+word[0]    # "p"   first character
+word[-1]   # "n"   last character (negative counts from the end)
+len(word)  # 6     how many characters
+\`\`\`
+
+### Slicing
+
+\`text[start:stop]\` takes a **slice** — from \`start\` up to *but not including* \`stop\`:
+
+\`\`\`python
+word[0:3]   # "pyt"   indices 0, 1, 2
+word[2:]    # "thon"  from 2 to the end
+word[:2]    # "py"    from the start to 2
+word[1:-1]  # "ytho"  drop the first and last character
+\`\`\`
+
+### Immutability
+
+Strings can't be changed in place — \`word[0] = "P"\` is an error. Instead you build a **new**
+string (you'll do that with methods in the next lesson).
+
+### Recap
+
+Index with \`[i]\` (0-based, negatives from the end), slice with \`[start:stop]\`, count with
+\`len()\`, and remember strings are immutable. Next you'll grab the ends of a word, then trim them
+off.`,
+    demoCode: `word = "python"
+print(word[0])     # p
+print(word[-1])    # n
+print(word[1:-1])  # ytho
+print(len(word))   # 6`,
+  },
+  apply: {
+    id: "py-l1-strings-index-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`first_and_last(text)\` — return a 2-character string made of the **first** and
+**last** characters of \`text\`.
+
+For \`"python"\` return \`"pn"\`. (A one-character string like \`"a"\` returns \`"aa"\`.)`,
+    starterCode: `def first_and_last(text):
+    # Return text's first character followed by its last character.
+    pass`,
+    hints: [
+      "The first character is `text[0]`.",
+      "The last character is `text[-1]`.",
+      "Join them with `+`: `return text[0] + text[-1]`.",
+    ],
+    referenceSolution: `def first_and_last(text):
+    return text[0] + text[-1]`,
+    testCases: [
+      { input: { text: "python" }, expected: "pn", description: "first p, last n" },
+      { input: { text: "hi" }, expected: "hi", description: "two characters" },
+      { input: { text: "a" }, expected: "aa", description: "one character repeats" },
+      { input: { text: "code" }, expected: "ce", description: "first c, last e" },
+    ],
+  },
+  practice: {
+    id: "py-l1-strings-index-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`without_ends(text)\` — return \`text\` with its first and last characters removed.
+
+For \`"python"\` return \`"ytho"\`. For \`"[hi]"\` return \`"hi"\`.`,
+    starterCode: `def without_ends(text):
+    # Return text without its first and last character.
+    pass`,
+    hints: [
+      "A slice from index 1 up to the last character does it.",
+      "`text[1:-1]` starts after the first char and stops before the last.",
+    ],
+    referenceSolution: `def without_ends(text):
+    return text[1:-1]`,
+    testCases: [
+      { input: { text: "python" }, expected: "ytho", description: "drop p and n" },
+      { input: { text: "abc" }, expected: "b", description: "only the middle is left" },
+      { input: { text: "[hi]" }, expected: "hi", description: "strip the brackets" },
+      { input: { text: "ab" }, expected: "", description: "nothing left in the middle" },
+    ],
+  },
+}
+
+const stringsMethodsLesson: PythonLesson = {
+  id: "py-l1-strings-methods",
+  title: "String methods & f-strings",
+  summary: "Clean and reshape text with methods, and build strings with f-strings.",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["strings", "string-methods", "f-strings"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Methods reshape text
+
+A **method** is a function attached to a value, called with a dot. Strings come with handy ones —
+each returns a **new** string (the original is untouched):
+
+\`\`\`python
+"  Hello  ".strip()        # "Hello"   remove surrounding whitespace
+"Hello".lower()            # "hello"
+"Hello".upper()            # "HELLO"
+"a,b,c".split(",")         # ["a", "b", "c"]   text -> list
+"cat".replace("c", "b")    # "bat"
+\`\`\`
+
+Because each returns a string, you can **chain** them left to right:
+
+\`\`\`python
+"  PyThOn  ".strip().lower()   # "python"
+\`\`\`
+
+### f-strings
+
+An **f-string** builds text by dropping values straight into \`{ }\`. Put an \`f\` before the quote:
+
+\`\`\`python
+name = "Ada"
+count = 3
+f"{name} has {count} messages"   # "Ada has 3 messages"
+\`\`\`
+
+You can even call methods inside the braces: \`f"Hi {name.upper()}"\` → \`"Hi ADA"\`.
+
+### Recap
+
+\`.strip()\`, \`.lower()\`, \`.upper()\`, \`.split()\`, and \`.replace()\` return new strings (and
+chain), while f-strings interpolate values into text. Next you'll normalise some text, then build a
+greeting with an f-string.`,
+    demoCode: `messy = "  PyThOn  "
+print(messy.strip().lower())   # python
+
+name = "Ada"
+print(f"Hi {name.upper()}!")   # Hi ADA!`,
+  },
+  apply: {
+    id: "py-l1-strings-methods-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`normalize(text)\` — return \`text\` with surrounding whitespace removed and all
+letters lowercased.
+
+For \`"  Hello  "\` return \`"hello"\`.`,
+    starterCode: `def normalize(text):
+    # Strip surrounding whitespace, then lowercase.
+    pass`,
+    hints: [
+      "`text.strip()` removes the surrounding spaces.",
+      "`.lower()` makes everything lowercase.",
+      "Chain them: `return text.strip().lower()`.",
+    ],
+    referenceSolution: `def normalize(text):
+    return text.strip().lower()`,
+    testCases: [
+      { input: { text: "  Hello  " }, expected: "hello", description: "trim and lowercase" },
+      { input: { text: "WORLD" }, expected: "world", description: "all caps" },
+      { input: { text: "  PyThOn " }, expected: "python", description: "mixed case with spaces" },
+      { input: { text: "already" }, expected: "already", description: "nothing to change" },
+    ],
+  },
+  practice: {
+    id: "py-l1-strings-methods-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`loud_greeting(name)\` — return an uppercased greeting using an f-string.
+
+For \`"ada"\` return \`"HELLO, ADA!"\`.`,
+    starterCode: `def loud_greeting(name):
+    # Build "HELLO, <NAME>!" with an f-string and .upper().
+    pass`,
+    hints: [
+      "Uppercase the name with `name.upper()`.",
+      'Build the rest with an f-string: `f"HELLO, {name.upper()}!"`.',
+    ],
+    referenceSolution: `def loud_greeting(name):
+    return f"HELLO, {name.upper()}!"`,
+    testCases: [
+      { input: { name: "ada" }, expected: "HELLO, ADA!", description: "lowercase input" },
+      { input: { name: "Sam" }, expected: "HELLO, SAM!", description: "mixed case input" },
+      { input: { name: "world" }, expected: "HELLO, WORLD!", description: "another name" },
+    ],
+  },
+}
+
 export const level1: PythonLevel = {
   id: 1,
   slug: "fundamentals",
@@ -607,7 +812,7 @@ export const level1: PythonLevel = {
       id: "py-l1-strings",
       title: "Strings & Formatting",
       description: "Index, slice, and reshape text with string methods and f-strings.",
-      lessons: [],
+      lessons: [stringsIndexLesson, stringsMethodsLesson],
     },
     {
       id: "py-l1-collections",

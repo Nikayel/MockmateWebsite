@@ -30,8 +30,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L1-04 · `py-l1-bool-none-convert`** (SF, easy) — *booleans, None & type conversion.* Objective: `True/False/None`, `int()/float()/str()`, truthiness intro.
 
 ### Module L1-M3 — Strings & Formatting
-- **PY-L1-05 · `py-l1-strings-index`** (SF, easy) — *string indexing & slicing.* Objective: index, slice, `len()`, immutability.
-- **PY-L1-06 · `py-l1-strings-methods`** (SF, easy) — *string methods & f-strings.* Objective: `.upper/.lower/.strip/.split/.replace`, f-string formatting.
+- [x] **PY-L1-05 · `py-l1-strings-index`** (SF, easy) — *string indexing & slicing.* Objective: index, slice, `len()`, immutability.
+- [x] **PY-L1-06 · `py-l1-strings-methods`** (SF, easy) — *string methods & f-strings.* Objective: `.upper/.lower/.strip/.split/.replace`, f-string formatting.
 
 ### Module L1-M4 — Collections
 - **PY-L1-07 · `py-l1-lists`** (SF, easy) — *lists.* Objective: create/index/slice, append/insert/remove, iterate.
