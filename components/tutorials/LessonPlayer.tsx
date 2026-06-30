@@ -166,6 +166,12 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   return (
     <div className="flex h-[100dvh] flex-col">
+      <a
+        href="#lesson-main"
+        className="bg-accent text-accent-foreground focus-visible:ring-accent/50 sr-only z-50 rounded-md px-3 py-1.5 text-sm font-medium focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus-visible:ring-2 focus-visible:outline-none"
+      >
+        Skip to lesson
+      </a>
       {/* Top bar (§C): brand · level badge · title · lesson n/total + progress · theme · Levels. */}
       <header className="border-border bg-background/80 flex shrink-0 items-center gap-3 border-b px-4 py-2.5 backdrop-blur-md">
         <Link href="/learn/python" className="text-foreground text-sm font-semibold tracking-tight">
@@ -223,7 +229,13 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             />
           </div>
 
-          <main ref={centerRef} className="overflow-y-auto px-6 py-6" aria-label="Lesson content">
+          <main
+            id="lesson-main"
+            ref={centerRef}
+            tabIndex={-1}
+            className="overflow-y-auto px-6 py-6 focus:outline-none"
+            aria-label="Lesson content"
+          >
             <div className="mx-auto max-w-2xl">
               <LessonHeader lesson={lesson} />
 
