@@ -34,9 +34,9 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L1-06 · `py-l1-strings-methods`** (SF, easy) — *string methods & f-strings.* Objective: `.upper/.lower/.strip/.split/.replace`, f-string formatting.
 
 ### Module L1-M4 — Collections
-- **PY-L1-07 · `py-l1-lists`** (SF, easy) — *lists.* Objective: create/index/slice, append/insert/remove, iterate.
-- **PY-L1-08 · `py-l1-tuples-sets`** (SF, easy) — *tuples & sets.* Objective: immutable tuples, unique-membership sets, when to use each.
-- **PY-L1-09 · `py-l1-dicts`** (SF, easy) — *dictionaries.* Objective: key/value access, add/update/delete, iterate items.
+- [x] **PY-L1-07 · `py-l1-lists`** (SF, easy) — *lists.* Objective: create/index/slice, append/insert/remove, iterate.
+- [x] **PY-L1-08 · `py-l1-tuples-sets`** (SF, easy) — *tuples & sets.* Objective: immutable tuples, unique-membership sets, when to use each.
+- [x] **PY-L1-09 · `py-l1-dicts`** (SF, easy) — *dictionaries.* Objective: key/value access, add/update/delete, iterate items.
 
 ### Module L1-M5 — Control Flow & Functions
 - **PY-L1-10 · `py-l1-conditionals`** (SF, easy) — *if/elif/else & logical operators.* Objective: branch on conditions, `and/or/not`, comparisons.

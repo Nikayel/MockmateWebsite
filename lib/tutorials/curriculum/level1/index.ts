@@ -788,6 +788,346 @@ For \`"ada"\` return \`"HELLO, ADA!"\`.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L1-M4 — Collections
+// ───────────────────────────────────────────────────────────────────────────
+
+const listsLesson: PythonLesson = {
+  id: "py-l1-lists",
+  title: "Lists",
+  summary: "Build, index, slice, and grow Python's ordered, mutable collection.",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["lists", "indexing", "append", "mutability"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Lists hold an ordered collection
+
+A **list** is an ordered, changeable collection written with square brackets:
+
+\`\`\`python
+nums = [10, 20, 30]
+nums[0]      # 10          index like a string (0-based)
+nums[-1]     # 30          negative counts from the end
+nums[1:]     # [20, 30]    slicing works too
+len(nums)    # 3
+\`\`\`
+
+### Changing a list
+
+Unlike strings, lists are **mutable** — you can change them in place:
+
+\`\`\`python
+nums.append(40)     # [10, 20, 30, 40]      add to the end
+nums.insert(0, 5)   # [5, 10, 20, 30, 40]   add at an index
+nums.remove(20)     # [5, 10, 30, 40]       remove the first 20
+\`\`\`
+
+### Building from scratch
+
+Start empty and grow:
+
+\`\`\`python
+picked = []
+picked.append("a")
+picked.append("b")   # ["a", "b"]
+\`\`\`
+
+### A peek at iterating
+
+You can walk every item with a \`for\` loop (you'll practise these soon):
+
+\`\`\`python
+for n in nums:
+    print(n)
+\`\`\`
+
+### Recap
+
+Lists are ordered and mutable: index/slice like strings, \`append\`/\`insert\`/\`remove\` to change
+them, \`len()\` to size them. Next you'll grow a list, then reach into the middle of one.`,
+    demoCode: `nums = [10, 20, 30]
+nums.append(40)
+print(nums)        # [10, 20, 30, 40]
+print(nums[-1])    # 40
+print(len(nums))   # 4`,
+  },
+  apply: {
+    id: "py-l1-lists-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`add_item(items, value)\` — append \`value\` to the list \`items\` and return the list.
+
+For \`([1, 2], 3)\` return \`[1, 2, 3]\`.`,
+    starterCode: `def add_item(items, value):
+    # Append value to items, then return items.
+    pass`,
+    hints: [
+      "Add to the end with `items.append(value)`.",
+      "After appending, `return items`.",
+      "`append` changes the list in place; you still return it.",
+    ],
+    referenceSolution: `def add_item(items, value):
+    items.append(value)
+    return items`,
+    testCases: [
+      { input: { items: [1, 2], value: 3 }, expected: [1, 2, 3], description: "append to a list" },
+      { input: { items: [], value: 5 }, expected: [5], description: "append to an empty list" },
+      { input: { items: [7], value: 8 }, expected: [7, 8], description: "append to a single item" },
+      {
+        input: { items: [1, 2, 3], value: 3 },
+        expected: [1, 2, 3, 3],
+        description: "duplicates are allowed",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l1-lists-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`middle_item(items)\` — return the item at the middle index of the list.
+
+The middle index is \`len(items) // 2\`. For \`[10, 20, 30, 40, 50]\` return \`30\`.`,
+    starterCode: `def middle_item(items):
+    # Return the item at index len(items) // 2.
+    pass`,
+    hints: [
+      "The middle index is `len(items) // 2`.",
+      "Index into the list with it: `items[len(items) // 2]`.",
+    ],
+    referenceSolution: `def middle_item(items):
+    return items[len(items) // 2]`,
+    testCases: [
+      { input: { items: [1, 2, 3] }, expected: 2, description: "middle of three" },
+      { input: { items: [10, 20, 30, 40, 50] }, expected: 30, description: "middle of five" },
+      { input: { items: [5] }, expected: 5, description: "single item is the middle" },
+      { input: { items: [1, 2, 3, 4, 5] }, expected: 3, description: "index 2 of five" },
+    ],
+  },
+}
+
+const tuplesSetsLesson: PythonLesson = {
+  id: "py-l1-tuples-sets",
+  title: "Tuples & sets",
+  summary: "Group fixed records with tuples and track uniqueness with sets.",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["tuples", "sets", "uniqueness", "membership"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Tuples: fixed records
+
+A **tuple** is like a list but **immutable** — once created it can't change. Use one for a fixed
+group of values that belong together (a point, a row):
+
+\`\`\`python
+point = (3, 4)
+point[0]      # 3
+x, y = point  # unpack into two names: x = 3, y = 4
+\`\`\`
+
+Many functions hand back tuples — e.g. \`divmod(17, 5)\` returns \`(3, 2)\`.
+
+## Sets: unique membership
+
+A **set** is an unordered collection with **no duplicates**, written with curly braces (or
+\`set(...)\`):
+
+\`\`\`python
+seen = {1, 2, 2, 3}   # {1, 2, 3}  — duplicates collapse
+3 in seen             # True       — fast membership test
+\`\`\`
+
+Building a set from a list is the quickest way to drop duplicates or count distinct values:
+
+\`\`\`python
+len(set([1, 2, 2, 3]))   # 3   how many distinct items
+\`\`\`
+
+### When to use which
+
+- **Tuple**: a small fixed record whose shape won't change.
+- **Set**: you care about uniqueness or "is this in here?", not order.
+
+### Recap
+
+Tuples are immutable ordered records (and unpack into names); sets are unordered, unique, and great
+for membership and de-duplication. Next you'll count distinct items, then find the smallest and
+largest.`,
+    demoCode: `nums = [1, 2, 2, 3, 3, 3]
+print(len(set(nums)))   # 3   distinct values
+print(2 in set(nums))   # True
+
+point = (3, 4)
+x, y = point
+print(x, y)             # 3 4`,
+  },
+  apply: {
+    id: "py-l1-tuples-sets-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`unique_count(arr)\` — return how many **distinct** values are in the list \`arr\`.
+
+For \`[1, 2, 2, 3]\` return \`3\`.`,
+    starterCode: `def unique_count(arr):
+    # Return the number of distinct values in arr.
+    pass`,
+    hints: [
+      "A set drops duplicates: `set(arr)`.",
+      "Count the distinct values with `len(set(arr))`.",
+    ],
+    referenceSolution: `def unique_count(arr):
+    return len(set(arr))`,
+    testCases: [
+      { input: { arr: [1, 2, 2, 3] }, expected: 3, description: "one duplicate" },
+      { input: { arr: [1, 1, 1] }, expected: 1, description: "all the same" },
+      { input: { arr: [] }, expected: 0, description: "empty list" },
+      { input: { arr: [4, 5, 6] }, expected: 3, description: "all distinct" },
+    ],
+  },
+  practice: {
+    id: "py-l1-tuples-sets-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`min_max(arr)\` — return a tuple \`(smallest, largest)\` of the list \`arr\`.
+
+For \`[3, 1, 5, 2]\` return \`(1, 5)\`.`,
+    starterCode: `def min_max(arr):
+    # Return (smallest, largest).
+    pass`,
+    hints: [
+      "`min(arr)` gives the smallest, `max(arr)` the largest.",
+      "Return both as a tuple: `return (min(arr), max(arr))`.",
+    ],
+    referenceSolution: `def min_max(arr):
+    return (min(arr), max(arr))`,
+    testCases: [
+      { input: { arr: [3, 1, 5, 2] }, expected: [1, 5], description: "min 1, max 5" },
+      { input: { arr: [10] }, expected: [10, 10], description: "single value is both" },
+      { input: { arr: [-4, 4] }, expected: [-4, 4], description: "negatives included" },
+      { input: { arr: [7, 7, 7] }, expected: [7, 7], description: "all equal" },
+    ],
+  },
+}
+
+const dictsLesson: PythonLesson = {
+  id: "py-l1-dicts",
+  title: "Dictionaries",
+  summary: "Map keys to values: read safely, assign, and merge dictionaries.",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["dictionaries", "key-value", "get", "merge"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Dictionaries map keys to values
+
+A **dictionary** stores **key → value** pairs in curly braces. Look a value up by its key, not by
+position:
+
+\`\`\`python
+prices = {"apple": 3, "pear": 2}
+prices["apple"]    # 3
+\`\`\`
+
+### Safe lookups with .get
+
+Indexing a missing key is an error. \`.get(key, default)\` returns a fallback instead:
+
+\`\`\`python
+prices.get("apple", 0)    # 3
+prices.get("banana", 0)   # 0   — not found, so the default
+\`\`\`
+
+### Add, update, and merge
+
+\`\`\`python
+prices["plum"] = 4                    # add a new pair
+prices["apple"] = 5                   # update an existing key
+combined = {**prices, **{"fig": 6}}   # merge into a NEW dict
+\`\`\`
+
+When two dicts share a key, the **right-hand** one wins in a merge.
+
+### A peek at iterating
+
+\`\`\`python
+for name, price in prices.items():
+    print(name, price)   # you'll practise loops next
+\`\`\`
+
+### Recap
+
+Dicts map keys to values: read with \`d[key]\` or the safer \`d.get(key, default)\`, assign with
+\`d[key] = value\`, and merge with \`{**a, **b}\`. Next you'll look up a price, then merge two dicts.`,
+    demoCode: `prices = {"apple": 3, "pear": 2}
+print(prices["apple"])          # 3
+print(prices.get("banana", 0))  # 0
+print({**prices, **{"fig": 6}})  # {'apple': 3, 'pear': 2, 'fig': 6}`,
+  },
+  apply: {
+    id: "py-l1-dicts-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`lookup(prices, name)\` — return the price for \`name\` from the \`prices\` dict, or
+\`0\` if it isn't there.
+
+For \`prices = {"apple": 3}\` and \`name = "banana"\`, return \`0\`.`,
+    starterCode: `def lookup(prices, name):
+    # Return prices[name], or 0 if name is missing.
+    pass`,
+    hints: [
+      "`prices.get(name)` returns None when the key is missing.",
+      "Give it a default: `prices.get(name, 0)`.",
+    ],
+    referenceSolution: `def lookup(prices, name):
+    return prices.get(name, 0)`,
+    testCases: [
+      {
+        input: { prices: { apple: 3, pear: 2 }, name: "apple" },
+        expected: 3,
+        description: "a key that exists",
+      },
+      {
+        input: { prices: { apple: 3, pear: 2 }, name: "banana" },
+        expected: 0,
+        description: "a missing key falls back to 0",
+      },
+      { input: { prices: { a: 1, b: 2 }, name: "b" }, expected: 2, description: "another hit" },
+      { input: { prices: {}, name: "x" }, expected: 0, description: "empty dict" },
+    ],
+  },
+  practice: {
+    id: "py-l1-dicts-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`merge_two(a, b)\` — return a new dict with all pairs from \`a\` and \`b\`. When a key
+is in both, \`b\`'s value wins.
+
+For \`({"x": 1}, {"x": 9})\` return \`{"x": 9}\`.`,
+    starterCode: `def merge_two(a, b):
+    # Return a new dict combining a and b (b wins on conflicts).
+    pass`,
+    hints: [
+      "Spread both into a new dict: `{**a, **b}`.",
+      "The later spread (`b`) overrides duplicate keys.",
+    ],
+    referenceSolution: `def merge_two(a, b):
+    return {**a, **b}`,
+    testCases: [
+      {
+        input: { a: { x: 1 }, b: { y: 2 } },
+        expected: { x: 1, y: 2 },
+        description: "no overlap",
+      },
+      {
+        input: { a: { a: 1 }, b: { a: 9 } },
+        expected: { a: 9 },
+        description: "b wins on conflict",
+      },
+      { input: { a: {}, b: { k: 5 } }, expected: { k: 5 }, description: "merge into empty" },
+      {
+        input: { a: { p: 1, q: 2 }, b: { q: 3 } },
+        expected: { p: 1, q: 3 },
+        description: "partial overlap",
+      },
+    ],
+  },
+}
+
 export const level1: PythonLevel = {
   id: 1,
   slug: "fundamentals",
@@ -818,7 +1158,7 @@ export const level1: PythonLevel = {
       id: "py-l1-collections",
       title: "Collections",
       description: "Lists, tuples, sets, and dictionaries — Python's core containers.",
-      lessons: [],
+      lessons: [listsLesson, tuplesSetsLesson, dictsLesson],
     },
     {
       id: "py-l1-control-flow",
