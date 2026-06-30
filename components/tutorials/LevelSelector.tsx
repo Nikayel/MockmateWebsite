@@ -116,7 +116,11 @@ export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
       </ol>
 
       <div className="lg:sticky lg:top-24">
-        <LevelPreviewPanel level={selected} onStart={handleStart} />
+        <LevelPreviewPanel
+          level={selected}
+          completedCount={completedCountFor(selected)}
+          onStart={handleStart}
+        />
       </div>
     </div>
   )

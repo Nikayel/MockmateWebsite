@@ -28,9 +28,12 @@ function levelTopics(level: PythonLevel): string[] {
 
 export function LevelPreviewPanel({
   level,
+  completedCount = 0,
   onStart,
 }: {
   level: PythonLevel
+  /** Lessons completed in this level (drives the Start/Continue/Review CTA + counts). */
+  completedCount?: number
   onStart: (level: PythonLevel) => void
 }) {
   // Every authored level (1–4) has a preview; guard defensively so a future level id can't crash.
@@ -38,6 +41,14 @@ export function LevelPreviewPanel({
   const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
   const activePhases = LEVEL_PHASE_COUNT[level.id]
   const topics = levelTopics(level)
+
+  const isDone = lessonCount > 0 && completedCount >= lessonCount
+  const inProgress = completedCount > 0 && !isDone
+  const ctaLabel = isDone
+    ? `Review Level ${level.id}`
+    : inProgress
+      ? `Continue Level ${level.id}`
+      : `Start Level ${level.id}`
 
   return (
     <div className="border-border bg-card/60 flex flex-col gap-5 rounded-2xl border p-5 shadow-sm backdrop-blur-sm">
@@ -100,7 +111,13 @@ export function LevelPreviewPanel({
           <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
           <dt className="sr-only">Lessons</dt>
           <dd>
-            {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"}
+            {inProgress || isDone ? (
+              <span className="text-accent font-medium">
+                {completedCount}/{lessonCount} done
+              </span>
+            ) : (
+              `${lessonCount} ${lessonCount === 1 ? "lesson" : "lessons"}`
+            )}
           </dd>
         </div>
         <div className="flex items-center gap-1.5">
@@ -120,7 +137,7 @@ export function LevelPreviewPanel({
         onClick={() => onStart(level)}
         className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 group inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
       >
-        Start Level {level.id}
+        {ctaLabel}
         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
       </button>
     </div>
