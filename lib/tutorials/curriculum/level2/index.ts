@@ -233,6 +233,367 @@ first match.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L2-M2 — Functions in Depth
+// ───────────────────────────────────────────────────────────────────────────
+
+const argsKwargsLesson: PythonLesson = {
+  id: "py-l2-args-kwargs",
+  title: "*args, **kwargs & unpacking",
+  summary:
+    "Write functions that accept any number of arguments, and unpack collections into calls.",
+  estimatedMinutes: 11,
+  difficulty: "medium",
+  skills: ["args", "kwargs", "unpacking", "functions"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Flexible argument lists
+
+Sometimes a function should accept *any number* of arguments.
+
+### \`*args\` collects extra positionals
+
+A parameter written \`*args\` gathers every extra positional argument into a **tuple**:
+
+\`\`\`python
+def total(*nums):
+    return sum(nums)        # nums is a tuple like (1, 2, 3)
+
+total(1, 2, 3)   # 6
+total()          # 0
+\`\`\`
+
+### \`**kwargs\` collects extra keywords
+
+A parameter written \`**kwargs\` gathers extra keyword arguments into a **dict**:
+
+\`\`\`python
+def tag(name, **attrs):
+    return name, attrs
+
+tag("a", href="/x")   # ("a", {"href": "/x"})
+\`\`\`
+
+### Unpacking at the call site
+
+The mirror image: \`*\` spreads a list into positional arguments, \`**\` spreads a dict into keyword
+arguments. This is how \`str.format\` fills a template from a dict:
+
+\`\`\`python
+values = {"name": "Ada", "age": 30}
+"{name} is {age}".format(**values)   # "Ada is 30"
+\`\`\`
+
+### Recap
+
+\`*args\` captures positionals into a tuple, \`**kwargs\` captures keywords into a dict, and \`*\`/\`**\`
+unpack a list/dict back into a call. Next you'll sum any number of values, then fill a template from
+a dict.`,
+    demoCode: `def total(*nums):
+    return sum(nums)
+
+print(total(1, 2, 3))    # 6
+print(total())           # 0
+print("{name} is {age}".format(**{"name": "Ada", "age": 30}))  # Ada is 30`,
+  },
+  apply: {
+    id: "py-l2-args-kwargs-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`total(*nums)\` — accept **any number** of numbers and return their sum.
+
+\`total(1, 2, 3)\` is \`6\`; \`total()\` is \`0\`. Use a \`*nums\` parameter.`,
+    starterCode: `def total(*nums):
+    # nums is a tuple of every argument passed. Return their sum.
+    pass`,
+    hints: [
+      "`*nums` collects all the arguments into a tuple.",
+      "`sum(nums)` adds them up (and sums to 0 when empty).",
+      "`return sum(nums)`.",
+    ],
+    referenceSolution: `def total(*nums):
+    return sum(nums)`,
+    testCases: [
+      { input: { a: 1, b: 2, c: 3 }, expected: 6, description: "three arguments" },
+      { input: { a: 5 }, expected: 5, description: "one argument" },
+      { input: {}, expected: 0, description: "no arguments sums to 0" },
+      { input: { a: 10, b: 20 }, expected: 30, description: "two arguments" },
+    ],
+  },
+  practice: {
+    id: "py-l2-args-kwargs-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`render(template, values)\` — fill the \`{placeholder}\` slots in \`template\` using the
+\`values\` dict.
+
+For \`template = "{name} is {age}"\` and \`values = {"name": "Ada", "age": 30}\`, return
+\`"Ada is 30"\`. Unpack the dict with \`**\`.`,
+    starterCode: `def render(template, values):
+    # Fill template's {slots} from the values dict using ** unpacking.
+    pass`,
+    hints: [
+      "`str.format` accepts keyword arguments: `template.format(name=..., age=...)`.",
+      "Spread the dict in with `**`: `template.format(**values)`.",
+    ],
+    referenceSolution: `def render(template, values):
+    return template.format(**values)`,
+    testCases: [
+      {
+        input: { template: "{name} is {age}", values: { name: "Ada", age: 30 } },
+        expected: "Ada is 30",
+        description: "two placeholders",
+      },
+      {
+        input: { template: "Hi {x}", values: { x: "there" } },
+        expected: "Hi there",
+        description: "one placeholder",
+      },
+      {
+        input: { template: "{a}+{b}={c}", values: { a: 1, b: 2, c: 3 } },
+        expected: "1+2=3",
+        description: "numbers fill in too",
+      },
+    ],
+  },
+}
+
+const lambdasHofLesson: PythonLesson = {
+  id: "py-l2-lambdas-hof",
+  title: "Lambdas & higher-order functions",
+  summary: "Pass functions as values: sorted(key=...), map, and filter.",
+  estimatedMinutes: 11,
+  difficulty: "medium",
+  skills: ["lambdas", "higher-order-functions", "sorted", "map"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Functions are values
+
+In Python a function is just a value — you can store it, pass it, and call it later. A function that
+**takes or returns** a function is a **higher-order function**.
+
+### Lambdas: tiny inline functions
+
+A \`lambda\` is a one-expression function with no name:
+
+\`\`\`python
+square = lambda x: x * x
+square(5)            # 25
+\`\`\`
+
+You'll rarely assign one — they're meant to be passed *into* another function.
+
+### sorted with a key
+
+\`sorted\` takes a \`key\` function that says *what to sort by*:
+
+\`\`\`python
+sorted(words, key=len)               # shortest first (pass the built-in len)
+sorted(words, key=lambda w: w[-1])   # by last character (a custom lambda)
+\`\`\`
+
+### map and filter
+
+\`map\` applies a function to every item; \`filter\` keeps items where a function is truthy. Both
+return lazy iterators, so wrap them in \`list(...)\`:
+
+\`\`\`python
+list(map(lambda x: x * 2, nums))         # double each
+list(filter(lambda x: x % 2 == 0, nums)) # keep evens
+\`\`\`
+
+### Recap
+
+A lambda is an inline function; \`sorted(key=...)\`, \`map\`, and \`filter\` are higher-order functions
+that take one. Next you'll sort words by length, then shout each one with \`map\`.`,
+    demoCode: `words = ["ccc", "a", "bb"]
+print(sorted(words, key=len))                 # ['a', 'bb', 'ccc']
+print(list(map(lambda w: w.upper(), words)))  # ['CCC', 'A', 'BB']`,
+  },
+  apply: {
+    id: "py-l2-lambdas-hof-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`sort_by_length(words)\` — return \`words\` sorted from shortest to longest.
+
+For \`["ccc", "a", "bb"]\` return \`["a", "bb", "ccc"]\`. Pass a \`key\` to \`sorted\`.`,
+    starterCode: `def sort_by_length(words):
+    # Return words sorted by length using sorted(key=...).
+    pass`,
+    hints: [
+      "`sorted(words, key=len)` sorts by each word's length.",
+      "`len` is itself a function — pass it as the key.",
+      "`return sorted(words, key=len)`.",
+    ],
+    referenceSolution: `def sort_by_length(words):
+    return sorted(words, key=len)`,
+    testCases: [
+      {
+        input: { words: ["ccc", "a", "bb"] },
+        expected: ["a", "bb", "ccc"],
+        description: "shortest first",
+      },
+      {
+        input: { words: ["bb", "aa"] },
+        expected: ["bb", "aa"],
+        description: "equal lengths keep their order",
+      },
+      { input: { words: [] }, expected: [], description: "empty list" },
+      { input: { words: ["one"] }, expected: ["one"], description: "single word" },
+    ],
+  },
+  practice: {
+    id: "py-l2-lambdas-hof-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`shout_all(words)\` — return a new list where each word is uppercased with a \`"!"\`
+appended.
+
+For \`["hi", "go"]\` return \`["HI!", "GO!"]\`. Use \`map\` with a \`lambda\`.`,
+    starterCode: `def shout_all(words):
+    # Use map() + a lambda to uppercase each word and add "!".
+    pass`,
+    hints: [
+      'The lambda is `lambda w: w.upper() + "!"`.',
+      "Apply it with `map(...)`, then wrap in `list(...)`.",
+      '`return list(map(lambda w: w.upper() + "!", words))`.',
+    ],
+    referenceSolution: `def shout_all(words):
+    return list(map(lambda w: w.upper() + "!", words))`,
+    testCases: [
+      { input: { words: ["hi", "go"] }, expected: ["HI!", "GO!"], description: "two words" },
+      { input: { words: [] }, expected: [], description: "empty list" },
+      { input: { words: ["a"] }, expected: ["A!"], description: "single word" },
+      { input: { words: ["Yes"] }, expected: ["YES!"], description: "mixed case" },
+    ],
+  },
+}
+
+const closuresDecoratorsLesson: PythonLesson = {
+  id: "py-l2-closures-decorators",
+  title: "Scope, closures & decorators",
+  summary: "Capture state in a closure and wrap behaviour with a decorator.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["closures", "scope", "decorators", "functions"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Inner functions remember their world
+
+A function defined **inside** another can use the outer function's variables. When the inner
+function is returned or used later, it keeps a live link to those variables — that's a **closure**.
+
+\`\`\`python
+def scaled(factor, value):
+    def multiply(x):
+        return x * factor    # 'factor' comes from the enclosing scope
+    return multiply(value)
+\`\`\`
+
+\`multiply\` *closes over* \`factor\`. (To **reassign** an enclosing variable, you'd mark it
+\`nonlocal\`.)
+
+## Decorators wrap a function
+
+A **decorator** is a higher-order function that takes a function and returns a new one with extra
+behaviour around it:
+
+\`\`\`python
+def double(fn):
+    def wrapper(x):
+        return fn(x) * 2     # call the original, then add behaviour
+    return wrapper
+
+@double                      # same as: triple = double(triple)
+def identity(x):
+    return x
+
+identity(5)                  # 10
+\`\`\`
+
+The \`@double\` line above a \`def\` rewires the name to the wrapped version.
+
+### Recap
+
+A closure is an inner function that captures enclosing variables; a decorator wraps a function to
+add behaviour, applied with \`@\`. Next you'll use a closure to scale a value, then write a decorator
+that doubles a result.`,
+    demoCode: `def double(fn):
+    def wrapper(x):
+        return fn(x) * 2
+    return wrapper
+
+@double
+def identity(x):
+    return x
+
+print(identity(5))   # 10`,
+  },
+  apply: {
+    id: "py-l2-closures-decorators-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`scaled(factor, value)\` using a **closure**: define an inner function that captures
+\`factor\` and multiplies its argument by it, then call that inner function on \`value\` and return
+the result.
+
+\`scaled(3, 5)\` is \`15\`.`,
+    starterCode: `def scaled(factor, value):
+    # Define an inner function that captures factor, then call it on value.
+    def multiply(x):
+        pass
+    return multiply(value)`,
+    hints: [
+      "Inside `multiply`, return `x * factor` — `factor` comes from the enclosing scope.",
+      "Then `return multiply(value)` from `scaled`.",
+    ],
+    referenceSolution: `def scaled(factor, value):
+    def multiply(x):
+        return x * factor
+    return multiply(value)`,
+    testCases: [
+      { input: { factor: 3, value: 5 }, expected: 15, description: "3 times 5" },
+      { input: { factor: 10, value: 2 }, expected: 20, description: "10 times 2" },
+      { input: { factor: 0, value: 7 }, expected: 0, description: "scaling by zero" },
+      { input: { factor: 5, value: 5 }, expected: 25, description: "5 times 5" },
+    ],
+  },
+  practice: {
+    id: "py-l2-closures-decorators-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`double_result(n)\` — write a decorator \`double\` that doubles whatever its wrapped
+function returns, apply it to a function that returns its argument, and return the result for \`n\`.
+
+\`double_result(5)\` is \`10\`.`,
+    starterCode: `def double_result(n):
+    def double(fn):
+        # Return a wrapper that doubles fn's result.
+        pass
+
+    @double
+    def identity(x):
+        return x
+
+    return identity(n)`,
+    hints: [
+      "Inside `double`, define `wrapper(x)` that returns `fn(x) * 2`, and return `wrapper`.",
+      "The `@double` line wraps `identity`, so `identity(n)` is already doubled.",
+    ],
+    referenceSolution: `def double_result(n):
+    def double(fn):
+        def wrapper(x):
+            return fn(x) * 2
+        return wrapper
+
+    @double
+    def identity(x):
+        return x
+
+    return identity(n)`,
+    testCases: [
+      { input: { n: 5 }, expected: 10, description: "5 doubled" },
+      { input: { n: 0 }, expected: 0, description: "zero doubled" },
+      { input: { n: -3 }, expected: -6, description: "negatives double too" },
+      { input: { n: 21 }, expected: 42, description: "21 doubled" },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -246,6 +607,12 @@ export const level2: PythonLevel = {
       title: "Comprehensions & Generators",
       description: "Transform collections concisely and stream values lazily.",
       lessons: [comprehensionsLesson, generatorsLesson],
+    },
+    {
+      id: "py-l2-functions-in-depth",
+      title: "Functions in Depth",
+      description: "Flexible signatures, functions as values, closures, and decorators.",
+      lessons: [argsKwargsLesson, lambdasHofLesson, closuresDecoratorsLesson],
     },
   ],
 }

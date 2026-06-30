@@ -52,9 +52,9 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L2-02 · `py-l2-generators`** (SF, medium) — *generators, `yield` & iterators.* Objective: lazy sequences, the iterator protocol, when to stream.
 
 ### Module L2-M2 — Functions in Depth
-- **PY-L2-03 · `py-l2-args-kwargs`** (SF, medium) — *`*args`, `**kwargs`, keyword args.* Objective: flexible signatures and argument unpacking.
-- **PY-L2-04 · `py-l2-lambdas-hof`** (SF, medium) — *lambdas & higher-order functions.* Objective: `sorted(key=...)`, `map`/`filter`, functions as values.
-- **PY-L2-05 · `py-l2-closures-decorators`** (SF, medium) — *scope, closures & decorators (intro).* Objective: capture state in closures; write a simple decorator.
+- [x] **PY-L2-03 · `py-l2-args-kwargs`** (SF, medium) — *`*args`, `**kwargs`, keyword args.* Objective: flexible signatures and argument unpacking.
+- [x] **PY-L2-04 · `py-l2-lambdas-hof`** (SF, medium) — *lambdas & higher-order functions.* Objective: `sorted(key=...)`, `map`/`filter`, functions as values.
+- [x] **PY-L2-05 · `py-l2-closures-decorators`** (SF, medium) — *scope, closures & decorators (intro).* Objective: capture state in closures; write a simple decorator.
 
 ### Module L2-M3 — OOP Foundations
 - **PY-L2-06 · `py-l2-classes`** (SF, medium) — *classes, `__init__`, methods & `self`.* Objective: model state + behavior with a class.
