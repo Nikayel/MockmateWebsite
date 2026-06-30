@@ -305,6 +305,49 @@ test to see the expected behaviour; some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Shared empty file content for package/test __init__.py entries.
+// ───────────────────────────────────────────────────────────────────────────
+const EMPTY_INIT = ""
+
+/** Build a standard workspace runner that imports two test modules and prints the results marker. */
+function buildRunner(
+  visibleModule: string,
+  hiddenModule: string,
+  visibleSuite: string,
+  hiddenSuite: string
+): string {
+  return String.raw`import json
+import os
+import sys
+import traceback
+
+sys.path.insert(0, os.getcwd())
+from tests import ${visibleModule}, ${hiddenModule}
+
+results = []
+
+
+def record_factory(suite):
+    def record(name, fn):
+        is_hidden = "hidden" in suite.lower()
+        try:
+            fn()
+            results.append({"suite": suite, "name": name, "passed": True, "error": None, "isHidden": is_hidden})
+        except AssertionError as exc:
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or (name + " failed"), "isHidden": is_hidden})
+        except Exception as exc:
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc(), "isHidden": is_hidden})
+
+    return record
+
+
+${visibleModule}.run_tests(record_factory("${visibleSuite}"))
+${hiddenModule}.run_tests(record_factory("${hiddenSuite}"))
+print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
+`
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // L3-M1 — Project Structure & Packaging  (py-l3-packages)
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -577,6 +620,252 @@ test to see expected behaviour; some tests are hidden.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L3-M2 — Type Hints & Static Typing
+// ───────────────────────────────────────────────────────────────────────────
+
+const TH_README = `# A typed stats module
+
+Add precise **type hints** while you implement a small stats module. \`stats/rounding.py\`
+(read-only) rounds to 2 decimals; implement \`average(values)\` in \`stats/summary.py\`.
+
+\`average\` should:
+- return \`0.0\` for an empty list
+- otherwise return the mean, rounded with the read-only \`round2\` helper
+
+Annotate it as \`def average(values: list[float]) -> float\`. Some tests are hidden.
+`
+
+const TH_ROUNDING = String.raw`def round2(x: float) -> float:
+    """Round a number to two decimal places."""
+    return round(x, 2)
+`
+
+const TH_SUMMARY_STARTER = String.raw`from stats.rounding import round2
+
+
+def average(values: list[float]) -> float:
+    """Return the rounded mean of values, or 0.0 when empty (see README.md)."""
+    # TODO: handle the empty list, then return round2(mean).
+    return 0.0
+`
+
+const TH_SUMMARY_REFERENCE = String.raw`from stats.rounding import round2
+
+
+def average(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    return round2(sum(values) / len(values))
+`
+
+const TH_TEST = String.raw`from stats.summary import average
+
+
+def run_tests(record):
+    def averages_two_numbers():
+        result = average([2, 4])
+        assert result == 3.0, f"expected 3.0, got {result!r}"
+
+    def empty_is_zero():
+        result = average([])
+        assert result == 0.0, f"expected 0.0, got {result!r}"
+
+    def keeps_one_decimal():
+        result = average([1, 2])
+        assert result == 1.5, f"expected 1.5, got {result!r}"
+
+    record("averages two numbers", averages_two_numbers)
+    record("empty list is 0.0", empty_is_zero)
+    record("keeps the decimal", keeps_one_decimal)
+`
+
+const TH_TEST_HIDDEN = String.raw`from stats.summary import average
+
+
+def run_tests(record):
+    def rounds_to_two_decimals():
+        result = average([10, 20, 35])
+        assert result == 21.67, f"expected 21.67, got {result!r}"
+
+    def single_value():
+        result = average([42])
+        assert result == 42.0, f"expected 42.0, got {result!r}"
+
+    record("rounds to two decimals", rounds_to_two_decimals)
+    record("single value averages to itself", single_value)
+`
+
+const typeHintsLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-type-hints",
+  title: "Type hints on functions & classes",
+  summary: "Annotate functions with precise types while implementing a small module.",
+  estimatedMinutes: 16,
+  difficulty: "medium",
+  skills: ["type-hints", "annotations", "modules", "mypy"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Annotations document your types
+
+A **type hint** records what a value is meant to be. Python doesn't enforce them at runtime, but
+they make code self-documenting and let tools like \`mypy\` or \`ty\` catch mismatches before you
+run.
+
+\`\`\`python
+def average(values: list[float]) -> float:
+    return sum(values) / len(values)
+\`\`\`
+
+- \`values: list[float]\` — the parameter is a list of floats.
+- \`-> float\` — the function returns a float.
+
+### Common shapes
+
+\`\`\`python
+name: str = "Ada"
+counts: dict[str, int] = {}
+pair: tuple[int, int] = (1, 2)
+\`\`\`
+
+### On classes
+
+Annotate attributes in \`__init__\` (or use a \`@dataclass\`):
+
+\`\`\`python
+class Account:
+    def __init__(self, balance: float) -> None:
+        self.balance: float = balance
+\`\`\`
+
+### Keep it honest
+
+A hint is a promise. If \`average\` can return \`0.0\` for an empty list, \`-> float\` still holds —
+but if it could return \`None\`, say so with \`-> float | None\`.
+
+### Recap
+
+Hints like \`list[float]\` and \`-> float\` document intent and power static checkers without changing
+runtime behaviour. You'll implement and annotate \`average\` — first in one file, then across the
+\`stats\` package.`,
+    demoCode: `def average(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+print(average([2, 4]))   # 3.0
+print(average([]))       # 0.0`,
+  },
+  apply: {
+    id: "py-l3-type-hints-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`average(nums)\` — return the mean of \`nums\` **rounded to 2
+decimals**, or \`0.0\` for an empty list.
+
+For \`[10, 20, 35]\` return \`21.67\`. Add type hints: \`def average(nums: list[float]) -> float\`.`,
+    starterCode: `def average(nums: list[float]) -> float:
+    # Return 0.0 when empty, else the mean rounded to 2 decimals.
+    pass`,
+    hints: [
+      "Guard the empty list first: `if not nums: return 0.0`.",
+      "The mean is `sum(nums) / len(nums)`.",
+      "Round it: `return round(sum(nums) / len(nums), 2)`.",
+    ],
+    referenceSolution: `def average(nums: list[float]) -> float:
+    if not nums:
+        return 0.0
+    return round(sum(nums) / len(nums), 2)`,
+    testCases: [
+      { input: { nums: [2, 4] }, expected: 3.0, description: "mean of two" },
+      { input: { nums: [] }, expected: 0.0, description: "empty -> 0.0" },
+      { input: { nums: [10, 20, 35] }, expected: 21.67, description: "rounds to 2 decimals" },
+      { input: { nums: [1, 2, 3] }, expected: 2.0, description: "mean of three" },
+    ],
+  },
+  practice: {
+    id: "py-l3-type-hints-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`average(values)\` in \`stats/summary.py\`: return \`0.0\` for an empty list, otherwise
+the mean rounded with the read-only \`round2\` helper imported from \`stats.rounding\`. Annotate it as
+\`def average(values: list[float]) -> float\`. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Guard the empty list: `if not values: return 0.0`.",
+      "`round2` is imported for you — wrap the mean in it.",
+      "`return round2(sum(values) / len(values))`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "stats/summary.py",
+      editableFilePaths: ["stats/summary.py"],
+      visibleTestPaths: ["tests/test_summary.py"],
+      hiddenTestPaths: ["tests/test_summary_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: TH_README },
+        { path: "stats/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "stats/rounding.py",
+          role: "readonly",
+          language: "python",
+          content: TH_ROUNDING,
+          description: "round2 helper (read-only)",
+        },
+        {
+          path: "stats/summary.py",
+          role: "editable",
+          language: "python",
+          content: TH_SUMMARY_STARTER,
+          description: "Implement average here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_summary.py",
+          role: "test",
+          language: "python",
+          content: TH_TEST,
+          description: "Visible stats tests",
+        },
+        {
+          path: "tests/test_summary_hidden.py",
+          role: "test",
+          language: "python",
+          content: TH_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner(
+            "test_summary",
+            "test_summary_hidden",
+            "visible stats",
+            "hidden stats"
+          ),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "stats/summary.py",
+          role: "editable",
+          language: "python",
+          content: TH_SUMMARY_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level3: PythonLevel = {
   id: 3,
   slug: "applied",
@@ -596,6 +885,12 @@ export const level3: PythonLevel = {
       title: "Project Structure & Packaging",
       description: "Lay out a multi-file package with a clear entry point.",
       lessons: [packagesLesson],
+    },
+    {
+      id: "py-l3-type-hints",
+      title: "Type Hints & Static Typing",
+      description: "Annotate functions and classes for clarity and static checking.",
+      lessons: [typeHintsLesson],
     },
   ],
 }

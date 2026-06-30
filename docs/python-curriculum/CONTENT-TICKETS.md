@@ -77,7 +77,7 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L3-01 · `py-l3-packages`** (WS, medium) — *modules vs packages, `__init__.py`, project layout.* Objective: structure a multi-file package with a clear entry point.
 
 ### Module L3-M2 — Type Hints & Static Typing
-- **PY-L3-02 · `py-l3-type-hints`** (WS, medium) — *annotations on functions/classes.* Objective: add precise type hints to a module.
+- [x] **PY-L3-02 · `py-l3-type-hints`** (WS, medium) — *annotations on functions/classes.* Objective: add precise type hints to a module.
 - **PY-L3-03 · `py-l3-typing-module`** (WS, medium) — *`typing`: Optional/Union, generics, Protocols (+ mypy/ty mindset).* Objective: type a small generic/Protocol-based API.
 
 ### Module L3-M3 — Testing with pytest
