@@ -131,6 +131,52 @@ chosen level** via the registry — keep it that way.
 
 ---
 
+## ✅ Curriculum content is COMPLETE (Agent 2) — what the UI binds to, read before building
+
+All four levels are authored, verified, and green: **46 lessons** (44 tickets + the 2 pinned samples) —
+single-file in L1/L2, workspace in L3/L4. Authored on branch `claude/python-curriculum-content` and
+merged to `main`. You **render** content; you don't author it. The whole surface is **data-driven by
+the registry** — bind to `listLevels()` / `getLevelBySlug()` / `getLessonLocation()` /
+`getNextLesson()` / `getLesson()`. **Never hardcode** level/module/lesson counts: modules per level
+vary (L1×5 → 13 lessons, L2×5 → 12, L3×6 → 11, L4×5 → 10).
+
+**Per lesson you render** `title`, `summary`, `estimatedMinutes`, `difficulty` (`easy|medium|hard`),
+`skills[]`, then the three phases — `teach` (`markdown` via `MarkdownRenderer` + optional `demoCode`
+"Run demo"), `apply`, `practice`. Each exercise has `prompt` (markdown; states the exact function
+signature), `starterCode`, `hints[]`, and either `testCases` (single-file) or a `workspace` config
+(file tabs).
+
+- **`skills[]` are curated + audited for honesty** — safe to use directly as topic chips / filter
+  facets (a lesson tagged `dataclasses` actually uses dataclasses). `estimatedMinutes` is set on every
+  lesson *and* every `teach` — use for the Path preview's lesson-count/time and the module list.
+- **Hints reveal progressively; the reference is gated** — `apply` reveals `referenceSolution` after
+  **2 failed runs**, `practice` **never**. Preserve that in the player.
+- **Run/grade ONLY through the shared `useExerciseRun` hook** (client-side Pyodide via
+  `executeScenarioInBrowser`). `demoCode` runs the same way with no tests. Do **not** call `/api/execute`.
+- **Pyodide cold start is multi-second** on the first Run of a session (it downloads + boots the WASM
+  runtime). Show an explicit "starting Python…" state on the first run so it doesn't read as hung;
+  later runs are fast.
+- **Workspace lessons** (`WorkspaceExerciseRunner`): render file tabs from `workspace.files` but
+  **exclude every `hidden:true` file** (the hidden tests + the runner) from the editor — they still
+  execute. Result rows carry `isHidden`; show hidden failures as "a hidden test failed" **without**
+  revealing the source or the assertion text.
+- **Two L4 lessons use deliberately sandbox-safe shapes — these are intentional, not stubs/bugs:** the
+  Pyodide runtime has **no OS threads** and runs inside an **already-active event loop**, so
+  `py-l4-concurrency` uses a `ThreadPoolExecutor`-with-sequential-fallback and `py-l4-asyncio` runs
+  coroutines via a provided read-only `aio/loop.py` `run_coroutines()` helper instead of `asyncio.run`.
+  If you upgrade the Pyodide worker later (≥0.27.7 + JSPI + COEP headers → real threads/`asyncio.run`),
+  you can restore the "textbook" forms; until then, leave the lesson code as-is.
+- **Completion overlay**: hydrate `isCompleted` on `LessonRow`/`LevelCard` from
+  `progress-client.fetchAllProgress()`. Editor text already persists across phase switches (the player
+  lifts per-exercise code) — don't re-implement it.
+
+The two canonical samples — `py-l1-temperature` (single-file) and `py-l3-parse-config` (workspace) —
+live inside the curriculum and render like any other lesson; they're good fixtures while building the
+player. Content was audited (grading contracts, workspace integrity, pedagogy, and registry/regressions
+all passed) — so you can build the UI against final, stable content.
+
+---
+
 ## Shared invariants & commands
 
 - Progress doc: `user_tutorial_progress/${uid}__${lessonId}`; `userId` + timestamps are **server-owned**
