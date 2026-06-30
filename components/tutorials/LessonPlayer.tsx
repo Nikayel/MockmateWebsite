@@ -18,6 +18,7 @@ import { ExerciseRunner } from "./ExerciseRunner"
 import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
+import { LessonHeader } from "./LessonHeader"
 import { SableTutor, type SableEvent, type SableEventInput } from "./SableTutor"
 import type {
   LessonSection,
@@ -210,6 +211,8 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
           <div className="overflow-y-auto px-6 py-6">
             <div className="mx-auto max-w-2xl">
+              <LessonHeader lesson={lesson} />
+
               {active === "teach" && (
                 <TeachPanel teach={lesson.teach} onContinue={() => goToSection("apply")} />
               )}
