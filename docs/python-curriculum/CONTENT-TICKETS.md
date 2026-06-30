@@ -102,8 +102,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L4-02 · `py-l4-solid-patterns`** (WS, hard) — *SOLID & design patterns (factory, strategy).* Objective: refactor toward SOLID; apply factory/strategy.
 
 ### Module L4-M2 — Decorators & Metaprogramming
-- **PY-L4-03 · `py-l4-decorators-advanced`** (WS, hard) — *decorators with arguments & `functools.wraps`.* Objective: parameterized, well-behaved decorators.
-- **PY-L4-04 · `py-l4-descriptors-metaclasses`** (WS, hard) — *descriptors & intro to metaclasses.* Objective: customize attribute access; understand class creation.
+- [x] **PY-L4-03 · `py-l4-decorators-advanced`** (WS, hard) — *decorators with arguments & `functools.wraps`.* Objective: parameterized, well-behaved decorators.
+- [x] **PY-L4-04 · `py-l4-descriptors-metaclasses`** (WS, hard) — *descriptors & intro to metaclasses.* Objective: customize attribute access; understand class creation.
 
 ### Module L4-M3 — Concurrency & Async
 - **PY-L4-05 · `py-l4-concurrency`** (WS, hard) — *threading, multiprocessing & the GIL (`concurrent.futures`).* Objective: choose the right model; parallelize safely.

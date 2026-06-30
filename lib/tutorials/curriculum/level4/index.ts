@@ -602,6 +602,626 @@ strategy must not require editing \`price_for\`. Some tests are hidden.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L4-M2 — Decorators & Metaprogramming
+// ───────────────────────────────────────────────────────────────────────────
+
+const DEC_README = `# A decorator that takes an argument
+
+Build a **parameterized** decorator. Implement \`multiply_by(factor)\` in
+\`decorators/wrappers.py\` — a decorator *factory* that returns a decorator which multiplies the
+wrapped function's result by \`factor\`. Use \`functools.wraps\` so the wrapped function keeps its
+name.
+
+\`decorators/math_ops.py\` (read-only) applies it: \`@multiply_by(3)\` on \`add\` makes
+\`add(2, 3) == 15\`. Some tests are hidden.
+`
+
+const DEC_WRAPPERS_STARTER = String.raw`import functools
+
+
+def multiply_by(factor):
+    """A decorator factory: multiply the wrapped function's result by factor (see README.md)."""
+
+    def decorator(fn):
+        # TODO: return a wrapper that multiplies fn(...) by factor. Use functools.wraps(fn).
+        return fn
+
+    return decorator
+`
+
+const DEC_WRAPPERS_REFERENCE = String.raw`import functools
+
+
+def multiply_by(factor):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs) * factor
+
+        return wrapper
+
+    return decorator
+`
+
+const DEC_MATH_OPS = String.raw`from decorators.wrappers import multiply_by
+
+
+@multiply_by(3)
+def add(a, b):
+    return a + b
+
+
+@multiply_by(10)
+def amount(x):
+    return x
+`
+
+const DEC_TEST = String.raw`from decorators.math_ops import add, amount
+
+
+def run_tests(record):
+    def triples_the_sum():
+        assert add(2, 3) == 15, f"expected 15, got {add(2, 3)!r}"
+
+    def scales_by_ten():
+        assert amount(5) == 50, f"expected 50, got {amount(5)!r}"
+
+    record("triples the sum", triples_the_sum)
+    record("scales by ten", scales_by_ten)
+`
+
+const DEC_TEST_HIDDEN = String.raw`from decorators.math_ops import add, amount
+
+
+def run_tests(record):
+    def preserves_name_with_wraps():
+        assert add.__name__ == "add", f"expected 'add', got {add.__name__!r} (use functools.wraps)"
+
+    def scales_zero():
+        assert amount(0) == 0
+
+    record("preserves __name__ via functools.wraps", preserves_name_with_wraps)
+    record("scales zero", scales_zero)
+`
+
+const decoratorsAdvancedLesson: PythonLesson = {
+  id: "py-l4-decorators-advanced",
+  title: "Decorators with arguments & functools.wraps",
+  summary: "Write a parameterized, well-behaved decorator that preserves the wrapped function.",
+  estimatedMinutes: 20,
+  difficulty: "hard",
+  skills: ["decorators", "functools", "closures", "metaprogramming"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Decorators that take arguments
+
+A plain decorator takes a function. A **decorator with arguments** is one level deeper: a *factory*
+that takes the arguments and *returns* a decorator.
+
+\`\`\`python
+def multiply_by(factor):          # 1. takes the argument
+    def decorator(fn):            # 2. the actual decorator
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs) * factor   # 3. wraps the call
+        return wrapper
+    return decorator
+
+@multiply_by(3)
+def add(a, b):
+    return a + b
+
+add(2, 3)    # 15
+\`\`\`
+
+Read \`@multiply_by(3)\` as \`add = multiply_by(3)(add)\` — call the factory, then apply the decorator
+it returns.
+
+### functools.wraps
+
+A wrapper hides the original's \`__name__\` and docstring. \`@functools.wraps(fn)\` copies them across
+so the wrapped function still looks like itself:
+
+\`\`\`python
+import functools
+
+def multiply_by(factor):
+    def decorator(fn):
+        @functools.wraps(fn)          # keep fn's name/doc
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs) * factor
+        return wrapper
+    return decorator
+\`\`\`
+
+Always add \`functools.wraps\` to real decorators — debuggers, logs, and \`help()\` depend on it.
+
+### Recap
+
+A parameterized decorator is a factory returning a decorator returning a wrapper; \`*args/**kwargs\`
+forwards any call and \`functools.wraps\` preserves the original's identity. You'll build
+\`multiply_by\` — first inline, then over a \`decorators\` package.`,
+    demoCode: `import functools
+
+
+def multiply_by(factor):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs) * factor
+
+        return wrapper
+
+    return decorator
+
+
+@multiply_by(3)
+def add(a, b):
+    return a + b
+
+
+print(add(2, 3))      # 15
+print(add.__name__)   # add`,
+  },
+  apply: {
+    id: "py-l4-decorators-advanced-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`multiply_by(factor)\` — a decorator factory that multiplies a
+function's result by \`factor\`. It's applied to \`add\` below, and the \`run\` driver calls it.
+
+\`run(2, 3)\` should be \`15\` (because \`(2 + 3) * 3\`).`,
+    starterCode: `import functools
+
+
+def multiply_by(factor):
+    def decorator(fn):
+        # TODO: return a wrapper multiplying fn(...) by factor (use functools.wraps).
+        return fn
+
+    return decorator
+
+
+@multiply_by(3)
+def add(a, b):
+    return a + b
+
+
+def run(a, b):
+    return add(a, b)`,
+    hints: [
+      "Inside `decorator`, define `wrapper(*args, **kwargs)` returning `fn(*args, **kwargs) * factor`.",
+      "Decorate the wrapper with `@functools.wraps(fn)` and return it.",
+      "`return wrapper` from `decorator`.",
+    ],
+    referenceSolution: `import functools
+
+
+def multiply_by(factor):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs) * factor
+
+        return wrapper
+
+    return decorator
+
+
+@multiply_by(3)
+def add(a, b):
+    return a + b
+
+
+def run(a, b):
+    return add(a, b)`,
+    testCases: [
+      { input: { a: 2, b: 3 }, expected: 15, description: "(2 + 3) * 3" },
+      { input: { a: 1, b: 1 }, expected: 6, description: "(1 + 1) * 3" },
+      { input: { a: 10, b: 5 }, expected: 45, description: "(10 + 5) * 3" },
+    ],
+  },
+  practice: {
+    id: "py-l4-decorators-advanced-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`multiply_by(factor)\` in \`decorators/wrappers.py\`: a decorator factory whose wrapper
+multiplies the wrapped function's result by \`factor\`, using \`functools.wraps\` to preserve the
+function's name. The read-only \`math_ops.py\` applies it. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Three nested layers: `multiply_by(factor)` → `decorator(fn)` → `wrapper(*args, **kwargs)`.",
+      "The wrapper returns `fn(*args, **kwargs) * factor`.",
+      "Decorate `wrapper` with `@functools.wraps(fn)` so `add.__name__` stays `'add'`.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "decorators/wrappers.py",
+      editableFilePaths: ["decorators/wrappers.py"],
+      visibleTestPaths: ["tests/test_decorators.py"],
+      hiddenTestPaths: ["tests/test_decorators_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: DEC_README },
+        {
+          path: "decorators/__init__.py",
+          role: "readonly",
+          language: "python",
+          content: EMPTY_INIT,
+        },
+        {
+          path: "decorators/wrappers.py",
+          role: "editable",
+          language: "python",
+          content: DEC_WRAPPERS_STARTER,
+          description: "Implement multiply_by here",
+        },
+        {
+          path: "decorators/math_ops.py",
+          role: "readonly",
+          language: "python",
+          content: DEC_MATH_OPS,
+          description: "Functions decorated with multiply_by (read-only)",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_decorators.py",
+          role: "test",
+          language: "python",
+          content: DEC_TEST,
+          description: "Visible decorator tests",
+        },
+        {
+          path: "tests/test_decorators_hidden.py",
+          role: "test",
+          language: "python",
+          content: DEC_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden functools.wraps tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_decorators", "test_decorators_hidden", "visible decorators", "hidden decorators"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "decorators/wrappers.py",
+          role: "editable",
+          language: "python",
+          content: DEC_WRAPPERS_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+const DESC_README = `# A validating descriptor
+
+Customize attribute access with a **descriptor**. Implement \`Positive\` in \`models/fields.py\` so it:
+- stores the value on the instance (under a private name from \`__set_name__\`)
+- returns it from \`__get__\`
+- **raises \`ValueError\`** from \`__set__\` when the value is negative
+
+\`models/account.py\` (read-only) uses it: \`balance = Positive()\`. Some tests are hidden.
+`
+
+const DESC_FIELDS_STARTER = String.raw`class Positive:
+    """A data descriptor that only allows non-negative values (see README.md)."""
+
+    def __set_name__(self, owner, name):
+        self.storage_name = "_" + name
+
+    def __get__(self, instance, owner):
+        # TODO: return the stored value from the instance.
+        return None
+
+    def __set__(self, instance, value):
+        # TODO: raise ValueError if value < 0, else store it on the instance.
+        pass
+`
+
+const DESC_FIELDS_REFERENCE = String.raw`class Positive:
+    def __set_name__(self, owner, name):
+        self.storage_name = "_" + name
+
+    def __get__(self, instance, owner):
+        return getattr(instance, self.storage_name)
+
+    def __set__(self, instance, value):
+        if value < 0:
+            raise ValueError("value must be non-negative")
+        setattr(instance, self.storage_name, value)
+`
+
+const DESC_ACCOUNT = String.raw`from models.fields import Positive
+
+
+class Account:
+    balance = Positive()
+
+    def __init__(self, balance):
+        self.balance = balance
+`
+
+const DESC_TEST = String.raw`from models.account import Account
+
+
+def run_tests(record):
+    def stores_and_reads():
+        assert Account(100).balance == 100, f"got {Account(100).balance!r}"
+
+    def allows_zero():
+        assert Account(0).balance == 0
+
+    def rejects_negative():
+        try:
+            Account(-5)
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, "a negative balance should raise ValueError"
+
+    record("stores and reads", stores_and_reads)
+    record("allows zero", allows_zero)
+    record("rejects a negative balance", rejects_negative)
+`
+
+const DESC_TEST_HIDDEN = String.raw`from models.account import Account
+
+
+def run_tests(record):
+    def reassignment_is_validated():
+        account = Account(100)
+        account.balance = 50
+        assert account.balance == 50
+        try:
+            account.balance = -1
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, "assigning a negative value should raise"
+
+    def instances_are_independent():
+        a, b = Account(10), Account(20)
+        assert (a.balance, b.balance) == (10, 20)
+
+    record("reassignment is validated", reassignment_is_validated)
+    record("instances stay independent", instances_are_independent)
+`
+
+const descriptorsMetaclassesLesson: PythonLesson = {
+  id: "py-l4-descriptors-metaclasses",
+  title: "Descriptors & a peek at metaclasses",
+  summary: "Customize attribute access with a descriptor and understand how classes are created.",
+  estimatedMinutes: 22,
+  difficulty: "hard",
+  skills: ["descriptors", "metaclasses", "attributes", "metaprogramming"],
+  teach: {
+    estimatedMinutes: 7,
+    markdown: `## Customizing attribute access
+
+### Descriptors
+
+A **descriptor** is a class that defines \`__get__\`/\`__set__\` and is used as a *class attribute*.
+Python routes attribute access through it — perfect for validation that lives in one place:
+
+\`\`\`python
+class Positive:
+    def __set_name__(self, owner, name):
+        self.storage_name = "_" + name          # remember where to stash the value
+
+    def __get__(self, instance, owner):
+        return getattr(instance, self.storage_name)
+
+    def __set__(self, instance, value):
+        if value < 0:
+            raise ValueError("must be non-negative")
+        setattr(instance, self.storage_name, value)
+
+class Account:
+    balance = Positive()       # the descriptor guards every Account.balance
+\`\`\`
+
+Now \`Account(100).balance\` is \`100\`, but \`Account(-5)\` raises — the validation can't be
+bypassed. \`__set_name__\` runs when the owning class is created and tells the descriptor which
+attribute name it's bound to.
+
+### Metaclasses (the peek)
+
+A **metaclass** is "the class of a class" — it controls how classes themselves are built. The
+default is \`type\`; \`class Account:\` is roughly \`Account = type("Account", (), {...})\`.
+
+\`\`\`python
+class Meta(type):
+    def __new__(mcls, name, bases, namespace):
+        # runs once, when the class is defined — register it, validate it, inject methods
+        return super().__new__(mcls, name, bases, namespace)
+
+class Thing(metaclass=Meta):
+    ...
+\`\`\`
+
+You'll rarely write one — dataclasses, ORMs, and \`abc\` use them under the hood — but knowing
+classes are objects built by \`type\` demystifies a lot of "magic".
+
+### Recap
+
+Descriptors put reusable get/set logic behind a class attribute; metaclasses customize class
+creation itself (\`type\` is the default). You'll build a \`Positive\` descriptor that validates an
+account balance — first inline, then across a \`models\` package.`,
+    demoCode: `class Positive:
+    def __set_name__(self, owner, name):
+        self.storage_name = "_" + name
+
+    def __get__(self, instance, owner):
+        return getattr(instance, self.storage_name)
+
+    def __set__(self, instance, value):
+        if value < 0:
+            raise ValueError("must be non-negative")
+        setattr(instance, self.storage_name, value)
+
+
+class Account:
+    balance = Positive()
+
+    def __init__(self, balance):
+        self.balance = balance
+
+
+print(Account(100).balance)   # 100`,
+  },
+  apply: {
+    id: "py-l4-descriptors-metaclasses-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement the \`Positive\` descriptor so \`Account\` stores and returns a
+balance through it (raising \`ValueError\` on negatives). The \`run\` driver builds an \`Account\` and
+returns its balance.
+
+\`run(100)\` is \`100\`; \`run(0)\` is \`0\`.`,
+    starterCode: `class Positive:
+    def __set_name__(self, owner, name):
+        self.storage_name = "_" + name
+
+    def __get__(self, instance, owner):
+        # TODO: return the stored value.
+        pass
+
+    def __set__(self, instance, value):
+        # TODO: raise ValueError if value < 0, else store it.
+        pass
+
+
+class Account:
+    balance = Positive()
+
+    def __init__(self, balance):
+        self.balance = balance
+
+
+def run(balance):
+    return Account(balance).balance`,
+    hints: [
+      "In `__get__`, return `getattr(instance, self.storage_name)`.",
+      "In `__set__`, `if value < 0: raise ValueError(...)`, otherwise `setattr(instance, self.storage_name, value)`.",
+      "`__set_name__` already gives you `self.storage_name` (e.g. `_balance`).",
+    ],
+    referenceSolution: `class Positive:
+    def __set_name__(self, owner, name):
+        self.storage_name = "_" + name
+
+    def __get__(self, instance, owner):
+        return getattr(instance, self.storage_name)
+
+    def __set__(self, instance, value):
+        if value < 0:
+            raise ValueError("value must be non-negative")
+        setattr(instance, self.storage_name, value)
+
+
+class Account:
+    balance = Positive()
+
+    def __init__(self, balance):
+        self.balance = balance
+
+
+def run(balance):
+    return Account(balance).balance`,
+    testCases: [
+      { input: { balance: 100 }, expected: 100, description: "stores and reads 100" },
+      { input: { balance: 0 }, expected: 0, description: "zero is allowed" },
+      { input: { balance: 50 }, expected: 50, description: "stores and reads 50" },
+    ],
+  },
+  practice: {
+    id: "py-l4-descriptors-metaclasses-practice",
+    executionMode: "workspace",
+    prompt: `Implement the \`Positive\` descriptor in \`models/fields.py\`: \`__get__\` returns the stored value,
+\`__set__\` raises \`ValueError\` for negatives and otherwise stores the value (the storage name comes
+from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "`__get__`: `return getattr(instance, self.storage_name)`.",
+      "`__set__`: guard `value < 0` with `raise ValueError(...)`, else `setattr(instance, self.storage_name, value)`.",
+      "Storing under `self.storage_name` (not a fixed name) keeps each instance independent.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "models/fields.py",
+      editableFilePaths: ["models/fields.py"],
+      visibleTestPaths: ["tests/test_account.py"],
+      hiddenTestPaths: ["tests/test_account_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: DESC_README },
+        { path: "models/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "models/fields.py",
+          role: "editable",
+          language: "python",
+          content: DESC_FIELDS_STARTER,
+          description: "Implement the Positive descriptor here",
+        },
+        {
+          path: "models/account.py",
+          role: "readonly",
+          language: "python",
+          content: DESC_ACCOUNT,
+          description: "Account uses the descriptor (read-only)",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_account.py",
+          role: "test",
+          language: "python",
+          content: DESC_TEST,
+          description: "Visible descriptor tests",
+        },
+        {
+          path: "tests/test_account_hidden.py",
+          role: "test",
+          language: "python",
+          content: DESC_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden descriptor tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_account", "test_account_hidden", "visible account", "hidden account"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "models/fields.py",
+          role: "editable",
+          language: "python",
+          content: DESC_FIELDS_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level4: PythonLevel = {
   id: 4,
   slug: "engineering",
@@ -615,6 +1235,12 @@ export const level4: PythonLevel = {
       title: "Advanced OOP & Design Patterns",
       description: "Program to interfaces with ABCs/Protocols and apply SOLID patterns.",
       lessons: [abcProtocolsLesson, solidPatternsLesson],
+    },
+    {
+      id: "py-l4-metaprogramming",
+      title: "Decorators & Metaprogramming",
+      description: "Parameterized decorators, descriptors, and how classes are created.",
+      lessons: [decoratorsAdvancedLesson, descriptorsMetaclassesLesson],
     },
   ],
 }
