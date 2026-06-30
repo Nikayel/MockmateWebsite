@@ -98,8 +98,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 ## LEVEL 4 — Production & Mastery (~11h, workspace, senior-track) — 10 lessons
 
 ### Module L4-M1 — Advanced OOP & Design Patterns
-- **PY-L4-01 · `py-l4-abc-protocols`** (WS, hard) — *ABCs & Protocols.* Objective: define interfaces with `abc`/`Protocol`; program to abstractions.
-- **PY-L4-02 · `py-l4-solid-patterns`** (WS, hard) — *SOLID & design patterns (factory, strategy).* Objective: refactor toward SOLID; apply factory/strategy.
+- [x] **PY-L4-01 · `py-l4-abc-protocols`** (WS, hard) — *ABCs & Protocols.* Objective: define interfaces with `abc`/`Protocol`; program to abstractions.
+- [x] **PY-L4-02 · `py-l4-solid-patterns`** (WS, hard) — *SOLID & design patterns (factory, strategy).* Objective: refactor toward SOLID; apply factory/strategy.
 
 ### Module L4-M2 — Decorators & Metaprogramming
 - **PY-L4-03 · `py-l4-decorators-advanced`** (WS, hard) — *decorators with arguments & `functools.wraps`.* Objective: parameterized, well-behaved decorators.
