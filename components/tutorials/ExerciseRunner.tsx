@@ -20,6 +20,12 @@ export interface ExerciseRunnerProps {
   code: string
   onCodeChange: (value: string) => void
   onPass?: () => void
+  /** Fires after each graded run with its pass/fail (drives Sable). */
+  onRunResult?: (passed: boolean) => void
+  /** Fires when the learner reveals a hint (1-based index, total available). */
+  onHintReveal?: (index: number, total: number) => void
+  /** Fires when the gated reference solution is revealed. */
+  onReferenceReveal?: () => void
   /** Guided steps (apply) reveal the reference after a few attempts; challenges (practice) never do. */
   canRevealReference?: boolean
   /** Failed attempts before the reference becomes revealable. */
@@ -31,10 +37,16 @@ export function ExerciseRunner({
   code,
   onCodeChange,
   onPass,
+  onRunResult,
+  onHintReveal,
+  onReferenceReveal,
   canRevealReference = false,
   revealReferenceAfter = 2,
 }: ExerciseRunnerProps) {
-  const { running, results, runError, attempts, passed, run } = useExerciseRun(exercise, onPass)
+  const { running, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
+    onPass,
+    onResult: onRunResult,
+  })
   const [emptyWarning, setEmptyWarning] = useState(false)
   const [hintsShown, setHintsShown] = useState(0)
   const [showReference, setShowReference] = useState(false)
@@ -72,7 +84,13 @@ export function ExerciseRunner({
         {hints.length > 0 && (
           <Button
             variant="outline"
-            onClick={() => setHintsShown((n) => Math.min(n + 1, hints.length))}
+            onClick={() =>
+              setHintsShown((n) => {
+                const next = Math.min(n + 1, hints.length)
+                if (next > n) onHintReveal?.(next, hints.length)
+                return next
+              })
+            }
             disabled={hintsShown >= hints.length}
             className="gap-2"
           >
@@ -81,7 +99,14 @@ export function ExerciseRunner({
           </Button>
         )}
         {canShowReference && !showReference && (
-          <Button variant="ghost" onClick={() => setShowReference(true)} className="gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowReference(true)
+              onReferenceReveal?.()
+            }}
+            className="gap-2"
+          >
             <Eye className="h-4 w-4" />
             Show solution
           </Button>

@@ -36,26 +36,6 @@ export default function LessonPage() {
 
   const { level, lesson } = location
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <Link
-          href={`/learn/python/${level.slug}`}
-          className="border-primary/40 bg-primary/5 text-foreground hover:bg-primary/10 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors"
-        >
-          LEVEL {level.id}
-        </Link>
-        <h1 className="text-xl font-semibold">{lesson.title}</h1>
-        <Link
-          href="/learn/python"
-          className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1.5 text-sm"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Levels
-        </Link>
-      </div>
-
-      <LessonPlayer lesson={lesson} level={level} />
-    </div>
-  )
+  // The workspace is a full-height 3-column tool that owns its own top bar (§C).
+  return <LessonPlayer lesson={lesson} level={level} />
 }

@@ -21,12 +21,15 @@ export interface WorkspaceExerciseRunnerProps {
   exercise: PythonExercise
   workspace: NonNullable<PythonExercise["workspace"]>
   onPass?: () => void
+  /** Fires after each graded run with its pass/fail (drives Sable). */
+  onRunResult?: (passed: boolean) => void
 }
 
 export function WorkspaceExerciseRunner({
   exercise,
   workspace,
   onPass,
+  onRunResult,
 }: WorkspaceExerciseRunnerProps) {
   const editablePaths = useMemo(() => new Set(workspace.editableFilePaths), [workspace])
   const isEditable = (file: WorkspaceScenarioFile) =>
@@ -45,7 +48,10 @@ export function WorkspaceExerciseRunner({
   })
   const [activePath, setActivePath] = useState<string>(workspace.primaryFilePath)
 
-  const { running, results, runError, passed, run } = useExerciseRun(exercise, onPass)
+  const { running, results, runError, passed, run } = useExerciseRun(exercise, {
+    onPass,
+    onResult: onRunResult,
+  })
 
   const activeFile =
     visibleFiles.find((file) => file.path === activePath) ?? visibleFiles[0] ?? null

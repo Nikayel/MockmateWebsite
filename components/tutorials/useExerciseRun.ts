@@ -54,7 +54,18 @@ export interface ExerciseRunState {
   run: (input: RunInput) => Promise<void>
 }
 
-export function useExerciseRun(exercise: PythonExercise, onPass?: () => void): ExerciseRunState {
+export interface ExerciseRunCallbacks {
+  /** Fires once when every test passes for the first time. */
+  onPass?: () => void
+  /** Fires after every graded run with that run's pass/fail (drives Sable's reactions). */
+  onResult?: (passed: boolean) => void
+}
+
+export function useExerciseRun(
+  exercise: PythonExercise,
+  callbacks: ExerciseRunCallbacks = {}
+): ExerciseRunState {
+  const { onPass, onResult } = callbacks
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState<TestResult[]>([])
   const [runError, setRunError] = useState<string | null>(null)
@@ -94,6 +105,7 @@ export function useExerciseRun(exercise: PythonExercise, onPass?: () => void): E
       }
 
       const allPassed = result.success && mapped.every((r) => r.passed)
+      onResult?.(allPassed)
       if (allPassed) {
         if (!passed) onPass?.()
         setPassed(true)

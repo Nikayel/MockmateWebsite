@@ -17,6 +17,12 @@ export type SableEvent =
   | { id: number; kind: "reference" }
   | { id: number; kind: "complete"; section: LessonSection }
 
+/** Distributive omit so each union member keeps its own fields when `id` is stripped. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+/** A Sable event before the player assigns it a stable id. */
+export type SableEventInput = DistributiveOmit<SableEvent, "id">
+
 const SECTION_LABEL: Record<LessonSection, string> = {
   teach: "Read",
   apply: "Apply",
