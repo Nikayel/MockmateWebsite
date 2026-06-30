@@ -1633,6 +1633,485 @@ quantities, never mutating the input). Some tests are hidden.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L3-M4 — Files, Data & Robustness
+// ───────────────────────────────────────────────────────────────────────────
+
+const PL_README = `# Total a scores file with pathlib
+
+Read real files with \`pathlib\`. Implement \`total_score(path)\` in \`reports/scores.py\` so it reads
+the file at \`path\` and returns the **sum of the integer on each non-blank line**.
+
+The \`data/\` folder holds the score files. Blank lines are skipped. Some tests are hidden.
+`
+
+const PL_SCORES = "10\n20\n30\n"
+const PL_SCORES2 = "5\n5\n5\n5\n"
+const PL_SCORES_BLANKS = "3\n\n4\n"
+const PL_SCORES_EMPTY = ""
+
+const PL_SCORES_STARTER = String.raw`from pathlib import Path
+
+
+def total_score(path):
+    """Sum the integer on each non-blank line of the file at path (see README.md)."""
+    # TODO: read the file with pathlib, then sum its integer lines.
+    return 0
+`
+
+const PL_SCORES_REFERENCE = String.raw`from pathlib import Path
+
+
+def total_score(path):
+    text = Path(path).read_text()
+    return sum(int(line) for line in text.splitlines() if line.strip())
+`
+
+const PL_TEST = String.raw`from reports.scores import total_score
+
+
+def run_tests(record):
+    def sums_the_scores_file():
+        result = total_score("data/scores.txt")
+        assert result == 60, f"expected 60, got {result!r}"
+
+    def sums_another_file():
+        result = total_score("data/scores2.txt")
+        assert result == 20, f"expected 20, got {result!r}"
+
+    record("sums the scores file", sums_the_scores_file)
+    record("sums another file", sums_another_file)
+`
+
+const PL_TEST_HIDDEN = String.raw`from reports.scores import total_score
+
+
+def run_tests(record):
+    def ignores_blank_lines():
+        result = total_score("data/with_blanks.txt")
+        assert result == 7, f"expected 7, got {result!r}"
+
+    def empty_file_is_zero():
+        result = total_score("data/empty.txt")
+        assert result == 0, f"expected 0, got {result!r}"
+
+    record("ignores blank lines", ignores_blank_lines)
+    record("empty file totals 0", empty_file_is_zero)
+`
+
+const pathlibLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-pathlib",
+  title: "pathlib & file processing",
+  summary: "Read and transform real files in a project with pathlib.",
+  estimatedMinutes: 17,
+  difficulty: "medium",
+  skills: ["pathlib", "files", "text-processing", "io"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Files the modern way: pathlib
+
+\`pathlib.Path\` is the modern, object-oriented way to work with files and folders — cleaner than
+string paths and \`os.path\`.
+
+\`\`\`python
+from pathlib import Path
+
+p = Path("data/scores.txt")
+p.read_text()                 # the whole file as a string
+p.write_text("hi")            # (over)write it
+p.exists()                    # True / False
+Path("data") / "scores.txt"   # join paths with /
+\`\`\`
+
+### Processing a file
+
+Read, split into lines, transform:
+
+\`\`\`python
+text = Path(path).read_text()
+numbers = [int(line) for line in text.splitlines() if line.strip()]
+\`\`\`
+
+\`splitlines()\` drops the newline characters; the \`if line.strip()\` guard skips blank lines so
+\`int()\` never sees an empty string.
+
+### Walking a folder
+
+\`\`\`python
+for child in Path("data").iterdir():
+    if child.suffix == ".txt":
+        ...
+\`\`\`
+
+### Recap
+
+\`Path(...).read_text()\` reads a file, \`/\` joins paths, and \`splitlines()\` + a blank-line guard
+turn text into clean data. You'll total a file's numbers — first from a string, then from real files
+in a \`data/\` folder.`,
+    demoCode: `text = "10\\n20\\n30"
+numbers = [int(line) for line in text.splitlines() if line.strip()]
+print(sum(numbers))   # 60`,
+  },
+  apply: {
+    id: "py-l3-pathlib-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`total_score(text)\` — sum the integer on each non-blank line of
+the string \`text\`.
+
+For \`"10\\n20\\n30"\` return \`60\`. Skip blank lines.`,
+    starterCode: `def total_score(text):
+    # Sum the integer on each non-blank line.
+    pass`,
+    hints: [
+      "`text.splitlines()` gives the lines without newline characters.",
+      "Skip blanks with `if line.strip()` so `int()` never sees an empty line.",
+      "`return sum(int(line) for line in text.splitlines() if line.strip())`.",
+    ],
+    referenceSolution: `def total_score(text):
+    return sum(int(line) for line in text.splitlines() if line.strip())`,
+    testCases: [
+      { input: { text: "10\n20\n30" }, expected: 60, description: "three numbers" },
+      { input: { text: "5\n5" }, expected: 10, description: "two numbers" },
+      { input: { text: "3\n\n4" }, expected: 7, description: "blank line skipped" },
+      { input: { text: "" }, expected: 0, description: "empty text" },
+    ],
+  },
+  practice: {
+    id: "py-l3-pathlib-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`total_score(path)\` in \`reports/scores.py\`: read the file at \`path\` with \`pathlib\`
+and return the sum of the integer on each non-blank line. The score files live in \`data/\`. Some
+tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "Read the file: `Path(path).read_text()`.",
+      "Split and guard: `for line in text.splitlines() if line.strip()`.",
+      "Sum the parsed ints with a generator expression.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "reports/scores.py",
+      editableFilePaths: ["reports/scores.py"],
+      visibleTestPaths: ["tests/test_scores.py"],
+      hiddenTestPaths: ["tests/test_scores_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: PL_README },
+        { path: "data/scores.txt", role: "readonly", language: "text", content: PL_SCORES },
+        { path: "data/scores2.txt", role: "readonly", language: "text", content: PL_SCORES2 },
+        {
+          path: "data/with_blanks.txt",
+          role: "readonly",
+          language: "text",
+          content: PL_SCORES_BLANKS,
+          hidden: true,
+        },
+        {
+          path: "data/empty.txt",
+          role: "readonly",
+          language: "text",
+          content: PL_SCORES_EMPTY,
+          hidden: true,
+        },
+        { path: "reports/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "reports/scores.py",
+          role: "editable",
+          language: "python",
+          content: PL_SCORES_STARTER,
+          description: "Implement total_score here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_scores.py",
+          role: "test",
+          language: "python",
+          content: PL_TEST,
+          description: "Visible file-reading tests",
+        },
+        {
+          path: "tests/test_scores_hidden.py",
+          role: "test",
+          language: "python",
+          content: PL_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_scores", "test_scores_hidden", "visible scores", "hidden scores"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "reports/scores.py",
+          role: "editable",
+          language: "python",
+          content: PL_SCORES_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
+const LG_README = `# Robust totals with an error boundary
+
+\`processing/parsing.py\` (read-only) has \`to_amount(raw)\`, which converts text to an int and
+**raises** \`ValueError\` on bad input. Implement \`safe_total(raws)\` in \`processing/totals.py\` so
+it totals every value that parses and **skips** the ones that don't (a clean error boundary).
+
+Example: \`safe_total(["1", "x", "3"])\` is \`4\`. Some tests are hidden.
+`
+
+const LG_PARSING = String.raw`def to_amount(raw):
+    """Convert raw text to an int amount. Raises ValueError on bad input."""
+    return int(raw)
+`
+
+const LG_TOTALS_STARTER = String.raw`from processing.parsing import to_amount
+
+
+def safe_total(raws):
+    """Total the values that parse, skipping any that raise ValueError (see README.md)."""
+    # TODO: try to_amount(raw) for each; skip the ones that raise.
+    return 0
+`
+
+const LG_TOTALS_REFERENCE = String.raw`from processing.parsing import to_amount
+
+
+def safe_total(raws):
+    total = 0
+    for raw in raws:
+        try:
+            total += to_amount(raw)
+        except ValueError:
+            continue
+    return total
+`
+
+const LG_TEST = String.raw`from processing.totals import safe_total
+
+
+def run_tests(record):
+    def sums_valid_amounts():
+        assert safe_total(["1", "2", "3"]) == 6, f"got {safe_total(['1','2','3'])!r}"
+
+    def skips_invalid_amounts():
+        assert safe_total(["1", "x", "3"]) == 4, f"got {safe_total(['1','x','3'])!r}"
+
+    def empty_list_is_zero():
+        assert safe_total([]) == 0
+
+    record("sums valid amounts", sums_valid_amounts)
+    record("skips invalid amounts", skips_invalid_amounts)
+    record("empty list totals 0", empty_list_is_zero)
+`
+
+const LG_TEST_HIDDEN = String.raw`from processing.totals import safe_total
+
+
+def run_tests(record):
+    def skips_blank_strings():
+        assert safe_total(["10", " ", "5"]) == 15, f"got {safe_total(['10',' ','5'])!r}"
+
+    def all_invalid_is_zero():
+        assert safe_total(["a", "b"]) == 0, f"got {safe_total(['a','b'])!r}"
+
+    record("skips blank strings", skips_blank_strings)
+    record("all invalid totals 0", all_invalid_is_zero)
+`
+
+const loggingErrorsLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-logging-errors",
+  title: "logging & exception design",
+  summary: "Use logging instead of print and design where errors get caught.",
+  estimatedMinutes: 17,
+  difficulty: "medium",
+  skills: ["logging", "exceptions", "error-boundaries", "robustness"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Logging and where to handle errors
+
+### Logging beats print
+
+In real programs, use the \`logging\` module instead of \`print\`. It adds levels
+(DEBUG/INFO/WARNING/ERROR), timestamps, and can be turned up or down without touching call sites:
+
+\`\`\`python
+import logging
+logger = logging.getLogger(__name__)
+
+logger.info("processing %d records", len(records))
+logger.warning("skipping bad record: %r", raw)
+\`\`\`
+
+### Designing error boundaries
+
+Don't catch errors everywhere — decide *where* a failure is handled. A common pattern: a low-level
+helper **raises** on bad input, and a higher-level loop **catches** and skips, so one bad record
+doesn't sink the whole batch:
+
+\`\`\`python
+def to_amount(raw):
+    return int(raw)        # raises ValueError on bad input
+
+def safe_total(raws):
+    total = 0
+    for raw in raws:
+        try:
+            total += to_amount(raw)
+        except ValueError:
+            continue        # skip + (in real code) logger.warning(...)
+    return total
+\`\`\`
+
+### Catch narrowly
+
+Catch the *specific* exception you expect (\`ValueError\`), not a bare \`except\` — you don't want to
+swallow unrelated bugs like a typo'd name.
+
+### Recap
+
+\`logging\` replaces \`print\` with levelled, configurable output; good error design puts the
+\`raise\` low and the \`try/except\` at the boundary that can recover. You'll build \`safe_total\` so
+one bad record never sinks the batch.`,
+    demoCode: `def safe_total(raws):
+    total = 0
+    for raw in raws:
+        try:
+            total += int(raw)
+        except ValueError:
+            continue
+    return total
+
+
+print(safe_total(["1", "x", "3"]))   # 4`,
+  },
+  apply: {
+    id: "py-l3-logging-errors-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`safe_total(raws)\` — total the strings in \`raws\` that parse as
+integers, **skipping** any that don't.
+
+\`safe_total(["1", "x", "3"])\` is \`4\`.`,
+    starterCode: `def safe_total(raws):
+    # Sum the values that int() accepts; skip the ones that raise ValueError.
+    pass`,
+    hints: [
+      "Loop the raws and `try: total += int(raw)`.",
+      "On `except ValueError:` use `continue` to skip that one.",
+      "Return the running total after the loop.",
+    ],
+    referenceSolution: `def safe_total(raws):
+    total = 0
+    for raw in raws:
+        try:
+            total += int(raw)
+        except ValueError:
+            continue
+    return total`,
+    testCases: [
+      { input: { raws: ["1", "2", "3"] }, expected: 6, description: "all valid" },
+      { input: { raws: ["1", "x", "3"] }, expected: 4, description: "one invalid skipped" },
+      { input: { raws: [] }, expected: 0, description: "empty list" },
+      { input: { raws: ["10", " ", "5"] }, expected: 15, description: "blank skipped" },
+    ],
+  },
+  practice: {
+    id: "py-l3-logging-errors-practice",
+    executionMode: "workspace",
+    prompt: `Implement \`safe_total(raws)\` in \`processing/totals.py\`: use the read-only \`to_amount\` helper
+(which raises \`ValueError\` on bad input) to total the valid values, skipping the rest. Some tests
+are hidden.`,
+    starterCode: "",
+    hints: [
+      "`to_amount` is imported for you — call it inside a `try`.",
+      "Catch `ValueError` and `continue` to skip bad records.",
+      "Return the accumulated total.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "processing/totals.py",
+      editableFilePaths: ["processing/totals.py"],
+      visibleTestPaths: ["tests/test_totals.py"],
+      hiddenTestPaths: ["tests/test_totals_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: LG_README },
+        {
+          path: "processing/__init__.py",
+          role: "readonly",
+          language: "python",
+          content: EMPTY_INIT,
+        },
+        {
+          path: "processing/parsing.py",
+          role: "readonly",
+          language: "python",
+          content: LG_PARSING,
+          description: "to_amount helper (read-only, raises on bad input)",
+        },
+        {
+          path: "processing/totals.py",
+          role: "editable",
+          language: "python",
+          content: LG_TOTALS_STARTER,
+          description: "Implement safe_total here",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_totals.py",
+          role: "test",
+          language: "python",
+          content: LG_TEST,
+          description: "Visible error-boundary tests",
+        },
+        {
+          path: "tests/test_totals_hidden.py",
+          role: "test",
+          language: "python",
+          content: LG_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: buildRunner("test_totals", "test_totals_hidden", "visible totals", "hidden totals"),
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "processing/totals.py",
+          role: "editable",
+          language: "python",
+          content: LG_TOTALS_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level3: PythonLevel = {
   id: 3,
   slug: "applied",
@@ -1664,6 +2143,12 @@ export const level3: PythonLevel = {
       title: "Testing with pytest",
       description: "Drive a module with pytest assertions, fixtures, and parametrize.",
       lessons: [pytestBasicsLesson, pytestFixturesLesson],
+    },
+    {
+      id: "py-l3-files-data-robustness",
+      title: "Files, Data & Robustness",
+      description: "Read files with pathlib and design resilient error handling.",
+      lessons: [pathlibLesson, loggingErrorsLesson],
     },
   ],
 }

@@ -85,8 +85,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L3-05 · `py-l3-pytest-fixtures`** (WS, medium) — *fixtures & parametrize (TDD a module).* Objective: share setup with fixtures; cover cases with `parametrize`.
 
 ### Module L3-M4 — Files, Data & Robustness
-- **PY-L3-06 · `py-l3-pathlib`** (WS, medium) — *pathlib & file processing in a project.* Objective: read/transform/write files across a small project.
-- **PY-L3-07 · `py-l3-logging-errors`** (WS, medium) — *logging & exception design.* Objective: structured `logging`; design error boundaries.
+- [x] **PY-L3-06 · `py-l3-pathlib`** (WS, medium) — *pathlib & file processing in a project.* Objective: read/transform/write files across a small project.
+- [x] **PY-L3-07 · `py-l3-logging-errors`** (WS, medium) — *logging & exception design.* Objective: structured `logging`; design error boundaries.
 
 ### Module L3-M5 — Real Programs & Tooling
 - **PY-L3-08 · `py-l3-cli`** (WS, medium) — *building a CLI (argparse/typer).* Objective: a runnable CLI with args/subcommands.
