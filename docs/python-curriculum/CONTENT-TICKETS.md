@@ -22,8 +22,8 @@ Legend: **SF** = single-file, **WS** = workspace.
 ## LEVEL 1 — Python Fundamentals (~9h, single-file, beginner) — 12 lessons
 
 ### Module L1-M1 — First Steps
-- **PY-L1-01 · `py-l1-hello`** (SF, easy) — *print, comments, running code.* Objective: produce output with `print()`, write comments, understand a program runs top-to-bottom.
-- **PY-L1-02 · `py-l1-variables`** (SF, easy) — *variables & assignment.* Objective: bind names to values, reassign, choose readable names.
+- [x] **PY-L1-01 · `py-l1-hello`** (SF, easy) — *print, comments, running code.* Objective: produce output with `print()`, write comments, understand a program runs top-to-bottom.
+- [x] **PY-L1-02 · `py-l1-variables`** (SF, easy) — *variables & assignment.* Objective: bind names to values, reassign, choose readable names.
 
 ### Module L1-M2 — Data Types
 - **PY-L1-03 · `py-l1-numbers`** (SF, easy) — *ints, floats & arithmetic.* Objective: arithmetic, integer vs float division, modulo.
