@@ -74,7 +74,7 @@ Legend: **SF** = single-file, **WS** = workspace.
 ## LEVEL 3 — Applied Engineering (~11h, workspace, real codebases) — 10 lessons
 
 ### Module L3-M1 — Project Structure & Packaging
-- **PY-L3-01 · `py-l3-packages`** (WS, medium) — *modules vs packages, `__init__.py`, project layout.* Objective: structure a multi-file package with a clear entry point.
+- [x] **PY-L3-01 · `py-l3-packages`** (WS, medium) — *modules vs packages, `__init__.py`, project layout.* Objective: structure a multi-file package with a clear entry point.
 
 ### Module L3-M2 — Type Hints & Static Typing
 - **PY-L3-02 · `py-l3-type-hints`** (WS, medium) — *annotations on functions/classes.* Objective: add precise type hints to a module.

@@ -304,6 +304,279 @@ test to see the expected behaviour; some tests are hidden.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L3-M1 — Project Structure & Packaging  (py-l3-packages)
+// ───────────────────────────────────────────────────────────────────────────
+
+const PKG_README = `# A tiny store package
+
+Turn one file into a real **package**. The \`store/\` folder is a package (it has an
+\`__init__.py\`). \`store/catalog.py\` (read-only) knows item prices; your job is \`store/cart.py\`.
+
+Implement \`cart_total(names)\` so it returns the **total price** of the items named in \`names\`,
+looking up each price with the read-only \`price_of\` helper from \`store.catalog\`. Unknown items
+cost 0.
+
+Run the tests — some are hidden.
+`
+
+const PKG_CATALOG = String.raw`PRICES = {"apple": 3, "bread": 2, "milk": 4}
+
+
+def price_of(name):
+    """Return the price of a named item, or 0 if it isn't sold."""
+    return PRICES.get(name, 0)
+`
+
+const PKG_CART_STARTER = String.raw`from store.catalog import price_of
+
+
+def cart_total(names):
+    """Total the price of every item name in the cart (see README.md)."""
+    # TODO: look up each name with price_of(...) and add the prices up.
+    return 0
+`
+
+const PKG_CART_REFERENCE = String.raw`from store.catalog import price_of
+
+
+def cart_total(names):
+    return sum(price_of(name) for name in names)
+`
+
+const PKG_TEST = String.raw`from store.cart import cart_total
+
+
+def run_tests(record):
+    def sums_known_items():
+        result = cart_total(["apple", "bread"])
+        assert result == 5, f"expected 5, got {result!r}"
+
+    def empty_cart_is_zero():
+        result = cart_total([])
+        assert result == 0, f"expected 0, got {result!r}"
+
+    def unknown_item_is_free():
+        result = cart_total(["apple", "candy"])
+        assert result == 3, f"expected 3, got {result!r}"
+
+    record("sums known items", sums_known_items)
+    record("empty cart totals 0", empty_cart_is_zero)
+    record("unknown items count as 0", unknown_item_is_free)
+`
+
+const PKG_TEST_HIDDEN = String.raw`from store.cart import cart_total
+
+
+def run_tests(record):
+    def repeated_items_add_up():
+        result = cart_total(["milk", "milk"])
+        assert result == 8, f"expected 8, got {result!r}"
+
+    def mixes_known_and_unknown():
+        result = cart_total(["apple", "milk", "x"])
+        assert result == 7, f"expected 7, got {result!r}"
+
+    record("repeated items add up", repeated_items_add_up)
+    record("mix of known and unknown", mixes_known_and_unknown)
+`
+
+const PKG_RUNNER = String.raw`import json
+import os
+import sys
+import traceback
+
+sys.path.insert(0, os.getcwd())
+from tests import test_cart, test_cart_hidden
+
+results = []
+
+
+def record_factory(suite):
+    def record(name, fn):
+        is_hidden = "hidden" in suite.lower()
+        try:
+            fn()
+            results.append({"suite": suite, "name": name, "passed": True, "error": None, "isHidden": is_hidden})
+        except AssertionError as exc:
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or (name + " failed"), "isHidden": is_hidden})
+        except Exception as exc:
+            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc(), "isHidden": is_hidden})
+
+    return record
+
+
+test_cart.run_tests(record_factory("visible cart"))
+test_cart_hidden.run_tests(record_factory("hidden cart"))
+print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
+`
+
+const packagesLesson: PythonLevel["modules"][number]["lessons"][number] = {
+  id: "py-l3-packages",
+  title: "Modules, packages & project layout",
+  summary: "Split logic across a real Python package with an __init__.py and cross-module imports.",
+  estimatedMinutes: 18,
+  difficulty: "medium",
+  skills: ["packages", "modules", "imports", "project-structure"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## From one file to a package
+
+A **module** is a single \`.py\` file. A **package** is a folder of modules with an \`__init__.py\`
+file (it can be empty) that marks the folder as importable.
+
+\`\`\`text
+store/
+    __init__.py     # makes 'store' a package
+    catalog.py      # data + lookups
+    cart.py         # uses catalog
+\`\`\`
+
+Inside \`cart.py\` you reach into a sibling module with a package-qualified import:
+
+\`\`\`python
+from store.catalog import price_of
+\`\`\`
+
+### Why split at all?
+
+One giant file is hard to navigate. Splitting by responsibility — \`catalog\` knows prices, \`cart\`
+knows totals — keeps each module short and makes imports document who depends on whom.
+
+### The entry point
+
+Tests (and apps) import the package's public functions: \`from store.cart import cart_total\`. That
+import is the **entry point** into your package.
+
+### Recap
+
+A package is a folder of modules plus an \`__init__.py\`; modules import each other with
+\`from package.module import name\`. First you'll total a cart in one file, then wire the same logic
+across a real \`store/\` package.`,
+    demoCode: `# one file now; a package next
+PRICES = {"apple": 3, "bread": 2}
+
+
+def price_of(name):
+    return PRICES.get(name, 0)
+
+
+print(price_of("apple"))   # 3
+print(price_of("candy"))   # 0`,
+  },
+  apply: {
+    id: "py-l3-packages-apply",
+    executionMode: "single-file",
+    prompt: `Warm-up (one file): implement \`cart_total(prices, names)\` — total the price of every name in
+\`names\`, looking each one up in the \`prices\` dict (missing items cost 0).
+
+For \`prices = {"apple": 3, "bread": 2}\` and \`names = ["apple", "bread"]\`, return \`5\`.`,
+    starterCode: `def cart_total(prices, names):
+    # Sum prices.get(name, 0) for each name.
+    pass`,
+    hints: [
+      "`prices.get(name, 0)` is the price of one item (0 if missing).",
+      "Add them across the cart with a generator expression in `sum(...)`.",
+      "`return sum(prices.get(name, 0) for name in names)`.",
+    ],
+    referenceSolution: `def cart_total(prices, names):
+    return sum(prices.get(name, 0) for name in names)`,
+    testCases: [
+      {
+        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: ["apple", "bread"] },
+        expected: 5,
+        description: "two known items",
+      },
+      {
+        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: [] },
+        expected: 0,
+        description: "empty cart",
+      },
+      {
+        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: ["milk", "milk"] },
+        expected: 8,
+        description: "repeated item",
+      },
+      {
+        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: ["apple", "x"] },
+        expected: 3,
+        description: "unknown item is free",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l3-packages-practice",
+    executionMode: "workspace",
+    prompt: `Now build it as a package. Implement \`cart_total(names)\` in \`store/cart.py\` using the
+read-only \`price_of\` helper imported from \`store.catalog\`. Unknown items cost 0. Open the visible
+test to see expected behaviour; some tests are hidden.`,
+    starterCode: "",
+    hints: [
+      "`price_of` is already imported from `store.catalog` — call it on each name.",
+      "Sum across the cart: `sum(price_of(name) for name in names)`.",
+      "The `store/__init__.py` is what makes `from store.catalog import ...` work.",
+    ],
+    workspace: {
+      language: "python",
+      primaryFilePath: "store/cart.py",
+      editableFilePaths: ["store/cart.py"],
+      visibleTestPaths: ["tests/test_cart.py"],
+      hiddenTestPaths: ["tests/test_cart_hidden.py"],
+      testRunnerPath: "tests/run_workspace_tests.py",
+      files: [
+        { path: "README.md", role: "docs", language: "markdown", content: PKG_README },
+        { path: "store/__init__.py", role: "readonly", language: "python", content: "" },
+        {
+          path: "store/catalog.py",
+          role: "readonly",
+          language: "python",
+          content: PKG_CATALOG,
+          description: "Item prices + price_of (read-only)",
+        },
+        {
+          path: "store/cart.py",
+          role: "editable",
+          language: "python",
+          content: PKG_CART_STARTER,
+          description: "Implement cart_total here",
+        },
+        { path: "tests/__init__.py", role: "test", language: "python", content: "", hidden: true },
+        {
+          path: "tests/test_cart.py",
+          role: "test",
+          language: "python",
+          content: PKG_TEST,
+          description: "Visible cart tests",
+        },
+        {
+          path: "tests/test_cart_hidden.py",
+          role: "test",
+          language: "python",
+          content: PKG_TEST_HIDDEN,
+          hidden: true,
+          description: "Hidden edge-case tests",
+        },
+        {
+          path: "tests/run_workspace_tests.py",
+          role: "test",
+          language: "python",
+          content: PKG_RUNNER,
+          hidden: true,
+          description: "Workspace test runner",
+        },
+      ],
+      referenceFiles: [
+        {
+          path: "store/cart.py",
+          role: "editable",
+          language: "python",
+          content: PKG_CART_REFERENCE,
+        },
+      ],
+    },
+  },
+}
+
 export const level3: PythonLevel = {
   id: 3,
   slug: "applied",
@@ -317,6 +590,12 @@ export const level3: PythonLevel = {
       title: "Working across files",
       description: "Follow imports and change code across a small multi-file Python package.",
       lessons: [parseConfigLesson],
+    },
+    {
+      id: "py-l3-project-structure",
+      title: "Project Structure & Packaging",
+      description: "Lay out a multi-file package with a clear entry point.",
+      lessons: [packagesLesson],
     },
   ],
 }
