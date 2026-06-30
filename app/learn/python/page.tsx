@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { listLevels } from "@/lib/tutorials/registry"
 import { LevelSelector } from "@/components/tutorials/LevelSelector"
+import { ResumeLearning } from "@/components/tutorials/ResumeLearning"
 
 export const metadata: Metadata = {
   title: "Learn Python — CodeSparring",
@@ -41,6 +42,8 @@ export default function LearnPythonPage() {
             </span>
           ))}
         </div>
+
+        <ResumeLearning levels={levels} />
       </header>
 
       <LevelSelector levels={levels} />
