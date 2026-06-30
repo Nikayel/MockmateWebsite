@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
@@ -6,6 +7,16 @@ import { LevelModules } from "@/components/tutorials/LevelModules"
 import type { PythonLevel } from "@/lib/tutorials/types"
 
 type Props = { params: Promise<{ levelSlug: string }> }
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { levelSlug } = await params
+  const level = getLevelBySlug(levelSlug as PythonLevel["slug"])
+  if (!level) return { title: "Learn Python — CodeSparring" }
+  return {
+    title: `${level.title} — Learn Python`,
+    description: level.tagline,
+  }
+}
 
 /** Screen between Path and lesson — a level's modules + lessons. Server Component. */
 export default async function LevelModulesPage({ params }: Props) {
