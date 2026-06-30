@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowRight, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { LESSON_SECTION_ORDER, useTutorialStore } from "@/lib/stores/tutorial-store"
 import { TeachPanel } from "./TeachPanel"
 import { ExerciseRunner } from "./ExerciseRunner"
+import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import type { LessonSection, PythonLesson, PythonLevel } from "@/lib/tutorials/types"
 
-const SECTION_ORDER: LessonSection[] = ["teach", "apply", "practice"]
 const SECTION_LABEL: Record<LessonSection, string> = {
   teach: "Read",
   apply: "Apply",
@@ -15,11 +16,9 @@ const SECTION_LABEL: Record<LessonSection, string> = {
 }
 
 /**
- * Drives one lesson through the Read → Apply → Practice loop. Owns the section stepper, the
- * per-exercise editor content (so code survives switching phases), and section completion.
- *
- * `onSectionComplete` is where progress persistence hooks in (Slice B); here it stays a callback so
- * the player is usable on its own and testable without Firestore.
+ * Drives one lesson through the Read → Apply → Practice loop. Section completion + lesson status
+ * live in `useTutorialStore` (persisted by `useTutorialProgressSync`); per-exercise editor text is
+ * local UI state so it survives switching phases. On resume, opens the first incomplete section.
  */
 export interface LessonPlayerProps {
   lesson: PythonLesson
@@ -28,19 +27,30 @@ export interface LessonPlayerProps {
 }
 
 export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerProps) {
+  useTutorialProgressSync(lesson.id, level.id)
+
+  const sections = useTutorialStore((s) => s.sections)
+  const isLoading = useTutorialStore((s) => s.isLoading)
+  const completeSection = useTutorialStore((s) => s.completeSection)
+
   const [active, setActive] = useState<LessonSection>("teach")
-  const [completed, setCompleted] = useState<Record<LessonSection, boolean>>({
-    teach: false,
-    apply: false,
-    practice: false,
-  })
   const [codeByExercise, setCodeByExercise] = useState<Record<string, string>>({
     [lesson.apply.id]: lesson.apply.starterCode,
     [lesson.practice.id]: lesson.practice.starterCode,
   })
 
+  // Resume: once the saved progress has loaded, open the first not-completed section (once).
+  const didResume = useRef(false)
+  useEffect(() => {
+    if (isLoading || didResume.current) return
+    didResume.current = true
+    const next = LESSON_SECTION_ORDER.find((s) => sections[s] !== "completed")
+    if (next) setActive(next)
+  }, [isLoading, sections])
+
   const markComplete = (section: LessonSection) => {
-    setCompleted((prev) => (prev[section] ? prev : { ...prev, [section]: true }))
+    // onPass fires only when every test passes, so practice completion is a 100% score.
+    completeSection(section, section === "practice" ? 100 : undefined)
     onSectionComplete?.(section)
   }
 
@@ -51,9 +61,9 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
     <div className="flex flex-col gap-6">
       <nav aria-label="Lesson sections">
         <ol className="flex items-center gap-2">
-          {SECTION_ORDER.map((section, i) => {
+          {LESSON_SECTION_ORDER.map((section, i) => {
             const isActive = active === section
-            const isDone = completed[section]
+            const isDone = sections[section] === "completed"
             return (
               <li key={section} className="flex items-center gap-2">
                 <button
@@ -77,7 +87,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                   </span>
                   {SECTION_LABEL[section]}
                 </button>
-                {i < SECTION_ORDER.length - 1 && (
+                {i < LESSON_SECTION_ORDER.length - 1 && (
                   <span className="bg-border h-px w-4" aria-hidden="true" />
                 )}
               </li>
@@ -105,7 +115,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             canRevealReference
             onPass={() => markComplete("apply")}
           />
-          {completed.apply && (
+          {sections.apply === "completed" && (
             <div>
               <Button onClick={() => setActive("practice")} className="gap-2">
                 Practice it
@@ -124,7 +134,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             onCodeChange={(value) => setCode(lesson.practice.id, value)}
             onPass={() => markComplete("practice")}
           />
-          {completed.practice && (
+          {sections.practice === "completed" && (
             <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
               Lesson complete — nice work. This idea resurfaces in 3 days for spaced practice.
             </p>
