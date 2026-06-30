@@ -39,9 +39,9 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L1-09 · `py-l1-dicts`** (SF, easy) — *dictionaries.* Objective: key/value access, add/update/delete, iterate items.
 
 ### Module L1-M5 — Control Flow & Functions
-- **PY-L1-10 · `py-l1-conditionals`** (SF, easy) — *if/elif/else & logical operators.* Objective: branch on conditions, `and/or/not`, comparisons.
-- **PY-L1-11 · `py-l1-loops`** (SF, easy) — *for, while, range, break/continue.* Objective: iterate collections and ranges, control loop flow.
-- **PY-L1-12 · `py-l1-functions`** (SF, easy) — *functions, params, return (+ reading errors).* Objective: define functions with params/defaults/return; read a traceback.
+- [x] **PY-L1-10 · `py-l1-conditionals`** (SF, easy) — *if/elif/else & logical operators.* Objective: branch on conditions, `and/or/not`, comparisons.
+- [x] **PY-L1-11 · `py-l1-loops`** (SF, easy) — *for, while, range, break/continue.* Objective: iterate collections and ranges, control loop flow.
+- [x] **PY-L1-12 · `py-l1-functions`** (SF, easy) — *functions, params, return (+ reading errors).* Objective: define functions with params/defaults/return; read a traceback.
 
 ---
 

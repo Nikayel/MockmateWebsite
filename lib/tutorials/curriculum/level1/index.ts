@@ -254,8 +254,345 @@ One hour is \`3600\` seconds and one minute is \`60\` seconds. Combine both part
 
 // ───────────────────────────────────────────────────────────────────────────
 // L1-M5 — Control Flow & Functions
-// `py-l1-temperature` is Agent 1's canonical single-file sample (pinned by registry.test.ts).
+// `py-l1-temperature` (further down) is Agent 1's canonical single-file sample, pinned by
+// registry.test.ts; the three ticketed lessons below precede it in the module.
 // ───────────────────────────────────────────────────────────────────────────
+
+const conditionalsLesson: PythonLesson = {
+  id: "py-l1-conditionals",
+  title: "if / elif / else & logical operators",
+  summary: "Branch on conditions and combine them with and / or / not.",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["conditionals", "comparisons", "boolean-logic"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Making decisions with if
+
+An **if statement** runs a block only when a condition is true. Add \`elif\` for more cases and
+\`else\` for "none of the above":
+
+\`\`\`python
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+else:
+    grade = "F"
+\`\`\`
+
+Python checks the branches top to bottom and takes the **first** one that's true.
+
+### Comparisons
+
+Conditions are usually comparisons, which produce \`True\`/\`False\`:
+
+\`\`\`text
+==  equal        !=  not equal
+<   less than    >   greater than
+<=  at most      >=  at least
+\`\`\`
+
+(Remember: \`==\` compares, a single \`=\` assigns.)
+
+### Combining conditions
+
+\`and\`, \`or\`, and \`not\` join conditions:
+
+\`\`\`python
+age >= 18 and citizen     # both must be true
+is_weekend or is_holiday  # either is enough
+not finished              # flips true/false
+\`\`\`
+
+### Recap
+
+\`if\`/\`elif\`/\`else\` pick a branch by the first true condition; comparisons and
+\`and\`/\`or\`/\`not\` build those conditions. Next you'll label a number's sign, then decide if
+someone can vote.`,
+    demoCode: `score = 85
+if score >= 90:
+    print("A")
+elif score >= 80:
+    print("B")
+else:
+    print("F")        # prints B`,
+  },
+  apply: {
+    id: "py-l1-conditionals-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`sign(n)\` — return \`"positive"\` when \`n\` is greater than 0, \`"negative"\` when it's
+less than 0, and \`"zero"\` when it's exactly 0.`,
+    starterCode: `def sign(n):
+    # Return "positive", "negative", or "zero".
+    pass`,
+    hints: [
+      'Start with `if n > 0:` and return "positive".',
+      'Add `elif n < 0:` for "negative".',
+      'The `else:` case is "zero".',
+    ],
+    referenceSolution: `def sign(n):
+    if n > 0:
+        return "positive"
+    elif n < 0:
+        return "negative"
+    else:
+        return "zero"`,
+    testCases: [
+      { input: { n: 5 }, expected: "positive", description: "a positive number" },
+      { input: { n: -3 }, expected: "negative", description: "a negative number" },
+      { input: { n: 0 }, expected: "zero", description: "exactly zero" },
+      { input: { n: 100 }, expected: "positive", description: "another positive" },
+    ],
+  },
+  practice: {
+    id: "py-l1-conditionals-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`can_vote(age, citizen)\` — return \`True\` only when \`age\` is at least 18 **and**
+\`citizen\` is \`True\`.`,
+    starterCode: `def can_vote(age, citizen):
+    # Return True when age >= 18 AND citizen is True.
+    pass`,
+    hints: ["Combine two conditions with `and`.", "`return age >= 18 and citizen`."],
+    referenceSolution: `def can_vote(age, citizen):
+    return age >= 18 and citizen`,
+    testCases: [
+      {
+        input: { age: 20, citizen: true },
+        expected: true,
+        description: "old enough and a citizen",
+      },
+      { input: { age: 16, citizen: true }, expected: false, description: "too young" },
+      { input: { age: 20, citizen: false }, expected: false, description: "not a citizen" },
+      { input: { age: 18, citizen: true }, expected: true, description: "exactly 18 counts" },
+    ],
+  },
+}
+
+const loopsLesson: PythonLesson = {
+  id: "py-l1-loops",
+  title: "for, while, range & break/continue",
+  summary: "Repeat work over collections and ranges, accumulating a result.",
+  estimatedMinutes: 11,
+  difficulty: "easy",
+  skills: ["loops", "for", "range", "accumulator"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Repeating work with loops
+
+A **for loop** runs its body once for each item in a collection:
+
+\`\`\`python
+for name in ["Ada", "Sam"]:
+    print(name)
+\`\`\`
+
+### range
+
+\`range(start, stop)\` produces the numbers from \`start\` up to *but not including* \`stop\`:
+
+\`\`\`python
+for i in range(1, 4):
+    print(i)        # 1, 2, 3
+\`\`\`
+
+### The accumulator pattern
+
+Keep a running total in a variable and update it each pass:
+
+\`\`\`python
+total = 0
+for i in range(1, 6):
+    total = total + i    # 1+2+3+4+5
+# total is now 15
+\`\`\`
+
+### while, break, continue
+
+A **while loop** runs as long as its condition holds. \`break\` exits early; \`continue\` skips to
+the next pass:
+
+\`\`\`python
+for n in nums:
+    if n < 0:
+        continue        # skip negatives
+    if n > 100:
+        break           # stop entirely
+\`\`\`
+
+### Recap
+
+\`for\` walks a collection or a \`range\`, the accumulator pattern builds up a result, and
+\`while\`/\`break\`/\`continue\` give finer control. Next you'll sum the numbers up to n, then count
+the evens in a list.`,
+    demoCode: `total = 0
+for i in range(1, 6):
+    total = total + i
+print(total)        # 15`,
+  },
+  apply: {
+    id: "py-l1-loops-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`sum_to(n)\` — return the sum of all whole numbers from 1 up to and including \`n\`.
+
+For \`n = 5\` that's \`1 + 2 + 3 + 4 + 5 = 15\`. For \`n = 0\`, return \`0\`.`,
+    starterCode: `def sum_to(n):
+    # Add up 1, 2, ..., n and return the total.
+    pass`,
+    hints: [
+      "Start a total at 0.",
+      "Loop `for i in range(1, n + 1):` so n is included.",
+      "Add each i to the total, then return it after the loop.",
+    ],
+    referenceSolution: `def sum_to(n):
+    total = 0
+    for i in range(1, n + 1):
+        total = total + i
+    return total`,
+    testCases: [
+      { input: { n: 5 }, expected: 15, description: "1..5" },
+      { input: { n: 1 }, expected: 1, description: "just 1" },
+      { input: { n: 10 }, expected: 55, description: "1..10" },
+      { input: { n: 0 }, expected: 0, description: "empty range sums to 0" },
+    ],
+  },
+  practice: {
+    id: "py-l1-loops-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`count_evens(nums)\` — return how many numbers in the list \`nums\` are even.
+
+For \`[1, 2, 3, 4]\` return \`2\`.`,
+    starterCode: `def count_evens(nums):
+    # Count how many numbers are even.
+    pass`,
+    hints: [
+      "A number is even when `n % 2 == 0`.",
+      "Keep a counter, loop the list, and add 1 when a number is even.",
+      "Return the counter after the loop.",
+    ],
+    referenceSolution: `def count_evens(nums):
+    count = 0
+    for x in nums:
+        if x % 2 == 0:
+            count = count + 1
+    return count`,
+    testCases: [
+      { input: { nums: [1, 2, 3, 4] }, expected: 2, description: "two evens" },
+      { input: { nums: [2, 4, 6] }, expected: 3, description: "all even" },
+      { input: { nums: [1, 3, 5] }, expected: 0, description: "none even" },
+      { input: { nums: [] }, expected: 0, description: "empty list" },
+    ],
+  },
+}
+
+const functionsLesson: PythonLesson = {
+  id: "py-l1-functions",
+  title: "Functions, parameters & defaults",
+  summary: "Write functions with default parameters and learn to read a traceback.",
+  estimatedMinutes: 11,
+  difficulty: "easy",
+  skills: ["functions", "default-parameters", "errors", "tracebacks"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Functions, defaults, and reading errors
+
+You've called functions already; now write richer ones. A function packages logic behind a name so
+you can reuse it:
+
+\`\`\`python
+def power(base, exp):
+    return base ** exp
+
+power(2, 3)    # 8
+\`\`\`
+
+### Default parameters
+
+Give a parameter a **default** so callers can leave it out:
+
+\`\`\`python
+def power(base, exp=2):
+    return base ** exp
+
+power(5)       # 25  — exp defaults to 2
+power(2, 3)    # 8   — exp given explicitly
+\`\`\`
+
+### Reading a traceback
+
+When code raises an error, Python prints a **traceback** — read it bottom-up:
+
+\`\`\`text
+Traceback (most recent call last):
+  File "main.py", line 2, in <module>
+    print(power("2", 3))
+TypeError: unsupported operand type(s) for ** : 'str' and 'int'
+\`\`\`
+
+The **last line** names the problem (here a \`TypeError\` — a string can't be raised to a power), and
+the lines above show where it happened. Most bugs are solved by reading that last line carefully.
+
+### Recap
+
+\`def\` packages reusable logic, defaults make parameters optional, and a traceback's last line tells
+you what went wrong. Next you'll write a power function with a default, then build an HTML tag.`,
+    demoCode: `def power(base, exp=2):
+    return base ** exp
+
+print(power(5))      # 25  (exp defaults to 2)
+print(power(2, 3))   # 8`,
+  },
+  apply: {
+    id: "py-l1-functions-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`power(base, exp=2)\` — return \`base\` raised to the \`exp\` power, where \`exp\`
+defaults to \`2\`.
+
+So \`power(3)\` is \`9\` (3 squared) and \`power(2, 3)\` is \`8\`.`,
+    starterCode: `def power(base, exp=2):
+    # Return base ** exp. exp defaults to 2.
+    pass`,
+    hints: [
+      "Raise to a power with `**`: `base ** exp`.",
+      "Keep the default in the signature: `def power(base, exp=2):`.",
+      "`return base ** exp`.",
+    ],
+    referenceSolution: `def power(base, exp=2):
+    return base ** exp`,
+    testCases: [
+      { input: { base: 3 }, expected: 9, description: "default exp of 2 (squared)" },
+      { input: { base: 2, exp: 3 }, expected: 8, description: "explicit exp" },
+      { input: { base: 5 }, expected: 25, description: "another default square" },
+      { input: { base: 2, exp: 10 }, expected: 1024, description: "a larger power" },
+    ],
+  },
+  practice: {
+    id: "py-l1-functions-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`make_tag(name, content)\` — wrap \`content\` in an HTML tag named \`name\`.
+
+For \`("b", "hi")\` return \`"<b>hi</b>"\`.`,
+    starterCode: `def make_tag(name, content):
+    # Return "<name>content</name>" using an f-string.
+    pass`,
+    hints: ["Use an f-string with the tag name on both sides.", '`f"<{name}>{content}</{name}>"`.'],
+    referenceSolution: `def make_tag(name, content):
+    return f"<{name}>{content}</{name}>"`,
+    testCases: [
+      { input: { name: "b", content: "hi" }, expected: "<b>hi</b>", description: "a bold tag" },
+      {
+        input: { name: "p", content: "text" },
+        expected: "<p>text</p>",
+        description: "a paragraph",
+      },
+      {
+        input: { name: "h1", content: "Title" },
+        expected: "<h1>Title</h1>",
+        description: "a heading",
+      },
+    ],
+  },
+}
 
 const temperatureLesson: PythonLesson = {
   id: "py-l1-temperature",
@@ -1164,7 +1501,7 @@ export const level1: PythonLevel = {
       id: "py-l1-control-flow",
       title: "Control Flow & Functions",
       description: "Branch with if/else, repeat with loops, and package logic into functions.",
-      lessons: [temperatureLesson],
+      lessons: [conditionalsLesson, loopsLesson, functionsLesson, temperatureLesson],
     },
   ],
 }
