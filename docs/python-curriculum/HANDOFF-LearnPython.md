@@ -19,6 +19,29 @@ and one workspace sample lesson (Level 3) ship as the canonical references.
 > `POST /api/execute` is deprecated** — do not wire new execution through it. Client execution is
 > free, so tutorial runs have **no quota**; the page is auth-gated instead.
 
+## ✅ UI surface SHIPPED (read before changing the Learn-Python screens)
+
+The design spec below (§B/§C/§E) is **implemented** on top of the engine. What the UI Agent added:
+
+- **Screen 1 / Path** — `app/learn/python/page.tsx` (accent hero + `ResumeLearning` "Continue
+  Level N" island) → `LevelSelector` (connected numbered spine + clay fill, completion-hydrated) →
+  `LevelCard` (selectable node) + `LevelPreviewPanel` (sticky: `CodeWindow` faux sample, phase strip,
+  topic chips, progress-aware Start/Continue/Review CTA). Samples live in `lib/tutorials/level-previews.ts`.
+- **Between** — `app/learn/python/[levelSlug]/page.tsx` stays a Server Component; `LevelModules`
+  is a client island that overlays per-lesson completion + an "n/total done" bar.
+- **Screen 2 / Lesson** — `LessonPlayer` is now the full-height **3-column workspace + top bar**:
+  `LessonOutline` (stepper + Up-next) | center phase (`LessonHeader` + Teach/Apply/Practice) |
+  `SableTutor` (reactive AI tutor + FAQ chips). Sable reacts to a `SableEvent` stream the player
+  emits from real run/hint/reference events (no LLM, no cost).
+- **Shared** — `useExerciseRun` gained `onResult` + a session `warming` flag ("Starting Python…"
+  cold-start). Hidden workspace test rows are masked via the pure `lib/tutorials/test-result-mapping.ts`
+  (`mapResultRow`, unit-tested). Syntax tokens `--kw/--str/--com/--fn/--num/--gut` in `globals.css`
+  ride the root View Transition. `Reveal` = transform-only reveal-on-scroll. Level pointer:
+  `lib/tutorials/level-preference.ts` (`cs_py_level`).
+
+Verified: `pnpm typecheck`, `pnpm lint` (tutorial scope), `pnpm test` (incl. the masking regression),
+and `pnpm build` all green. The live browser e2e is still the one unrun check.
+
 ## Module map (what exists)
 
 ```
