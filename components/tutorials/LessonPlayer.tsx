@@ -50,6 +50,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
   const completeSection = useTutorialStore((s) => s.completeSection)
 
   const [active, setActive] = useState<LessonSection>("teach")
+  const centerRef = useRef<HTMLElement>(null)
   const [codeByExercise, setCodeByExercise] = useState<Record<string, string>>({
     [lesson.apply.id]: lesson.apply.starterCode,
     [lesson.practice.id]: lesson.practice.starterCode,
@@ -105,6 +106,11 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
     setActive(section)
     pushEvent({ kind: "phase", section })
   }
+
+  // Reset the reading area to the top whenever the phase changes (revisit or advance).
+  useEffect(() => {
+    centerRef.current?.scrollTo({ top: 0 })
+  }, [active])
 
   const markComplete = (section: LessonSection) => {
     completeSection(section, section === "practice" ? 100 : undefined)
@@ -208,7 +214,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             />
           </div>
 
-          <main className="overflow-y-auto px-6 py-6" aria-label="Lesson content">
+          <main ref={centerRef} className="overflow-y-auto px-6 py-6" aria-label="Lesson content">
             <div className="mx-auto max-w-2xl">
               <LessonHeader lesson={lesson} />
 
