@@ -62,7 +62,7 @@ Legend: **SF** = single-file, **WS** = workspace.
 - [x] **PY-L2-08 · `py-l2-dunder-properties`** (SF, medium) — *dunder methods & properties.* Objective: `__repr__`/`__eq__`, computed `@property`.
 
 ### Module L2-M4 — Data Modeling
-- **PY-L2-09 · `py-l2-dataclasses-enums`** (SF, medium) — *dataclasses, enums & typing basics.* Objective: `@dataclass`, `Enum`, `list[int]`/`Optional` annotations.
+- [x] **PY-L2-09 · `py-l2-dataclasses-enums`** (SF, medium) — *dataclasses, enums & typing basics.* Objective: `@dataclass`, `Enum`, `list[int]`/`Optional` annotations.
 
 ### Module L2-M5 — Errors, Files & Modules
 - **PY-L2-10 · `py-l2-exceptions`** (SF, medium) — *try/except/finally, raising, custom exceptions.* Objective: handle and define exceptions cleanly.

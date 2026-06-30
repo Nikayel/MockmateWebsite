@@ -1060,6 +1060,163 @@ def run(radius):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L2-M4 — Data Modeling
+// ───────────────────────────────────────────────────────────────────────────
+
+const dataclassesEnumsLesson: PythonLesson = {
+  id: "py-l2-dataclasses-enums",
+  title: "Dataclasses, enums & typing basics",
+  summary: "Model data with @dataclass, name fixed choices with Enum, and add type hints.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["dataclasses", "enums", "type-hints", "data-modeling"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Less boilerplate for data
+
+### Dataclasses
+
+A class that mostly holds data needs an \`__init__\`, a \`__repr__\`, and often \`__eq__\`. The
+\`@dataclass\` decorator writes all three from a list of typed fields:
+
+\`\`\`python
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+Point(1, 2)                 # __init__ for free
+Point(1, 2) == Point(1, 2)  # True — __eq__ for free
+print(Point(1, 2))          # Point(x=1, y=2) — __repr__ for free
+\`\`\`
+
+Each \`name: type\` line is a **field**.
+
+### Type hints
+
+Annotations describe what a value should be. Python doesn't enforce them, but they guide readers and
+tools like \`mypy\`:
+
+\`\`\`python
+def total(prices: list[int]) -> int:
+    return sum(prices)
+
+note: int | None = None     # Optional: an int or None
+\`\`\`
+
+### Enums
+
+An \`Enum\` gives a fixed set of named choices, each with a \`.value\`:
+
+\`\`\`python
+from enum import Enum
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+
+Color.RED.value     # "red"
+Color["RED"]        # look up by name -> Color.RED
+\`\`\`
+
+### Recap
+
+\`@dataclass\` generates \`__init__\`/\`__repr__\`/\`__eq__\` from typed fields; type hints document
+intent; \`Enum\` names a fixed set of choices. Next you'll make a dataclass, then define an enum.`,
+    demoCode: `from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+print(Point(1, 2))                  # Point(x=1, y=2)
+print(Point(1, 2) == Point(1, 2))   # True`,
+  },
+  apply: {
+    id: "py-l2-dataclasses-enums-apply",
+    executionMode: "single-file",
+    prompt: `Make \`Point\` a \`@dataclass\` with two fields, \`x: int\` and \`y: int\`.
+
+Dataclasses generate \`__init__\` and \`__eq__\` for you, so two points with the same coordinates
+compare equal. \`run(1, 2, 1, 2)\` should return \`True\`.`,
+    starterCode: `from dataclasses import dataclass
+
+
+# Make Point a dataclass with x: int and y: int.
+class Point:
+    pass
+
+
+def run(x1, y1, x2, y2):
+    return Point(x1, y1) == Point(x2, y2)`,
+    hints: [
+      "Add the `@dataclass` decorator on the line above `class Point:`.",
+      "Replace the body with two typed fields: `x: int` and `y: int`.",
+      "Remove the `pass` once the fields are in place.",
+    ],
+    referenceSolution: `from dataclasses import dataclass
+
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+
+def run(x1, y1, x2, y2):
+    return Point(x1, y1) == Point(x2, y2)`,
+    testCases: [
+      { input: { x1: 1, y1: 2, x2: 1, y2: 2 }, expected: true, description: "equal points" },
+      { input: { x1: 1, y1: 2, x2: 3, y2: 4 }, expected: false, description: "different points" },
+      { input: { x1: 0, y1: 0, x2: 0, y2: 0 }, expected: true, description: "origins are equal" },
+    ],
+  },
+  practice: {
+    id: "py-l2-dataclasses-enums-practice",
+    executionMode: "single-file",
+    prompt: `Define a \`Color\` enum with three members: \`RED = "red"\`, \`GREEN = "green"\`, and
+\`BLUE = "blue"\`.
+
+The driver looks up \`Color[name]\` and returns its \`.value\`, so \`run("RED")\` should return
+\`"red"\`.`,
+    starterCode: `from enum import Enum
+
+
+# Define a Color enum: RED = "red", GREEN = "green", BLUE = "blue".
+class Color(Enum):
+    pass
+
+
+def run(name):
+    return Color[name].value`,
+    hints: [
+      'Each member is `NAME = value`, e.g. `RED = "red"`.',
+      "List all three members and remove the `pass`.",
+      "`Color[name]` looks a member up by name; `.value` reads its string.",
+    ],
+    referenceSolution: `from enum import Enum
+
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+
+def run(name):
+    return Color[name].value`,
+    testCases: [
+      { input: { name: "RED" }, expected: "red", description: "red member" },
+      { input: { name: "GREEN" }, expected: "green", description: "green member" },
+      { input: { name: "BLUE" }, expected: "blue", description: "blue member" },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -1085,6 +1242,12 @@ export const level2: PythonLevel = {
       title: "OOP Foundations",
       description: "Model state and behaviour with classes, inheritance, composition, and dunders.",
       lessons: [classesLesson, inheritanceCompositionLesson, dunderPropertiesLesson],
+    },
+    {
+      id: "py-l2-data-modeling",
+      title: "Data Modeling",
+      description: "Model data cleanly with dataclasses, enums, and type hints.",
+      lessons: [dataclassesEnumsLesson],
     },
   ],
 }
