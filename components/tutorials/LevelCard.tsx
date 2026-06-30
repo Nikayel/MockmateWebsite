@@ -37,7 +37,7 @@ export function LevelCard({
       onClick={() => onSelect(level)}
       aria-pressed={isSelected}
       className={[
-        "group w-full rounded-xl border p-5 text-left transition-colors",
+        "group focus-visible:ring-accent/50 w-full rounded-xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
         isSelected
           ? "border-accent/50 bg-accent/[0.06] shadow-sm"
           : "border-border bg-card hover:border-accent/30 hover:bg-accent/[0.03]",

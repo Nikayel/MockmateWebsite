@@ -82,7 +82,7 @@ export function LessonOutline({
                   onClick={() => onSelect(section)}
                   aria-current={isActive ? "step" : undefined}
                   className={[
-                    "mb-3 flex-1 rounded-lg px-3 py-2 text-left transition-colors",
+                    "focus-visible:ring-accent/50 mb-3 flex-1 rounded-lg px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
                     isActive ? "bg-accent/[0.07]" : "hover:bg-muted/50",
                   ].join(" ")}
                 >
@@ -114,7 +114,7 @@ export function LessonOutline({
               <li key={lesson.id}>
                 <Link
                   href={`/learn/python/${lesson.levelSlug}/${lesson.id}`}
-                  className="group hover:bg-muted/50 flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors"
+                  className="group focus-visible:ring-accent/50 hover:bg-muted/50 flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <span
                     className={[
