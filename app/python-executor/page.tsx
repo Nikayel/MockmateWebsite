@@ -46,10 +46,6 @@ export default function PythonExecutorPage() {
             <h1 className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
               Run Python, freely
             </h1>
-            <p className="text-muted-foreground mt-1.5 max-w-xl text-pretty">
-              A plain scratchpad — write anything and run it. No lessons, no grading, nothing saved.
-              Runs entirely in your browser.
-            </p>
           </header>
 
           <div className="border-border overflow-hidden rounded-xl border shadow-sm">
