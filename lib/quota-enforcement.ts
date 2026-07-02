@@ -279,13 +279,38 @@ async function getUserQuota(userId: string): Promise<UserQuota | null> {
     const profile = profileDoc.data()
     const tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
 
-    // Find current period quota from limited results
-    const quota = quotaQuery.docs
+    // Find current period quota from limited results.
+    //
+    // SECURITY: Firestore rules let a client CREATE additional profile_quota
+    // docs for the current period with sessions_used: 0. If we simply took the
+    // first match, a user could mint a fresh zero-usage doc to reset their
+    // session count and bypass the free-tier limit. Defend on the read side by
+    // choosing the MOST-CONSERVATIVE matching doc: highest sessions_used, and on
+    // ties the fewest free_opens_remaining. A forged zero-usage doc can then
+    // never lower the reported usage (the create rule also pins free_opens to 0,
+    // so free opens cannot be inflated). See FIXES.md for the server-authoritative
+    // follow-up that removes client writes entirely.
+    const currentPeriodQuotas = quotaQuery.docs
       .map((doc) => doc.data())
-      .find((q) => {
+      .filter((q) => {
         const qStart = new Date(q.period_start)
         return qStart >= currentPeriodStart && qStart <= currentPeriodEnd
       })
+
+    const quota = currentPeriodQuotas.reduce<FirebaseFirestore.DocumentData | undefined>(
+      (mostUsed, candidate) => {
+        if (!mostUsed) return candidate
+        const candidateUsed = candidate.sessions_used ?? 0
+        const bestUsed = mostUsed.sessions_used ?? 0
+        if (candidateUsed > bestUsed) return candidate
+        if (candidateUsed < bestUsed) return mostUsed
+        // Tie on sessions_used → prefer the doc granting the fewest free opens.
+        return (candidate.free_opens_remaining ?? 0) < (mostUsed.free_opens_remaining ?? 0)
+          ? candidate
+          : mostUsed
+      },
+      undefined
+    )
 
     const usageSummary = usageSummaryDoc.data()
     const budgetUsed = usageSummary?.totalCost || 0
