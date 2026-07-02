@@ -6,6 +6,7 @@ import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { ColdStartNote } from "@/components/tutorials/ColdStartNote"
+import { ExecutorSidePanel } from "@/components/tutorials/ExecutorSidePanel"
 import { usePythonExecutor } from "@/components/tutorials/usePythonExecutor"
 
 const STARTER_CODE = `# Free-form Python — write anything and hit Run.
@@ -20,6 +21,10 @@ for n in range(5):
  * `/learn/python`, this route is intentionally NOT in `proxy.ts` PROTECTED_ROUTES). Runs entirely
  * client-side via the same Pyodide worker the tutorials use (`runPythonInWorker`), so it's free to
  * offer with no quota. Reachable from the Learn Python Path as "Python Executor".
+ *
+ * Full-height 3-pane layout (side panel | editor | output) so the code panel still gets most of the
+ * width — the side panel is a "Problem" (paste-and-read reference) / "Scratchpad"
+ * (Understand → Plan → Implement) tab pair, not a 4th column.
  */
 export default function PythonExecutorPage() {
   const [code, setCode] = useState(STARTER_CODE)
@@ -37,44 +42,61 @@ export default function PythonExecutorPage() {
   return (
     <>
       <Header />
-      <div className="pt-20 pb-12 sm:pt-24 sm:pb-16">
-        <div className="mx-auto max-w-4xl px-4">
-          <header className="mb-6">
-            <p className="text-accent text-xs font-semibold tracking-[0.18em] uppercase">
-              Python Executor
-            </p>
-            <h1 className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Run Python, freely
-            </h1>
-          </header>
-
-          <div className="border-border overflow-hidden rounded-xl border shadow-sm">
-            <div className="border-border bg-muted/40 flex items-center justify-between border-b px-3 py-2">
-              <span className="text-muted-foreground font-mono text-xs">scratch.py</span>
-            </div>
-            <CodeMirrorErrorBoundary>
-              <CodeMirrorEditor value={code} onChange={setCode} language="python" height={340} />
-            </CodeMirrorErrorBoundary>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Button onClick={handleRun} disabled={running || !code.trim()} className="gap-2">
-              <Play className="h-4 w-4" />
+      {/* sr-only heading: no visible title chrome, but the page still has a labeled landmark. */}
+      <h1 className="sr-only">Python Executor</h1>
+      <div className="flex h-[calc(100dvh-80px)] flex-col pt-20">
+        <div className="border-border flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2.5">
+          <span className="text-muted-foreground font-mono text-xs">Python Executor</span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              onClick={handleRun}
+              disabled={running || !code.trim()}
+              size="sm"
+              className="gap-2"
+            >
+              <Play className="h-3.5 w-3.5" />
               {warming ? "Starting Python…" : running ? "Running…" : "Run"}
             </Button>
-            <Button onClick={handleClear} disabled={running} variant="outline" className="gap-2">
-              <Eraser className="h-4 w-4" />
+            <Button
+              onClick={handleClear}
+              disabled={running}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Eraser className="h-3.5 w-3.5" />
               Clear
             </Button>
             <ColdStartNote warming={warming} />
           </div>
+        </div>
 
-          <div className="border-border bg-card mt-6 overflow-hidden rounded-xl border shadow-sm">
-            <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-2">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <ExecutorSidePanel />
+
+          <div className="lg:border-border flex min-h-0 flex-1 flex-col border-t lg:border-t-0 lg:border-r">
+            <div className="border-border bg-muted/40 flex shrink-0 items-center justify-between border-b px-3 py-1.5">
+              <span className="text-muted-foreground font-mono text-xs">scratch.py</span>
+            </div>
+            <div className="min-h-0 flex-1">
+              <CodeMirrorErrorBoundary>
+                <CodeMirrorEditor
+                  value={code}
+                  onChange={setCode}
+                  language="python"
+                  height="100%"
+                  className="h-full"
+                />
+              </CodeMirrorErrorBoundary>
+            </div>
+          </div>
+
+          <div className="border-border bg-card flex min-h-0 flex-1 flex-col border-t lg:w-[420px] lg:flex-none lg:border-t-0">
+            <div className="border-border bg-muted/40 flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
               <Terminal className="text-muted-foreground h-3.5 w-3.5" aria-hidden="true" />
               <span className="text-muted-foreground font-mono text-xs">Output</span>
             </div>
-            <div className="min-h-[120px] px-3 py-3 font-mono text-sm">
+            <div className="flex-1 overflow-y-auto px-3 py-3 font-mono text-sm">
               {output.length === 0 && result === undefined && !error && !running && (
                 <p className="text-muted-foreground/70">Run your code to see output here.</p>
               )}
