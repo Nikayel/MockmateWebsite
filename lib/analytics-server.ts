@@ -1,10 +1,13 @@
 /**
  * Server-side analytics helper for API routes
- * Writes events directly to Firestore
+ * Writes events directly to Firestore via the Admin SDK.
+ *
+ * NOTE: this runs in API routes where there is no client auth context, so it
+ * must use the Admin SDK. The previous client-SDK path (`db` from ./firebase)
+ * was denied by Firestore rules on every call and silently dropped all events.
  */
 
-import { db } from "./firebase"
-import { collection, addDoc } from "firebase/firestore"
+import { adminDb } from "./firebase-admin"
 
 /**
  * Track event server-side (for API routes)
@@ -14,7 +17,7 @@ export async function trackEventServer(
   params: Record<string, any>
 ) {
   try {
-    await addDoc(collection(db, "analytics_events"), {
+    await adminDb.collection("analytics_events").add({
       event_name: eventName,
       properties: params,
       timestamp: new Date().toISOString(),

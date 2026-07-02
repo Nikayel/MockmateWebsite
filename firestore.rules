@@ -200,17 +200,13 @@ service cloud.firestore {
     // ANALYTICS & METRICS (Write-only from client)
     // ============================================================================
 
+    // Analytics are written server-side via the Admin SDK (see
+    // lib/analytics-server.ts), which bypasses these rules. No client access.
+    // (Previously this allowed any authenticated user to create documents in an
+    // unused `analytics` collection; the real telemetry collection is
+    // `analytics_events`, which stays default-deny for clients.)
     match /analytics/{document=**} {
-      // No read access from client (only admin)
-      allow read: if false;
-
-      // Users can write their own analytics events
-      allow create: if isAuthenticated()
-                    && request.resource.data.user_id == request.auth.uid;
-
-      // No updates or deletes
-      allow update: if false;
-      allow delete: if false;
+      allow read, write: if false;
     }
 
     // ============================================================================
@@ -329,10 +325,17 @@ service cloud.firestore {
                   && documentExists()
                   && resource.data.userId == request.auth.uid;
 
-      // Users can update (mark as read)
+      // Users can update (mark as read/dismissed) their OWN notifications.
+      // The owner must stay pinned to the caller, otherwise a user could
+      // reassign a notification they own to a victim (notification injection).
+      // Restrict mutable keys to the read/dismiss state so title/body/link
+      // (potential phishing content) cannot be rewritten client-side.
       allow update: if isAuthenticated()
                     && documentExists()
-                    && resource.data.userId == request.auth.uid;
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['read', 'readAt', 'dismissed', 'dismissedAt']);
 
       // Only backend can create in-app notifications
       allow create: if false;
