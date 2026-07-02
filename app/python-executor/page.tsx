@@ -74,6 +74,7 @@ export default function PythonExecutorPage() {
 
   return (
     <div className="h-[100dvh] overflow-x-auto overflow-y-hidden">
+      <h1 className="sr-only">Python Executor</h1>
       <div className="flex h-full min-w-[940px] flex-col">
         <ExecutorTopBar />
 
@@ -149,7 +150,7 @@ export default function PythonExecutorPage() {
                   {line.message}
                 </p>
               ))}
-              {result !== undefined && (
+              {result !== undefined && result !== null && (
                 <p className="text-muted-foreground mt-1">
                   <span className="text-accent">{">>> "}</span>
                   {typeof result === "string" ? result : JSON.stringify(result)}
