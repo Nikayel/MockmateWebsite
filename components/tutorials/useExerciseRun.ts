@@ -1,7 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { executeScenarioInBrowser } from "@/lib/workspace-execution"
+import {
+  executeScenarioInBrowser,
+  isPythonRuntimeWarm,
+  markPythonRuntimeWarm,
+} from "@/lib/workspace-execution"
 import { getTutorialExerciseScenario } from "@/lib/tutorials/exercise-scenarios"
 import { mapResultRow, type RawResultRow } from "@/lib/tutorials/test-result-mapping"
 import type { TestResult } from "@/components/interview/TestResultsPanel"
@@ -19,13 +23,6 @@ export interface RunInput {
   /** Workspace: the edited editable files. */
   workspaceFiles?: Array<{ path: string; content: string }>
 }
-
-/**
- * Pyodide boots once per session (it downloads + starts the WASM runtime on the first Run, which is
- * multi-second). Module-level so every runner shares the same "has it warmed yet" signal — the first
- * run anywhere shows a distinct "Starting Python…" state; later runs are fast. See HANDOFF §C.
- */
-let pyodideWarmed = false
 
 export interface ExerciseRunState {
   running: boolean
@@ -59,7 +56,7 @@ export function useExerciseRun(
 
   const run = async (input: RunInput) => {
     setRunning(true)
-    setWarming(!pyodideWarmed)
+    setWarming(!isPythonRuntimeWarm())
     setRunError(null)
     try {
       const scenario = getTutorialExerciseScenario(exercise.id)
@@ -103,7 +100,7 @@ export function useExerciseRun(
         error instanceof Error ? error.message : "Something went wrong running your code."
       )
     } finally {
-      pyodideWarmed = true
+      markPythonRuntimeWarm()
       setWarming(false)
       setRunning(false)
     }

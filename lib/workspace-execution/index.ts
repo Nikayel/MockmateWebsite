@@ -10,6 +10,8 @@ export {
   executePythonClientSide,
   executeWorkspaceScenarioPythonClientSide,
   runPythonInWorker,
+  isPythonRuntimeWarm,
+  markPythonRuntimeWarm,
 } from "./python-sandbox"
 export { executeScenarioInBrowser } from "./browser-execution"
 export { overlayWorkspaceFiles, getVisibleWorkspaceFiles, getWorkspacePrimaryCode } from "./files"
