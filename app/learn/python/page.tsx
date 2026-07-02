@@ -1,4 +1,6 @@
 import type { Metadata } from "next"
+import Link from "next/link"
+import { Terminal } from "lucide-react"
 import { listLevels } from "@/lib/tutorials/registry"
 import { LevelSelector } from "@/components/tutorials/LevelSelector"
 import { ResumeLearning } from "@/components/tutorials/ResumeLearning"
@@ -44,6 +46,16 @@ export default function LearnPythonPage() {
         </div>
 
         <ResumeLearning levels={levels} />
+
+        <div className="mt-4 flex justify-center">
+          <Link
+            href="/python-executor"
+            className="border-border text-muted-foreground hover:border-accent/30 hover:text-foreground inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
+          >
+            <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
+            Just want to freestyle? Try the Python Executor
+          </Link>
+        </div>
       </header>
 
       <LevelSelector levels={levels} />

@@ -10,7 +10,7 @@ import {
   Terminal,
   LogOut,
   Map,
-  Brain,
+  GraduationCap,
   FlaskConical,
   ChevronDown,
   type LucideIcon,
@@ -82,10 +82,10 @@ const APP_NAV: AppNavItem[] = [
     isActive: (pathname) => pathname.startsWith("/roadmap"),
   },
   {
-    label: "Review",
-    href: "/practice",
-    icon: Brain,
-    isActive: (pathname) => pathname.startsWith("/practice"),
+    label: "Learn Python",
+    href: "/learn/python",
+    icon: GraduationCap,
+    isActive: (pathname) => pathname.startsWith("/learn"),
   },
 ]
 
