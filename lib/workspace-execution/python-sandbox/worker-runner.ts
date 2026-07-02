@@ -16,8 +16,21 @@ interface PythonWorkerData {
 interface PendingPythonRun {
   resolve: (value: PythonWorkerRunResult) => void
   timeoutId: ReturnType<typeof setTimeout>
+  execTimeoutMs: number
   logs: DsaExecutionResult["consoleLogs"]
 }
+
+// Downloading + initializing Pyodide on a first run is a multi-MB CDN fetch that
+// can take many seconds on a slow connection. Keep this well above the execution
+// budget so a slow COLD START is never misreported as an infinite loop.
+const DEFAULT_BOOT_TIMEOUT_MS = 60000
+// Once the runtime is ready, real user code should finish quickly; a longer run
+// is treated as a runaway loop.
+const DEFAULT_EXEC_TIMEOUT_MS = 5000
+
+const BOOT_TIMEOUT_MESSAGE =
+  "Couldn't start the Python runtime. Check your connection and try again."
+const EXEC_TIMEOUT_MESSAGE = "Code execution timed out. Try checking for infinite loops."
 
 let pythonWorker: Worker | null = null
 let pendingRun: PendingPythonRun | null = null
@@ -38,13 +51,25 @@ function getPythonWorker(): Worker {
       if (!pendingRun) return
 
       const data = event.data as {
-        type?: "status" | "result"
+        type?: "status" | "exec-start" | "result"
         success?: boolean
         result?: unknown
         logs?: DsaExecutionResult["consoleLogs"]
         error?: string
         message?: string
         timestamp?: number
+      }
+
+      // The runtime has finished booting and is about to execute user code.
+      // Swap the generous boot timeout for the tight execution timeout so that
+      // a runaway loop is still caught quickly, without penalizing cold starts.
+      if (data.type === "exec-start") {
+        clearTimeout(pendingRun.timeoutId)
+        pendingRun.timeoutId = setTimeout(() => {
+          resetPythonWorker()
+          resolveActive({ success: false, logs: [], error: EXEC_TIMEOUT_MESSAGE })
+        }, pendingRun.execTimeoutMs)
+        return
       }
 
       if (data.type === "status") {
@@ -57,25 +82,23 @@ function getPythonWorker(): Worker {
       }
 
       clearTimeout(pendingRun.timeoutId)
-      const resolve = pendingRun.resolve
       const statusLogs = pendingRun.logs
-      pendingRun = null
-      resolve({
+      const payload: PythonWorkerRunResult = {
         success: data.success === true,
         result: data.result,
         logs: [...statusLogs, ...(data.logs || [])],
         error: data.error,
-      })
+      }
+      resolveActive(payload)
     }
 
     pythonWorker.onerror = (error) => {
       if (!pendingRun) return
 
       clearTimeout(pendingRun.timeoutId)
-      const resolve = pendingRun.resolve
       const statusLogs = pendingRun.logs
       resetPythonWorker()
-      resolve({
+      resolveActive({
         success: false,
         logs: statusLogs,
         error: error.message || "Unknown Python worker error",
@@ -86,9 +109,18 @@ function getPythonWorker(): Worker {
   return pythonWorker
 }
 
+// Resolve the in-flight run exactly once and clear it.
+function resolveActive(value: PythonWorkerRunResult): void {
+  if (!pendingRun) return
+  const resolve = pendingRun.resolve
+  pendingRun = null
+  resolve(value)
+}
+
 export function runPythonInWorker(
   workerData: string | PythonWorkerData,
-  timeoutMs = 5000
+  execTimeoutMs = DEFAULT_EXEC_TIMEOUT_MS,
+  bootTimeoutMs = DEFAULT_BOOT_TIMEOUT_MS
 ): Promise<PythonWorkerRunResult> {
   return new Promise((resolve) => {
     if (typeof window === "undefined") {
@@ -113,16 +145,14 @@ export function runPythonInWorker(
       return
     }
 
+    // Start on the boot timeout. It is replaced by the execution timeout as soon
+    // as the worker reports it is about to run code (`exec-start`).
     const timeoutId = setTimeout(() => {
       resetPythonWorker()
-      resolve({
-        success: false,
-        logs: [],
-        error: "Code execution timed out. Try checking for infinite loops.",
-      })
-    }, timeoutMs)
+      resolveActive({ success: false, logs: [], error: BOOT_TIMEOUT_MESSAGE })
+    }, bootTimeoutMs)
 
-    pendingRun = { resolve, timeoutId, logs: [] }
+    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [] }
     worker.postMessage(typeof workerData === "string" ? { code: workerData } : workerData)
   })
 }
