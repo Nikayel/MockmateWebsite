@@ -18,10 +18,16 @@ export interface PythonExecutorLine {
   message: string
 }
 
+/** Coarse run lifecycle for the Output header status pill. */
+export type PythonExecutorStatus = "idle" | "running" | "success" | "error"
+
 export interface PythonExecutorState {
   running: boolean
   /** True only while the first run of the session is booting the Python runtime. */
   warming: boolean
+  status: PythonExecutorStatus
+  /** Wall-clock duration of the last completed run, in ms (null until a run finishes). */
+  elapsedMs: number | null
   output: PythonExecutorLine[]
   /** The value of the last expression, if the script ended in one (REPL-style echo). */
   result: unknown
@@ -33,15 +39,19 @@ export interface PythonExecutorState {
 export function usePythonExecutor(): PythonExecutorState {
   const [running, setRunning] = useState(false)
   const [warming, setWarming] = useState(false)
+  const [status, setStatus] = useState<PythonExecutorStatus>("idle")
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null)
   const [output, setOutput] = useState<PythonExecutorLine[]>([])
   const [result, setResult] = useState<unknown>(undefined)
   const [error, setError] = useState<string | null>(null)
 
   const run = async (code: string) => {
     setRunning(true)
+    setStatus("running")
     setWarming(!isPythonRuntimeWarm())
     setError(null)
     setResult(undefined)
+    const startedAt = performance.now()
     try {
       const outcome = await runPythonInWorker(code)
       // The worker also emits transient "info" boot-status lines — never part of the program's output.
@@ -52,12 +62,16 @@ export function usePythonExecutor(): PythonExecutorState {
       )
       if (outcome.success) {
         setResult(outcome.result)
+        setStatus("success")
       } else {
         setError(outcome.error ?? "Something went wrong running your code.")
+        setStatus("error")
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong running your code.")
+      setStatus("error")
     } finally {
+      setElapsedMs(Math.round(performance.now() - startedAt))
       markPythonRuntimeWarm()
       setWarming(false)
       setRunning(false)
@@ -68,7 +82,9 @@ export function usePythonExecutor(): PythonExecutorState {
     setOutput([])
     setResult(undefined)
     setError(null)
+    setStatus("idle")
+    setElapsedMs(null)
   }
 
-  return { running, warming, output, result, error, run, clear }
+  return { running, warming, status, elapsedMs, output, result, error, run, clear }
 }
