@@ -9,6 +9,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 
 export interface FeedbackScores {
   understanding: number
@@ -133,10 +134,19 @@ export function useTwoPhaseFeedback() {
     })
 
     try {
+      const idToken = await getCurrentUserToken()
+      if (!idToken) {
+        throw new Error("You must be signed in to get feedback.")
+      }
+      const authHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      }
+
       // Phase 1: Get instant feedback
       const instantResponse = await fetch("/api/feedback/instant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders,
         body: JSON.stringify(request),
       })
 
@@ -167,7 +177,7 @@ export function useTwoPhaseFeedback() {
       // Fire-and-forget the process request
       fetch("/api/feedback/process", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders,
         body: JSON.stringify({ jobId: instantData.jobId }),
       }).catch((err) => console.error("Background process trigger failed:", err))
 
@@ -195,7 +205,10 @@ export function useTwoPhaseFeedback() {
 
     const poll = async () => {
       try {
-        const response = await fetch(`/api/feedback/status?jobId=${jobId}`)
+        const idToken = await getCurrentUserToken()
+        const response = await fetch(`/api/feedback/status?jobId=${jobId}`, {
+          headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+        })
         if (!response.ok) {
           throw new Error(`Status check failed: ${response.status}`)
         }

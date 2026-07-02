@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
+import { verifyAuth } from "@/lib/auth-helpers"
 import {
   getSessionMetrics,
   getInstantScores,
@@ -72,6 +73,14 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
+    // This route creates paid-feedback jobs and mutates interview_sessions, so
+    // it must run under a verified token and never trust a body userId.
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const authenticatedUserId = authResult.userId
+
     const body: InstantFeedbackRequest = await request.json()
     const {
       sessionId,
@@ -90,6 +99,19 @@ export async function POST(request: NextRequest) {
 
     if (!sessionId || !userId) {
       return NextResponse.json({ error: "sessionId and userId are required" }, { status: 400 })
+    }
+
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    // The session being scored must belong to the caller.
+    const sessionSnapshot = await adminDb.collection("interview_sessions").doc(sessionId).get()
+    if (!sessionSnapshot.exists) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
+    }
+    if (sessionSnapshot.get("user_id") !== authenticatedUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     logger.info("[Instant Feedback] Processing request", {

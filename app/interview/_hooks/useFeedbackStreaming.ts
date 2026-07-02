@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import type { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 
 type ScoreBreakdown = {
@@ -72,9 +73,16 @@ export function useFeedbackStreaming(
         opts.setComprehensiveFeedback(fallbackText)
 
         if (opts.currentSessionId) {
+          const idToken = await getCurrentUserToken()
+          if (!idToken) {
+            throw new Error("You must be signed in to save feedback.")
+          }
           await fetch("/api/feedback/persist", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
             body: JSON.stringify({
               sessionId: request.sessionId,
               userId: request.userId,

@@ -14,6 +14,7 @@
  */
 
 import { NextRequest } from "next/server"
+import { verifyAuthEdge } from "@/lib/auth-edge"
 import {
   generateFeedbackResponseEdge,
   validateConversationEdge,
@@ -47,6 +48,17 @@ import type {
 export const runtime = "edge"
 
 export async function POST(request: NextRequest) {
+  // Verify the caller before streaming any paid AI output. Header-only check so
+  // the request body stays available for processRequest().
+  const auth = await verifyAuthEdge(request)
+  if (!auth.authenticated || !auth.userId) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+  const authenticatedUserId = auth.userId
+
   const encoder = new TextEncoder()
 
   // Create a TransformStream for streaming
@@ -89,6 +101,12 @@ export async function POST(request: NextRequest) {
         bugfixRootCauseRubric,
         bugfixGroundTruth,
       } = body
+
+      // The session owner in the body must match the verified token.
+      if (userId && userId !== authenticatedUserId) {
+        await sendEvent("error", { message: "Forbidden" })
+        return
+      }
 
       // ========================================
       // PHASE 1: Instant Scores (< 100ms, no AI)

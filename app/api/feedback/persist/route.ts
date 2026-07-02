@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
 import { logger } from "@/lib/logger"
+import { verifyAuth } from "@/lib/auth-helpers"
 import {
   calculateMasteryScore,
   type MasteryScoreInput,
@@ -100,6 +101,14 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
+    // Require a verified Firebase ID token. This route mutates
+    // interview_sessions scores/feedback, so it must never trust a body userId.
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const authenticatedUserId = authResult.userId
+
     const body: PersistRequest = await request.json()
     const {
       sessionId,
@@ -131,6 +140,20 @@ export async function POST(request: NextRequest) {
 
     if (!scores || !feedback) {
       return NextResponse.json({ error: "scores and feedback are required" }, { status: 400 })
+    }
+
+    // A caller may only persist feedback for their own account and their own
+    // session. Verify both against the decoded token before any write.
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const sessionSnapshot = await adminDb.collection("interview_sessions").doc(sessionId).get()
+    if (!sessionSnapshot.exists) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 })
+    }
+    if (sessionSnapshot.get("user_id") !== authenticatedUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     logger.info("[Feedback Persist] Processing request", {

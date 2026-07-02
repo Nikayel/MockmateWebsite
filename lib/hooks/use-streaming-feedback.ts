@@ -23,6 +23,7 @@
 import { useState, useCallback, useRef } from "react"
 import { logger } from "@/lib/logger"
 import { getGuidedLabMasterySummary } from "@/lib/stores/guided-lab-store"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 
 export interface StreamingScores {
   understanding: number
@@ -156,9 +157,16 @@ export function useStreamingFeedback() {
       }))
 
       try {
+        const idToken = await getCurrentUserToken()
+        if (!idToken) {
+          throw new Error("You must be signed in to save feedback.")
+        }
         const response = await fetch("/api/feedback/persist", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
             sessionId: request.sessionId,
             userId: request.userId,
@@ -262,9 +270,16 @@ export function useStreamingFeedback() {
       let finalFeedback: StreamingFeedback | null = null
 
       try {
+        const idToken = await getCurrentUserToken()
+        if (!idToken) {
+          throw new Error("You must be signed in to generate feedback.")
+        }
         const response = await fetch("/api/feedback/stream", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
           body: JSON.stringify(request),
           signal: abortController.signal,
         })

@@ -11,11 +11,17 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 
 export const maxDuration = 5 // Quick check, no heavy processing
 
 export async function GET(request: NextRequest) {
+  const authResult = await verifyAuth(request)
+  if (!authResult.authenticated || !authResult.userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const jobId = searchParams.get("jobId")
 
@@ -31,6 +37,11 @@ export async function GET(request: NextRequest) {
     }
 
     const job = jobDoc.data()!
+
+    // A job's feedback result is private to its owner.
+    if (job.userId !== authResult.userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     // Base response
     const response: {

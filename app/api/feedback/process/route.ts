@@ -9,9 +9,11 @@
  * The heavy AI operations happen here, not in the user-facing request.
  */
 
+import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { generateFeedbackResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
 import type { FeedbackScores, StructuredFeedback } from "@/lib/feedback"
@@ -46,6 +48,20 @@ interface ProcessRequest {
   limit?: number // Max jobs to process
 }
 
+const CRON_SECRET = process.env.CRON_SECRET
+
+// Batch/queue processing (processAll) is an internal operation and must only be
+// reachable with the cron secret — never by an end user.
+function isCronAuthorized(request: NextRequest): boolean {
+  if (!CRON_SECRET) return false
+  const authHeader = request.headers.get("authorization") || ""
+  const expectedToken = `Bearer ${CRON_SECRET}`
+  return (
+    authHeader.length === expectedToken.length &&
+    timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedToken))
+  )
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
@@ -53,16 +69,25 @@ export async function POST(request: NextRequest) {
     const body: ProcessRequest = await request.json()
     const { jobId, processAll = false, limit = 5 } = body
 
+    // Two authorized callers: the cron/queue worker (cron secret) may batch
+    // process; an end user (verified token) may only process their OWN job.
+    const cronAuthorized = isCronAuthorized(request)
+    let authenticatedUserId: string | null = null
+    if (!cronAuthorized) {
+      const authResult = await verifyAuth(request)
+      if (!authResult.authenticated || !authResult.userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      authenticatedUserId = authResult.userId
+    }
+
     // Get jobs to process
     let jobs: FirebaseFirestore.QueryDocumentSnapshot[] = []
 
-    if (jobId) {
-      // Process specific job
-      const jobDoc = await adminDb.collection("feedback_jobs").doc(jobId).get()
-      if (jobDoc.exists && ["pending", "failed"].includes(jobDoc.data()?.status)) {
-        jobs = [jobDoc as FirebaseFirestore.QueryDocumentSnapshot]
+    if (processAll) {
+      if (!cronAuthorized) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
-    } else if (processAll) {
       // Process pending jobs
       const snapshot = await adminDb
         .collection("feedback_jobs")
@@ -71,6 +96,19 @@ export async function POST(request: NextRequest) {
         .limit(limit)
         .get()
       jobs = snapshot.docs
+    } else if (jobId) {
+      // Process specific job
+      const jobDoc = await adminDb.collection("feedback_jobs").doc(jobId).get()
+      // An end user may only process a job they own.
+      if (
+        !cronAuthorized &&
+        (!jobDoc.exists || jobDoc.data()?.userId !== authenticatedUserId)
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      if (jobDoc.exists && ["pending", "failed"].includes(jobDoc.data()?.status)) {
+        jobs = [jobDoc as FirebaseFirestore.QueryDocumentSnapshot]
+      }
     }
 
     if (jobs.length === 0) {
