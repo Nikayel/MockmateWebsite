@@ -1,0 +1,605 @@
+<title>CodeSparring Pre-Launch Audit — Learning Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ground: #EEF1F4;
+    --surface: #FBFCFD;
+    --surface-2: #F2F5F8;
+    --ink: #1A2330;
+    --ink-soft: #384456;
+    --muted: #5B6675;
+    --line: #D6DCE4;
+    --line-soft: #E4E9EF;
+    --accent: #0B6E7A;
+    --accent-deep: #084C55;
+    --accent-wash: #E3EFF1;
+
+    --crit: #C0324B;
+    --high: #C2670B;
+    --med: #9A7B00;
+    --low: #5B6675;
+    --good: #2E7D5B;
+
+    --crit-wash: #F8E7EA;
+    --high-wash: #FCEEDD;
+    --med-wash: #F6F1DA;
+    --good-wash: #E4F1EA;
+
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --spine: 74ch;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap { max-width: var(--spine); margin: 0 auto; padding: 0 22px; }
+
+  /* ---------- Masthead ---------- */
+  header.masthead {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .masthead-inner {
+    max-width: var(--spine);
+    margin: 0 auto;
+    padding: 12px 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .brand-mark {
+    width: 30px; height: 30px; flex: none;
+    border-radius: 7px;
+    background: radial-gradient(120% 120% at 30% 20%, var(--accent) 0%, var(--accent-deep) 100%);
+    display: grid; place-items: center;
+    color: #fff; font-family: var(--mono); font-weight: 700; font-size: 15px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .brand-text { font-family: var(--mono); font-size: 12.5px; letter-spacing: .02em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-text strong { color: var(--ink); font-weight: 600; }
+
+  .readiness { display: flex; align-items: center; gap: 12px; flex: none; }
+  .meter { width: 150px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .meter > i { display: block; height: 100%; width: 64%; background: linear-gradient(90deg, var(--good), #3aa06f); border-radius: 99px; }
+  .readiness .count { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 640px) { .meter { width: 84px; } .brand-text { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: 62px 0 34px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent-deep);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-size: clamp(2.1rem, 6.4vw, 3.5rem);
+    line-height: 1.03;
+    letter-spacing: -0.03em;
+    font-weight: 680;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  h1 .tint { color: var(--accent-deep); }
+  .lede { font-size: 1.16rem; color: var(--ink-soft); max-width: 60ch; margin: 0 0 26px; }
+  .lede strong { color: var(--ink); font-weight: 620; }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .fact {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    background: var(--surface); border: 1px solid var(--line-soft);
+    border-radius: 99px; padding: 7px 14px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  }
+  .fact b { font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ---------- Section framing ---------- */
+  section { padding: 26px 0; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; margin: 12px 0 20px; }
+  .section-head .num { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: .1em; }
+  .section-head h2 { font-size: 1.5rem; letter-spacing: -0.02em; margin: 0; font-weight: 640; }
+  .section-note { color: var(--muted); font-size: 0.98rem; margin: -6px 0 22px; max-width: 62ch; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; margin: 0 0 16px; flex-wrap: wrap; }
+  .btn {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--ink-soft); border-radius: 7px; padding: 6px 11px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent-deep); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .legend { margin-left: auto; display: flex; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+
+  /* ---------- Concept cards (mental models) ---------- */
+  .models { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .model {
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius);
+    padding: 16px 17px;
+  }
+  .model h3 { margin: 0 0 6px; font-size: 1.02rem; letter-spacing: -0.01em; }
+  .model .kicker { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 9px; }
+  .model p { margin: 0; font-size: 0.92rem; color: var(--ink-soft); line-height: 1.55; }
+
+  /* ---------- Finding cards ---------- */
+  .findings { display: flex; flex-direction: column; gap: 12px; }
+  details.finding {
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-left: 4px solid var(--sev, var(--muted));
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  details.finding[open] { box-shadow: 0 6px 26px -18px rgba(20,30,45,.5); }
+
+  summary {
+    list-style: none; cursor: pointer;
+    padding: 15px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "meta chev" "title chev";
+    gap: 4px 12px;
+    align-items: center;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+  .f-meta { grid-area: meta; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .f-id { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+  .tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .06em; padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+  }
+  .tag.sev { color: #fff; background: var(--sev); }
+  .tag.status { border: 1px solid var(--line); color: var(--muted); background: var(--surface-2); }
+  .tag.status.shipped { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, var(--line)); background: var(--good-wash); }
+  .f-title { grid-area: title; font-size: 1.08rem; font-weight: 600; letter-spacing: -0.015em; color: var(--ink); }
+  .chev { grid-area: chev; color: var(--muted); transition: transform .2s ease; font-family: var(--mono); font-size: 18px; }
+  details[open] .chev { transform: rotate(90deg); color: var(--accent); }
+
+  .f-body { padding: 4px 18px 20px; border-top: 1px solid var(--line-soft); }
+  .f-body > .whatline {
+    font-size: 0.98rem; color: var(--ink-soft); margin: 16px 0 18px; padding-left: 14px;
+    border-left: 2px solid var(--line);
+  }
+
+  /* lens grid */
+  .lenses { display: grid; gap: 10px; grid-template-columns: 1fr; margin: 0 0 16px; }
+  @media (min-width: 720px) { .lenses { grid-template-columns: repeat(3, 1fr); } }
+  .lens {
+    background: var(--surface-2); border: 1px solid var(--line-soft);
+    border-radius: 8px; padding: 13px 14px;
+  }
+  .lens .role {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-weight: 600;
+  }
+  .lens.pm .role { color: #7A4E9E; }
+  .lens.eng .role { color: var(--accent-deep); }
+  .lens.data .role { color: #A65418; }
+  .lens .role::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: currentColor; flex: none; }
+  .lens p { margin: 0; font-size: 0.88rem; line-height: 1.5; color: var(--ink-soft); }
+
+  .fix, .lesson { border-radius: 8px; padding: 12px 14px; margin-top: 10px; font-size: 0.92rem; }
+  .fix { background: var(--accent-wash); border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line)); }
+  .lesson { background: #FFFDF6; border: 1px solid var(--med-wash); }
+  .fix .label, .lesson .label { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 5px; }
+  .fix .label { color: var(--accent-deep); }
+  .lesson .label { color: #8A6D00; }
+  .fix p, .lesson p { margin: 0; color: var(--ink-soft); line-height: 1.5; }
+  .fix code, .lesson code, .f-body code, .lens code {
+    font-family: var(--mono); font-size: 0.82em; background: #fff;
+    border: 1px solid var(--line-soft); border-radius: 4px; padding: 1px 5px; color: var(--accent-deep);
+    word-break: break-word;
+  }
+
+  .paths { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+  .path { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 3px 8px; }
+
+  /* footer */
+  footer { padding: 40px 0 70px; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); margin-top: 30px; }
+  footer .wrap { display: flex; flex-direction: column; gap: 10px; }
+  footer code { font-family: var(--mono); font-size: 0.85em; color: var(--accent-deep); }
+  a { color: var(--accent-deep); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <div class="brand-mark">CS</div>
+      <div class="brand-text"><strong>CodeSparring</strong> · pre-launch audit</div>
+    </div>
+    <div class="readiness" title="Launch readiness: fixes shipped vs. total findings">
+      <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+      <span class="count" id="readinessCount">7 shipped · 11 open</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Security · UX · Reliability — read before you go live</p>
+      <h1>The findings, taught as a <span class="tint">launch readiness</span> review.</h1>
+      <p class="lede">This is the pre-launch audit of CodeSparring — but written to teach, not just to list. Every finding is read through <strong>three lenses</strong>: the <strong>PM</strong> deciding if it blocks launch, the <strong>software engineer</strong> fixing the code, and the <strong>data engineer</strong> guarding the integrity of your data. Learn the mental model once; recognize the pattern everywhere.</p>
+      <div class="facts">
+        <span class="fact"><b>1</b> critical closed</span>
+        <span class="fact"><b>2</b> high closed</span>
+        <span class="fact"><b>7</b> fixes shipped &amp; pushed</span>
+        <span class="fact"><b>11</b> documented for follow-up</span>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="section-head"><span class="num">01</span><h2>How to read this</h2></div>
+      <p class="section-note">Each finding is collapsed by default. Open one to see the same problem explained from three jobs you're growing into. The goal isn't to memorize 18 bugs — it's to internalize the handful of mental models underneath them.</p>
+      <div class="models">
+        <div class="model">
+          <p class="kicker">Lens · PM</p>
+          <h3>Is this a launch blocker?</h3>
+          <p>Severity ≈ <em>how easy to exploit</em> × <em>how much it touches</em>. A trivially-exploitable flaw that hits every user's data outranks a clever one that hits nobody. PMs turn risk into a go / no-go.</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Lens · Engineer</p>
+          <h3>Where's the flaw, what's the fix?</h3>
+          <p>The exact line, the exact change, and the <em>reusable pattern</em> — so the next route is written correctly the first time instead of re-audited later.</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Lens · Data engineer</p>
+          <h3>Who can touch which data?</h3>
+          <p>Every write crosses a trust boundary. The question is always: does this mutation carry a <em>“…where owner = caller”</em> clause the server actually enforces?</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="models">
+      <div class="section-head"><span class="num">02</span><h2>Six mental models</h2></div>
+      <p class="section-note">These recur across the whole audit. Once you can name them, most of the findings collapse into “oh — that one again.”</p>
+      <div class="models">
+        <div class="model">
+          <p class="kicker">Concept</p>
+          <h3>Trust boundary</h3>
+          <p>The line between code you control (server) and input you don't (the browser, the request body). Anything crossing it is a lie until verified. The client is a suggestion; the server is the truth.</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Concept</p>
+          <h3>IDOR</h3>
+          <p>Insecure Direct Object Reference: acting on an ID from the request without checking the caller <em>owns</em> that object. “Update session <code>X</code>” must become “update session <code>X</code> <em>if it belongs to me</em>.”</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Concept</p>
+          <h3>Client-attested vs. server-authoritative</h3>
+          <p>If the browser reports “I passed / I used 0 sessions” and the server believes it, the browser is now in charge of your billing and your grades. Trust the server's own count.</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Concept</p>
+          <h3>Defense in depth</h3>
+          <p>Rules <em>and</em> server checks <em>and</em> conservative reads. When one layer is awkward to fix safely, a second layer can still close the hole today without breaking the flow.</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Concept</p>
+          <h3>Cold-start UX</h3>
+          <p>The first run is always the slowest (downloads, warmups). If your timeout can't tell “still loading” from “stuck,” you punish exactly the users you're trying to onboard.</p>
+        </div>
+        <div class="model">
+          <p class="kicker">Concept</p>
+          <h3>Fail closed, and fail readable</h3>
+          <p>When a secret is missing or a token is bad, deny by default — never accidentally allow. And when you deny, say what happened in words a human can act on.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="shipped">
+      <div class="section-head"><span class="num">03</span><h2>Shipped this session</h2></div>
+      <p class="section-note">Fixed in code, typechecked, tested where tests exist, committed as separate changes and pushed to <code>main</code>. Open each to learn why it mattered.</p>
+      <div class="toolbar">
+        <button class="btn" data-scope="shipped" data-act="open">Expand all</button>
+        <button class="btn" data-scope="shipped" data-act="close">Collapse all</button>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--crit)"></i>critical</span>
+          <span><i class="dot" style="background:var(--high)"></i>high</span>
+          <span><i class="dot" style="background:var(--med)"></i>medium</span>
+          <span><i class="dot" style="background:var(--good)"></i>shipped</span>
+        </div>
+      </div>
+
+      <div class="findings" data-group="shipped">
+
+        <details class="finding" style="--sev: var(--crit)">
+          <summary>
+            <div class="f-meta"><span class="f-id">FEEDBACK-IDOR</span><span class="tag sev">Critical</span><span class="tag status shipped">Shipped</span></div>
+            <div class="f-title">Anyone could overwrite any user's interview scores</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">app/api/feedback/persist/route.ts</span><span class="path">+ instant · status · process · stream</span></div>
+            <p class="whatline">The feedback routes had <strong>no authentication at all</strong>. They read <code>userId</code> and <code>sessionId</code> from the request body and wrote scores, feedback, and mastery straight into <code>interview_sessions</code> — for whatever session ID you sent.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>Ship-blocker. Exploit cost is near-zero (no login needed) and blast radius is total (every user's results and spaced-repetition schedule). If a stranger can rewrite your grades, the product's core promise — an honest read on your readiness — is gone. This is exactly why “require sign-in on data/cost routes” is a launch gate.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>The route trusted body identity and did a blind <code>adminDb…doc(sessionId).update()</code>. Fix: verify the Firebase token with <code>verifyAuth</code>, reject if <code>body.userId</code> ≠ token uid, then <em>load the session and confirm <code>user_id === caller</code></em> before writing. The Edge <code>stream</code> route needed a new REST verifier (<code>lib/auth-edge.ts</code>) since it can't load the Admin SDK.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>Textbook IDOR. The write crossed the trust boundary with no ownership predicate. In data terms every mutation needs a <code>WHERE owner = caller</code> — enforced <em>server-side</em>, because Firestore rules don't run on Admin-SDK writes. The doc shape is a contract; the server is the only place it holds.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Never derive identity from the body. Verify the token → match the claimed user → confirm the target doc is owned by that user → then write.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>Two questions for every mutating route: <em>“who is calling?”</em> (authentication) and <em>“are they allowed to touch this specific object?”</em> (authorization). The second is the one that's quietly skipped.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--high)">
+          <summary>
+            <div class="f-meta"><span class="f-id">FEEDBACK-COST</span><span class="tag sev">High</span><span class="tag status shipped">Shipped</span></div>
+            <div class="f-title">Unauthenticated callers could burn your AI budget</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">feedback/process · stream · instant</span></div>
+            <p class="whatline">The same routes also kick off paid LLM work. <code>process</code> with <code>processAll:true</code> would churn through <em>everyone's</em> pending jobs; <code>stream</code> streamed model output to anyone.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>This is a money leak, not just a data leak. Unauthenticated cost paths turn your launch into someone else's free compute. The mitigation to internalize: gate anything that spends money behind identity <em>and</em> a rate limit.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p><code>process</code> is dual-use, so it now accepts <em>either</em> a <code>CRON_SECRET</code> (for batch mode, timing-safe compared, failing closed if unset) <em>or</em> a user token that may only process <em>its own</em> job. The client hooks were updated to attach <code>getCurrentUserToken()</code> on every call — otherwise the real flow would 401.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>Batch operations are a privilege. “Process all pending jobs” is an admin/cron capability; a signed-in user gets exactly one verb — “process the job I own.” Scope the blast radius of every bulk endpoint.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Split the identities: cron secret unlocks batch; a user token unlocks only their own record. Attach the token in the client, or you break your own flow.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>When you add auth to a route, you must update its callers in the same change — a “secure” endpoint whose UI can't reach it is just an outage.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--high)">
+          <summary>
+            <div class="f-meta"><span class="f-id">PYODIDE-COLDSTART</span><span class="tag sev">High</span><span class="tag status shipped">Shipped</span></div>
+            <div class="f-title">Slow-network learners could never finish their first Python run</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">lib/workspace-execution/python-sandbox/worker-runner.ts</span><span class="path">public/workers/python-sandbox-worker.js</span></div>
+            <p class="whatline">The 5-second “Run” timeout <em>included</em> the multi-megabyte Pyodide download. On a slow connection the first run timed out, showed a misleading <em>“check for infinite loops”</em> error, and <strong>killed the worker</strong> — discarding the download, so every retry restarted from zero.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>This punishes your most important moment — a new learner's very first run — and blames <em>them</em> (“infinite loop”) for <em>your</em> cold start. Silent first-run failure is an invisible churn machine: they don't file a bug, they just leave. For a Python curriculum, this is a launch blocker even though nothing is “insecure.”</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>One timer was doing two jobs. Now there's a 60s <em>boot</em> timeout that swaps to a 5s <em>execution</em> timeout the moment the worker signals <code>exec-start</code> — so cold starts get patience and runaway loops still get caught fast. A failed load no longer caches forever, so a brief offline blip can recover without a page reload.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>Instrument the boundary you care about. Measuring boot + execution as one number hides which half is slow. Separate the phases and your telemetry can finally answer “are people bouncing off cold start?”</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Give “still loading” and “stuck in a loop” different clocks and different messages — a slow download is not an error.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>Timeouts encode a hypothesis about what “too long” means. If one timeout spans two very different phases, it will misdiagnose one of them — and error copy that guesses wrong erodes trust.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--high)">
+          <summary>
+            <div class="f-meta"><span class="f-id">PYODIDE-FORGED-PASS</span><span class="tag sev">High</span><span class="tag status shipped">Shipped</span></div>
+            <div class="f-title">A previous run's answer could make the wrong code “pass”</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">public/workers/python-sandbox-worker.js</span></div>
+            <p class="whatline">Every run executed in the <em>same</em> Python global namespace. The test harness finds the candidate function via <code>globals()</code> — so if your current code didn't define it but an <em>earlier</em> run did, the stale function satisfied the test and the lesson was marked complete.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>A learning tool that says “correct!” for code that isn't teaches the wrong thing — the single worst outcome for an education product. Correctness of the grader is the product. Quietly, this also inflates your “completion” metrics.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>State leaked between runs. Each execution now gets a <em>fresh namespace</em> (<code>pyodide.toPy({})</code>), and PyProxies/temp files are destroyed after use. Because the DSA harness bundles the user's code and the tests into one self-contained string, running it in a clean namespace is both safe and correct.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>Idempotency &amp; isolation. A test run must be a pure function of <em>this</em> submission, not of session history. Shared mutable state is the enemy of reproducible results — the same defect that makes flaky test suites.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Reset the world between runs — no definition should survive from one execution to the next.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>“Passes the test” is only trustworthy if each run starts from a known-clean state. Reused interpreters, warm caches, and singletons all leak state that turns green into a lie.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--high)">
+          <summary>
+            <div class="f-meta"><span class="f-id">QUOTA-RESET</span><span class="tag sev">High</span><span class="tag status shipped">Shipped (depth)</span></div>
+            <div class="f-title">A user could reset their own session limit</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">lib/quota-enforcement.ts</span><span class="path">firestore.rules · profile_quota</span></div>
+            <p class="whatline">Firestore rules let a user create their own <code>profile_quota</code> doc with <code>sessions_used: 0</code>. The server read the <em>first</em> matching doc — so minting a fresh zero-usage doc reset the free-tier limit.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>This is the free-tier fence with a gate left open — directly erodes the reason to upgrade. Note the bound, though: a server-only budget cap still limits real spend, so it's “free sessions,” not “infinite money.” That nuance is why it's High, not Critical — severity is about <em>actual</em> blast radius, not worst-imaginable.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>The full fix (server-only quota writes) is coupled to an existing anniversary-vs-calendar period mismatch and the billing flow — risky to ship without a Firestore emulator. So the <em>safe</em> layer went in now: the server reads the <em>most-conservative</em> matching doc (highest <code>sessions_used</code>). A forged zero-usage doc can no longer lower the count. The complete follow-up is written up in <code>PRE-LAUNCH-FIXES.md → QUOTA-1</code>.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>When duplicate records can exist, your read has to define which one is authoritative. “First by date” trusted an attacker-controllable field; “max usage” is monotonic and can't be gamed downward. Choosing the aggregation is a data-integrity decision.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Two layers: read defensively today (take the highest usage), and make writes server-authoritative next (with emulator tests) — don't ship a risky rules change blind.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>When the correct fix is risky to verify, a conservative read-side layer can close the hole <em>now</em> without breaking the flow. Defense in depth buys you safe time.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--med)">
+          <summary>
+            <div class="f-meta"><span class="f-id">NOTIF-INJECTION</span><span class="tag sev">Medium</span><span class="tag status shipped">Shipped</span></div>
+            <div class="f-title">A user could plant a notification in someone else's inbox</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">firestore.rules · in_app_notifications</span></div>
+            <p class="whatline">The update rule checked you owned the notification <em>now</em>, but didn't stop you from <em>reassigning</em> its owner. You could rewrite a notification's text into a phishing message and set its <code>userId</code> to a victim.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>Phishing that renders inside your own trusted UI is worse than external spam — users have their guard down. Reputational risk out of proportion to the “medium” label.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>The sibling <code>notifications</code> rule already pinned the owner on write; <code>in_app_notifications</code> didn't. Fix: pin <code>request.resource.data.userId == auth.uid</code> and restrict writable keys to the read/dismiss state via <code>affectedKeys().hasOnly([…])</code>.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>“Mark as read” should mutate <em>state</em>, never <em>ownership or content</em>. Column-level write permissions matter: allow the two fields the action needs, deny the rest.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>On update, freeze the owner and the content — only the read/dismissed flags may change.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>“Can edit” is not one permission. Scope <em>which fields</em> an action may touch; an unrestricted update is a re-write.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--med)">
+          <summary>
+            <div class="f-meta"><span class="f-id">API-HARDENING</span><span class="tag sev">Medium</span><span class="tag status shipped">Shipped ×4</span></div>
+            <div class="f-title">Four smaller holes: DoS, privilege check, identity override, billing link</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">transpile</span><span class="path">rate-limit-feedback</span><span class="path">notifications</span><span class="path">customer-portal</span></div>
+            <p class="whatline">A cluster of medium issues fixed together — each a clean example of a distinct class of bug.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>None alone blocks launch, but together they're the “unlocked windows” of the app. Cheap to close now, expensive to explain after an incident. Batch the low-risk hardening before you go live.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p><b>transpile</b>: unbounded CPU → added rate limit + 100KB cap. <b>rate-limit-feedback</b>: admin gate read the user-writable <code>profiles.is_admin</code> → switched to RBAC <code>verifyAdminAccess</code>. <b>notifications</b>: <code>{ userId, ...body.context }</code> let the body override identity → spread body <em>first</em>. <b>customer-portal</b>: refused to link a Stripe customer owned by a different user.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>The privilege-check one is the keeper: <em>never authorize on a field the subject can write.</em> If a user can set their own <code>is_admin</code>, it isn't an access control — it's a suggestion box. Authority must come from a source the subject can't edit.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Cap untrusted work, authorize from an unwriteable source, spread trusted values last, and confirm ownership before linking money.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>Object-spread order is a security boundary: <code>{ ...untrusted, trusted }</code> is safe; <code>{ trusted, ...untrusted }</code> hands the keys to the caller.</p></div>
+          </div>
+        </details>
+
+      </div>
+    </section>
+
+    <section id="open">
+      <div class="section-head"><span class="num">04</span><h2>Documented for follow-up</h2></div>
+      <p class="section-note">Not yet fixed — each is specced precisely in <code>PRE-LAUNCH-FIXES.md</code> so a coding agent (or you) can implement it without guessing or introducing a new flaw. The most instructive ones are below; the file has the full list with exact <code>file:line</code>.</p>
+      <div class="toolbar">
+        <button class="btn" data-scope="open" data-act="open">Expand all</button>
+        <button class="btn" data-scope="open" data-act="close">Collapse all</button>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--high)"></i>high</span>
+          <span><i class="dot" style="background:var(--med)"></i>medium</span>
+          <span><i class="dot" style="background:var(--low)"></i>low</span>
+        </div>
+      </div>
+
+      <div class="findings" data-group="open">
+
+        <details class="finding" style="--sev: var(--high)">
+          <summary>
+            <div class="f-meta"><span class="f-id">QUOTA-1</span><span class="tag sev">High</span><span class="tag status">Needs staging</span></div>
+            <div class="f-title">Make session quota server-authoritative</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <p class="whatline">The read-side defense is live, but <code>profile_quota</code> is still client-writable and the client (anniversary billing) and server (calendar month) disagree on where a period starts.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>Trustworthy usage accounting is the backbone of monetization. Worth doing right — behind the emulator — rather than fast.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>Move quota writes to an authenticated Admin-SDK route, set the rule to <code>write: if false</code>, and unify on one period model with a deterministic doc id <code>{uid}_{period}</code>. Verify the free/pro/rollover flow in the Firestore emulator before shipping.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>One writer, one period key, one doc per period. Deterministic ids turn “which record is real?” into a non-question.</p></div>
+            </div>
+            <div class="lesson"><span class="label">Why it's not shipped yet</span><p>The safe fix needs an emulator to prove it doesn't break paid sessions. “Don't ship a security fix you can't verify” is itself the lesson — a broken checkout is also a flaw.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--med)">
+          <summary>
+            <div class="f-meta"><span class="f-id">API-IDOR-1</span><span class="tag sev">Medium</span><span class="tag status">Open</span></div>
+            <div class="f-title">session/metrics trusts a session id it never checks you own</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">app/api/session/metrics/route.ts</span></div>
+            <p class="whatline">The token is verified, but every action operates on <code>body.sessionId</code> with no ownership check — the same IDOR class as the feedback routes, one layer down.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>Lower blast radius (mostly in-memory metrics), so medium — but it's the identical pattern, and patterns spread. Fix it so the codebase's “shape” stays correct.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>Stamp the owner onto the metrics record at <code>session_start</code>; reject later events whose record owner ≠ caller. Reuse the ownership check from <code>feedback/persist</code>.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>Ownership isn't checked once at the door — it's checked on <em>every</em> operation against the object, because ids are guessable.</p></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--med)">
+          <summary>
+            <div class="f-meta"><span class="f-id">AUTH-GATE-1</span><span class="tag sev">Medium</span><span class="tag status">Open</span></div>
+            <div class="f-title">The “hard gate” on the Python tutorial is a paper gate</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">proxy.ts</span></div>
+            <p class="whatline">The route guard treats <em>any</em> value in an auth cookie as “logged in” — <code>document.cookie = "firebase-auth-token=x"</code> walks right past it into the signed-in-only tutorial.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>The danger is the false confidence: a comment says “hard gate,” so the next engineer builds on it as if it's real. Mislabeled security is worse than none.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>Either verify the session cookie in the proxy, or (simpler) demote the comment to “cosmetic” and make sure gated content is fetched from an authenticated API — which the progress endpoints already require.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>Presence ≠ validity. A cookie existing tells you nothing; only verifying its signature does. Never let an unverified token stand in for an identity.</p></div>
+            </div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>A gate is only as strong as what it <em>checks</em>. “There is a cookie” is not authentication; “this cookie is a valid, unexpired, signed token” is.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--low)">
+          <summary>
+            <div class="f-meta"><span class="f-id">DATA-TELEMETRY</span><span class="tag sev">Low</span><span class="tag status shipped">Shipped</span></div>
+            <div class="f-title">Your server-side analytics were silently going nowhere</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <div class="paths"><span class="path">lib/analytics-server.ts</span></div>
+            <p class="whatline">The server telemetry helper used the <em>client</em> Firestore SDK, which has no auth context on the server — so Firestore rules denied every write and the <code>catch</code> swallowed it. Months of “tracked” events, gone.</p>
+            <div class="lenses">
+              <div class="lens pm"><p class="role">Product</p><p>The scariest bugs are the silent ones. You'd make launch decisions on dashboards that were quietly empty. Always confirm your instrumentation actually lands before you trust it.</p></div>
+              <div class="lens eng"><p class="role">Engineer</p><p>Wrong SDK for the runtime. Server code writes with the <em>Admin</em> SDK (bypasses rules, carries service credentials). Switched the helper to <code>adminDb</code>; a swallowing <code>catch</code> hid the failure for a long time.</p></div>
+              <div class="lens data"><p class="role">Data engineer</p><p>This is <em>your</em> job's cautionary tale: a pipeline that fails silently is worse than one that fails loudly. Verify writes land end-to-end, and never let a <code>catch</code> turn a broken pipeline into a green one.</p></div>
+            </div>
+            <div class="fix"><span class="label">The fix, in one line</span><p>Use the runtime's correct SDK, and don't let error-swallowing hide a dead pipeline.</p></div>
+            <div class="lesson"><span class="label">The transferable lesson</span><p>“No errors” is not “it works.” A <code>try/catch</code> that logs and moves on can mask a total outage of a background system for months. Assert the effect, not the absence of a throw.</p></div>
+          </div>
+        </details>
+
+        <details class="finding" style="--sev: var(--low)">
+          <summary>
+            <div class="f-meta"><span class="f-id">MORE</span><span class="tag sev">Low</span><span class="tag status">7 more</span></div>
+            <div class="f-title">Seven more low-severity items — full specs in the fixes doc</div>
+            <span class="chev">›</span>
+          </summary>
+          <div class="f-body">
+            <p class="whatline">Documented with exact <code>file:line</code>, scenario, and fix in <code>PRE-LAUNCH-FIXES.md</code>:</p>
+            <div class="lenses" style="grid-template-columns:1fr">
+              <div class="lens eng"><p class="role">Engineer · checklist</p><p><b>API-LEAK-1/2</b> stop returning raw error messages / health topology to anonymous callers. <b>API-VALID-1/2/3</b> Zod-validate + rate-limit spaced-repetition, NPS, and notification-preference writes; build the analyze-complexity prompt server-side. <b>API-COST-1</b> rate-limit the agent recommendation routes. <b>CSP-1</b> move to nonce-based CSP (drop <code>unsafe-inline</code>). <b>RUNNER-1</b> self-host Pyodide (drop the CDN + supply-chain risk). <b>DEPRECATE-1</b> retire the server-side Piston executor and delete the callerless <code>execute/ast</code> route. <b>RULES-1</b> make tutorial/lab progress server-authoritative.</p></div>
+            </div>
+            <div class="lesson"><span class="label">How to work these</span><p>Feed one ID at a time to your loop agent. Each entry names the repo pattern to reuse and a “do-not-break” note, so the fix stays inside the lines.</p></div>
+          </div>
+        </details>
+
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="wrap">
+      <div>Developer handoff with exact <code>file:line</code> specs → <code>PRE-LAUNCH-FIXES.md</code> (repo root).</div>
+      <div>Seven fixes were committed as separate changes and pushed to <code>main</code> this session; typecheck and focused tests pass.</div>
+      <div style="color:var(--accent-deep); font-family:var(--mono); font-size:12px; letter-spacing:.04em;">CodeSparring · pre-launch readiness · read once, recognize forever</div>
+    </div>
+  </footer>
+</main>
+
+<script>
+  (function () {
+    // Expand / collapse all within a group
+    document.querySelectorAll('.btn[data-scope]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var scope = btn.getAttribute('data-scope');
+        var open = btn.getAttribute('data-act') === 'open';
+        document.querySelectorAll('.findings[data-group="' + scope + '"] details').forEach(function (d) {
+          d.open = open;
+        });
+      });
+    });
+
+    // Readiness meter: shipped vs total distinct findings
+    var shipped = 7, total = 18;
+    var pct = Math.round((shipped / total) * 100);
+    var fill = document.getElementById('meterFill');
+    if (fill) fill.style.width = pct + '%';
+    var count = document.getElementById('readinessCount');
+    if (count) count.textContent = shipped + ' shipped · ' + (total - shipped) + ' open';
+  })();
+</script>
