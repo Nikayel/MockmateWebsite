@@ -66,8 +66,11 @@ function getPythonWorker(): Worker {
       if (data.type === "exec-start") {
         clearTimeout(pendingRun.timeoutId)
         pendingRun.timeoutId = setTimeout(() => {
-          resetPythonWorker()
+          // Resolve BEFORE tearing down: resetPythonWorker() nulls pendingRun,
+          // and resolveActive() no-ops on a null pendingRun. Reversing the order
+          // would leave the run promise pending forever.
           resolveActive({ success: false, logs: [], error: EXEC_TIMEOUT_MESSAGE })
+          resetPythonWorker()
         }, pendingRun.execTimeoutMs)
         return
       }
@@ -97,12 +100,14 @@ function getPythonWorker(): Worker {
 
       clearTimeout(pendingRun.timeoutId)
       const statusLogs = pendingRun.logs
-      resetPythonWorker()
+      // Resolve BEFORE resetPythonWorker() (which nulls pendingRun); otherwise
+      // resolveActive() would short-circuit and the promise would never settle.
       resolveActive({
         success: false,
         logs: statusLogs,
         error: error.message || "Unknown Python worker error",
       })
+      resetPythonWorker()
     }
   }
 
@@ -148,8 +153,9 @@ export function runPythonInWorker(
     // Start on the boot timeout. It is replaced by the execution timeout as soon
     // as the worker reports it is about to run code (`exec-start`).
     const timeoutId = setTimeout(() => {
-      resetPythonWorker()
+      // Resolve BEFORE resetPythonWorker() nulls pendingRun, or the promise hangs.
       resolveActive({ success: false, logs: [], error: BOOT_TIMEOUT_MESSAGE })
+      resetPythonWorker()
     }, bootTimeoutMs)
 
     pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [] }
