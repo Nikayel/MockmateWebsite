@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Pencil } from "lucide-react"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
+import { usePersistentState } from "./usePersistentState"
 
 const PLACEHOLDER = `Paste a problem description here — a LeetCode prompt, an interview
 question, your own notes — so you can read it without switching windows while
@@ -12,11 +13,22 @@ you write your solution in the editor.`
  * Read-while-you-code problem notes. Paste plain text (e.g. a LeetCode description) and it renders
  * through the shared `MarkdownRenderer` so headers, examples, and code blocks read cleanly — no
  * separate window needed to reference the problem while coding. Content-only (no outer panel
- * chrome) — mounted inside `ExecutorSidePanel`'s "Problem" tab. Local state only, not persisted.
+ * chrome) — mounted inside `ExecutorSidePanel`'s "Problem" tab. Text persists to localStorage so a
+ * reload keeps the problem on hand (HANDOFF §4).
  */
 export function ProblemNotesPanel() {
-  const [notes, setNotes] = useState("")
+  const [notes, setNotes] = usePersistentState("cs_pyexec_problem", "")
   const [editing, setEditing] = useState(true)
+
+  // Once persisted text hydrates on reload, show it rendered rather than in the raw textarea. Fires
+  // at most once, so it never yanks the user out of editing while they're typing.
+  const flipped = useRef(false)
+  useEffect(() => {
+    if (!flipped.current && notes.trim()) {
+      flipped.current = true
+      setEditing(false)
+    }
+  }, [notes])
 
   if (editing) {
     return (

@@ -21,7 +21,7 @@ export function ExecutorSidePanel() {
   const [tab, setTab] = useState<Tab>("problem")
 
   return (
-    <div className="border-border bg-card flex min-h-0 flex-1 flex-col lg:w-[340px] lg:flex-none lg:border-r">
+    <div className="border-border bg-card flex min-h-0 w-[300px] shrink-0 flex-col border-r">
       <div
         role="tablist"
         aria-label="Executor side panel"

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { usePersistentState } from "./usePersistentState"
 
 /**
  * The classic interview problem-solving scratchpad: Understand → Plan → Implement. Three fillable
  * sections the user steps through while working a problem — restate it, sketch an approach, then
  * jot implementation notes (pseudocode, gotchas) alongside the real code in the editor. Each
- * section's text is kept in local state so switching steps doesn't lose anything already written.
+ * section's text persists to localStorage, so switching steps (and reloading) never loses anything.
  * Content-only (no outer panel chrome) — mounted inside `ExecutorSidePanel`'s "Scratchpad" tab.
  */
 type Step = "understand" | "plan" | "implement"
@@ -34,18 +35,19 @@ const STEPS: { key: Step; label: string; placeholder: string }[] = [
 
 export function UnderstandPlanImplementPanel() {
   const [active, setActive] = useState<Step>("understand")
-  const [text, setText] = useState<Record<Step, string>>({
-    understand: "",
-    plan: "",
-    implement: "",
-  })
+  // One persistent field per step. Hook calls are unconditional + fixed-order (rules-of-hooks safe).
+  const fields: Record<Step, [string, (value: string) => void]> = {
+    understand: usePersistentState("cs_pyexec_understand", ""),
+    plan: usePersistentState("cs_pyexec_plan", ""),
+    implement: usePersistentState("cs_pyexec_implement", ""),
+  }
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-1 px-2 pt-2">
         {STEPS.map((step, i) => {
           const isActive = active === step.key
-          const isFilled = text[step.key].trim().length > 0
+          const isFilled = fields[step.key][0].trim().length > 0
           return (
             <button
               key={step.key}
@@ -74,17 +76,19 @@ export function UnderstandPlanImplementPanel() {
         })}
       </div>
 
-      {STEPS.map((step) =>
-        step.key === active ? (
+      {STEPS.map((step) => {
+        if (step.key !== active) return null
+        const [value, setValue] = fields[step.key]
+        return (
           <textarea
             key={step.key}
-            value={text[step.key]}
-            onChange={(e) => setText((prev) => ({ ...prev, [step.key]: e.target.value }))}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
             placeholder={step.placeholder}
             className="text-foreground placeholder:text-muted-foreground/60 mt-2 min-h-0 flex-1 resize-none bg-transparent px-3 py-2 text-sm leading-relaxed outline-none"
           />
-        ) : null
-      )}
+        )
+      })}
     </div>
   )
 }
