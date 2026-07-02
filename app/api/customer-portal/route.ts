@@ -190,27 +190,38 @@ export async function POST(request: NextRequest) {
             })
           }
         } else if (customers.data.length === 1) {
-          // Only ONE customer with this email - likely safe to use
-          // But only if the user has no other stripe IDs that conflict
+          // Exactly one Stripe customer shares this (verified) email and none
+          // matched on metadata.userId. Linking by email is only safe for legacy
+          // customers that carry NO owner metadata. If the customer is already
+          // owned by a DIFFERENT user, refuse — otherwise this user could open a
+          // billing portal onto someone else's payment methods/invoices.
           const singleCustomer = customers.data[0]
-          try {
-            await stripe.customers.retrieve(singleCustomer.id)
-            stripeCustomerId = singleCustomer.id
-
-            // Update profile with found customer ID
-            await profileRef.update({
-              stripe_customer_id: stripeCustomerId,
-              updated_at: new Date().toISOString(),
-            })
-
-            logger.info("Customer portal: Found single customer by email (no metadata match)", {
+          const customerOwner = singleCustomer.metadata?.userId
+          if (customerOwner && customerOwner !== userId) {
+            logger.warn("Customer portal: Single email match owned by another user - not linking", {
               userId,
-              customerId: stripeCustomerId,
-            })
-          } catch {
-            logger.warn("Customer portal: Single customer is invalid", {
               customerId: singleCustomer.id,
             })
+          } else {
+            try {
+              await stripe.customers.retrieve(singleCustomer.id)
+              stripeCustomerId = singleCustomer.id
+
+              // Update profile with found customer ID
+              await profileRef.update({
+                stripe_customer_id: stripeCustomerId,
+                updated_at: new Date().toISOString(),
+              })
+
+              logger.info("Customer portal: Found single customer by email (no metadata match)", {
+                userId,
+                customerId: stripeCustomerId,
+              })
+            } catch {
+              logger.warn("Customer portal: Single customer is invalid", {
+                customerId: singleCustomer.id,
+              })
+            }
           }
         } else if (customers.data.length > 1) {
           // Multiple customers with same email but no userId match - can't safely determine which

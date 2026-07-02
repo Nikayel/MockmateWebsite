@@ -95,9 +95,11 @@ export async function POST(request: NextRequest) {
 
     switch (body.action) {
       case 'evaluate': {
+        // Spread the client context FIRST so the verified userId always wins and
+        // a body.context.userId cannot retarget another account.
         const context: NotificationTriggerContext = {
-          userId,
           ...body.context,
+          userId,
         }
 
         const result = await processUserNotifications(userId, context)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { apiRateLimit } from "@/lib/rate-limit"
+import { verifyAdminAccess } from "@/lib/admin/middleware"
 
 /**
  * API endpoint to collect user feedback when they think rate limiting was applied incorrectly.
@@ -139,20 +140,14 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin access
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.slice(7)
-    const decodedToken = await adminAuth.verifyIdToken(token)
-
-    // Check if user is admin (you may want to use a different method)
-    const userDoc = await adminDb.collection("profiles").doc(decodedToken.uid).get()
-    const userData = userDoc.data()
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    // Authorize via RBAC (admin_roles), NOT the user-writable profiles.is_admin
+    // field, which a user could set on their own profile to self-escalate.
+    const adminResult = await verifyAdminAccess(request)
+    if (!adminResult.authorized) {
+      return NextResponse.json(
+        { error: adminResult.error || "Admin access required" },
+        { status: adminResult.status || 403 }
+      )
     }
 
     // Parse query params
@@ -215,20 +210,13 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    // Verify admin access
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.slice(7)
-    const decodedToken = await adminAuth.verifyIdToken(token)
-
-    // Check if user is admin
-    const userDoc = await adminDb.collection("profiles").doc(decodedToken.uid).get()
-    const userData = userDoc.data()
-    if (!userData?.is_admin) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    // Authorize via RBAC (admin_roles), NOT the user-writable profiles.is_admin.
+    const adminResult = await verifyAdminAccess(request)
+    if (!adminResult.authorized) {
+      return NextResponse.json(
+        { error: adminResult.error || "Admin access required" },
+        { status: adminResult.status || 403 }
+      )
     }
 
     const body = await request.json()
@@ -252,7 +240,7 @@ export async function PATCH(request: NextRequest) {
 
     if (status) {
       updateData.status = status
-      updateData.reviewedBy = decodedToken.uid
+      updateData.reviewedBy = adminResult.context?.userId
       updateData.reviewedAt = new Date()
     }
 
@@ -269,7 +257,7 @@ export async function PATCH(request: NextRequest) {
     logger.info("Rate limit feedback updated", {
       feedbackId,
       status,
-      adminId: decodedToken.uid,
+      adminId: adminResult.context?.userId,
     })
 
     return NextResponse.json({
