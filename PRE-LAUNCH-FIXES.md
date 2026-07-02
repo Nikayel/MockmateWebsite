@@ -244,6 +244,26 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 - **Verify:** run a Python lesson with the network throttled/offline after first load.
 - **Commit:** `fix(learn): self-host Pyodide runtime`
 
+### NOTIF-WELCOME-1 — welcome in-app notification is denied by rules — **LOW**
+- **Files:** `app/auth/callback/auth-callback-client.tsx:49` calls
+  `createInAppNotification` (`lib/notification-helpers.ts:282`, a client-SDK `setDoc` on
+  `in_app_notifications`); `firestore.rules` sets `in_app_notifications` `create: if false`.
+- **Problem:** The write is denied by rules (`PERMISSION_DENIED`), so a new user's welcome
+  notification is never persisted. Pre-existing (predates this audit's rule change, which
+  only touched the *update* rule); wrapped in try/catch so it fails silently. Cosmetic.
+- **Fix spec:** Route the welcome notification through the server
+  (`createInAppNotificationServer` via an API route, matching
+  `notification-service.ts` / `session-notifications.ts`) instead of the client SDK. Do
+  **not** relax the `create: if false` rule.
+- **Commit:** `fix(notifications): persist welcome notification server-side`
+
+### FEEDBACK-STREAM-2 — (fixed) stream ownership guard now requires userId — **LOW**
+- **Status:** Shipped in this session's follow-up. The Edge `stream` route's guard was
+  `if (userId && userId !== authenticatedUserId)`, which skipped the check when the body
+  omitted `userId`. Not exploitable (the route persists nothing and `verifyAuthEdge`
+  already blocks anonymous callers), but tightened to `if (!userId || userId !== …)` so an
+  omitted field can't bypass the match. Listed for the record.
+
 ### RUNNER-2 — lesson completion is client-attested — **LOW (do not build entitlements on it)**
 - **Files:** `app/api/tutorials/progress/route.ts` (PUT), `lib/tutorials/progress.ts:28–39`.
 - **Status:** Acceptable **today** — tests run client-side and the server Zod-validates shape

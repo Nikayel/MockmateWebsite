@@ -102,8 +102,10 @@ export async function POST(request: NextRequest) {
         bugfixGroundTruth,
       } = body
 
-      // The session owner in the body must match the verified token.
-      if (userId && userId !== authenticatedUserId) {
+      // The session owner in the body must be present AND match the verified
+      // token. The client always sends it; requiring it closes the gap where an
+      // omitted userId would skip the ownership check entirely.
+      if (!userId || userId !== authenticatedUserId) {
         await sendEvent("error", { message: "Forbidden" })
         return
       }
