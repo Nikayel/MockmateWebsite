@@ -23,6 +23,8 @@ interface PendingSqlRun {
   timeoutId: ReturnType<typeof setTimeout>
   execTimeoutMs: number
   logs: DsaExecutionResult["consoleLogs"]
+  /** true for a background prewarm (mode "warm") — a real Run is allowed to wait for it, not be rejected. */
+  isWarm: boolean
 }
 
 // Compiling the SQLite WASM module on a first run is a ~1 MB same-origin fetch + compile. Keep the
@@ -37,6 +39,8 @@ const EXEC_TIMEOUT_MESSAGE = "Query timed out. Check for an accidental cross joi
 
 let sqlWorker: Worker | null = null
 let pendingRun: PendingSqlRun | null = null
+// The in-flight background prewarm (if any), so a real Run can await it instead of being rejected.
+let warmPromise: Promise<SqlWorkerRunResult> | null = null
 
 function resetSqlWorker(): void {
   if (sqlWorker) {
@@ -128,17 +132,34 @@ export function runSqlInWorker(
   execTimeoutMs = DEFAULT_EXEC_TIMEOUT_MS,
   bootTimeoutMs = DEFAULT_BOOT_TIMEOUT_MS
 ): Promise<SqlWorkerRunResult> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") {
-      resolve({ success: false, logs: [], error: "Execution environment is not browser" })
-      return
-    }
+  if (typeof window === "undefined") {
+    return Promise.resolve({
+      success: false,
+      logs: [],
+      error: "Execution environment is not browser",
+    })
+  }
 
-    if (pendingRun) {
-      resolve({ success: false, logs: [], error: "A SQL query is already running" })
-      return
-    }
+  // A background prewarm (mode "warm") holds the single run slot only until the ~1 MB WASM module
+  // compiles. If a real Run lands in that window, WAIT for the prewarm to finish (the worker stays
+  // warm) and then run — instead of rejecting the learner's click with "A SQL query is already running".
+  if (pendingRun && pendingRun.isWarm && workerData.mode !== "warm" && warmPromise) {
+    return warmPromise.then(() => runSqlInWorker(workerData, execTimeoutMs, bootTimeoutMs))
+  }
 
+  if (pendingRun) {
+    return Promise.resolve({ success: false, logs: [], error: "A SQL query is already running" })
+  }
+
+  return startSqlRun(workerData, execTimeoutMs, bootTimeoutMs)
+}
+
+function startSqlRun(
+  workerData: SqlWorkerData,
+  execTimeoutMs: number,
+  bootTimeoutMs: number
+): Promise<SqlWorkerRunResult> {
+  const promise = new Promise<SqlWorkerRunResult>((resolve) => {
     let worker: Worker
     try {
       worker = getSqlWorker()
@@ -159,7 +180,17 @@ export function runSqlInWorker(
       resetSqlWorker()
     }, bootTimeoutMs)
 
-    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [] }
+    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [], isWarm: workerData.mode === "warm" }
     worker.postMessage(workerData)
   })
+
+  // Track the prewarm so a concurrent real Run can await it (see runSqlInWorker), and clear it when done.
+  if (workerData.mode === "warm") {
+    warmPromise = promise
+    void promise.finally(() => {
+      if (warmPromise === promise) warmPromise = null
+    })
+  }
+
+  return promise
 }
