@@ -2223,6 +2223,271 @@ CREATE TABLE fact_sales (
   }),
 }
 
+const dimensionalIntro: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-dimensional-intro",
+  title: "Facts, Dimensions, and Grain",
+  summary: "Split analytics data into a narrow fact and wide dimensions around a declared grain.",
+  estimatedMinutes: 35,
+  difficulty: "hard",
+  skills: ["fact vs dimension", "grain declaration", "surrogate keys", "star vs snowflake"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Two kinds of table, one shape
+
+Full 3NF is great for safe writes but painful for analytics — a "revenue by category by month" report might join six tables. The **star schema** (Ralph Kimball's dimensional model) is the disciplined denormalization that BI runs on. It has exactly two kinds of table:
+
+- **Fact table** — *narrow and tall*. Holds the **measures** (numeric, additive things you sum: revenue, quantity) plus **foreign keys** to dimensions. One fact table, millions of rows, few columns. \`fact_sales(customer_sk, product_sk, date_sk, quantity, revenue_cents)\`.
+- **Dimension tables** — *wide and short*. Hold the **descriptive context** you filter and group by: \`dim_customer(customer_sk, name, country, segment)\`, \`dim_product(product_sk, name, category, brand)\`, \`dim_date(date_sk, date, month, year, weekday)\`.
+
+Drawn out, the fact sits in the center with dimensions radiating around it — hence **star**.
+
+## Grain — declare it first, always
+
+The **grain** is the precise meaning of one fact row: "one row per order line item," or "one row per order," or "one row per customer per day." *Everything* depends on getting this right — a measure only makes sense at a stated grain, and mixing grains double-counts. Kimball's first rule: **declare the grain before you add a single column.** Our fact's grain: **one row per order line item.**
+
+**Worked example — a minimal star:**
+
+\`\`\`sql
+-- Dimensions: wide, descriptive, surrogate-keyed
+CREATE TABLE dim_product (
+    product_sk   INTEGER PRIMARY KEY,   -- surrogate
+    product_id   INTEGER,               -- natural/business key
+    product_name TEXT,
+    category     TEXT
+);
+CREATE TABLE dim_date (
+    date_sk INTEGER PRIMARY KEY,        -- e.g. 20260105
+    date    TEXT,
+    year_month TEXT                     -- 'YYYY-MM'
+);
+-- Fact: narrow, measures + FKs to dims, at line-item grain
+CREATE TABLE fact_sales (
+    sale_sk    INTEGER PRIMARY KEY,
+    product_sk INTEGER REFERENCES dim_product(product_sk),
+    date_sk    INTEGER REFERENCES dim_date(date_sk),
+    quantity   INTEGER,
+    revenue_cents INTEGER
+);
+\`\`\`
+
+A BI query is now a couple of joins from the fact out to the dims:
+
+\`\`\`sql
+SELECT p.category, d.year_month, SUM(f.revenue_cents) AS revenue
+FROM fact_sales f
+JOIN dim_product p ON p.product_sk = f.product_sk
+JOIN dim_date    d ON d.date_sk    = f.date_sk
+GROUP BY p.category, d.year_month;
+\`\`\`
+
+**Anatomy of the star:**
+
+\`\`\`
+          dim_customer
+                │
+ dim_date ── fact_sales ── dim_product
+                │
+          (measures: quantity, revenue_cents; FKs: *_sk)
+
+  fact  = numeric measures + dimension FKs, at ONE declared grain
+  dim   = descriptive attributes you filter/group by, surrogate-keyed
+\`\`\`
+
+## Star vs snowflake
+
+A **star** keeps each dimension flat (denormalized) — \`dim_product\` holds \`category\` right on it. A **snowflake** normalizes dimensions further (\`dim_product → dim_category\`), saving space but re-introducing joins. Kimball's default is **star**: flatter dims, fewer joins, faster and simpler for analysts. Snowflake only when a dimension is huge and its sub-attributes are heavily reused.
+
+**Surrogate keys everywhere.** Dimensions use surrogate \`*_sk\` keys, and the fact references *those*, not the business keys. This is what makes slowly-changing dimensions possible later — the surrogate can point at the *version* of a dimension valid when the fact happened.
+
+> **In the warehouse this differs — this is the warehouse's home turf.** Star schemas are the native modeling pattern of Snowflake, BigQuery, Redshift, and dbt projects. The SQL you write here is exactly what you'd write there (minus the un-enforced FKs). \`dim_date\` in particular is a warehouse staple — a pre-built calendar dimension every fact joins to.
+
+**Keep it readable / common pitfall.** The #1 pitfall is **not declaring the grain** and then mixing grains in one fact (e.g. line-item rows *and* order-total rows) — every sum double-counts. State the grain in a comment at the top of the fact DDL. Second pitfall: stuffing descriptive text into the fact ("just this once") — descriptions belong in dimensions; the fact stays numeric and narrow.
+
+**Recap:** a star schema is one narrow measure-and-FK fact surrounded by wide descriptive dimensions, all surrogate-keyed, around a single declared grain — the model BI queries are built for; default to star (flat dims) over snowflake.
+
+**Execution mode:** you write a multi-statement DDL+DML script. It runs against a fresh in-memory SQLite DB, then hidden assertion queries check the star's shape, grain, and that every fact FK resolves.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-dimensional-intro-apply",
+    prompt: `Build a minimal **star schema**. Create \`dim_product\` with a surrogate key \`product_sk\`
+(plus the business key \`product_id\`, and \`name\`, \`category\`), and a narrow \`fact_sales\` at
+**one-row-per-sale grain** that references \`dim_product\` via \`product_sk\` and carries only \`quantity\` and
+\`revenue_cents\`. Load the two products and three sales from the \`raw_*\` seed, then materialize the BI
+query "revenue by category" as a table named \`cat_revenue(category, revenue)\`.`,
+    starterCode: `-- Seed tables raw_product and raw_sale already exist.
+DROP TABLE IF EXISTS dim_product;
+DROP TABLE IF EXISTS fact_sales;
+DROP TABLE IF EXISTS cat_revenue;
+
+-- 1. dim_product: surrogate product_sk PK + business key product_id, name, category.
+--    Load it from raw_product (let product_sk auto-assign).
+
+-- 2. fact_sales at one-row-per-sale grain: sale_sk PK, product_sk REFERENCES dim_product,
+--    quantity, revenue_cents. Load by joining raw_sale to dim_product on product_id.
+
+-- 3. cat_revenue: materialize revenue-by-category from the star.`,
+    hints: [
+      "`dim_product(product_sk INTEGER PRIMARY KEY, product_id INTEGER, name TEXT, category TEXT)` — load it from `raw_product` (let `product_sk` auto-assign).",
+      "Load `fact_sales` by joining `raw_sale` to `dim_product` on `product_id` to look up the `product_sk`.",
+      "The fact holds only `product_sk`, `quantity`, `revenue_cents` — no category text.",
+      "Materialize the BI result as `cat_revenue` (e.g. `CREATE TABLE cat_revenue AS SELECT p.category, SUM(f.revenue_cents) AS revenue FROM fact_sales f JOIN dim_product p … GROUP BY p.category`).",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS dim_product;
+DROP TABLE IF EXISTS fact_sales;
+DROP TABLE IF EXISTS cat_revenue;
+
+CREATE TABLE dim_product (
+    product_sk INTEGER PRIMARY KEY,
+    product_id INTEGER,
+    name       TEXT,
+    category   TEXT
+);
+INSERT INTO dim_product (product_id, name, category)
+SELECT product_id, name, category FROM raw_product;
+
+-- grain: one row per sale
+CREATE TABLE fact_sales (
+    sale_sk    INTEGER PRIMARY KEY,
+    product_sk INTEGER REFERENCES dim_product(product_sk),
+    quantity   INTEGER,
+    revenue_cents INTEGER
+);
+INSERT INTO fact_sales (product_sk, quantity, revenue_cents)
+SELECT d.product_sk, r.quantity, r.revenue_cents
+FROM raw_sale r
+JOIN dim_product d ON d.product_id = r.product_id;
+
+CREATE TABLE cat_revenue AS
+SELECT p.category, SUM(f.revenue_cents) AS revenue
+FROM fact_sales f
+JOIN dim_product p ON p.product_sk = f.product_sk
+GROUP BY p.category;`,
+    seedSql: `DROP TABLE IF EXISTS raw_product; DROP TABLE IF EXISTS raw_sale;
+CREATE TABLE raw_product (product_id INTEGER, name TEXT, category TEXT);
+CREATE TABLE raw_sale (product_id INTEGER, quantity INTEGER, revenue_cents INTEGER);
+INSERT INTO raw_product VALUES (100,'Mouse','peripherals'),(101,'Monitor','displays');
+INSERT INTO raw_sale VALUES (100,2,4998),(101,1,19999),(100,3,7497);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "dim_product declares a surrogate primary key (product_sk)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('dim_product') WHERE name='product_sk' AND pk=1) <> 1`,
+      },
+      {
+        suite: "schema",
+        name: "dim_product keeps the business key product_id",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('dim_product') WHERE name='product_id') <> 1`,
+      },
+      {
+        suite: "star",
+        name: "fact_sales references dim_product via the surrogate key",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_foreign_key_list('fact_sales') WHERE "table"='dim_product') <> 1`,
+      },
+      {
+        suite: "star",
+        name: "fact_sales stays narrow: no descriptive text columns",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('fact_sales') WHERE name IN ('category','name')) <> 0`,
+      },
+      {
+        suite: "bi",
+        name: "revenue-by-category: peripherals = 12495 (4998 + 7497)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT revenue FROM cat_revenue WHERE category='peripherals'), -1) <> 12495`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-dimensional-intro-practice",
+    prompt: `Convert the normalized 3NF seed (\`customers\`, \`products\`, \`orders\`, \`order_items\`) into a
+**first star schema**:
+
+- \`dim_customer(customer_sk PK, customer_id, email, country_code)\`
+- \`dim_product(product_sk PK, product_id, product_name, category)\`
+- \`dim_date(date_sk PK, full_date, year_month)\` — derive \`date_sk\` as an integer \`YYYYMMDD\`,
+  \`year_month\` as \`'YYYY-MM'\`, one row per **distinct** order date.
+- \`fact_sales\` at **line-item grain**: \`(sale_sk PK, customer_sk, product_sk, date_sk, quantity, revenue_cents)\`,
+  each FK looked up from its dimension by natural key, with **zero orphan facts**.
+
+Then materialize one BI query as \`revenue_by_cat_month(category, year_month, revenue)\` computing revenue
+by category by month over the star.`,
+    starterCode: `-- Normalized seed tables customers, products, orders, order_items already exist.
+DROP TABLE IF EXISTS dim_customer;
+DROP TABLE IF EXISTS dim_product;
+DROP TABLE IF EXISTS dim_date;
+DROP TABLE IF EXISTS fact_sales;
+DROP TABLE IF EXISTS revenue_by_cat_month;
+
+-- 1. Build the three dimensions (surrogate *_sk PKs) and load them FIRST.
+--    dim_date: one row per DISTINCT order date, date_sk = YYYYMMDD, year_month = 'YYYY-MM'.
+
+-- 2. fact_sales at line-item grain: measures + FKs only, each surrogate looked up by natural key.
+--    revenue_cents = qty * unit_price_cents. Zero orphan facts.
+
+-- 3. revenue_by_cat_month(category, year_month, revenue): BI query over the star.`,
+    hints: [
+      "Load dims first so their surrogate keys exist before the fact looks them up: `dim_customer`/`dim_product` from the normalized tables; `dim_date` from `SELECT DISTINCT order_date`, deriving `date_sk = CAST(strftime('%Y%m%d', order_date) AS INTEGER)` and `year_month = strftime('%Y-%m', order_date)`.",
+      "Compute `revenue_cents` at load as `oi.qty * p.unit_price_cents` (join `order_items` to `products`).",
+      "Build the fact by joining `order_items → orders → products` and then looking up each surrogate: join to `dim_customer` on `customer_id`, `dim_product` on `product_id`, `dim_date` on the order date. Insert `customer_sk`, `product_sk`, `date_sk` — never the natural keys or any text.",
+      'Declare the grain in a comment ("one row per order line item") and keep the fact to measures + FKs only; the zero-orphan assertions fail if any surrogate lookup misses, so make sure all three dims are fully populated before loading the fact.',
+    ],
+    seedSql: `DROP TABLE IF EXISTS customers; DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS order_items;
+CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, email TEXT, country_code TEXT);
+CREATE TABLE products (product_id INTEGER PRIMARY KEY, product_name TEXT, category TEXT, unit_price_cents INTEGER);
+CREATE TABLE orders (order_id INTEGER PRIMARY KEY, customer_id INTEGER, order_date TEXT);
+CREATE TABLE order_items (order_id INTEGER, product_id INTEGER, qty INTEGER, PRIMARY KEY(order_id,product_id));
+INSERT INTO customers VALUES (10,'ada@x.com','GB'),(11,'grace@x.com','US');
+INSERT INTO products VALUES (100,'Mouse','peripherals',2499),(101,'Monitor','displays',19999);
+INSERT INTO orders VALUES (1,10,'2026-01-05'),(2,11,'2026-02-06'),(3,10,'2026-02-07');
+INSERT INTO order_items VALUES (1,100,2),(1,101,1),(2,100,1),(3,101,2);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "all three dimensions declare a surrogate primary key",
+        sql: `SELECT 1 WHERE
+          (SELECT COUNT(*) FROM pragma_table_info('dim_customer') WHERE name='customer_sk' AND pk=1) <> 1
+          OR (SELECT COUNT(*) FROM pragma_table_info('dim_product') WHERE name='product_sk' AND pk=1) <> 1
+          OR (SELECT COUNT(*) FROM pragma_table_info('dim_date') WHERE name='date_sk' AND pk=1) <> 1`,
+      },
+      {
+        suite: "grain",
+        name: "dim_date has one row per distinct order date (3)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_date) <> 3`,
+      },
+      {
+        suite: "grain",
+        name: "fact_sales is at line-item grain (4 rows, one per order item)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_sales) <> 4`,
+      },
+      {
+        suite: "integrity",
+        name: "zero orphan facts: every dimension FK resolves",
+        isHidden: true,
+        sql: `SELECT 1 WHERE
+          (SELECT COUNT(*) FROM fact_sales f LEFT JOIN dim_customer c ON c.customer_sk = f.customer_sk WHERE c.customer_sk IS NULL) <> 0
+          OR (SELECT COUNT(*) FROM fact_sales f LEFT JOIN dim_product p ON p.product_sk = f.product_sk WHERE p.product_sk IS NULL) <> 0
+          OR (SELECT COUNT(*) FROM fact_sales f LEFT JOIN dim_date d ON d.date_sk = f.date_sk WHERE d.date_sk IS NULL) <> 0`,
+      },
+      {
+        suite: "star",
+        name: "fact_sales stays narrow: no descriptive text leaked in",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('fact_sales') WHERE name IN ('category','email','product_name')) <> 0`,
+      },
+      {
+        suite: "bi",
+        name: "revenue by category by month matches the star",
+        isHidden: true,
+        sql: `SELECT 1 WHERE
+          COALESCE((SELECT revenue FROM revenue_by_cat_month WHERE category='peripherals' AND year_month='2026-02'), -1) <> 2499
+          OR COALESCE((SELECT revenue FROM revenue_by_cat_month WHERE category='displays' AND year_month='2026-01'), -1) <> 19999`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel3: SqlLevel = {
   id: 3,
   slug: "modeling",
@@ -2258,6 +2523,12 @@ export const sqlLevel3: SqlLevel = {
       description:
         "Entities and cardinality, junction tables for many-to-many, and the indexes that keep reads fast.",
       lessons: [cardinality, junctionTables, indexes],
+    },
+    {
+      id: "sql-l3-dimensional",
+      title: "Module 3.5 — Dimensional Modeling Introduction",
+      description: "Your first Kimball star: narrow facts, wide dimensions, and a declared grain.",
+      lessons: [dimensionalIntro],
     },
   ],
 }
