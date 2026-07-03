@@ -7,6 +7,7 @@ import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
 import { useExerciseRun } from "./useExerciseRun"
 import type { SqlExercise, SqlResultSet } from "@/lib/tutorials/types"
@@ -76,6 +77,9 @@ export function SqlExerciseRunner({
       <div className="prose prose-sm dark:prose-invert max-w-none">
         <MarkdownRenderer content={exercise.prompt} />
       </div>
+
+      {/* Show the tables this query runs against — the learner can't transform data they can't see. */}
+      <SqlDataPreview seedSql={exercise.singleFile?.seedSql} />
 
       <div className="border-border overflow-hidden rounded-lg border">
         <CodeMirrorErrorBoundary>

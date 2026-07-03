@@ -160,6 +160,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
           exercise={exercise}
           workspace={exercise.workspace}
           engine="sql"
+          seedSql={exercise.workspace.seedSql}
           onPass={opts.onPass}
         />
       )
