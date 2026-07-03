@@ -35,30 +35,53 @@ export default function PythonExecutorPage() {
     usePythonExecutor()
   const [cleared, setCleared] = useState(false)
 
-  // Draggable console height (HANDOFF-UX §1 nicety). Persisted in px; clamped against the center.
+  // Draggable console height (HANDOFF-UX §1 nicety). The persisted px value is the *desired* size;
+  // the rendered height is always clamped against the live center height so the editor can never be
+  // squeezed to zero (measured via ResizeObserver, so window/layout changes re-clamp — not just drags).
   const centerRef = useRef<HTMLDivElement>(null)
   const [outputHeightRaw, setOutputHeightRaw] = usePersistentState("cs_pyexec_output_h", "220")
-  const outputHeight = Math.max(130, Number(outputHeightRaw) || 220)
+  const [maxOutput, setMaxOutput] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = centerRef.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    const measure = () => setMaxOutput(Math.max(130, el.clientHeight - 160))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const desiredOutput = Math.max(130, Number(outputHeightRaw) || 220)
+  const outputHeight = maxOutput ? Math.min(desiredOutput, maxOutput) : desiredOutput
 
   const clampHeight = (px: number) => {
-    const centerH = centerRef.current?.clientHeight ?? window.innerHeight
-    return Math.min(Math.max(130, centerH - 160), Math.max(130, px))
+    const ceil =
+      maxOutput ?? Math.max(130, (centerRef.current?.clientHeight ?? window.innerHeight) - 160)
+    return Math.min(ceil, Math.max(130, px))
   }
+  // Track an in-flight drag's teardown so we can also clean up on pointercancel / unmount.
+  const dragCleanup = useRef<(() => void) | null>(null)
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault()
     const startY = e.clientY
     const startH = outputHeight
     const onMove = (ev: PointerEvent) =>
       setOutputHeightRaw(String(clampHeight(startH + (startY - ev.clientY))))
-    const onUp = () => {
+    const end = () => {
       window.removeEventListener("pointermove", onMove)
-      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointerup", end)
+      window.removeEventListener("pointercancel", end)
       document.body.style.userSelect = ""
+      dragCleanup.current = null
     }
+    dragCleanup.current = end
     document.body.style.userSelect = "none"
     window.addEventListener("pointermove", onMove)
-    window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointerup", end)
+    window.addEventListener("pointercancel", end)
   }
+  useEffect(() => () => dragCleanup.current?.(), [])
   const nudgeResize = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowUp") setOutputHeightRaw(String(clampHeight(outputHeight + 24)))
     else if (e.key === "ArrowDown") setOutputHeightRaw(String(clampHeight(outputHeight - 24)))
@@ -173,6 +196,7 @@ export default function PythonExecutorPage() {
               aria-label="Resize output panel"
               aria-valuenow={outputHeight}
               aria-valuemin={130}
+              aria-valuemax={maxOutput ?? outputHeight}
               tabIndex={0}
               onPointerDown={startResize}
               onKeyDown={nudgeResize}
@@ -207,7 +231,7 @@ export default function PythonExecutorPage() {
                 )}
 
                 {!running && !hasOutput && status !== "success" && (
-                  <p className="text-muted-foreground/70">
+                  <p className="text-muted-foreground">
                     {cleared ? "Cleared." : "Run to see output."}
                   </p>
                 )}
@@ -243,7 +267,7 @@ export default function PythonExecutorPage() {
                 )}
 
                 {!running && status === "success" && !hasOutput && (
-                  <p className="text-muted-foreground/60">(ran successfully — no output)</p>
+                  <p className="text-muted-foreground">(ran successfully — no output)</p>
                 )}
               </div>
             </div>
@@ -266,7 +290,7 @@ function RunStatus({
   elapsedMs: number | null
 }) {
   let label = "ready"
-  let tone = "text-muted-foreground/60"
+  let tone = "text-muted-foreground"
   if (status === "running") {
     label = warming ? "starting…" : "running…"
     tone = "text-muted-foreground"
