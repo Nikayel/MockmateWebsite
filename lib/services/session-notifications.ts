@@ -21,6 +21,7 @@
 
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
+import { reconcileStreak } from "@/lib/spaced-repetition/streak"
 import {
   createInAppNotificationServer,
   getNotificationPreferencesServer,
@@ -176,11 +177,11 @@ export async function checkStreakAtRisk(userId: string): Promise<boolean> {
 
     if (!learningState) return false
 
-    const streakDays = learningState.streak_days || 0
+    const storedStreak = learningState.streak_days || 0
     const lastSessionAt = learningState.last_session_at
 
-    // No streak to protect
-    if (streakDays < 3) return false
+    // No streak to protect (cheap exit before the timezone fetch; effective <= stored).
+    if (storedStreak < 3) return false
 
     // Get user's timezone from preferences
     const prefs = await getNotificationPreferencesServer(userId)
@@ -188,6 +189,11 @@ export async function checkStreakAtRisk(userId: string): Promise<boolean> {
 
     // Get current hour in user's timezone
     const now = new Date()
+
+    // Reconcile the stored streak against the last session: if it's already broken (missed > 1 day),
+    // there is nothing "at risk" and we must not message a stale count. (chore #4)
+    const streakDays = reconcileStreak(storedStreak, lastSessionAt, userTimezone, now)
+    if (streakDays < 3) return false
     let currentHour: number
     try {
       const formatter = new Intl.DateTimeFormat("en-US", {
@@ -246,7 +252,13 @@ export async function sendDailyReminderIfNeeded(userId: string): Promise<boolean
     // FIXED: Previously used UTC date comparison
     if (isToday(lastSessionAt, userTimezone)) return false
 
-    const streakDays = learningState.streak_days || 0
+    // Reconcile so a broken streak reads as 0 ("start a new streak") instead of a stale count. (chore #4)
+    const streakDays = reconcileStreak(
+      learningState.streak_days,
+      lastSessionAt,
+      userTimezone,
+      new Date()
+    )
 
     await sendSessionNotification(userId, "daily_practice_reminder", {
       streakDays,
