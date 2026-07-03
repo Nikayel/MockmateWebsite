@@ -1842,6 +1842,488 @@ WHERE a.effective_from < b.effective_to AND b.effective_from < a.effective_to`,
   }),
 }
 
+const dedup: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-dedup",
+  title: "Deduplication",
+  summary: "Keep exactly one row per business key from a dirty source.",
+  estimatedMinutes: 20,
+  difficulty: "medium",
+  skills: ["ROW_NUMBER() dedup", "partition-by-key", "keep-rank-1 subquery", "QUALIFY note"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Deduplicate to one row per business key
+
+Source feeds are dirty. A daily customer dump often contains the same \`email\` several times — an old
+record plus one or more updates. Before you load it, you must reduce it to **one row per business
+key**, keeping the **right** one (usually the most recently updated). The portable pattern is
+\`ROW_NUMBER\` (from Module 4.1) plus a wrapping filter:
+
+\`\`\`sql
+SELECT * FROM (
+  SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY email          -- the business key
+           ORDER BY updated_at DESC     -- newest wins
+         ) AS rn
+  FROM stg_customer
+) ranked
+WHERE rn = 1;                          -- keep only the freshest row per email
+\`\`\`
+
+\`PARTITION BY email\` groups the duplicates; \`ORDER BY updated_at DESC\` puts the freshest first;
+\`WHERE rn = 1\` keeps it. Because \`ROW_NUMBER\` assigns **unique** ranks, you get exactly one row per
+key — never zero, never two.
+
+### Common pitfalls
+
+- **Ties in the \`ORDER BY\` make the winner nondeterministic.** If two rows share the same
+  \`updated_at\`, add a deterministic tiebreaker (\`ORDER BY updated_at DESC, id DESC\`) so the same row
+  wins every run — critical for idempotency.
+- **\`DISTINCT\` is not dedup-by-key.** \`SELECT DISTINCT\` removes rows that are identical across *all*
+  columns; it will **not** collapse two rows with the same \`email\` but different \`updated_at\`. Reach
+  for \`ROW_NUMBER\` whenever "duplicate" means "same key, possibly different attributes."
+- **Filtering \`rn\` inline fails.** You can't write \`WHERE ROW_NUMBER() OVER(...) = 1\` — a window
+  function isn't allowed in \`WHERE\`. Wrap the window in a subquery/CTE and filter the \`rn\` alias
+  outside it.
+
+> **In the warehouse:** Snowflake and BigQuery let you drop the wrapping subquery entirely:
+> \`… QUALIFY ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) = 1\`. SQLite and Postgres
+> have no \`QUALIFY\` — wrap in a subquery/CTE as above.
+
+**One more SQLite detail worth knowing:** \`NULL\` sorts as the *lowest* value, so \`ORDER BY updated_at
+DESC\` puts every real timestamp first and pushes the \`NULL\`s last. A row whose \`updated_at\` is missing
+therefore loses to any row that has one — exactly the behavior you want when a missing timestamp means
+"unknown / oldest." (Some engines need an explicit \`NULLS LAST\` to get this; SQLite gives it to you
+for free under \`DESC\`.)
+
+**Recap:** dedup to one row per business key with
+\`ROW_NUMBER() OVER (PARTITION BY key ORDER BY updated_at DESC)\`, then keep \`rn = 1\` in a wrapping
+query. Add a deterministic tiebreaker so the same row wins every run, and reach for this (not
+\`DISTINCT\`) whenever "duplicate" means the same key with differing attributes.
+
+**Execution mode:** you write a multi-statement script. The target table is pre-created and may already
+hold rows from a prior run, so **lead your load with \`DELETE FROM <target>;\`** — the grader runs your
+script twice and checks the row count is identical, so a repeat must not double the rows. Hidden
+assertion queries then check the row count, which row won each key, and that zero duplicate keys
+remain.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-dedup-apply",
+    prompt: `Reduce a source with duplicate emails to **one latest row per email**. \`stg_customer\`
+(already seeded, with an \`updated_at\`) may list the same email several times; write the deduped rows
+into \`clean_customer(email, name, city, updated_at)\`, keeping the most recently updated row per email.
+**Lead with \`DELETE FROM clean_customer;\`** so re-running the script doesn't double the rows.`,
+    starterCode: `-- stg_customer is already seeded. Load one latest row per email into clean_customer.
+DELETE FROM clean_customer;
+
+-- WITH ranked AS (
+--   SELECT email, name, city, updated_at,
+--          ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) AS rn
+--   FROM stg_customer
+-- )
+-- INSERT INTO clean_customer (email, name, city, updated_at)
+-- SELECT email, name, city, updated_at FROM ranked WHERE rn = 1;`,
+    hints: [
+      "\`ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC)\` numbers each email's rows newest-first; keep \`rn = 1\`.",
+      "Put the window in a CTE, then \`INSERT INTO clean_customer (email, name, city, updated_at) SELECT email, name, city, updated_at FROM ranked WHERE rn = 1\`.",
+      "\`updated_at\` is ISO text, so \`DESC\` sorts newest-first correctly.",
+    ],
+    referenceSolution: `DELETE FROM clean_customer;
+
+INSERT INTO clean_customer (email, name, city, updated_at)
+WITH ranked AS (
+  SELECT email, name, city, updated_at,
+         ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) AS rn
+  FROM stg_customer
+)
+SELECT email, name, city, updated_at
+FROM ranked
+WHERE rn = 1;`,
+    seedSql: `DROP TABLE IF EXISTS stg_customer;
+DROP TABLE IF EXISTS clean_customer;
+CREATE TABLE stg_customer (
+  email TEXT, name TEXT, city TEXT, updated_at TEXT
+);
+INSERT INTO stg_customer VALUES
+  ('a@x.com','Ada','London','2026-01-01'),
+  ('a@x.com','Ada','Berlin','2026-03-01'),
+  ('b@x.com','Ben','Paris','2026-02-01');
+CREATE TABLE clean_customer (email TEXT, name TEXT, city TEXT, updated_at TEXT);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "clean_customer holds exactly two rows — one per email",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM clean_customer) <> 2`,
+      },
+      {
+        suite: "winner",
+        name: "a@x.com kept the newer Berlin row",
+        sql: `SELECT 1 WHERE COALESCE((SELECT city FROM clean_customer WHERE email = 'a@x.com'), '~') <> 'Berlin'`,
+      },
+      {
+        suite: "winner",
+        name: "the newest updated_at won for a@x.com",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT updated_at FROM clean_customer WHERE email = 'a@x.com'), '~') <> '2026-03-01'`,
+      },
+      {
+        suite: "rows",
+        name: "b@x.com appears exactly once",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM clean_customer WHERE email = 'b@x.com') <> 1`,
+      },
+      {
+        suite: "dedup",
+        name: "no email is duplicated",
+        isHidden: true,
+        sql: `SELECT email FROM clean_customer GROUP BY email HAVING COUNT(*) > 1`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-dedup-practice",
+    prompt: `Deduplicate a **messy daily customer dump** to one current row per natural key and prove
+zero duplicates. \`raw_customer\` (already seeded) has duplicate \`customer_code\`s with differing
+\`updated_at\`, some rows sharing the **same** \`updated_at\` (needs a deterministic tiebreaker), and some
+rows with a \`NULL\` \`updated_at\` that must lose to any non-null timestamp. Populate
+\`dedup_customer(customer_code, email, updated_at, source_row_id)\` with exactly one row per
+\`customer_code\`: the row with the latest non-null \`updated_at\`, tiebroken by the **highest**
+\`source_row_id\`. **Lead with \`DELETE FROM dedup_customer;\`** so a re-run stays stable.`,
+    starterCode: `-- raw_customer is already seeded. Deduplicate it to one current row per customer_code.
+DELETE FROM dedup_customer;
+
+-- WITH ranked AS (
+--   SELECT customer_code, email, updated_at, source_row_id,
+--          ROW_NUMBER() OVER (
+--            PARTITION BY customer_code
+--            ORDER BY updated_at DESC, source_row_id DESC
+--          ) AS rn
+--   FROM raw_customer
+-- )
+-- INSERT INTO dedup_customer (customer_code, email, updated_at, source_row_id)
+-- SELECT customer_code, email, updated_at, source_row_id FROM ranked WHERE rn = 1;`,
+    hints: [
+      "SQLite sorts \`NULL\` as the lowest value, so \`ORDER BY updated_at DESC\` puts every non-null timestamp first and the NULLs last — exactly what you want when a NULL must lose to any real date.",
+      "Add the tiebreaker so ties are deterministic: \`ORDER BY updated_at DESC, source_row_id DESC\` keeps the higher \`source_row_id\` when two rows share a date.",
+      "\`PARTITION BY customer_code\`, then keep \`rn = 1\` from a wrapping CTE — you can't filter \`ROW_NUMBER()\` in \`WHERE\` directly.",
+      "\`C3\` has only a NULL-\`updated_at\` row — \`ROW_NUMBER()\` still assigns it rank 1, so it survives. Don't filter out NULL timestamps.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS raw_customer;
+DROP TABLE IF EXISTS dedup_customer;
+CREATE TABLE raw_customer (
+  source_row_id INTEGER PRIMARY KEY,
+  customer_code TEXT,
+  email         TEXT,
+  updated_at    TEXT
+);
+INSERT INTO raw_customer (customer_code, email, updated_at) VALUES
+  ('C1','a@x.com','2026-01-01'),
+  ('C1','a2@x.com','2026-03-01'),
+  ('C1','a3@x.com','2026-03-01'),
+  ('C2','b@x.com', NULL),
+  ('C2','b2@x.com','2026-02-01'),
+  ('C3','c@x.com', NULL);
+CREATE TABLE dedup_customer (
+  customer_code TEXT, email TEXT, updated_at TEXT, source_row_id INTEGER
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "dedup_customer holds exactly three rows — one per customer_code",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dedup_customer) <> 3`,
+      },
+      {
+        suite: "tiebreak",
+        name: "C1 kept the higher source_row_id (3) of the two date-tied rows",
+        sql: `SELECT 1 WHERE COALESCE((SELECT source_row_id FROM dedup_customer WHERE customer_code = 'C1'), -1) <> 3`,
+      },
+      {
+        suite: "winner",
+        name: "C1 kept the latest updated_at",
+        sql: `SELECT 1 WHERE COALESCE((SELECT updated_at FROM dedup_customer WHERE customer_code = 'C1'), '~') <> '2026-03-01'`,
+      },
+      {
+        suite: "nulls",
+        name: "C2 kept the non-null b2@x.com over the NULL row",
+        sql: `SELECT 1 WHERE COALESCE((SELECT email FROM dedup_customer WHERE customer_code = 'C2'), '~') <> 'b2@x.com'`,
+      },
+      {
+        suite: "nulls",
+        name: "C3's only row (a NULL timestamp) still survived",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dedup_customer WHERE customer_code = 'C3' AND email = 'c@x.com' AND updated_at IS NULL) <> 1`,
+      },
+      {
+        suite: "dedup",
+        name: "no customer_code is duplicated",
+        isHidden: true,
+        sql: `SELECT customer_code FROM dedup_customer GROUP BY customer_code HAVING COUNT(*) > 1`,
+      },
+    ],
+  }),
+}
+
+const idempotentMerge: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-idempotent-merge",
+  title: "Idempotent Loads: Upsert & MERGE",
+  summary: "Make a re-run produce the same result — no duplicated rows.",
+  estimatedMinutes: 26,
+  difficulty: "hard",
+  skills: [
+    "idempotency",
+    "INSERT … ON CONFLICT upsert",
+    "MERGE concept",
+    "unique_key",
+    "high-water mark",
+  ],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Idempotent loads: run it twice, get the same table
+
+Pipelines fail and get re-run. A backfill reprocesses last week. The same daily file lands twice. If
+your loader is a blind \`INSERT\`, every re-run **duplicates rows** — the cardinal data-engineering sin.
+A loader is **idempotent** when running it N times leaves the target in the same state as running it
+once. The test is blunt, and it's exactly what the Level 4 grader does: **run the script twice, assert
+the row count is identical.**
+
+The tool is an **upsert**: insert the row if its key is new, otherwise update the existing row. SQLite
+(and Postgres) spell it \`INSERT … ON CONFLICT\`:
+
+\`\`\`sql
+INSERT INTO dim_customer (email, name, city)
+SELECT email, name, city FROM stg_customer
+WHERE true
+ON CONFLICT(email) DO UPDATE SET
+  name = excluded.name,
+  city = excluded.city;
+\`\`\`
+
+- **\`ON CONFLICT(email)\`** names the unique key that defines "same row." (\`email\` must have a
+  \`UNIQUE\` / \`PRIMARY KEY\` constraint.)
+- **\`DO UPDATE SET … = excluded.<col>\`** overwrites with the incoming values; \`excluded\` is the row
+  that *would have* been inserted.
+- Run it twice: the first run inserts, the second run hits the conflict and updates to the same values
+  — **zero new rows.** Idempotent.
+
+Use \`DO NOTHING\` instead of \`DO UPDATE\` when you only want inserts-if-absent and never want to touch
+existing rows.
+
+### Incremental loads with a high-water mark
+
+For large sources you don't reprocess everything — you load only rows newer than the last successful
+load, tracked as a **high-water mark**:
+
+\`\`\`sql
+INSERT INTO fact_events (event_id, payload, event_ts)
+SELECT event_id, payload, event_ts
+FROM stg_events
+WHERE event_ts > (SELECT COALESCE(MAX(event_ts), '1970-01-01') FROM fact_events)
+ON CONFLICT(event_id) DO NOTHING;
+\`\`\`
+
+The \`WHERE event_ts > MAX(...)\` skips already-loaded rows; the \`ON CONFLICT DO NOTHING\` is the safety
+net for overlap at the boundary. Together they're both efficient **and** idempotent. (Whether you use
+\`>\` or \`>=\` at the boundary barely matters when \`ON CONFLICT\` is there to absorb any re-seen key.)
+
+### Common pitfalls
+
+- **No unique constraint = no conflict = duplicates.** \`ON CONFLICT(email)\` only fires if \`email\` is
+  actually declared \`UNIQUE\` / \`PRIMARY KEY\`. Without the constraint, the insert just appends.
+  Idempotency is enforced by the **schema**, not the query.
+- **\`INSERT … SELECT … ON CONFLICT\` parse quirk:** SQLite needs a \`WHERE\` (use \`WHERE true\` if you
+  have no real filter) before \`ON CONFLICT\` when the source is a \`SELECT\`, to disambiguate the
+  grammar. A bare \`INSERT … SELECT … ON CONFLICT …\` can fail to parse.
+- **Upserting the wrong key.** Conflict on a non-business column (e.g. a surrogate key) never matches
+  the natural duplicate, so re-runs still duplicate. Conflict on the **natural / business key**.
+
+> **In the warehouse:** Snowflake / BigQuery / SQL Server use
+> \`MERGE INTO target USING source ON <key> WHEN MATCHED THEN UPDATE WHEN NOT MATCHED THEN INSERT\`.
+> SQLite / Postgres use \`INSERT … ON CONFLICT\`. Same idea, different keyword — and interviewers expect
+> you to name both.
+
+**Recap:** an idempotent loader survives re-runs without duplicating rows; achieve it with
+\`INSERT … ON CONFLICT(<business key>) DO UPDATE / DO NOTHING\` backed by a real \`UNIQUE\` constraint,
+optionally scoped by a high-water-mark \`WHERE\`, and prove it with the "run twice, same count" test
+(warehouses spell the same operation \`MERGE\`).
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
+hidden assertion queries check the row count and the merged values, and the grader **re-runs your whole
+script** to confirm the row count doesn't move.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-idempotent-merge-apply",
+    prompt: `Convert a blind \`INSERT\` into an **\`INSERT … ON CONFLICT\` upsert** keyed on a unique
+column. \`dim_product\` already exists with \`sku\` declared \`UNIQUE\` and two rows in it; \`stg_product\`
+holds a fresh extract (already seeded). Load \`stg_product\` into \`dim_product\` so that:
+
+- a **new** SKU (\`SKU3\`) is inserted,
+- an **existing** SKU (\`SKU1\`) updates its \`name\` and \`price\`,
+- \`SKU2\` (not in the extract) is left untouched,
+- and **re-running the load adds no rows** — the table stays at exactly 3.
+
+Do it with a single \`INSERT … SELECT … ON CONFLICT(sku) DO UPDATE\`.`,
+    starterCode: `-- dim_product (sku UNIQUE) and stg_product are already seeded.
+-- Upsert the staging extract into dim_product so re-runs never duplicate.
+
+-- INSERT INTO dim_product (sku, name, price)
+-- SELECT sku, name, price FROM stg_product
+-- WHERE true
+-- ON CONFLICT(sku) DO UPDATE SET ... ;`,
+    hints: [
+      "`INSERT INTO dim_product (sku,name,price) SELECT sku,name,price FROM stg_product WHERE true ON CONFLICT(sku) DO UPDATE SET name = excluded.name, price = excluded.price;`",
+      "The `WHERE true` before `ON CONFLICT` is required with a `SELECT` source in SQLite.",
+      "`excluded.name` / `excluded.price` are the incoming staging values that would have been inserted.",
+    ],
+    referenceSolution: `INSERT INTO dim_product (sku, name, price)
+SELECT sku, name, price FROM stg_product
+WHERE true
+ON CONFLICT(sku) DO UPDATE SET
+  name  = excluded.name,
+  price = excluded.price;`,
+    seedSql: `DROP TABLE IF EXISTS dim_product;
+DROP TABLE IF EXISTS stg_product;
+
+CREATE TABLE dim_product (
+  product_key INTEGER PRIMARY KEY,
+  sku   TEXT UNIQUE NOT NULL,
+  name  TEXT,
+  price INTEGER
+);
+INSERT INTO dim_product (sku, name, price) VALUES
+  ('SKU1','Widget',10),
+  ('SKU2','Gadget',20);
+
+CREATE TABLE stg_product (sku TEXT, name TEXT, price INTEGER);
+INSERT INTO stg_product VALUES
+  ('SKU1','Widget Pro',12),
+  ('SKU3','Gizmo',30);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "dim_product holds exactly 3 rows after the upsert",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_product) <> 3`,
+      },
+      {
+        suite: "insert",
+        name: "the new SKU3 was inserted with its staging values",
+        sql: `SELECT 1 WHERE COALESCE((SELECT name FROM dim_product WHERE sku = 'SKU3'), '~') <> 'Gizmo'
+          OR COALESCE((SELECT price FROM dim_product WHERE sku = 'SKU3'), -1) <> 30`,
+      },
+      {
+        suite: "untouched",
+        name: "SKU2 (absent from the extract) was left unchanged",
+        sql: `SELECT 1 WHERE COALESCE((SELECT name FROM dim_product WHERE sku = 'SKU2'), '~') <> 'Gadget'
+          OR COALESCE((SELECT price FROM dim_product WHERE sku = 'SKU2'), -1) <> 20`,
+      },
+      {
+        suite: "update",
+        name: "the existing SKU1 was updated to the incoming name/price",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT name FROM dim_product WHERE sku = 'SKU1'), '~') <> 'Widget Pro'
+          OR COALESCE((SELECT price FROM dim_product WHERE sku = 'SKU1'), -1) <> 12`,
+      },
+      {
+        suite: "dedup",
+        name: "no sku appears twice",
+        isHidden: true,
+        sql: `SELECT sku FROM dim_product GROUP BY sku HAVING COUNT(*) > 1`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-idempotent-merge-practice",
+    prompt: `Write an **incremental upsert loader** and prove idempotency. \`fact_events\` accumulates
+events keyed by a unique \`event_id\`; \`stg_events\` is a fresh extract (both seeded). The extract
+**overlaps** already-loaded data (it repeats \`e2\`), contains a **duplicate \`event_id\` within itself**
+(\`e3\` appears twice with different \`ingested_at\`), and brings genuinely new events (\`e3\`, \`e4\`).
+
+In one \`INSERT … SELECT … ON CONFLICT\` load:
+
+1. **dedup the extract** so each \`event_id\` appears once, keeping the row with the **latest**
+   \`ingested_at\`;
+2. apply a **high-water mark** on \`event_ts\` so you don't reprocess old rows;
+3. **upsert on \`event_id\`** so overlap at the boundary updates in place instead of duplicating.
+
+After one run \`fact_events\` must hold \`e1, e2, e3, e4\` (4 rows), \`e3\`'s payload must be the
+later-ingested \`{"a":3b}\`, and **running the whole script twice must still leave 4 rows** with the same
+\`e3\` payload.`,
+    starterCode: `-- fact_events (PK event_id) and stg_events are already seeded.
+-- Load the extract idempotently: dedup -> high-water mark -> upsert on event_id.
+
+-- INSERT INTO fact_events (event_id, payload, event_ts, ingested_at)
+-- SELECT event_id, payload, event_ts, ingested_at
+-- FROM (
+--   SELECT ..., ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ingested_at DESC, payload DESC) AS rn
+--   FROM stg_events
+-- ) d
+-- WHERE d.rn = 1
+--   AND d.event_ts >= (SELECT COALESCE(MAX(event_ts), '1970-01-01') FROM fact_events)
+-- ON CONFLICT(event_id) DO UPDATE SET ... ;`,
+    hints: [
+      "Dedup the extract first with `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ingested_at DESC, payload DESC)` and keep `rn = 1` (the dedup pattern from Module 4.4).",
+      "High-water mark: `WHERE d.event_ts >= (SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events)`. You can't filter a window function in `WHERE`, so put the `ROW_NUMBER()` in a subquery and filter its `rn` outside — the same subquery is the natural place for the high-water filter.",
+      "Upsert on the PK: `ON CONFLICT(event_id) DO UPDATE SET payload = excluded.payload, event_ts = excluded.event_ts, ingested_at = excluded.ingested_at`.",
+      "Idempotency trap: on run #2 the high-water mark has risen to the newest event_ts, so almost everything is filtered out; whatever still slips through hits `ON CONFLICT` and updates in place — never inserts. That's what keeps the row count at 4.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS fact_events;
+DROP TABLE IF EXISTS stg_events;
+
+CREATE TABLE fact_events (
+  event_id    TEXT PRIMARY KEY,
+  payload     TEXT,
+  event_ts    TEXT,
+  ingested_at TEXT
+);
+INSERT INTO fact_events (event_id, payload, event_ts, ingested_at) VALUES
+  ('e1','{"a":1}','2026-03-01','2026-03-01'),
+  ('e2','{"a":2}','2026-03-02','2026-03-02');
+
+CREATE TABLE stg_events (
+  event_id    TEXT,
+  payload     TEXT,
+  event_ts    TEXT,
+  ingested_at TEXT
+);
+INSERT INTO stg_events VALUES
+  ('e2','{"a":2}','2026-03-02','2026-03-02'),
+  ('e3','{"a":3}','2026-03-03','2026-03-03'),
+  ('e3','{"a":3b}','2026-03-03','2026-03-04'),
+  ('e4','{"a":4}','2026-03-04','2026-03-04');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "fact_events holds exactly 4 rows after the load",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_events) <> 4`,
+      },
+      {
+        suite: "coverage",
+        name: "e1, e2, e3 and e4 are all present",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_events WHERE event_id IN ('e1','e2','e3','e4')) <> 4`,
+      },
+      {
+        suite: "untouched",
+        name: "already-loaded e2 was not duplicated or corrupted",
+        sql: `SELECT 1 WHERE COALESCE((SELECT payload FROM fact_events WHERE event_id = 'e2'), '~') <> '{"a":2}'`,
+      },
+      {
+        suite: "dedup",
+        name: 'e3 kept the later-ingested payload {"a":3b}',
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT payload FROM fact_events WHERE event_id = 'e3'), '~') <> '{"a":3b}'`,
+      },
+      {
+        suite: "unique",
+        name: "no event_id appears more than once",
+        isHidden: true,
+        sql: `SELECT event_id FROM fact_events GROUP BY event_id HAVING COUNT(*) > 1`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel4: SqlLevel = {
   id: 4,
   slug: "engineering",
@@ -1871,6 +2353,13 @@ export const sqlLevel4: SqlLevel = {
       description:
         "Load a star schema and track change over time: surrogate keys, then SCD Type 1 overwrite and Type 2 history.",
       lessons: [starBuild, scdType1, scdType2],
+    },
+    {
+      id: "sql-l4-correctness",
+      title: "Module 4.4 — Pipeline Correctness",
+      description:
+        "The habits that separate a junior script from a production loader: deduplication and idempotent upsert/merge.",
+      lessons: [dedup, idempotentMerge],
     },
   ],
 }
