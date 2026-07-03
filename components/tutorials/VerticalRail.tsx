@@ -18,14 +18,17 @@ export function VerticalRail({
   /** Which edge the rail sits on — decides the chevron direction (expands toward the center). */
   side: "left" | "right"
 }) {
+  // A left-edge rail expands toward the center on its right (border-r); a right-edge rail is the
+  // mirror (border-l, chevron points left toward the center).
   const Chevron = side === "left" ? ChevronRight : ChevronLeft
+  const borderSide = side === "left" ? "border-r" : "border-l"
   return (
     <button
       type="button"
       onClick={onExpand}
       aria-label={`Show ${label}`}
       title={`Show ${label}`}
-      className="group border-border text-muted-foreground hover:text-foreground hover:bg-muted/40 focus-visible:ring-accent/50 flex w-10 shrink-0 flex-col items-center gap-2 border-r py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      className={`group border-border text-muted-foreground hover:text-foreground hover:bg-muted/40 focus-visible:ring-accent/50 flex w-10 shrink-0 flex-col items-center gap-2 ${borderSide} py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none`}
     >
       <Chevron className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span

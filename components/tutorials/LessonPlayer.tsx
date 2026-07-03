@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,9 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
-import { SableTutor, type SableEvent, type SableEventInput } from "./SableTutor"
+import { SableTutor } from "./SableTutor"
+import { VerticalRail } from "./VerticalRail"
+import { usePersistentState } from "./usePersistentState"
 import type {
   LessonSection,
   PythonExercise,
@@ -56,12 +58,8 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
     [lesson.practice.id]: lesson.practice.starterCode,
   })
 
-  // Sable's reaction stream — the player is the single source of events; ids keep React keys stable.
-  const [events, setEvents] = useState<SableEvent[]>([])
-  const eventId = useRef(0)
-  const pushEvent = useCallback((event: SableEventInput) => {
-    setEvents((prev) => [...prev, { ...event, id: eventId.current++ } as SableEvent])
-  }, [])
+  // The AI tutor (Sable) is locked / "coming soon"; its column is collapsible and the state persists.
+  const [tutorOpen, setTutorOpen] = usePersistentState("cs_py_tutor_open", "1")
 
   // Remember this level for the Path's "continue" behavior whenever a lesson is open.
   useEffect(() => {
@@ -113,7 +111,6 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const goToSection = (section: LessonSection) => {
     setActive(section)
-    pushEvent({ kind: "phase", section })
   }
 
   // Reset the reading area to the top whenever the phase changes (revisit or advance).
@@ -123,7 +120,6 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const markComplete = (section: LessonSection) => {
     completeSection(section, section === "practice" ? 100 : undefined)
-    pushEvent({ kind: "complete", section })
     onSectionComplete?.(section)
   }
 
@@ -132,19 +128,15 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const renderExercise = (
     exercise: PythonExercise,
-    section: LessonSection,
+    _section: LessonSection,
     opts: { canRevealReference?: boolean; onPass: () => void }
   ) => {
-    const shared = {
-      onRunResult: (passed: boolean) => pushEvent({ kind: "run", passed, section }),
-    }
     if (exercise.executionMode === "workspace" && exercise.workspace) {
       return (
         <WorkspaceExerciseRunner
           exercise={exercise}
           workspace={exercise.workspace}
           onPass={opts.onPass}
-          {...shared}
         />
       )
     }
@@ -155,9 +147,6 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
         onCodeChange={(value) => setCode(exercise.id, value)}
         canRevealReference={opts.canRevealReference}
         onPass={opts.onPass}
-        onHintReveal={(index, total) => pushEvent({ kind: "hint", index, total })}
-        onReferenceReveal={() => pushEvent({ kind: "reference" })}
-        {...shared}
       />
     )
   }
@@ -217,9 +206,17 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
         </div>
       </header>
 
-      {/* Below 1080px the whole workspace scrolls horizontally as one unit. */}
+      {/* Below 1080px the whole workspace scrolls horizontally as one unit. The tutor column
+          collapses to a slim rail, giving the lesson more room. */}
       <div className="flex-1 overflow-x-auto">
-        <div className="grid h-full min-w-[1080px] grid-cols-[248px_minmax(400px,1fr)_300px]">
+        <div
+          className={[
+            "grid h-full min-w-[1080px]",
+            tutorOpen === "1"
+              ? "grid-cols-[248px_minmax(400px,1fr)_300px]"
+              : "grid-cols-[248px_minmax(400px,1fr)_2.5rem]",
+          ].join(" ")}
+        >
           <div className="border-border overflow-y-auto border-r px-4 py-6">
             <LessonOutline
               sections={sections}
@@ -301,9 +298,13 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             </div>
           </main>
 
-          <div className="border-border overflow-hidden border-l p-3">
-            <SableTutor level={level} lesson={lesson} events={events} />
-          </div>
+          {tutorOpen === "1" ? (
+            <div className="border-border overflow-hidden border-l p-3">
+              <SableTutor onCollapse={() => setTutorOpen("0")} />
+            </div>
+          ) : (
+            <VerticalRail label="Sable" side="right" onExpand={() => setTutorOpen("1")} />
+          )}
         </div>
       </div>
     </div>
