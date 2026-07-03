@@ -1,57 +1,15 @@
-import type { SqlExercise, SqlLevel } from "@/lib/tutorials/types"
+import type { SqlLevel } from "@/lib/tutorials/types"
+import { scriptExercise } from "./script-exercise"
 
 /**
  * Level 3 — Data Modeling & Schema Design (script/workspace grading).
  *
- * AGENT-1 ships ONE proof lesson here (`sql-l3-ddl-create`) to prove the workspace/marker pipeline
- * end-to-end; AGENT-2 authors the rest from `docs/sql-curriculum/CONTENT.md`. Workspace grading: the
- * learner writes a multi-statement script (the single editable file); after it runs, hidden
- * **assertion queries** run — each returns the OFFENDING rows, so zero rows = pass (the dbt
- * "count of violations = 0" convention) — and `checkIdempotency` re-runs the script to assert a
- * stable row count. The runner emits the byte-identical `__WORKSPACE_TEST_RESULTS__:` marker.
+ * Workspace grading: the learner writes a multi-statement script (the single editable file); after it
+ * runs, hidden **assertion queries** run — each returns the OFFENDING rows, so zero rows = pass (the
+ * dbt "count of violations = 0" convention) — and `checkIdempotency` re-runs the script to assert a
+ * stable row count. The runner emits the byte-identical `__WORKSPACE_TEST_RESULTS__:` marker. The
+ * `scriptExercise` builder (shared with Level 4) lives in `./script-exercise`.
  */
-
-/** Build a workspace SqlExercise — one editable `solution.sql` the learner writes, plus grading. */
-function scriptExercise(input: {
-  id: string
-  prompt: string
-  starterCode: string
-  hints: string[]
-  referenceSolution?: string
-  seedSql: string
-  assertions: NonNullable<SqlExercise["workspace"]>["assertions"]
-  checkIdempotency?: boolean
-}): SqlExercise {
-  return {
-    id: input.id,
-    executionMode: "workspace",
-    prompt: input.prompt,
-    starterCode: input.starterCode,
-    hints: input.hints,
-    referenceSolution: input.referenceSolution,
-    workspace: {
-      language: "sql",
-      primaryFilePath: "solution.sql",
-      editableFilePaths: ["solution.sql"],
-      // Vestigial for SQL (assertions are hidden queries, not files) but required by the shared
-      // WorkspaceScenarioConfig contract the reused WorkspaceExerciseRunner renders.
-      testRunnerPath: "solution.sql",
-      visibleTestPaths: [],
-      hiddenTestPaths: [],
-      files: [
-        {
-          path: "solution.sql",
-          content: input.starterCode,
-          role: "editable",
-          language: "sql",
-        },
-      ],
-      seedSql: input.seedSql,
-      assertions: input.assertions,
-      checkIdempotency: input.checkIdempotency,
-    },
-  }
-}
 
 const ddlCreate: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l3-ddl-create",
