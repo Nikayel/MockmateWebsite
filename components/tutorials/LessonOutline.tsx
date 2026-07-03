@@ -34,11 +34,14 @@ export function LessonOutline({
   active,
   onSelect,
   upNext,
+  basePath,
 }: {
   sections: Record<LessonSection, SectionStatus>
   active: LessonSection
   onSelect: (section: LessonSection) => void
   upNext: UpNextLesson[]
+  /** Route prefix for "Up next" links, e.g. "/learn/python" or "/learn/sql". */
+  basePath: string
 }) {
   return (
     <div className="flex flex-col gap-8">
@@ -113,7 +116,7 @@ export function LessonOutline({
             {upNext.map((lesson) => (
               <li key={lesson.id}>
                 <Link
-                  href={`/learn/python/${lesson.levelSlug}/${lesson.id}`}
+                  href={`${basePath}/${lesson.levelSlug}/${lesson.id}`}
                   className="group focus-visible:ring-accent/50 hover:bg-muted/50 flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <span

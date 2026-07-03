@@ -218,6 +218,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
               active={active}
               onSelect={goToSection}
               upNext={upNext}
+              basePath="/learn/sql"
             />
           </div>
 

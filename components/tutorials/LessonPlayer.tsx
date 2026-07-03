@@ -223,6 +223,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
               active={active}
               onSelect={goToSection}
               upNext={upNext}
+              basePath="/learn/python"
             />
           </div>
 

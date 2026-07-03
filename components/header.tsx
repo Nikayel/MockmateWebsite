@@ -11,6 +11,7 @@ import {
   LogOut,
   Map,
   GraduationCap,
+  Database,
   FlaskConical,
   ChevronDown,
   type LucideIcon,
@@ -81,13 +82,27 @@ const APP_NAV: AppNavItem[] = [
     icon: Map,
     isActive: (pathname) => pathname.startsWith("/roadmap"),
   },
-  {
-    label: "Learn Python",
-    href: "/learn/python",
-    icon: GraduationCap,
-    isActive: (pathname) => pathname.startsWith("/learn"),
-  },
 ]
+
+// "Learn" is a two-track hub (Python + SQL) rather than a single destination, so it
+// renders as a labelled group: a dropdown on desktop, an inline sub-list on mobile.
+// Both tracks live under /learn/*, so the parent's active state covers either child.
+type LearnNavChild = { label: string; href: string; icon: LucideIcon }
+
+const LEARN_NAV: {
+  label: string
+  icon: LucideIcon
+  isActive: (pathname: string) => boolean
+  children: LearnNavChild[]
+} = {
+  label: "Learn",
+  icon: GraduationCap,
+  isActive: (pathname) => pathname.startsWith("/learn"),
+  children: [
+    { label: "Python", href: "/learn/python", icon: GraduationCap },
+    { label: "SQL", href: "/learn/sql", icon: Database },
+  ],
+}
 
 // Single source of truth for the marketing (logged-out) nav. Desktop and mobile
 // both render from this list so the two menus can never drift apart, and every
@@ -207,6 +222,47 @@ export function Header() {
                         </Link>
                       )
                     })}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-current={LEARN_NAV.isActive(pathname) ? "page" : undefined}
+                          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                            LEARN_NAV.isActive(pathname)
+                              ? "bg-foreground/10 text-foreground"
+                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                          }`}
+                        >
+                          {LEARN_NAV.label}
+                          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        className="border-border bg-popover text-popover-foreground w-44 shadow-xl shadow-black/20"
+                      >
+                        {LEARN_NAV.children.map((child) => {
+                          const ChildIcon = child.icon
+                          const childActive = pathname.startsWith(child.href)
+                          return (
+                            <DropdownMenuItem
+                              key={child.href}
+                              asChild
+                              className="focus:bg-foreground/10 cursor-pointer"
+                            >
+                              <Link
+                                href={child.href}
+                                aria-current={childActive ? "page" : undefined}
+                                className="flex items-center gap-2"
+                              >
+                                <ChildIcon className="h-4 w-4" />
+                                {child.label}
+                              </Link>
+                            </DropdownMenuItem>
+                          )
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   <div className="border-border flex items-center space-x-3 border-l pl-4">
                     <ThemeToggle />
@@ -314,6 +370,30 @@ export function Header() {
                         </Link>
                       )
                     })}
+                    <div className="flex flex-col gap-3">
+                      <span className="text-muted-foreground/70 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+                        <LEARN_NAV.icon className="h-3.5 w-3.5" />
+                        {LEARN_NAV.label}
+                      </span>
+                      {LEARN_NAV.children.map((child) => {
+                        const ChildIcon = child.icon
+                        const childActive = pathname.startsWith(child.href)
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            aria-current={childActive ? "page" : undefined}
+                            className={`ml-1.5 flex items-center space-x-2 transition-colors duration-300 ${
+                              childActive ? "text-accent" : "hover:text-accent text-foreground/90"
+                            }`}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <ChildIcon className="h-4 w-4" />
+                            <span>{child.label}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
                     <Link
                       href="/account"
                       className="hover:text-accent text-foreground/90 flex items-center space-x-2 transition-colors duration-300"
