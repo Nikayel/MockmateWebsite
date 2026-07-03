@@ -726,11 +726,13 @@ WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999);`,
 - \`order_items.order_id → orders\`: \`ON DELETE CASCADE\` (line items are meaningless without their order).
 - \`order_items.product_id → products\`: \`ON DELETE RESTRICT\`.
 
-Turn FK enforcement on. Insert a valid chain (one customer → two products → one order → **two** items
-referencing real products). Then prove **two** enforcements: (a) an \`order_items\` row for a
-**non-existent** order (\`order_id = 999\`) does not land — use a **guarded insert** (\`INSERT ... SELECT
-... WHERE EXISTS (the order)\`), since \`INSERT OR IGNORE\` will *not* skip an FK error; and (b)
-\`DELETE FROM orders WHERE order_id = 1;\` **cascades** to remove that order's items.`,
+Turn FK enforcement on. Insert one customer, two products, and **two** orders for that customer, each with
+**two** items referencing real products: **order 1** (which you will delete) and **order 2** (which must
+survive untouched). Then prove **three** things: (a) an \`order_items\` row for a **non-existent** order
+(\`order_id = 999\`) does not land — use a **guarded insert** (\`INSERT ... SELECT ... WHERE EXISTS (the
+order)\`), since \`INSERT OR IGNORE\` will *not* skip an FK error; (b) \`DELETE FROM orders WHERE order_id =
+1;\` **cascades** to remove order 1's two items; and (c) the cascade is **surgical** — order 2 keeps its
+two items, so exactly two \`order_items\` rows survive.`,
     starterCode: `PRAGMA foreign_keys = ON;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -741,14 +743,15 @@ DROP TABLE IF EXISTS customers;
 --   orders.customer_id     -> customers  ON DELETE RESTRICT
 --   order_items.order_id   -> orders     ON DELETE CASCADE
 --   order_items.product_id -> products   ON DELETE RESTRICT
--- INSERT the valid chain: one customer, two products, one order, two order_items ...
--- Guarded orphan: INSERT ... SELECT 102, 999, ... WHERE EXISTS (order 999)  -> no-op ...
--- DELETE FROM orders WHERE order_id = 1;  -- let the cascade clear its items ...`,
+-- INSERT the valid chain: one customer, two products, then TWO orders (1 and 2),
+--   each with two order_items referencing real products ...
+-- Guarded orphan: INSERT ... SELECT 103, 999, ... WHERE EXISTS (order 999)  -> no-op ...
+-- DELETE FROM orders WHERE order_id = 1;  -- cascade clears order 1's items; order 2 survives ...`,
     hints: [
       "`PRAGMA foreign_keys = ON;` first — the cascade won't fire without it.",
-      "Insert in dependency order: `products` and `customers`, then `orders`, then `order_items`.",
+      "Insert in dependency order: `products` and `customers`, then both `orders`, then all four `order_items`.",
       "Give the `order_items.order_id` FK `ON DELETE CASCADE`; give the other two `ON DELETE RESTRICT`.",
-      "Guard the orphan item with `... SELECT 102, 999, 10, 1 WHERE EXISTS (SELECT 1 FROM orders WHERE order_id = 999)`, then run `DELETE FROM orders WHERE order_id = 1;` and let the cascade clear its items before the assertions read.",
+      "Give order 1 and order 2 two items each. Guard the orphan with `... SELECT 103, 999, 10, 1 WHERE EXISTS (SELECT 1 FROM orders WHERE order_id = 999)`, then run `DELETE FROM orders WHERE order_id = 1;` — the cascade clears order 1's two items while order 2 keeps its two before the assertions read.",
     ],
     seedSql: "",
     checkIdempotency: true,
@@ -793,6 +796,18 @@ DROP TABLE IF EXISTS customers;
         name: "deleting order 1 cascaded its items away",
         isHidden: true,
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items WHERE order_id = 1) <> 0`,
+      },
+      {
+        suite: "integrity",
+        name: "surviving order 2 kept its two items (the cascade was surgical, not a table-wipe)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items WHERE order_id = 2) <> 2`,
+      },
+      {
+        suite: "integrity",
+        name: "exactly two order_items remain — order 1's cascaded away, order 2's survived",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items) <> 2`,
       },
     ],
   }),
@@ -1136,40 +1151,48 @@ INSERT INTO raw_order VALUES
   }),
   practice: scriptExercise({
     id: "sql-l3-normalize-1nf-practice",
-    prompt: `A "sales spreadsheet" export packs an entire order's items into **one comma-delimited
-string** like \`'mouse:2:2499,keyboard:1:4999'\` — each token is \`product:qty:price_cents\`. Unpack
-\`raw_sales\` into a 1NF \`order_line\` table \`(order_id, product, qty, unit_price_cents)\` with a
-composite primary key \`(order_id, product)\`. Orders have **up to three** items, and \`qty\` /
-\`unit_price_cents\` must be stored as \`INTEGER\`.
-
-SQLite has no split function, so the clean route is a \`WITH RECURSIVE\` that peels one token off the
-front of the string at a time, then splits each token on \`:\`. (A position-based \`substr\`/\`instr\`
-extraction per slot also works.)`,
+    prompt: `A "sales spreadsheet" export stores **up to three line-item slots per order** in packed
+columns (\`product_1\`/\`qty_1\`/\`price_1\`, \`product_2\`/\`qty_2\`/\`price_2\`,
+\`product_3\`/\`qty_3\`/\`price_3\`). Unpack \`raw_sales\` into a 1NF \`order_line\` table
+\`(order_id, product, qty, unit_price_cents)\` with a composite primary key \`(order_id, product)\` —
+**one row per line item**. Use **three** \`INSERT … SELECT\` statements (one per slot); skip the empty
+slots with a \`WHERE product_N IS NOT NULL\`. The slot columns are already \`INTEGER\`, so \`qty\` and
+\`price_N\` carry straight into \`unit_price_cents\` — no parsing, no \`CAST\`.`,
     starterCode: `DROP TABLE IF EXISTS order_line;
 
 -- CREATE TABLE order_line ( ... , PRIMARY KEY (order_id, product) );
 
--- Split raw_sales.items into one token per line item (a WITH RECURSIVE peels one token
--- off the front at a time), then split each token on ':' into product / qty / price,
--- CAST qty and price to INTEGER, and INSERT the rows.`,
+-- INSERT … SELECT from slot 1 (product_1, qty_1, price_1) for every order ...
+
+-- INSERT … SELECT from slot 2, then slot 3, each skipping empty slots (WHERE product_N IS NOT NULL) ...`,
     hints: [
-      "Declare `PRIMARY KEY (order_id, product)` so the grain is enforced.",
-      "One clean route: a `WITH RECURSIVE` that peels one `product:qty:price` token off the front of `items` at a time until the string is empty (append a trailing `,` in the anchor so every token ends with a delimiter).",
-      "Split each token on `:` with `instr`/`substr`: product before the first colon, qty between the colons, price after the last.",
-      "`CAST` qty and price to `INTEGER` — a purely `TEXT` price fails the numeric assertion downstream.",
+      "First `INSERT … SELECT order_id, product_1, qty_1, price_1 FROM raw_sales WHERE product_1 IS NOT NULL` for every order.",
+      "Add one more `INSERT … SELECT` per slot (product_2/qty_2/price_2, then product_3/qty_3/price_3), each with `WHERE product_N IS NOT NULL` so empty slots are skipped.",
+      "Declare `PRIMARY KEY (order_id, product)` so the composite grain is enforced.",
+      "The slot columns are already `INTEGER`, so a plain `SELECT` carries `qty` and `price` over — no CAST needed.",
     ],
     seedSql: `DROP TABLE IF EXISTS raw_sales;
-CREATE TABLE raw_sales (order_id INTEGER, items TEXT);
+CREATE TABLE raw_sales (
+    order_id  INTEGER,
+    product_1 TEXT, qty_1 INTEGER, price_1 INTEGER,
+    product_2 TEXT, qty_2 INTEGER, price_2 INTEGER,
+    product_3 TEXT, qty_3 INTEGER, price_3 INTEGER
+);
 INSERT INTO raw_sales VALUES
-    (1, 'mouse:2:2499,keyboard:1:4999'),
-    (2, 'monitor:1:19999'),
-    (3, 'cable:3:599,hub:1:2999,mat:2:1499');`,
+    (1, 'mouse',   2, 2499,  'keyboard', 1, 4999, NULL,  NULL, NULL),  -- slot 3 empty
+    (2, 'monitor', 1, 19999, NULL,       NULL, NULL, NULL, NULL, NULL),  -- slots 2 & 3 empty
+    (3, 'cable',   3, 599,   'hub',      1, 2999, 'mat', 2,    1499);`,
     checkIdempotency: true,
     assertions: [
       {
         suite: "rows",
         name: "exactly 6 line items were unpacked (2 + 1 + 3)",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_line) <> 6`,
+      },
+      {
+        suite: "rows",
+        name: "order 2 has exactly one line item (its two empty slots were skipped)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_line WHERE order_id = 2) <> 1`,
       },
       {
         suite: "keys",
@@ -1352,8 +1375,9 @@ product attributes on every line. Produce four tables, each populated with \`INS
 different \`customer_id\`s in the raw feed, so keep one row per distinct email at the **lowest**
 \`customer_id\`.
 - \`products\` keyed on \`product_id\`, deduplicated.
-- \`orders\` keyed on \`order_id\` — one row per order, carrying \`customer_id\` (not customer
-attributes).
+- \`orders\` keyed on \`order_id\` — one row per order, carrying the **surviving** \`customer_id\` from
+\`customers\` (map each raw id to the deduped one via email; never point an order at a \`customer_id\`
+you deduped away), and no customer attributes.
 - \`order_items\` keyed on \`(order_id, product_id)\` — carrying \`qty\` (not product attributes).`,
     starterCode: `DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS products;
@@ -1366,7 +1390,7 @@ DROP TABLE IF EXISTS order_items;
 -- order_items: (order_id, product_id, qty) at line grain, no product attributes ...`,
     hints: [
       "Dedup customers with a grouped insert: `SELECT MIN(customer_id), email FROM flat_sales GROUP BY email` — one row per email, lowest id wins.",
-      "`orders` is `SELECT DISTINCT order_id, customer_id FROM flat_sales`. Order 3's customer_id is 12, which you dropped in favor of 10 — the assertions only check that orders has 3 rows and carries no attributes, so keeping the raw customer_id is acceptable here (a real SCD remap comes in L4).",
+      "Don't load `orders` straight from the raw feed: order 3's raw customer_id (12) was deduped away in favor of 10, so `SELECT DISTINCT order_id, customer_id FROM flat_sales` would leave order 3 pointing at a customer that no longer exists — an orphaned foreign key. Remap through the dim on the natural key: `SELECT DISTINCT f.order_id, c.customer_id FROM flat_sales f JOIN customers c ON c.email = f.email` — every order now resolves to a surviving customer_id.",
       "`products` = `SELECT DISTINCT product_id, product_name FROM flat_sales`.",
       "`order_items` = `SELECT order_id, product_id, qty FROM flat_sales` — atomic grain, no descriptive columns.",
     ],
@@ -1407,6 +1431,16 @@ INSERT INTO flat_sales VALUES
         suite: "orders",
         name: "orders has one row per order (3 rows)",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders) <> 3`,
+      },
+      {
+        suite: "orders",
+        name: "order 3 is remapped to the surviving customer_id (10, not the deduped 12)",
+        sql: `SELECT 1 WHERE COALESCE((SELECT customer_id FROM orders WHERE order_id = 3), -1) <> 10`,
+      },
+      {
+        suite: "integrity",
+        name: "no order references a customer_id that was deduped away (0 orphans)",
+        sql: `SELECT o.order_id FROM orders o LEFT JOIN customers c ON o.customer_id = c.customer_id WHERE c.customer_id IS NULL`,
       },
       {
         suite: "grain",
@@ -1452,7 +1486,8 @@ the expensive part of analytics. The two worlds:
 \`product_name\` changes you must update it in many places; in analytics that's fine because these
 tables are *rebuilt* by the loader, not hand-edited.
 
-**Worked example.** From the 3NF schema, build one wide reporting table:
+**Worked example.** From the 3NF schema, build one wide, denormalized reporting *table* — a real,
+physical table that stores its own rows (not a view):
 
 \`\`\`sql
 CREATE TABLE rpt_sales AS
@@ -1469,7 +1504,11 @@ JOIN customers c ON c.customer_id = o.customer_id;
 
 A BI query against \`rpt_sales\` — "revenue by category by country" — now touches **one** table. The
 four-way join happened *once*, at build time, not on every dashboard load. \`CREATE TABLE … AS SELECT\`
-(CTAS) runs a query and stores its result set as a brand-new table.
+(CTAS) runs a query and stores its result set as a brand-new, **physical** table — real rows on disk,
+not a view. (A true **view**, by contrast, is just a *saved SELECT* that stores no data of its own and
+re-runs its query on every read — you'll build views in a later lesson; \`rpt_sales\` here is a
+materialized *table*, which is exactly why its join cost is paid once at build time and never again on
+read.)
 
 > **In the warehouse this differs — this is the warehouse's whole point.** Columnar warehouses
 > (Snowflake/BigQuery/Redshift) are built to scan wide denormalized tables fast, and storage is cheap,
