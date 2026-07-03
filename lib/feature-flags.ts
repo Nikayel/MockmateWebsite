@@ -29,32 +29,71 @@ export const FLAGS = {
 export type FlagName = keyof typeof FLAGS
 
 /**
+ * Gradual-rollout percentage per flag (0–100). A flag with `50` is on for a deterministic ~50% of
+ * users. Overridable per-flag at runtime via `FEATURE_FLAG_<NAME>_PCT`. Absent → no rollout (falls
+ * through to the static default).
+ */
+const ROLLOUT_PERCENTAGES: Partial<Record<FlagName, number>> = {}
+
+/** Users the flag is ALWAYS on for (e.g. internal testers), regardless of the rollout percentage. */
+const ALLOWLIST: Partial<Record<FlagName, string[]>> = {}
+
+/** Users the flag is ALWAYS off for. Takes precedence over the allowlist and the rollout percentage. */
+const DENYLIST: Partial<Record<FlagName, string[]>> = {}
+
+/**
+ * Deterministic 0–99 bucket for (userId, flag). FNV-1a over `flag:userId` so each flag buckets
+ * INDEPENDENTLY (a user isn't in the same slice for every flag) and STABLY (same input → same bucket
+ * every request — never `Math.random`, which would flip a user in and out between requests).
+ */
+function rolloutBucket(userId: string, flag: FlagName): number {
+  const input = `${flag}:${userId}`
+  let hash = 0x811c9dc5 // FNV offset basis
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) // FNV prime
+  }
+  return (hash >>> 0) % 100
+}
+
+/** Effective rollout percentage for a flag: `FEATURE_FLAG_<NAME>_PCT` env wins, else the static map. */
+function rolloutPercentage(flag: FlagName): number | undefined {
+  const envPct = process.env[`FEATURE_FLAG_${flag}_PCT`]
+  if (envPct !== undefined) {
+    const n = Number.parseInt(envPct, 10)
+    if (Number.isFinite(n)) return Math.min(100, Math.max(0, n))
+  }
+  return ROLLOUT_PERCENTAGES[flag]
+}
+
+/**
  * Get the value of a feature flag.
  *
- * @param flag - The flag name to check
- * @param userId - Optional user ID for percentage rollouts (future)
- * @returns boolean - Whether the flag is enabled
+ * Resolution order:
+ *   1. `FEATURE_FLAG_<NAME>` env override — the ops kill-switch / force-on; wins over everything.
+ *   2. Per-user targeting (only when `userId` is supplied): denylist (off) → allowlist (on) →
+ *      percentage rollout (`FEATURE_FLAG_<NAME>_PCT` or `ROLLOUT_PERCENTAGES`) by deterministic hash.
+ *   3. The static default in `FLAGS`.
  *
- * Future enhancements:
- * - Percentage-based rollout by userId hash
- * - User allowlist/denylist
- * - Environment-based overrides
- * - Remote config fetching
+ * @param flag - The flag name to check
+ * @param userId - Optional stable user id; enables allow/deny lists and percentage rollout
  */
 export function getFlag(flag: FlagName, userId?: string): boolean {
-  // Environment override: FEATURE_FLAG_<NAME>=true
-  const envKey = `FEATURE_FLAG_${flag}`
-  const envValue = process.env[envKey]
+  // 1. Environment override: FEATURE_FLAG_<NAME>=true|false — the ultimate switch.
+  const envValue = process.env[`FEATURE_FLAG_${flag}`]
   if (envValue !== undefined) {
     return envValue === "true" || envValue === "1"
   }
 
-  // Future: percentage rollout based on userId
-  // if (userId && ROLLOUT_PERCENTAGES[flag]) {
-  //   const hash = simpleHash(userId)
-  //   return hash % 100 < ROLLOUT_PERCENTAGES[flag]
-  // }
+  // 2. Per-user targeting.
+  if (userId) {
+    if (DENYLIST[flag]?.includes(userId)) return false
+    if (ALLOWLIST[flag]?.includes(userId)) return true
+    const pct = rolloutPercentage(flag)
+    if (pct !== undefined) return rolloutBucket(userId, flag) < pct
+  }
 
+  // 3. Static default.
   return FLAGS[flag]
 }
 
