@@ -1076,6 +1076,772 @@ CREATE TABLE category_path (
   }),
 }
 
+const starBuild: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-star-build",
+  title: "Building a Star Schema Load",
+  summary: "Populate dimensions with surrogate keys, then load a fact that references them.",
+  estimatedMinutes: 24,
+  difficulty: "hard",
+  skills: ["dimension load", "surrogate-key assignment", "fact load", "key lookup join"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## The fact stores surrogate keys, so the dimensions load first
+
+A star schema's fact table stores **surrogate keys** (small integers like \`product_key\`), not
+business/natural keys (\`sku\`, \`email\`). That keeps the fact narrow and decouples it from messy
+source keys. But it forces a strict **load order**:
+
+1. **Load the dimensions first.** Each dimension row gets a surrogate key — an \`INTEGER PRIMARY KEY\`
+   in SQLite auto-assigns one.
+2. **Load the fact second**, and for each fact row **look up** the surrogate key by joining the
+   staging row's *natural* key to the dimension.
+
+If you load the fact first, there are no surrogate keys to point at. If a fact's natural key has no
+matching dimension row, you get an **orphan fact** — an inner join drops it, a left join leaves a
+\`NULL\` key. A correct load has **zero orphan facts**.
+
+### Worked pattern
+
+\`\`\`sql
+-- 1. dims first: surrogate key auto-assigned, natural key kept as an attribute
+CREATE TABLE dim_product (
+  product_key INTEGER PRIMARY KEY,   -- surrogate
+  sku         TEXT UNIQUE NOT NULL,  -- natural key
+  name        TEXT
+);
+INSERT INTO dim_product (sku, name)
+SELECT DISTINCT sku, name FROM stg_products;
+
+-- 2. fact second: join staging natural key -> dim to fetch the surrogate key
+CREATE TABLE fact_sales (
+  sale_id     INTEGER PRIMARY KEY,
+  product_key INTEGER NOT NULL REFERENCES dim_product(product_key),
+  qty         INTEGER,
+  revenue     INTEGER
+);
+INSERT INTO fact_sales (product_key, qty, revenue)
+SELECT dp.product_key, s.qty, s.revenue
+FROM stg_sales s
+JOIN dim_product dp ON dp.sku = s.sku;   -- INNER JOIN = orphans excluded
+\`\`\`
+
+The \`JOIN … ON dp.sku = s.sku\` is the **key lookup**: it swaps the source \`sku\` for the warehouse
+\`product_key\`. Notice the fact insert never types a surrogate key literally — it always *looks one up*.
+
+### Common pitfalls
+
+- **Inner join silently drops orphans.** An inner join *is* the right choice when the rule is "every
+  fact must match a dimension," but you should **assert** the dropped count is zero rather than
+  silently lose rows. A common defense is loading an \`UNKNOWN\` dimension member (surrogate key
+  \`-1\`) and left-joining with \`COALESCE(dp.product_key, -1)\` so orphans are *counted*, not vanished.
+- **Duplicate natural keys in the dimension.** If \`stg_products\` has the same \`sku\` twice, an
+  \`INSERT … SELECT DISTINCT\` (or a dedup step) is required, or the lookup join fans out and inflates
+  the fact.
+
+> **In the warehouse:** Snowflake/BigQuery mint surrogate keys with \`IDENTITY\`/\`AUTOINCREMENT\` or
+> sequences and often generate them during a \`MERGE\`. The dims-then-fact-with-lookup pattern is
+> universal.
+
+**Recap:** load dims first (mint surrogate keys), then load the fact by joining each staging row's
+natural key to its dimension to fetch the surrogate key; a correct load produces zero orphan facts —
+assert it rather than trusting the inner join.
+
+**Execution mode:** you write a multi-statement script. The dimension and fact tables are pre-created
+but **empty**; your script populates them. Lead with \`DELETE FROM\` each target so the load is
+**re-runnable** — a second run must leave the same row counts, not double the fact.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-star-build-apply",
+    prompt: `Load \`dim_customer\` with surrogate keys from staging, then load \`fact_sales\` by looking
+those keys up. \`stg_customers(email, name)\` and \`stg_sales(email, amount)\` are seeded; the empty
+targets \`dim_customer(customer_key, email, name)\` (surrogate \`customer_key\`) and
+\`fact_sales(sale_id, customer_key, amount)\` already exist.
+
+Insert the dimension letting \`customer_key\` auto-assign, then insert the fact by **joining
+\`stg_sales\` to \`dim_customer\` on \`email\`** to fetch each \`customer_key\` — never type a key literally.
+Lead with \`DELETE FROM\` both targets so the load survives a re-run.`,
+    starterCode: `-- stg_customers and stg_sales are seeded; dim_customer and fact_sales exist (empty).
+-- Make the load re-runnable: clear the targets first (fact before dim).
+DELETE FROM fact_sales;
+DELETE FROM dim_customer;
+
+-- 1. Load the dimension; let customer_key auto-assign.
+-- INSERT INTO dim_customer (email, name) SELECT ... FROM stg_customers;
+
+-- 2. Load the fact: look up each customer_key by joining stg_sales to dim_customer on email.
+-- INSERT INTO fact_sales (customer_key, amount)
+-- SELECT dc.customer_key, s.amount FROM stg_sales s JOIN dim_customer dc ON ...;`,
+    hints: [
+      "Lead with `DELETE FROM fact_sales;` then `DELETE FROM dim_customer;` so a second run doesn't double the rows.",
+      "Insert dims with `INSERT INTO dim_customer (email, name) SELECT email, name FROM stg_customers;` — the `customer_key` auto-fills.",
+      "Load the fact with a join: `SELECT dc.customer_key, s.amount FROM stg_sales s JOIN dim_customer dc ON dc.email = s.email`.",
+      "Don't insert `customer_key` values manually into the fact — always look them up through the join.",
+    ],
+    referenceSolution: `DELETE FROM fact_sales;
+DELETE FROM dim_customer;
+
+INSERT INTO dim_customer (email, name)
+SELECT email, name FROM stg_customers;
+
+INSERT INTO fact_sales (customer_key, amount)
+SELECT dc.customer_key, s.amount
+FROM stg_sales s
+JOIN dim_customer dc ON dc.email = s.email;`,
+    seedSql: `CREATE TABLE stg_customers (email TEXT, name TEXT);
+INSERT INTO stg_customers VALUES
+  ('a@x.com','Ada'),('b@x.com','Ben'),('c@x.com','Cara');
+CREATE TABLE stg_sales (email TEXT, amount INTEGER);
+INSERT INTO stg_sales VALUES
+  ('a@x.com',100),('a@x.com',50),('b@x.com',200);
+
+CREATE TABLE dim_customer (
+  customer_key INTEGER PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name  TEXT
+);
+CREATE TABLE fact_sales (
+  sale_id INTEGER PRIMARY KEY,
+  customer_key INTEGER NOT NULL REFERENCES dim_customer(customer_key),
+  amount INTEGER
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "dimension",
+        name: "dim_customer has three rows with distinct surrogate keys",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 3
+          OR (SELECT COUNT(DISTINCT customer_key) FROM dim_customer) <> 3`,
+      },
+      {
+        suite: "fact",
+        name: "fact_sales has three rows (one per staging sale)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_sales) <> 3`,
+      },
+      {
+        suite: "integrity",
+        name: "zero orphan facts: every customer_key resolves to a dim_customer row",
+        isHidden: true,
+        sql: `SELECT f.sale_id
+          FROM fact_sales f
+          LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+          WHERE d.customer_key IS NULL`,
+      },
+      {
+        suite: "lookup",
+        name: "both sales for a@x.com share the same customer_key",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM fact_sales
+          WHERE customer_key = (SELECT customer_key FROM dim_customer WHERE email = 'a@x.com')
+        ) <> 2`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-star-build-practice",
+    prompt: `Build a **full star load** from staging: three dimensions and a line-item fact.
+\`stg_orders\` (one row per order line, carrying natural keys \`email\`, \`sku\`, and \`order_date\`) is
+seeded, along with the empty targets \`dim_customer(customer_key, email, name)\`,
+\`dim_product(product_key, sku, product_name)\`, \`dim_date(date_key, full_date)\`, and
+\`fact_order_items(item_key, customer_key, product_key, date_key, qty, revenue)\`.
+
+**Deduplicate each dimension by its natural key** (\`SELECT DISTINCT\`), then load the fact so every
+row references all three dimensions by surrogate key, with **zero orphan facts**. Lead with
+\`DELETE FROM\` every target (fact first) so the load re-runs cleanly.`,
+    starterCode: `-- stg_orders is seeded; the three dims and the fact table exist (empty).
+-- Make the load re-runnable: clear every target first (fact before dims).
+DELETE FROM fact_order_items;
+DELETE FROM dim_customer;
+DELETE FROM dim_product;
+DELETE FROM dim_date;
+
+-- 1. Load each dimension, deduped by its natural key (SELECT DISTINCT ...).
+-- INSERT INTO dim_customer (email, name)       SELECT DISTINCT ... FROM stg_orders;
+-- INSERT INTO dim_product  (sku, product_name) SELECT DISTINCT ... FROM stg_orders;
+-- INSERT INTO dim_date     (full_date)         SELECT DISTINCT ... FROM stg_orders;
+
+-- 2. Load the fact: join staging to ALL THREE dims on the natural keys to fetch the surrogate keys.
+-- INSERT INTO fact_order_items (customer_key, product_key, date_key, qty, revenue)
+-- SELECT dc.customer_key, dp.product_key, dd.date_key, o.qty, o.revenue
+-- FROM stg_orders o JOIN ... JOIN ... JOIN ... ;`,
+    hints: [
+      "Clear the targets first — `DELETE FROM fact_order_items;` then the three dims — so a re-run doesn't double the fact.",
+      "Load each dimension with `INSERT … SELECT DISTINCT natural_key, attr FROM stg_orders` — `DISTINCT` collapses the repeated natural keys.",
+      "Load the fact by joining staging to all three dimensions on their natural keys to fetch all three surrogate keys in one `SELECT`.",
+      "Order matters: load all three dims before the fact. Inner joins to each dim are enough here because every staging natural key appears in its dim.",
+    ],
+    seedSql: `CREATE TABLE stg_orders (
+  email TEXT, name TEXT, sku TEXT, product_name TEXT,
+  order_date TEXT, qty INTEGER, revenue INTEGER
+);
+INSERT INTO stg_orders VALUES
+  ('a@x.com','Ada','SKU1','Widget','2026-01-01',2,20),
+  ('a@x.com','Ada','SKU2','Gadget','2026-01-01',1,15),
+  ('b@x.com','Ben','SKU1','Widget','2026-01-02',3,30),
+  ('a@x.com','Ada','SKU1','Widget','2026-01-02',1,10);
+
+CREATE TABLE dim_customer (customer_key INTEGER PRIMARY KEY, email TEXT UNIQUE, name TEXT);
+CREATE TABLE dim_product  (product_key  INTEGER PRIMARY KEY, sku TEXT UNIQUE, product_name TEXT);
+CREATE TABLE dim_date     (date_key     INTEGER PRIMARY KEY, full_date TEXT UNIQUE);
+CREATE TABLE fact_order_items (
+  item_key    INTEGER PRIMARY KEY,
+  customer_key INTEGER NOT NULL REFERENCES dim_customer(customer_key),
+  product_key  INTEGER NOT NULL REFERENCES dim_product(product_key),
+  date_key     INTEGER NOT NULL REFERENCES dim_date(date_key),
+  qty INTEGER, revenue INTEGER
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "dimension",
+        name: "dim_customer deduped to two rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 2`,
+      },
+      {
+        suite: "dimension",
+        name: "dim_product deduped to two rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_product) <> 2`,
+      },
+      {
+        suite: "dimension",
+        name: "dim_date deduped to two rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_date) <> 2`,
+      },
+      {
+        suite: "fact",
+        name: "fact_order_items has four rows (one per staging line)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_order_items) <> 4`,
+      },
+      {
+        suite: "integrity",
+        name: "zero orphan facts against dim_customer",
+        sql: `SELECT f.item_key
+          FROM fact_order_items f
+          LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+          WHERE d.customer_key IS NULL`,
+      },
+      {
+        suite: "integrity",
+        name: "zero orphan facts against dim_product",
+        isHidden: true,
+        sql: `SELECT f.item_key
+          FROM fact_order_items f
+          LEFT JOIN dim_product d ON d.product_key = f.product_key
+          WHERE d.product_key IS NULL`,
+      },
+      {
+        suite: "integrity",
+        name: "zero orphan facts against dim_date",
+        sql: `SELECT f.item_key
+          FROM fact_order_items f
+          LEFT JOIN dim_date d ON d.date_key = f.date_key
+          WHERE d.date_key IS NULL`,
+      },
+      {
+        suite: "totals",
+        name: "total revenue carried into the fact is 75",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COALESCE(SUM(revenue), 0) FROM fact_order_items) <> 75`,
+      },
+    ],
+  }),
+}
+
+const scdType1: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-scd-type1",
+  title: "Slowly Changing Dimensions — Type 1",
+  summary: "Overwrite a changed attribute in place with no history.",
+  estimatedMinutes: 20,
+  difficulty: "medium",
+  skills: ["SCD Type 1", "in-place UPDATE", "correction semantics"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Slowly Changing Dimensions: Type 1 overwrites in place
+
+A **dimension** describes an entity — a customer, a product — and its attributes drift over time: a
+customer moves city, a product gets renamed. How you *handle* that drift is the **Slowly Changing
+Dimension (SCD)** question. **Type 1** is the simplest answer: **overwrite the old value in place and
+keep no history.** The row count never changes — you just \`UPDATE\` the changed columns to their new
+values.
+
+Type 1 is the right choice when the old value was **wrong**: a typo, a misspelled city, a data-entry
+error nobody ever needs to see again. You don't want a history *of a mistake*; you want it corrected
+everywhere, retroactively.
+
+### Worked example — the in-place overwrite
+
+A fresh source dump lands in \`stg_customer\`; apply a Type 1 overwrite to \`dim_customer\`:
+
+\`\`\`sql
+UPDATE dim_customer
+SET name = (SELECT s.name FROM stg_customer s WHERE s.email = dim_customer.email),
+    city = (SELECT s.city FROM stg_customer s WHERE s.email = dim_customer.email)
+WHERE email IN (SELECT email FROM stg_customer);
+\`\`\`
+
+Match on the **natural key** (\`email\`), overwrite the attributes, add **no rows** for the change.
+
+A cleaner, portable form uses \`INSERT … ON CONFLICT(key) DO UPDATE\` (an *upsert*) so brand-new
+customers are inserted and existing ones overwritten in a single statement — you'll write exactly that
+in the practice. Either way the essence is identical: **match on the natural key, overwrite the
+attributes, add no rows for changes.**
+
+### Common pitfalls
+
+- **Type 1 destroys the ability to answer "what was the value on date X."** If finance ever needs the
+  customer's city *at the time of sale*, Type 1 is wrong — you need **Type 2** (next lesson). Choosing
+  Type 1 is a **business decision**, not a default.
+- **The correlated-subquery \`UPDATE\` needs its guard.** The \`WHERE email IN (SELECT email FROM
+  stg_customer)\` clause matters: without it, every customer *absent* from the new dump has its
+  \`name\`/\`city\` set to \`NULL\` — the subquery returns nothing, so the assignment is NULL.
+
+> **In the warehouse:** Snowflake and BigQuery express Type 1 as a \`MERGE … WHEN MATCHED THEN UPDATE\`.
+> SQLite and Postgres use \`INSERT … ON CONFLICT DO UPDATE\` or a plain \`UPDATE\`. Same semantics:
+> overwrite, no history.
+
+**Recap:** SCD Type 1 overwrites changed attributes in place — match on the natural key, \`UPDATE\`, add
+zero new rows. It's correct for fixing errors where no history is wanted; if you need "the value as of
+date X," reach for Type 2 instead.
+
+**Execution mode:** you write a multi-statement script against a fresh in-memory SQLite DB already
+seeded with \`dim_customer\` and \`stg_customer\`. Hidden assertion queries then check the row count, the
+overwritten values, and that surrogate keys stayed put — and running your script twice must leave the
+same number of rows.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-scd-type1-apply",
+    prompt: `Apply a **Type 1 update** to correct a customer's misspelled city. \`dim_customer\` holds the
+current dimension; \`stg_customer\` holds a corrected dump. Overwrite \`name\` and \`city\` in
+\`dim_customer\` for every email present in the staging dump, adding **no new rows** and leaving the
+surrogate \`customer_key\` untouched.`,
+    starterCode: `-- dim_customer and stg_customer are already seeded for you.
+-- Apply a Type 1 overwrite: match on email, overwrite name + city, add no rows.
+
+-- UPDATE dim_customer
+-- SET name = (SELECT s.name FROM stg_customer s WHERE s.email = dim_customer.email),
+--     city = ...
+-- WHERE email IN (SELECT email FROM stg_customer);`,
+    hints: [
+      "A single `UPDATE dim_customer SET … WHERE email IN (SELECT email FROM stg_customer)` does the whole job.",
+      "Pull the new `city`/`name` with correlated subqueries matched on `email`.",
+      "Don't `INSERT` anything — Type 1 is overwrite-only, so the row count must stay at 2.",
+    ],
+    referenceSolution: `UPDATE dim_customer
+SET name = (SELECT s.name FROM stg_customer s WHERE s.email = dim_customer.email),
+    city = (SELECT s.city FROM stg_customer s WHERE s.email = dim_customer.email)
+WHERE email IN (SELECT email FROM stg_customer);`,
+    seedSql: `DROP TABLE IF EXISTS dim_customer;
+DROP TABLE IF EXISTS stg_customer;
+
+CREATE TABLE dim_customer (
+  customer_key INTEGER PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name  TEXT,
+  city  TEXT
+);
+INSERT INTO dim_customer (email, name, city) VALUES
+  ('a@x.com','Ada','Lundon'),   -- misspelled city
+  ('b@x.com','Ben','Paris');
+
+CREATE TABLE stg_customer (email TEXT, name TEXT, city TEXT);
+INSERT INTO stg_customer VALUES
+  ('a@x.com','Ada','London'),   -- corrected spelling
+  ('b@x.com','Ben','Paris');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "no history rows added — dim_customer still holds exactly 2 rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 2`,
+      },
+      {
+        suite: "correction",
+        name: "a@x.com city corrected to London",
+        sql: `SELECT 1 WHERE COALESCE((SELECT city FROM dim_customer WHERE email = 'a@x.com'), '~') <> 'London'`,
+      },
+      {
+        suite: "correction",
+        name: "b@x.com left untouched (still Ben / Paris)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT name || '|' || city FROM dim_customer WHERE email = 'b@x.com'), '~') <> 'Ben|Paris'`,
+      },
+      {
+        suite: "identity",
+        name: "surrogate key preserved — a@x.com is still customer_key 1 (overwrite, not delete+reinsert)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'a@x.com'), -1) <> 1`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-scd-type1-practice",
+    prompt: `Write a **Type 1 apply step** that overwrites changed attributes from a fresh source dump
+**and** inserts brand-new customers — leaving exactly **one row per email**. \`dim_customer\` (which now
+carries a \`tier\` column) and a \`stg_customer\` dump are already seeded; the dump contains updates to
+existing customers **and** a customer not yet in the dimension. Produce a \`dim_customer\` where existing
+rows are overwritten in place (keeping their \`customer_key\`) and the new customer is appended with a
+fresh key. Re-running your script must leave the row count unchanged.`,
+    starterCode: `-- dim_customer (with a tier column) and stg_customer are already seeded.
+-- Apply a Type 1 step that OVERWRITES existing customers and INSERTS brand-new ones,
+-- leaving exactly one row per email — and idempotent on a re-run.
+
+-- INSERT INTO dim_customer (email, name, city, tier)
+-- SELECT email, name, city, tier FROM stg_customer WHERE true
+-- ON CONFLICT(email) DO UPDATE SET ... ;`,
+    hints: [
+      "The clean one-statement form is `INSERT INTO dim_customer (email,name,city,tier) SELECT email,name,city,tier FROM stg_customer WHERE true ON CONFLICT(email) DO UPDATE SET name=excluded.name, city=excluded.city, tier=excluded.tier;` — `email` must be `UNIQUE` (it is).",
+      "`excluded.<col>` refers to the row that would have been inserted — that's the new source value.",
+      "The `ON CONFLICT` upsert makes this idempotent for free: re-running overwrites with the same values and inserts nothing new. (`INSERT OR REPLACE` would work too, but it deletes+reinserts and so churns the surrogate key — avoid it.)",
+      "If you split it into `UPDATE` + `INSERT … WHERE email NOT IN (SELECT email FROM dim_customer)`, run the `INSERT` after the `UPDATE` and only for genuinely new emails.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS dim_customer;
+DROP TABLE IF EXISTS stg_customer;
+
+CREATE TABLE dim_customer (
+  customer_key INTEGER PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name  TEXT, city TEXT, tier TEXT
+);
+INSERT INTO dim_customer (email, name, city, tier) VALUES
+  ('a@x.com','Ada','Lundon','gold'),
+  ('b@x.com','Ben','Paris','silver');
+
+CREATE TABLE stg_customer (email TEXT, name TEXT, city TEXT, tier TEXT);
+INSERT INTO stg_customer VALUES
+  ('a@x.com','Ada','London','gold'),      -- corrected city
+  ('b@x.com','Ben','Paris','gold'),       -- tier upgraded
+  ('c@x.com','Cara','Berlin','bronze');   -- brand-new customer`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "one row per email — dim_customer holds exactly 3 rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 3`,
+      },
+      {
+        suite: "correction",
+        name: "a@x.com city overwritten to London",
+        sql: `SELECT 1 WHERE COALESCE((SELECT city FROM dim_customer WHERE email = 'a@x.com'), '~') <> 'London'`,
+      },
+      {
+        suite: "correction",
+        name: "b@x.com tier upgraded to gold in place",
+        sql: `SELECT 1 WHERE COALESCE((SELECT tier FROM dim_customer WHERE email = 'b@x.com'), '~') <> 'gold'`,
+      },
+      {
+        suite: "insert",
+        name: "brand-new c@x.com landed with a fresh surrogate key",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'c@x.com'), -1) < 3`,
+      },
+      {
+        suite: "identity",
+        name: "existing surrogate keys stayed stable — a@x.com is still key 1, b@x.com still key 2 (upsert, not a key-churning replace)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'a@x.com'), -1) <> 1
+          OR COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'b@x.com'), -1) <> 2`,
+      },
+    ],
+  }),
+}
+
+const scdType2: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-scd-type2",
+  title: "Slowly Changing Dimensions — Type 2",
+  summary: "Preserve history by expiring old rows and inserting new versions.",
+  estimatedMinutes: 28,
+  difficulty: "hard",
+  skills: [
+    "SCD Type 2",
+    "effective_from/effective_to",
+    "is_current flag",
+    "new surrogate per version",
+  ],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## SCD Type 2: keep history instead of overwriting
+
+Type 1 overwrites and forgets. But finance often needs to attribute a sale to the customer's attributes
+**as they were on the sale date** — if Ada lived in London in January and Berlin in March, a January
+order must stay attributed to London. That requires keeping **history**, and that's **SCD Type 2**:
+instead of overwriting, you **expire the old row and insert a new version** with a fresh surrogate key.
+The dimension grows one row per change, and each row carries a **validity window**.
+
+Three columns make Type 2 work:
+
+- **\`effective_from\`** — the date this version became true.
+- **\`effective_to\`** — the date it stopped being true (a far-future sentinel like \`'9999-12-31'\` while still current).
+- **\`is_current\`** — a \`1\`/\`0\` flag; exactly **one** current row per natural key.
+
+Each version also gets its **own new surrogate key**, so a fact table can point at the specific version
+valid *as of* the event date. That's the whole point: \`fact.customer_key\` references the version that
+was current when the sale happened, not the latest one.
+
+### The apply algorithm
+
+When a fresh source dump arrives, for each natural key whose tracked attributes **changed**:
+
+1. **Expire the current row:** set \`effective_to = <change_date>\` and \`is_current = 0\` on the row where \`is_current = 1\`.
+2. **Insert a new version:** the new attribute values, \`effective_from = <change_date>\`, \`effective_to = '9999-12-31'\`, \`is_current = 1\`, a fresh surrogate key.
+
+Unchanged keys are left alone; brand-new keys get a single current row.
+
+### Worked example
+
+\`\`\`sql
+-- Ada moves from London to Berlin, effective 2026-03-01.
+
+-- Step 1: expire the old current row
+UPDATE dim_customer
+SET effective_to = '2026-03-01', is_current = 0
+WHERE email = 'a@x.com' AND is_current = 1;
+
+-- Step 2: insert the new version with a fresh surrogate key
+INSERT INTO dim_customer (email, name, city, effective_from, effective_to, is_current)
+VALUES ('a@x.com', 'Ada', 'Berlin', '2026-03-01', '9999-12-31', 1);
+\`\`\`
+
+After this, \`dim_customer\` has two rows for Ada: \`[London, 2026-01-01 → 2026-03-01, is_current=0]\` and
+\`[Berlin, 2026-03-01 → 9999-12-31, is_current=1]\`. A fact row dated \`2026-02-10\` joins to the **London**
+version because \`2026-02-10\` falls in \`[effective_from, effective_to)\`; a fact dated \`2026-03-15\` joins
+to **Berlin**.
+
+### Anatomy of the as-of join (how facts use Type 2)
+
+\`\`\`sql
+SELECT f.sale_id, d.city
+FROM fact_sales f
+JOIN dim_customer d
+  ON d.email = f.email
+ AND f.sale_date >= d.effective_from
+ AND f.sale_date <  d.effective_to;     -- half-open window: [from, to)
+\`\`\`
+
+The \`>= effective_from AND < effective_to\` is the **as-of** predicate — it selects the one version valid
+on the sale date. Use a **half-open interval** (\`< effective_to\`, not \`<=\`) so the boundary date belongs
+to exactly one version and rows never double-count.
+
+### Common pitfalls
+
+- **More than one \`is_current = 1\` per key** is the #1 Type 2 bug — it means an update ran the insert
+  without expiring the old row, and every downstream \`WHERE is_current = 1\` now doubles. Graders assert
+  exactly one current row per key.
+- **Overlapping windows** (old row's \`effective_to\` ≠ new row's \`effective_from\`) make the as-of join
+  match two versions or none. Set the expiring row's \`effective_to\` **equal** to the new row's \`effective_from\`.
+- **Closed intervals double-count.** If both versions include the boundary date (\`<=\`), a sale on that
+  exact day joins twice. Always half-open.
+- **Expiring on the wrong key.** \`WHERE email = ? AND is_current = 1\` — forgetting \`is_current = 1\`
+  expires *all* historical versions.
+
+> **In the warehouse:** Snowflake/BigQuery implement the whole Type 2 apply as a single \`MERGE\` with
+> \`WHEN MATCHED THEN UPDATE\` (expire) plus an \`INSERT\` for the new version, often generated by dbt's
+> snapshot macro. The two-step expire-then-insert logic is identical; only the statement packaging
+> differs. \`TRUE\`/\`FALSE\` are real booleans there; in SQLite \`is_current\` is \`1\`/\`0\`.
+
+**Recap:** SCD Type 2 keeps history by expiring the old row (\`effective_to = change_date\`,
+\`is_current = 0\`) and inserting a new version (fresh surrogate key, \`effective_from = change_date\`,
+\`effective_to = '9999-12-31'\`, \`is_current = 1\`); facts join to the version valid on the event date via a
+half-open \`[effective_from, effective_to)\` as-of predicate, and there must be exactly one
+\`is_current = 1\` per natural key.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
+hidden assertion queries check the version count, the current flag, the validity windows, and idempotency.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-scd-type2-apply",
+    prompt: `Close the current row and open a new version when a customer changes city. \`dim_customer\`
+holds one current row for \`a@x.com\` (city London, effective \`2026-01-01\`). A change arrives: as of
+\`2026-03-01\`, Ada's city is Berlin. Apply the Type 2 change — **expire** the London row and **insert** a
+Berlin version — so the dimension keeps both the expired London history and the current Berlin version,
+with their validity windows meeting exactly.`,
+    starterCode: `-- dim_customer already holds Ada's current London row (effective 2026-01-01).
+-- Apply the Type 2 change: as of 2026-03-01, Ada's city is Berlin.
+
+-- Step 1: expire the current London row — SET effective_to = '2026-03-01', is_current = 0 ...
+
+-- Step 2: insert the Berlin version — effective_from = '2026-03-01', effective_to = '9999-12-31', is_current = 1 ...`,
+    hints: [
+      "Two statements: an `UPDATE` to expire, then an `INSERT` for the new version.",
+      "Expire with `SET effective_to = '2026-03-01', is_current = 0 WHERE email = 'a@x.com' AND is_current = 1`.",
+      "Insert the Berlin row with `effective_from = '2026-03-01'`, `effective_to = '9999-12-31'`, `is_current = 1`.",
+      "Set the old `effective_to` equal to the new `effective_from` so the windows are contiguous — no gap, no overlap.",
+    ],
+    referenceSolution: `UPDATE dim_customer
+SET effective_to = '2026-03-01', is_current = 0
+WHERE email = 'a@x.com' AND is_current = 1;
+
+INSERT INTO dim_customer (email, name, city, effective_from, effective_to, is_current)
+VALUES ('a@x.com', 'Ada', 'Berlin', '2026-03-01', '9999-12-31', 1);`,
+    seedSql: `DROP TABLE IF EXISTS dim_customer;
+CREATE TABLE dim_customer (
+  customer_key   INTEGER PRIMARY KEY,
+  email          TEXT NOT NULL,
+  name           TEXT,
+  city           TEXT,
+  effective_from TEXT NOT NULL,
+  effective_to   TEXT NOT NULL,
+  is_current     INTEGER NOT NULL
+);
+INSERT INTO dim_customer (email, name, city, effective_from, effective_to, is_current)
+VALUES ('a@x.com','Ada','London','2026-01-01','9999-12-31',1);`,
+    assertions: [
+      {
+        suite: "versions",
+        name: "a@x.com now has exactly two versions",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer WHERE email = 'a@x.com') <> 2`,
+      },
+      {
+        suite: "current",
+        name: "exactly one current row for a@x.com",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer WHERE email = 'a@x.com' AND is_current = 1) <> 1`,
+      },
+      {
+        suite: "current",
+        name: "the current version is Berlin, 2026-03-01 → 9999-12-31",
+        sql: `SELECT customer_key FROM dim_customer
+WHERE email = 'a@x.com' AND is_current = 1
+  AND NOT (city = 'Berlin' AND effective_from = '2026-03-01' AND effective_to = '9999-12-31')`,
+      },
+      {
+        suite: "history",
+        name: "the London row is expired (is_current = 0, effective_to = 2026-03-01)",
+        sql: `SELECT customer_key FROM dim_customer
+WHERE email = 'a@x.com' AND city = 'London'
+  AND NOT (is_current = 0 AND effective_to = '2026-03-01')`,
+      },
+      {
+        suite: "windows",
+        name: "the two versions meet exactly — no gap, no overlap",
+        isHidden: true,
+        sql: `SELECT 1 WHERE
+  COALESCE((SELECT effective_to FROM dim_customer WHERE email = 'a@x.com' AND city = 'London'), 'x')
+  <> COALESCE((SELECT effective_from FROM dim_customer WHERE email = 'a@x.com' AND city = 'Berlin'), 'y')`,
+      },
+      {
+        suite: "windows",
+        name: "no two versions of the customer have overlapping validity windows",
+        isHidden: true,
+        sql: `SELECT a.customer_key
+FROM dim_customer a
+JOIN dim_customer b ON a.email = b.email AND a.customer_key <> b.customer_key
+WHERE a.effective_from < b.effective_to AND b.effective_from < a.effective_to`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-scd-type2-practice",
+    prompt: `Build a **general Type 2 apply step** driven by a fresh source dump, not a single hand-coded
+change. \`dim_customer\` holds the current dimension (one \`is_current = 1\` row per email). \`stg_customer\`
+is today's dump with a \`snapshot_date\`. For each email whose tracked attribute (\`city\`) **differs** from
+its current dimension row: expire the current row (\`effective_to = snapshot_date\`, \`is_current = 0\`) and
+insert a new version (\`effective_from = snapshot_date\`, \`effective_to = '9999-12-31'\`, \`is_current = 1\`).
+Customers whose city is **unchanged** get no new row; customers **absent** from today's dump are left
+as-is; brand-new emails get a single current version. The step must be **idempotent** — running it twice
+must leave \`dim_customer\` byte-for-byte identical.`,
+    starterCode: `-- dim_customer holds the current dimension (one is_current = 1 row per email).
+-- stg_customer is today's dump, each row carrying a snapshot_date.
+-- Apply a GENERAL Type 2 step and make it idempotent (safe to run twice).
+--
+-- Trap: capture the CHANGED emails FIRST, before you expire or insert, so the
+-- insert can't re-detect its own freshly written rows on a second run.
+
+-- Step 1: DROP + CREATE a temp table of changed emails
+--   (stg.city <> the current dim row's city) ...
+
+-- Step 2: expire the current row for those changed emails
+--   (effective_to = snapshot_date, is_current = 0) ...
+
+-- Step 3: insert the new current version for each changed email
+--   (effective_from = snapshot_date, effective_to = '9999-12-31', is_current = 1) ...
+
+-- Step 4: insert brand-new emails (present in stg, absent from dim) as one current version ...`,
+    hints: [
+      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where `stg.city <> dim.city`.",
+      "Expire step: `UPDATE dim_customer SET effective_to = <snapshot>, is_current = 0 WHERE is_current = 1 AND email IN (<changed emails>)`.",
+      "Insert step: insert new versions for changed emails **and** brand-new emails (emails in staging with no current dim row). Both get `is_current = 1`, `effective_from = snapshot_date`, `effective_to = '9999-12-31'`.",
+      "Idempotency is the trap: after the first run the current city already equals staging, so the changed set is empty on the second run — compare against the **current** row, and compute the changed-set into a temp table first so the insert doesn't re-detect its own new rows.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS dim_customer;
+CREATE TABLE dim_customer (
+  customer_key   INTEGER PRIMARY KEY,
+  email          TEXT NOT NULL,
+  name           TEXT,
+  city           TEXT,
+  effective_from TEXT NOT NULL,
+  effective_to   TEXT NOT NULL,
+  is_current     INTEGER NOT NULL
+);
+INSERT INTO dim_customer (email, name, city, effective_from, effective_to, is_current) VALUES
+  ('a@x.com','Ada','London','2026-01-01','9999-12-31',1),
+  ('b@x.com','Ben','Paris', '2026-01-01','9999-12-31',1),
+  ('c@x.com','Cara','Rome', '2026-01-01','9999-12-31',1);
+
+DROP TABLE IF EXISTS stg_customer;
+CREATE TABLE stg_customer (email TEXT, name TEXT, city TEXT, snapshot_date TEXT);
+INSERT INTO stg_customer VALUES
+  ('a@x.com','Ada','Berlin','2026-03-01'),
+  ('b@x.com','Ben','Paris', '2026-03-01'),
+  ('d@x.com','Dan','Oslo',  '2026-03-01');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "current",
+        name: "exactly one current (is_current = 1) row per email a, b, c, d",
+        sql: `SELECT e.email
+FROM (SELECT 'a@x.com' AS email UNION SELECT 'b@x.com' UNION SELECT 'c@x.com' UNION SELECT 'd@x.com') e
+WHERE (SELECT COALESCE(SUM(is_current), 0) FROM dim_customer d WHERE d.email = e.email) <> 1`,
+      },
+      {
+        suite: "history",
+        name: "a@x.com has exactly two versions (London expired, Berlin current)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer WHERE email = 'a@x.com') <> 2`,
+      },
+      {
+        suite: "current",
+        name: "a@x.com's current version is Berlin, 2026-03-01 → 9999-12-31",
+        sql: `SELECT customer_key FROM dim_customer
+WHERE email = 'a@x.com' AND is_current = 1
+  AND NOT (city = 'Berlin' AND effective_from = '2026-03-01' AND effective_to = '9999-12-31')`,
+      },
+      {
+        suite: "untouched",
+        name: "b@x.com (unchanged) and c@x.com (absent from dump) each still have one row",
+        sql: `SELECT e.email
+FROM (SELECT 'b@x.com' AS email UNION SELECT 'c@x.com') e
+WHERE (SELECT COUNT(*) FROM dim_customer d WHERE d.email = e.email) <> 1`,
+      },
+      {
+        suite: "newkey",
+        name: "d@x.com has exactly one current Oslo version from 2026-03-01",
+        sql: `SELECT 1 WHERE
+  NOT EXISTS (
+    SELECT 1 FROM dim_customer
+    WHERE email = 'd@x.com' AND is_current = 1 AND city = 'Oslo'
+      AND effective_from = '2026-03-01' AND effective_to = '9999-12-31'
+  )
+  OR (SELECT COUNT(*) FROM dim_customer WHERE email = 'd@x.com') <> 1`,
+      },
+      {
+        suite: "history",
+        name: "a@x.com's London version is expired at 2026-03-01 (is_current = 0)",
+        isHidden: true,
+        sql: `SELECT customer_key FROM dim_customer
+WHERE email = 'a@x.com' AND city = 'London'
+  AND NOT (is_current = 0 AND effective_to = '2026-03-01')`,
+      },
+      {
+        suite: "windows",
+        name: "no customer has overlapping validity windows",
+        isHidden: true,
+        sql: `SELECT a.customer_key
+FROM dim_customer a
+JOIN dim_customer b ON a.email = b.email AND a.customer_key <> b.customer_key
+WHERE a.effective_from < b.effective_to AND b.effective_from < a.effective_to`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel4: SqlLevel = {
   id: 4,
   slug: "engineering",
@@ -1098,6 +1864,13 @@ export const sqlLevel4: SqlLevel = {
       description:
         "Walk self-referencing hierarchies (org charts, category trees) to produce depth and breadcrumb paths.",
       lessons: [recursiveCte],
+    },
+    {
+      id: "sql-l4-warehouse-history",
+      title: "Module 4.3 — Warehouse Modeling and History",
+      description:
+        "Load a star schema and track change over time: surrogate keys, then SCD Type 1 overwrite and Type 2 history.",
+      lessons: [starBuild, scdType1, scdType2],
     },
   ],
 }
