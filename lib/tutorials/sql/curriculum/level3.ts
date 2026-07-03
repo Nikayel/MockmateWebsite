@@ -439,6 +439,613 @@ INSERT INTO raw_feed VALUES
   }),
 }
 
+const primaryKeys: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-primary-keys",
+  title: "Primary Keys: Surrogate vs Natural",
+  summary: "Give every row a stable identity that survives source changes.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["PRIMARY KEY", "surrogate keys", "natural keys", "UNIQUE"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Primary keys give a row its identity
+
+A **primary key (PK)** is the column (or columns) that uniquely identifies each row. The database
+enforces it: two rows can never share a PK value, and a PK can't be NULL. This is the single most
+important guarantee in a schema — it's what makes "one row per thing" true.
+
+You get to choose *what* the key is. Two families:
+
+- **Natural key** — a business value that's already unique: an email, an ISBN, a country code.
+  Meaningful, but risky: business values change (people change emails), can be reused, and are often
+  wide (bad for joins/indexes).
+- **Surrogate key** — a system-generated integer with no business meaning, usually auto-incrementing.
+  It never changes, is compact, and joins fast.
+
+**DEs strongly prefer surrogate keys** for warehouse dimensions. The natural key can change or arrive
+dirty; the surrogate stays stable so facts that reference it never break. You keep the natural key as
+a regular attribute (often \`UNIQUE\`), but *identity* rides on the surrogate.
+
+### Worked example
+
+\`\`\`sql
+CREATE TABLE dim_customer (
+    customer_sk  INTEGER PRIMARY KEY,   -- surrogate: system identity
+    email        TEXT UNIQUE,           -- natural key kept as a UNIQUE attribute
+    country_code TEXT
+);
+\`\`\`
+
+In SQLite, \`INTEGER PRIMARY KEY\` auto-assigns rowids, so an insert can omit it:
+
+\`\`\`sql
+INSERT INTO dim_customer (email, country_code) VALUES ('ada@example.com','GB');
+-- customer_sk auto-filled to 1
+\`\`\`
+
+**Anatomy:**
+
+\`\`\`
+customer_sk  INTEGER PRIMARY KEY
+    │           │        │
+ surrogate   integer   uniqueness + not-null + auto-index,
+   name      affinity   and (in SQLite) auto-increment
+\`\`\`
+
+Declaring a PK **automatically creates a unique index** on it — lookups and joins by PK are fast for
+free.
+
+> **In the warehouse this differs — surrogate generation.** SQLite gives you \`INTEGER PRIMARY KEY\`
+> (and the stricter \`AUTOINCREMENT\`) for free surrogates. Postgres uses \`GENERATED ALWAYS AS IDENTITY\`
+> (or \`serial\`); Snowflake/BigQuery often use sequences or \`ROW_NUMBER()\`-assigned keys during the
+> load because they don't auto-increment the same way. The *concept* — a stable system integer — is
+> identical; the syntax that mints it is per-engine.
+
+**Keep it readable / common pitfall.** Don't make a natural key the PK just because it's "obviously
+unique today." The day it isn't (a supplier reuses a SKU, a customer re-registers an email) your PK
+constraint blocks a legitimate load. Use a surrogate PK and add \`UNIQUE\` on the natural key — you get
+identity *and* a duplicate guard, decoupled.
+
+**Recap:** every row needs a stable identity; prefer a surrogate integer PK (auto-indexed, unchanging)
+and keep the natural key as a separate \`UNIQUE\` attribute.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
+then hidden assertion queries check the primary key, the unique index, and the row counts.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-primary-keys-apply",
+    prompt: `Create a \`dim_customer\` table with a **surrogate** integer PK \`customer_sk\` and keep the
+business key \`email\` as a plain attribute (add \`country_code\` too). Insert two customers **without**
+specifying \`customer_sk\` and let SQLite assign it.`,
+    starterCode: `DROP TABLE IF EXISTS dim_customer;
+
+-- CREATE TABLE dim_customer with a surrogate INTEGER PRIMARY KEY customer_sk,
+-- plus email TEXT and country_code TEXT ...
+-- INSERT two customers WITHOUT listing customer_sk (let SQLite auto-assign it) ...`,
+    hints: [
+      "`customer_sk INTEGER PRIMARY KEY` is all you need for an auto-incrementing surrogate in SQLite.",
+      "Don't list `customer_sk` in your `INSERT` column list — let it auto-fill.",
+      "`email` is just `email TEXT` here (no PK) — identity rides on the surrogate, not the business value.",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS dim_customer;
+
+CREATE TABLE dim_customer (
+    customer_sk  INTEGER PRIMARY KEY,
+    email        TEXT,
+    country_code TEXT
+);
+
+INSERT INTO dim_customer (email, country_code) VALUES ('ada@example.com','GB');
+INSERT INTO dim_customer (email, country_code) VALUES ('grace@example.com','US');`,
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "customer_sk is the primary key of dim_customer",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('dim_customer') WHERE name='customer_sk' AND pk=1) <> 1`,
+      },
+      {
+        suite: "rows",
+        name: "two rows landed with distinct surrogate keys",
+        sql: `SELECT 1 WHERE (SELECT COUNT(DISTINCT customer_sk) FROM dim_customer) <> 2`,
+      },
+      {
+        suite: "surrogate",
+        name: "surrogates were auto-assigned starting at 1",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT MIN(customer_sk) FROM dim_customer), -1) <> 1`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-primary-keys-practice",
+    prompt: `Design \`dim_product\` with a surrogate PK \`product_sk\` **and** a \`UNIQUE\` natural key
+\`sku\` (plus a \`name\`). Insert two valid products (use skus \`'A-1'\` and \`'B-2'\`). Then **attempt a
+third insert that duplicates an existing \`sku\`** and prove the database rejects it — the row count
+must stay at 2 after the failed insert. Use \`INSERT OR IGNORE\` for the duplicate so the script keeps
+running and the assertions can execute.`,
+    starterCode: `DROP TABLE IF EXISTS dim_product;
+
+-- CREATE TABLE dim_product: surrogate PK product_sk, UNIQUE natural key sku, plus name ...
+-- INSERT two valid products (sku 'A-1' and 'B-2') ...
+-- Attempt a THIRD insert reusing sku 'A-1' with INSERT OR IGNORE so the script continues ...`,
+    hints: [
+      "`product_sk INTEGER PRIMARY KEY` for identity; `sku TEXT UNIQUE` for the natural-key guard.",
+      "The `UNIQUE` on `sku` creates the unique index the constraint assertion checks.",
+      "For the duplicate attempt, `INSERT OR IGNORE INTO dim_product (sku, name) VALUES ('A-1', …)` silently skips the conflicting row instead of aborting the whole script.",
+      "Identity (PK) and duplicate-blocking (UNIQUE) are two separate guarantees on two different columns.",
+    ],
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "product_sk is the primary key of dim_product",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('dim_product') WHERE name='product_sk' AND pk=1) <> 1`,
+      },
+      {
+        suite: "rows",
+        name: "the duplicate sku did not create a third row",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_product) <> 2`,
+      },
+      {
+        suite: "constraint",
+        name: "sku carries a UNIQUE index",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_index_list('dim_product') WHERE "unique"=1) < 1`,
+      },
+      {
+        suite: "guard",
+        name: "exactly one row survives for the duplicated sku",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_product WHERE sku='A-1') <> 1`,
+      },
+    ],
+  }),
+}
+
+const foreignKeys: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-foreign-keys",
+  title: "Foreign Keys and Referential Integrity",
+  summary: "Guarantee a child row always points at a real parent.",
+  estimatedMinutes: 30,
+  difficulty: "medium",
+  skills: ["FOREIGN KEY", "REFERENCES", "ON DELETE", "PRAGMA foreign_keys"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Foreign keys keep every child pointing at a real parent
+
+A **foreign key (FK)** says: "the value in *this* column must exist as a key in *that* table." An
+\`orders.customer_id\` FK to \`customers.customer_id\` makes it **impossible** to insert an order for a
+customer who doesn't exist. That guarantee is **referential integrity** — the backbone of a
+trustworthy schema, and the thing that stops orphan rows from ever forming.
+
+**Worked example.**
+
+\`\`\`sql
+CREATE TABLE customers (
+    customer_id INTEGER PRIMARY KEY,
+    email       TEXT
+);
+CREATE TABLE orders (
+    order_id    INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    total_cents INTEGER,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+        ON DELETE RESTRICT
+);
+\`\`\`
+
+Now \`INSERT INTO orders (order_id, customer_id, total_cents) VALUES (1, 999, 500);\` **fails** if
+customer 999 doesn't exist.
+
+**\`ON DELETE\` policies** decide what happens to children when a parent is deleted:
+
+| Policy | Behavior |
+|---|---|
+| \`RESTRICT\` (or \`NO ACTION\`) | **Block** the parent delete while children exist. Safest default. |
+| \`CASCADE\` | **Delete the children too.** Use only when children are meaningless without the parent (e.g. order line items when the order dies). |
+| \`SET NULL\` | Null out the child's FK. Requires the FK column be nullable. |
+
+**Anatomy:**
+
+\`\`\`
+FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT
+             │                        │        │                        │
+       child column           parent table  parent key          delete policy
+\`\`\`
+
+> **In the warehouse this differs — and SQLite has a trap.** SQLite **does not enforce foreign keys
+> unless you turn them on** every connection: \`PRAGMA foreign_keys = ON;\`. Forget it and your
+> \`REFERENCES\` clauses parse fine but enforce nothing — orphans slip right in. Warehouses are the
+> opposite extreme: Redshift, Snowflake, and BigQuery let you *declare* FKs but **don't enforce them
+> at all** (they're informational, used by the planner). So in the real warehouse, referential
+> integrity is enforced by your *load logic and DQ tests*, not the engine. Here in SQLite you get
+> real enforcement — as long as you flip the pragma.
+
+> **A second SQLite gotcha:** \`INSERT OR IGNORE\` does **not** suppress a foreign-key violation. The
+> \`OR IGNORE\` conflict clause only skips \`UNIQUE\` / \`NOT NULL\` / \`CHECK\` / \`PRIMARY KEY\` conflicts —
+> an FK violation still raises \`FOREIGN KEY constraint failed\` and aborts the statement. So the
+> defensive way to "insert only if the parent exists" is a **guarded insert**:
+> \`INSERT INTO orders (...) SELECT ... WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = ...)\`.
+> The row lands only when the parent is present; otherwise it's a clean no-op instead of an error.
+
+**Keep it readable / common pitfall.** Two pitfalls dominate. First: forgetting
+\`PRAGMA foreign_keys = ON;\` — always the first line of an FK script. Second: reaching for \`CASCADE\`
+by default. Cascading deletes are a foot-gun; a single parent delete can silently wipe thousands of
+children. Default to \`RESTRICT\` and only cascade where the child genuinely cannot outlive the parent.
+
+**Recap:** an FK forces every child to point at a real parent; choose \`ON DELETE\` deliberately
+(default \`RESTRICT\`), and in SQLite you *must* run \`PRAGMA foreign_keys = ON;\` or enforcement is off.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB
+with FK enforcement available, then hidden assertion queries check your FK graph, its \`ON DELETE\`
+policies, and that referential integrity actually held.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-foreign-keys-apply",
+    prompt: `Create \`customers\` (PK \`customer_id\`, plus \`email\`) and \`orders\` (\`order_id\` PK,
+\`customer_id\` NOT NULL, \`total_cents\`) with an FK \`orders.customer_id → customers.customer_id\` using
+\`ON DELETE RESTRICT\`. **Turn FK enforcement on** as the first line. Insert **one** customer and **one**
+valid order for that customer. Then attempt an order for a **non-existent** customer (\`customer_id = 999\`)
+with a **guarded insert** — \`INSERT ... SELECT ... WHERE EXISTS (the parent)\` — so the orphan cleanly
+does **not** land (a raw \`INSERT\`, even \`INSERT OR IGNORE\`, would raise an FK error and abort).`,
+    starterCode: `PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS customers;
+
+-- CREATE customers (customer_id PK, email) ...
+-- CREATE orders with FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT ...
+-- INSERT one customer, then one valid order for that customer ...
+-- Guarded orphan attempt: INSERT ... SELECT 2, 999, 100 WHERE EXISTS (customer 999) -> no-op ...`,
+    hints: [
+      "First line: `PRAGMA foreign_keys = ON;` — without it your `REFERENCES` clause enforces nothing.",
+      "Declare the FK inside `orders` with `FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT`.",
+      "Insert the parent customer *before* the order, or even the valid order fails the FK check.",
+      "For the orphan, use a guarded `INSERT INTO orders (...) SELECT 2, 999, 100 WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999)` — it inserts nothing because customer 999 is absent.",
+    ],
+    referenceSolution: `PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS customers;
+
+CREATE TABLE customers (
+    customer_id INTEGER PRIMARY KEY,
+    email       TEXT
+);
+CREATE TABLE orders (
+    order_id    INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    total_cents INTEGER,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT
+);
+
+INSERT INTO customers (customer_id, email) VALUES (1, 'ada@example.com');
+INSERT INTO orders (order_id, customer_id, total_cents) VALUES (1, 1, 2499);
+
+-- Guarded orphan attempt: fires only if customer 999 exists (it doesn't), so nothing lands.
+INSERT INTO orders (order_id, customer_id, total_cents)
+SELECT 2, 999, 100
+WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999);`,
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "orders declares an FK on customer_id to customers",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_foreign_key_list('orders')
+          WHERE "table" = 'customers' AND "from" = 'customer_id'
+        ) <> 1`,
+      },
+      {
+        suite: "policy",
+        name: "the orders FK uses ON DELETE RESTRICT",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((
+          SELECT on_delete FROM pragma_foreign_key_list('orders')
+          WHERE "table" = 'customers' AND "from" = 'customer_id'
+        ), '~') <> 'RESTRICT'`,
+      },
+      {
+        suite: "rows",
+        name: "exactly one order landed (the valid one)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders) <> 1`,
+      },
+      {
+        suite: "integrity",
+        name: "the orphan order for customer 999 did not land",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders WHERE customer_id = 999) <> 0`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-foreign-keys-practice",
+    prompt: `Wire a **three-table order schema** — \`customers\`, \`orders\`, \`order_items\` — plus a
+\`products\` table, with a **defensible \`ON DELETE\` policy per relationship**:
+- \`orders.customer_id → customers\`: \`ON DELETE RESTRICT\` (never lose orders because a customer was deleted).
+- \`order_items.order_id → orders\`: \`ON DELETE CASCADE\` (line items are meaningless without their order).
+- \`order_items.product_id → products\`: \`ON DELETE RESTRICT\`.
+
+Turn FK enforcement on. Insert a valid chain (one customer → two products → one order → **two** items
+referencing real products). Then prove **two** enforcements: (a) an \`order_items\` row for a
+**non-existent** order (\`order_id = 999\`) does not land — use a **guarded insert** (\`INSERT ... SELECT
+... WHERE EXISTS (the order)\`), since \`INSERT OR IGNORE\` will *not* skip an FK error; and (b)
+\`DELETE FROM orders WHERE order_id = 1;\` **cascades** to remove that order's items.`,
+    starterCode: `PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS customers;
+
+-- CREATE customers, products, orders, order_items ...
+--   orders.customer_id     -> customers  ON DELETE RESTRICT
+--   order_items.order_id   -> orders     ON DELETE CASCADE
+--   order_items.product_id -> products   ON DELETE RESTRICT
+-- INSERT the valid chain: one customer, two products, one order, two order_items ...
+-- Guarded orphan: INSERT ... SELECT 102, 999, ... WHERE EXISTS (order 999)  -> no-op ...
+-- DELETE FROM orders WHERE order_id = 1;  -- let the cascade clear its items ...`,
+    hints: [
+      "`PRAGMA foreign_keys = ON;` first — the cascade won't fire without it.",
+      "Insert in dependency order: `products` and `customers`, then `orders`, then `order_items`.",
+      "Give the `order_items.order_id` FK `ON DELETE CASCADE`; give the other two `ON DELETE RESTRICT`.",
+      "Guard the orphan item with `... SELECT 102, 999, 10, 1 WHERE EXISTS (SELECT 1 FROM orders WHERE order_id = 999)`, then run `DELETE FROM orders WHERE order_id = 1;` and let the cascade clear its items before the assertions read.",
+    ],
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "orders has an FK to customers",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_foreign_key_list('orders') WHERE "table" = 'customers'
+        ) <> 1`,
+      },
+      {
+        suite: "schema",
+        name: "order_items has an FK to orders",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_foreign_key_list('order_items') WHERE "table" = 'orders'
+        ) <> 1`,
+      },
+      {
+        suite: "schema",
+        name: "order_items has an FK to products",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_foreign_key_list('order_items') WHERE "table" = 'products'
+        ) <> 1`,
+      },
+      {
+        suite: "policy",
+        name: "the order_items to orders FK uses ON DELETE CASCADE",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_foreign_key_list('order_items')
+          WHERE "table" = 'orders' AND on_delete = 'CASCADE'
+        ) <> 1`,
+      },
+      {
+        suite: "integrity",
+        name: "the orphan item for order 999 did not land",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items WHERE order_id = 999) <> 0`,
+      },
+      {
+        suite: "integrity",
+        name: "deleting order 1 cascaded its items away",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items WHERE order_id = 1) <> 0`,
+      },
+    ],
+  }),
+}
+
+const constraints: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-constraints",
+  title: "UNIQUE, NOT NULL, and CHECK",
+  summary: "Push data-quality rules into the schema so bad rows can't land.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["NOT NULL", "UNIQUE", "CHECK", "composite unique", "column invariants"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Constraints are the cheapest data-quality layer you have
+
+A \`CHECK\` or \`NOT NULL\` is enforced by the database *before* any dbt test, alert, or dashboard notices
+a problem — the bad row simply never lands. Three workhorses:
+
+- \`NOT NULL\` — the column must always have a value.
+- \`UNIQUE\` — no two rows share this value (or this *combination* of values, for a **composite unique**).
+- \`CHECK (condition)\` — every row must satisfy a boolean condition: an enum whitelist, a non-negative
+  price, a valid date order.
+
+### Worked example
+
+\`\`\`sql
+CREATE TABLE fact_order (
+    order_id    INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    status      TEXT NOT NULL CHECK (status IN ('pending','paid','shipped','cancelled')),
+    total_cents INTEGER NOT NULL CHECK (total_cents >= 0),
+    order_date  TEXT,
+    ship_date   TEXT,
+    UNIQUE (customer_id, order_date),                 -- composite: one order per customer per day
+    CHECK (ship_date IS NULL OR ship_date >= order_date)
+);
+\`\`\`
+
+Any insert with \`status = 'refunded'\`, a negative total, or a ship date before the order date is
+**rejected outright**.
+
+**Anatomy of a column constraint:**
+
+\`\`\`
+status TEXT NOT NULL CHECK (status IN ('pending','paid','shipped','cancelled'))
+        │      │          │        │
+      type  required   invariant  the whitelist the value must be in
+\`\`\`
+
+Column-level constraints sit on one column; **table-level** constraints (\`UNIQUE (a, b)\`, cross-column
+\`CHECK\`) go after the column list and can reference several columns.
+
+> **In the warehouse this differs.** SQLite enforces \`CHECK\`, \`NOT NULL\`, and \`UNIQUE\` reliably. Big
+> analytical warehouses are looser: BigQuery has **no** \`CHECK\`/\`UNIQUE\` enforcement, and Snowflake
+> enforces \`NOT NULL\` but treats \`UNIQUE\`/\`CHECK\` as *informational*. So in production these invariants
+> are re-expressed as **dbt / DQ tests** (you'll build those in L4). Author them in your DDL anyway —
+> they document intent and they *are* enforced on strict engines like Postgres.
+
+### Keep each CHECK to one clear invariant
+
+A giant compound \`CHECK\` is unreadable and hard to debug when it fires. Common trap: a \`CHECK\`
+**passes** when its condition evaluates to \`NULL\` (three-valued logic) — that's why the ship-date rule
+is written \`ship_date IS NULL OR ship_date >= order_date\`, so a *missing* ship date is allowed but a
+*wrong* one isn't.
+
+**Recap:** constraints are the cheapest DQ layer — use \`NOT NULL\` for required fields, \`UNIQUE\` (incl.
+composite) for identity/dedup, and \`CHECK\` for enums and invariants. Author them even where the
+warehouse won't enforce them.
+
+**Execution mode:** you write a multi-statement DDL+DML script. It runs against a fresh in-memory
+SQLite DB, then hidden assertion queries check the constraints and row counts. Use \`INSERT OR IGNORE\`
+for rows you *expect* to be rejected — a constraint violation is then silently skipped instead of
+aborting your whole script.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-constraints-apply",
+    prompt: `Create an \`orders\` table whose schema *refuses* bad data. It needs:
+
+- \`order_id INTEGER PRIMARY KEY\`,
+- \`status TEXT NOT NULL\` constrained by a \`CHECK\` to the enum \`('pending','paid','shipped','cancelled')\`,
+- \`total_cents INTEGER NOT NULL\`.
+
+Insert **one valid row**. Then, using \`INSERT OR IGNORE\`, attempt a row with \`status = 'refunded'\` and
+prove it never lands — the table should end with exactly one row.`,
+    starterCode: `DROP TABLE IF EXISTS orders;
+
+-- CREATE TABLE orders ( ... ) with a CHECK on status and NOT NULL columns ...
+-- INSERT one valid row (a whitelisted status) ...
+-- INSERT OR IGNORE a row with status = 'refunded' — it should be rejected ...`,
+    hints: [
+      "`status TEXT NOT NULL CHECK (status IN ('pending','paid','shipped','cancelled'))` puts the enum right in the column definition.",
+      "Insert the valid row with a whitelisted status like `'paid'`.",
+      "Use `INSERT OR IGNORE` for the `'refunded'` attempt so the CHECK violation is skipped and the script survives to the assertions.",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS orders;
+
+CREATE TABLE orders (
+    order_id    INTEGER PRIMARY KEY,
+    status      TEXT NOT NULL CHECK (status IN ('pending','paid','shipped','cancelled')),
+    total_cents INTEGER NOT NULL
+);
+
+INSERT INTO orders (order_id, status, total_cents) VALUES (1, 'paid', 2499);
+INSERT OR IGNORE INTO orders (order_id, status, total_cents) VALUES (2, 'refunded', 100);`,
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "the table ends with exactly one row",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders) <> 1`,
+      },
+      {
+        suite: "enum",
+        name: "the 'refunded' row was rejected by the CHECK",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders WHERE status = 'refunded') <> 0`,
+      },
+      {
+        suite: "schema",
+        name: "a CHECK constraint on status is declared in the DDL",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM sqlite_master
+          WHERE type = 'table' AND name = 'orders' AND sql LIKE '%CHECK%status%'
+        ) < 1`,
+      },
+      {
+        suite: "schema",
+        name: "status and total_cents are both NOT NULL",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_table_info('orders')
+          WHERE name IN ('status','total_cents') AND "notnull" = 1
+        ) <> 2`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-constraints-practice",
+    prompt: `Harden a \`dim_product\` dimension so three data-quality rules are enforced **by the schema
+itself**:
+
+1. a **composite** \`UNIQUE (supplier_id, sku)\` — the same SKU may exist under *different* suppliers,
+   but never twice under one;
+2. a **non-negative** price: \`CHECK (unit_price_cents >= 0)\`;
+3. an **enum**: \`CHECK (status IN ('active','discontinued'))\`.
+
+Insert **one fully valid row**. Then, with \`INSERT OR IGNORE\`, fire one violation of *each* rule — a
+duplicate \`(supplier_id, sku)\`, a negative price, and a bad status — and prove the table still holds
+exactly one row.`,
+    starterCode: `DROP TABLE IF EXISTS dim_product;
+
+-- CREATE TABLE dim_product ( ... )
+--   with a composite UNIQUE (supplier_id, sku),
+--   a CHECK (unit_price_cents >= 0),
+--   and a CHECK (status IN ('active','discontinued')) ...
+-- INSERT one fully valid row ...
+-- INSERT OR IGNORE one duplicate (supplier_id, sku), one negative price, one bad status ...`,
+    hints: [
+      "Put the composite unique as a table-level constraint after the columns: `UNIQUE (supplier_id, sku)`.",
+      "Two column-level checks: `CHECK (unit_price_cents >= 0)` and `CHECK (status IN ('active','discontinued'))`.",
+      "Insert the good row first — a whitelisted status, a non-negative price, and a unique supplier+sku.",
+      "Fire all three bad rows with `INSERT OR IGNORE`; each is silently skipped, leaving exactly one row.",
+    ],
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "exactly the one valid row survived all three bad inserts",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_product) <> 1`,
+      },
+      {
+        suite: "keys",
+        name: "a UNIQUE constraint is declared on dim_product",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_index_list('dim_product') WHERE "unique" = 1
+        ) < 1`,
+      },
+      {
+        suite: "schema",
+        name: "a non-negative CHECK on unit_price_cents is declared",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM sqlite_master
+          WHERE name = 'dim_product' AND sql LIKE '%unit_price_cents%>=%0%'
+        ) < 1`,
+      },
+      {
+        suite: "schema",
+        name: "an enum CHECK on status is declared",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM sqlite_master
+          WHERE name = 'dim_product' AND sql LIKE '%status%IN%active%'
+        ) < 1`,
+      },
+      {
+        suite: "keys",
+        name: "the UNIQUE is composite over exactly (supplier_id, sku)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE NOT EXISTS (
+          SELECT 1 FROM pragma_index_list('dim_product') il
+          WHERE il."unique" = 1
+            AND (SELECT COUNT(*) FROM pragma_index_info(il.name)) = 2
+            AND (SELECT COUNT(*) FROM pragma_index_info(il.name) WHERE name IN ('supplier_id','sku')) = 2
+        )`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel3: SqlLevel = {
   id: 3,
   slug: "modeling",
@@ -453,6 +1060,13 @@ export const sqlLevel3: SqlLevel = {
       description:
         "The two verbs every pipeline is built on: CREATE TABLE to define, INSERT to fill.",
       lessons: [ddlCreate, insertPopulate],
+    },
+    {
+      id: "sql-l3-keys",
+      title: "Module 3.2 — Keys and Constraints",
+      description:
+        "Primary and foreign keys, UNIQUE / NOT NULL / CHECK — the rules the database enforces so bad rows can never land.",
+      lessons: [primaryKeys, foreignKeys, constraints],
     },
   ],
 }
