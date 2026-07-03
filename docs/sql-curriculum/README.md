@@ -20,6 +20,8 @@ mirrors `docs/python-curriculum/` so the two courses read the same way.
 | [`CONTENT.md`](./CONTENT.md) | **The course content** — all 4 levels, every lesson authored as **Read → Apply → Practice** with data-engineering framing (source tables, dims/facts, warehouse transforms). This is what a content author ships into `lib/tutorials/sql/curriculum/levelN/`. |
 | [`CURRICULUM-MAP.md`](./CURRICULUM-MAP.md) | The one-page **taxonomy** — every level → module → lesson with a one-line Read/Apply/Practice note. The contract the content + spec were built against. |
 | [`RESEARCH.md`](./RESEARCH.md) | The web-grounded research that shaped the curriculum: what a DE intern is expected to know, the SQL skill taxonomy, and data-modeling / DE depth (normalization, dimensional modeling, window functions, SCD, ELT). |
+| [`AGENT-1-engineer.md`](./AGENT-1-engineer.md) | **Ship-the-spec prompt** — a copy-paste runbook for the engineering agent that builds the sql.js runner + wiring + routes + two proof lessons from `SPEC.md`. |
+| [`AGENT-2-curriculum-developer.md`](./AGENT-2-curriculum-developer.md) | **Curriculum-author prompt** — a `/loop` runbook that authors all 46 lessons from `CONTENT.md` into `SqlLesson` objects, one per iteration, verified green. Run after AGENT 1. |
 
 Related: [`../python-curriculum/CURRICULUM-GAP-ANALYSIS.md`](../python-curriculum/CURRICULUM-GAP-ANALYSIS.md)
 — the audit of what the **Python** course is missing (produced in the same pass).
@@ -44,12 +46,18 @@ Runs entirely client-side on **SQLite via `sql.js`** (WASM) — free, no quota, 
 warehouse SQL (Postgres / Snowflake / BigQuery) diverges from SQLite is flagged inline in the Read as
 an *"In the warehouse this differs…"* callout, so the intern learns transferable SQL.
 
-## How to build it
+## How to build it — two agents
 
-Follow `SPEC.md` §8 (runner-first thin vertical slice → generalize types → registry/routes/auth → UI
-polish → author content L1→L4). New npm deps: `sql.js` and `@codemirror/lang-sql`. New code is one
-runner directory + one worker + one results-grid sub-component + ~6 lines of union/dispatch widening;
-everything else is reuse.
+Mirrors how the Python course was built (an engineer, then a curriculum author):
+
+1. **Engineer** — paste [`AGENT-1-engineer.md`](./AGENT-1-engineer.md)'s prompt into a fresh Claude
+   Code session. It follows `SPEC.md` §8 (runner-first thin slice → generalize types → registry/
+   routes/auth → UI polish) and ships the sql.js runner + two proof lessons end-to-end. New npm deps:
+   `sql.js`, `@codemirror/lang-sql`. New code is one runner directory + one worker + one results-grid
+   sub-component + ~6 lines of union/dispatch widening — everything else is reuse.
+2. **Curriculum author** — once AGENT 1 is green, run
+   [`AGENT-2-curriculum-developer.md`](./AGENT-2-curriculum-developer.md) with `/loop` to author all
+   46 lessons from `CONTENT.md`, one per iteration, each verified green on the runner.
 
 ## Status
 
