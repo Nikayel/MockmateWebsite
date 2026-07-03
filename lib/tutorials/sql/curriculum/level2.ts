@@ -467,6 +467,714 @@ INSERT INTO orders VALUES
   },
 }
 
+const innerJoin: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-inner-join",
+  title: "INNER JOIN and Join Keys",
+  summary: "Combine two source tables on a matching key.",
+  estimatedMinutes: 30,
+  difficulty: "medium",
+  skills: ["INNER JOIN", "ON", "join keys", "table aliases", "qualifying columns"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Real data lives in many tables
+
+Real source data is never in one table. A raw e-commerce feed splits \`orders\` (who bought, when,
+total) from \`customers\` (name, region, email) from \`products\` (name, category, price). To answer
+"revenue by customer region" you must first *stitch these back together* on their shared keys. That
+stitching is a **join**, and the everyday workhorse is the \`INNER JOIN\`: it returns rows where a key
+in one table **matches** a key in the other, and drops everything with no match on either side.
+
+## Worked example — attach each order to its customer
+
+\`\`\`sql
+SELECT
+  o.order_id,
+  o.total_cents,
+  c.customer_name
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.customer_id;
+\`\`\`
+
+Read it as: for each \`orders\` row, find the \`customers\` row whose \`customer_id\` equals this order's
+\`customer_id\`, and glue their columns side by side. An order with no matching customer, or a customer
+with no orders, does **not** appear — that's the "inner" part.
+
+## Anatomy of a join
+
+\`\`\`
+FROM   orders     AS o          ← left table, aliased 'o'
+INNER JOIN customers AS c       ← right table, aliased 'c'
+  ON   o.customer_id = c.customer_id
+       └─── join key: the column(s) that relate the two tables ───┘
+SELECT o.order_id, c.customer_name
+       └── qualify columns with the alias so 'customer_id' isn't ambiguous ──┘
+\`\`\`
+
+Three habits that make joins readable and correct:
+
+1. **Alias every table** (\`orders AS o\`). Short aliases keep the \`ON\` and \`SELECT\` legible.
+2. **Qualify every column** (\`o.order_id\`, not \`order_id\`) — the instant two tables share a column
+   name, an unqualified reference is ambiguous and errors.
+3. **Name the join key deliberately.** The \`ON\` clause is the contract: "these two rows describe the
+   same thing."
+
+## Cardinality — the concept that separates a DE from a query monkey
+
+Before you join, know the *relationship* between the tables:
+
+- **1:1** — each order has exactly one customer *record*, but reversed a customer has many orders, so
+  order→customer is *many-to-one*.
+- **1:N** — one order has *many* \`order_items\`. Joining \`orders\` to \`order_items\` multiplies each
+  order row by its number of line items.
+- **M:N** — needs a bridge table (you'll model these in Level 3).
+
+Why this matters: **a 1:N join fans out rows, and a fan-out inflates a \`SUM\`.** If you join \`orders\`
+to \`order_items\` and then \`SUM(orders.total_cents)\`, you sum each order's total *once per line item* —
+a 3-item order counts its total three times. The revenue triples and looks plausible, which is how bad
+numbers ship. The fix is to know your grain: after a fan-out join, aggregate the **line-level** measure
+(\`SUM(quantity * unit_price_cents)\`), never the pre-aggregated header total.
+
+## Keep it readable / common pitfall
+
+Forgetting the \`ON\` clause (or writing \`,\`-separated tables with the join condition in \`WHERE\`) can
+produce a **cross join** — every row paired with every row, N×M rows. If your result set is
+suspiciously huge, you dropped or weakened a join key. Always join on the *full* key; a partial key
+silently fans out.
+
+**Recap:** \`INNER JOIN … ON key\` returns only matching rows from both tables; alias and qualify
+everything, and always know the cardinality — a 1:N join fans out rows and will double-count any
+header-level \`SUM\`.`,
+    demoCode: `SELECT
+  o.order_id,
+  o.total_cents,
+  c.customer_name
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.customer_id;`,
+  },
+  apply: {
+    id: "sql-l2-inner-join-apply",
+    executionMode: "single-file",
+    prompt: `Join \`orders\` to \`customers\` on \`customer_id\`. Return \`order_id\`, \`total_cents\`, and \`customer_name\`, one row per order that has a matching customer, sorted by \`order_id\`.`,
+    starterCode: `-- Join orders to its customer, then sort by order_id.
+-- Return order_id, total_cents, customer_name.
+SELECT
+
+FROM orders AS o
+INNER JOIN customers AS c
+  ON
+ORDER BY o.order_id;`,
+    hints: [
+      "Put `orders` on the left (`FROM orders o`) and `INNER JOIN customers c ON o.customer_id = c.customer_id`.",
+      "Qualify each selected column with its alias: `o.order_id`, `o.total_cents`, `c.customer_name`.",
+      "The orphan order (customer 9) disappears automatically — that's the inner join at work; you don't filter it manually.",
+      "Add `ORDER BY o.order_id` for a deterministic result.",
+    ],
+    referenceSolution: `SELECT
+  o.order_id,
+  o.total_cents,
+  c.customer_name
+FROM orders AS o
+INNER JOIN customers AS c
+  ON o.customer_id = c.customer_id
+ORDER BY o.order_id;`,
+    singleFile: {
+      seedSql: `CREATE TABLE customers (
+  customer_id   INTEGER PRIMARY KEY,
+  customer_name TEXT
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  total_cents INTEGER
+);
+INSERT INTO customers VALUES
+  (1, 'Ada Lovelace'),
+  (2, 'Grace Hopper'),
+  (3, 'Alan Turing');
+INSERT INTO orders VALUES
+  (100, 1, 2500),
+  (101, 2, 5000),
+  (102, 1, 9900),
+  (103, 9, 1500);   -- customer_id 9 does not exist, dropped by INNER JOIN`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "total_cents", "customer_name"],
+        rows: [
+          [100, 2500, "Ada Lovelace"],
+          [101, 5000, "Grace Hopper"],
+          [102, 9900, "Ada Lovelace"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-inner-join-practice",
+    executionMode: "single-file",
+    prompt: `Assemble a line-item fact by joining three tables: \`order_items\` → \`orders\` (on \`order_id\`) → \`products\` (on \`product_id\`). Return one row **per order item** with columns \`order_item_id\`, \`order_id\`, \`product_name\`, \`category\`, \`order_status\`, and \`line_revenue\` (that item's \`quantity * unit_price_cents\`), sorted by \`order_item_id\`.
+
+Because this is a 1:N chain, prove to yourself the grain stays at the line-item level — the output row count must equal the number of \`order_items\` rows that have a matching order **and** a matching product (inner joins on both). Do **not** sum anything; this is a preview at line grain.`,
+    starterCode: `-- Line-item fact: order_items -> orders -> products (inner joins on both keys).
+-- One row per order item; sort by order_item_id. Do not SUM.
+SELECT
+
+FROM order_items AS oi
+INNER JOIN orders AS o
+  ON
+INNER JOIN products AS p
+  ON
+ORDER BY oi.order_item_id;`,
+    hints: [
+      "Drive from the most granular table: `FROM order_items oi INNER JOIN orders o ON oi.order_id = o.order_id INNER JOIN products p ON oi.product_id = p.product_id`.",
+      "Qualify columns from each of the three aliases; `line_revenue` is computed from `oi.quantity * oi.unit_price_cents`.",
+      "The inner join to `products` silently drops item 5 (product 77 missing) — that's the correct grain behavior, not a bug to work around.",
+      "Resist the urge to `SUM` — the task wants a row-level preview; summing would require choosing the right measure and grain, which is a later lesson.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE customers (
+  customer_id   INTEGER PRIMARY KEY,
+  customer_name TEXT
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  status      TEXT
+);
+CREATE TABLE products (
+  product_id   INTEGER PRIMARY KEY,
+  product_name TEXT,
+  category     TEXT
+);
+CREATE TABLE order_items (
+  order_item_id    INTEGER PRIMARY KEY,
+  order_id         INTEGER,
+  product_id       INTEGER,
+  quantity         INTEGER,
+  unit_price_cents INTEGER
+);
+INSERT INTO customers VALUES (1,'Ada'),(2,'Grace');
+INSERT INTO orders VALUES
+  (100, 1, 'paid'),
+  (101, 2, 'shipped'),
+  (102, 1, 'paid');
+INSERT INTO products VALUES
+  (10, 'USB-C Cable', 'cables'),
+  (11, 'Earbuds',     'audio'),
+  (12, 'Smartwatch',  'wearables');
+INSERT INTO order_items VALUES
+  (1, 100, 10, 2,  500),
+  (2, 100, 11, 1, 1500),
+  (3, 101, 12, 1, 9900),
+  (4, 102, 11, 3, 1500),
+  (5, 102, 77, 1, 1000);   -- product 77 does not exist, dropped by inner join to products`,
+      orderMatters: true,
+      expected: {
+        columns: [
+          "order_item_id",
+          "order_id",
+          "product_name",
+          "category",
+          "order_status",
+          "line_revenue",
+        ],
+        rows: [
+          [1, 100, "USB-C Cable", "cables", "paid", 1000],
+          [2, 100, "Earbuds", "audio", "paid", 1500],
+          [3, 101, "Smartwatch", "wearables", "shipped", 9900],
+          [4, 102, "Earbuds", "audio", "paid", 4500],
+        ],
+      },
+    },
+  },
+}
+
+const leftJoin: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-left-join",
+  title: "LEFT JOIN and Preserving Rows",
+  summary: "Keep all rows from the driving table even when the match is missing.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["LEFT JOIN", "outer-join NULLs", "preserving the driving side", "COALESCE on join"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Keep the rows an INNER JOIN would drop
+
+An \`INNER JOIN\` silently drops any row without a match. That's often exactly wrong. If you're building "orders per customer," a customer with zero orders should show **0**, not vanish — dropping them understates your customer base and hides the very thing you might be investigating. The fix is \`LEFT JOIN\`: keep **every** row from the left (driving) table, and fill the right table's columns with \`NULL\` where there's no match.
+
+Worked example — every customer, with their order count, including the silent ones:
+
+\`\`\`sql
+SELECT
+  c.customer_id,
+  c.customer_name,
+  COUNT(o.order_id) AS order_count
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.customer_name;
+\`\`\`
+
+A customer with no orders still appears; their \`o.order_id\` is NULL, and \`COUNT(o.order_id)\` — which skips NULLs — correctly returns \`0\` for them.
+
+**Anatomy — the NULL is the whole point:**
+
+\`\`\`
+customers (LEFT)   LEFT JOIN   orders (RIGHT)
+  every row kept  ───────────►  matched cols filled, else NULL
+\`\`\`
+
+Two rules that make left joins behave:
+
+1. **\`COUNT(right.col)\` not \`COUNT(*)\`** in an aggregate. \`COUNT(*)\` counts the NULL-padded row as 1, giving a customer with no orders a count of \`1\` instead of \`0\`. \`COUNT(o.order_id)\` skips the NULL and returns \`0\`. This is the single most common left-join-plus-aggregate bug.
+2. **Filtering the right table in \`WHERE\` secretly turns a LEFT JOIN into an INNER JOIN.** A condition like \`WHERE o.status = 'paid'\` rejects the NULL-padded no-match rows (because \`NULL = 'paid'\` is not true), silently dropping the very rows you left-joined to preserve. If you must filter the right side, put the condition in the \`ON\` clause (\`LEFT JOIN orders o ON o.customer_id = c.customer_id AND o.status = 'paid'\`) so unmatched left rows survive.
+
+**Keep it readable / common pitfall:** use \`COALESCE(right.col, default)\` to turn the NULLs into a sensible display value — \`COALESCE(SUM(o.total_cents), 0)\` shows \`0\` revenue for a customer who never bought, instead of a blank.
+
+**Recap:** \`LEFT JOIN\` preserves every driving-table row and NULL-pads missing matches; aggregate with \`COUNT(right.col)\` for a true 0, and never filter the right table in \`WHERE\` or you collapse it back to an inner join.`,
+    demoCode: `SELECT
+  c.customer_id,
+  c.customer_name,
+  COUNT(o.order_id) AS order_count
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.customer_name;`,
+  },
+  apply: {
+    id: "sql-l2-left-join-apply",
+    executionMode: "single-file",
+    prompt: `List every customer with their order count, including customers who have never ordered (they must show \`0\`). Return \`customer_id\`, \`customer_name\`, \`order_count\`, sorted by \`customer_id\`.`,
+    starterCode: `-- Keep every customer; count their orders (0 when they've never ordered).
+-- Drive from customers, LEFT JOIN orders, group, and sort by customer_id.
+SELECT
+
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.customer_id
+;`,
+    hints: [
+      "Drive from `customers` (the table whose rows you must keep): `FROM customers c LEFT JOIN orders o ON o.customer_id = c.customer_id`.",
+      "Aggregate with `COUNT(o.order_id)`, **not** `COUNT(*)` — otherwise Alan gets `1`.",
+      "Group by the customer columns you select: `GROUP BY c.customer_id, c.customer_name`.",
+    ],
+    referenceSolution: `SELECT
+  c.customer_id,
+  c.customer_name,
+  COUNT(o.order_id) AS order_count
+FROM customers AS c
+LEFT JOIN orders AS o
+  ON o.customer_id = c.customer_id
+GROUP BY c.customer_id, c.customer_name
+ORDER BY c.customer_id;`,
+    singleFile: {
+      seedSql: `CREATE TABLE customers (
+  customer_id   INTEGER PRIMARY KEY,
+  customer_name TEXT
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER
+);
+INSERT INTO customers VALUES
+  (1, 'Ada'),
+  (2, 'Grace'),
+  (3, 'Alan');    -- Alan has never ordered
+INSERT INTO orders VALUES
+  (100, 1),
+  (101, 1),
+  (102, 2);`,
+      orderMatters: true,
+      expected: {
+        columns: ["customer_id", "customer_name", "order_count"],
+        rows: [
+          [1, "Ada", 2],
+          [2, "Grace", 1],
+          [3, "Alan", 0],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-left-join-practice",
+    executionMode: "single-file",
+    prompt: `**Product coverage report:** For **every** product (including ones that never sold), report total units sold. Return \`product_id\`, \`product_name\`, and \`units_sold\` (sum of \`quantity\` from matching \`order_items\`, shown as \`0\` — not NULL — when the product never sold), sorted by \`product_id\`. A product with no sales must appear with \`units_sold = 0\`.`,
+    starterCode: `-- Product coverage: every product with total units_sold (0 when never sold).
+-- Drive from products, LEFT JOIN order_items, COALESCE the SUM, sort by product_id.
+SELECT
+
+FROM products AS p
+LEFT JOIN order_items AS oi
+  ON oi.product_id = p.product_id
+;`,
+    hints: [
+      "Drive from `products` and `LEFT JOIN order_items` so unsold products survive.",
+      "`SUM(oi.quantity)` returns NULL for a product with no matching items — wrap it: `COALESCE(SUM(oi.quantity), 0)`.",
+      "Group by the product columns; sort by `product_id`.",
+      "Don't add a `WHERE` on `oi.*` — it would drop the unsold product and defeat the whole point.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE products (
+  product_id   INTEGER PRIMARY KEY,
+  product_name TEXT
+);
+CREATE TABLE order_items (
+  order_item_id INTEGER PRIMARY KEY,
+  product_id    INTEGER,
+  quantity      INTEGER
+);
+INSERT INTO products VALUES
+  (10, 'USB-C Cable'),
+  (11, 'Earbuds'),
+  (12, 'Smartwatch'),
+  (13, 'Screen Protector');   -- never sold
+INSERT INTO order_items VALUES
+  (1, 10, 2),
+  (2, 11, 1),
+  (3, 10, 3),
+  (4, 12, 1),
+  (5, 11, 4);`,
+      orderMatters: true,
+      expected: {
+        columns: ["product_id", "product_name", "units_sold"],
+        rows: [
+          [10, "USB-C Cable", 5],
+          [11, "Earbuds", 5],
+          [12, "Smartwatch", 1],
+          [13, "Screen Protector", 0],
+        ],
+      },
+    },
+  },
+}
+
+const antiJoin: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-anti-join",
+  title: "Anti-Joins: Finding Missing Matches",
+  summary: "Find records that have no counterpart — the DE's referential-integrity check.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["anti-join (LEFT JOIN … IS NULL)", "semi-join concept", "orphan detection"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Referential integrity: find the orphans
+
+Before you trust a source, you check its **referential integrity**: does every \`order\` point at a real \`customer\`? Does every \`order_item\` point at a real \`product\`? Rows that point at a nonexistent parent are **orphans**, and finding them is a DE's daily hygiene. The pattern is the **anti-join**: "give me every left row that has *no* match on the right."
+
+The portable recipe is a \`LEFT JOIN\` plus an \`IS NULL\` filter:
+
+\`\`\`sql
+SELECT o.order_id, o.customer_id
+FROM orders AS o
+LEFT JOIN customers AS c
+  ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL;   -- keep ONLY the rows that failed to match
+\`\`\`
+
+The \`LEFT JOIN\` keeps every order and NULL-pads the customer columns for unmatched orders. The \`WHERE c.customer_id IS NULL\` then keeps *only* those NULL-padded rows — the orphans. Every matched order is discarded because its \`c.customer_id\` is non-NULL.
+
+**Anatomy:**
+
+\`\`\`
+LEFT JOIN customers c ON ...     → matched orders get c.*, orphans get NULLs
+WHERE c.customer_id IS NULL      → survives ONLY if there was NO match  ← the anti-join
+\`\`\`
+
+**Two siblings, one distinction:**
+- **Anti-join** = rows with *no* match (what we just wrote).
+- **Semi-join** = rows *with* a match, but you don't want the right table's columns — classically written \`WHERE EXISTS (SELECT 1 FROM customers c WHERE c.customer_id = o.customer_id)\` or \`WHERE o.customer_id IN (SELECT customer_id FROM customers)\`. Use it when you only need to *confirm* a match exists, not pull data from it.
+
+> **In the warehouse this differs.** \`NOT IN\` is a tempting shorthand for an anti-join, but it has a NULL landmine: if the subquery's list contains even one NULL, \`NOT IN\` returns *no rows at all* (three-valued logic — \`x NOT IN (…, NULL)\` is never true). The \`LEFT JOIN … IS NULL\` and \`NOT EXISTS\` patterns are NULL-safe and work identically across SQLite, Postgres, and every warehouse. Prefer them.
+
+**Keep it readable / common pitfall:** the \`IS NULL\` must reference a column that is **guaranteed non-NULL in matched rows** — the join key or the right table's primary key. If you \`IS NULL\`-check a nullable right column, you'll misclassify matched rows (that legitimately have a NULL there) as orphans.
+
+**Recap:** An anti-join finds rows with no counterpart via \`LEFT JOIN … WHERE right.key IS NULL\` — the backbone of orphan/FK checks; prefer it (or \`NOT EXISTS\`) over \`NOT IN\`, which breaks on NULLs.`,
+    demoCode: `SELECT o.order_id, o.customer_id
+FROM orders AS o
+LEFT JOIN customers AS c
+  ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL;`,
+  },
+  apply: {
+    id: "sql-l2-anti-join-apply",
+    executionMode: "single-file",
+    prompt: `Find \`orders\` whose \`customer_id\` has no matching row in \`customers\` (orphaned orders). Return \`order_id\` and \`customer_id\`, sorted by \`order_id\`.`,
+    starterCode: `-- Anti-join: keep only orders with no matching customer.
+SELECT
+FROM orders AS o
+LEFT JOIN customers AS c
+  ON o.customer_id = c.customer_id
+`,
+    hints: [
+      "`LEFT JOIN customers c ON o.customer_id = c.customer_id` keeps all orders.",
+      "Filter to the unmatched ones with `WHERE c.customer_id IS NULL`.",
+      "Select from the `orders` side (`o.order_id`, `o.customer_id`) — the `customers` columns are all NULL for orphans.",
+    ],
+    referenceSolution: `SELECT o.order_id, o.customer_id
+FROM orders AS o
+LEFT JOIN customers AS c
+  ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL
+ORDER BY o.order_id;`,
+    singleFile: {
+      seedSql: `CREATE TABLE customers (
+  customer_id INTEGER PRIMARY KEY
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER
+);
+INSERT INTO customers VALUES (1),(2),(3);
+INSERT INTO orders VALUES
+  (100, 1),
+  (101, 9),    -- orphan: customer 9 doesn't exist
+  (102, 2),
+  (103, 7);    -- orphan: customer 7 doesn't exist`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "customer_id"],
+        rows: [
+          [101, 9],
+          [103, 7],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-anti-join-practice",
+    executionMode: "single-file",
+    prompt: `Referential audit (union of two anti-joins): produce a single problem report of two kinds of integrity break, tagged by type. Return columns \`issue_type\` and \`bad_id\`, where each row is either:
+- \`'orphan_order_item'\` — an \`order_items\` row whose \`product_id\` has no matching product; \`bad_id\` is the \`order_item_id\`.
+- \`'customer_no_orders'\` — a \`customers\` row that has never appeared in \`orders\`; \`bad_id\` is the \`customer_id\`.
+
+Stack both anti-joins with \`UNION ALL\` and sort by \`issue_type\`, then \`bad_id\`.`,
+    starterCode: `-- Two anti-joins, each tagged with a literal issue_type, stacked with UNION ALL.
+SELECT 'orphan_order_item' AS issue_type, oi.order_item_id AS bad_id
+FROM order_items AS oi
+LEFT JOIN products AS p ON oi.product_id = p.product_id
+WHERE
+UNION ALL
+-- second anti-join here
+`,
+    hints: [
+      "Write each anti-join separately first. Orphan items: `order_items LEFT JOIN products … WHERE products.product_id IS NULL`. Customers with no orders: `customers LEFT JOIN orders … WHERE orders.order_id IS NULL`.",
+      "In each `SELECT`, hard-code the tag as a literal column: `SELECT 'orphan_order_item' AS issue_type, oi.order_item_id AS bad_id …`.",
+      "Both `SELECT`s must expose the same two column names in the same order to be `UNION ALL`-compatible.",
+      "Combine with `UNION ALL` (no dedup needed here) and add a final `ORDER BY issue_type, bad_id` after the union.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE customers (
+  customer_id INTEGER PRIMARY KEY
+);
+CREATE TABLE products (
+  product_id INTEGER PRIMARY KEY
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER
+);
+CREATE TABLE order_items (
+  order_item_id INTEGER PRIMARY KEY,
+  order_id      INTEGER,
+  product_id    INTEGER
+);
+INSERT INTO customers VALUES (1),(2),(3),(4);
+INSERT INTO products  VALUES (10),(11),(12);
+INSERT INTO orders VALUES
+  (100, 1),
+  (101, 2);          -- customers 3 and 4 never order
+INSERT INTO order_items VALUES
+  (1, 100, 10),
+  (2, 100, 99),      -- product 99 doesn't exist → orphan item
+  (3, 101, 11),
+  (4, 101, 88);      -- product 88 doesn't exist → orphan item`,
+      orderMatters: true,
+      expected: {
+        columns: ["issue_type", "bad_id"],
+        rows: [
+          ["customer_no_orders", 3],
+          ["customer_no_orders", 4],
+          ["orphan_order_item", 2],
+          ["orphan_order_item", 4],
+        ],
+      },
+    },
+  },
+}
+
+const selfJoin: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-self-join",
+  title: "Self-Joins and RIGHT/FULL OUTER",
+  summary: "Join a table to itself and reconcile two sources with outer joins.",
+  estimatedMinutes: 30,
+  difficulty: "hard",
+  skills: ["self-join", "RIGHT JOIN", "FULL OUTER JOIN", "aliasing one table twice"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Joining a table to itself
+
+Sometimes the two things you're relating live in the **same** table. An \`employees\` table where each
+row has a \`manager_id\` pointing at another row *in that same table* is the classic case — to show each
+employee next to their manager's name, you join \`employees\` to \`employees\`. This is a **self-join**,
+and the only trick is that you must alias the table twice so the two "copies" are distinguishable.
+
+\`\`\`sql
+SELECT
+  e.employee_name          AS employee,
+  m.employee_name          AS manager
+FROM employees AS e
+LEFT JOIN employees AS m
+  ON e.manager_id = m.employee_id;
+\`\`\`
+
+\`e\` is the employee copy, \`m\` is the manager copy. The \`ON\` says "match this row's \`manager_id\` to
+some other row's \`employee_id\`." Using \`LEFT JOIN\` keeps top-level employees (whose \`manager_id\` is
+NULL) with a NULL manager, rather than dropping them.
+
+**Anatomy:**
+
+\`\`\`
+FROM employees AS e            <- "the employee" copy
+LEFT JOIN employees AS m       <- "the manager" copy (same table, second alias)
+  ON e.manager_id = m.employee_id
+\`\`\`
+
+## Outer joins for reconciliation
+
+When you compare two *different* sources — yesterday's snapshot vs today's — you often need every key
+from **both** sides so you can see what was added, dropped, or changed. That's a \`FULL OUTER JOIN\`:
+keep all left rows, all right rows, NULL-pad wherever one side is missing. A \`RIGHT JOIN\` is just a
+\`LEFT JOIN\` with the tables swapped (keep all right-side rows).
+
+> **In the warehouse this differs.** \`RIGHT JOIN\` and \`FULL OUTER JOIN\` only arrived in SQLite 3.39
+> (2022). Older embedded builds reject them, and you'll sometimes see them emulated as \`LEFT JOIN\` +
+> a \`UNION\` of the reverse \`LEFT JOIN\`. Postgres, Snowflake, BigQuery, and SQL Server have supported
+> both for years. The self-join is universal — it's just an ordinary join whose two operands happen to
+> be the same table.
+
+**Keep it readable / common pitfall.** In a \`FULL OUTER JOIN\`, a key present on only one side has NULL
+for *that side's* key column — so to get a single non-NULL key for the output, use
+\`COALESCE(a.id, b.id)\`. And to classify each row (added / dropped / changed), test which side's key is
+NULL. Order those \`CASE\` branches so the NULL-side checks come *before* any comparison of the payload
+columns: comparing a NULL \`tier\` with \`<>\` yields \`unknown\`, so a dropped/added row would otherwise
+fall through to the wrong branch.
+
+**Recap.** A self-join is an ordinary join with the table aliased twice (e.g. employee to manager);
+\`FULL OUTER JOIN\` keeps unmatched rows from both sides for reconciliation — available in SQLite 3.39+
+and every major warehouse.`,
+    demoCode: `SELECT
+  e.employee_name AS employee,
+  m.employee_name AS manager
+FROM employees AS e
+LEFT JOIN employees AS m
+  ON e.manager_id = m.employee_id;`,
+  },
+  apply: {
+    id: "sql-l2-self-join-apply",
+    executionMode: "single-file",
+    prompt: `Self-join \`employees\` to pair each employee with their manager's name. Return \`employee\`
+(the person's name) and \`manager\` (their manager's name, or NULL for someone with no manager), sorted
+by \`employee\`.`,
+    starterCode: `-- Alias employees twice: e = the employee, m = their manager.
+-- Return employee, manager; sort by employee.
+SELECT
+
+FROM employees AS e
+`,
+    hints: [
+      "Alias the table twice: `FROM employees e LEFT JOIN employees m ON e.manager_id = m.employee_id`.",
+      "Use `LEFT JOIN` (not `INNER`) so Ada, who has no manager, still appears with a NULL manager.",
+      "Select `e.employee_name AS employee` and `m.employee_name AS manager`.",
+    ],
+    referenceSolution: `SELECT
+  e.employee_name AS employee,
+  m.employee_name AS manager
+FROM employees AS e
+LEFT JOIN employees AS m
+  ON e.manager_id = m.employee_id
+ORDER BY e.employee_name;`,
+    singleFile: {
+      seedSql: `CREATE TABLE employees (
+  employee_id   INTEGER PRIMARY KEY,
+  employee_name TEXT,
+  manager_id    INTEGER     -- NULL for the top of the org
+);
+INSERT INTO employees VALUES
+  (1, 'Ada',   NULL),
+  (2, 'Grace', 1),
+  (3, 'Alan',  1),
+  (4, 'Katherine', 2);`,
+      orderMatters: true,
+      expected: {
+        columns: ["employee", "manager"],
+        rows: [
+          ["Ada", null],
+          ["Alan", "Ada"],
+          ["Grace", "Ada"],
+          ["Katherine", "Grace"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-self-join-practice",
+    executionMode: "single-file",
+    prompt: `Reconcile two daily snapshots. You have yesterday's and today's customer dimension
+snapshots. Use a \`FULL OUTER JOIN\` on \`customer_id\` to surface every change. Return \`customer_id\`
+(the non-NULL id from whichever side has it), and \`change_type\`, one of:
+
+- \`'added'\` — in today but not yesterday,
+- \`'dropped'\` — in yesterday but not today,
+- \`'changed'\` — in both, but \`tier\` differs,
+- \`'unchanged'\` — in both with the same \`tier\`.
+
+Sort by \`customer_id\`.`,
+    starterCode: `-- FULL OUTER JOIN the two snapshots on customer_id.
+-- Return a non-NULL customer_id and a change_type; sort by customer_id.
+SELECT
+
+FROM snapshot_yesterday AS y
+`,
+    hints: [
+      "`FROM snapshot_yesterday y FULL OUTER JOIN snapshot_today t ON y.customer_id = t.customer_id` (SQLite 3.39+ supports this).",
+      "Get a single id with `COALESCE(y.customer_id, t.customer_id) AS customer_id`.",
+      "Build `change_type` with a `CASE`: test `y.customer_id IS NULL` -> `'added'`; `t.customer_id IS NULL` -> `'dropped'`; `y.tier <> t.tier` -> `'changed'`; else `'unchanged'`.",
+      "Order the `CASE` branches so the NULL-side checks come *before* the `tier` comparison (comparing a NULL tier would otherwise fall through).",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE snapshot_yesterday (
+  customer_id INTEGER PRIMARY KEY,
+  tier        TEXT
+);
+CREATE TABLE snapshot_today (
+  customer_id INTEGER PRIMARY KEY,
+  tier        TEXT
+);
+INSERT INTO snapshot_yesterday VALUES
+  (1, 'gold'),
+  (2, 'silver'),
+  (3, 'bronze'),
+  (4, 'silver');
+INSERT INTO snapshot_today VALUES
+  (1, 'gold'),      -- unchanged
+  (2, 'gold'),      -- changed (silver -> gold)
+  (4, 'silver'),    -- unchanged
+  (5, 'bronze');    -- added; customer 3 dropped`,
+      orderMatters: true,
+      expected: {
+        columns: ["customer_id", "change_type"],
+        rows: [
+          [1, "unchanged"],
+          [2, "changed"],
+          [3, "dropped"],
+          [4, "unchanged"],
+          [5, "added"],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel2: SqlLevel = {
   id: 2,
   slug: "aggregation",
@@ -481,6 +1189,13 @@ export const sqlLevel2: SqlLevel = {
       description:
         "Collapse rows into metrics: the aggregate functions, GROUP BY for per-category rollups, and HAVING to filter groups.",
       lessons: [aggregates, groupBy, having],
+    },
+    {
+      id: "sql-l2-joins",
+      title: "Module 2.2 — Joining Tables",
+      description:
+        "Combine source tables: inner joins on keys, LEFT joins that preserve rows, anti-joins for gaps, and self/outer joins.",
+      lessons: [innerJoin, leftJoin, antiJoin, selfJoin],
     },
   ],
 }
