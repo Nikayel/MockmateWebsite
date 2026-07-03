@@ -63,6 +63,9 @@ export function usePythonExecutor(): PythonExecutorState {
       if (outcome.success) {
         setResult(outcome.result)
         setStatus("success")
+        // Only a successful run proves the runtime booted. On a boot failure the worker discards
+        // its cached Pyodide and re-downloads next time, so a retry is a genuine cold start.
+        markPythonRuntimeWarm()
       } else {
         setError(outcome.error ?? "Something went wrong running your code.")
         setStatus("error")
@@ -72,7 +75,6 @@ export function usePythonExecutor(): PythonExecutorState {
       setStatus("error")
     } finally {
       setElapsedMs(Math.round(performance.now() - startedAt))
-      markPythonRuntimeWarm()
       setWarming(false)
       setRunning(false)
     }

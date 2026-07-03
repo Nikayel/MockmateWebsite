@@ -32,12 +32,12 @@ export function ExecutorTopBar() {
         />
         <Link
           href="/learn/python"
-          className="text-muted-foreground hover:text-foreground hidden text-sm whitespace-nowrap transition-colors sm:inline"
+          className="text-muted-foreground hover:text-foreground text-sm whitespace-nowrap transition-colors"
         >
           Learn Python
         </Link>
         <ChevronRight
-          className="text-muted-foreground/50 hidden h-3.5 w-3.5 shrink-0 sm:block"
+          className="text-muted-foreground/50 h-3.5 w-3.5 shrink-0"
           aria-hidden="true"
         />
         <span
@@ -49,7 +49,7 @@ export function ExecutorTopBar() {
         </span>
       </nav>
 
-      <span className="border-border text-muted-foreground ml-2 hidden rounded-full border px-2 py-0.5 font-mono text-[11px] whitespace-nowrap sm:inline">
+      <span className="border-border text-muted-foreground ml-2 rounded-full border px-2 py-0.5 font-mono text-[11px] whitespace-nowrap">
         Python 3.12
       </span>
 
