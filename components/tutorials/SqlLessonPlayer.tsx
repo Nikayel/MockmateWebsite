@@ -11,9 +11,9 @@ import {
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
 import {
-  getSqlLessonLocation,
-  getNextSqlLesson,
-  listAllSqlLessons,
+  getNextSqlLessonInLevel,
+  getFirstLessonOfNextSqlLevel,
+  listSqlLessonsInLevel,
 } from "@/lib/tutorials/sql/registry"
 import { prewarmSqlRuntime } from "@/lib/workspace-execution"
 import { useCompletedLessons } from "./useCompletedLessons"
@@ -43,6 +43,19 @@ export interface SqlLessonPlayerProps {
   level: SqlLevel
   onSectionComplete?: (section: LessonSection) => void
 }
+
+/** What the post-Practice CTA offers, kept level-aware so a boundary is a deliberate hand-off. */
+type NextStep =
+  | { kind: "lesson"; id: string; title: string; slug: string }
+  | {
+      kind: "level-complete"
+      id: string
+      title: string
+      slug: string
+      levelId: SqlLevel["id"]
+      levelTitle: string
+    }
+  | { kind: "finished" }
 
 export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonPlayerProps) {
   useTutorialProgressSync(lesson.id, level.id)
@@ -76,26 +89,39 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
   const completedIds = useCompletedLessons()
 
   const { lessonNumber, totalInLevel, upNext } = useMemo(() => {
-    const inLevel = level.modules.flatMap((mod) => mod.lessons)
+    // "Up next" is scoped to the current level: it must never bleed into another level. At the
+    // level's last lesson this is empty, and the deliberate level hand-off (`nextStep`) takes over.
+    const inLevel = listSqlLessonsInLevel(level)
     const idx = inLevel.findIndex((l) => l.id === lesson.id)
-    const all = listAllSqlLessons()
-    const globalIdx = all.findIndex((l) => l.id === lesson.id)
-    const next: UpNextLesson[] = all
-      .slice(globalIdx + 1, globalIdx + 1 + UP_NEXT_COUNT)
-      .map((l) => ({
-        id: l.id,
-        title: l.title,
-        levelSlug: getSqlLessonLocation(l.id)?.level.slug ?? level.slug,
-        isCompleted: completedIds.has(l.id),
-      }))
+    const next: UpNextLesson[] = inLevel.slice(idx + 1, idx + 1 + UP_NEXT_COUNT).map((l) => ({
+      id: l.id,
+      title: l.title,
+      levelSlug: level.slug,
+      isCompleted: completedIds.has(l.id),
+    }))
     return { lessonNumber: idx + 1, totalInLevel: inLevel.length, upNext: next }
   }, [level, lesson.id, completedIds])
 
-  const nextLesson = useMemo(() => {
-    const next = getNextSqlLesson(lesson.id)
-    if (!next) return null
-    return { id: next.id, title: next.title, slug: getSqlLessonLocation(next.id)?.level.slug }
-  }, [lesson.id])
+  // Where the "Next lesson" CTA points after Practice: the next in-level lesson, a deliberate
+  // level-complete hand-off at a boundary, or the end of the path. Crossing a level is never silent.
+  const nextStep = useMemo((): NextStep => {
+    const withinLevel = getNextSqlLessonInLevel(lesson.id)
+    if (withinLevel) {
+      return { kind: "lesson", id: withinLevel.id, title: withinLevel.title, slug: level.slug }
+    }
+    const nextLevel = getFirstLessonOfNextSqlLevel(lesson.id)
+    if (nextLevel) {
+      return {
+        kind: "level-complete",
+        id: nextLevel.lesson.id,
+        title: nextLevel.lesson.title,
+        slug: nextLevel.level.slug,
+        levelId: nextLevel.level.id,
+        levelTitle: nextLevel.level.title,
+      }
+    }
+    return { kind: "finished" }
+  }, [lesson.id, level.slug])
 
   const completeSection = useTutorialStore((s) => s.completeSection)
 
@@ -272,14 +298,39 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                         practice.
                       </p>
                       <div>
-                        {nextLesson?.slug ? (
+                        {nextStep.kind === "lesson" && (
                           <Button asChild className="gap-2">
-                            <Link href={`/learn/sql/${nextLesson.slug}/${nextLesson.id}`}>
-                              Next lesson: {nextLesson.title}
+                            <Link href={`/learn/sql/${nextStep.slug}/${nextStep.id}`}>
+                              Next lesson: {nextStep.title}
                               <ArrowRight className="h-4 w-4" />
                             </Link>
                           </Button>
-                        ) : (
+                        )}
+                        {nextStep.kind === "level-complete" && (
+                          <div className="border-accent/40 bg-accent/[0.07] flex flex-col gap-3 rounded-xl border p-4">
+                            <p className="text-foreground text-sm font-semibold">
+                              Level {level.id} complete — you finished {level.title}.
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                              Next up: Level {nextStep.levelId} — {nextStep.levelTitle}.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <Button asChild className="gap-2">
+                                <Link href={`/learn/sql/${nextStep.slug}/${nextStep.id}`}>
+                                  Start Level {nextStep.levelId}
+                                  <ArrowRight className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button asChild variant="outline" className="gap-2">
+                                <Link href="/learn/sql">
+                                  <ArrowLeft className="h-4 w-4" />
+                                  All levels
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {nextStep.kind === "finished" && (
                           <Button asChild variant="outline" className="gap-2">
                             <Link href="/learn/sql">
                               <ArrowLeft className="h-4 w-4" />
