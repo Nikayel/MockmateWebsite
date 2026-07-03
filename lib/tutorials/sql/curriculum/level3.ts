@@ -1666,6 +1666,563 @@ INSERT INTO order_items VALUES (1,100,2),(1,101,1),(2,100,3);`,
   }),
 }
 
+const cardinality: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-cardinality",
+  title: "Entities, Relationships, and Cardinality",
+  summary: "Read and encode 1:1, 1:N, and M:N relationships.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["ER modeling", "cardinality (1:1/1:N/M:N)", "FK placement on the many side"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Entities, relationships, and cardinality
+
+An **entity** is a thing you store (customer, order, product); a **relationship** connects entities; **cardinality** says how many of one relate to how many of the other. Three shapes:
+
+- **1:N (one-to-many)** — one customer has many orders; one order belongs to one customer. The overwhelmingly common case.
+- **1:1 (one-to-one)** — one user has one profile. Rare; usually modeled as an optional table split.
+- **M:N (many-to-many)** — one order has many products, one product is in many orders. Cannot be expressed with a single FK.
+
+**The one rule that resolves most modeling questions: the FK goes on the "many" side.** For customer 1:N orders, the FK \`customer_id\` lives on **orders** (the many side), pointing at customers. It cannot go the other way — a customer row can't hold a single \`order_id\` because a customer has *many* orders.
+
+**Worked example.**
+
+\`\`\`sql
+-- 1:N — FK on the many side (orders)
+CREATE TABLE customers (customer_id INTEGER PRIMARY KEY);
+CREATE TABLE orders (
+    order_id    INTEGER PRIMARY KEY,
+    customer_id INTEGER REFERENCES customers(customer_id)   -- FK here, on 'orders'
+);
+\`\`\`
+
+- **1:1** is a table *split*: put the FK (also \`UNIQUE\`) on the optional/less-common side, e.g. \`user_profile.user_id UNIQUE REFERENCES users\`. The \`UNIQUE\` is what turns 1:N into 1:1.
+- **M:N** needs a third table (next lesson) — a single FK can't represent it because *both* sides are "many."
+
+**Anatomy of encoding cardinality:**
+
+\`\`\`
+1:N   → FK on many side (no UNIQUE)
+1:1   → FK on one side  + UNIQUE on that FK
+M:N   → junction table with two FKs (see next lesson)
+\`\`\`
+
+> **In the warehouse this differs — placement is universal.** ER modeling and FK placement are engine-independent design. The only warehouse wrinkle (from the FK lesson) is that many warehouses don't *enforce* the FK — but the *placement* decision (which table holds the key) is identical and drives how you join.
+
+**Keep it readable / common pitfall.** The classic error is putting the FK on the wrong side of a 1:N — trying to store a list of order ids on the customer. If you're tempted to store "many ids in one column," that's the signal you've either got the FK backwards (put it on the many side) or you actually have M:N (needs a junction). Second pitfall: modeling a true M:N as 1:N and losing half the relationship.
+
+**Recap:** cardinality is how many relate to how many; the FK always sits on the many side, 1:1 adds a \`UNIQUE\` to the FK, and M:N can't be done with one FK — it needs a junction table.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB, then hidden assertion queries check FK placement, the \`UNIQUE\` that encodes 1:1, and that M:N was left for a junction table.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-cardinality-apply",
+    prompt: `Two entities, \`authors\` and \`books\`, are in a **1:N** relationship: one author writes many
+books, and each book has exactly one author. Create both tables and place the foreign key on the
+**correct side**, then insert one author and two of their books. The hidden checks confirm the FK
+direction by joining the books back to their author.`,
+    starterCode: `PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS books;
+DROP TABLE IF EXISTS authors;
+
+-- CREATE authors — the one side: author_id PRIMARY KEY, name. No FK here.
+-- CREATE books — the many side: book_id PRIMARY KEY, title, author_id REFERENCES authors.
+-- INSERT one author, then two books that both point at that author.`,
+    hints: [
+      "\`authors(author_id INTEGER PRIMARY KEY, name TEXT)\` — the one side carries no FK.",
+      "\`books(book_id INTEGER PRIMARY KEY, title TEXT, author_id INTEGER REFERENCES authors(author_id))\` — the FK lives on the many side.",
+      "Insert the author before the books so the reference resolves.",
+    ],
+    referenceSolution: `PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS books;
+DROP TABLE IF EXISTS authors;
+
+CREATE TABLE authors (
+    author_id INTEGER PRIMARY KEY,
+    name      TEXT
+);
+
+CREATE TABLE books (
+    book_id   INTEGER PRIMARY KEY,
+    title     TEXT,
+    author_id INTEGER REFERENCES authors(author_id)
+);
+
+INSERT INTO authors VALUES (1, 'Ada');
+INSERT INTO books VALUES (1, 'Notes', 1), (2, 'Engine', 1);`,
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "placement",
+        name: "the FK sits on books (the many side), pointing at authors",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_foreign_key_list('books') WHERE "table" = 'authors') <> 1`,
+      },
+      {
+        suite: "placement",
+        name: "authors (the one side) carries no FK",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_foreign_key_list('authors')) <> 0`,
+      },
+      {
+        suite: "relationship",
+        name: "the join links each book to its author (2 matched rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM books b JOIN authors a ON a.author_id = b.author_id) <> 2`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-cardinality-practice",
+    prompt: `Model a *playlists ↔ songs* feature with three relationships, encoded purely in DDL:
+
+1. **user 1:N playlists** — a user owns many playlists. Put the FK on the many side.
+2. **playlist 1:1 cover_image** — each playlist has at most one cover. Model it as a table split with a \`UNIQUE\` FK.
+3. **playlists M:N songs** — a playlist has many songs and a song appears on many playlists. A single FK **cannot** express this, so leave \`songs\` standalone (the junction table comes next lesson).
+
+Create \`users\`, \`playlists\`, \`cover_images\`, and \`songs\`, wire the 1:N and 1:1 FKs, and add a one-row
+\`model_notes\` table stating \`mn_needs_junction = 1\` to record that the playlist↔song link still needs a
+junction.`,
+    starterCode: `PRAGMA foreign_keys = ON;
+DROP TABLE IF EXISTS cover_images;
+DROP TABLE IF EXISTS playlists;
+DROP TABLE IF EXISTS songs;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS model_notes;
+
+-- users — the one side of user 1:N playlists.
+-- playlists — the many side: FK user_id REFERENCES users.
+-- cover_images — the 1:1 split: playlist_id UNIQUE REFERENCES playlists.
+-- songs — standalone; the M:N link to playlists can't be a single FK.
+-- model_notes — record mn_needs_junction = 1.`,
+    hints: [
+      "\`playlists.user_id INTEGER REFERENCES users(user_id)\` — FK on the many side.",
+      "\`cover_images.playlist_id INTEGER UNIQUE REFERENCES playlists(playlist_id)\` — the \`UNIQUE\` is what turns 1:N into 1:1.",
+      "Do **not** give \`songs\` a \`playlist_id\` FK — that would force each song into a single playlist. Leave it standalone; the M:N link is a junction table (next lesson).",
+      "\`CREATE TABLE model_notes AS SELECT 1 AS mn_needs_junction;\` records the decision the grader checks.",
+    ],
+    seedSql: "",
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "one-to-many",
+        name: "playlists carries the FK to users (many side)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_foreign_key_list('playlists') WHERE "table" = 'users') <> 1`,
+      },
+      {
+        suite: "one-to-one",
+        name: "cover_images has a FK to playlists",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_foreign_key_list('cover_images') WHERE "table" = 'playlists') <> 1`,
+      },
+      {
+        suite: "one-to-one",
+        name: "the cover_images FK is UNIQUE — that is what encodes 1:1",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_index_list('cover_images') WHERE "unique" = 1) < 1`,
+      },
+      {
+        suite: "many-to-many",
+        name: "songs has no direct FK to playlists (M:N needs a junction)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_foreign_key_list('songs') WHERE "table" = 'playlists') <> 0`,
+      },
+      {
+        suite: "modeling",
+        name: "the M:N decision is recorded in model_notes",
+        sql: `SELECT 1 WHERE COALESCE((SELECT mn_needs_junction FROM model_notes), -1) <> 1`,
+      },
+    ],
+  }),
+}
+
+const junctionTables: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-junction-tables",
+  title: "Junction Tables for Many-to-Many",
+  summary: "Resolve M:N relationships with a bridge table carrying its own attributes.",
+  estimatedMinutes: 30,
+  difficulty: "hard",
+  skills: ["junction/associative table", "composite PK of paired FKs", "relationship attributes"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## A single foreign key can't model many-to-many
+
+A single FK can encode 1:N, never M:N — because M:N means *both* sides have many, and one column
+can't hold many values. The resolution is a **junction table** (a.k.a. associative or bridge table):
+a third table whose job is to hold *pairs*, one row per related (A, B) combination.
+
+Its shape is stereotyped:
+
+- Two FK columns, one to each parent.
+- A **composite primary key** of those two FKs — this both identifies the pair *and* blocks the same
+  pair from being stored twice.
+- Optionally, **relationship attributes**: facts that belong to the *pairing*, not to either entity
+  alone.
+
+### Worked example — students M:N courses
+
+\`\`\`sql
+CREATE TABLE enrollments (
+    student_id INTEGER REFERENCES students(student_id),
+    course_id  INTEGER REFERENCES courses(course_id),
+    enrolled_at TEXT,                    -- relationship attribute: when THIS pair formed
+    grade       TEXT,                    -- belongs to the pairing, not to student or course alone
+    PRIMARY KEY (student_id, course_id)  -- composite PK: one row per (student, course)
+);
+\`\`\`
+
+\`enrolled_at\` and \`grade\` can't live on \`students\` (a student has many enrollments) or on
+\`courses\` — they describe the *relationship*. That's the tell for a junction attribute: "does this
+fact depend on *both* entities together?"
+
+### Anatomy
+
+\`\`\`
+PRIMARY KEY (student_id, course_id)
+             └──── two FKs together ────┘
+       ▶ identifies the pair
+       ▶ prevents a duplicate (student, course) row
+\`\`\`
+
+> **In the warehouse this differs — barely.** Junction tables are universal relational modeling. In
+> dimensional/warehouse terms an M:N junction that carries measures becomes a **fact table** or a
+> **bridge table** (e.g. a many-to-many between a fact and a dimension). Same structure — two keys
+> plus attributes — different name for the role it plays.
+
+### Keep it readable / common pitfall
+
+The composite PK is not optional decoration — without it, nothing stops the same student being
+enrolled in the same course twice, and every count doubles. Pitfall: putting relationship attributes
+on the wrong table (a \`grade\` column on \`students\` makes no sense once a student has many courses).
+Always ask "does this attribute need *both* keys to be meaningful?"
+
+**Recap:** M:N is resolved by a junction table of two FKs with a composite PK (which also blocks
+duplicate pairs); attributes that depend on *both* entities live on the junction, not on either
+parent.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
+then hidden assertion queries check the composite key, the relationship attribute, and that duplicate
+pairs are rejected.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-junction-tables-apply",
+    prompt: `The seed already gives you \`students\` and \`courses\` (both populated). Create the
+\`enrollments\` **junction table** that resolves their many-to-many relationship:
+
+- Two FK columns \`student_id\` and \`course_id\`, plus an \`enrolled_at TEXT\` relationship attribute.
+- A **composite primary key** \`(student_id, course_id)\` — one row per (student, course) pair.
+
+Insert **three** distinct enrollments: \`(1, 10)\`, \`(1, 11)\`, and \`(2, 10)\`. Then attempt to insert
+the \`(1, 10)\` pair a second time with \`INSERT OR IGNORE\` and prove the composite PK makes it a no-op
+(the table stays at three rows).`,
+    starterCode: `DROP TABLE IF EXISTS enrollments;
+
+-- CREATE TABLE enrollments ( ... ) with a composite PRIMARY KEY (student_id, course_id) ...
+-- INSERT the three distinct pairs (1,10), (1,11), (2,10) ...
+-- INSERT OR IGNORE the duplicate (1,10) pair — it should be skipped, not error ...`,
+    hints: [
+      "Declare the key at table level: `PRIMARY KEY (student_id, course_id)` — one composite key, not two separate primary keys.",
+      "Insert the three distinct pairs, then attempt an already-existing pair with `INSERT OR IGNORE`.",
+      "`INSERT OR IGNORE` skips the row that would violate the composite PK instead of aborting the whole script.",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS enrollments;
+
+CREATE TABLE enrollments (
+    student_id INTEGER REFERENCES students(student_id),
+    course_id  INTEGER REFERENCES courses(course_id),
+    enrolled_at TEXT,
+    PRIMARY KEY (student_id, course_id)
+);
+
+INSERT INTO enrollments (student_id, course_id, enrolled_at) VALUES
+    (1, 10, '2026-01-01'),
+    (1, 11, '2026-01-02'),
+    (2, 10, '2026-01-03');
+
+-- Duplicate (student 1, course 10) pair — the composite PK makes this a no-op.
+INSERT OR IGNORE INTO enrollments (student_id, course_id, enrolled_at) VALUES (1, 10, '2026-02-09');`,
+    seedSql: `DROP TABLE IF EXISTS enrollments; DROP TABLE IF EXISTS students; DROP TABLE IF EXISTS courses;
+CREATE TABLE students (student_id INTEGER PRIMARY KEY, name TEXT);
+CREATE TABLE courses  (course_id  INTEGER PRIMARY KEY, title TEXT);
+INSERT INTO students VALUES (1,'Ada'),(2,'Grace');
+INSERT INTO courses  VALUES (10,'SQL'),(11,'Modeling');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "enrollments has a composite (two-column) primary key",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('enrollments') WHERE pk>0) <> 2`,
+      },
+      {
+        suite: "rows",
+        name: "exactly three enrollment rows remain (the duplicate pair was ignored)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM enrollments) <> 3`,
+      },
+      {
+        suite: "dedup",
+        name: "the (student 1, course 10) pair exists exactly once",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM enrollments WHERE student_id=1 AND course_id=10) <> 1`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-junction-tables-practice",
+    prompt: `Build the \`playlist_songs\` junction that resolves a playlists ↔ songs many-to-many, and
+give it a **relationship attribute** \`position\` (a song's ordering within a playlist). The seed
+provides two playlists and four songs. Requirements:
+
+- A composite primary key \`(playlist_id, song_id)\` — a song can appear in a playlist only once.
+- A \`position INTEGER NOT NULL\` relationship attribute.
+- A composite \`UNIQUE (playlist_id, position)\` so two songs can't claim the same slot in one playlist.
+
+Insert **three** rows into playlist 1 at positions 1, 2, 3. Then prove **two** guards with
+\`INSERT OR IGNORE\`: a duplicate \`(playlist_id, song_id)\` pair is rejected, and a fourth song
+claiming an already-taken position is rejected. Playlist 1 must stay at exactly three rows.`,
+    starterCode: `DROP TABLE IF EXISTS playlist_songs;
+
+-- CREATE TABLE playlist_songs ( ... ) with:
+--   PRIMARY KEY (playlist_id, song_id)
+--   position INTEGER NOT NULL
+--   UNIQUE (playlist_id, position)
+-- INSERT three rows into playlist 1 at positions 1, 2, 3 ...
+-- INSERT OR IGNORE a repeat (playlist,song) pair — blocked by the PK ...
+-- INSERT OR IGNORE a new song at an already-taken position — blocked by the UNIQUE ...`,
+    hints: [
+      "`PRIMARY KEY (playlist_id, song_id)` for the pair; separately `UNIQUE (playlist_id, position)` for slot uniqueness.",
+      "`position INTEGER NOT NULL` — the ordering fact depends on both the playlist and the song, so it lives on the junction.",
+      "Insert three rows in playlist 1 at positions 1, 2, 3; then `INSERT OR IGNORE` a repeat song (blocked by the PK) and a fourth song at position 1 (blocked by the position UNIQUE).",
+      "Both `INSERT OR IGNORE` attempts should leave playlist 1 at exactly three rows.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS playlist_songs; DROP TABLE IF EXISTS playlists; DROP TABLE IF EXISTS songs;
+CREATE TABLE playlists (playlist_id INTEGER PRIMARY KEY, name TEXT);
+CREATE TABLE songs (song_id INTEGER PRIMARY KEY, title TEXT);
+INSERT INTO playlists VALUES (1,'Focus'),(2,'Party');
+INSERT INTO songs VALUES (100,'A'),(101,'B'),(102,'C'),(103,'D');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "playlist_songs has a composite (two-column) primary key",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('playlist_songs') WHERE pk>0) <> 2`,
+      },
+      {
+        suite: "schema",
+        name: "position is a NOT NULL relationship attribute",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('playlist_songs') WHERE name='position' AND "notnull"=1) <> 1`,
+      },
+      {
+        suite: "constraints",
+        name: "a second UNIQUE index (playlist_id, position) guards the slot",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_index_list('playlist_songs') WHERE "unique"=1) < 2`,
+      },
+      {
+        suite: "dedup",
+        name: "playlist 1 holds exactly three songs (both duplicate attempts were ignored)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM playlist_songs WHERE playlist_id=1) <> 3`,
+      },
+    ],
+  }),
+}
+
+const indexes: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-indexes",
+  title: "Indexes: Speeding Up Reads",
+  summary: "Add B-tree indexes on the columns queries actually filter and join on.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: [
+    "CREATE INDEX",
+    "indexing FK / WHERE / JOIN / ORDER BY columns",
+    "read vs write trade-off",
+  ],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Indexes turn scans into seeks
+
+An **index** is a sorted secondary structure (a B-tree) that lets the database *seek* directly to
+matching rows instead of *scanning* every row. On a filter like \`WHERE customer_id = 42\`, an index
+on \`customer_id\` turns an O(n) table scan into an O(log n) seek. The columns worth indexing are
+exactly the ones queries **filter, join, and sort on**:
+
+- **FK columns** — you join on them constantly.
+- **\`WHERE\` predicate columns** — the selective filters.
+- **\`ORDER BY\` / \`GROUP BY\` columns** — an index can supply pre-sorted rows.
+
+**Two things are auto-indexed for free.** \`PRIMARY KEY\` and \`UNIQUE\` constraints each create an
+index automatically, so you rarely index a PK yourself — you index the *other* hot columns,
+especially FKs, which are **not** auto-indexed in SQLite.
+
+### Worked example
+
+\`\`\`sql
+-- fact_sales is joined to dim_customer on customer_sk all day long
+CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);
+
+-- a mart repeatedly filters events by date
+CREATE INDEX idx_events_date ON raw_events(event_date);
+\`\`\`
+
+**Anatomy:**
+
+\`\`\`
+CREATE INDEX  idx_fact_sales_customer  ON fact_sales (customer_sk)
+                    │                        │            │
+              index name (convention:      table      indexed column(s)
+              idx_<table>_<col>)                   (multi-col = composite index)
+\`\`\`
+
+A **composite index** \`(a, b)\` speeds filters on \`a\` and on \`a, b\` together (the leftmost-prefix
+rule) — but not on \`b\` alone.
+
+### The trade-off — indexes cost writes
+
+Every index must be *updated* on every \`INSERT\` / \`UPDATE\` / \`DELETE\`. More indexes = faster reads,
+slower writes, more storage. So **index selectively**: the FK and filter columns queries actually
+use, not every column "just in case."
+
+> **In the warehouse this differs — a lot.** Columnar warehouses (Snowflake, BigQuery) generally
+> **don't have traditional B-tree indexes** at all; they rely on columnar storage, partitioning,
+> clustering keys, and micro-partition pruning. \`CREATE INDEX\` is a row-store
+> (SQLite / Postgres / MySQL) concept. The *principle* — help the engine skip data instead of
+> scanning — carries over, but the mechanism is partition/cluster design, not indexes.
+
+**Common pitfall — over-indexing.** An index on a column no query filters on is pure write-cost with
+zero read benefit. Before adding one, name the query it helps. The second pitfall: forgetting FKs
+aren't auto-indexed in SQLite — an unindexed FK makes every join scan. Leave a comment on
+non-obvious indexes explaining the query they serve.
+
+**Recap:** indexes turn scans into seeks on filter/join/sort columns; \`PRIMARY KEY\` and \`UNIQUE\` are
+auto-indexed but FKs are not — index those, index selectively because every index taxes writes, and
+remember warehouses use partitioning/clustering instead.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
+then hidden assertion queries inspect the indexes you created via \`pragma_index_list\` /
+\`pragma_index_info\`.`,
+    demoCode: `-- Self-contained: run me to watch an index change the query plan.
+CREATE TABLE orders (order_id INTEGER PRIMARY KEY, customer_id INTEGER, total_cents INTEGER);
+INSERT INTO orders (customer_id, total_cents) VALUES (42, 1000), (7, 500), (42, 250);
+
+-- customer_id is a plain column (not the PK) -> not auto-indexed -> this filter SCANs:
+EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer_id = 42;
+
+-- Add the index the filter needs...
+CREATE INDEX idx_orders_customer ON orders(customer_id);
+
+-- ...now the optimizer can SEARCH using idx_orders_customer instead of scanning:
+EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer_id = 42;`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-indexes-apply",
+    prompt: `A \`fact_sales\` table is joined to \`dim_customer\` on \`customer_sk\` in every mart — but
+\`customer_sk\` is a plain column, **not** the primary key, so SQLite has not auto-indexed it and the
+join scans all 500 rows. Add the one index that turns that join into a seek.
+
+You only need to **create the index** — the seed already loaded the 500 rows, and the grader checks
+that an index exists on the right column of \`fact_sales\`.`,
+    starterCode: `-- fact_sales(customer_sk) is the FK the marts join on, and it is NOT auto-indexed.
+-- Add the index that makes that join a seek (convention: idx_<table>_<col>):
+
+-- CREATE INDEX idx_fact_sales_customer ON fact_sales(...);`,
+    hints: [
+      "`CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);` — one statement is all you need.",
+      "Name it `idx_<table>_<col>` by convention.",
+      "`customer_sk` is a plain FK-style column, not the PK, so it isn't auto-indexed; the PK `sale_id` already is.",
+    ],
+    referenceSolution: `CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);`,
+    seedSql: `DROP TABLE IF EXISTS fact_sales;
+CREATE TABLE fact_sales (sale_id INTEGER PRIMARY KEY, customer_sk INTEGER, revenue_cents INTEGER);
+INSERT INTO fact_sales (customer_sk, revenue_cents)
+SELECT (value % 50) + 1, value * 10
+FROM (WITH RECURSIVE n(value) AS (
+    SELECT 1 UNION ALL SELECT value + 1 FROM n WHERE value < 500
+) SELECT value FROM n);`,
+    assertions: [
+      {
+        suite: "indexes",
+        name: "an index on fact_sales(customer_sk) exists",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_index_list('fact_sales') AS il
+          JOIN pragma_index_info(il.name) AS ii
+          WHERE ii.name = 'customer_sk'
+        ) < 1`,
+      },
+      {
+        suite: "data",
+        name: "the 500 seeded fact_sales rows are left intact",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_sales) <> 500`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-indexes-practice",
+    prompt: `You're given a slow three-table mart (seeded for you). The dashboard runs a
+\`fact_sales → dim_customer → dim_product\` join, filtered by \`dim_product.category\` and sorted by
+\`order_date\`. Add the **two indexes that matter** and deliberately **skip the ones that don't**:
+
+- Add an index on \`fact_sales(customer_sk)\` — an FK join column.
+- Add an index on \`fact_sales(product_sk)\` — an FK join column.
+- Do **not** index \`revenue_cents\` (never filtered or joined) or \`dim_product.product_sk\` (already
+  the PK, auto-indexed).
+- Add a SQL \`--\` comment noting each index taxes every \`INSERT\` / \`UPDATE\` / \`DELETE\`, which is why
+  you index selectively.`,
+    starterCode: `-- Index the two FK join columns on fact_sales — and nothing else.
+-- Then leave a comment explaining the write-cost trade-off.
+
+-- CREATE INDEX ... ON fact_sales(customer_sk);
+-- CREATE INDEX ... ON fact_sales(product_sk);`,
+    hints: [
+      "Two `CREATE INDEX` statements, one per FK column on `fact_sales`.",
+      "Skip `revenue_cents` — no query filters or joins on it, so an index there is pure write cost.",
+      "`product_sk` on `dim_product` is the PK — already indexed; don't duplicate it.",
+      "Add a `--` comment noting every index slows `INSERT` / `UPDATE` / `DELETE` on `fact_sales`.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS fact_sales;
+DROP TABLE IF EXISTS dim_customer;
+DROP TABLE IF EXISTS dim_product;
+CREATE TABLE dim_customer (customer_sk INTEGER PRIMARY KEY, email TEXT);
+CREATE TABLE dim_product (product_sk INTEGER PRIMARY KEY, category TEXT);
+CREATE TABLE fact_sales (
+    sale_id INTEGER PRIMARY KEY,
+    customer_sk INTEGER,
+    product_sk INTEGER,
+    order_date TEXT,
+    revenue_cents INTEGER
+);`,
+    assertions: [
+      {
+        suite: "indexes",
+        name: "an index on fact_sales(customer_sk) exists",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_index_list('fact_sales') AS il
+          JOIN pragma_index_info(il.name) AS ii
+          WHERE ii.name = 'customer_sk'
+        ) < 1`,
+      },
+      {
+        suite: "indexes",
+        name: "an index on fact_sales(product_sk) exists",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_index_list('fact_sales') AS il
+          JOIN pragma_index_info(il.name) AS ii
+          WHERE ii.name = 'product_sk'
+        ) < 1`,
+      },
+      {
+        suite: "selectivity",
+        name: "no index was wasted on revenue_cents",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_index_list('fact_sales') AS il
+          JOIN pragma_index_info(il.name) AS ii
+          WHERE ii.name = 'revenue_cents'
+        ) <> 0`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel3: SqlLevel = {
   id: 3,
   slug: "modeling",
@@ -1694,6 +2251,13 @@ export const sqlLevel3: SqlLevel = {
       description:
         "From a flat export to 3NF and back: atomic values, removing redundancy, and deliberate denormalization for analytics.",
       lessons: [normalize1nf, normalize2nf3nf, denormalization],
+    },
+    {
+      id: "sql-l3-er-indexes",
+      title: "Module 3.4 — ER Modeling, Relationships, and Indexes",
+      description:
+        "Entities and cardinality, junction tables for many-to-many, and the indexes that keep reads fast.",
+      lessons: [cardinality, junctionTables, indexes],
     },
   ],
 }
