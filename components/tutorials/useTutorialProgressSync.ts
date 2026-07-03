@@ -32,20 +32,28 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Python
   // Load-on-mount + resume. Persistent ref key guards against the StrictMode double-invoke
   // leaving isLoading stuck true.
   const loadedKey = useRef<string | null>(null)
+  // Gate autosave until the initial load RESOLVES (progress hydrated, or a genuine "none"). If the load
+  // FAILS, this stays false so autosave never overwrites the unread server doc with a reset state. (Audit #4.)
+  const hasLoaded = useRef(false)
   useEffect(() => {
     if (!lessonId || !levelId) return
     const key = `${lessonId}:${reloadNonce}`
     if (loadedKey.current === key) return
     loadedKey.current = key
+    hasLoaded.current = false
 
     initLesson(lessonId, levelId)
     setError(null)
     setLoading(true)
     fetchLessonProgress(lessonId)
       .then((progress) => {
-        if (loadedKey.current === key && progress) hydrate(progress)
+        if (loadedKey.current !== key) return
+        if (progress) hydrate(progress)
+        // Load confirmed (saved progress or a genuine none) — autosave may now persist changes.
+        hasLoaded.current = true
       })
       .catch(() => {
+        // Leave hasLoaded false: a failed load must NOT enable autosave, or it would clobber the doc.
         if (loadedKey.current === key) setError("Couldn't load your saved progress.")
       })
       .finally(() => {
@@ -58,6 +66,9 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Python
   const lastSaved = useRef<string>("")
   useEffect(() => {
     if (!lessonId || !levelId) return
+    // Never autosave before the initial load resolved — otherwise a failed/in-flight load would let a
+    // reset store overwrite the real server doc (audit #4).
+    if (!hasLoaded.current) return
     // Only save once the store is pointed at THIS lesson (avoids a stale cross-lesson save).
     if (storeLessonId !== lessonId) return
     // Never persist a pristine, untouched lesson.

@@ -52,7 +52,10 @@ export async function fetchLessonProgress(
       headers,
       signal: controller.signal,
     })
-    if (!res.ok) return null
+    // Distinguish a real load FAILURE from "no saved progress yet": throw on non-ok so the resume hook
+    // keeps autosave gated and never clobbers an unread server doc; reserve null for a genuine 200 with
+    // `progress: null` (or signed-out above). (Audit #4.)
+    if (!res.ok) throw new Error(`Progress load failed with status ${res.status}`)
     const data = (await res.json()) as { progress: TutorialLessonProgress | null }
     return data.progress ?? null
   } finally {
