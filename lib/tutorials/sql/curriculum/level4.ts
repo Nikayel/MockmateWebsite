@@ -2324,6 +2324,876 @@ INSERT INTO stg_events VALUES
   }),
 }
 
+const dataQuality: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-data-quality",
+  title: "Data-Quality Assertions",
+  summary: "Encode expectations as tests that fail before bad data spreads.",
+  estimatedMinutes: 22,
+  difficulty: "medium",
+  skills: [
+    "assertion queries (zero-rows-pass)",
+    "not_null / unique / accepted_values / relationships",
+    "dbt-test mapping",
+  ],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## A successful load can still be wrong
+
+A loader that runs without error can still produce **wrong** data: a duplicated key, a NULL where a
+NULL can't be, an orphan fact pointing at a customer who doesn't exist. Data-quality (DQ) tests catch
+this before the bad data reaches a dashboard. The universal pattern — the one dbt is built on — is the
+**zero-rows assertion**: write a query that returns the **violating** rows; if it returns **any** rows,
+the test fails. **Healthy data → zero rows → pass.**
+
+### The dbt four — each as a "count of violations = 0" query
+
+\\\`\\\`\\\`sql
+-- 1. not_null: rows where a required column is NULL
+SELECT COUNT(*) AS violations FROM dim_customer WHERE email IS NULL;
+
+-- 2. unique: keys that appear more than once
+SELECT customer_code FROM dim_customer
+GROUP BY customer_code HAVING COUNT(*) > 1;
+
+-- 3. accepted_values: rows whose status is outside the allowed set
+SELECT COUNT(*) AS violations FROM fact_order
+WHERE status NOT IN ('paid','shipped','cancelled');
+
+-- 4. relationships (referential integrity): fact rows with no matching dimension
+SELECT f.customer_key FROM fact_sales f
+LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+WHERE d.customer_key IS NULL;
+\\\`\\\`\\\`
+
+Each returns rows **only when something is wrong**. Wire them into CI (or a workspace grader) as "this
+query must return zero rows," and a bad load fails loudly instead of silently corrupting downstream
+marts.
+
+### Anatomy of the relationships (orphan) test
+
+\\\`\\\`\\\`
+SELECT f.customer_key
+FROM fact_sales f
+LEFT JOIN dim_customer d ON d.customer_key = f.customer_key   -- keep all fact rows
+WHERE d.customer_key IS NULL;                                 -- ...where the dim match is missing
+\\\`\\\`\\\`
+
+This is the anti-join from Level 2, repurposed as a referential-integrity assertion — the most valuable
+DQ check in a star schema.
+
+### Common pitfalls
+
+- **Asserting the happy path instead of the violations.** A test that does
+  \\\`SELECT COUNT(*) FROM dim WHERE email IS NOT NULL\\\` and checks it's "large" is fragile. Always count
+  the **bad** rows and require **zero** — it's unambiguous and threshold-free.
+- **NULLs in \\\`NOT IN\\\`.** \\\`status NOT IN ('paid','shipped')\\\` returns nothing for a \\\`NULL\\\` status
+  (three-valued logic), silently passing a null. Add \\\`OR status IS NULL\\\` if a null is also a violation.
+
+> **In the warehouse:** dbt ships these four as one-line YAML (\\\`unique\\\`, \\\`not_null\\\`,
+> \\\`accepted_values\\\`, \\\`relationships\\\`) that compile to exactly these zero-row SQL queries. The SQL is
+> identical across engines.
+
+**Recap:** encode each expectation as a query that returns only the violating rows and require **zero
+rows** to pass; the dbt four — \\\`not_null\\\`, \\\`unique\\\`, \\\`accepted_values\\\`, \\\`relationships\\\` (the orphan
+anti-join) — are the standard suite, always counting the bad rows rather than asserting the good ones.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
+hidden assertion queries check your DQ output — and, true to the discipline, each grader assertion is
+itself a zero-rows violation query.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-data-quality-apply",
+    prompt: `Write a **relationships assertion** that flags \`fact_sales\` rows with no matching
+\`dim_customer\`. \`dim_customer\`, \`fact_sales\`, and an **empty** \`orphan_facts(customer_key)\` are
+already seeded. Populate \`orphan_facts\` with the \`customer_key\` of every fact row whose key is absent
+from the dimension (key \`99\` is the planted orphan; keys \`1\` and \`2\` match and must stay out).
+
+Lead your script with \`DELETE FROM orphan_facts;\` so a re-run recomputes the table instead of doubling
+its rows — on healthy data this table would be empty, and empty is the "pass" state.`,
+    starterCode: `-- dim_customer, fact_sales, and an empty orphan_facts are already seeded.
+-- Fill orphan_facts with the customer_key of every fact row that has NO matching dim_customer.
+DELETE FROM orphan_facts;   -- clear first so a re-run recomputes instead of doubling rows
+
+-- INSERT INTO orphan_facts (customer_key)
+-- SELECT f.customer_key
+-- FROM fact_sales f
+-- LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+-- WHERE d.customer_key IS NULL;`,
+    hints: [
+      "`LEFT JOIN dim_customer` and keep only the rows `WHERE dim_customer.customer_key IS NULL` — that's the orphan anti-join.",
+      "Insert those unmatched keys into `orphan_facts`.",
+      "Lead with `DELETE FROM orphan_facts;` so running the script twice recomputes the same rows instead of doubling them.",
+      "On healthy data the anti-join returns nothing, so `orphan_facts` would be empty — that emptiness is the passing condition.",
+    ],
+    referenceSolution: `DELETE FROM orphan_facts;
+
+INSERT INTO orphan_facts (customer_key)
+SELECT f.customer_key
+FROM fact_sales f
+LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+WHERE d.customer_key IS NULL;`,
+    seedSql: `DROP TABLE IF EXISTS orphan_facts;
+DROP TABLE IF EXISTS fact_sales;
+DROP TABLE IF EXISTS dim_customer;
+
+CREATE TABLE dim_customer (customer_key INTEGER PRIMARY KEY, email TEXT);
+INSERT INTO dim_customer VALUES (1,'a@x.com'),(2,'b@x.com');
+
+CREATE TABLE fact_sales (sale_id INTEGER PRIMARY KEY, customer_key INTEGER, amount INTEGER);
+INSERT INTO fact_sales VALUES (10,1,100),(11,2,50),(12,99,25);   -- key 99 is an orphan
+
+CREATE TABLE orphan_facts (customer_key INTEGER);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "orphan_facts holds exactly one violating row",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orphan_facts) <> 1`,
+      },
+      {
+        suite: "integrity",
+        name: "the planted orphan key 99 was flagged",
+        isHidden: true,
+        sql: `SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM orphan_facts WHERE customer_key = 99)`,
+      },
+      {
+        suite: "integrity",
+        name: "no matched key (1 or 2) was wrongly flagged as an orphan",
+        isHidden: true,
+        sql: `SELECT customer_key FROM orphan_facts WHERE customer_key IN (1, 2)`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-data-quality-practice",
+    prompt: `Build a **four-test quality suite** where every check returns **zero rows on healthy data**.
+\`dim_customer(customer_key, email, status)\`, \`fact_sales\`, and an empty
+\`dq_results(test_name TEXT, violations INTEGER)\` are seeded. Populate \`dq_results\` with **exactly one
+row per test**, each storing the **count of violating rows**:
+
+- \`pk_unique\` — \`customer_key\` values appearing more than once,
+- \`email_not_null\` — rows with a NULL \`email\`,
+- \`status_accepted\` — rows whose \`status\` is not in \`('active','churned','prospect')\` (**a NULL status
+  also counts as a violation**),
+- \`no_orphan_facts\` — \`fact_sales\` rows with no matching \`dim_customer\`.
+
+The suite **passes** only when all four \`violations\` are \`0\`. Lead with \`DELETE FROM dq_results;\` so a
+re-run recomputes the four rows instead of stacking eight.`,
+    starterCode: `-- dim_customer, fact_sales, and an empty dq_results are already seeded.
+-- Populate dq_results with one row per DQ test — each COUNTs only the VIOLATING rows.
+DELETE FROM dq_results;   -- recompute cleanly on every run
+
+-- INSERT INTO dq_results (test_name, violations)
+-- SELECT 'pk_unique', COUNT(*) FROM ( ...customer_keys appearing > 1 time... );
+-- ...then 'email_not_null', 'status_accepted' (NULL status is ALSO a violation), and 'no_orphan_facts'...`,
+    hints: [
+      "Each test is an `INSERT INTO dq_results SELECT '<name>', COUNT(*) FROM (<the violating rows>)`.",
+      "`pk_unique`: `SELECT COUNT(*) FROM (SELECT customer_key FROM dim_customer GROUP BY customer_key HAVING COUNT(*) > 1)`.",
+      "`status_accepted`: `WHERE status NOT IN ('active','churned','prospect') OR status IS NULL` — the `OR ... IS NULL` is essential or a NULL status slips through.",
+      "`no_orphan_facts`: the `LEFT JOIN ... IS NULL` anti-join from the Apply, wrapped in `COUNT(*)`.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS dq_results;
+DROP TABLE IF EXISTS fact_sales;
+DROP TABLE IF EXISTS dim_customer;
+
+CREATE TABLE dim_customer (
+  customer_key INTEGER PRIMARY KEY,
+  email  TEXT,
+  status TEXT
+);
+INSERT INTO dim_customer VALUES
+  (1,'a@x.com','active'),
+  (2,'b@x.com','churned'),
+  (3,'c@x.com','prospect');
+
+CREATE TABLE fact_sales (sale_id INTEGER PRIMARY KEY, customer_key INTEGER, amount INTEGER);
+INSERT INTO fact_sales VALUES (10,1,100),(11,2,50),(12,3,25);
+
+CREATE TABLE dq_results (test_name TEXT, violations INTEGER);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "shape",
+        name: "dq_results holds exactly four test rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dq_results) <> 4`,
+      },
+      {
+        suite: "shape",
+        name: "the four required test names are all present",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(DISTINCT test_name) FROM dq_results
+          WHERE test_name IN ('pk_unique','email_not_null','status_accepted','no_orphan_facts')
+        ) <> 4`,
+      },
+      {
+        suite: "green",
+        name: "every test reports zero violations on the healthy seed",
+        sql: `SELECT test_name, violations FROM dq_results WHERE violations <> 0`,
+      },
+      {
+        suite: "correctness",
+        name: "pk_unique equals the recomputed duplicate-key count",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT violations FROM dq_results WHERE test_name = 'pk_unique'), -1) <> (
+          SELECT COUNT(*) FROM (
+            SELECT customer_key FROM dim_customer GROUP BY customer_key HAVING COUNT(*) > 1
+          )
+        )`,
+      },
+      {
+        suite: "correctness",
+        name: "no_orphan_facts equals the recomputed orphan anti-join count",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT violations FROM dq_results WHERE test_name = 'no_orphan_facts'), -1) <> (
+          SELECT COUNT(*) FROM fact_sales f
+          LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+          WHERE d.customer_key IS NULL
+        )`,
+      },
+    ],
+  }),
+}
+
+const explainPlan: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-explain",
+  title: "EXPLAIN and Query Performance",
+  summary: "Read a query plan and turn a full scan into an index seek.",
+  estimatedMinutes: 24,
+  difficulty: "hard",
+  skills: ["EXPLAIN QUERY PLAN", "seek vs scan", "sargable predicates", "index-driven fixes"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Read the plan before you optimize
+
+When a query is slow, guessing is a waste of time — ask the database what it's doing.
+\`EXPLAIN QUERY PLAN <query>\` returns the **plan**: how the engine will access each table. The word
+you're hunting for is **SCAN** versus **SEARCH**:
+
+- **\`SCAN table\`** — a full table scan: the engine reads *every* row. Fine for tiny tables,
+  catastrophic for large facts.
+- **\`SEARCH table USING INDEX …\`** — an index seek: the engine jumps straight to the matching rows.
+  This is what you want on a filtered or joined column.
+
+\`\`\`sql
+EXPLAIN QUERY PLAN
+SELECT * FROM fact_sales WHERE customer_key = 42;
+\`\`\`
+
+On an unindexed \`customer_key\` this reports \`SCAN fact_sales\`. Add the index:
+
+\`\`\`sql
+CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_key);
+\`\`\`
+
+and the same \`EXPLAIN QUERY PLAN\` now reports
+\`SEARCH fact_sales USING INDEX idx_fact_sales_customer (customer_key=?)\` — the scan became a seek.
+Index the columns queries **filter on**, **join on**, and often **order by**.
+
+### Sargable predicates
+
+An index can only be used if the predicate is **sargable** (Search-ARGument-able): the indexed column
+must appear **bare** on one side of the comparison. Wrapping it in a function defeats the index:
+
+\`\`\`sql
+-- NON-sargable: function on the column -> index unusable -> full scan
+WHERE strftime('%Y', order_date) = '2026'
+
+-- Sargable: bare column vs a literal range -> index seek
+WHERE order_date >= '2026-01-01' AND order_date < '2027-01-01'
+\`\`\`
+
+Both select 2026, but only the second lets the engine seek. Rewriting a function-wrapped predicate as
+a **range on the bare column** is one of the highest-leverage performance fixes a DE makes. Note the
+half-open upper bound (\`< '2027-01-01'\`): it keeps the very last day of the year (\`2026-12-31\`) and
+cleanly drops \`2027-01-01\` — no fencepost bug, and no \`BETWEEN\` gotcha.
+
+### Common pitfalls
+
+- **Indexing everything.** Every index speeds reads but **slows writes** (each \`INSERT\` / \`UPDATE\`
+  must maintain it) and costs storage. Index selectively — the FK/join columns and the hot filter
+  columns — not every column.
+- **Redundant indexes.** \`PRIMARY KEY\` and \`UNIQUE\` columns are **already indexed**; don't add a
+  second index on them.
+- **Reading the plan wrong.** \`SCAN\` on a 5-row lookup table is totally fine — a seek's overhead
+  isn't worth it. Optimize the scans that hurt: big tables in the hot path.
+
+> **In the warehouse:** SQLite's \`EXPLAIN QUERY PLAN\` is the lightweight cousin of Postgres's
+> \`EXPLAIN ANALYZE\` (which also *runs* the query and reports real timings) and Snowflake's
+> query-profile UI. Columnar warehouses lean on partition pruning and clustering rather than B-tree
+> indexes, but the **sargable-predicate** rule (bare column, no function) is universal.
+
+**Recap:** \`EXPLAIN QUERY PLAN\` reveals \`SCAN\` (full read) vs \`SEARCH … USING INDEX\` (seek); turn a
+hot-path scan into a seek by indexing the filter/join column and keeping predicates sargable (bare
+column, range not function) — and index selectively, because every index taxes writes.
+
+**Execution mode:** you write a multi-statement script against a fresh seeded SQLite DB, then hidden
+assertion queries check that the right indexes exist and that your rewritten query returns exactly the
+right rows. You can eyeball the plan yourself with \`EXPLAIN QUERY PLAN <your query>;\` while you work —
+but the grader checks the **index and the result**, not the plan text.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-explain-apply",
+    prompt: `\`fact_sales\` is seeded with **no index** on \`customer_key\`, so
+\`EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;\` reports a full \`SCAN\`. **Add the
+index that turns that scan into a \`SEARCH … USING INDEX\` seek** — index the column the query filters
+on. (In the real grader the table is large enough that the scan actually hurts.) Keep the script
+re-runnable so a second run doesn't error.`,
+    starterCode: `-- fact_sales is already seeded — there is no index on customer_key yet.
+-- Add the index that turns the SCAN in
+--   EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;
+-- into a SEARCH … USING INDEX seek.
+
+-- CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);`,
+    hints: [
+      "`CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);` — the `IF NOT EXISTS` keeps the script idempotent so a re-run doesn't error.",
+      "The filter column is `customer_key` — that's the column to index, so `WHERE customer_key = ?` becomes a seek instead of a scan.",
+      "Verify for yourself with `EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;` — you want `SEARCH … USING INDEX`, not a bare `SCAN`.",
+    ],
+    referenceSolution: `-- Turn the full SCAN on customer_key into an index SEARCH (seek).
+-- IF NOT EXISTS makes the CREATE re-runnable for the idempotency double-run.
+CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);`,
+    seedSql: `DROP TABLE IF EXISTS fact_sales;
+CREATE TABLE fact_sales (
+  sale_id      INTEGER PRIMARY KEY,
+  customer_key INTEGER,
+  amount       INTEGER
+);
+INSERT INTO fact_sales (customer_key, amount) VALUES
+  (1,100),(1,50),(2,200),(3,75),(1,25);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "index",
+        name: "an index exists on fact_sales(customer_key)",
+        sql: `SELECT 1 WHERE NOT EXISTS (
+          SELECT 1 FROM pragma_index_list('fact_sales') il
+          WHERE (SELECT COUNT(*) FROM pragma_index_info(il.name) WHERE name = 'customer_key') >= 1
+        )`,
+      },
+      {
+        suite: "correctness",
+        name: "the filtered query still returns the three customer_key = 1 rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_sales WHERE customer_key = 1) <> 3`,
+      },
+      {
+        suite: "seek",
+        name: "customer_key is the leading column of the index (so equality can seek)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE NOT EXISTS (
+          SELECT 1 FROM pragma_index_list('fact_sales') il
+          WHERE (SELECT COUNT(*) FROM pragma_index_info(il.name) WHERE seqno = 0 AND name = 'customer_key') = 1
+        )`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-explain-practice",
+    prompt: `A hot query joins \`fact_orders\` to \`dim_customer\` on \`customer_key\` and filters
+\`order_date\` with a **non-sargable** year function — two full scans. Fix all three problems:
+
+1. Add the index that makes the fact→dim join a **seek** on the fact side (\`fact_orders.customer_key\`).
+2. Add the index that lets the date filter **seek** (\`fact_orders.order_date\`).
+3. Rewrite the filter \`strftime('%Y', order_date) = '2026'\` as a **sargable** half-open date range
+   (bare column, no function), then load the 2026 orders into \`orders_2026 (order_id, customer_key)\`
+   — join to \`dim_customer\` so only orders with a real customer land.
+
+\`orders_2026\` is pre-created (empty). Lead the load with \`DELETE FROM orders_2026;\` so a second run
+doesn't double the rows.`,
+    starterCode: `-- dim_customer, fact_orders, and an empty orders_2026 are already seeded.
+-- 1) Index the fact-side join column so fact_orders -> dim_customer can seek.
+-- 2) Index order_date so a date-range filter can seek.
+-- 3) Rewrite strftime('%Y', order_date) = '2026' as a sargable half-open range,
+--    then load the 2026 orders into orders_2026.
+
+-- CREATE INDEX IF NOT EXISTS idx_fact_orders_customer ON fact_orders(customer_key);
+-- CREATE INDEX IF NOT EXISTS idx_fact_orders_date     ON fact_orders(order_date);
+
+-- DELETE FROM orders_2026;            -- lead the load so a re-run doesn't double rows
+-- INSERT INTO orders_2026 (order_id, customer_key)
+-- SELECT f.order_id, f.customer_key
+-- FROM fact_orders f
+-- JOIN dim_customer d ON d.customer_key = f.customer_key
+-- WHERE f.order_date >= '2026-01-01' AND f.order_date < '2027-01-01';`,
+    hints: [
+      "Two indexes, both idempotent: `CREATE INDEX IF NOT EXISTS … ON fact_orders(customer_key)` for the join and `… ON fact_orders(order_date)` for the filter.",
+      "Rewrite the filter as `order_date >= '2026-01-01' AND order_date < '2027-01-01'` — bare column, half-open range, no `strftime`.",
+      "The half-open upper bound `< '2027-01-01'` includes `2026-12-31` and excludes `2027-01-01`.",
+      "Lead the load with `DELETE FROM orders_2026;` (so a re-run doesn't double rows), then `INSERT … SELECT` the 2026 fact rows joined to `dim_customer` into `orders_2026 (order_id, customer_key)`.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS orders_2026;
+DROP TABLE IF EXISTS fact_orders;
+DROP TABLE IF EXISTS dim_customer;
+
+CREATE TABLE dim_customer (customer_key INTEGER PRIMARY KEY, name TEXT);
+INSERT INTO dim_customer VALUES (1,'Ada'),(2,'Ben'),(3,'Cara');
+
+CREATE TABLE fact_orders (
+  order_id     INTEGER PRIMARY KEY,
+  customer_key INTEGER,
+  order_date   TEXT,          -- 'YYYY-MM-DD'
+  amount       INTEGER
+);
+INSERT INTO fact_orders (customer_key, order_date, amount) VALUES
+  (1,'2025-12-31',10),(1,'2026-01-15',20),(2,'2026-06-01',30),
+  (3,'2026-12-31',40),(2,'2027-01-01',50);
+
+CREATE TABLE orders_2026 (order_id INTEGER, customer_key INTEGER);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "index",
+        name: "fact_orders has a join index leading with customer_key",
+        sql: `SELECT 1 WHERE NOT EXISTS (
+          SELECT 1 FROM pragma_index_list('fact_orders') il
+          WHERE (SELECT COUNT(*) FROM pragma_index_info(il.name) WHERE seqno = 0 AND name = 'customer_key') = 1
+        )`,
+      },
+      {
+        suite: "index",
+        name: "fact_orders has a filter index leading with order_date",
+        sql: `SELECT 1 WHERE NOT EXISTS (
+          SELECT 1 FROM pragma_index_list('fact_orders') il
+          WHERE (SELECT COUNT(*) FROM pragma_index_info(il.name) WHERE seqno = 0 AND name = 'order_date') = 1
+        )`,
+      },
+      {
+        suite: "rows",
+        name: "orders_2026 holds exactly the three 2026 orders",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders_2026) <> 3`,
+      },
+      {
+        suite: "rows",
+        name: "no out-of-range order leaked into orders_2026",
+        sql: `SELECT order_id FROM orders_2026
+          WHERE order_id NOT IN (
+            SELECT order_id FROM fact_orders
+            WHERE order_date >= '2026-01-01' AND order_date < '2027-01-01'
+          )`,
+      },
+      {
+        suite: "boundary",
+        name: "half-open range kept 2026-12-31 and dropped 2025-12-31 / 2027-01-01",
+        isHidden: true,
+        sql: `SELECT 1 WHERE
+          (SELECT COUNT(*) FROM orders_2026 WHERE order_id = 4) <> 1
+          OR (SELECT COUNT(*) FROM orders_2026 WHERE order_id IN (1,5)) <> 0`,
+      },
+      {
+        suite: "join",
+        name: "each loaded row carries its fact row's customer_key",
+        isHidden: true,
+        sql: `SELECT o.order_id FROM orders_2026 o
+          JOIN fact_orders f ON f.order_id = o.order_id
+          WHERE o.customer_key <> f.customer_key`,
+      },
+    ],
+  }),
+}
+
+const capstone: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-capstone",
+  title: "Capstone: A Type-2 SCD Loader",
+  summary: "Combine dedup, SCD2, idempotency, quality, and perf into one production-grade loader.",
+  estimatedMinutes: 40,
+  difficulty: "hard",
+  skills: [
+    "end-to-end pipeline",
+    "dedup + SCD2 + upsert",
+    "DQ assertions",
+    "EXPLAIN",
+    "idempotent re-run",
+  ],
+  teach: {
+    estimatedMinutes: 12,
+    markdown: `## A production loader composes every Level-4 skill
+
+Everything in Level 4 so far was a **component**. A real daily loader **composes** them in order.
+Here is the anatomy of a production \`dim_customer\` Type-2 loader processing one daily dump:
+
+1. **Dedup the source** (Module 4.4). A raw dump has duplicate natural keys; reduce it to one row per
+   customer, keeping the freshest with
+   \`ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC)\` and keeping \`rn = 1\`.
+   Everything downstream reads this clean set, never the raw dump.
+2. **Apply SCD Type 2** (Module 4.3). For each deduped customer whose tracked attribute changed versus
+   the current dimension row: **expire** the old row (\`effective_to = snapshot_date\`,
+   \`is_current = 0\`) and **insert** a new version (fresh surrogate key,
+   \`effective_from = snapshot_date\`, \`effective_to = '9999-12-31'\`, \`is_current = 1\`). Brand-new
+   customers get one current row. Unchanged (and absent) customers are left untouched.
+3. **Assert quality** (Module 4.5). Run zero-row DQ tests: exactly one \`is_current = 1\` per customer,
+   no orphan facts against the dimension, contiguous validity windows.
+4. **Verify performance** (the \`EXPLAIN\` module). The fact→dim as-of join should be an index **seek**,
+   so index the join key.
+5. **Idempotency** (Module 4.4). The whole script, run twice on the same dump, must leave the dimension
+   **byte-identical**: the second pass detects no changes and inserts nothing.
+
+### The one property everything depends on: idempotent change-detection
+
+The single most important correctness property is **idempotency of the SCD2 step**. Change-detection
+must compare the dump against the *current* dimension row, and you must **snapshot the changed set into
+a temp table _before_ you expire or insert** — otherwise the insert creates rows that a naive second
+pass re-reads as "changes," and you get infinite version growth on re-runs.
+
+\`\`\`sql
+-- 1. dedup -> clean_dump (one row per code, latest updated_at)
+DROP TABLE IF EXISTS clean_dump;
+CREATE TEMP TABLE clean_dump AS
+WITH ranked AS (
+  SELECT customer_code, city, updated_at,
+         ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC) AS rn
+  FROM raw_dump
+)
+SELECT customer_code, city FROM ranked WHERE rn = 1;
+
+-- 2. FREEZE the changed set BEFORE mutating anything
+DROP TABLE IF EXISTS changed;
+CREATE TEMP TABLE changed AS
+SELECT c.customer_code, c.city
+FROM clean_dump c
+JOIN dim_customer d ON d.customer_code = c.customer_code AND d.is_current = 1
+WHERE c.city <> d.city;
+
+-- 3. expire the old versions, then 4. insert the new ones, both driven by 'changed'
+UPDATE dim_customer SET effective_to = '2026-03-01', is_current = 0
+WHERE is_current = 1 AND customer_code IN (SELECT customer_code FROM changed);
+INSERT INTO dim_customer (customer_code, city, effective_from, effective_to, is_current)
+SELECT customer_code, city, '2026-03-01', '9999-12-31', 1 FROM changed;
+\`\`\`
+
+On the second run \`changed\` is **empty** — the current city already equals the dump — so the expire
+and insert both no-op. Brand-new customers are the mirror image: freeze the codes that have *no* row in
+the dimension at all, and insert one current version for each (never run the expire step for them).
+
+Two guards keep the *whole script* re-runnable, not just the SCD2 step:
+
+- Lead every temp table with \`DROP TABLE IF EXISTS …;\` so a second pass doesn't error on "table
+  already exists."
+- Populate a recomputable target (\`fact_sales.customer_key\`, a \`dq_results\` gate) with an idempotent
+  \`UPDATE\` or a \`DELETE\` + re-\`INSERT\`, never a blind \`INSERT\` that doubles rows on the second pass.
+
+Resolve each fact to the surrogate key that was valid **on its sale date** with a half-open as-of join
+— \`f.sale_date >= d.effective_from AND f.sale_date < d.effective_to\` — as an \`UPDATE\`, so re-running
+recomputes the identical key. Then index the join column and confirm the plan with
+\`EXPLAIN QUERY PLAN\`; you're looking for a \`SEARCH … USING INDEX\` (a seek), not a \`SCAN\`.
+
+> **In the warehouse:** SQLite has no \`QUALIFY\`, so you filter \`ROW_NUMBER()\` in a wrapping
+> subquery/CTE (\`WHERE rn = 1\`). Snowflake and BigQuery let you write
+> \`QUALIFY ROW_NUMBER() OVER (…) = 1\` in one line — same dedup, less nesting.
+
+> **In the warehouse:** this entire loader is what dbt's \`snapshot\` (SCD2) plus \`MERGE\`-based
+> incremental models plus schema \`tests\` generate for you — but building it by hand once is exactly how
+> you learn what those tools are doing, and it's the interview question behind "walk me through a
+> Type-2 dimension load."
+
+**Recap:** a production loader = dedup → SCD2 (snapshot-then-expire-then-insert) → DQ assertions → plan
+verification, all engineered so re-running the whole script changes nothing. Idempotent
+change-detection against the *current* row is the property everything else depends on.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
+hidden assertion queries check the dimension, the as-of fact keys, the DQ gate, and the join index —
+and the grader re-runs your whole script to prove it changes nothing the second time.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-capstone-apply",
+    prompt: `Wire the **dedup step to the SCD2 apply step** for a single-day load. Given a raw dump
+\`raw_dump\` (with duplicate \`customer_code\`s) and a Type-2 \`dim_customer\`:
+
+1. **Dedup** \`raw_dump\` to one row per \`customer_code\`, keeping the latest \`updated_at\` (this picks
+   the Berlin row for \`C1\`).
+2. **Apply a Type 2 change** for any customer whose \`city\` differs from its current dimension row, as
+   of \`snapshot_date = '2026-03-01'\`: expire the old current row (\`effective_to = '2026-03-01'\`,
+   \`is_current = 0\`) and insert a new current version (\`effective_from = '2026-03-01'\`,
+   \`effective_to = '9999-12-31'\`, \`is_current = 1\`).
+
+Snapshot the changed set into a temp table *before* you expire or insert, so re-running the script is a
+no-op.`,
+    starterCode: `-- Seed: dim_customer (Type-2, C1 = London current) and raw_dump (two C1 rows, latest = Berlin).
+-- Guard temp tables so the whole script re-runs cleanly.
+DROP TABLE IF EXISTS clean_dump;
+DROP TABLE IF EXISTS changed;
+
+-- 1. Dedup raw_dump into TEMP clean_dump: one row per customer_code, latest updated_at ...
+
+-- 2a. Freeze the changed set (current dim row whose city differs) into TEMP changed ...
+
+-- 2b. Expire the old current rows for changed codes (effective_to = '2026-03-01', is_current = 0) ...
+
+-- 2c. Insert the new current versions (effective_from = '2026-03-01', effective_to = '9999-12-31') ...`,
+    hints: [
+      "Guard each temp table with `DROP TABLE IF EXISTS clean_dump;` before `CREATE TEMP TABLE`, then dedup with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC)` and keep `rn = 1` — this picks the Berlin row for C1.",
+      "Compare the deduped dump to the current dim row (`is_current = 1`) to find changed cities, and freeze that set into a temp table before you touch `dim_customer`.",
+      "Expire, then insert — exactly the pattern from `sql-l4-scd-type2`.",
+      "Use `snapshot_date = '2026-03-01'` for both the expiring `effective_to` and the new `effective_from`.",
+    ],
+    referenceSolution: `-- Temp-table guards so a second run of the whole script does not error.
+DROP TABLE IF EXISTS clean_dump;
+DROP TABLE IF EXISTS changed;
+
+-- 1. Dedup the dump to one row per customer_code (latest updated_at wins).
+CREATE TEMP TABLE clean_dump AS
+WITH ranked AS (
+  SELECT customer_code, city, updated_at,
+         ROW_NUMBER() OVER (
+           PARTITION BY customer_code ORDER BY updated_at DESC
+         ) AS rn
+  FROM raw_dump
+)
+SELECT customer_code, city FROM ranked WHERE rn = 1;
+
+-- 2a. Freeze which codes actually changed (compare to the current dim row).
+CREATE TEMP TABLE changed AS
+SELECT c.customer_code, c.city
+FROM clean_dump c
+JOIN dim_customer d
+  ON d.customer_code = c.customer_code AND d.is_current = 1
+WHERE c.city <> d.city;
+
+-- 2b. Expire the old current rows for changed codes.
+UPDATE dim_customer
+SET effective_to = '2026-03-01', is_current = 0
+WHERE is_current = 1
+  AND customer_code IN (SELECT customer_code FROM changed);
+
+-- 2c. Insert the new current versions.
+INSERT INTO dim_customer (customer_code, city, effective_from, effective_to, is_current)
+SELECT customer_code, city, '2026-03-01', '9999-12-31', 1
+FROM changed;`,
+    seedSql: `CREATE TABLE dim_customer (
+  customer_key   INTEGER PRIMARY KEY,
+  customer_code  TEXT NOT NULL,
+  city           TEXT,
+  effective_from TEXT NOT NULL,
+  effective_to   TEXT NOT NULL,
+  is_current     INTEGER NOT NULL
+);
+INSERT INTO dim_customer (customer_code, city, effective_from, effective_to, is_current)
+VALUES ('C1','London','2026-01-01','9999-12-31',1);
+
+CREATE TABLE raw_dump (customer_code TEXT, city TEXT, updated_at TEXT);
+INSERT INTO raw_dump VALUES
+  ('C1','London','2026-02-20'),
+  ('C1','Berlin','2026-02-28');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "C1 now has two versions",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer WHERE customer_code = 'C1') <> 2`,
+      },
+      {
+        suite: "scd",
+        name: "exactly one current row remains for C1",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer WHERE customer_code = 'C1' AND is_current = 1) <> 1`,
+      },
+      {
+        suite: "scd",
+        name: "Berlin is the new current version",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dim_customer
+          WHERE customer_code = 'C1' AND city = 'Berlin' AND is_current = 1
+            AND effective_from = '2026-03-01' AND effective_to = '9999-12-31'
+        ) <> 1`,
+      },
+      {
+        suite: "scd",
+        name: "the old London row was expired on the snapshot date",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dim_customer
+          WHERE customer_code = 'C1' AND city = 'London' AND is_current = 0 AND effective_to = '2026-03-01'
+        ) <> 1`,
+      },
+      {
+        suite: "windows",
+        name: "the two versions form a contiguous, gap-free timeline",
+        isHidden: true,
+        sql: `SELECT customer_code FROM (
+          SELECT customer_code, effective_to,
+                 LEAD(effective_from) OVER (PARTITION BY customer_code ORDER BY effective_from) AS next_from
+          FROM dim_customer
+        ) WHERE next_from IS NOT NULL AND next_from <> effective_to`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-capstone-practice",
+    prompt: `Build the complete \`dim_customer\` **Type-2 loader** from a daily dump, then prove it
+end-to-end. From \`raw_customer_dump\` (dirty: duplicate \`customer_code\`s, some brand-new customers,
+some unchanged, some changed) load a Type-2 \`dim_customer\` as of \`snapshot_date = '2026-03-01'\`, and
+maintain \`fact_sales\` so its \`customer_key\` points at the surrogate that was valid on each sale date.
+Your script must:
+
+1. **Dedup** the dump to one row per \`customer_code\` (latest \`updated_at\`, tiebreak by highest
+   \`source_row_id\`).
+2. **Apply SCD2**: expire + insert for changed cities, one current row for brand-new customers, and
+   leave unchanged and absent customers alone.
+3. **Resolve** \`fact_sales.customer_key\` with a half-open as-of \`UPDATE\`
+   (\`sale_date >= effective_from AND sale_date < effective_to\`).
+4. **Index** \`fact_sales(customer_key)\` and confirm the fact→dim join is a seek with
+   \`EXPLAIN QUERY PLAN\`.
+5. **Write a DQ gate**: three rows into \`dq_results(test_name, violations)\` —
+   \`pk_natural_one_current\` (codes with more than one current row), \`orphan_facts\` (fact keys that
+   aren't a real surrogate), and \`contiguous_windows\` (codes with gapped/overlapping windows). All
+   three must be **0** on healthy output.
+6. **Idempotency**: the grader runs your entire script **twice** and asserts \`dim_customer\`,
+   \`fact_sales\`, and every \`dq_results.violations\` are identical — no new versions on the second run.`,
+    starterCode: `-- Guard every temp table so the entire loader re-runs cleanly.
+DROP TABLE IF EXISTS clean_dump;
+DROP TABLE IF EXISTS changed;
+DROP TABLE IF EXISTS new_codes;
+
+-- 1. Dedup raw_customer_dump -> TEMP clean_dump: one row per customer_code,
+--    latest updated_at, tiebreak by source_row_id DESC ...
+
+-- 2a. Freeze changed codes (existing current row whose city differs) -> TEMP changed ...
+-- 2b. Freeze brand-new codes (no row at all in dim_customer)         -> TEMP new_codes ...
+-- 2c. Expire changed current rows; 2d. insert their new versions; 2e. insert the new customers ...
+
+-- 3. Resolve fact_sales.customer_key with a half-open as-of UPDATE
+--    (sale_date >= effective_from AND sale_date < effective_to) ...
+
+-- 4. CREATE INDEX IF NOT EXISTS idx_fact_sales_customer_key ON fact_sales(customer_key) ...
+
+-- 5. DQ gate: DELETE FROM dq_results, then INSERT three violation counts
+--    (pk_natural_one_current, orphan_facts, contiguous_windows) ...
+
+-- 6. EXPLAIN QUERY PLAN the fact->dim key join to confirm a seek ...`,
+    hints: [
+      "Dedup first into a temp table with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC, source_row_id DESC)` keeping `rn = 1`. Everything downstream reads the clean set, never `raw_customer_dump`.",
+      "**Snapshot the changed set into a temp table before mutating** `dim_customer` — compute `codes whose deduped city <> current dim city` once, then expire, then insert from that frozen set. This is what makes run #2 a no-op: on the second run the current city already equals the dump, so `changed` is empty. Brand-new customers = deduped codes with `customer_code NOT IN (SELECT customer_code FROM dim_customer)`.",
+      "Resolve `fact_sales.customer_key` as an idempotent `UPDATE` with the as-of join, and make the DQ step `DELETE FROM dq_results;` then re-`INSERT` the three rows — a blind `INSERT` would double the DQ rows on run #2 and break idempotency.",
+      "DQ shapes: `pk_natural_one_current` = `COUNT(*)` of `(SELECT customer_code FROM dim_customer WHERE is_current = 1 GROUP BY customer_code HAVING COUNT(*) > 1)`; `contiguous_windows` uses `LEAD(effective_from) OVER (PARTITION BY customer_code ORDER BY effective_from)` and counts codes where the next version's start doesn't equal this version's `effective_to`.",
+    ],
+    seedSql: `CREATE TABLE dim_customer (
+  customer_key   INTEGER PRIMARY KEY,
+  customer_code  TEXT NOT NULL,
+  name           TEXT,
+  city           TEXT,
+  effective_from TEXT NOT NULL,
+  effective_to   TEXT NOT NULL,
+  is_current     INTEGER NOT NULL
+);
+INSERT INTO dim_customer (customer_code, name, city, effective_from, effective_to, is_current) VALUES
+  ('C1','Ada','London','2026-01-01','9999-12-31',1),
+  ('C2','Ben','Paris', '2026-01-01','9999-12-31',1),
+  ('C3','Cara','Rome', '2026-01-01','9999-12-31',1);
+
+CREATE TABLE raw_customer_dump (
+  source_row_id INTEGER PRIMARY KEY,
+  customer_code TEXT, name TEXT, city TEXT, updated_at TEXT
+);
+INSERT INTO raw_customer_dump (customer_code, name, city, updated_at) VALUES
+  ('C1','Ada','Berlin','2026-02-20'),
+  ('C1','Ada','Berlin','2026-02-20'),
+  ('C2','Ben','Paris','2026-02-25'),
+  ('C4','Dan','Oslo','2026-02-26');
+
+CREATE TABLE fact_sales (
+  sale_id INTEGER PRIMARY KEY,
+  customer_code TEXT,
+  sale_date TEXT,
+  customer_key INTEGER,
+  amount INTEGER
+);
+INSERT INTO fact_sales (customer_code, sale_date, amount) VALUES
+  ('C1','2026-02-10',100),
+  ('C1','2026-03-15',50),
+  ('C4','2026-03-20',30);
+
+CREATE TABLE dq_results (test_name TEXT, violations INTEGER);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "dim_customer holds exactly five rows after the load",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 5`,
+      },
+      {
+        suite: "scd",
+        name: "exactly one is_current = 1 per customer_code",
+        isHidden: true,
+        sql: `SELECT customer_code FROM dim_customer GROUP BY customer_code HAVING SUM(is_current) <> 1`,
+      },
+      {
+        suite: "scd",
+        name: "C1's London version was expired on the snapshot date",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dim_customer
+          WHERE customer_code = 'C1' AND city = 'London' AND is_current = 0 AND effective_to = '2026-03-01'
+        ) <> 1`,
+      },
+      {
+        suite: "scd",
+        name: "C1's Berlin version is the new current row",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dim_customer
+          WHERE customer_code = 'C1' AND city = 'Berlin' AND is_current = 1
+            AND effective_from = '2026-03-01' AND effective_to = '9999-12-31'
+        ) <> 1`,
+      },
+      {
+        suite: "scd",
+        name: "C3 (absent from the dump) was left untouched",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dim_customer
+          WHERE customer_code = 'C3' AND city = 'Rome' AND is_current = 1
+            AND effective_from = '2026-01-01' AND effective_to = '9999-12-31'
+        ) <> 1`,
+      },
+      {
+        suite: "scd",
+        name: "the brand-new customer C4 got one current row",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dim_customer
+          WHERE customer_code = 'C4' AND city = 'Oslo' AND is_current = 1
+            AND effective_from = '2026-03-01' AND effective_to = '9999-12-31'
+        ) <> 1`,
+      },
+      {
+        suite: "fact",
+        name: "C1's two sales resolve to the London vs Berlin versions",
+        sql: `SELECT 1 WHERE
+          COALESCE((SELECT d.city FROM fact_sales f JOIN dim_customer d ON d.customer_key = f.customer_key
+                    WHERE f.customer_code = 'C1' AND f.sale_date = '2026-02-10'), '~') <> 'London'
+          OR COALESCE((SELECT d.city FROM fact_sales f JOIN dim_customer d ON d.customer_key = f.customer_key
+                       WHERE f.customer_code = 'C1' AND f.sale_date = '2026-03-15'), '~') <> 'Berlin'`,
+      },
+      {
+        suite: "fact",
+        name: "every fact_sales.customer_key is the version valid on its sale_date",
+        isHidden: true,
+        sql: `SELECT f.sale_id
+          FROM fact_sales f
+          LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+          WHERE d.customer_code IS NULL
+             OR d.customer_code <> f.customer_code
+             OR NOT (f.sale_date >= d.effective_from AND f.sale_date < d.effective_to)`,
+      },
+      {
+        suite: "dq",
+        name: "all three named DQ tests are present and report zero violations",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM dq_results
+          WHERE test_name IN ('pk_natural_one_current','orphan_facts','contiguous_windows')
+            AND violations = 0
+        ) <> 3`,
+      },
+      {
+        suite: "dq",
+        name: "no DQ test reports a violation",
+        sql: `SELECT test_name FROM dq_results WHERE violations <> 0`,
+      },
+      {
+        suite: "perf",
+        name: "an index on fact_sales(customer_key) exists for the join seek",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM sqlite_master
+          WHERE type = 'index' AND tbl_name = 'fact_sales' AND sql LIKE '%customer_key%'
+        ) < 1`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel4: SqlLevel = {
   id: 4,
   slug: "engineering",
@@ -2360,6 +3230,13 @@ export const sqlLevel4: SqlLevel = {
       description:
         "The habits that separate a junior script from a production loader: deduplication and idempotent upsert/merge.",
       lessons: [dedup, idempotentMerge],
+    },
+    {
+      id: "sql-l4-quality-capstone",
+      title: "Module 4.5 — Quality, Performance, and Capstone",
+      description:
+        "Guard and tune the pipeline: dbt-style data-quality assertions, EXPLAIN/indexes, and a capstone Type-2 SCD loader.",
+      lessons: [dataQuality, explainPlan, capstone],
     },
   ],
 }
