@@ -1449,6 +1449,581 @@ For \`({"x": 1}, {"x": 9})\` return \`{"x": 9}\`.`,
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Gap-fill lessons (added after the CURRICULUM-GAP-ANALYSIS audit): high-value
+// beginner topics the original tree missed — identity/equality, the reference
+// model, data-structure choice, the enumerate/zip/items idioms, and recursion.
+// ───────────────────────────────────────────────────────────────────────────
+
+const identityEqualityLesson: PythonLesson = {
+  id: "py-l1-identity-equality",
+  title: "is vs == and checking for None",
+  summary: "Tell identity (is) apart from equality (==), and check for None the right way.",
+  estimatedMinutes: 8,
+  difficulty: "easy",
+  skills: ["identity", "equality", "none", "is-operator"],
+  teach: {
+    estimatedMinutes: 3,
+    markdown: `## Two different questions: "equal?" vs "the same object?"
+
+\`==\` asks **"are these two values equal?"**. \`is\` asks **"are these two names pointing at the exact
+same object?"** They usually agree, but they answer different questions:
+
+\`\`\`python
+a = [1, 2, 3]
+b = [1, 2, 3]
+a == b     # True  — same contents
+a is b     # False — two different lists
+\`\`\`
+
+### Always check None with \`is\`
+
+\`None\` is a single, unique object, so the idiomatic (and correct) test is \`is None\`:
+
+\`\`\`python
+if value is None:      # the right way
+    ...
+if value == None:      # works, but reviewers will flag it — don't
+    ...
+\`\`\`
+
+### Why not use \`is\` for numbers or strings?
+
+Python *sometimes* reuses small ints and short strings, so \`is\` may look like it works — then
+silently break on bigger values:
+
+\`\`\`python
+x = 1000
+y = 1000
+x == y    # True  — always use == for values
+x is y    # may be False! never rely on this
+\`\`\`
+
+**Rule of thumb:** \`is\` only for \`None\` (and \`True\`/\`False\`); \`==\` for everything else.
+
+### Recap
+
+\`==\` compares values, \`is\` compares identity, and you check for \`None\` with \`is None\`. Next
+you'll flag a missing value, then safely measure one that might be \`None\`.`,
+    demoCode: `a = [1, 2, 3]
+b = [1, 2, 3]
+print(a == b)   # True  (equal contents)
+print(a is b)   # False (different objects)
+
+value = None
+print(value is None)   # True`,
+  },
+  apply: {
+    id: "py-l1-identity-equality-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`is_missing(value)\` — return \`True\` when \`value\` **is** \`None\`, otherwise \`False\`.
+
+Use the \`is None\` test, not \`== None\`.`,
+    starterCode: `def is_missing(value):
+    # Return True when value is None, else False.
+    pass`,
+    hints: [
+      "Compare with `is None`, not `== None`.",
+      "The comparison already produces a bool: `return value is None`.",
+    ],
+    referenceSolution: `def is_missing(value):
+    return value is None`,
+    testCases: [
+      { input: { value: null }, expected: true, description: "None is missing" },
+      { input: { value: 0 }, expected: false, description: "zero is a real value, not missing" },
+      { input: { value: "" }, expected: false, description: "empty string is not None" },
+      { input: { value: "x" }, expected: false, description: "a normal value" },
+    ],
+  },
+  practice: {
+    id: "py-l1-identity-equality-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`none_safe_len(value)\` — return \`len(value)\`, but return \`0\` when \`value\` is \`None\`
+(so it never crashes).
+
+For \`None\` return \`0\`; for \`"abc"\` return \`3\`.`,
+    starterCode: `def none_safe_len(value):
+    # Return 0 when value is None, otherwise its length.
+    pass`,
+    hints: [
+      "Guard first: `if value is None: return 0`.",
+      "Otherwise return `len(value)`.",
+      "One line works: `return 0 if value is None else len(value)`.",
+    ],
+    referenceSolution: `def none_safe_len(value):
+    return 0 if value is None else len(value)`,
+    testCases: [
+      { input: { value: null }, expected: 0, description: "None is length 0" },
+      { input: { value: "abc" }, expected: 3, description: "a three-letter string" },
+      { input: { value: [1, 2] }, expected: 2, description: "a two-item list" },
+      { input: { value: "" }, expected: 0, description: "empty string" },
+    ],
+  },
+}
+
+const referencesCopyLesson: PythonLesson = {
+  id: "py-l1-references-copy",
+  title: "References, copies & the mutable-default trap",
+  summary:
+    "Names share objects — build new lists instead of mutating, and never use a mutable default argument.",
+  estimatedMinutes: 11,
+  difficulty: "easy",
+  skills: ["references", "mutability", "copying", "default-arguments"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## A name is a label on an object, not a box
+
+Assigning one list to another name does **not** copy it — both names label the **same** list:
+
+\`\`\`python
+a = [1, 2, 3]
+b = a            # b labels the SAME list
+b.append(4)
+a                # [1, 2, 3, 4]  — a changed too!
+\`\`\`
+
+This "spooky action at a distance" is the #1 source of *"why did my other list change?"* bugs.
+
+### Build a new list instead of mutating
+
+When a function should return a changed version, build a **new** list and leave the input alone:
+
+\`\`\`python
+def with_doubled(nums):
+    return [n * 2 for n in nums]   # new list; nums untouched
+\`\`\`
+
+### Copying on purpose
+
+Need a genuine copy? Shallow copy with a slice or \`list(...)\`; deep copy (nested) with
+\`copy.deepcopy\`:
+
+\`\`\`python
+shallow = nums[:]            # new outer list, same inner objects
+import copy
+deep = copy.deepcopy(grid)   # fully independent, nested included
+\`\`\`
+
+### The mutable-default-argument trap
+
+A default value is created **once**, so a mutable default is shared across every call:
+
+\`\`\`python
+def bad(item, bucket=[]):     # the SAME list every call — a classic bug
+    bucket.append(item)
+    return bucket
+
+def good(item, bucket=None):  # fresh list when none is given
+    if bucket is None:
+        bucket = []
+    bucket.append(item)
+    return bucket
+\`\`\`
+
+### Recap
+
+Names share objects, so prefer building new values over mutating shared ones, copy deliberately
+(\`[:]\` or \`copy.deepcopy\`), and never use \`[]\`/\`{}\` as a default — use \`None\` and create it
+inside. Next you'll double a list without touching it, then write a safe accumulator.`,
+    demoCode: `a = [1, 2, 3]
+b = a
+b.append(4)
+print(a)          # [1, 2, 3, 4] — same list!
+
+c = a[:]          # a real (shallow) copy
+c.append(99)
+print(a)          # unchanged by c`,
+  },
+  apply: {
+    id: "py-l1-references-copy-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`doubled(nums)\` — return a **new** list where every number is doubled, **without changing**
+the original \`nums\`.
+
+For \`[1, 2, 3]\` return \`[2, 4, 6]\`.`,
+    starterCode: `def doubled(nums):
+    # Return a NEW list with each value doubled; don't mutate nums.
+    pass`,
+    hints: [
+      "Build a new list rather than editing nums in place.",
+      "A comprehension makes a new list: `[n * 2 for n in nums]`.",
+    ],
+    referenceSolution: `def doubled(nums):
+    return [n * 2 for n in nums]`,
+    testCases: [
+      { input: { nums: [1, 2, 3] }, expected: [2, 4, 6], description: "doubles each value" },
+      { input: { nums: [] }, expected: [], description: "empty list stays empty" },
+      { input: { nums: [5] }, expected: [10], description: "single value" },
+      { input: { nums: [-1, 0, 4] }, expected: [-2, 0, 8], description: "negatives and zero" },
+    ],
+  },
+  practice: {
+    id: "py-l1-references-copy-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`append_new(value, bucket=None)\` — append \`value\` to \`bucket\` and return it, but when no
+\`bucket\` is given, start a **fresh** list (avoid the mutable-default trap).
+
+\`append_new(1, [2, 3])\` returns \`[2, 3, 1]\`; \`append_new("a")\` returns \`["a"]\`.`,
+    starterCode: `def append_new(value, bucket=None):
+    # Default bucket to None, then create a fresh [] inside when it's None.
+    pass`,
+    hints: [
+      "Don't write `bucket=[]` — use `bucket=None`.",
+      "Inside: `if bucket is None: bucket = []`.",
+      "Then `bucket.append(value)` and `return bucket`.",
+    ],
+    referenceSolution: `def append_new(value, bucket=None):
+    if bucket is None:
+        bucket = []
+    bucket.append(value)
+    return bucket`,
+    testCases: [
+      {
+        input: { value: 1, bucket: [2, 3] },
+        expected: [2, 3, 1],
+        description: "appends to a given list",
+      },
+      { input: { value: "a" }, expected: ["a"], description: "fresh list when bucket is omitted" },
+      { input: { value: 9, bucket: [] }, expected: [9], description: "appends to an empty list" },
+    ],
+  },
+}
+
+const complexityChoiceLesson: PythonLesson = {
+  id: "py-l1-complexity-choice",
+  title: "Choosing the right data structure",
+  summary: "Pick a set or dict for fast membership and lookups instead of scanning a list.",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["sets", "membership", "big-o", "data-structures"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Not all lookups cost the same
+
+Checking \`x in some_list\` makes Python **scan every element** — on a list of a million items that's
+a million comparisons. Checking \`x in some_set\` (or a dict) jumps almost straight to the answer:
+
+\`\`\`python
+x in a_list    # O(n)  — walks the whole list  (slow for big data)
+x in a_set     # O(1)  — near-instant, any size (fast)
+x in a_dict    # O(1)  — key lookup is instant too
+\`\`\`
+
+\`O(n)\` means "cost grows with the size"; \`O(1)\` means "cost stays flat". This is the single most
+useful performance instinct: **when you repeatedly ask 'have I seen this?', reach for a set.**
+
+### The classic upgrade
+
+\`\`\`python
+# slow: membership against a list, inside a loop -> O(n^2)
+seen = []
+for x in items:
+    if x in seen:   # scans seen every time
+        ...
+    seen.append(x)
+
+# fast: same logic, a set -> O(n)
+seen = set()
+for x in items:
+    if x in seen:   # instant
+        ...
+    seen.add(x)
+\`\`\`
+
+### Pick by the question you're asking
+
+- **"Is it in here?" / "have I seen it?"** -> **set**
+- **"What value maps to this key?"** -> **dict**
+- **"What's the order / can there be duplicates?"** -> **list**
+
+### Recap
+
+List membership is \`O(n)\`; set and dict membership is \`O(1)\`. When you test membership repeatedly,
+a set turns a slow \`O(n^2)\` loop into a fast \`O(n)\` one. Next you'll detect duplicates, then find
+the first repeat.`,
+    demoCode: `nums = [3, 1, 4, 1, 5, 9, 2, 6]
+distinct = set(nums)
+print(1 in distinct)               # True  — O(1) membership
+print(len(distinct) != len(nums))  # True  — there was a duplicate`,
+  },
+  apply: {
+    id: "py-l1-complexity-choice-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`has_duplicates(nums)\` — return \`True\` if any value appears more than once in \`nums\`,
+otherwise \`False\`. Use a set so it stays fast.
+
+\`[1, 2, 2]\` returns \`True\`; \`[1, 2, 3]\` returns \`False\`.`,
+    starterCode: `def has_duplicates(nums):
+    # A set drops duplicates — compare its size to the list's.
+    pass`,
+    hints: [
+      "`set(nums)` removes duplicates.",
+      "If the set is smaller than the list, there was a duplicate.",
+      "`return len(set(nums)) != len(nums)`.",
+    ],
+    referenceSolution: `def has_duplicates(nums):
+    return len(set(nums)) != len(nums)`,
+    testCases: [
+      { input: { nums: [1, 2, 3] }, expected: false, description: "all distinct" },
+      { input: { nums: [1, 2, 2] }, expected: true, description: "one duplicate" },
+      { input: { nums: [] }, expected: false, description: "empty list" },
+      { input: { nums: [5, 5] }, expected: true, description: "two of the same" },
+    ],
+  },
+  practice: {
+    id: "py-l1-complexity-choice-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`first_repeated(nums)\` — return the first value that appears a **second** time as you scan
+left to right, or \`None\` if every value is unique. Track what you've seen with a set.
+
+\`[1, 2, 3, 2, 1]\` returns \`2\` (2 repeats before 1 does).`,
+    starterCode: `def first_repeated(nums):
+    # Keep a set of seen values; return the first one you see again.
+    pass`,
+    hints: [
+      "Start an empty `seen = set()`.",
+      "For each value: if it's already in `seen`, return it; otherwise add it.",
+      "Return `None` after the loop if nothing repeated.",
+    ],
+    referenceSolution: `def first_repeated(nums):
+    seen = set()
+    for x in nums:
+        if x in seen:
+            return x
+        seen.add(x)
+    return None`,
+    testCases: [
+      { input: { nums: [1, 2, 3, 2, 1] }, expected: 2, description: "2 repeats first" },
+      { input: { nums: [1, 2, 3] }, expected: null, description: "no repeats -> None" },
+      { input: { nums: [5, 5] }, expected: 5, description: "immediate repeat" },
+      { input: { nums: [] }, expected: null, description: "empty list -> None" },
+    ],
+  },
+}
+
+const loopIdiomsLesson: PythonLesson = {
+  id: "py-l1-loop-idioms",
+  title: "Looping like a Pythonista: enumerate, zip & items",
+  summary:
+    "Loop with a counter (enumerate), over two lists at once (zip), and over a dict (.items()).",
+  estimatedMinutes: 10,
+  difficulty: "easy",
+  skills: ["enumerate", "zip", "dict-items", "iteration"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Loop over what you have, not over indexes
+
+Beginners often reach for \`range(len(...))\` and index back in. Python has cleaner idioms.
+
+### enumerate — when you need the index *and* the value
+
+\`\`\`python
+for i, name in enumerate(["Ada", "Sam"]):
+    print(i, name)     # 0 Ada / 1 Sam
+\`\`\`
+
+Compare the clunky version — \`for i in range(len(names)): names[i]\` — which is easy to get wrong.
+
+### zip — walk two lists in lockstep
+
+\`\`\`python
+names = ["Ada", "Sam"]
+scores = [90, 85]
+for name, score in zip(names, scores):
+    print(name, score)    # Ada 90 / Sam 85
+\`\`\`
+
+\`zip\` stops at the shorter list.
+
+### .items() — loop a dict's keys and values together
+
+\`\`\`python
+prices = {"apple": 3, "pear": 2}
+for fruit, price in prices.items():
+    print(fruit, price)
+\`\`\`
+
+(\`.keys()\` and \`.values()\` give just one side.)
+
+### Recap
+
+\`enumerate\` gives you \`index, value\`; \`zip\` pairs up two sequences; \`.items()\` gives \`key,
+value\` from a dict. Reach for these instead of manual index bookkeeping. Next you'll number a list,
+then pair two lists together.`,
+    demoCode: `for i, letter in enumerate(["a", "b", "c"]):
+    print(i, letter)
+
+for name, score in zip(["Ada", "Sam"], [90, 85]):
+    print(name, score)`,
+  },
+  apply: {
+    id: "py-l1-loop-idioms-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`indexed(items)\` — return a list of \`[index, value]\` pairs, numbering each item from 0.
+Use \`enumerate\`.
+
+For \`["a", "b"]\` return \`[[0, "a"], [1, "b"]]\`.`,
+    starterCode: `def indexed(items):
+    # Return [[0, items[0]], [1, items[1]], ...] using enumerate.
+    pass`,
+    hints: [
+      "`enumerate(items)` yields `(i, value)` pairs.",
+      "Collect them: `[[i, v] for i, v in enumerate(items)]`.",
+    ],
+    referenceSolution: `def indexed(items):
+    return [[i, v] for i, v in enumerate(items)]`,
+    testCases: [
+      {
+        input: { items: ["a", "b"] },
+        expected: [
+          [0, "a"],
+          [1, "b"],
+        ],
+        description: "two items numbered",
+      },
+      { input: { items: [] }, expected: [], description: "empty list" },
+      { input: { items: ["x"] }, expected: [[0, "x"]], description: "single item" },
+    ],
+  },
+  practice: {
+    id: "py-l1-loop-idioms-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`pair_totals(names, scores)\` — return a list of \`[name, score]\` pairs by walking both
+lists together with \`zip\`.
+
+\`(["a", "b"], [1, 2])\` returns \`[["a", 1], ["b", 2]]\`.`,
+    starterCode: `def pair_totals(names, scores):
+    # Pair each name with its score using zip.
+    pass`,
+    hints: [
+      "`zip(names, scores)` yields `(name, score)` pairs.",
+      "Build the list: `[[n, s] for n, s in zip(names, scores)]`.",
+    ],
+    referenceSolution: `def pair_totals(names, scores):
+    return [[n, s] for n, s in zip(names, scores)]`,
+    testCases: [
+      {
+        input: { names: ["a", "b"], scores: [1, 2] },
+        expected: [
+          ["a", 1],
+          ["b", 2],
+        ],
+        description: "pairs two lists",
+      },
+      { input: { names: [], scores: [] }, expected: [], description: "empty inputs" },
+      { input: { names: ["x"], scores: [9] }, expected: [["x", 9]], description: "single pair" },
+    ],
+  },
+}
+
+const recursionLesson: PythonLesson = {
+  id: "py-l1-recursion",
+  title: "Recursion: a function that calls itself",
+  summary: "Solve a problem in terms of a smaller version of itself, with a base case to stop.",
+  estimatedMinutes: 11,
+  difficulty: "medium",
+  skills: ["recursion", "base-case", "call-stack", "functions"],
+  teach: {
+    estimatedMinutes: 4,
+    markdown: `## Recursion: solve it in terms of a smaller self
+
+A **recursive** function calls itself on a smaller input until it hits a **base case** that stops the
+chain. Every recursion needs two parts:
+
+1. **Base case** — the smallest input, answered directly (no further call).
+2. **Recursive case** — reduce the problem and call yourself.
+
+\`\`\`python
+def factorial(n):
+    if n <= 1:                    # base case
+        return 1
+    return n * factorial(n - 1)   # recursive case
+\`\`\`
+
+\`factorial(3)\` -> \`3 * factorial(2)\` -> \`3 * 2 * factorial(1)\` -> \`3 * 2 * 1\` = \`6\`.
+
+### The call stack
+
+Each call waits for the one it made, stacking up until the base case returns and they unwind. Forget
+the base case and the calls never stop — Python raises \`RecursionError\`.
+
+### When it shines
+
+Recursion is natural for **nested / tree-shaped** data — folders inside folders, a list of lists —
+where each part looks like a smaller version of the whole.
+
+### Recap
+
+A recursive function has a **base case** (stop) and a **recursive case** (shrink + call itself). Miss
+the base case and it never ends. Next you'll write factorial, then sum a nested list.`,
+    demoCode: `def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+print(factorial(5))   # 120`,
+  },
+  apply: {
+    id: "py-l1-recursion-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`factorial(n)\` **recursively** — the product \`n * (n-1) * ... * 1\`, with \`factorial(0)\`
+and \`factorial(1)\` both equal to \`1\`.
+
+\`factorial(5)\` is \`120\`. Call \`factorial\` from inside itself; don't use a loop.`,
+    starterCode: `def factorial(n):
+    # Base case: n <= 1 returns 1. Otherwise n * factorial(n - 1).
+    pass`,
+    hints: [
+      "Base case first: `if n <= 1: return 1`.",
+      "Recursive case: `return n * factorial(n - 1)`.",
+    ],
+    referenceSolution: `def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)`,
+    testCases: [
+      { input: { n: 0 }, expected: 1, description: "0! is 1" },
+      { input: { n: 1 }, expected: 1, description: "1! is 1" },
+      { input: { n: 5 }, expected: 120, description: "5! is 120" },
+      { input: { n: 3 }, expected: 6, description: "3! is 6" },
+    ],
+  },
+  practice: {
+    id: "py-l1-recursion-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`sum_nested(items)\` — return the sum of all numbers in a list that may contain **nested
+lists**, to any depth. Recurse into each sub-list.
+
+\`[1, [2, 3], [4, [5]]]\` returns \`15\`.`,
+    starterCode: `def sum_nested(items):
+    # For each element: recurse if it's a list, otherwise add the number.
+    pass`,
+    hints: [
+      "Check each element with `isinstance(x, list)`.",
+      "If it's a list, add `sum_nested(x)`; otherwise add `x`.",
+      "Keep a running total and return it.",
+    ],
+    referenceSolution: `def sum_nested(items):
+    total = 0
+    for x in items:
+        if isinstance(x, list):
+            total += sum_nested(x)
+        else:
+            total += x
+    return total`,
+    testCases: [
+      { input: { items: [1, 2, 3] }, expected: 6, description: "flat list" },
+      { input: { items: [1, [2, 3], [4, [5]]] }, expected: 15, description: "nested to depth 2" },
+      { input: { items: [] }, expected: 0, description: "empty list" },
+      {
+        input: { items: [[1], [2]] },
+        expected: 3,
+        description: "lists of lists",
+      },
+    ],
+  },
+}
+
 export const level1: PythonLevel = {
   id: 1,
   slug: "fundamentals",
@@ -1467,7 +2042,7 @@ export const level1: PythonLevel = {
       id: "py-l1-data-types",
       title: "Data Types",
       description: "Numbers, booleans, None, and converting between types.",
-      lessons: [numbersLesson, boolNoneConvertLesson],
+      lessons: [numbersLesson, boolNoneConvertLesson, identityEqualityLesson],
     },
     {
       id: "py-l1-strings",
@@ -1479,13 +2054,26 @@ export const level1: PythonLevel = {
       id: "py-l1-collections",
       title: "Collections",
       description: "Lists, tuples, sets, and dictionaries — Python's core containers.",
-      lessons: [listsLesson, tuplesSetsLesson, dictsLesson],
+      lessons: [
+        listsLesson,
+        tuplesSetsLesson,
+        dictsLesson,
+        referencesCopyLesson,
+        complexityChoiceLesson,
+      ],
     },
     {
       id: "py-l1-control-flow",
       title: "Control Flow & Functions",
       description: "Branch with if/else, repeat with loops, and package logic into functions.",
-      lessons: [conditionalsLesson, loopsLesson, functionsLesson, temperatureLesson],
+      lessons: [
+        conditionalsLesson,
+        loopsLesson,
+        loopIdiomsLesson,
+        functionsLesson,
+        recursionLesson,
+        temperatureLesson,
+      ],
     },
   ],
 }
