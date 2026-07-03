@@ -83,6 +83,18 @@ describe("compareResultSets", () => {
     expect(result.reason).toContain("order_id")
   })
 
+  it("hard-fails on column-name mismatch when assertColumnNames is set (aliasing lessons)", () => {
+    const expected = { columns: ["order_id", "amount_cents"], rows: [[1, 500]] }
+    // right values, wrong/absent aliases — advisory pass by default, hard fail when names are graded.
+    const unaliased = { columns: ["ord_id", "amt_c"], rows: [[1, 500]] }
+    expect(compareResultSets(expected, unaliased).passed).toBe(true)
+    expect(compareResultSets(expected, unaliased, { assertColumnNames: true }).passed).toBe(false)
+    expect(compareResultSets(expected, expected, { assertColumnNames: true }).passed).toBe(true)
+    // column names are SQL identifiers → the name check is case-insensitive.
+    const upper = { columns: ["ORDER_ID", "Amount_Cents"], rows: [[1, 500]] }
+    expect(compareResultSets(expected, upper, { assertColumnNames: true }).passed).toBe(true)
+  })
+
   it("fails a null/undefined actual", () => {
     expect(compareResultSets({ columns: cols, rows: [] }, null).passed).toBe(false)
   })

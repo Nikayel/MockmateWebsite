@@ -80,6 +80,7 @@ INSERT INTO orders (ord_id, cust_id, ord_status, amt_c) VALUES
   (1002, 7, 'shipped',  1250),
   (1003, 9, 'paid',    10000);`,
       orderMatters: false,
+      assertColumnNames: true,
       expected: {
         columns: ["order_id", "customer_id", "amount_cents"],
         rows: [
@@ -130,6 +131,7 @@ INSERT INTO orders_raw VALUES
   (2003, 31, 'shipped',   2750, 'UK', '2026-03-02T15:40:00Z', 1),
   (2004, 58, 'paid',     12000, 'US', '2026-03-02T18:20:00Z', 0);`,
       orderMatters: false,
+      assertColumnNames: true,
       expected: {
         columns: [
           "order_id",
@@ -248,6 +250,7 @@ INSERT INTO order_items VALUES
   (1001, 502, 1, 4999),
   (1002, 501, 3, 1500);`,
       orderMatters: false,
+      assertColumnNames: true,
       expected: {
         columns: ["order_id", "product_id", "qty", "line_revenue_cents"],
         rows: [
@@ -290,6 +293,7 @@ INSERT INTO products VALUES
   (502, 'SKU-AUDIO-02', 'Over-Ear Headphones', 'AUD', 8900),
   (503, 'SKU-HOME-11',  'Desk Lamp',           'HOM', 4500);`,
       orderMatters: false,
+      assertColumnNames: true,
       expected: {
         columns: ["product_id", "unit_price_dollars", "label", "source_system"],
         rows: [

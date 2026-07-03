@@ -74,6 +74,7 @@ function toSqlSingleFileScenario(
         description: "Result set matches the expected output",
         orderMatters: grading.orderMatters,
         caseInsensitive: grading.caseInsensitive,
+        assertColumnNames: grading.assertColumnNames,
       },
     ],
     title: exercise.id,

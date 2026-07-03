@@ -14,6 +14,7 @@ interface SqlSingleFileTestCase {
   expected?: SqlResultSet
   orderMatters?: boolean
   caseInsensitive?: boolean
+  assertColumnNames?: boolean
 }
 
 export interface SqlSingleFileScenario {
@@ -58,6 +59,7 @@ export async function executeSqlClientSide(
     const comparison = compareResultSets(expected, actual, {
       orderMatters: testCase.orderMatters,
       caseInsensitive: testCase.caseInsensitive ?? scenario.caseInsensitive,
+      assertColumnNames: testCase.assertColumnNames,
     })
 
     return singleResult(

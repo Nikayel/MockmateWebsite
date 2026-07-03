@@ -25,6 +25,12 @@ export interface CompareOptions {
   orderMatters?: boolean
   /** true → string cell comparison is case-insensitive. Default false. */
   caseInsensitive?: boolean
+  /**
+   * true → column NAMES must match positionally (case-insensitive, since SQL identifiers are), a hard
+   * fail on mismatch. Default false → names are advisory. Set only on lessons where aliasing IS the
+   * graded skill, so the anti-pattern (right values, no aliases) can't pass. (SPEC §3.3.)
+   */
+  assertColumnNames?: boolean
 }
 
 export interface CompareResult {
@@ -106,7 +112,21 @@ export function compareResultSets(
     }
   }
 
-  // Values match. Column names are advisory — surface drift as a soft hint on an otherwise-passing run.
+  // Values match. When the lesson grades aliasing, column names are a HARD check (case-insensitive,
+  // since SQL identifiers are) — so "right values, wrong/absent aliases" fails instead of passing.
+  if (options.assertColumnNames) {
+    const nameMismatch = expected.columns.some(
+      (name, i) => name.toLowerCase() !== String(actual.columns[i] ?? "").toLowerCase()
+    )
+    if (nameMismatch) {
+      return {
+        passed: false,
+        reason: `Alias each column to the exact name requested: expected ${expected.columns.join(", ")} but got ${actual.columns.join(", ")}.`,
+      }
+    }
+  }
+
+  // Otherwise column names are advisory — surface drift as a soft hint on an otherwise-passing run.
   const nameHint = columnNameHint(expected.columns, actual.columns)
   return nameHint ? { passed: true, reason: nameHint } : { passed: true }
 }

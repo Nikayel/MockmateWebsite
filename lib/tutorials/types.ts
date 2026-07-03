@@ -145,6 +145,11 @@ export interface SqlSingleFileGrading {
   orderMatters?: boolean
   /** true → string cell comparison is case-insensitive. Default false. */
   caseInsensitive?: boolean
+  /**
+   * true → the learner's column NAMES must match `expected.columns` (case-insensitive). Set on lessons
+   * where aliasing is the graded skill so an unaliased answer with the right values still fails.
+   */
+  assertColumnNames?: boolean
 }
 
 /** One hidden assertion query — the dbt "count of violations = 0" convention (zero rows = pass). */
