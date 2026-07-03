@@ -126,3 +126,27 @@ Legend: **SF** = single-file, **WS** = workspace.
 - L1–L2 are single-file (fast to author). L3–L4 are workspace (heavier — budget more time per ticket).
 - Two reference lessons already exist (Agent 1's single-file L1 sample and workspace L3 sample);
   point each content agent at them plus `AGENT-2-curriculum-developer.md`.
+
+---
+
+## Gap-fill additions (post-launch, from CURRICULUM-GAP-ANALYSIS.md)
+
+Shipped after the curriculum audit — the highest-value beginner topics the original 46-lesson tree
+missed. All single-file, reference solutions verified in `python3`, `pnpm typecheck` + tutorial tests
+green.
+
+### Level 1
+- [x] **`py-l1-identity-equality`** (SF, easy) — *is vs ==, checking None.* → module `py-l1-data-types`.
+- [x] **`py-l1-references-copy`** (SF, easy) — *references, copies, mutable-default trap.* → `py-l1-collections`.
+- [x] **`py-l1-complexity-choice`** (SF, easy) — *set/dict vs list lookup cost (early Big-O).* → `py-l1-collections`.
+- [x] **`py-l1-loop-idioms`** (SF, easy) — *enumerate / zip / dict.items().* → `py-l1-control-flow`.
+- [x] **`py-l1-recursion`** (SF, medium) — *base case / recursive case / call stack.* → `py-l1-control-flow`.
+
+### Level 2
+- [x] **`py-l2-regex`** (SF, medium) — *re: findall / search / sub, raw strings.* → new module `py-l2-stdlib-toolkit`.
+- [x] **`py-l2-collections`** (SF, medium) — *Counter / defaultdict / deque.* → `py-l2-stdlib-toolkit`.
+
+**Still open from the analysis (need a different vehicle, not plain single-file):** `venv`/`pip`
+(not runnable in the Pyodide sandbox — teach-only), interactive `breakpoint()`/`pdb` (sandbox
+caveat), and an optional `numpy`/`pandas` data-track module. See
+`CURRICULUM-GAP-ANALYSIS.md` for the full ranked list.
