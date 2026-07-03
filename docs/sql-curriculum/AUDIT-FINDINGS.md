@@ -23,6 +23,23 @@ Raw reports: coverage `tasks/wfa0096vi.output`, system `tasks/wkd40quzp.output`.
 
 ---
 
+## Fix status (2026-07-03)
+
+**Shipped:** all **11** confirmed system-audit defects — grading correctness (#1 aliasing name grading,
+#2 idempotency scoped to graded tables by content), #3 render crash, #4 silent progress clobber, #5
+prewarm race, and the UI seams (#8/#9/#11) — plus **7** lesson-content correctness bugs: #6 3NF orphan
+FK, #7 1NF prereq inversion, #10 FK-cascade proof, late-arriving loader lookback, null-safe SCD2 change
+detection (`IS NOT`/`IS DISTINCT FROM`), denormalization "view" wording, and the null-logic CASE
+prerequisite. All 46 lessons green on the sql.js harness; `typecheck` clean; full `test` = 519 passed / 0
+failures; new regression tests added (comparator name-assertion, progress-client throw-vs-null).
+
+**Deferred follow-up** (documented, not blocking): the **Tier B** interview lessons (Part 1 gaps) and
+**Tier C** modules (dbt-mechanics, mock-screen, ops Reads); the dense `dim_date` spine (folds into the
+Tier B date-densification lesson); and Sable-graded conversational steps (needs tutor/UI work, not just
+content). `dedup` needed no `IS DISTINCT FROM` change (it keys on `ROW_NUMBER`, no change predicate).
+
+---
+
 ## Part 1 — Coverage gaps (DE-internship interview readiness)
 
 Verdict: **~75% ready.** Bread-and-butter SQL screen + modeling conversation: covered. Thin on
