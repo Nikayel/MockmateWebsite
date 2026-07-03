@@ -1441,6 +1441,391 @@ INSERT INTO orders VALUES
   },
 }
 
+const ctes: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-ctes",
+  title: "CTEs: Readable Multi-Step Queries",
+  summary: "Name subqueries with WITH so a transform reads top-to-bottom.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["WITH", "single and chained CTEs", "refactoring nested subqueries"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Nested subqueries read inside-out — CTEs read top-to-bottom
+
+Nested subqueries read inside-out — you parse the innermost first and work outward, which is
+exhausting once there are two levels. A **Common Table Expression (CTE)**, introduced with \`WITH\`,
+lets you name each step and read the query **top-to-bottom** like a pipeline. This is not cosmetic:
+production SQL (every dbt model) is built as a chain of named CTEs precisely because named stages are
+reviewable, testable, and self-documenting.
+
+## Syntax — name a subquery, then use it like a table
+
+\`\`\`sql
+WITH paid_orders AS (
+  SELECT customer_id, total_cents
+  FROM orders
+  WHERE status = 'paid'
+)
+SELECT customer_id, SUM(total_cents) AS revenue
+FROM paid_orders
+GROUP BY customer_id;
+\`\`\`
+
+## Chaining — the staging → intermediate → mart pattern
+
+Each CTE can reference the ones above it, forming the staging → intermediate → mart pattern:
+
+\`\`\`sql
+WITH paid_orders AS (
+  SELECT customer_id, total_cents FROM orders WHERE status = 'paid'
+),
+per_customer AS (
+  SELECT customer_id, SUM(total_cents) AS revenue
+  FROM paid_orders
+  GROUP BY customer_id
+)
+SELECT * FROM per_customer WHERE revenue > 10000;
+\`\`\`
+
+## Anatomy
+
+\`\`\`
+WITH name1 AS ( … ),        ← first stage
+     name2 AS ( … name1 … ) ← second stage, may read name1
+SELECT … FROM name2         ← final query reads the last stage
+       └─ commas separate CTEs; the final SELECT has NO leading comma ─┘
+\`\`\`
+
+## Keep it readable / common pitfall
+
+Each CTE definition is comma-separated, but there is **no comma** before the final \`SELECT\`. A CTE is
+scoped to the single statement it prefixes — you can't reference it from a later, separate query.
+
+> **In the warehouse this differs.** In most engines a non-recursive CTE is just a named inline view;
+> SQLite may materialize or inline it, but correctness is identical.
+
+## Recap
+
+\`WITH\` names a subquery so a transform reads top-to-bottom; chain CTEs (each reading the previous) to
+express the staging → intermediate → mart pipeline that production SQL is built from.`,
+    demoCode: `WITH paid_orders AS (
+  SELECT customer_id, total_cents
+  FROM orders
+  WHERE status = 'paid'
+)
+SELECT customer_id, SUM(total_cents) AS revenue
+FROM paid_orders
+GROUP BY customer_id;`,
+  },
+  apply: {
+    id: "sql-l2-ctes-apply",
+    executionMode: "single-file",
+    prompt: `Rewrite a two-level nested subquery as **two chained CTEs**. From \`orders\`: first select the paid
+orders, then aggregate revenue per customer, then return only customers with revenue over \`5000\`.
+Return \`customer_id\` and \`revenue\`, sorted by \`customer_id\` ascending.`,
+    starterCode: `-- Two chained CTEs: paid_orders, then per_customer, then filter.
+WITH paid_orders AS (
+
+),
+per_customer AS (
+
+)
+SELECT customer_id, revenue
+FROM per_customer
+`,
+    hints: [
+      "First CTE `paid_orders`: `SELECT customer_id, total_cents FROM orders WHERE status = 'paid'`.",
+      "Second CTE `per_customer` reads the first: `SELECT customer_id, SUM(total_cents) AS revenue FROM paid_orders GROUP BY customer_id`.",
+      "Final `SELECT ... FROM per_customer WHERE revenue > 5000 ORDER BY customer_id` — no comma before this final SELECT.",
+    ],
+    referenceSolution: `WITH paid_orders AS (
+  SELECT customer_id, total_cents
+  FROM orders
+  WHERE status = 'paid'
+),
+per_customer AS (
+  SELECT customer_id, SUM(total_cents) AS revenue
+  FROM paid_orders
+  GROUP BY customer_id
+)
+SELECT customer_id, revenue
+FROM per_customer
+WHERE revenue > 5000
+ORDER BY customer_id;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  status      TEXT,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (1, 1, 'paid',      3000),
+  (2, 1, 'paid',      4000),
+  (3, 2, 'paid',      1000),
+  (4, 2, 'cancelled', 9000),
+  (5, 3, 'paid',      6000);`,
+      orderMatters: true,
+      expected: {
+        columns: ["customer_id", "revenue"],
+        rows: [
+          [1, 7000],
+          [3, 6000],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-ctes-practice",
+    executionMode: "single-file",
+    prompt: `Author a three-stage transform with CTEs — the staging → intermediate → mart structure of
+production SQL.
+
+- **Stage 1** \`paid_orders\`: paid orders only, joined to their line items, computing each line's
+  revenue (\`quantity * unit_price_cents\`).
+- **Stage 2** \`per_customer\`: revenue and order count per customer.
+- **Final:** customers with **more than 1 order** AND **revenue over 10000**, returning
+  \`customer_id\`, \`order_count\`, \`revenue\`, sorted by \`revenue\` descending.`,
+    starterCode: `-- Three stages: paid_orders (join), per_customer (aggregate), then the mart filter.
+WITH paid_orders AS (
+
+),
+per_customer AS (
+
+)
+SELECT customer_id, order_count, revenue
+FROM per_customer
+`,
+    hints: [
+      "Stage 1 `paid_orders`: `SELECT o.order_id, o.customer_id, oi.quantity * oi.unit_price_cents AS line_revenue FROM orders o JOIN order_items oi ON oi.order_id = o.order_id WHERE o.status = 'paid'`.",
+      "Stage 2 `per_customer`: group stage 1 by `customer_id`, computing `COUNT(DISTINCT order_id) AS order_count` and `SUM(line_revenue) AS revenue`.",
+      "Use `COUNT(DISTINCT order_id)` for order count — a fan-out join means a single order can span multiple item rows.",
+      "Final filter: `WHERE order_count > 1 AND revenue > 10000`, ordered by `revenue DESC`.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  status      TEXT
+);
+CREATE TABLE order_items (
+  order_item_id    INTEGER PRIMARY KEY,
+  order_id         INTEGER,
+  quantity         INTEGER,
+  unit_price_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (100, 1, 'paid'),
+  (101, 1, 'paid'),
+  (102, 2, 'paid'),
+  (103, 3, 'cancelled'),
+  (104, 3, 'paid');
+INSERT INTO order_items VALUES
+  (1, 100, 2, 3000),
+  (2, 101, 1, 8000),
+  (3, 102, 1, 5000),
+  (4, 103, 1, 9999),
+  (5, 104, 1, 4000);`,
+      orderMatters: true,
+      expected: {
+        columns: ["customer_id", "order_count", "revenue"],
+        rows: [[1, 2, 14000]],
+      },
+    },
+  },
+}
+
+const caseExpr: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-case",
+  title: "CASE: Conditional Columns",
+  summary: "Branch a value inside a query for bucketing and pivoting.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["CASE WHEN", "searched vs simple CASE", "conditional aggregation"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## CASE is SQL's if/else
+
+\`CASE\` is SQL's \`if/else\`. It lets you compute a *different value per row* based on conditions —
+bucketing a numeric measure into labels, mapping codes to names, or (the DE power move) pivoting rows
+into columns via **conditional aggregation**.
+
+## Searched CASE — the general form
+
+Conditions can be anything:
+
+\`\`\`sql
+SELECT
+  order_id,
+  CASE
+    WHEN total_cents >= 10000 THEN 'large'
+    WHEN total_cents >= 2000  THEN 'medium'
+    ELSE 'small'
+  END AS size_bucket
+FROM orders;
+\`\`\`
+
+Conditions are tested top-to-bottom; the **first** true branch wins, so order them from most to least
+specific. If none match and there's no \`ELSE\`, the result is NULL.
+
+## Simple CASE — shorthand for equality checks
+
+Shorthand when you're comparing one expression to constants:
+
+\`\`\`sql
+CASE status WHEN 'paid' THEN 1 WHEN 'cancelled' THEN 0 ELSE NULL END
+\`\`\`
+
+## Anatomy
+
+\`\`\`
+CASE WHEN cond1 THEN val1     ← first matching branch wins
+     WHEN cond2 THEN val2
+     ELSE fallback            ← optional; without it, no-match → NULL
+END AS alias
+\`\`\`
+
+## The conditional-aggregation trick — pivoting rows into columns
+
+Wrap a \`CASE\` inside an aggregate and you turn categories into columns. To count paid vs cancelled
+*side by side, per day*:
+
+\`\`\`sql
+SELECT
+  order_date,
+  SUM(CASE WHEN status = 'paid'      THEN 1 ELSE 0 END) AS paid_count,
+  SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count
+FROM orders
+GROUP BY order_date;
+\`\`\`
+
+Each \`CASE\` emits \`1\` for the rows it wants and \`0\` otherwise; the \`SUM\` counts them. This is how
+you build a classic reporting mart (one row per day, one column per status) without a dedicated PIVOT
+operator.
+
+> **In the warehouse this differs — PIVOT.** Snowflake, SQL Server, and others ship a dedicated
+> \`PIVOT\` operator, but its syntax is warehouse-specific. Conditional aggregation with
+> \`SUM(CASE …)\` is the fully portable equivalent — it runs on every engine, including SQLite — so we
+> author pivots that way here.
+
+## Keep it readable / common pitfall
+
+Every branch of a \`CASE\` should return the **same type**. Mixing \`'small'\` (text) and \`0\` (number)
+across branches yields inconsistent typing that some engines coerce and others reject. Also:
+\`COUNT(CASE WHEN … THEN 1 END)\` works too (COUNT skips the NULL from the missing \`ELSE\`), but
+\`SUM(CASE … THEN 1 ELSE 0 END)\` is the clearer, more portable idiom.
+
+## Recap
+
+\`CASE\` branches a value per row (first true \`WHEN\` wins) for bucketing; wrapped inside \`SUM\`/\`COUNT\`
+it becomes conditional aggregation — the portable way to pivot categories into side-by-side columns.`,
+    demoCode: `SELECT
+  order_id,
+  CASE
+    WHEN total_cents >= 10000 THEN 'large'
+    WHEN total_cents >= 2000  THEN 'medium'
+    ELSE 'small'
+  END AS size_bucket
+FROM orders;`,
+  },
+  apply: {
+    id: "sql-l2-case-apply",
+    executionMode: "single-file",
+    prompt: `Bucket each order by \`total_cents\` into \`size_bucket\`: \`'large'\` if >= 10000,
+\`'medium'\` if >= 2000 (and < 10000), else \`'small'\`. Return \`order_id\` and \`size_bucket\`, sorted
+by \`order_id\`.`,
+    starterCode: `-- Bucket each order into size_bucket, sorted by order_id.
+SELECT
+  order_id,
+
+FROM orders
+ORDER BY order_id;`,
+    hints: [
+      "Order the `WHEN` branches from highest threshold down: check `>= 10000` first, then `>= 2000`.",
+      "The first true branch wins, so you don't need upper bounds — a 15000 order matches `>= 10000` before reaching `>= 2000`.",
+      "Add an `ELSE 'small'` for everything below 2000, and alias the whole thing `AS size_bucket`.",
+    ],
+    referenceSolution: `SELECT
+  order_id,
+  CASE
+    WHEN total_cents >= 10000 THEN 'large'
+    WHEN total_cents >= 2000  THEN 'medium'
+    ELSE 'small'
+  END AS size_bucket
+FROM orders
+ORDER BY order_id;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (100,   500),
+  (101,  2000),
+  (102,  9900),
+  (103, 10000),
+  (104, 15000);`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "size_bucket"],
+        rows: [
+          [100, "small"],
+          [101, "medium"],
+          [102, "medium"],
+          [103, "large"],
+          [104, "large"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-case-practice",
+    executionMode: "single-file",
+    prompt: `Build a daily status report using **conditional aggregation**: **one row per
+\`order_date\`** with three count columns — \`paid_count\`, \`shipped_count\`, \`cancelled_count\`.
+Return \`order_date\`, \`paid_count\`, \`shipped_count\`, \`cancelled_count\`, sorted by \`order_date\`.
+Every date present in the source must appear, and a status with zero occurrences that day must show
+\`0\` (not NULL).`,
+    starterCode: `-- One row per order_date; three conditional-aggregation count columns.
+SELECT
+  order_date,
+
+FROM orders
+GROUP BY order_date
+ORDER BY order_date;`,
+    hints: [
+      "`GROUP BY order_date` gives one row per day.",
+      "Each count column is `SUM(CASE WHEN status = '<x>' THEN 1 ELSE 0 END)` — the `ELSE 0` guarantees a `0`, not a NULL, for absent statuses.",
+      "Three such `SUM(CASE …)` expressions, one per status, become your three columns.",
+      "Sort by `order_date` for a deterministic report.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id   INTEGER PRIMARY KEY,
+  order_date TEXT,     -- 'YYYY-MM-DD'
+  status     TEXT      -- 'paid' | 'shipped' | 'cancelled'
+);
+INSERT INTO orders VALUES
+  (1, '2026-03-01', 'paid'),
+  (2, '2026-03-01', 'paid'),
+  (3, '2026-03-01', 'cancelled'),
+  (4, '2026-03-02', 'shipped'),
+  (5, '2026-03-02', 'shipped'),
+  (6, '2026-03-02', 'paid'),
+  (7, '2026-03-03', 'cancelled');`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_date", "paid_count", "shipped_count", "cancelled_count"],
+        rows: [
+          ["2026-03-01", 2, 0, 1],
+          ["2026-03-02", 1, 2, 0],
+          ["2026-03-03", 0, 0, 1],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel2: SqlLevel = {
   id: 2,
   slug: "aggregation",
@@ -1469,6 +1854,12 @@ export const sqlLevel2: SqlLevel = {
       description:
         "Stack and compare result sets with UNION/INTERSECT/EXCEPT, and nest queries as scalar, IN, and correlated subqueries.",
       lessons: [setOps, subqueries],
+    },
+    {
+      id: "sql-l2-readability",
+      title: "Module 2.4 — Readability and Conditional Logic",
+      description: "Make complex SQL legible with CTEs, and branch per-row with CASE expressions.",
+      lessons: [ctes, caseExpr],
     },
   ],
 }
