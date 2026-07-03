@@ -1599,6 +1599,251 @@ def gcd_of(a, b):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L2-M6 — Standard Library Toolkit  (gap-fill: see CURRICULUM-GAP-ANALYSIS.md)
+// Regular expressions and specialized collections — high-use stdlib the original
+// tree named but never taught directly.
+// ───────────────────────────────────────────────────────────────────────────
+
+const regexLesson: PythonLesson = {
+  id: "py-l2-regex",
+  title: "Pattern-matching text with re",
+  summary: "Find, extract, and replace text patterns with regular expressions.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["regex", "re", "findall", "sub"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Regular expressions describe text patterns
+
+A **regular expression** (regex) is a mini-language for "text that looks like this". Python's \`re\`
+module runs them. Write patterns as **raw strings** (\`r"..."\`) so backslashes mean what you expect.
+
+### The building blocks you'll use most
+
+\`\`\`text
+\\d   a digit            \\w   a word char (letter/digit/_)
+\\s   whitespace         .    any character
++    one or more         *    zero or more
+[abc] any of a, b, c     ()   a capture group
+\`\`\`
+
+### The three workhorse functions
+
+\`\`\`python
+import re
+
+re.findall(r"\\d+", "a1 b22")     # ['1', '22']   every match
+re.search(r"\\d+", "abc7")         # a Match at '7' (or None)  first match anywhere
+re.sub(r"\\d", "#", "a1b2")        # 'a#b#'        replace matches
+\`\`\`
+
+\`re.findall\` returns a **list** of every match — perfect for pulling all the numbers, words, or
+codes out of a blob of text.
+
+### Groups
+
+Parentheses capture part of a match:
+
+\`\`\`python
+re.findall(r"(\\w+)@(\\w+)", "a@x b@y")   # [('a', 'x'), ('b', 'y')]
+\`\`\`
+
+### Recap
+
+\`re.findall\` pulls out every match, \`re.search\` finds the first, \`re.sub\` replaces — and raw
+strings (\`r"..."\`) keep your patterns readable. Next you'll extract numbers, then redact them.`,
+    demoCode: `import re
+print(re.findall(r"\\d+", "order 12, item 345"))   # ['12', '345']
+print(re.sub(r"\\d", "#", "PIN 4021"))             # 'PIN ####'`,
+  },
+  apply: {
+    id: "py-l2-regex-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`find_numbers(text)\` — return a list of every run of digits in \`text\`, in order, using
+\`re.findall\`.
+
+For \`"a1b22"\` return \`["1", "22"]\`. If there are no digits, return \`[]\`.`,
+    starterCode: `import re
+
+def find_numbers(text):
+    # Return re.findall of one-or-more digits.
+    pass`,
+    hints: [
+      'The pattern for one-or-more digits is `r"\\d+"`.',
+      "`re.findall(pattern, text)` returns every match as a list.",
+      'Return `re.findall(r"\\d+", text)`.',
+    ],
+    referenceSolution: `import re
+
+def find_numbers(text):
+    return re.findall(r"\\d+", text)`,
+    testCases: [
+      { input: { text: "a1b22" }, expected: ["1", "22"], description: "two digit-runs" },
+      { input: { text: "no digits" }, expected: [], description: "none present" },
+      { input: { text: "42" }, expected: ["42"], description: "one number" },
+      { input: { text: "a1b2c3" }, expected: ["1", "2", "3"], description: "single digits" },
+    ],
+  },
+  practice: {
+    id: "py-l2-regex-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`redact_digits(text)\` — return \`text\` with **every digit** replaced by \`"#"\`, using
+\`re.sub\`.
+
+For \`"a1b2"\` return \`"a#b#"\`; for \`"2024"\` return \`"####"\`.`,
+    starterCode: `import re
+
+def redact_digits(text):
+    # Replace each digit with "#".
+    pass`,
+    hints: [
+      'Match a single digit with `r"\\d"`.',
+      "`re.sub(pattern, replacement, text)` swaps every match.",
+      'Return `re.sub(r"\\d", "#", text)`.',
+    ],
+    referenceSolution: `import re
+
+def redact_digits(text):
+    return re.sub(r"\\d", "#", text)`,
+    testCases: [
+      { input: { text: "a1b2" }, expected: "a#b#", description: "digits become #" },
+      { input: { text: "abc" }, expected: "abc", description: "nothing to redact" },
+      { input: { text: "2024" }, expected: "####", description: "all digits" },
+    ],
+  },
+}
+
+const collectionsToolkitLesson: PythonLesson = {
+  id: "py-l2-collections",
+  title: "Counter, defaultdict & deque",
+  summary:
+    "Reach for specialized collections: count with Counter, group with defaultdict, queue with deque.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["collections", "counter", "defaultdict", "deque"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## The collections module: sharper tools for common jobs
+
+The standard library's \`collections\` module has drop-in upgrades over plain dicts and lists.
+
+### Counter — tally things in one line
+
+\`\`\`python
+from collections import Counter
+
+Counter(["a", "b", "a"])          # Counter({'a': 2, 'b': 1})
+Counter("mississippi")["s"]        # 4
+Counter(words).most_common(2)      # the two most frequent (word, count) pairs
+\`\`\`
+
+What would be a 6-line manual counting loop is now one call.
+
+### defaultdict — grouping without "does the key exist yet?"
+
+A plain dict raises \`KeyError\` on a missing key. A \`defaultdict(list)\` auto-creates an empty list
+the first time you touch a key, so grouping is clean:
+
+\`\`\`python
+from collections import defaultdict
+
+groups = defaultdict(list)
+for word in ["ant", "apple", "bee"]:
+    groups[word[0]].append(word)   # no "if key not in groups" needed
+# {'a': ['ant', 'apple'], 'b': ['bee']}
+\`\`\`
+
+### deque — a fast queue
+
+A \`deque\` ("deck") adds/removes from **both ends** in \`O(1)\` (a list's \`pop(0)\` is \`O(n)\`):
+
+\`\`\`python
+from collections import deque
+q = deque([1, 2, 3])
+q.appendleft(0)   # deque([0, 1, 2, 3])
+q.popleft()       # 0
+\`\`\`
+
+### Recap
+
+\`Counter\` tallies frequencies, \`defaultdict\` removes missing-key boilerplate when grouping, and
+\`deque\` is the right structure for a queue. Next you'll count words, then group them by first
+letter.`,
+    demoCode: `from collections import Counter, defaultdict
+print(Counter(["a", "b", "a", "c", "a"]))   # Counter({'a': 3, 'b': 1, 'c': 1})
+
+groups = defaultdict(list)
+for w in ["ant", "apple", "bee"]:
+    groups[w[0]].append(w)
+print(dict(groups))   # {'a': ['ant', 'apple'], 'b': ['bee']}`,
+  },
+  apply: {
+    id: "py-l2-collections-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`word_counts(words)\` — return a dict mapping each word to how many times it appears in the
+list \`words\`. Use \`Counter\`.
+
+For \`["a", "b", "a"]\` return \`{"a": 2, "b": 1}\`.`,
+    starterCode: `from collections import Counter
+
+def word_counts(words):
+    # Count the words and return a plain dict.
+    pass`,
+    hints: [
+      "`Counter(words)` tallies the list.",
+      "Convert it to a plain dict for the result: `dict(Counter(words))`.",
+    ],
+    referenceSolution: `from collections import Counter
+
+def word_counts(words):
+    return dict(Counter(words))`,
+    testCases: [
+      {
+        input: { words: ["a", "b", "a"] },
+        expected: { a: 2, b: 1 },
+        description: "counts repeats",
+      },
+      { input: { words: [] }, expected: {}, description: "empty list" },
+      { input: { words: ["x"] }, expected: { x: 1 }, description: "single word" },
+    ],
+  },
+  practice: {
+    id: "py-l2-collections-practice",
+    executionMode: "single-file",
+    prompt: `Implement \`group_by_first(words)\` — return a dict mapping each **first letter** to the list of words
+starting with it, preserving order. Use \`defaultdict(list)\`.
+
+\`["apple", "ant", "bee"]\` returns \`{"a": ["apple", "ant"], "b": ["bee"]}\`.`,
+    starterCode: `from collections import defaultdict
+
+def group_by_first(words):
+    # Group words by their first character; return a plain dict.
+    pass`,
+    hints: [
+      "`groups = defaultdict(list)` auto-creates a list per new key.",
+      "For each word: `groups[word[0]].append(word)`.",
+      "Return `dict(groups)`.",
+    ],
+    referenceSolution: `from collections import defaultdict
+
+def group_by_first(words):
+    groups = defaultdict(list)
+    for word in words:
+        groups[word[0]].append(word)
+    return dict(groups)`,
+    testCases: [
+      {
+        input: { words: ["apple", "ant", "bee"] },
+        expected: { a: ["apple", "ant"], b: ["bee"] },
+        description: "groups by first letter",
+      },
+      { input: { words: [] }, expected: {}, description: "empty list" },
+      { input: { words: ["x"] }, expected: { x: ["x"] }, description: "single word" },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -1636,6 +1881,12 @@ export const level2: PythonLevel = {
       title: "Errors, Files & Modules",
       description: "Handle errors, parse JSON/CSV, and use the standard library.",
       lessons: [exceptionsLesson, filesJsonCsvLesson, modulesLesson],
+    },
+    {
+      id: "py-l2-stdlib-toolkit",
+      title: "Standard Library Toolkit",
+      description: "Reach for the batteries: regular expressions and specialized collections.",
+      lessons: [regexLesson, collectionsToolkitLesson],
     },
   ],
 }
