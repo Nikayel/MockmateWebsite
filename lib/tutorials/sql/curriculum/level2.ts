@@ -1175,6 +1175,272 @@ INSERT INTO snapshot_today VALUES
   },
 }
 
+const setOps: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-set-ops",
+  title: "UNION, INTERSECT, EXCEPT",
+  summary: "Stack and compare result sets with set logic.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["UNION", "UNION ALL", "INTERSECT", "EXCEPT", "column compatibility"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Stack rows, don't glue columns
+
+A join glues tables **horizontally** (adding columns). Set operations stack or compare them **vertically** (combining *rows*). As a DE you reach for them constantly: stacking multi-region loads into one stream, or diffing yesterday's IDs against today's to find what disappeared.
+
+The four operators, all requiring both sides to have the **same number of columns with compatible types**:
+
+| Operator | Meaning |
+|---|---|
+| \`UNION ALL\` | stack all rows from both, **keep duplicates** (cheapest — no dedup pass) |
+| \`UNION\` | stack and **remove duplicate rows** |
+| \`INTERSECT\` | rows present in **both** result sets |
+| \`EXCEPT\` | rows in the first set but **not** the second (a set difference / diff) |
+
+## Worked example — stack two regional order feeds
+
+\`\`\`sql
+SELECT order_id, total_cents FROM orders_eu
+UNION ALL
+SELECT order_id, total_cents FROM orders_us;
+\`\`\`
+
+**Anatomy:**
+
+\`\`\`
+SELECT a, b FROM left_source
+UNION ALL                       ← operator sits BETWEEN two full SELECTs
+SELECT a, b FROM right_source   ← same column count, compatible types, matched by POSITION
+ORDER BY a                      ← a single ORDER BY applies to the whole combined result, at the end
+\`\`\`
+
+Columns are matched **by position, not by name** — the first column of the top query lines up with the first column of the bottom, regardless of what they're called. The output takes its column names from the *first* \`SELECT\`.
+
+## \`UNION\` vs \`UNION ALL\` — a real cost decision
+
+\`UNION\` runs a deduplication pass (effectively a sort or hash) over the combined rows; \`UNION ALL\` just concatenates. When you *know* the sources don't overlap — or you *want* to preserve duplicates (e.g. two regions that both legitimately contain an order with the same total) — use \`UNION ALL\`. Reaching for \`UNION\` by reflex silently drops legitimate duplicate rows *and* costs more.
+
+## Keep it readable / common pitfall
+
+Put \`ORDER BY\` only once, after the final \`SELECT\` — it sorts the whole combined set. An \`ORDER BY\` inside an individual branch is either ignored or an error depending on the engine.
+
+**Recap.** Set operators combine rows vertically by column position — \`UNION ALL\` stacks and keeps dupes (cheapest), \`UNION\` dedupes, \`INTERSECT\` keeps common rows, and \`EXCEPT\` computes a diff.`,
+    demoCode: `SELECT order_id, total_cents FROM orders_eu
+UNION ALL
+SELECT order_id, total_cents FROM orders_us;`,
+  },
+  apply: {
+    id: "sql-l2-set-ops-apply",
+    executionMode: "single-file",
+    prompt: `Combine two regional order tables into one stream, keeping every row (including any coincidental duplicates). Return \`order_id\` and \`region\` for all EU and US orders, using \`UNION ALL\`, sorted by \`order_id\`, then \`region\`.`,
+    starterCode: `-- Stack both regional feeds with UNION ALL, keep every row, then sort.
+SELECT order_id, region FROM orders_eu
+-- combine with orders_us here
+;`,
+    hints: [
+      "Write two `SELECT order_id, region FROM …` and join them with `UNION ALL`.",
+      "Both branches must expose the same two columns in the same order.",
+      "A single `ORDER BY order_id, region` goes at the very end, after the second `SELECT`.",
+    ],
+    referenceSolution: `SELECT order_id, region FROM orders_eu
+UNION ALL
+SELECT order_id, region FROM orders_us
+ORDER BY order_id, region;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders_eu (
+  order_id INTEGER,
+  region   TEXT
+);
+CREATE TABLE orders_us (
+  order_id INTEGER,
+  region   TEXT
+);
+INSERT INTO orders_eu VALUES (100,'EU'),(101,'EU'),(102,'EU');
+INSERT INTO orders_us VALUES (200,'US'),(201,'US');`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "region"],
+        rows: [
+          [100, "EU"],
+          [101, "EU"],
+          [102, "EU"],
+          [200, "US"],
+          [201, "US"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-set-ops-practice",
+    executionMode: "single-file",
+    prompt: `Diff two source extracts. Find customer IDs that were present in yesterday's extract but are **missing** from today's (dropped customers) using \`EXCEPT\`. Return a single column \`dropped_customer_id\`, sorted ascending. (Both extracts may contain duplicate rows within themselves — \`EXCEPT\` treats each side as a set, which is exactly what you want for a presence diff.)`,
+    starterCode: `-- Rows present yesterday but absent today, via EXCEPT.
+-- One column: dropped_customer_id, sorted ascending.
+SELECT customer_id AS dropped_customer_id FROM extract_yesterday
+;`,
+    hints: [
+      "`EXCEPT` returns rows in the first `SELECT` that aren't in the second: `SELECT customer_id FROM extract_yesterday EXCEPT SELECT customer_id FROM extract_today`.",
+      "`EXCEPT` already deduplicates, so the doubled `2` in yesterday collapses to a set automatically.",
+      "Alias isn't applied per-branch — name the output column in the first `SELECT` (`SELECT customer_id AS dropped_customer_id …`) and sort at the end.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE extract_yesterday (
+  customer_id INTEGER
+);
+CREATE TABLE extract_today (
+  customer_id INTEGER
+);
+INSERT INTO extract_yesterday VALUES (1),(2),(2),(3),(4);
+INSERT INTO extract_today     VALUES (2),(3),(5);`,
+      orderMatters: true,
+      expected: {
+        columns: ["dropped_customer_id"],
+        rows: [[1], [4]],
+      },
+    },
+  },
+}
+
+const subqueries: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l2-subqueries",
+  title: "Subqueries: Scalar, IN, and Correlated",
+  summary: "Nest a query inside another to filter or compute against a derived value.",
+  estimatedMinutes: 30,
+  difficulty: "hard",
+  skills: ["scalar subquery", "IN subquery", "correlated subquery", "EXISTS"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Three shapes of subquery
+
+A subquery is a \`SELECT\` nested inside another query. You use one whenever a filter or a computed value depends on *another query's result* — "orders above the overall average," "customers who have ever ordered," "orders bigger than that customer's own average." There are three shapes, and knowing which is which is a common interview probe.
+
+**1. Scalar subquery** — returns exactly one row, one column; usable anywhere a single value is:
+
+\`\`\`sql
+SELECT order_id, total_cents
+FROM orders
+WHERE total_cents > (SELECT AVG(total_cents) FROM orders);
+\`\`\`
+
+The inner query yields one number (the overall average); the outer query compares each order to it.
+
+**2. \`IN\` (or \`NOT IN\`) subquery** — returns one column, many rows; tests set membership:
+
+\`\`\`sql
+SELECT customer_id, customer_name
+FROM customers
+WHERE customer_id IN (SELECT customer_id FROM orders);   -- customers who have ordered
+\`\`\`
+
+**3. Correlated subquery** — references the outer row, so it re-runs *per outer row*:
+
+\`\`\`sql
+SELECT o.order_id, o.customer_id, o.total_cents
+FROM orders AS o
+WHERE o.total_cents > (
+  SELECT AVG(o2.total_cents)
+  FROM orders AS o2
+  WHERE o2.customer_id = o.customer_id   -- ← the correlation: depends on the outer o
+);
+\`\`\`
+
+For each order, the inner query computes *that order's customer's* average — "orders above their own customer's average."
+
+**Anatomy — spot the correlation:**
+
+\`\`\`
+non-correlated: inner query is self-contained, runs ONCE
+correlated:     inner query references an outer alias (o), re-evaluated per outer row
+\`\`\`
+
+**\`EXISTS\`** is the correlated cousin of \`IN\`: \`WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)\` — true if at least one matching row exists. It's the NULL-safe way to write a semi-join.
+
+> **Performance note.** A correlated subquery conceptually re-runs per outer row, which can be slow on large tables. Very often the same result is expressible as a **join** or a **window function** (Level 4), which the optimizer executes in one pass. Reach for the correlated form for clarity, but know that "above their own group's average" is a textbook case a window function does faster.
+
+**Keep it readable / common pitfall:** a scalar subquery that accidentally returns more than one row is a runtime error (\`sub-select returns N columns/rows\`). And remember the \`NOT IN\` + NULL trap from Level 1 — if the subquery can emit a NULL, prefer \`NOT EXISTS\`.
+
+**Recap:** Subqueries come in three shapes — scalar (one value), \`IN\` (a column of values), and correlated (re-runs per outer row referencing it); correlated logic is clear but often beaten on speed by a join or a window function.`,
+    demoCode: `SELECT order_id, total_cents
+FROM orders
+WHERE total_cents > (SELECT AVG(total_cents) FROM orders);`,
+  },
+  apply: {
+    id: "sql-l2-subqueries-apply",
+    executionMode: "single-file",
+    prompt: `Return every order whose \`total_cents\` exceeds the **overall average** \`total_cents\` across all orders — a scalar subquery. Return \`order_id\` and \`total_cents\`, sorted by \`order_id\`.`,
+    starterCode: `-- Keep orders above the overall average total_cents, sorted by order_id.
+SELECT order_id, total_cents
+FROM orders
+WHERE ;`,
+    hints: [
+      "Compute the average in a scalar subquery: `(SELECT AVG(total_cents) FROM orders)`.",
+      "Compare each row to it in the `WHERE`: `WHERE total_cents > (…)`.",
+      "The subquery returns one value, so it slots directly into the comparison.",
+    ],
+    referenceSolution: `SELECT order_id, total_cents
+FROM orders
+WHERE total_cents > (SELECT AVG(total_cents) FROM orders)
+ORDER BY order_id;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (100, 1000),
+  (101, 2000),
+  (102, 9000),
+  (103, 3000),
+  (104,  500);
+-- average = (1000 + 2000 + 9000 + 3000 + 500) / 5 = 3100`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "total_cents"],
+        rows: [[102, 9000]],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l2-subqueries-practice",
+    executionMode: "single-file",
+    prompt: `**Above-their-own-average orders (correlated).** For each order, keep it only if its \`total_cents\` is **strictly greater** than the average \`total_cents\` of that same customer's orders. Return \`customer_id\`, \`order_id\`, and \`total_cents\`, sorted by \`customer_id\`, then \`order_id\`. Use a correlated subquery that averages within the outer row's customer.
+
+(Note for yourself: a window function \`AVG() OVER (PARTITION BY customer_id)\` would compute this in one pass — you'll meet it in Level 4.)`,
+    starterCode: `-- Keep orders whose total exceeds their OWN customer's average (correlated subquery).
+SELECT o.customer_id, o.order_id, o.total_cents
+FROM orders AS o
+WHERE ;`,
+    hints: [
+      "Alias the outer table (`orders o`) and use a second alias inside (`orders o2`) so the subquery can correlate on `o2.customer_id = o.customer_id`.",
+      "The inner query is `SELECT AVG(o2.total_cents) FROM orders o2 WHERE o2.customer_id = o.customer_id`.",
+      "Compare with strict `>` so an order equal to its customer's average (customer 3) is excluded.",
+      "This is the correlated shape — the inner query references the outer `o`, so it re-evaluates per order.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (100, 1, 1000),
+  (101, 1, 3000),   -- cust 1 avg = 2000 → 3000 qualifies, 1000 does not
+  (102, 2, 5000),
+  (103, 2, 5000),
+  (104, 2, 8000),   -- cust 2 avg = 6000 → only 8000 qualifies
+  (105, 3, 4000);   -- cust 3 avg = 4000 → nothing strictly above`,
+      orderMatters: true,
+      expected: {
+        columns: ["customer_id", "order_id", "total_cents"],
+        rows: [
+          [1, 101, 3000],
+          [2, 104, 8000],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel2: SqlLevel = {
   id: 2,
   slug: "aggregation",
@@ -1196,6 +1462,13 @@ export const sqlLevel2: SqlLevel = {
       description:
         "Combine source tables: inner joins on keys, LEFT joins that preserve rows, anti-joins for gaps, and self/outer joins.",
       lessons: [innerJoin, leftJoin, antiJoin, selfJoin],
+    },
+    {
+      id: "sql-l2-sets-subqueries",
+      title: "Module 2.3 — Set Operations and Subqueries",
+      description:
+        "Stack and compare result sets with UNION/INTERSECT/EXCEPT, and nest queries as scalar, IN, and correlated subqueries.",
+      lessons: [setOps, subqueries],
     },
   ],
 }
