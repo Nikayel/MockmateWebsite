@@ -13,12 +13,12 @@ const selectColumns: SqlLevel["modules"][number]["lessons"][number] = {
 
 When a raw table lands in the warehouse, its column names are whatever the source system used:
 \`cust_nm\`, \`ord_dt\`, \`amt_c\`. Those names are cryptic and can change without warning. The first
-transform a data engineer writes — the **staging model** — selects only the columns downstream needs
+transform a data engineer writes, the **staging model**, selects only the columns downstream needs
 and renames each to a clean, predictable convention (usually \`snake_case\`).
 
 \`SELECT *\` is the opposite of that discipline: it drags every column downstream, breaks the moment
 the source adds a column, and hides which fields a model depends on. **Explicit projection is a
-contract** — it documents exactly what you consume and insulates you from upstream churn.
+contract**: it documents exactly what you consume and insulates you from upstream churn.
 
 ## The concept
 
@@ -36,7 +36,7 @@ The output columns are named by *you*, regardless of what the source called them
 depend on your stable names, not the source's.
 
 **Pitfall:** forgetting a comma between columns. \`SELECT order_id customer_id FROM orders\` doesn't
-error — SQLite reads it as "select \`order_id\`, aliased to \`customer_id\`," silently dropping a column.`,
+error. SQLite reads it as "select \`order_id\`, aliased to \`customer_id\`," silently dropping a column.`,
     demoCode: `SELECT
   ord_id  AS order_id,
   cust_id AS customer_id,
@@ -58,7 +58,7 @@ SELECT
 
 FROM orders;`,
     hints: [
-      "You only need `SELECT ... FROM orders;` — no WHERE, no sorting.",
+      "You only need `SELECT ... FROM orders;` (no WHERE, no sorting).",
       "Name exactly three columns, comma-separated, each followed by `AS <clean_name>`.",
       "Leave `ord_status` out of the projection entirely.",
       "Watch your commas: one after each alias except the last.",
@@ -111,7 +111,7 @@ SELECT
 
 FROM orders_raw;`,
     hints: [
-      "Six columns in the projection, `internal_flag` omitted — that's the whole shape.",
+      "Six columns in the projection, `internal_flag` omitted. That's the whole shape.",
       "The output column order is graded; list them top-to-bottom exactly as specified.",
       "Every raw name changes; give all six an `AS` alias.",
     ],
@@ -174,16 +174,16 @@ to **derive it at query time**: \`qty * unit_price_cents AS line_revenue_cents\`
 one place (your model), and it can never drift out of sync with its inputs.
 
 The same applies to labels. Instead of storing a \`full_name\`, you concatenate
-\`first_name || ' ' || last_name\` in the model — one source of truth, computed on read.
+\`first_name || ' ' || last_name\` in the model: one source of truth, computed on read.
 
 ## The building blocks
 
 - **Arithmetic:** \`+\`, \`-\`, \`*\`, \`/\`. Integer division truncates in SQLite (\`7 / 2\` → \`3\`);
   multiply by \`1.0\` or cast to force decimals.
 - **String concatenation:** \`||\` joins text. \`'A' || '-' || 'B'\` → \`'A-B'\`.
-- **Literal columns:** a constant becomes a column for every row — \`'raw' AS source_system\`.
+- **Literal columns:** a constant becomes a column for every row: \`'raw' AS source_system\`.
 
-> **In the warehouse this differs — string concatenation.** Postgres/Snowflake also support \`||\`,
+> **In the warehouse this differs: string concatenation.** Postgres/Snowflake also support \`||\`,
 > but SQL Server uses \`+\` and BigQuery uses \`CONCAT()\`. \`||\` is the portable ANSI choice and the one
 > SQLite understands, so we author with it here.
 
@@ -206,11 +206,11 @@ qty * unit_price_cents   AS   line_revenue_cents
 \`\`\`
 
 **Pitfall.** Integer division silently truncates: \`unit_price_cents / 100\` for \`4999\` gives \`49\`, not
-\`49.99\`. To keep the cents, divide by \`100.0\`. And always alias a computed column — an un-aliased
+\`49.99\`. To keep the cents, divide by \`100.0\`. And always alias a computed column: an un-aliased
 expression gets an ugly, unstable auto-name like \`qty * unit_price_cents\`.
 
-**Recap.** Compute derived values (\`qty * price\`, \`a || b\`, constants) in the query and alias them —
-never rely on the source to store what you can derive.`,
+**Recap.** Compute derived values (\`qty * price\`, \`a || b\`, constants) in the query and alias them.
+Never rely on the source to store what you can derive.`,
     demoCode: `SELECT
   product_id,
   qty * unit_price_cents      AS line_revenue_cents,
@@ -267,10 +267,10 @@ INSERT INTO order_items VALUES
     prompt: `Produce a source-preview projection over \`products\` with these output columns, in order:
 
 - \`product_id\`
-- \`unit_price_dollars\` — the price in dollars as a decimal (cents ÷ 100, **keep** the fractional part)
-- \`label\` — the \`product_name\`, a space, an opening paren, the \`sku\`, and a closing paren, e.g.
+- \`unit_price_dollars\`: the price in dollars as a decimal (cents ÷ 100, **keep** the fractional part)
+- \`label\`: the \`product_name\`, a space, an opening paren, the \`sku\`, and a closing paren, e.g.
   \`Wireless Earbuds (SKU-AUDIO-01)\`
-- \`source_system\` — a hard-coded literal \`'ecommerce_raw'\` on every row`,
+- \`source_system\`: a hard-coded literal \`'ecommerce_raw'\` on every row`,
     starterCode: `-- product_id, a decimal price, a built label, and a literal source_system.
 SELECT
 
@@ -278,7 +278,7 @@ FROM products;`,
     hints: [
       "To get decimals from integer cents, divide by `100.0`, not `100`.",
       "Build `label` with `||`: `product_name || ' (' || sku || ')'`.",
-      "A bare string literal like `'ecommerce_raw'` becomes a constant column — just alias it.",
+      "A bare string literal like `'ecommerce_raw'` becomes a constant column. Just alias it.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE products (
@@ -325,7 +325,7 @@ The cheapest row is the one you never process. A staging model that only cares a
 
 \`=\` (equal), \`<>\` or \`!=\` (not equal), \`<\`, \`>\`, \`<=\`, \`>=\`. Text comparisons use single quotes: \`status = 'paid'\`. Numbers are bare: \`total_cents >= 5000\`.
 
-## Worked example — the "processable" slice
+## Worked example: the "processable" slice
 
 \`\`\`sql
 SELECT order_id, status, total_cents
@@ -348,7 +348,7 @@ Use single quotes for string *values* (\`'paid'\`); double quotes mean *identifi
 
 ## Recap
 
-\`WHERE col op value\` keeps only matching rows — quote text values, filter as early as possible.`,
+\`WHERE col op value\` keeps only matching rows. Quote text values, filter as early as possible.`,
     demoCode: `SELECT order_id, status, total_cents
 FROM orders
 WHERE status = 'paid'
@@ -364,7 +364,7 @@ SELECT
 FROM orders;`,
     hints: [
       "Two conditions joined by `AND`.",
-      "`>=` is inclusive — `5000` qualifies.",
+      "`>=` is inclusive: `5000` qualifies.",
       "Quote the text value: `'paid'`.",
     ],
     referenceSolution: `SELECT order_id, status, total_cents
@@ -445,9 +445,9 @@ const inBetweenLike: SqlLevel["modules"][number]["lessons"][number] = {
 
 Beyond \`=\`, a data engineer constantly needs three more filter shapes:
 
-- **Set membership** — "status is one of these": \`status IN ('paid','shipped')\` (cleaner than a chain of \`OR\`s).
-- **Range** — "price in this band": \`unit_price_cents BETWEEN 1000 AND 5000\` (inclusive on both ends).
-- **Pattern** — "SKU looks like this": \`sku LIKE 'AUD-%'\`. In \`LIKE\`, \`%\` matches any run of characters, \`_\` matches exactly one.
+- **Set membership** means "status is one of these": \`status IN ('paid','shipped')\` (cleaner than a chain of \`OR\`s).
+- **Range** means "price in this band": \`unit_price_cents BETWEEN 1000 AND 5000\` (inclusive on both ends).
+- **Pattern** means "SKU looks like this": \`sku LIKE 'AUD-%'\`. In \`LIKE\`, \`%\` matches any run of characters, \`_\` matches exactly one.
 
 ### Worked example
 
@@ -469,17 +469,17 @@ sku LIKE 'SKU-%'                         -- '%' = any chars, '_' = one char
 
 ### The NOT IN + NULL trap
 
-If the list inside \`NOT IN\` contains a \`NULL\` — or the column being tested is \`NULL\` — the result can become "unknown" and silently drop rows you expected to keep. \`status NOT IN ('paid', NULL)\` returns **no rows at all**. When you use \`NOT IN\`, make sure neither side involves NULLs, or switch to \`NOT EXISTS\`. (More on this in the next lesson.)
+If the list inside \`NOT IN\` contains a \`NULL\` (or the column being tested is \`NULL\`), the result can become "unknown" and silently drop rows you expected to keep. \`status NOT IN ('paid', NULL)\` returns **no rows at all**. When you use \`NOT IN\`, make sure neither side involves NULLs, or switch to \`NOT EXISTS\`. (More on this in the next lesson.)
 
 ### Pitfall
 
-\`BETWEEN\` is inclusive — \`BETWEEN 1 AND 10\` includes both 1 and 10. If you mean "under 10," don't use \`BETWEEN\`.
+\`BETWEEN\` is inclusive: \`BETWEEN 1 AND 10\` includes both 1 and 10. If you mean "under 10," don't use \`BETWEEN\`.
 
 > **In the warehouse this differs…** \`LIKE\` is case-insensitive for ASCII in SQLite by default but **case-sensitive** in Postgres. Normalize case first if it matters (see Lesson \`sql-l1-strings\`).
 
 ### Recap
 
-\`IN\` for sets, \`BETWEEN\` for inclusive ranges, \`LIKE\` with \`%\`/\`_\` for patterns — and never put NULL near \`NOT IN\`.`,
+\`IN\` for sets, \`BETWEEN\` for inclusive ranges, \`LIKE\` with \`%\`/\`_\` for patterns. Never put NULL near \`NOT IN\`.`,
     demoCode: `SELECT product_id, sku, category_code, unit_price_cents
 FROM products
 WHERE category_code IN ('AUD','HOM')
@@ -497,7 +497,7 @@ WHERE
 ;`,
     hints: [
       "Use IN ('AUD','HOM') for the category.",
-      "Use BETWEEN 2000 AND 9000 for the price — both ends inclusive.",
+      "Use BETWEEN 2000 AND 9000 for the price (both ends inclusive).",
       "The TOY row and the 15000 row both drop.",
     ],
     referenceSolution: `SELECT product_id, category_code, unit_price_cents
@@ -531,10 +531,10 @@ INSERT INTO products VALUES
   practice: {
     id: "sql-l1-in-between-like-practice",
     executionMode: "single-file",
-    prompt: `Quarantine suspect rows — return \`product_id\`, \`sku\`, \`status\` for products that match **all three** conditions:
+    prompt: `Quarantine suspect rows: return \`product_id\`, \`sku\`, \`status\` for products that match **all three** conditions:
 - the \`sku\` matches the malformed prefix pattern \`TMP-%\` (temporary SKUs that should never ship),
 - the \`status\` is in the excluded set \`('draft','deprecated')\`,
-- the \`added_date\` is **outside** the valid window \`2026-01-01\` to \`2026-02-28\` (i.e., *not* \`BETWEEN\` those dates — ISO date text compares lexicographically, so \`BETWEEN\` works on \`'YYYY-MM-DD'\`).`,
+- the \`added_date\` is **outside** the valid window \`2026-01-01\` to \`2026-02-28\` (i.e., *not* \`BETWEEN\` those dates; ISO date text compares lexicographically, so \`BETWEEN\` works on \`'YYYY-MM-DD'\`).`,
     starterCode: `-- Pattern-match the SKU, restrict the status set, and exclude the valid date window.
 SELECT product_id, sku, status
 FROM products_raw
@@ -543,7 +543,7 @@ WHERE
     hints: [
       "sku LIKE 'TMP-%' catches the temporary SKUs.",
       "status IN ('draft','deprecated') for the excluded set.",
-      "\"Outside the window\" is added_date NOT BETWEEN '2026-01-01' AND '2026-02-28' — row 3 is a draft but inside the window, so it drops; only row 4 satisfies all three.",
+      "\"Outside the window\" is added_date NOT BETWEEN '2026-01-01' AND '2026-02-28'. Row 3 is a draft but inside the window, so it drops; only row 4 satisfies all three.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE products_raw (
@@ -572,7 +572,7 @@ INSERT INTO products_raw VALUES
 const nullLogic: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l1-null-logic",
   title: "NULLs and Three-Valued Logic",
-  summary: "Handle missing values correctly — the #1 source of silent data bugs.",
+  summary: "Handle missing values correctly: the #1 source of silent data bugs.",
   estimatedMinutes: 15,
   difficulty: "medium",
   skills: ["IS NULL", "IS NOT NULL", "COALESCE", "three-valued logic", "NULL in comparisons"],
@@ -580,7 +580,7 @@ const nullLogic: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 6,
     markdown: `## Why this lesson matters more than it looks
 
-NULL is not a value — it's the *absence* of a value, SQL's way of saying "unknown." Almost every silent data bug a DE chases ("why did 4,000 rows vanish from the mart?") traces back to a mishandled NULL. Source systems are full of them: an email that was never collected, a \`region\` the app forgot to set, a \`total\` that hasn't been computed yet. Learning to reason about NULL correctly is the difference between a pipeline you trust and one that quietly loses data.
+NULL is not a value: it's the *absence* of a value, SQL's way of saying "unknown." Almost every silent data bug a DE chases ("why did 4,000 rows vanish from the mart?") traces back to a mishandled NULL. Source systems are full of them: an email that was never collected, a \`region\` the app forgot to set, a \`total\` that hasn't been computed yet. Learning to reason about NULL correctly is the difference between a pipeline you trust and one that quietly loses data.
 
 ## Three-valued logic
 
@@ -592,7 +592,7 @@ In most languages a comparison is \`true\` or \`false\`. In SQL there's a third 
 NULL = NULL     -> unknown   (two unknowns aren't "equal")
 \`\`\`
 
-And \`WHERE\` only keeps rows where the condition is **\`true\`** — it discards both \`false\` and \`unknown\`. That's the trap: \`WHERE email = NULL\` matches *nothing*, because \`= NULL\` is never \`true\`. To test for NULL you must use the special operators **\`IS NULL\`** and **\`IS NOT NULL\`**, which return real \`true\`/\`false\`:
+And \`WHERE\` only keeps rows where the condition is **\`true\`**. It discards both \`false\` and \`unknown\`. That's the trap: \`WHERE email = NULL\` matches *nothing*, because \`= NULL\` is never \`true\`. To test for NULL you must use the special operators **\`IS NULL\`** and **\`IS NOT NULL\`**, which return real \`true\`/\`false\`:
 
 \`\`\`sql
 SELECT customer_id, email
@@ -611,7 +611,7 @@ WHERE customer_id NOT IN (SELECT customer_id FROM flagged);
 
 The fix: filter NULLs out of the subquery, or use \`NOT EXISTS\` (Level 2).
 
-## COALESCE — supply a default
+## COALESCE: supply a default
 
 \`COALESCE(a, b, c)\` returns the first non-NULL argument. It's how you replace a missing value with a display default *without dropping the row*:
 
@@ -634,7 +634,7 @@ COALESCE(region, 'UNSPECIFIED')   -- region if present, else the fallback
 
 ## Keep it readable / the audit pattern
 
-A DE often wants to *keep* the NULL rows but *flag* them — never silently drop data during profiling. You don't need any new syntax for the flag: a predicate like \`email IS NULL\` is itself a value — in SQLite it evaluates to \`1\` when true and \`0\` when false. So you can drop an \`IS NULL\` test (or several joined with \`OR\`) straight into the \`SELECT\` list, beside a \`COALESCE\` display, and the row survives with its problem made visible:
+A DE often wants to *keep* the NULL rows but *flag* them. Never silently drop data during profiling. You don't need any new syntax for the flag: a predicate like \`email IS NULL\` is itself a value: in SQLite it evaluates to \`1\` when true and \`0\` when false. So you can drop an \`IS NULL\` test (or several joined with \`OR\`) straight into the \`SELECT\` list, beside a \`COALESCE\` display, and the row survives with its problem made visible:
 
 \`\`\`sql
 SELECT
@@ -647,11 +647,11 @@ FROM customers;
 Join several tests with \`OR\` to flag "any key missing" in one \`1\`/\`0\` column: \`(email IS NULL OR region IS NULL)\`.
 
 **Common pitfalls.**
-- \`= NULL\` / \`<> NULL\` are always \`unknown\` — use \`IS NULL\` / \`IS NOT NULL\`.
+- \`= NULL\` / \`<> NULL\` are always \`unknown\`. Use \`IS NULL\` / \`IS NOT NULL\`.
 - Aggregates and \`NOT IN\` treat NULL surprisingly; assume nothing.
-- \`COALESCE(NULL, NULL)\` is still NULL — provide a non-NULL final fallback if you need a guaranteed value.
+- \`COALESCE(NULL, NULL)\` is still NULL. Provide a non-NULL final fallback if you need a guaranteed value.
 
-**Recap.** NULL means "unknown"; comparisons to it are \`unknown\`, and \`WHERE\` drops \`unknown\` — test with \`IS NULL\`/\`IS NOT NULL\`, default with \`COALESCE\`, and flag-don't-drop when auditing.`,
+**Recap.** NULL means "unknown"; comparisons to it are \`unknown\`, and \`WHERE\` drops \`unknown\`. Test with \`IS NULL\`/\`IS NOT NULL\`, default with \`COALESCE\`, and flag-don't-drop when auditing.`,
     demoCode: `SELECT customer_id, email
 FROM customers
 WHERE email IS NULL;`,
@@ -659,16 +659,16 @@ WHERE email IS NULL;`,
   apply: {
     id: "sql-l1-null-logic-apply",
     executionMode: "single-file",
-    prompt: `Find customers with a **missing email**. Return \`customer_id\`, \`email\` for the rows where \`email IS NULL\`. Remember: \`WHERE email = NULL\` is the trap — it matches nothing.`,
+    prompt: `Find customers with a **missing email**. Return \`customer_id\`, \`email\` for the rows where \`email IS NULL\`. Remember: \`WHERE email = NULL\` is the trap. It matches nothing.`,
     starterCode: `-- Find customers whose email is missing.
 -- Return customer_id, email.
 SELECT
 
 FROM customers;`,
     hints: [
-      "`WHERE email = NULL` will return nothing — that's the trap.",
+      "`WHERE email = NULL` will return nothing. That's the trap.",
       "Use `email IS NULL`.",
-      "Row 3's email is present (its region is the NULL) — it must not appear.",
+      "Row 3's email is present (its region is the NULL). It must not appear.",
     ],
     referenceSolution: `SELECT customer_id, email
 FROM customers
@@ -700,9 +700,9 @@ INSERT INTO customers VALUES
     executionMode: "single-file",
     prompt: `Write a **null-audit projection** that keeps *every* row (no filtering) and exposes the data-quality problems. Return these columns, in order:
 - \`customer_id\`
-- \`email_display\` — the email, or \`'MISSING_EMAIL'\` when NULL
-- \`region_display\` — the region, or \`'UNSPECIFIED'\` when NULL
-- \`has_missing_key\` — \`1\` if **either** \`email\` **or** \`region\` **or** \`signup_date\` is NULL, else \`0\`
+- \`email_display\`: the email, or \`'MISSING_EMAIL'\` when NULL
+- \`region_display\`: the region, or \`'UNSPECIFIED'\` when NULL
+- \`has_missing_key\`: \`1\` if **either** \`email\` **or** \`region\` **or** \`signup_date\` is NULL, else \`0\`
 
 You don't need \`CASE\` for the flag: a predicate is itself a value, so an \`IS NULL\` test dropped into the \`SELECT\` list evaluates to \`1\` (true) or \`0\` (false).`,
     starterCode: `-- Null-audit projection: keep all rows, expose the missing values.
@@ -711,9 +711,9 @@ SELECT
 
 FROM customers_raw;`,
     hints: [
-      "No `WHERE` — the audit keeps all five rows on purpose.",
+      "No `WHERE`: the audit keeps all five rows on purpose.",
       "Use `COALESCE(email, 'MISSING_EMAIL')` and `COALESCE(region, 'UNSPECIFIED')`.",
-      "For the flag, put the predicate straight in the SELECT list — `(email IS NULL OR region IS NULL OR signup_date IS NULL)` evaluates to 1 when any key is missing, else 0. No CASE needed.",
+      "For the flag, put the predicate straight in the SELECT list: `(email IS NULL OR region IS NULL OR signup_date IS NULL)` evaluates to 1 when any key is missing, else 0. No CASE needed.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE customers_raw (
@@ -754,13 +754,13 @@ const booleanAndOr: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 6,
     markdown: `## Precedence is where filters silently break
 
-\`AND\` binds *tighter* than \`OR\` — just like \`*\` binds tighter than \`+\`. So this:
+\`AND\` binds *tighter* than \`OR\`, just like \`*\` binds tighter than \`+\`. So this:
 
 \`\`\`sql
 WHERE status = 'paid' OR status = 'shipped' AND region = 'EU'
 \`\`\`
 
-does **not** mean "(paid or shipped) and in EU." SQL reads it as \`paid OR (shipped AND region='EU')\` — which lets in *every* paid order from *any* region. A missing pair of parentheses just silently widened your filter and let bad rows into the model. This is one of the most common real bugs in production SQL.
+does **not** mean "(paid or shipped) and in EU." SQL reads it as \`paid OR (shipped AND region='EU')\`, which lets in *every* paid order from *any* region. A missing pair of parentheses just silently widened your filter and let bad rows into the model. This is one of the most common real bugs in production SQL.
 
 **The fix is always the same: parenthesize the OR branch.**
 
@@ -779,7 +779,7 @@ WHERE ( A OR B )   -- group the alternatives first
   AND NOT D        -- and exclude D
 \`\`\`
 
-**Keep it readable.** When a filter mixes \`AND\` and \`OR\`, *always* parenthesize — even where precedence would technically do the right thing. Explicit parens document intent and survive future edits. A reviewer should never have to recall the precedence table to know what a \`WHERE\` means.
+**Keep it readable.** When a filter mixes \`AND\` and \`OR\`, *always* parenthesize, even where precedence would technically do the right thing. Explicit parens document intent and survive future edits. A reviewer should never have to recall the precedence table to know what a \`WHERE\` means.
 
 **Recap.** \`AND\` binds tighter than \`OR\`; wrap every \`OR\` group in parentheses so a business rule's grouping is exact and unambiguous.`,
     demoCode: `SELECT order_id, status, region
@@ -837,7 +837,7 @@ WHERE ;`,
     hints: [
       "Three groups joined by AND: (status ...), (region ...), and the test-account exclusion.",
       "Each OR group needs its own parentheses: (status = 'paid' OR status = 'shipped') and (region = 'EU' OR region = 'UK').",
-      '"Excluding test accounts" is is_test_acct = 0 (or <> 1) — that drops orders 4 and 7. Order 3 (US) and order 5 (cancelled) also drop.',
+      '"Excluding test accounts" is is_test_acct = 0 (or <> 1). That drops orders 4 and 7. Order 3 (US) and order 5 (cancelled) also drop.',
     ],
     singleFile: {
       seedSql: `CREATE TABLE orders (
@@ -878,11 +878,11 @@ const orderBy: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Rows have no inherent order
 
-A table is a *set* — without \`ORDER BY\`, the engine may return rows in any order, and that order can change between runs, after a reload, or when an index changes. For any preview, any "newest 10," any output a human or a test will eyeball, you **must** sort explicitly, and you must sort on enough columns to make the order *deterministic*.
+A table is a *set*. Without \`ORDER BY\`, the engine may return rows in any order, and that order can change between runs, after a reload, or when an index changes. For any preview, any "newest 10," any output a human or a test will eyeball, you **must** sort explicitly, and you must sort on enough columns to make the order *deterministic*.
 
 ## Sort keys and tie-breaking
 
-\`ORDER BY order_ts DESC\` puts newest first. But if two orders share a timestamp, their relative order is still undefined — add a **tie-breaker**: \`ORDER BY order_ts DESC, order_id DESC\`. Now the output is stable every run.
+\`ORDER BY order_ts DESC\` puts newest first. But if two orders share a timestamp, their relative order is still undefined. Add a **tie-breaker**: \`ORDER BY order_ts DESC, order_id DESC\`. Now the output is stable every run.
 
 Worked example:
 
@@ -902,9 +902,9 @@ ORDER BY  order_ts DESC ,  total_cents DESC
 
 ## Where NULLs land
 
-> **In the warehouse this differs:** SQLite sorts NULLs *first* under \`ASC\` (and last under \`DESC\`); Postgres defaults to NULLs *last* under \`ASC\`. If NULL placement matters, be explicit — standard SQL supports \`ORDER BY col ASC NULLS LAST\` (Postgres/Oracle), though SQLite only added \`NULLS FIRST/LAST\` in 3.30. Portable trick: \`ORDER BY (col IS NULL), col\` forces NULLs last everywhere.
+> **In the warehouse this differs:** SQLite sorts NULLs *first* under \`ASC\` (and last under \`DESC\`); Postgres defaults to NULLs *last* under \`ASC\`. If NULL placement matters, be explicit. Standard SQL supports \`ORDER BY col ASC NULLS LAST\` (Postgres/Oracle), though SQLite only added \`NULLS FIRST/LAST\` in 3.30. Portable trick: \`ORDER BY (col IS NULL), col\` forces NULLs last everywhere.
 
-**Pitfall.** Sorting on a non-unique column alone is *not* deterministic — always add a unique tie-breaker (often the primary key) if the output must be stable.
+**Pitfall.** Sorting on a non-unique column alone is *not* deterministic. Always add a unique tie-breaker (often the primary key) if the output must be stable.
 
 **Recap.** \`ORDER BY\` makes output deterministic; add a unique tie-breaker column, and be explicit about NULL placement across dialects.`,
     demoCode: `SELECT order_id, order_ts, total_cents
@@ -960,7 +960,7 @@ FROM orders
 `,
     hints: [
       "Three sort keys, in order: order_ts DESC, total_cents DESC, order_id ASC.",
-      "Rows 1 and 2 tie on timestamp and total — only the order_id ASC key makes them deterministic (1 before 2).",
+      "Rows 1 and 2 tie on timestamp and total. Only the order_id ASC key makes them deterministic (1 before 2).",
       "ISO-8601 text sorts chronologically as a plain string, so no date parsing is needed.",
     ],
     singleFile: {
@@ -1004,16 +1004,16 @@ const limitDistinct: SqlLevel["modules"][number]["lessons"][number] = {
 
 When a fresh source lands, a DE does two things immediately:
 
-1. **Sample it** — \`LIMIT 10\` after an \`ORDER BY\` to eyeball the top rows without pulling millions.
-2. **Probe cardinality** — \`SELECT DISTINCT status FROM orders\` to learn what values a column *actually* contains (often not what the schema doc claims).
+1. **Sample it**: \`LIMIT 10\` after an \`ORDER BY\` to eyeball the top rows without pulling millions.
+2. **Probe cardinality**: \`SELECT DISTINCT status FROM orders\` to learn what values a column *actually* contains (often not what the schema doc claims).
 
 ## LIMIT (and OFFSET)
 
-\`LIMIT n\` returns at most \`n\` rows; \`LIMIT n OFFSET m\` skips \`m\` then returns \`n\` (basic pagination). Always pair \`LIMIT\` with \`ORDER BY\` — a limit on an unsorted set gives arbitrary rows.
+\`LIMIT n\` returns at most \`n\` rows; \`LIMIT n OFFSET m\` skips \`m\` then returns \`n\` (basic pagination). Always pair \`LIMIT\` with \`ORDER BY\`. A limit on an unsorted set gives arbitrary rows.
 
 ## DISTINCT
 
-\`DISTINCT\` removes duplicate rows from the result. \`SELECT DISTINCT region, status FROM orders\` returns each unique *combination* of the two columns — a fast way to map the value space.
+\`DISTINCT\` removes duplicate rows from the result. \`SELECT DISTINCT region, status FROM orders\` returns each unique *combination* of the two columns, a fast way to map the value space.
 
 Worked example:
 
@@ -1034,7 +1034,7 @@ LIMIT 10 OFFSET 0;               -- top 10 after sorting (OFFSET optional)
 
 > **In the warehouse (dialect note).** SQLite/Postgres/MySQL use \`LIMIT\`. SQL Server uses \`SELECT TOP 10 ...\` or the ANSI \`OFFSET ... FETCH NEXT 10 ROWS ONLY\`; Oracle also uses \`FETCH FIRST\`. \`LIMIT\` is the portable choice for this course but flag it when you move to SQL Server.
 
-**Pitfall.** \`DISTINCT\` applies to the *entire* row, not one column — \`SELECT DISTINCT region, status\` does **not** mean "distinct regions with any status." And \`LIMIT\` without \`ORDER BY\` is non-deterministic.
+**Pitfall.** \`DISTINCT\` applies to the *entire* row, not one column: \`SELECT DISTINCT region, status\` does **not** mean "distinct regions with any status." And \`LIMIT\` without \`ORDER BY\` is non-deterministic.
 
 **Recap.** \`LIMIT\`/\`OFFSET\` sample a sorted set; \`DISTINCT\` collapses duplicate *rows* (across all selected columns) to profile a source's real value space.`,
     demoCode: `SELECT DISTINCT status
@@ -1087,7 +1087,7 @@ FROM orders;`,
     hints: [
       "SELECT DISTINCT region, status returns unique pairs, not unique single columns.",
       "Sort by region, status so the output is deterministic before you LIMIT.",
-      "LIMIT 10 at the end — there are fewer than 10 distinct pairs, so all of them come through.",
+      "LIMIT 10 at the end. There are fewer than 10 distinct pairs, so all of them come through.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE orders (
@@ -1135,9 +1135,9 @@ const castTypes: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Data Types and CAST
 
-**Why a DE casts at the boundary.** Source data arrives with the wrong types constantly — an amount stored as the text \`'4999'\`, a flag as \`'1'\`.
+**Why a DE casts at the boundary.** Source data arrives with the wrong types constantly: an amount stored as the text \`'4999'\`, a flag as \`'1'\`.
 
-> **In the warehouse this differs.** SQLite has *dynamic typing with type affinity* — it will happily store the string \`'oops'\` in a column you declared \`INTEGER\`, and arithmetic on text may silently coerce or return \`0\`. Postgres and Snowflake are strict: they *reject* a bad value at write time. Because your DDL should port to those strict systems, the DE habit is to **\`CAST\` explicitly at the boundary** rather than trust the source's typing.
+> **In the warehouse this differs.** SQLite has *dynamic typing with type affinity*: it will happily store the string \`'oops'\` in a column you declared \`INTEGER\`, and arithmetic on text may silently coerce or return \`0\`. Postgres and Snowflake are strict: they *reject* a bad value at write time. Because your DDL should port to those strict systems, the DE habit is to **\`CAST\` explicitly at the boundary** rather than trust the source's typing.
 
 **\`CAST\`.** \`CAST(expr AS type)\` converts a value. Common targets: \`INTEGER\`, \`REAL\` (float), \`TEXT\`. \`CAST('4999' AS INTEGER)\` → \`4999\`; you can now do arithmetic on it reliably.
 
@@ -1160,7 +1160,7 @@ CAST( total_cents_text  AS  INTEGER )
 
 **Guarding junk.** If a text column may hold non-numeric junk, casting it in SQLite yields \`0\` (not an error), which can silently corrupt a sum. A portable guard is to only treat rows as numeric when they match a numeric shape (\`GLOB '[0-9]*'\` in SQLite / a regex in Postgres) or to \`CASE\` non-numeric values to NULL so they don't pollute a measure.
 
-**Pitfall.** \`CAST('12.99' AS INTEGER)\` → \`12\` (truncates, doesn't round). Cast to \`REAL\` first if you need the decimal, or cast the cents (an integer) rather than a dollar float. And remember SQLite won't *error* on a bad cast the way a warehouse does — test your assumptions.
+**Pitfall.** \`CAST('12.99' AS INTEGER)\` → \`12\` (truncates, doesn't round). Cast to \`REAL\` first if you need the decimal, or cast the cents (an integer) rather than a dollar float. And remember SQLite won't *error* on a bad cast the way a warehouse does. Test your assumptions.
 
 **Recap.** \`CAST(expr AS type)\` converts values explicitly at the trust boundary; SQLite's lax typing means you must cast (and guard junk) yourself so the model ports to strict warehouses.`,
     demoCode: `SELECT
@@ -1263,19 +1263,19 @@ const stringFns: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Standardize before you join
 
-Joins and dedup only work when keys match *exactly*. \`'  Ana@Example.com '\` and \`'ana@example.com'\` are different strings — a join on them fails, a dedup keeps both. Before any join, a staging model normalizes the key: trim whitespace, lowercase, strip prefixes. Getting this right is the difference between a clean dimension and a duplicated one.
+Joins and dedup only work when keys match *exactly*. \`'  Ana@Example.com '\` and \`'ana@example.com'\` are different strings: a join on them fails, a dedup keeps both. Before any join, a staging model normalizes the key: trim whitespace, lowercase, strip prefixes. Getting this right is the difference between a clean dimension and a duplicated one.
 
-> In the warehouse this differs: a staging model normalizes keys — trim, lowercase, strip prefixes — *before* any join or dedup, so a clean dimension does not silently fragment into duplicate rows.
+> In the warehouse this differs: a staging model normalizes keys (trim, lowercase, strip prefixes) *before* any join or dedup, so a clean dimension does not silently fragment into duplicate rows.
 
 ## The toolkit
 
-- \`LOWER(s)\` / \`UPPER(s)\` — case-fold.
-- \`TRIM(s)\` — remove leading/trailing whitespace (\`LTRIM\`/\`RTRIM\` for one side; \`TRIM(s, chars)\` to trim specific characters).
-- \`SUBSTR(s, start, len)\` — slice (1-indexed in SQLite).
-- \`REPLACE(s, from, to)\` — swap all occurrences.
-- \`LENGTH(s)\` — character count. \`INSTR(s, sub)\` — 1-based position of \`sub\` (0 if absent).
+- \`LOWER(s)\` / \`UPPER(s)\`: case-fold.
+- \`TRIM(s)\`: remove leading/trailing whitespace (\`LTRIM\`/\`RTRIM\` for one side; \`TRIM(s, chars)\` to trim specific characters).
+- \`SUBSTR(s, start, len)\`: slice (1-indexed in SQLite).
+- \`REPLACE(s, from, to)\`: swap all occurrences.
+- \`LENGTH(s)\`: character count. \`INSTR(s, sub)\`: 1-based position of \`sub\` (0 if absent).
 
-**Worked example — a cleaned email key:**
+**Worked example (a cleaned email key):**
 
 \`\`\`sql
 SELECT
@@ -1294,9 +1294,9 @@ SUBSTR('SKU-AUD-01', 5)      -> 'AUD-01'   (from position 5 to end)
 REPLACE('US-A', 'US-', '')   -> 'A'
 \`\`\`
 
-**Pitfall.** \`SUBSTR\` is **1-indexed** in SQLite (and Oracle), but some languages/dialects are 0-indexed — count carefully. \`TRIM\` only removes whitespace by default, not interior spaces (\`'a b'\` stays \`'a b'\`); use \`REPLACE(s, ' ', '')\` to strip all spaces. And functions **nest inside-out**: \`LOWER(TRIM(x))\` trims first, then lowercases.
+**Pitfall.** \`SUBSTR\` is **1-indexed** in SQLite (and Oracle), but some languages/dialects are 0-indexed. Count carefully. \`TRIM\` only removes whitespace by default, not interior spaces (\`'a b'\` stays \`'a b'\`); use \`REPLACE(s, ' ', '')\` to strip all spaces. And functions **nest inside-out**: \`LOWER(TRIM(x))\` trims first, then lowercases.
 
-**Recap.** \`TRIM\` + \`LOWER\` build matchable join keys; \`SUBSTR\`/\`REPLACE\`/\`INSTR\` slice and rewrite messy source text — standardize keys *before* any join or dedup.`,
+**Recap.** \`TRIM\` + \`LOWER\` build matchable join keys; \`SUBSTR\`/\`REPLACE\`/\`INSTR\` slice and rewrite messy source text. Standardize keys *before* any join or dedup.`,
     demoCode: `SELECT customer_id, LOWER(TRIM(email)) AS email_key FROM customers_raw;`,
   },
   apply: {
@@ -1340,9 +1340,9 @@ INSERT INTO customers_raw VALUES
     id: "sql-l1-strings-practice",
     executionMode: "single-file",
     prompt: `Build the cleaned join key set a staging model prepares before any join. Return \`customer_id\` and:
-- \`email_key\` — trimmed and lowercased email,
-- \`sku_clean\` — the \`sku\` with the leading \`'PRD-'\` prefix removed (e.g. \`PRD-AUD-01\` → \`AUD-01\`),
-- \`country_code_norm\` — the \`country_code\` trimmed and **uppercased** (e.g. \`' us '\` → \`US\`).`,
+- \`email_key\`: trimmed and lowercased email,
+- \`sku_clean\`: the \`sku\` with the leading \`'PRD-'\` prefix removed (e.g. \`PRD-AUD-01\` → \`AUD-01\`),
+- \`country_code_norm\`: the \`country_code\` trimmed and **uppercased** (e.g. \`' us '\` → \`US\`).`,
     starterCode: `-- Return customer_id, email_key, sku_clean, country_code_norm
 SELECT
 
@@ -1379,7 +1379,7 @@ INSERT INTO customers_raw VALUES
 const dates: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l1-dates",
   title: "Dates and Times in SQLite",
-  summary: "Parse and format ISO-8601 date text — where dialects diverge most.",
+  summary: "Parse and format ISO-8601 date text, where dialects diverge most.",
   estimatedMinutes: 15,
   difficulty: "medium",
   skills: ["date()", "strftime", "ISO-8601 text dates", "date filtering/truncation"],
@@ -1387,14 +1387,14 @@ const dates: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 6,
     markdown: `## Dates and Times in SQLite
 
-> **In the warehouse this differs.** SQLite has **no dedicated DATE or TIMESTAMP type**. Dates live as **TEXT in ISO-8601** (\`'2026-03-01'\` or \`'2026-03-01T09:14:00Z'\`), and you manipulate them with the \`date()\`, \`datetime()\`, and \`strftime()\` functions. Real warehouses have native \`DATE\`/\`TIMESTAMP\` types and *different* function names — Postgres uses \`date_trunc('month', ts)\` and \`EXTRACT(YEAR FROM ts)\`; BigQuery uses \`DATE_TRUNC\`/\`FORMAT_DATE\`; Snowflake uses \`DATE_TRUNC\`/\`TO_CHAR\`. The **concepts** below (truncate, extract a part, filter a window) transfer everywhere; the exact syntax does not. Because ISO-8601 text also *sorts and compares* chronologically as plain strings, a lot of date filtering needs no functions at all.
+> **In the warehouse this differs.** SQLite has **no dedicated DATE or TIMESTAMP type**. Dates live as **TEXT in ISO-8601** (\`'2026-03-01'\` or \`'2026-03-01T09:14:00Z'\`), and you manipulate them with the \`date()\`, \`datetime()\`, and \`strftime()\` functions. Real warehouses have native \`DATE\`/\`TIMESTAMP\` types and *different* function names: Postgres uses \`date_trunc('month', ts)\` and \`EXTRACT(YEAR FROM ts)\`; BigQuery uses \`DATE_TRUNC\`/\`FORMAT_DATE\`; Snowflake uses \`DATE_TRUNC\`/\`TO_CHAR\`. The **concepts** below (truncate, extract a part, filter a window) transfer everywhere; the exact syntax does not. Because ISO-8601 text also *sorts and compares* chronologically as plain strings, a lot of date filtering needs no functions at all.
 
 ### The core functions (SQLite)
 
-- \`date(ts)\` — truncate a timestamp to the day: \`date('2026-03-01T09:14:00Z')\` → \`'2026-03-01'\`.
-- \`strftime(fmt, ts)\` — format/extract. \`strftime('%Y-%m', ts)\` → \`'2026-03'\` (year-month); \`%Y\` year, \`%m\` month, \`%d\` day, \`%w\` day-of-week (0=Sunday).
+- \`date(ts)\` truncates a timestamp to the day: \`date('2026-03-01T09:14:00Z')\` → \`'2026-03-01'\`.
+- \`strftime(fmt, ts)\` formats or extracts. \`strftime('%Y-%m', ts)\` → \`'2026-03'\` (year-month); \`%Y\` year, \`%m\` month, \`%d\` day, \`%w\` day-of-week (0=Sunday).
 
-**Worked example — extract year-month:**
+**Worked example (extract year-month):**
 
 \`\`\`sql
 SELECT
@@ -1414,9 +1414,9 @@ order_ts >= '2026-01-01'      -> string compare = chronological filter
 
 **Filtering a window.** Because ISO text sorts correctly, a rolling window is just a string range: \`WHERE order_ts >= '2026-01-01' AND order_ts < '2026-04-01'\`. Prefer half-open ranges (\`>= start AND < next_start\`) over \`BETWEEN\` for timestamps, so you don't accidentally include or exclude the boundary instant.
 
-**Pitfall.** \`strftime\` returns **text**, so \`strftime('%m', ts)\` is \`'03'\` (string), not the number \`3\` — cast if you need arithmetic. And \`strftime\`/\`date\` only work on *valid ISO-8601* strings; a malformed date like \`'03/01/2026'\` returns NULL silently. Validate/standardize date text before relying on these functions.
+**Pitfall.** \`strftime\` returns **text**, so \`strftime('%m', ts)\` is \`'03'\` (string), not the number \`3\`. Cast if you need arithmetic. And \`strftime\`/\`date\` only work on *valid ISO-8601* strings; a malformed date like \`'03/01/2026'\` returns NULL silently. Validate/standardize date text before relying on these functions.
 
-**Recap.** In SQLite dates are ISO text: \`date()\` truncates to day, \`strftime()\` extracts/formats, and plain string comparison filters windows — but the function names change in every real warehouse, so lean on the portable concepts.`,
+**Recap.** In SQLite dates are ISO text: \`date()\` truncates to day, \`strftime()\` extracts/formats, and plain string comparison filters windows, but the function names change in every real warehouse, so lean on the portable concepts.`,
     demoCode: `SELECT
   order_id,
   strftime('%Y-%m', order_ts) AS order_year_month
@@ -1464,9 +1464,9 @@ INSERT INTO orders VALUES
     executionMode: "single-file",
     prompt: `Build a date-spine preview for a daily mart, filtered to a rolling window of \`2026-01-01\` (inclusive) up to \`2026-04-01\` (exclusive). For each in-window order return:
 - \`order_id\`
-- \`order_date\` — the timestamp truncated to the day (\`YYYY-MM-DD\`)
-- \`order_year_month\` — \`YYYY-MM\`
-- \`day_of_week\` — the numeric day-of-week as text via \`strftime('%w', ...)\` (\`0\`=Sunday … \`6\`=Saturday)
+- \`order_date\`: the timestamp truncated to the day (\`YYYY-MM-DD\`)
+- \`order_year_month\`: \`YYYY-MM\`
+- \`day_of_week\`: the numeric day-of-week as text via \`strftime('%w', ...)\` (\`0\`=Sunday … \`6\`=Saturday)
 
 Sort the output by \`order_date\` ascending.`,
     starterCode: `-- Windowed date-spine preview: filter 2026-01-01 (inclusive) to 2026-04-01 (exclusive),
@@ -1475,7 +1475,7 @@ SELECT
 
 FROM orders;`,
     hints: [
-      "Filter with a half-open window: WHERE order_ts >= '2026-01-01' AND order_ts < '2026-04-01' — ISO text compares chronologically, so no parsing needed. The 2025 row drops.",
+      "Filter with a half-open window: WHERE order_ts >= '2026-01-01' AND order_ts < '2026-04-01'. ISO text compares chronologically, so no parsing needed. The 2025 row drops.",
       "date(order_ts) gives the day; strftime('%Y-%m', order_ts) the year-month; strftime('%w', order_ts) the day-of-week.",
       "ORDER BY order_date (or order_ts) ascending for the deterministic spine.",
     ],
@@ -1507,36 +1507,36 @@ INSERT INTO orders VALUES
 export const sqlLevel1: SqlLevel = {
   id: 1,
   slug: "foundations",
-  title: "Level 1 — SQL Foundations: Reading Source Data",
+  title: "Level 1: SQL Foundations (Reading Source Data)",
   tagline:
-    "SELECT, WHERE, ORDER BY, types — querying raw source tables the way a DE does on day one.",
+    "SELECT, WHERE, ORDER BY, types: querying raw source tables the way a DE does on day one.",
   defaultExecutionMode: "single-file",
   estimatedHours: 4,
   modules: [
     {
       id: "sql-l1-projecting",
-      title: "Module 1.1 — Projecting Columns from a Source Table",
+      title: "Module 1.1: Projecting Columns from a Source Table",
       description:
         "Decide which columns you want and what to call them: explicit projection and clean aliasing.",
       lessons: [selectColumns, computedExpressions],
     },
     {
       id: "sql-l1-filtering",
-      title: "Module 1.2 — Filtering Rows",
+      title: "Module 1.2: Filtering Rows",
       description:
         "Cut a scan down to the rows a model needs: comparisons, sets and ranges, NULL logic, and boolean predicates.",
       lessons: [whereBasics, inBetweenLike, nullLogic, booleanAndOr],
     },
     {
       id: "sql-l1-shaping",
-      title: "Module 1.3 — Shaping the Result Set",
+      title: "Module 1.3: Shaping the Result Set",
       description:
         "Order, limit, and de-duplicate output for deterministic previews and top-N inspection.",
       lessons: [orderBy, limitDistinct],
     },
     {
       id: "sql-l1-types",
-      title: "Module 1.4 — Types, Casting, Strings, and Dates",
+      title: "Module 1.4: Types, Casting, Strings, and Dates",
       description:
         "Coerce and clean raw values: type affinity and CAST, string functions, and SQLite date/time handling.",
       lessons: [castTypes, stringFns, dates],

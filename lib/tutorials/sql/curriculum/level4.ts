@@ -13,12 +13,12 @@ const windowRanking: SqlLevel["modules"][number]["lessons"][number] = {
     markdown: `## Window functions keep every row
 
 You just loaded a \`fact_sales\` table and product wants a "top 3 products per category" mart. Your
-first instinct — \`GROUP BY category ORDER BY revenue DESC LIMIT 3\` — gives you the top 3 for **one**
+first instinct, \`GROUP BY category ORDER BY revenue DESC LIMIT 3\`, gives you the top 3 for **one**
 category, not per category. The moment you need "top N *within each group*" or "the latest row *per
 key*," you've hit the wall that window functions were invented to knock down.
 
 A **window function** runs a calculation over a "window" of rows defined relative to the current row,
-and — crucially — **keeps every input row**. \`GROUP BY category\` returns one row per category;
+and, crucially, **keeps every input row**. \`GROUP BY category\` returns one row per category;
 \`ROW_NUMBER() OVER (PARTITION BY category …)\` returns *every* product row, each tagged with its rank
 inside its category. You keep the detail *and* get the ranking.
 
@@ -61,7 +61,7 @@ For the \`audio\` category (two products tied at 500), the three columns produce
 | Speaker | 300 | 3 | **3** | **2** |
 | Cable | 100 | 4 | 4 | 3 |
 
-Read the tie row carefully — this **is** the exam question:
+Read the tie row carefully. This **is** the exam question:
 
 - **ROW_NUMBER** -> \`1, 2, 3, 4\`. Always unique, **breaks ties arbitrarily**. Use it when you must
   pick exactly one row ("the latest record per customer").
@@ -79,7 +79,7 @@ ROW_NUMBER() OVER ( PARTITION BY category   ORDER BY revenue DESC )
 
 - **PARTITION BY** slices the data into independent groups; the ranking restarts at 1 for each. Omit
   it and the whole result set is one window.
-- **ORDER BY** inside \`OVER\` decides what "first" means — it is **separate** from the query's outer
+- **ORDER BY** inside \`OVER\` decides what "first" means, and it is **separate** from the query's outer
   \`ORDER BY\`, which only controls display order.
 
 ### Pick one row per key (the pattern you'll reuse all level)
@@ -105,17 +105,17 @@ in this level.
   functions are evaluated after \`WHERE\` / \`GROUP BY\` / \`HAVING\`. Wrap and filter outside.
 - **Nondeterministic \`ROW_NUMBER\`:** if your \`ORDER BY\` has ties, \`ROW_NUMBER\` picks a winner
   arbitrarily and the choice can change between runs. Add a **tiebreaker** column (e.g.
-  \`ORDER BY updated_at DESC, id DESC\`) so the result is deterministic — graders and idempotency
+  \`ORDER BY updated_at DESC, id DESC\`) so the result is deterministic. Graders and idempotency
   checks depend on this.
 - **Readability:** name the ranked subquery (\`ranked\`, \`numbered\`) and lift the window into a CTE
   when the query grows.
 
 > **In the warehouse:** Snowflake and BigQuery let you skip the subquery with
-> \`QUALIFY ROW_NUMBER() OVER (...) = 1\`. SQLite and Postgres have no \`QUALIFY\` — you must wrap in a
+> \`QUALIFY ROW_NUMBER() OVER (...) = 1\`. SQLite and Postgres have no \`QUALIFY\`, so you must wrap in a
 > subquery/CTE. The \`ROW_NUMBER\` / \`RANK\` / \`DENSE_RANK\` semantics are identical everywhere.
 
 **Recap:** \`ROW_NUMBER\` = unique \`1,2,3\` (pick one); \`RANK\` = \`1,1,3\` (ties skip);
-\`DENSE_RANK\` = \`1,1,2\` (ties don't skip) — all keep every row, all reset per \`PARTITION BY\`.
+\`DENSE_RANK\` = \`1,1,2\` (ties don't skip). All keep every row, all reset per \`PARTITION BY\`.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
 then hidden assertion queries check the ranks, tie handling, and row counts. Lead your load with
@@ -129,7 +129,7 @@ the ranking function that assigns **unique slot numbers** (so exactly three rows
 and keep rows whose slot is \`<= 3\`. Write the result into the pre-created \`top_products(category,
 product, revenue, rank_in_category)\` table.
 
-The target table is seeded **empty** — lead your load with \`DELETE FROM top_products;\` so the script
+The target table is seeded **empty**. Lead your load with \`DELETE FROM top_products;\` so the script
 is safe to re-run.`,
     starterCode: `-- fact_sales and the (empty) top_products table are already seeded.
 -- Populate top_products with the top 3 products per category.
@@ -245,11 +245,11 @@ category ordered by **total revenue descending**:
 - \`rank_rank\` = \`RANK\` (ties skip).
 - \`dense_rank\` = \`DENSE_RANK\` (ties don't skip).
 - \`is_podium\` = \`1\` when the product is in the **top 3 distinct revenue tiers** (\`dense_rank <= 3\`),
-  else \`0\` — so genuinely tied products **all** make the podium, unlike a strict slot cutoff.
+  else \`0\`, so genuinely tied products **all** make the podium, unlike a strict slot cutoff.
 
 Then keep **only** rows where \`is_podium = 1\`.
 
-Note: some products (like \`Headphones\`) appear on **several** fact rows — aggregate to per-product
+Note: some products (like \`Headphones\`) appear on **several** fact rows. Aggregate to per-product
 totals first, and carry \`MIN(sold_at)\` as the date tiebreaker. The target table is seeded empty; lead
 your load with \`DELETE FROM leaderboard;\` so the script re-runs cleanly.`,
     starterCode: `-- fact_sales (with sold_at) and the (empty) leaderboard table are already seeded.
@@ -264,7 +264,7 @@ DELETE FROM leaderboard;   -- re-runnable: clear before you repopulate
     hints: [
       "Aggregate to per-product totals first, but carry `MIN(sold_at) AS first_sold` so you have a deterministic date tiebreaker.",
       "Compute all three ranking functions in the same CTE over the same `PARTITION BY category ORDER BY revenue DESC`; only the `ROW_NUMBER` needs the extra `, first_sold, product` tiebreaker.",
-      "`is_podium` is derived from `dense_rank` — compute the ranks in one CTE, then `CASE WHEN dense_rank <= 3 THEN 1 ELSE 0 END` in the next.",
+      "`is_podium` is derived from `dense_rank`: compute the ranks in one CTE, then `CASE WHEN dense_rank <= 3 THEN 1 ELSE 0 END` in the next.",
       "Filter `WHERE is_podium = 1` in the outer query, never inside the windowed CTE.",
     ],
     seedSql: `DROP TABLE IF EXISTS fact_sales;
@@ -352,7 +352,7 @@ const windowOffset: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["LAG", "LEAD", "offset windows", "deltas", "growth rates"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Compare a row to its neighbor — no self-join
+    markdown: `## Compare a row to its neighbor without a self-join
 
 "Month-over-month revenue change" and "days since the customer's previous order" are two of the
 most-requested analytics metrics, and juniors reach for a self-join: join the table to itself on
@@ -374,7 +374,7 @@ FROM monthly_revenue;
 \`\`\`
 
 For a customer's first month there is no previous row, so \`LAG\` returns \`NULL\` and the delta is
-\`NULL\` — a real "no prior period" signal, not a bug. Supply a default third argument to replace it:
+\`NULL\`, a real "no prior period" signal, not a bug. Supply a default third argument to replace it:
 \`LAG(revenue, 1, 0)\` yields \`0\` instead of \`NULL\` for the first row.
 
 ### Anatomy
@@ -396,10 +396,10 @@ LAG( revenue , 1 , 0 ) OVER ( PARTITION BY customer_id ORDER BY order_month )
   \`NULL\` and blows up when \`prev\` is \`0\`. Guard with \`NULLIF(prev, 0)\`.
 
 > **In the warehouse:** identical syntax in Postgres, Snowflake, BigQuery, and SQL Server. Only the
-> \`FIRST_VALUE\`/\`LAST_VALUE\` frame defaults differ across engines — plain \`LAG\`/\`LEAD\` behave the
+> \`FIRST_VALUE\`/\`LAST_VALUE\` frame defaults differ across engines; plain \`LAG\`/\`LEAD\` behave the
 > same everywhere.
 
-**Recap:** \`LAG\`/\`LEAD\` pull a value from an earlier/later row in the ordered window — replacing
+**Recap:** \`LAG\`/\`LEAD\` pull a value from an earlier/later row in the ordered window, replacing
 self-joins for deltas and growth. The first row's \`LAG\` is \`NULL\` (or your supplied default), and
 gaps are positional.
 
@@ -414,7 +414,7 @@ to the pre-created \`mom(customer_id, order_month, revenue, prev_revenue, mom_de
 \`prev_revenue\` is the prior month's revenue for that customer (NULL for their first month) and
 \`mom_delta = revenue - prev_revenue\`.
 
-The target is seeded **empty** — lead your load with \`DELETE FROM mom;\` so the script re-runs cleanly.`,
+The target is seeded **empty**. Lead your load with \`DELETE FROM mom;\` so the script re-runs cleanly.`,
     starterCode: `-- monthly_revenue and the (empty) mom table are already seeded.
 DELETE FROM mom;   -- re-runnable: clear before you repopulate
 
@@ -423,7 +423,7 @@ DELETE FROM mom;   -- re-runnable: clear before you repopulate
 -- FROM monthly_revenue;`,
     hints: [
       "`LAG(revenue) OVER (PARTITION BY customer_id ORDER BY order_month)` is the whole trick.",
-      "Because `order_month` is `'YYYY-MM'` text, it sorts chronologically as text — no casting needed.",
+      "Because `order_month` is `'YYYY-MM'` text, it sorts chronologically as text (no casting needed).",
       "`mom_delta` is just `revenue - prev_revenue`; leave it NULL for the first month (don't default it).",
     ],
     referenceSolution: `DELETE FROM mom;
@@ -504,7 +504,7 @@ DELETE FROM churn_signal;
 --        CASE WHEN rn_latest = 1 AND pct_change < -30 THEN 1 ELSE 0 END AS churn_flag
 -- FROM base;`,
     hints: [
-      "`pct_change = ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1)` — the `100.0` forces real division and `NULLIF` guards a zero prior month.",
+      "`pct_change = ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1)`: the `100.0` forces real division and `NULLIF` guards a zero prior month.",
       '"Latest month per customer" needs a second window: `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_month DESC) = 1` marks it.',
       "Compute prev_revenue, pct_change, and the latest-month marker in one CTE, then `churn_flag = CASE WHEN rn_latest = 1 AND pct_change < -30 THEN 1 ELSE 0 END`.",
       'Watch the sign: a *drop* is a negative pct_change; "more than 30% drop" is `pct_change < -30`.',
@@ -599,12 +599,12 @@ FROM daily_revenue;
 Three shapes, one clause:
 
 - **Running total:** \`ORDER BY\` + \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`. Accumulates from the first row up to the current one.
-- **Moving average:** \`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\` = current row plus the 6 before it (7 rows). Early rows average over fewer rows — that's correct behavior.
+- **Moving average:** \`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\` = current row plus the 6 before it (7 rows). Early rows average over fewer rows, and that's correct behavior.
 - **Grand total / percent-of-total:** \`SUM(revenue) OVER ()\` with **no \`ORDER BY\` and no frame** sums the entire partition (or whole set), so \`revenue / SUM(revenue) OVER ()\` is each row's share.
 
 ### The subtle default that bites everyone
 
-When you add \`ORDER BY\` to an aggregate window **without** an explicit frame, SQL supplies a default frame of \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`. With ties in the \`ORDER BY\` key, \`RANGE\` includes **all peer rows with the same order value**, which can make a "running total" jump. Writing \`ROWS BETWEEN …\` instead gives you deterministic row-by-row accumulation. **Rule of thumb: for running totals and moving averages, always spell out \`ROWS BETWEEN\` — don't rely on the default.**
+When you add \`ORDER BY\` to an aggregate window **without** an explicit frame, SQL supplies a default frame of \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`. With ties in the \`ORDER BY\` key, \`RANGE\` includes **all peer rows with the same order value**, which can make a "running total" jump. Writing \`ROWS BETWEEN …\` instead gives you deterministic row-by-row accumulation. **Rule of thumb: for running totals and moving averages, always spell out \`ROWS BETWEEN\`; don't rely on the default.**
 
 ### Anatomy
 
@@ -624,9 +624,9 @@ SUM(revenue) OVER (PARTITION BY customer_id ORDER BY order_date
 
 > **In the warehouse:** frame syntax is ANSI-standard and identical across Postgres/Snowflake/BigQuery. BigQuery spells unbounded frames the same way. No divergence to memorize here.
 
-> **In the warehouse:** you can't filter a window value in a \`WHERE\` clause — the window is computed *after* \`WHERE\` runs. Postgres/Snowflake/BigQuery add a \`QUALIFY\` clause for exactly this ("keep rows whose window value passes a test"); SQLite has no \`QUALIFY\`, so wrap the window in a subquery/CTE and filter outside it.
+> **In the warehouse:** you can't filter a window value in a \`WHERE\` clause. The window is computed *after* \`WHERE\` runs. Postgres/Snowflake/BigQuery add a \`QUALIFY\` clause for exactly this ("keep rows whose window value passes a test"); SQLite has no \`QUALIFY\`, so wrap the window in a subquery/CTE and filter outside it.
 
-**Recap:** the frame clause (\`ROWS BETWEEN …\`) turns a window aggregate into a running total (\`UNBOUNDED PRECEDING\`→\`CURRENT ROW\`), a moving average (\`n PRECEDING\`→\`CURRENT ROW\`), or — with an empty \`OVER ()\` — a grand total for percent-of-total; always spell out \`ROWS\` for row-count windows.
+**Recap:** the frame clause (\`ROWS BETWEEN …\`) turns a window aggregate into a running total (\`UNBOUNDED PRECEDING\`→\`CURRENT ROW\`), a moving average (\`n PRECEDING\`→\`CURRENT ROW\`), or, with an empty \`OVER ()\`, a grand total for percent-of-total; always spell out \`ROWS\` for row-count windows.
 
 **Execution mode:** you write a multi-statement script. The seed creates \`daily_revenue\` and an empty target table for you; your script populates the target with a single \`INSERT … SELECT\`. Lead with \`DELETE FROM <target>;\` so a re-run stays idempotent, then hidden assertion queries check the frame math and the row count.`,
   },
@@ -645,7 +645,7 @@ DELETE FROM lifetime;
 -- FROM daily_revenue;`,
     hints: [
       "`SUM(revenue) OVER (PARTITION BY customer_id ORDER BY order_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`.",
-      "Spell out the `ROWS BETWEEN` frame — don't rely on the default.",
+      "Spell out the `ROWS BETWEEN` frame; don't rely on the default.",
       "Partition by customer so each customer's total restarts.",
     ],
     referenceSolution: `DELETE FROM lifetime;
@@ -719,7 +719,7 @@ CREATE TABLE lifetime (
     prompt: `Ship a **customer revenue-trend mart** in one pass. From \`daily_revenue\`, populate \`trend(customer_id, order_date, revenue, running_total, moving_avg_3, pct_of_total)\` where, **per customer ordered by date**:
 
 - \`running_total\` is the cumulative revenue;
-- \`moving_avg_3\` is the average of the current row and the **2** prior rows (a 3-row window), rounded to 2 decimals — early rows average over fewer rows, and that's correct;
+- \`moving_avg_3\` is the average of the current row and the **2** prior rows (a 3-row window), rounded to 2 decimals (early rows average over fewer rows, and that's correct);
 - \`pct_of_total\` is the row's revenue as a **percentage of that customer's overall total revenue** (across all their days), rounded to 1 decimal.
 
 The empty \`trend\` target is created for you. Lead with \`DELETE FROM trend;\` so a re-run stays idempotent, then fill it with a single \`INSERT … SELECT\` carrying three window expressions.`,
@@ -735,7 +735,7 @@ DELETE FROM trend;
 -- FROM daily_revenue;`,
     hints: [
       "Three windows over the same `PARTITION BY customer_id ORDER BY order_date`: running total (`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`), moving avg (`ROWS BETWEEN 2 PRECEDING AND CURRENT ROW`), and the per-customer grand total.",
-      "The per-customer total is `SUM(revenue) OVER (PARTITION BY customer_id)` — partition but **no** `ORDER BY`/frame, so it spans all of that customer's rows.",
+      "The per-customer total is `SUM(revenue) OVER (PARTITION BY customer_id)`: partition but **no** `ORDER BY`/frame, so it spans all of that customer's rows.",
       "`pct_of_total = ROUND(revenue * 100.0 / SUM(revenue) OVER (PARTITION BY customer_id), 1)`.",
       "Force real division with `* 100.0` and round each column exactly as specified.",
     ],
@@ -884,11 +884,11 @@ Each level appends its own name to the parent's path.
 - **Infinite loops on dirty data.** If the data has a cycle (A's parent is B, B's parent is A),
   recursion never terminates. Guard with a depth cap (\`WHERE t.depth < 100\` in the recursive member)
   or track a visited-path and stop on repeats.
-- **\`UNION\` vs \`UNION ALL\`.** Use \`UNION ALL\` — it's cheaper and correct for a tree. \`UNION\` would
+- **\`UNION\` vs \`UNION ALL\`.** Use \`UNION ALL\`: it's cheaper and correct for a tree. \`UNION\` would
   dedupe every pass, which is wasteful and can mask cycles.
 
 > **In the warehouse:** Postgres, SQLite, Snowflake, BigQuery all require the \`RECURSIVE\` keyword;
-> **SQL Server omits it** — you write plain \`WITH tree AS (…)\` for a recursive CTE there. The
+> **SQL Server omits it**: you write plain \`WITH tree AS (…)\` for a recursive CTE there. The
 > three-part structure is identical everywhere.
 
 **Recap:** \`WITH RECURSIVE\` = anchor (roots) \`UNION ALL\` recursive member (join the CTE back to the
@@ -990,7 +990,7 @@ CREATE TABLE org_depth (emp_id INTEGER, name TEXT, depth INTEGER);`,
 - \`root_name\` is the top-level ancestor's name.
 
 Guard against a cyclic row in the data by **capping depth at 20** in the recursive member. The
-\`categories\` source is seeded and the empty \`category_path\` target already exists — lead your load
+\`categories\` source is seeded and the empty \`category_path\` target already exists. Lead your load
 with \`DELETE FROM category_path;\` so a re-run keeps exactly eight rows.`,
     starterCode: `-- categories is already seeded; category_path exists but is empty.
 DELETE FROM category_path;   -- keep the load idempotent on re-run
@@ -1005,7 +1005,7 @@ DELETE FROM category_path;   -- keep the load idempotent on re-run
 -- SELECT category_id, name, breadcrumb, depth, root_name FROM cat_tree;`,
     hints: [
       "Seed both `breadcrumb` (`= name`) and `root_name` (`= name`) in the anchor so `root_name` propagates down unchanged.",
-      "In the recursive member, `breadcrumb = t.breadcrumb || ' > ' || c.name`, but `root_name = t.root_name` — carry the root down, don't recompute it.",
+      "In the recursive member, `breadcrumb = t.breadcrumb || ' > ' || c.name`, but `root_name = t.root_name`: carry the root down, don't recompute it.",
       "Add `WHERE t.depth < 20` to the recursive member's join as the cycle guard.",
       "`UNION ALL`, then insert all five columns into `category_path`.",
     ],
@@ -1091,13 +1091,13 @@ A star schema's fact table stores **surrogate keys** (small integers like \`prod
 business/natural keys (\`sku\`, \`email\`). That keeps the fact narrow and decouples it from messy
 source keys. But it forces a strict **load order**:
 
-1. **Load the dimensions first.** Each dimension row gets a surrogate key — an \`INTEGER PRIMARY KEY\`
+1. **Load the dimensions first.** Each dimension row gets a surrogate key: an \`INTEGER PRIMARY KEY\`
    in SQLite auto-assigns one.
 2. **Load the fact second**, and for each fact row **look up** the surrogate key by joining the
    staging row's *natural* key to the dimension.
 
 If you load the fact first, there are no surrogate keys to point at. If a fact's natural key has no
-matching dimension row, you get an **orphan fact** — an inner join drops it, a left join leaves a
+matching dimension row, you get an **orphan fact**: an inner join drops it, a left join leaves a
 \`NULL\` key. A correct load has **zero orphan facts**.
 
 ### Worked pattern
@@ -1126,7 +1126,7 @@ JOIN dim_product dp ON dp.sku = s.sku;   -- INNER JOIN = orphans excluded
 \`\`\`
 
 The \`JOIN … ON dp.sku = s.sku\` is the **key lookup**: it swaps the source \`sku\` for the warehouse
-\`product_key\`. Notice the fact insert never types a surrogate key literally — it always *looks one up*.
+\`product_key\`. Notice the fact insert never types a surrogate key literally; it always *looks one up*.
 
 ### Common pitfalls
 
@@ -1143,12 +1143,12 @@ The \`JOIN … ON dp.sku = s.sku\` is the **key lookup**: it swaps the source \`
 > universal.
 
 **Recap:** load dims first (mint surrogate keys), then load the fact by joining each staging row's
-natural key to its dimension to fetch the surrogate key; a correct load produces zero orphan facts —
-assert it rather than trusting the inner join.
+natural key to its dimension to fetch the surrogate key; a correct load produces zero orphan facts.
+Assert it rather than trusting the inner join.
 
 **Execution mode:** you write a multi-statement script. The dimension and fact tables are pre-created
 but **empty**; your script populates them. Lead with \`DELETE FROM\` each target so the load is
-**re-runnable** — a second run must leave the same row counts, not double the fact.`,
+**re-runnable**: a second run must leave the same row counts, not double the fact.`,
   },
   apply: scriptExercise({
     id: "sql-l4-star-build-apply",
@@ -1158,7 +1158,7 @@ targets \`dim_customer(customer_key, email, name)\` (surrogate \`customer_key\`)
 \`fact_sales(sale_id, customer_key, amount)\` already exist.
 
 Insert the dimension letting \`customer_key\` auto-assign, then insert the fact by **joining
-\`stg_sales\` to \`dim_customer\` on \`email\`** to fetch each \`customer_key\` — never type a key literally.
+\`stg_sales\` to \`dim_customer\` on \`email\`** to fetch each \`customer_key\`. Never type a key literally.
 Lead with \`DELETE FROM\` both targets so the load survives a re-run.`,
     starterCode: `-- stg_customers and stg_sales are seeded; dim_customer and fact_sales exist (empty).
 -- Make the load re-runnable: clear the targets first (fact before dim).
@@ -1173,9 +1173,9 @@ DELETE FROM dim_customer;
 -- SELECT dc.customer_key, s.amount FROM stg_sales s JOIN dim_customer dc ON ...;`,
     hints: [
       "Lead with `DELETE FROM fact_sales;` then `DELETE FROM dim_customer;` so a second run doesn't double the rows.",
-      "Insert dims with `INSERT INTO dim_customer (email, name) SELECT email, name FROM stg_customers;` — the `customer_key` auto-fills.",
+      "Insert dims with `INSERT INTO dim_customer (email, name) SELECT email, name FROM stg_customers;`. The `customer_key` auto-fills.",
       "Load the fact with a join: `SELECT dc.customer_key, s.amount FROM stg_sales s JOIN dim_customer dc ON dc.email = s.email`.",
-      "Don't insert `customer_key` values manually into the fact — always look them up through the join.",
+      "Don't insert `customer_key` values manually into the fact. Always look them up through the join.",
     ],
     referenceSolution: `DELETE FROM fact_sales;
 DELETE FROM dim_customer;
@@ -1265,8 +1265,8 @@ DELETE FROM dim_date;
 -- SELECT dc.customer_key, dp.product_key, dd.date_key, o.qty, o.revenue
 -- FROM stg_orders o JOIN ... JOIN ... JOIN ... ;`,
     hints: [
-      "Clear the targets first — `DELETE FROM fact_order_items;` then the three dims — so a re-run doesn't double the fact.",
-      "Load each dimension with `INSERT … SELECT DISTINCT natural_key, attr FROM stg_orders` — `DISTINCT` collapses the repeated natural keys.",
+      "Clear the targets first (`DELETE FROM fact_order_items;` then the three dims) so a re-run doesn't double the fact.",
+      "Load each dimension with `INSERT … SELECT DISTINCT natural_key, attr FROM stg_orders`; `DISTINCT` collapses the repeated natural keys.",
       "Load the fact by joining staging to all three dimensions on their natural keys to fetch all three surrogate keys in one `SELECT`.",
       "Order matters: load all three dims before the fact. Inner joins to each dim are enough here because every staging natural key appears in its dim.",
     ],
@@ -1349,7 +1349,7 @@ CREATE TABLE fact_order_items (
 
 const scdType1: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-scd-type1",
-  title: "Slowly Changing Dimensions — Type 1",
+  title: "Slowly Changing Dimensions: Type 1",
   summary: "Overwrite a changed attribute in place with no history.",
   estimatedMinutes: 20,
   difficulty: "medium",
@@ -1358,17 +1358,17 @@ const scdType1: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 8,
     markdown: `## Slowly Changing Dimensions: Type 1 overwrites in place
 
-A **dimension** describes an entity — a customer, a product — and its attributes drift over time: a
+A **dimension** describes an entity (a customer, a product) and its attributes drift over time: a
 customer moves city, a product gets renamed. How you *handle* that drift is the **Slowly Changing
 Dimension (SCD)** question. **Type 1** is the simplest answer: **overwrite the old value in place and
-keep no history.** The row count never changes — you just \`UPDATE\` the changed columns to their new
+keep no history.** The row count never changes: you just \`UPDATE\` the changed columns to their new
 values.
 
 Type 1 is the right choice when the old value was **wrong**: a typo, a misspelled city, a data-entry
 error nobody ever needs to see again. You don't want a history *of a mistake*; you want it corrected
 everywhere, retroactively.
 
-### Worked example — the in-place overwrite
+### Worked example: the in-place overwrite
 
 A fresh source dump lands in \`stg_customer\`; apply a Type 1 overwrite to \`dim_customer\`:
 
@@ -1382,30 +1382,30 @@ WHERE email IN (SELECT email FROM stg_customer);
 Match on the **natural key** (\`email\`), overwrite the attributes, add **no rows** for the change.
 
 A cleaner, portable form uses \`INSERT … ON CONFLICT(key) DO UPDATE\` (an *upsert*) so brand-new
-customers are inserted and existing ones overwritten in a single statement — you'll write exactly that
+customers are inserted and existing ones overwritten in a single statement. You'll write exactly that
 in the practice. Either way the essence is identical: **match on the natural key, overwrite the
 attributes, add no rows for changes.**
 
 ### Common pitfalls
 
 - **Type 1 destroys the ability to answer "what was the value on date X."** If finance ever needs the
-  customer's city *at the time of sale*, Type 1 is wrong — you need **Type 2** (next lesson). Choosing
+  customer's city *at the time of sale*, Type 1 is wrong: you need **Type 2** (next lesson). Choosing
   Type 1 is a **business decision**, not a default.
 - **The correlated-subquery \`UPDATE\` needs its guard.** The \`WHERE email IN (SELECT email FROM
   stg_customer)\` clause matters: without it, every customer *absent* from the new dump has its
-  \`name\`/\`city\` set to \`NULL\` — the subquery returns nothing, so the assignment is NULL.
+  \`name\`/\`city\` set to \`NULL\`: the subquery returns nothing, so the assignment is NULL.
 
 > **In the warehouse:** Snowflake and BigQuery express Type 1 as a \`MERGE … WHEN MATCHED THEN UPDATE\`.
 > SQLite and Postgres use \`INSERT … ON CONFLICT DO UPDATE\` or a plain \`UPDATE\`. Same semantics:
 > overwrite, no history.
 
-**Recap:** SCD Type 1 overwrites changed attributes in place — match on the natural key, \`UPDATE\`, add
+**Recap:** SCD Type 1 overwrites changed attributes in place: match on the natural key, \`UPDATE\`, add
 zero new rows. It's correct for fixing errors where no history is wanted; if you need "the value as of
 date X," reach for Type 2 instead.
 
 **Execution mode:** you write a multi-statement script against a fresh in-memory SQLite DB already
 seeded with \`dim_customer\` and \`stg_customer\`. Hidden assertion queries then check the row count, the
-overwritten values, and that surrogate keys stayed put — and running your script twice must leave the
+overwritten values, and that surrogate keys stayed put. Running your script twice must leave the
 same number of rows.`,
   },
   apply: scriptExercise({
@@ -1424,7 +1424,7 @@ surrogate \`customer_key\` untouched.`,
     hints: [
       "A single `UPDATE dim_customer SET … WHERE email IN (SELECT email FROM stg_customer)` does the whole job.",
       "Pull the new `city`/`name` with correlated subqueries matched on `email`.",
-      "Don't `INSERT` anything — Type 1 is overwrite-only, so the row count must stay at 2.",
+      "Don't `INSERT` anything: Type 1 is overwrite-only, so the row count must stay at 2.",
     ],
     referenceSolution: `UPDATE dim_customer
 SET name = (SELECT s.name FROM stg_customer s WHERE s.email = dim_customer.email),
@@ -1477,7 +1477,7 @@ INSERT INTO stg_customer VALUES
   practice: scriptExercise({
     id: "sql-l4-scd-type1-practice",
     prompt: `Write a **Type 1 apply step** that overwrites changed attributes from a fresh source dump
-**and** inserts brand-new customers — leaving exactly **one row per email**. \`dim_customer\` (which now
+**and** inserts brand-new customers, leaving exactly **one row per email**. \`dim_customer\` (which now
 carries a \`tier\` column) and a \`stg_customer\` dump are already seeded; the dump contains updates to
 existing customers **and** a customer not yet in the dimension. Produce a \`dim_customer\` where existing
 rows are overwritten in place (keeping their \`customer_key\`) and the new customer is appended with a
@@ -1490,9 +1490,9 @@ fresh key. Re-running your script must leave the row count unchanged.`,
 -- SELECT email, name, city, tier FROM stg_customer WHERE true
 -- ON CONFLICT(email) DO UPDATE SET ... ;`,
     hints: [
-      "The clean one-statement form is `INSERT INTO dim_customer (email,name,city,tier) SELECT email,name,city,tier FROM stg_customer WHERE true ON CONFLICT(email) DO UPDATE SET name=excluded.name, city=excluded.city, tier=excluded.tier;` — `email` must be `UNIQUE` (it is).",
-      "`excluded.<col>` refers to the row that would have been inserted — that's the new source value.",
-      "The `ON CONFLICT` upsert makes this idempotent for free: re-running overwrites with the same values and inserts nothing new. (`INSERT OR REPLACE` would work too, but it deletes+reinserts and so churns the surrogate key — avoid it.)",
+      "The clean one-statement form is `INSERT INTO dim_customer (email,name,city,tier) SELECT email,name,city,tier FROM stg_customer WHERE true ON CONFLICT(email) DO UPDATE SET name=excluded.name, city=excluded.city, tier=excluded.tier;`. `email` must be `UNIQUE` (it is).",
+      "`excluded.<col>` refers to the row that would have been inserted; that's the new source value.",
+      "The `ON CONFLICT` upsert makes this idempotent for free: re-running overwrites with the same values and inserts nothing new. (`INSERT OR REPLACE` would work too, but it deletes+reinserts and so churns the surrogate key, so avoid it.)",
       "If you split it into `UPDATE` + `INSERT … WHERE email NOT IN (SELECT email FROM dim_customer)`, run the `INSERT` after the `UPDATE` and only for genuinely new emails.",
     ],
     seedSql: `DROP TABLE IF EXISTS dim_customer;
@@ -1549,7 +1549,7 @@ INSERT INTO stg_customer VALUES
 
 const scdType2: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-scd-type2",
-  title: "Slowly Changing Dimensions — Type 2",
+  title: "Slowly Changing Dimensions: Type 2",
   summary: "Preserve history by expiring old rows and inserting new versions.",
   estimatedMinutes: 28,
   difficulty: "hard",
@@ -1564,16 +1564,16 @@ const scdType2: SqlLevel["modules"][number]["lessons"][number] = {
     markdown: `## SCD Type 2: keep history instead of overwriting
 
 Type 1 overwrites and forgets. But finance often needs to attribute a sale to the customer's attributes
-**as they were on the sale date** — if Ada lived in London in January and Berlin in March, a January
+**as they were on the sale date**: if Ada lived in London in January and Berlin in March, a January
 order must stay attributed to London. That requires keeping **history**, and that's **SCD Type 2**:
 instead of overwriting, you **expire the old row and insert a new version** with a fresh surrogate key.
 The dimension grows one row per change, and each row carries a **validity window**.
 
 Three columns make Type 2 work:
 
-- **\`effective_from\`** — the date this version became true.
-- **\`effective_to\`** — the date it stopped being true (a far-future sentinel like \`'9999-12-31'\` while still current).
-- **\`is_current\`** — a \`1\`/\`0\` flag; exactly **one** current row per natural key.
+- **\`effective_from\`**: the date this version became true.
+- **\`effective_to\`**: the date it stopped being true (a far-future sentinel like \`'9999-12-31'\` while still current).
+- **\`is_current\`**: a \`1\`/\`0\` flag; exactly **one** current row per natural key.
 
 Each version also gets its **own new surrogate key**, so a fact table can point at the specific version
 valid *as of* the event date. That's the whole point: \`fact.customer_key\` references the version that
@@ -1619,7 +1619,7 @@ JOIN dim_customer d
  AND f.sale_date <  d.effective_to;     -- half-open window: [from, to)
 \`\`\`
 
-The \`>= effective_from AND < effective_to\` is the **as-of** predicate — it selects the one version valid
+The \`>= effective_from AND < effective_to\` is the **as-of** predicate: it selects the one version valid
 on the sale date. Use a **half-open interval** (\`< effective_to\`, not \`<=\`) so the boundary date belongs
 to exactly one version and rows never double-count.
 
@@ -1627,7 +1627,7 @@ to exactly one version and rows never double-count.
 
 A general apply compares today's dump to the current dimension row and versions only the keys whose
 tracked attribute **changed**. The trap: an attribute can go from **NULL to a value** (the city was
-unknown at first load, now it's filled in) or from a **value to NULL**. Plain \`<>\` is **not** null-safe —
+unknown at first load, now it's filled in) or from a **value to NULL**. Plain \`<>\` is **not** null-safe:
 \`'Madrid' <> NULL\` evaluates to \`NULL\`, not \`TRUE\`, so the changed-set filter drops the row, treats it as
 *unchanged*, and **no new version is created**. That's a silently lost history record.
 
@@ -1642,20 +1642,20 @@ WHERE stg.city IS NOT dim.city
 \`\`\`
 
 > **In the warehouse:** the ANSI spelling is \`a IS DISTINCT FROM b\` (Postgres, Snowflake, BigQuery, and
-> SQLite 3.39+ all support it) — the same null-safe "did it actually change?" test. dbt snapshots use it
+> SQLite 3.39+ all support it), the same null-safe "did it actually change?" test. dbt snapshots use it
 > to pick the rows to version, precisely so a NULL becoming populated still opens a new row. Never write
 > raw \`<>\` in SCD change detection.
 
 ### Common pitfalls
 
-- **More than one \`is_current = 1\` per key** is the #1 Type 2 bug — it means an update ran the insert
+- **More than one \`is_current = 1\` per key** is the #1 Type 2 bug: it means an update ran the insert
   without expiring the old row, and every downstream \`WHERE is_current = 1\` now doubles. Graders assert
   exactly one current row per key.
 - **Overlapping windows** (old row's \`effective_to\` ≠ new row's \`effective_from\`) make the as-of join
   match two versions or none. Set the expiring row's \`effective_to\` **equal** to the new row's \`effective_from\`.
 - **Closed intervals double-count.** If both versions include the boundary date (\`<=\`), a sale on that
   exact day joins twice. Always half-open.
-- **Expiring on the wrong key.** \`WHERE email = ? AND is_current = 1\` — forgetting \`is_current = 1\`
+- **Expiring on the wrong key.** \`WHERE email = ? AND is_current = 1\`: forgetting \`is_current = 1\`
   expires *all* historical versions.
 
 > **In the warehouse:** Snowflake/BigQuery implement the whole Type 2 apply as a single \`MERGE\` with
@@ -1676,8 +1676,8 @@ hidden assertion queries check the version count, the current flag, the validity
     id: "sql-l4-scd-type2-apply",
     prompt: `Close the current row and open a new version when a customer changes city. \`dim_customer\`
 holds one current row for \`a@x.com\` (city London, effective \`2026-01-01\`). A change arrives: as of
-\`2026-03-01\`, Ada's city is Berlin. Apply the Type 2 change — **expire** the London row and **insert** a
-Berlin version — so the dimension keeps both the expired London history and the current Berlin version,
+\`2026-03-01\`, Ada's city is Berlin. Apply the Type 2 change: **expire** the London row and **insert** a
+Berlin version, so the dimension keeps both the expired London history and the current Berlin version,
 with their validity windows meeting exactly.`,
     starterCode: `-- dim_customer already holds Ada's current London row (effective 2026-01-01).
 -- Apply the Type 2 change: as of 2026-03-01, Ada's city is Berlin.
@@ -1689,7 +1689,7 @@ with their validity windows meeting exactly.`,
       "Two statements: an `UPDATE` to expire, then an `INSERT` for the new version.",
       "Expire with `SET effective_to = '2026-03-01', is_current = 0 WHERE email = 'a@x.com' AND is_current = 1`.",
       "Insert the Berlin row with `effective_from = '2026-03-01'`, `effective_to = '9999-12-31'`, `is_current = 1`.",
-      "Set the old `effective_to` equal to the new `effective_from` so the windows are contiguous — no gap, no overlap.",
+      "Set the old `effective_to` equal to the new `effective_from` so the windows are contiguous: no gap, no overlap.",
     ],
     referenceSolution: `UPDATE dim_customer
 SET effective_to = '2026-03-01', is_current = 0
@@ -1760,10 +1760,10 @@ change. \`dim_customer\` holds the current dimension (one \`is_current = 1\` row
 is today's dump with a \`snapshot_date\`. For each email whose tracked attribute (\`city\`) **differs** from
 its current dimension row: expire the current row (\`effective_to = snapshot_date\`, \`is_current = 0\`) and
 insert a new version (\`effective_from = snapshot_date\`, \`effective_to = '9999-12-31'\`, \`is_current = 1\`).
-Detect "differs" **null-safely** — one customer's city is \`NULL\` in the dimension and set in today's dump,
+Detect "differs" **null-safely**: one customer's city is \`NULL\` in the dimension and set in today's dump,
 and a plain \`<>\` would silently miss that transition, so compare with \`stg.city IS NOT dim.city\`.
 Customers whose city is **unchanged** get no new row; customers **absent** from today's dump are left
-as-is; brand-new emails get a single current version. The step must be **idempotent** — running it twice
+as-is; brand-new emails get a single current version. The step must be **idempotent**: running it twice
 must leave \`dim_customer\` byte-for-byte identical.`,
     starterCode: `-- dim_customer holds the current dimension (one is_current = 1 row per email).
 -- stg_customer is today's dump, each row carrying a snapshot_date.
@@ -1783,10 +1783,10 @@ must leave \`dim_customer\` byte-for-byte identical.`,
 
 -- Step 4: insert brand-new emails (present in stg, absent from dim) as one current version ...`,
     hints: [
-      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where the city is null-safely different — `stg.city IS NOT dim.city`. Plain `<>` misses NULL↔value transitions (`'x' <> NULL` is NULL, not TRUE).",
+      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where the city is null-safely different: `stg.city IS NOT dim.city`. Plain `<>` misses NULL↔value transitions (`'x' <> NULL` is NULL, not TRUE).",
       "Expire step: `UPDATE dim_customer SET effective_to = <snapshot>, is_current = 0 WHERE is_current = 1 AND email IN (<changed emails>)`.",
       "Insert step: insert new versions for changed emails **and** brand-new emails (emails in staging with no current dim row). Both get `is_current = 1`, `effective_from = snapshot_date`, `effective_to = '9999-12-31'`.",
-      "Idempotency is the trap: after the first run the current city already equals staging, so the changed set is empty on the second run — compare against the **current** row, and compute the changed-set into a temp table first so the insert doesn't re-detect its own new rows.",
+      "Idempotency is the trap: after the first run the current city already equals staging, so the changed set is empty on the second run. Compare against the **current** row, and compute the changed-set into a temp table first so the insert doesn't re-detect its own new rows.",
     ],
     seedSql: `DROP TABLE IF EXISTS dim_customer;
 CREATE TABLE dim_customer (
@@ -1902,7 +1902,7 @@ const dedup: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 8,
     markdown: `## Deduplicate to one row per business key
 
-Source feeds are dirty. A daily customer dump often contains the same \`email\` several times — an old
+Source feeds are dirty. A daily customer dump often contains the same \`email\` several times: an old
 record plus one or more updates. Before you load it, you must reduce it to **one row per business
 key**, keeping the **right** one (usually the most recently updated). The portable pattern is
 \`ROW_NUMBER\` (from Module 4.1) plus a wrapping filter:
@@ -1921,27 +1921,27 @@ WHERE rn = 1;                          -- keep only the freshest row per email
 
 \`PARTITION BY email\` groups the duplicates; \`ORDER BY updated_at DESC\` puts the freshest first;
 \`WHERE rn = 1\` keeps it. Because \`ROW_NUMBER\` assigns **unique** ranks, you get exactly one row per
-key — never zero, never two.
+key: never zero, never two.
 
 ### Common pitfalls
 
 - **Ties in the \`ORDER BY\` make the winner nondeterministic.** If two rows share the same
   \`updated_at\`, add a deterministic tiebreaker (\`ORDER BY updated_at DESC, id DESC\`) so the same row
-  wins every run — critical for idempotency.
+  wins every run, critical for idempotency.
 - **\`DISTINCT\` is not dedup-by-key.** \`SELECT DISTINCT\` removes rows that are identical across *all*
   columns; it will **not** collapse two rows with the same \`email\` but different \`updated_at\`. Reach
   for \`ROW_NUMBER\` whenever "duplicate" means "same key, possibly different attributes."
-- **Filtering \`rn\` inline fails.** You can't write \`WHERE ROW_NUMBER() OVER(...) = 1\` — a window
+- **Filtering \`rn\` inline fails.** You can't write \`WHERE ROW_NUMBER() OVER(...) = 1\`: a window
   function isn't allowed in \`WHERE\`. Wrap the window in a subquery/CTE and filter the \`rn\` alias
   outside it.
 
 > **In the warehouse:** Snowflake and BigQuery let you drop the wrapping subquery entirely:
 > \`… QUALIFY ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) = 1\`. SQLite and Postgres
-> have no \`QUALIFY\` — wrap in a subquery/CTE as above.
+> have no \`QUALIFY\`, so wrap in a subquery/CTE as above.
 
 **One more SQLite detail worth knowing:** \`NULL\` sorts as the *lowest* value, so \`ORDER BY updated_at
 DESC\` puts every real timestamp first and pushes the \`NULL\`s last. A row whose \`updated_at\` is missing
-therefore loses to any row that has one — exactly the behavior you want when a missing timestamp means
+therefore loses to any row that has one, exactly the behavior you want when a missing timestamp means
 "unknown / oldest." (Some engines need an explicit \`NULLS LAST\` to get this; SQLite gives it to you
 for free under \`DESC\`.)
 
@@ -1951,7 +1951,7 @@ query. Add a deterministic tiebreaker so the same row wins every run, and reach 
 \`DISTINCT\`) whenever "duplicate" means the same key with differing attributes.
 
 **Execution mode:** you write a multi-statement script. The target table is pre-created and may already
-hold rows from a prior run, so **lead your load with \`DELETE FROM <target>;\`** — the grader runs your
+hold rows from a prior run, so **lead your load with \`DELETE FROM <target>;\`**. The grader runs your
 script twice and checks the row count is identical, so a repeat must not double the rows. Hidden
 assertion queries then check the row count, which row won each key, and that zero duplicate keys
 remain.`,
@@ -2053,10 +2053,10 @@ DELETE FROM dedup_customer;
 -- INSERT INTO dedup_customer (customer_code, email, updated_at, source_row_id)
 -- SELECT customer_code, email, updated_at, source_row_id FROM ranked WHERE rn = 1;`,
     hints: [
-      "SQLite sorts \`NULL\` as the lowest value, so \`ORDER BY updated_at DESC\` puts every non-null timestamp first and the NULLs last — exactly what you want when a NULL must lose to any real date.",
+      "SQLite sorts \`NULL\` as the lowest value, so \`ORDER BY updated_at DESC\` puts every non-null timestamp first and the NULLs last, exactly what you want when a NULL must lose to any real date.",
       "Add the tiebreaker so ties are deterministic: \`ORDER BY updated_at DESC, source_row_id DESC\` keeps the higher \`source_row_id\` when two rows share a date.",
-      "\`PARTITION BY customer_code\`, then keep \`rn = 1\` from a wrapping CTE — you can't filter \`ROW_NUMBER()\` in \`WHERE\` directly.",
-      "\`C3\` has only a NULL-\`updated_at\` row — \`ROW_NUMBER()\` still assigns it rank 1, so it survives. Don't filter out NULL timestamps.",
+      "\`PARTITION BY customer_code\`, then keep \`rn = 1\` from a wrapping CTE; you can't filter \`ROW_NUMBER()\` in \`WHERE\` directly.",
+      "\`C3\` has only a NULL-\`updated_at\` row: \`ROW_NUMBER()\` still assigns it rank 1, so it survives. Don't filter out NULL timestamps.",
     ],
     seedSql: `DROP TABLE IF EXISTS raw_customer;
 DROP TABLE IF EXISTS dedup_customer;
@@ -2117,7 +2117,7 @@ CREATE TABLE dedup_customer (
 const idempotentMerge: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-idempotent-merge",
   title: "Idempotent Loads: Upsert & MERGE",
-  summary: "Make a re-run produce the same result — no duplicated rows.",
+  summary: "Make a re-run produce the same result: no duplicated rows.",
   estimatedMinutes: 26,
   difficulty: "hard",
   skills: [
@@ -2132,7 +2132,7 @@ const idempotentMerge: SqlLevel["modules"][number]["lessons"][number] = {
     markdown: `## Idempotent loads: run it twice, get the same table
 
 Pipelines fail and get re-run. A backfill reprocesses last week. The same daily file lands twice. If
-your loader is a blind \`INSERT\`, every re-run **duplicates rows** — the cardinal data-engineering sin.
+your loader is a blind \`INSERT\`, every re-run **duplicates rows**, the cardinal data-engineering sin.
 A loader is **idempotent** when running it N times leaves the target in the same state as running it
 once. The test is blunt, and it's exactly what the Level 4 grader does: **run the script twice, assert
 the row count is identical.**
@@ -2153,15 +2153,15 @@ ON CONFLICT(email) DO UPDATE SET
   \`UNIQUE\` / \`PRIMARY KEY\` constraint.)
 - **\`DO UPDATE SET … = excluded.<col>\`** overwrites with the incoming values; \`excluded\` is the row
   that *would have* been inserted.
-- Run it twice: the first run inserts, the second run hits the conflict and updates to the same values
-  — **zero new rows.** Idempotent.
+- Run it twice: the first run inserts, the second run hits the conflict and updates to the same values:
+  **zero new rows.** Idempotent.
 
 Use \`DO NOTHING\` instead of \`DO UPDATE\` when you only want inserts-if-absent and never want to touch
 existing rows.
 
 ### Incremental loads with a high-water mark
 
-For large sources you don't reprocess everything — you load only rows newer than the last successful
+For large sources you don't reprocess everything; you load only rows newer than the last successful
 load, tracked as a **high-water mark**:
 
 \`\`\`sql
@@ -2174,17 +2174,17 @@ ON CONFLICT(event_id) DO NOTHING;
 
 The \`WHERE event_ts > MAX(...)\` skips already-loaded rows; the \`ON CONFLICT DO NOTHING\` is the safety
 net for overlap at the boundary. Together they're both efficient **and** idempotent. (Whether you use
-\`>\` or \`>=\` at the *exact* boundary barely matters when \`ON CONFLICT\` absorbs any re-seen key — but a
+\`>\` or \`>=\` at the *exact* boundary barely matters when \`ON CONFLICT\` absorbs any re-seen key, but a
 strict cutoff of *either* kind has a subtler failure mode, covered next.)
 
 ### Late-arriving data: why a strict high-water mark silently drops rows
 
-A high-water mark of \`MAX(event_ts)\` quietly assumes events arrive **in event-time order** — that once
+A high-water mark of \`MAX(event_ts)\` quietly assumes events arrive **in event-time order**: that once
 you've recorded \`2026-03-02\`, nothing older will ever appear again. Real sources violate that
 constantly: a mobile client was offline, an upstream queue retried, a partner's nightly file ran a day
 late. The event *happened* at \`event_ts = 2026-02-28\`, but it only lands in your source **after** the
 load that already advanced the high-water to \`2026-03-02\`. A strict \`WHERE event_ts > high_water\` (or
-even \`>=\`) filters that row out on every future run — it is **silently dropped**, and no error is ever
+even \`>=\`) filters that row out on every future run: it is **silently dropped**, and no error is ever
 raised.
 
 The fix is a **lookback** (a "safety lag"): reprocess a trailing window instead of a hard cutoff.
@@ -2201,7 +2201,7 @@ ON CONFLICT(event_id) DO UPDATE SET payload = excluded.payload;
 \`\`\`
 
 You deliberately re-scan the last N days each run. Rows you've already loaded hit \`ON CONFLICT\` and
-update in place — **harmless, precisely because the load is idempotent** — while a genuinely late row
+update in place (**harmless, precisely because the load is idempotent**) while a genuinely late row
 inside the window finally gets inserted. The lookback trades a little repeated work for the guarantee
 that nothing older-than-cutoff is lost. Size N to your worst realistic lateness (an hour, a day, a
 week): too small and stragglers still slip through, too large and every run reprocesses more than it
@@ -2211,7 +2211,7 @@ needs.
 > strategy exposes a \`lookback\` config for exactly this, and teams write an explicit
 > \`WHERE event_ts >= (SELECT MAX(event_ts) FROM {{ this }}) - INTERVAL 'N days'\`. Snowflake/BigQuery
 > streaming and Spark structured streaming call the same idea a **watermark with allowed lateness**.
-> The lookback only works *because* the merge underneath is idempotent — the two techniques are a pair.
+> The lookback only works *because* the merge underneath is idempotent; the two techniques are a pair.
 
 ### Common pitfalls
 
@@ -2226,7 +2226,7 @@ needs.
 
 > **In the warehouse:** Snowflake / BigQuery / SQL Server use
 > \`MERGE INTO target USING source ON <key> WHEN MATCHED THEN UPDATE WHEN NOT MATCHED THEN INSERT\`.
-> SQLite / Postgres use \`INSERT … ON CONFLICT\`. Same idea, different keyword — and interviewers expect
+> SQLite / Postgres use \`INSERT … ON CONFLICT\`. Same idea, different keyword, and interviewers expect
 > you to name both.
 
 **Recap:** an idempotent loader survives re-runs without duplicating rows; achieve it with
@@ -2248,7 +2248,7 @@ holds a fresh extract (already seeded). Load \`stg_product\` into \`dim_product\
 - a **new** SKU (\`SKU3\`) is inserted,
 - an **existing** SKU (\`SKU1\`) updates its \`name\` and \`price\`,
 - \`SKU2\` (not in the extract) is left untouched,
-- and **re-running the load adds no rows** — the table stays at exactly 3.
+- and **re-running the load adds no rows**: the table stays at exactly 3.
 
 Do it with a single \`INSERT … SELECT … ON CONFLICT(sku) DO UPDATE\`.`,
     starterCode: `-- dim_product (sku UNIQUE) and stg_product are already seeded.
@@ -2327,15 +2327,15 @@ INSERT INTO stg_product VALUES
 (both seeded). The extract **overlaps** already-loaded data (it repeats \`e2\`), contains a
 **duplicate \`event_id\` within itself** (\`e3\` appears twice with different \`ingested_at\`), brings
 genuinely new events (\`e3\`, \`e4\`), and carries one **late-arriving** event \`e5\` whose \`event_ts\`
-(\`2026-02-28\`) is *before* the \`2026-03-02\` high-water — it happened in the past but only landed in
+(\`2026-02-28\`) is *before* the \`2026-03-02\` high-water: it happened in the past but only landed in
 the source now.
 
 In one \`INSERT … SELECT … ON CONFLICT\` load:
 
 1. **dedup the extract** so each \`event_id\` appears once, keeping the row with the **latest**
    \`ingested_at\`;
-2. bound it with a **lookback window** on \`event_ts\` — \`>= date(MAX(event_ts), '-3 days')\`, *not* a
-   strict \`> MAX\` — so the late-arriving \`e5\` inside the window is still picked up instead of being
+2. bound it with a **lookback window** on \`event_ts\`: \`>= date(MAX(event_ts), '-3 days')\`, *not* a
+   strict \`> MAX\`, so the late-arriving \`e5\` inside the window is still picked up instead of being
    silently dropped;
 3. **upsert on \`event_id\`** so overlap re-seen inside the window updates in place instead of
    duplicating.
@@ -2359,7 +2359,7 @@ still leave 5 rows** with the same \`e3\` payload.`,
       "Dedup the extract first with `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ingested_at DESC, payload DESC)` and keep `rn = 1` (the dedup pattern from Module 4.4).",
       "Bound it with a lookback window, not a strict cutoff: `AND d.event_ts >= date((SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events), '-3 days')`. A strict `> MAX` (or even `>= MAX`) silently drops the late-arriving `e5` (event_ts 2026-02-28, before the 2026-03-02 high-water); re-scanning the last few days catches it. You can't filter a window function in `WHERE`, so put the `ROW_NUMBER()` in a subquery and filter `rn` (and the lookback) outside.",
       "Upsert on the PK: `ON CONFLICT(event_id) DO UPDATE SET payload = excluded.payload, event_ts = excluded.event_ts, ingested_at = excluded.ingested_at`.",
-      "Idempotency trap: on run #2 the high-water has risen to the newest event_ts, so the lookback window slides forward and most rows fall outside it; whatever still slips through hits `ON CONFLICT` and updates in place — never inserts. `e5` is already loaded, so its dropping out of the window on run #2 is harmless. That's what keeps the row count at 5.",
+      "Idempotency trap: on run #2 the high-water has risen to the newest event_ts, so the lookback window slides forward and most rows fall outside it; whatever still slips through hits `ON CONFLICT` and updates in place, never inserts. `e5` is already loaded, so its dropping out of the window on run #2 is harmless. That's what keeps the row count at 5.",
     ],
     seedSql: `DROP TABLE IF EXISTS fact_events;
 DROP TABLE IF EXISTS stg_events;
@@ -2444,11 +2444,11 @@ const dataQuality: SqlLevel["modules"][number]["lessons"][number] = {
 
 A loader that runs without error can still produce **wrong** data: a duplicated key, a NULL where a
 NULL can't be, an orphan fact pointing at a customer who doesn't exist. Data-quality (DQ) tests catch
-this before the bad data reaches a dashboard. The universal pattern — the one dbt is built on — is the
+this before the bad data reaches a dashboard. The universal pattern (the one dbt is built on) is the
 **zero-rows assertion**: write a query that returns the **violating** rows; if it returns **any** rows,
 the test fails. **Healthy data → zero rows → pass.**
 
-### The dbt four — each as a "count of violations = 0" query
+### The dbt four: each as a "count of violations = 0" query
 
 \\\`\\\`\\\`sql
 -- 1. not_null: rows where a required column is NULL
@@ -2481,14 +2481,14 @@ LEFT JOIN dim_customer d ON d.customer_key = f.customer_key   -- keep all fact r
 WHERE d.customer_key IS NULL;                                 -- ...where the dim match is missing
 \\\`\\\`\\\`
 
-This is the anti-join from Level 2, repurposed as a referential-integrity assertion — the most valuable
+This is the anti-join from Level 2, repurposed as a referential-integrity assertion, the most valuable
 DQ check in a star schema.
 
 ### Common pitfalls
 
 - **Asserting the happy path instead of the violations.** A test that does
   \\\`SELECT COUNT(*) FROM dim WHERE email IS NOT NULL\\\` and checks it's "large" is fragile. Always count
-  the **bad** rows and require **zero** — it's unambiguous and threshold-free.
+  the **bad** rows and require **zero**; it's unambiguous and threshold-free.
 - **NULLs in \\\`NOT IN\\\`.** \\\`status NOT IN ('paid','shipped')\\\` returns nothing for a \\\`NULL\\\` status
   (three-valued logic), silently passing a null. Add \\\`OR status IS NULL\\\` if a null is also a violation.
 
@@ -2497,11 +2497,11 @@ DQ check in a star schema.
 > identical across engines.
 
 **Recap:** encode each expectation as a query that returns only the violating rows and require **zero
-rows** to pass; the dbt four — \\\`not_null\\\`, \\\`unique\\\`, \\\`accepted_values\\\`, \\\`relationships\\\` (the orphan
-anti-join) — are the standard suite, always counting the bad rows rather than asserting the good ones.
+rows** to pass; the dbt four, \\\`not_null\\\`, \\\`unique\\\`, \\\`accepted_values\\\`, \\\`relationships\\\` (the orphan
+anti-join) are the standard suite, always counting the bad rows rather than asserting the good ones.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
-hidden assertion queries check your DQ output — and, true to the discipline, each grader assertion is
+hidden assertion queries check your DQ output, and, true to the discipline, each grader assertion is
 itself a zero-rows violation query.`,
   },
   apply: scriptExercise({
@@ -2512,7 +2512,7 @@ already seeded. Populate \`orphan_facts\` with the \`customer_key\` of every fac
 from the dimension (key \`99\` is the planted orphan; keys \`1\` and \`2\` match and must stay out).
 
 Lead your script with \`DELETE FROM orphan_facts;\` so a re-run recomputes the table instead of doubling
-its rows — on healthy data this table would be empty, and empty is the "pass" state.`,
+its rows. On healthy data this table would be empty, and empty is the "pass" state.`,
     starterCode: `-- dim_customer, fact_sales, and an empty orphan_facts are already seeded.
 -- Fill orphan_facts with the customer_key of every fact row that has NO matching dim_customer.
 DELETE FROM orphan_facts;   -- clear first so a re-run recomputes instead of doubling rows
@@ -2523,10 +2523,10 @@ DELETE FROM orphan_facts;   -- clear first so a re-run recomputes instead of dou
 -- LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
 -- WHERE d.customer_key IS NULL;`,
     hints: [
-      "`LEFT JOIN dim_customer` and keep only the rows `WHERE dim_customer.customer_key IS NULL` — that's the orphan anti-join.",
+      "`LEFT JOIN dim_customer` and keep only the rows `WHERE dim_customer.customer_key IS NULL`: that's the orphan anti-join.",
       "Insert those unmatched keys into `orphan_facts`.",
       "Lead with `DELETE FROM orphan_facts;` so running the script twice recomputes the same rows instead of doubling them.",
-      "On healthy data the anti-join returns nothing, so `orphan_facts` would be empty — that emptiness is the passing condition.",
+      "On healthy data the anti-join returns nothing, so `orphan_facts` would be empty; that emptiness is the passing condition.",
     ],
     referenceSolution: `DELETE FROM orphan_facts;
 
@@ -2574,11 +2574,11 @@ CREATE TABLE orphan_facts (customer_key INTEGER);`,
 \`dq_results(test_name TEXT, violations INTEGER)\` are seeded. Populate \`dq_results\` with **exactly one
 row per test**, each storing the **count of violating rows**:
 
-- \`pk_unique\` — \`customer_key\` values appearing more than once,
-- \`email_not_null\` — rows with a NULL \`email\`,
-- \`status_accepted\` — rows whose \`status\` is not in \`('active','churned','prospect')\` (**a NULL status
+- \`pk_unique\`: \`customer_key\` values appearing more than once,
+- \`email_not_null\`: rows with a NULL \`email\`,
+- \`status_accepted\`: rows whose \`status\` is not in \`('active','churned','prospect')\` (**a NULL status
   also counts as a violation**),
-- \`no_orphan_facts\` — \`fact_sales\` rows with no matching \`dim_customer\`.
+- \`no_orphan_facts\`: \`fact_sales\` rows with no matching \`dim_customer\`.
 
 The suite **passes** only when all four \`violations\` are \`0\`. Lead with \`DELETE FROM dq_results;\` so a
 re-run recomputes the four rows instead of stacking eight.`,
@@ -2592,7 +2592,7 @@ DELETE FROM dq_results;   -- recompute cleanly on every run
     hints: [
       "Each test is an `INSERT INTO dq_results SELECT '<name>', COUNT(*) FROM (<the violating rows>)`.",
       "`pk_unique`: `SELECT COUNT(*) FROM (SELECT customer_key FROM dim_customer GROUP BY customer_key HAVING COUNT(*) > 1)`.",
-      "`status_accepted`: `WHERE status NOT IN ('active','churned','prospect') OR status IS NULL` — the `OR ... IS NULL` is essential or a NULL status slips through.",
+      "`status_accepted`: `WHERE status NOT IN ('active','churned','prospect') OR status IS NULL`; the `OR ... IS NULL` is essential or a NULL status slips through.",
       "`no_orphan_facts`: the `LEFT JOIN ... IS NULL` anti-join from the Apply, wrapped in `COUNT(*)`.",
     ],
     seedSql: `DROP TABLE IF EXISTS dq_results;
@@ -2668,13 +2668,13 @@ const explainPlan: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 9,
     markdown: `## Read the plan before you optimize
 
-When a query is slow, guessing is a waste of time — ask the database what it's doing.
+When a query is slow, guessing is a waste of time; ask the database what it's doing.
 \`EXPLAIN QUERY PLAN <query>\` returns the **plan**: how the engine will access each table. The word
 you're hunting for is **SCAN** versus **SEARCH**:
 
-- **\`SCAN table\`** — a full table scan: the engine reads *every* row. Fine for tiny tables,
+- **\`SCAN table\`** is a full table scan: the engine reads *every* row. Fine for tiny tables,
   catastrophic for large facts.
-- **\`SEARCH table USING INDEX …\`** — an index seek: the engine jumps straight to the matching rows.
+- **\`SEARCH table USING INDEX …\`** is an index seek: the engine jumps straight to the matching rows.
   This is what you want on a filtered or joined column.
 
 \`\`\`sql
@@ -2689,7 +2689,7 @@ CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_key);
 \`\`\`
 
 and the same \`EXPLAIN QUERY PLAN\` now reports
-\`SEARCH fact_sales USING INDEX idx_fact_sales_customer (customer_key=?)\` — the scan became a seek.
+\`SEARCH fact_sales USING INDEX idx_fact_sales_customer (customer_key=?)\`: the scan became a seek.
 Index the columns queries **filter on**, **join on**, and often **order by**.
 
 ### Sargable predicates
@@ -2708,16 +2708,16 @@ WHERE order_date >= '2026-01-01' AND order_date < '2027-01-01'
 Both select 2026, but only the second lets the engine seek. Rewriting a function-wrapped predicate as
 a **range on the bare column** is one of the highest-leverage performance fixes a DE makes. Note the
 half-open upper bound (\`< '2027-01-01'\`): it keeps the very last day of the year (\`2026-12-31\`) and
-cleanly drops \`2027-01-01\` — no fencepost bug, and no \`BETWEEN\` gotcha.
+cleanly drops \`2027-01-01\`: no fencepost bug, and no \`BETWEEN\` gotcha.
 
 ### Common pitfalls
 
 - **Indexing everything.** Every index speeds reads but **slows writes** (each \`INSERT\` / \`UPDATE\`
-  must maintain it) and costs storage. Index selectively — the FK/join columns and the hot filter
-  columns — not every column.
+  must maintain it) and costs storage. Index selectively: the FK/join columns and the hot filter
+  columns, not every column.
 - **Redundant indexes.** \`PRIMARY KEY\` and \`UNIQUE\` columns are **already indexed**; don't add a
   second index on them.
-- **Reading the plan wrong.** \`SCAN\` on a 5-row lookup table is totally fine — a seek's overhead
+- **Reading the plan wrong.** \`SCAN\` on a 5-row lookup table is totally fine; a seek's overhead
   isn't worth it. Optimize the scans that hurt: big tables in the hot path.
 
 > **In the warehouse:** SQLite's \`EXPLAIN QUERY PLAN\` is the lightweight cousin of Postgres's
@@ -2727,18 +2727,18 @@ cleanly drops \`2027-01-01\` — no fencepost bug, and no \`BETWEEN\` gotcha.
 
 **Recap:** \`EXPLAIN QUERY PLAN\` reveals \`SCAN\` (full read) vs \`SEARCH … USING INDEX\` (seek); turn a
 hot-path scan into a seek by indexing the filter/join column and keeping predicates sargable (bare
-column, range not function) — and index selectively, because every index taxes writes.
+column, range not function), and index selectively, because every index taxes writes.
 
 **Execution mode:** you write a multi-statement script against a fresh seeded SQLite DB, then hidden
 assertion queries check that the right indexes exist and that your rewritten query returns exactly the
-right rows. You can eyeball the plan yourself with \`EXPLAIN QUERY PLAN <your query>;\` while you work —
+right rows. You can eyeball the plan yourself with \`EXPLAIN QUERY PLAN <your query>;\` while you work,
 but the grader checks the **index and the result**, not the plan text.`,
   },
   apply: scriptExercise({
     id: "sql-l4-explain-apply",
     prompt: `\`fact_sales\` is seeded with **no index** on \`customer_key\`, so
 \`EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;\` reports a full \`SCAN\`. **Add the
-index that turns that scan into a \`SEARCH … USING INDEX\` seek** — index the column the query filters
+index that turns that scan into a \`SEARCH … USING INDEX\` seek**: index the column the query filters
 on. (In the real grader the table is large enough that the scan actually hurts.) Keep the script
 re-runnable so a second run doesn't error.`,
     starterCode: `-- fact_sales is already seeded — there is no index on customer_key yet.
@@ -2748,9 +2748,9 @@ re-runnable so a second run doesn't error.`,
 
 -- CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);`,
     hints: [
-      "`CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);` — the `IF NOT EXISTS` keeps the script idempotent so a re-run doesn't error.",
-      "The filter column is `customer_key` — that's the column to index, so `WHERE customer_key = ?` becomes a seek instead of a scan.",
-      "Verify for yourself with `EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;` — you want `SEARCH … USING INDEX`, not a bare `SCAN`.",
+      "`CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);`. The `IF NOT EXISTS` keeps the script idempotent so a re-run doesn't error.",
+      "The filter column is `customer_key`; that's the column to index, so `WHERE customer_key = ?` becomes a seek instead of a scan.",
+      "Verify for yourself with `EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;`: you want `SEARCH … USING INDEX`, not a bare `SCAN`.",
     ],
     referenceSolution: `-- Turn the full SCAN on customer_key into an index SEARCH (seek).
 -- IF NOT EXISTS makes the CREATE re-runnable for the idempotency double-run.
@@ -2792,13 +2792,13 @@ INSERT INTO fact_sales (customer_key, amount) VALUES
   practice: scriptExercise({
     id: "sql-l4-explain-practice",
     prompt: `A hot query joins \`fact_orders\` to \`dim_customer\` on \`customer_key\` and filters
-\`order_date\` with a **non-sargable** year function — two full scans. Fix all three problems:
+\`order_date\` with a **non-sargable** year function: two full scans. Fix all three problems:
 
 1. Add the index that makes the fact→dim join a **seek** on the fact side (\`fact_orders.customer_key\`).
 2. Add the index that lets the date filter **seek** (\`fact_orders.order_date\`).
 3. Rewrite the filter \`strftime('%Y', order_date) = '2026'\` as a **sargable** half-open date range
-   (bare column, no function), then load the 2026 orders into \`orders_2026 (order_id, customer_key)\`
-   — join to \`dim_customer\` so only orders with a real customer land.
+   (bare column, no function), then load the 2026 orders into \`orders_2026 (order_id, customer_key)\`.
+   Join to \`dim_customer\` so only orders with a real customer land.
 
 \`orders_2026\` is pre-created (empty). Lead the load with \`DELETE FROM orders_2026;\` so a second run
 doesn't double the rows.`,
@@ -2819,7 +2819,7 @@ doesn't double the rows.`,
 -- WHERE f.order_date >= '2026-01-01' AND f.order_date < '2027-01-01';`,
     hints: [
       "Two indexes, both idempotent: `CREATE INDEX IF NOT EXISTS … ON fact_orders(customer_key)` for the join and `… ON fact_orders(order_date)` for the filter.",
-      "Rewrite the filter as `order_date >= '2026-01-01' AND order_date < '2027-01-01'` — bare column, half-open range, no `strftime`.",
+      "Rewrite the filter as `order_date >= '2026-01-01' AND order_date < '2027-01-01'`: bare column, half-open range, no `strftime`.",
       "The half-open upper bound `< '2027-01-01'` includes `2026-12-31` and excludes `2027-01-01`.",
       "Lead the load with `DELETE FROM orders_2026;` (so a re-run doesn't double rows), then `INSERT … SELECT` the 2026 fact rows joined to `dim_customer` into `orders_2026 (order_id, customer_key)`.",
     ],
@@ -2933,7 +2933,7 @@ Here is the anatomy of a production \`dim_customer\` Type-2 loader processing on
 
 The single most important correctness property is **idempotency of the SCD2 step**. Change-detection
 must compare the dump against the *current* dimension row, and you must **snapshot the changed set into
-a temp table _before_ you expire or insert** — otherwise the insert creates rows that a naive second
+a temp table _before_ you expire or insert**; otherwise the insert creates rows that a naive second
 pass re-reads as "changes," and you get infinite version growth on re-runs.
 
 \`\`\`sql
@@ -2962,7 +2962,7 @@ INSERT INTO dim_customer (customer_code, city, effective_from, effective_to, is_
 SELECT customer_code, city, '2026-03-01', '9999-12-31', 1 FROM changed;
 \`\`\`
 
-On the second run \`changed\` is **empty** — the current city already equals the dump — so the expire
+On the second run \`changed\` is **empty** (the current city already equals the dump) so the expire
 and insert both no-op. Brand-new customers are the mirror image: freeze the codes that have *no* row in
 the dimension at all, and insert one current version for each (never run the expire step for them).
 
@@ -2974,16 +2974,16 @@ Two guards keep the *whole script* re-runnable, not just the SCD2 step:
   \`UPDATE\` or a \`DELETE\` + re-\`INSERT\`, never a blind \`INSERT\` that doubles rows on the second pass.
 
 Resolve each fact to the surrogate key that was valid **on its sale date** with a half-open as-of join
-— \`f.sale_date >= d.effective_from AND f.sale_date < d.effective_to\` — as an \`UPDATE\`, so re-running
+(\`f.sale_date >= d.effective_from AND f.sale_date < d.effective_to\`) as an \`UPDATE\`, so re-running
 recomputes the identical key. Then index the join column and confirm the plan with
 \`EXPLAIN QUERY PLAN\`; you're looking for a \`SEARCH … USING INDEX\` (a seek), not a \`SCAN\`.
 
 > **In the warehouse:** SQLite has no \`QUALIFY\`, so you filter \`ROW_NUMBER()\` in a wrapping
 > subquery/CTE (\`WHERE rn = 1\`). Snowflake and BigQuery let you write
-> \`QUALIFY ROW_NUMBER() OVER (…) = 1\` in one line — same dedup, less nesting.
+> \`QUALIFY ROW_NUMBER() OVER (…) = 1\` in one line: same dedup, less nesting.
 
 > **In the warehouse:** this entire loader is what dbt's \`snapshot\` (SCD2) plus \`MERGE\`-based
-> incremental models plus schema \`tests\` generate for you — but building it by hand once is exactly how
+> incremental models plus schema \`tests\` generate for you, but building it by hand once is exactly how
 > you learn what those tools are doing, and it's the interview question behind "walk me through a
 > Type-2 dimension load."
 
@@ -2992,8 +2992,8 @@ verification, all engineered so re-running the whole script changes nothing. Ide
 change-detection against the *current* row is the property everything else depends on.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
-hidden assertion queries check the dimension, the as-of fact keys, the DQ gate, and the join index —
-and the grader re-runs your whole script to prove it changes nothing the second time.`,
+hidden assertion queries check the dimension, the as-of fact keys, the DQ gate, and the join index. The
+grader re-runs your whole script to prove it changes nothing the second time.`,
   },
   apply: scriptExercise({
     id: "sql-l4-capstone-apply",
@@ -3022,9 +3022,9 @@ DROP TABLE IF EXISTS changed;
 
 -- 2c. Insert the new current versions (effective_from = '2026-03-01', effective_to = '9999-12-31') ...`,
     hints: [
-      "Guard each temp table with `DROP TABLE IF EXISTS clean_dump;` before `CREATE TEMP TABLE`, then dedup with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC)` and keep `rn = 1` — this picks the Berlin row for C1.",
+      "Guard each temp table with `DROP TABLE IF EXISTS clean_dump;` before `CREATE TEMP TABLE`, then dedup with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC)` and keep `rn = 1`; this picks the Berlin row for C1.",
       "Compare the deduped dump to the current dim row (`is_current = 1`) to find changed cities, and freeze that set into a temp table before you touch `dim_customer`.",
-      "Expire, then insert — exactly the pattern from `sql-l4-scd-type2`.",
+      "Expire, then insert: exactly the pattern from `sql-l4-scd-type2`.",
       "Use `snapshot_date = '2026-03-01'` for both the expiring `effective_to` and the new `effective_from`.",
     ],
     referenceSolution: `-- Temp-table guards so a second run of the whole script does not error.
@@ -3133,12 +3133,12 @@ Your script must:
    (\`sale_date >= effective_from AND sale_date < effective_to\`).
 4. **Index** \`fact_sales(customer_key)\` and confirm the fact→dim join is a seek with
    \`EXPLAIN QUERY PLAN\`.
-5. **Write a DQ gate**: three rows into \`dq_results(test_name, violations)\` —
+5. **Write a DQ gate**: three rows into \`dq_results(test_name, violations)\`,
    \`pk_natural_one_current\` (codes with more than one current row), \`orphan_facts\` (fact keys that
    aren't a real surrogate), and \`contiguous_windows\` (codes with gapped/overlapping windows). All
    three must be **0** on healthy output.
 6. **Idempotency**: the grader runs your entire script **twice** and asserts \`dim_customer\`,
-   \`fact_sales\`, and every \`dq_results.violations\` are identical — no new versions on the second run.`,
+   \`fact_sales\`, and every \`dq_results.violations\` are identical: no new versions on the second run.`,
     starterCode: `-- Guard every temp table so the entire loader re-runs cleanly.
 DROP TABLE IF EXISTS clean_dump;
 DROP TABLE IF EXISTS changed;
@@ -3162,8 +3162,8 @@ DROP TABLE IF EXISTS new_codes;
 -- 6. EXPLAIN QUERY PLAN the fact->dim key join to confirm a seek ...`,
     hints: [
       "Dedup first into a temp table with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC, source_row_id DESC)` keeping `rn = 1`. Everything downstream reads the clean set, never `raw_customer_dump`.",
-      "**Snapshot the changed set into a temp table before mutating** `dim_customer` — compute `codes whose deduped city <> current dim city` once, then expire, then insert from that frozen set. This is what makes run #2 a no-op: on the second run the current city already equals the dump, so `changed` is empty. Brand-new customers = deduped codes with `customer_code NOT IN (SELECT customer_code FROM dim_customer)`.",
-      "Resolve `fact_sales.customer_key` as an idempotent `UPDATE` with the as-of join, and make the DQ step `DELETE FROM dq_results;` then re-`INSERT` the three rows — a blind `INSERT` would double the DQ rows on run #2 and break idempotency.",
+      "**Snapshot the changed set into a temp table before mutating** `dim_customer`: compute `codes whose deduped city <> current dim city` once, then expire, then insert from that frozen set. This is what makes run #2 a no-op: on the second run the current city already equals the dump, so `changed` is empty. Brand-new customers = deduped codes with `customer_code NOT IN (SELECT customer_code FROM dim_customer)`.",
+      "Resolve `fact_sales.customer_key` as an idempotent `UPDATE` with the as-of join, and make the DQ step `DELETE FROM dq_results;` then re-`INSERT` the three rows; a blind `INSERT` would double the DQ rows on run #2 and break idempotency.",
       "DQ shapes: `pk_natural_one_current` = `COUNT(*)` of `(SELECT customer_code FROM dim_customer WHERE is_current = 1 GROUP BY customer_code HAVING COUNT(*) > 1)`; `contiguous_windows` uses `LEAD(effective_from) OVER (PARTITION BY customer_code ORDER BY effective_from)` and counts codes where the next version's start doesn't equal this version's `effective_to`.",
     ],
     seedSql: `CREATE TABLE dim_customer (
@@ -3300,43 +3300,43 @@ CREATE TABLE dq_results (test_name TEXT, violations INTEGER);`,
 export const sqlLevel4: SqlLevel = {
   id: 4,
   slug: "engineering",
-  title: "Level 4 — Data Engineering with SQL",
+  title: "Level 4: Data Engineering with SQL",
   tagline:
-    "Window functions, recursive CTEs, SCD, idempotent merge, data-quality — warehouse transforms.",
+    "Window functions, recursive CTEs, SCD, idempotent merge, data-quality: warehouse transforms.",
   defaultExecutionMode: "workspace",
   estimatedHours: 8,
   modules: [
     {
       id: "sql-l4-windows",
-      title: "Module 4.1 — Analytical SQL: Window Functions",
+      title: "Module 4.1: Analytical SQL (Window Functions)",
       description:
         "Compute across related rows without collapsing them: ranking, period-over-period offsets, and running-total frames.",
       lessons: [windowRanking, windowOffset, windowFrames],
     },
     {
       id: "sql-l4-recursive",
-      title: "Module 4.2 — Recursive CTEs",
+      title: "Module 4.2: Recursive CTEs",
       description:
         "Walk self-referencing hierarchies (org charts, category trees) to produce depth and breadcrumb paths.",
       lessons: [recursiveCte],
     },
     {
       id: "sql-l4-warehouse-history",
-      title: "Module 4.3 — Warehouse Modeling and History",
+      title: "Module 4.3: Warehouse Modeling and History",
       description:
         "Load a star schema and track change over time: surrogate keys, then SCD Type 1 overwrite and Type 2 history.",
       lessons: [starBuild, scdType1, scdType2],
     },
     {
       id: "sql-l4-correctness",
-      title: "Module 4.4 — Pipeline Correctness",
+      title: "Module 4.4: Pipeline Correctness",
       description:
         "The habits that separate a junior script from a production loader: deduplication and idempotent upsert/merge.",
       lessons: [dedup, idempotentMerge],
     },
     {
       id: "sql-l4-quality-capstone",
-      title: "Module 4.5 — Quality, Performance, and Capstone",
+      title: "Module 4.5: Quality, Performance, and Capstone",
       description:
         "Guard and tune the pipeline: dbt-style data-quality assertions, EXPLAIN/indexes, and a capstone Type-2 SCD loader.",
       lessons: [dataQuality, explainPlan, capstone],

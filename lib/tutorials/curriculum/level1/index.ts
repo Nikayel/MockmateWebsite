@@ -1,5 +1,5 @@
 /**
- * Level 1 — Foundations (single-file). Reference-style basics.
+ * Level 1: Foundations (single-file). Reference-style basics.
  *
  * Authored by Agent 2 against the single-file contract proven by `py-l1-temperature` (kept below as
  * the canonical sample). Modules follow docs/python-curriculum/CONTENT-TICKETS.md (L1-M1..M5).
@@ -10,7 +10,7 @@
  *  - Each `testCases[i].input` is a keyed object; values are passed POSITIONALLY in key order,
  *    so the key order must match the function's parameter order.
  *  - Parameter names `root/tree/node/p/q/t1/t2/left/right/subroot` (→ TreeNode) and
- *    `head/list/l1/l2` (→ ListNode) are auto-coerced when the value is a list — avoid them for
+ *    `head/list/l1/l2` (→ ListNode) are auto-coerced when the value is a list. Avoid them for
  *    plain numbers/lists. These lessons use safe names (nums, arr, n, k, text, width, …).
  *  - Numeric `expected` values are compared with tolerance, so float results (e.g. 37.0) match
  *    integer expectations (37).
@@ -18,12 +18,12 @@
 import type { PythonLesson, PythonLevel } from "../../types"
 
 // ───────────────────────────────────────────────────────────────────────────
-// L1-M1 — First Steps
+// L1-M1: First Steps
 // ───────────────────────────────────────────────────────────────────────────
 
 const helloLesson: PythonLesson = {
   id: "py-l1-hello",
-  title: "Your first program — print & comments",
+  title: "Your first program: print & comments",
   summary: "Show output with print(), leave comments, and return a value to be checked.",
   estimatedMinutes: 8,
   difficulty: "easy",
@@ -44,7 +44,7 @@ Each \`print\` writes its text on its own line.
 
 ### Comments
 
-A line that starts with \`#\` is a **comment** — Python ignores it. Comments are notes for humans:
+A line that starts with \`#\` is a **comment**. Python ignores it. Comments are notes for humans:
 
 \`\`\`python
 # This is a comment. Python skips it.
@@ -53,7 +53,7 @@ print("but this runs")   # a comment can also sit after code
 
 ### print vs return
 
-\`print\` shows text on the screen. But when we **check** your code, we don't watch the screen — we
+\`print\` shows text on the screen. But when we **check** your code, we don't watch the screen. We
 call your function and look at the value it hands back with \`return\`.
 
 \`\`\`python
@@ -73,7 +73,7 @@ keyword name  param colon  keyword     the string sent back
 
 ### Keep it readable
 
-Build the message once and return it. You can still \`print()\` while you experiment — just remember
+Build the message once and return it. You can still \`print()\` while you experiment, just remember
 the grader reads the **return** value, not the printout.
 
 ### Recap
@@ -90,7 +90,7 @@ print(greeting)`,
   apply: {
     id: "py-l1-hello-apply",
     executionMode: "single-file",
-    prompt: `Implement \`greet(name)\` — return a greeting for the given \`name\`.
+    prompt: `Implement \`greet(name)\`: return a greeting for the given \`name\`.
 
 For \`name = "World"\` it should return the string \`"Hello, World!"\`. Build it by joining
 \`"Hello, "\`, the \`name\`, and \`"!"\` with \`+\`. Return it (don't print it).`,
@@ -99,7 +99,7 @@ For \`name = "World"\` it should return the string \`"Hello, World!"\`. Build it
     pass`,
     hints: [
       'Join the pieces with `+`: `"Hello, " + name + "!"`.',
-      "Use `return`, not `print` — the grader checks the returned string.",
+      "Use `return`, not `print`. The grader checks the returned string.",
       'One line works: `return "Hello, " + name + "!"`.',
     ],
     referenceSolution: `def greet(name):
@@ -113,7 +113,7 @@ For \`name = "World"\` it should return the string \`"Hello, World!"\`. Build it
   practice: {
     id: "py-l1-hello-practice",
     executionMode: "single-file",
-    prompt: `Implement \`banner(name)\` — wrap \`name\` in a simple banner.
+    prompt: `Implement \`banner(name)\`: wrap \`name\` in a simple banner.
 
 For \`name = "Ada"\` it should return \`"=== Ada ==="\` (the name with \`"=== "\` before it and
 \`" ==="\` after it).`,
@@ -156,7 +156,7 @@ score = 10        # score gets 10
 name = "Ada"      # name gets the string "Ada"
 \`\`\`
 
-Once a value has a name, you use it by that name — and you can **reassign** it later:
+Once a value has a name, you use it by that name, and you can **reassign** it later:
 
 \`\`\`python
 score = 10
@@ -207,7 +207,7 @@ print(width * height)  # 30`,
   apply: {
     id: "py-l1-variables-apply",
     executionMode: "single-file",
-    prompt: `Implement \`rectangle_area(width, height)\` — return the area of a rectangle.
+    prompt: `Implement \`rectangle_area(width, height)\`: return the area of a rectangle.
 
 The area is \`width * height\`. You may store it in a variable first or return the expression
 directly.`,
@@ -231,7 +231,7 @@ directly.`,
   practice: {
     id: "py-l1-variables-practice",
     executionMode: "single-file",
-    prompt: `Implement \`seconds_total(hours, minutes)\` — convert a duration to **total seconds**.
+    prompt: `Implement \`seconds_total(hours, minutes)\`: convert a duration to **total seconds**.
 
 One hour is \`3600\` seconds and one minute is \`60\` seconds. Combine both parts.`,
     starterCode: `def seconds_total(hours, minutes):
@@ -253,7 +253,7 @@ One hour is \`3600\` seconds and one minute is \`60\` seconds. Combine both part
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L1-M5 — Control Flow & Functions
+// L1-M5: Control Flow & Functions
 // `py-l1-temperature` (further down) is Agent 1's canonical single-file sample, pinned by
 // registry.test.ts; the three ticketed lessons below precede it in the module.
 // ───────────────────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ else:
   apply: {
     id: "py-l1-conditionals-apply",
     executionMode: "single-file",
-    prompt: `Implement \`sign(n)\` — return \`"positive"\` when \`n\` is greater than 0, \`"negative"\` when it's
+    prompt: `Implement \`sign(n)\`: return \`"positive"\` when \`n\` is greater than 0, \`"negative"\` when it's
 less than 0, and \`"zero"\` when it's exactly 0.`,
     starterCode: `def sign(n):
     # Return "positive", "negative", or "zero".
@@ -348,7 +348,7 @@ less than 0, and \`"zero"\` when it's exactly 0.`,
   practice: {
     id: "py-l1-conditionals-practice",
     executionMode: "single-file",
-    prompt: `Implement \`can_vote(age, citizen)\` — return \`True\` only when \`age\` is at least 18 **and**
+    prompt: `Implement \`can_vote(age, citizen)\`: return \`True\` only when \`age\` is at least 18 **and**
 \`citizen\` is \`True\`.`,
     starterCode: `def can_vote(age, citizen):
     # Return True when age >= 18 AND citizen is True.
@@ -433,7 +433,7 @@ print(total)        # 15`,
   apply: {
     id: "py-l1-loops-apply",
     executionMode: "single-file",
-    prompt: `Implement \`sum_to(n)\` — return the sum of all whole numbers from 1 up to and including \`n\`.
+    prompt: `Implement \`sum_to(n)\`: return the sum of all whole numbers from 1 up to and including \`n\`.
 
 For \`n = 5\` that's \`1 + 2 + 3 + 4 + 5 = 15\`. For \`n = 0\`, return \`0\`.`,
     starterCode: `def sum_to(n):
@@ -459,7 +459,7 @@ For \`n = 5\` that's \`1 + 2 + 3 + 4 + 5 = 15\`. For \`n = 0\`, return \`0\`.`,
   practice: {
     id: "py-l1-loops-practice",
     executionMode: "single-file",
-    prompt: `Implement \`count_evens(nums)\` — return how many numbers in the list \`nums\` are even.
+    prompt: `Implement \`count_evens(nums)\`: return how many numbers in the list \`nums\` are even.
 
 For \`[1, 2, 3, 4]\` return \`2\`.`,
     starterCode: `def count_evens(nums):
@@ -520,7 +520,7 @@ power(2, 3)    # 8   — exp given explicitly
 
 ### Reading a traceback
 
-When code raises an error, Python prints a **traceback** — read it bottom-up:
+When code raises an error, Python prints a **traceback**. Read it bottom-up:
 
 \`\`\`text
 Traceback (most recent call last):
@@ -529,7 +529,7 @@ Traceback (most recent call last):
 TypeError: unsupported operand type(s) for ** : 'str' and 'int'
 \`\`\`
 
-The **last line** names the problem (here a \`TypeError\` — a string can't be raised to a power), and
+The **last line** names the problem (here a \`TypeError\`: a string can't be raised to a power), and
 the lines above show where it happened. Most bugs are solved by reading that last line carefully.
 
 ### Recap
@@ -545,7 +545,7 @@ print(power(2, 3))   # 8`,
   apply: {
     id: "py-l1-functions-apply",
     executionMode: "single-file",
-    prompt: `Implement \`power(base, exp=2)\` — return \`base\` raised to the \`exp\` power, where \`exp\`
+    prompt: `Implement \`power(base, exp=2)\`: return \`base\` raised to the \`exp\` power, where \`exp\`
 defaults to \`2\`.
 
 So \`power(3)\` is \`9\` (3 squared) and \`power(2, 3)\` is \`8\`.`,
@@ -569,7 +569,7 @@ So \`power(3)\` is \`9\` (3 squared) and \`power(2, 3)\` is \`8\`.`,
   practice: {
     id: "py-l1-functions-practice",
     executionMode: "single-file",
-    prompt: `Implement \`make_tag(name, content)\` — wrap \`content\` in an HTML tag named \`name\`.
+    prompt: `Implement \`make_tag(name, content)\`: wrap \`content\` in an HTML tag named \`name\`.
 
 For \`("b", "hi")\` return \`"<b>hi</b>"\`.`,
     starterCode: `def make_tag(name, content):
@@ -626,7 +626,7 @@ keyword name  param colon  keyword  the value sent back
 
 - \`def\` starts the definition.
 - \`square\` is the name you'll call.
-- \`n\` is a **parameter** — a placeholder filled in when the function is called.
+- \`n\` is a **parameter**, a placeholder filled in when the function is called.
 - Everything indented under the \`def\` is the **body**.
 - \`return\` ends the function and produces its result. A function with no \`return\` hands back
   \`None\`.
@@ -647,7 +647,7 @@ Printing is **not** the same as returning. The grader checks what you \`return\`
 ### Keep it readable
 
 Give parameters names that say what they hold (\`f\` for Fahrenheit, \`c\` for Celsius), and
-return the expression directly when it's a one-liner — no temporary variable needed.
+return the expression directly when it's a one-liner. No temporary variable is needed.
 
 ### Recap
 
@@ -661,7 +661,7 @@ print(square(9))   # 81`,
   apply: {
     id: "py-l1-temperature-apply",
     executionMode: "single-file",
-    prompt: `Implement \`to_celsius(f)\` — convert a temperature in **Fahrenheit** to **Celsius**.
+    prompt: `Implement \`to_celsius(f)\`: convert a temperature in **Fahrenheit** to **Celsius**.
 
 The formula is \`(f - 32) * 5 / 9\`. Return the result (don't print it).`,
     starterCode: `def to_celsius(f):
@@ -669,7 +669,7 @@ The formula is \`(f - 32) * 5 / 9\`. Return the result (don't print it).`,
     pass`,
     hints: [
       "Use the formula (f - 32) * 5 / 9.",
-      "Use `return`, not `print` — the grader checks the returned value.",
+      "Use `return`, not `print`. The grader checks the returned value.",
       "A single line works: `return (f - 32) * 5 / 9`.",
     ],
     referenceSolution: `def to_celsius(f):
@@ -684,7 +684,7 @@ The formula is \`(f - 32) * 5 / 9\`. Return the result (don't print it).`,
   practice: {
     id: "py-l1-temperature-practice",
     executionMode: "single-file",
-    prompt: `Now go the other way: implement \`to_fahrenheit(c)\` — convert **Celsius** to **Fahrenheit**.
+    prompt: `Now go the other way: implement \`to_fahrenheit(c)\` to convert **Celsius** to **Fahrenheit**.
 
 The formula is \`c * 9 / 5 + 32\`. Return the result.`,
     starterCode: `def to_fahrenheit(c):
@@ -706,7 +706,7 @@ The formula is \`c * 9 / 5 + 32\`. Return the result.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L1-M2 — Data Types
+// L1-M2: Data Types
 // ───────────────────────────────────────────────────────────────────────────
 
 const numbersLesson: PythonLesson = {
@@ -739,7 +739,7 @@ Two operators are easy to miss but show up constantly:
 17 % 5    # 2   modulo: the remainder left over
 \`\`\`
 
-Together they split a number into a whole part and a remainder — perfect for "125 minutes is 2
+Together they split a number into a whole part and a remainder, perfect for "125 minutes is 2
 hours and 5 minutes":
 
 \`\`\`python
@@ -771,7 +771,7 @@ print(2 ** 10)       # 1024`,
   apply: {
     id: "py-l1-numbers-apply",
     executionMode: "single-file",
-    prompt: `Implement \`minutes_to_hm(total_minutes)\` — split a number of minutes into hours and minutes.
+    prompt: `Implement \`minutes_to_hm(total_minutes)\`: split a number of minutes into hours and minutes.
 
 Return a list \`[hours, minutes]\` where \`hours\` is the whole hours and \`minutes\` is what's left
 over. For \`125\` minutes, return \`[2, 5]\`.`,
@@ -795,7 +795,7 @@ over. For \`125\` minutes, return \`[2, 5]\`.`,
   practice: {
     id: "py-l1-numbers-practice",
     executionMode: "single-file",
-    prompt: `Implement \`average(a, b, c)\` — return the mean of three numbers.
+    prompt: `Implement \`average(a, b, c)\`: return the mean of three numbers.
 
 Add them up and divide by 3. The result may be a decimal (a float), which is fine.`,
     starterCode: `def average(a, b, c):
@@ -834,7 +834,7 @@ A **boolean** is one of two values: \`True\` or \`False\`. Comparisons produce b
 3 == 4    # False   (== tests equality; = assigns)
 \`\`\`
 
-\`None\` is Python's "nothing here" value — a deliberate placeholder for "no result yet".
+\`None\` is Python's "nothing here" value, a deliberate placeholder for "no result yet".
 
 ### Converting between types
 
@@ -873,7 +873,7 @@ print("yes" if "" else "no")   # no  (empty string is falsy)`,
   apply: {
     id: "py-l1-bool-none-convert-apply",
     executionMode: "single-file",
-    prompt: `Implement \`parse_or_zero(text)\` — turn a string of digits into an integer, but return \`0\`
+    prompt: `Implement \`parse_or_zero(text)\`: turn a string of digits into an integer, but return \`0\`
 when the string is empty.
 
 For \`"42"\` return \`42\`; for \`""\` return \`0\`.`,
@@ -897,7 +897,7 @@ For \`"42"\` return \`42\`; for \`""\` return \`0\`.`,
   practice: {
     id: "py-l1-bool-none-convert-practice",
     executionMode: "single-file",
-    prompt: `Implement \`yes_no(value)\` — return the string \`"yes"\` when \`value\` is truthy, otherwise
+    prompt: `Implement \`yes_no(value)\`: return the string \`"yes"\` when \`value\` is truthy, otherwise
 \`"no"\`.
 
 Remember the falsy values: \`0\`, \`""\`, \`None\`, and \`False\`.`,
@@ -905,7 +905,7 @@ Remember the falsy values: \`0\`, \`""\`, \`None\`, and \`False\`.`,
     # Return "yes" when value is truthy, else "no".
     pass`,
     hints: [
-      "You don't need to compare anything — `value` itself is truthy or falsy.",
+      "You don't need to compare anything: `value` itself is truthy or falsy.",
       'Conditional expression: `return "yes" if value else "no"`.',
     ],
     referenceSolution: `def yes_no(value):
@@ -921,7 +921,7 @@ Remember the falsy values: \`0\`, \`""\`, \`None\`, and \`False\`.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L1-M3 — Strings & Formatting
+// L1-M3: Strings & Formatting
 // ───────────────────────────────────────────────────────────────────────────
 
 const stringsIndexLesson: PythonLesson = {
@@ -954,7 +954,7 @@ len(word)  # 6     how many characters
 
 ### Slicing
 
-\`text[start:stop]\` takes a **slice** — from \`start\` up to *but not including* \`stop\`:
+\`text[start:stop]\` takes a **slice**, from \`start\` up to *but not including* \`stop\`:
 
 \`\`\`python
 word[0:3]   # "pyt"   indices 0, 1, 2
@@ -965,7 +965,7 @@ word[1:-1]  # "ytho"  drop the first and last character
 
 ### Immutability
 
-Strings can't be changed in place — \`word[0] = "P"\` is an error. Instead you build a **new**
+Strings can't be changed in place: \`word[0] = "P"\` is an error. Instead you build a **new**
 string (you'll do that with methods in the next lesson).
 
 ### Recap
@@ -982,7 +982,7 @@ print(len(word))   # 6`,
   apply: {
     id: "py-l1-strings-index-apply",
     executionMode: "single-file",
-    prompt: `Implement \`first_and_last(text)\` — return a 2-character string made of the **first** and
+    prompt: `Implement \`first_and_last(text)\`: return a 2-character string made of the **first** and
 **last** characters of \`text\`.
 
 For \`"python"\` return \`"pn"\`. (A one-character string like \`"a"\` returns \`"aa"\`.)`,
@@ -1006,7 +1006,7 @@ For \`"python"\` return \`"pn"\`. (A one-character string like \`"a"\` returns \
   practice: {
     id: "py-l1-strings-index-practice",
     executionMode: "single-file",
-    prompt: `Implement \`without_ends(text)\` — return \`text\` with its first and last characters removed.
+    prompt: `Implement \`without_ends(text)\`: return \`text\` with its first and last characters removed.
 
 For \`"python"\` return \`"ytho"\`. For \`"[hi]"\` return \`"hi"\`.`,
     starterCode: `def without_ends(text):
@@ -1038,8 +1038,8 @@ const stringsMethodsLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Methods reshape text
 
-A **method** is a function attached to a value, called with a dot. Strings come with handy ones —
-each returns a **new** string (the original is untouched):
+A **method** is a function attached to a value, called with a dot. Strings come with handy ones.
+Each returns a **new** string (the original is untouched):
 
 \`\`\`python
 "  Hello  ".strip()        # "Hello"   remove surrounding whitespace
@@ -1081,7 +1081,7 @@ print(f"Hi {name.upper()}!")   # Hi ADA!`,
   apply: {
     id: "py-l1-strings-methods-apply",
     executionMode: "single-file",
-    prompt: `Implement \`normalize(text)\` — return \`text\` with surrounding whitespace removed and all
+    prompt: `Implement \`normalize(text)\`: return \`text\` with surrounding whitespace removed and all
 letters lowercased.
 
 For \`"  Hello  "\` return \`"hello"\`.`,
@@ -1105,7 +1105,7 @@ For \`"  Hello  "\` return \`"hello"\`.`,
   practice: {
     id: "py-l1-strings-methods-practice",
     executionMode: "single-file",
-    prompt: `Implement \`loud_greeting(name)\` — return an uppercased greeting using an f-string.
+    prompt: `Implement \`loud_greeting(name)\`: return an uppercased greeting using an f-string.
 
 For \`"ada"\` return \`"HELLO, ADA!"\`.`,
     starterCode: `def loud_greeting(name):
@@ -1126,7 +1126,7 @@ For \`"ada"\` return \`"HELLO, ADA!"\`.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L1-M4 — Collections
+// L1-M4: Collections
 // ───────────────────────────────────────────────────────────────────────────
 
 const listsLesson: PythonLesson = {
@@ -1152,7 +1152,7 @@ len(nums)    # 3
 
 ### Changing a list
 
-Unlike strings, lists are **mutable** — you can change them in place:
+Unlike strings, lists are **mutable**. You can change them in place:
 
 \`\`\`python
 nums.append(40)     # [10, 20, 30, 40]      add to the end
@@ -1183,7 +1183,7 @@ print(len(nums))   # 4`,
   apply: {
     id: "py-l1-lists-apply",
     executionMode: "single-file",
-    prompt: `Implement \`add_item(items, value)\` — append \`value\` to the list \`items\` and return the list.
+    prompt: `Implement \`add_item(items, value)\`: append \`value\` to the list \`items\` and return the list.
 
 For \`([1, 2], 3)\` return \`[1, 2, 3]\`.`,
     starterCode: `def add_item(items, value):
@@ -1211,7 +1211,7 @@ For \`([1, 2], 3)\` return \`[1, 2, 3]\`.`,
   practice: {
     id: "py-l1-lists-practice",
     executionMode: "single-file",
-    prompt: `Implement \`middle_item(items)\` — return the item at the middle index of the list.
+    prompt: `Implement \`middle_item(items)\`: return the item at the middle index of the list.
 
 The middle index is \`len(items) // 2\`. For \`[10, 20, 30, 40, 50]\` return \`30\`.`,
     starterCode: `def middle_item(items):
@@ -1243,7 +1243,7 @@ const tuplesSetsLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Tuples: fixed records
 
-A **tuple** is like a list but **immutable** — once created it can't change. Use one for a fixed
+A **tuple** is like a list but **immutable**: once created it can't change. Use one for a fixed
 group of values that belong together (a point, a row):
 
 \`\`\`python
@@ -1252,7 +1252,7 @@ point[0]      # 3
 x, y = point  # unpack into two names: x = 3, y = 4
 \`\`\`
 
-Many functions hand back tuples — e.g. \`divmod(17, 5)\` returns \`(3, 2)\`.
+Many functions hand back tuples. For example, \`divmod(17, 5)\` returns \`(3, 2)\`.
 
 ## Sets: unique membership
 
@@ -1291,7 +1291,7 @@ print(x, y)             # 3 4`,
   apply: {
     id: "py-l1-tuples-sets-apply",
     executionMode: "single-file",
-    prompt: `Implement \`unique_count(arr)\` — return how many **distinct** values are in the list \`arr\`.
+    prompt: `Implement \`unique_count(arr)\`: return how many **distinct** values are in the list \`arr\`.
 
 For \`[1, 2, 2, 3]\` return \`3\`.`,
     starterCode: `def unique_count(arr):
@@ -1313,7 +1313,7 @@ For \`[1, 2, 2, 3]\` return \`3\`.`,
   practice: {
     id: "py-l1-tuples-sets-practice",
     executionMode: "single-file",
-    prompt: `Implement \`min_max(arr)\` — return a tuple \`(smallest, largest)\` of the list \`arr\`.
+    prompt: `Implement \`min_max(arr)\`: return a tuple \`(smallest, largest)\` of the list \`arr\`.
 
 For \`[3, 1, 5, 2]\` return \`(1, 5)\`.`,
     starterCode: `def min_max(arr):
@@ -1384,7 +1384,7 @@ print({**prices, **{"fig": 6}})  # {'apple': 3, 'pear': 2, 'fig': 6}`,
   apply: {
     id: "py-l1-dicts-apply",
     executionMode: "single-file",
-    prompt: `Implement \`lookup(prices, name)\` — return the price for \`name\` from the \`prices\` dict, or
+    prompt: `Implement \`lookup(prices, name)\`: return the price for \`name\` from the \`prices\` dict, or
 \`0\` if it isn't there.
 
 For \`prices = {"apple": 3}\` and \`name = "banana"\`, return \`0\`.`,
@@ -1415,7 +1415,7 @@ For \`prices = {"apple": 3}\` and \`name = "banana"\`, return \`0\`.`,
   practice: {
     id: "py-l1-dicts-practice",
     executionMode: "single-file",
-    prompt: `Implement \`merge_two(a, b)\` — return a new dict with all pairs from \`a\` and \`b\`. When a key
+    prompt: `Implement \`merge_two(a, b)\`: return a new dict with all pairs from \`a\` and \`b\`. When a key
 is in both, \`b\`'s value wins.
 
 For \`({"x": 1}, {"x": 9})\` return \`{"x": 9}\`.`,
@@ -1451,7 +1451,7 @@ For \`({"x": 1}, {"x": 9})\` return \`{"x": 9}\`.`,
 
 // ───────────────────────────────────────────────────────────────────────────
 // Gap-fill lessons (added after the CURRICULUM-GAP-ANALYSIS audit): high-value
-// beginner topics the original tree missed — identity/equality, the reference
+// beginner topics the original tree missed: identity/equality, the reference
 // model, data-structure choice, the enumerate/zip/items idioms, and recursion.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -1489,7 +1489,7 @@ if value == None:      # works, but reviewers will flag it — don't
 
 ### Why not use \`is\` for numbers or strings?
 
-Python *sometimes* reuses small ints and short strings, so \`is\` may look like it works — then
+Python *sometimes* reuses small ints and short strings, so \`is\` may look like it works, then
 silently break on bigger values:
 
 \`\`\`python
@@ -1516,7 +1516,7 @@ print(value is None)   # True`,
   apply: {
     id: "py-l1-identity-equality-apply",
     executionMode: "single-file",
-    prompt: `Implement \`is_missing(value)\` — return \`True\` when \`value\` **is** \`None\`, otherwise \`False\`.
+    prompt: `Implement \`is_missing(value)\`: return \`True\` when \`value\` **is** \`None\`, otherwise \`False\`.
 
 Use the \`is None\` test, not \`== None\`.`,
     starterCode: `def is_missing(value):
@@ -1538,7 +1538,7 @@ Use the \`is None\` test, not \`== None\`.`,
   practice: {
     id: "py-l1-identity-equality-practice",
     executionMode: "single-file",
-    prompt: `Implement \`none_safe_len(value)\` — return \`len(value)\`, but return \`0\` when \`value\` is \`None\`
+    prompt: `Implement \`none_safe_len(value)\`: return \`len(value)\`, but return \`0\` when \`value\` is \`None\`
 (so it never crashes).
 
 For \`None\` return \`0\`; for \`"abc"\` return \`3\`.`,
@@ -1565,7 +1565,7 @@ const referencesCopyLesson: PythonLesson = {
   id: "py-l1-references-copy",
   title: "References, copies & the mutable-default trap",
   summary:
-    "Names share objects — build new lists instead of mutating, and never use a mutable default argument.",
+    "Names share objects: build new lists instead of mutating, and never use a mutable default argument.",
   estimatedMinutes: 11,
   difficulty: "easy",
   skills: ["references", "mutability", "copying", "default-arguments"],
@@ -1573,7 +1573,7 @@ const referencesCopyLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## A name is a label on an object, not a box
 
-Assigning one list to another name does **not** copy it — both names label the **same** list:
+Assigning one list to another name does **not** copy it. Both names label the **same** list:
 
 \`\`\`python
 a = [1, 2, 3]
@@ -1623,7 +1623,7 @@ def good(item, bucket=None):  # fresh list when none is given
 ### Recap
 
 Names share objects, so prefer building new values over mutating shared ones, copy deliberately
-(\`[:]\` or \`copy.deepcopy\`), and never use \`[]\`/\`{}\` as a default — use \`None\` and create it
+(\`[:]\` or \`copy.deepcopy\`), and never use \`[]\`/\`{}\` as a default: use \`None\` and create it
 inside. Next you'll double a list without touching it, then write a safe accumulator.`,
     demoCode: `a = [1, 2, 3]
 b = a
@@ -1637,7 +1637,7 @@ print(a)          # unchanged by c`,
   apply: {
     id: "py-l1-references-copy-apply",
     executionMode: "single-file",
-    prompt: `Implement \`doubled(nums)\` — return a **new** list where every number is doubled, **without changing**
+    prompt: `Implement \`doubled(nums)\`: return a **new** list where every number is doubled, **without changing**
 the original \`nums\`.
 
 For \`[1, 2, 3]\` return \`[2, 4, 6]\`.`,
@@ -1660,7 +1660,7 @@ For \`[1, 2, 3]\` return \`[2, 4, 6]\`.`,
   practice: {
     id: "py-l1-references-copy-practice",
     executionMode: "single-file",
-    prompt: `Implement \`append_new(value, bucket=None)\` — append \`value\` to \`bucket\` and return it, but when no
+    prompt: `Implement \`append_new(value, bucket=None)\`: append \`value\` to \`bucket\` and return it, but when no
 \`bucket\` is given, start a **fresh** list (avoid the mutable-default trap).
 
 \`append_new(1, [2, 3])\` returns \`[2, 3, 1]\`; \`append_new("a")\` returns \`["a"]\`.`,
@@ -1668,7 +1668,7 @@ For \`[1, 2, 3]\` return \`[2, 4, 6]\`.`,
     # Default bucket to None, then create a fresh [] inside when it's None.
     pass`,
     hints: [
-      "Don't write `bucket=[]` — use `bucket=None`.",
+      "Don't write `bucket=[]`. Use `bucket=None`.",
       "Inside: `if bucket is None: bucket = []`.",
       "Then `bucket.append(value)` and `return bucket`.",
     ],
@@ -1700,7 +1700,7 @@ const complexityChoiceLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Not all lookups cost the same
 
-Checking \`x in some_list\` makes Python **scan every element** — on a list of a million items that's
+Checking \`x in some_list\` makes Python **scan every element**. On a list of a million items that's
 a million comparisons. Checking \`x in some_set\` (or a dict) jumps almost straight to the answer:
 
 \`\`\`python
@@ -1749,7 +1749,7 @@ print(len(distinct) != len(nums))  # True  — there was a duplicate`,
   apply: {
     id: "py-l1-complexity-choice-apply",
     executionMode: "single-file",
-    prompt: `Implement \`has_duplicates(nums)\` — return \`True\` if any value appears more than once in \`nums\`,
+    prompt: `Implement \`has_duplicates(nums)\`: return \`True\` if any value appears more than once in \`nums\`,
 otherwise \`False\`. Use a set so it stays fast.
 
 \`[1, 2, 2]\` returns \`True\`; \`[1, 2, 3]\` returns \`False\`.`,
@@ -1773,7 +1773,7 @@ otherwise \`False\`. Use a set so it stays fast.
   practice: {
     id: "py-l1-complexity-choice-practice",
     executionMode: "single-file",
-    prompt: `Implement \`first_repeated(nums)\` — return the first value that appears a **second** time as you scan
+    prompt: `Implement \`first_repeated(nums)\`: return the first value that appears a **second** time as you scan
 left to right, or \`None\` if every value is unique. Track what you've seen with a set.
 
 \`[1, 2, 3, 2, 1]\` returns \`2\` (2 repeats before 1 does).`,
@@ -1815,16 +1815,16 @@ const loopIdiomsLesson: PythonLesson = {
 
 Beginners often reach for \`range(len(...))\` and index back in. Python has cleaner idioms.
 
-### enumerate — when you need the index *and* the value
+### enumerate: when you need the index *and* the value
 
 \`\`\`python
 for i, name in enumerate(["Ada", "Sam"]):
     print(i, name)     # 0 Ada / 1 Sam
 \`\`\`
 
-Compare the clunky version — \`for i in range(len(names)): names[i]\` — which is easy to get wrong.
+Compare the clunky version (\`for i in range(len(names)): names[i]\`), which is easy to get wrong.
 
-### zip — walk two lists in lockstep
+### zip: walk two lists in lockstep
 
 \`\`\`python
 names = ["Ada", "Sam"]
@@ -1835,7 +1835,7 @@ for name, score in zip(names, scores):
 
 \`zip\` stops at the shorter list.
 
-### .items() — loop a dict's keys and values together
+### .items(): loop a dict's keys and values together
 
 \`\`\`python
 prices = {"apple": 3, "pear": 2}
@@ -1859,7 +1859,7 @@ for name, score in zip(["Ada", "Sam"], [90, 85]):
   apply: {
     id: "py-l1-loop-idioms-apply",
     executionMode: "single-file",
-    prompt: `Implement \`indexed(items)\` — return a list of \`[index, value]\` pairs, numbering each item from 0.
+    prompt: `Implement \`indexed(items)\`: return a list of \`[index, value]\` pairs, numbering each item from 0.
 Use \`enumerate\`.
 
 For \`["a", "b"]\` return \`[[0, "a"], [1, "b"]]\`.`,
@@ -1888,7 +1888,7 @@ For \`["a", "b"]\` return \`[[0, "a"], [1, "b"]]\`.`,
   practice: {
     id: "py-l1-loop-idioms-practice",
     executionMode: "single-file",
-    prompt: `Implement \`pair_totals(names, scores)\` — return a list of \`[name, score]\` pairs by walking both
+    prompt: `Implement \`pair_totals(names, scores)\`: return a list of \`[name, score]\` pairs by walking both
 lists together with \`zip\`.
 
 \`(["a", "b"], [1, 2])\` returns \`[["a", 1], ["b", 2]]\`.`,
@@ -1930,8 +1930,8 @@ const recursionLesson: PythonLesson = {
 A **recursive** function calls itself on a smaller input until it hits a **base case** that stops the
 chain. Every recursion needs two parts:
 
-1. **Base case** — the smallest input, answered directly (no further call).
-2. **Recursive case** — reduce the problem and call yourself.
+1. **Base case**: the smallest input, answered directly (no further call).
+2. **Recursive case**: reduce the problem and call yourself.
 
 \`\`\`python
 def factorial(n):
@@ -1945,11 +1945,11 @@ def factorial(n):
 ### The call stack
 
 Each call waits for the one it made, stacking up until the base case returns and they unwind. Forget
-the base case and the calls never stop — Python raises \`RecursionError\`.
+the base case and the calls never stop: Python raises \`RecursionError\`.
 
 ### When it shines
 
-Recursion is natural for **nested / tree-shaped** data — folders inside folders, a list of lists —
+Recursion is natural for **nested / tree-shaped** data (folders inside folders, a list of lists)
 where each part looks like a smaller version of the whole.
 
 ### Recap
@@ -1966,7 +1966,7 @@ print(factorial(5))   # 120`,
   apply: {
     id: "py-l1-recursion-apply",
     executionMode: "single-file",
-    prompt: `Implement \`factorial(n)\` **recursively** — the product \`n * (n-1) * ... * 1\`, with \`factorial(0)\`
+    prompt: `Implement \`factorial(n)\` **recursively**: the product \`n * (n-1) * ... * 1\`, with \`factorial(0)\`
 and \`factorial(1)\` both equal to \`1\`.
 
 \`factorial(5)\` is \`120\`. Call \`factorial\` from inside itself; don't use a loop.`,
@@ -1991,7 +1991,7 @@ and \`factorial(1)\` both equal to \`1\`.
   practice: {
     id: "py-l1-recursion-practice",
     executionMode: "single-file",
-    prompt: `Implement \`sum_nested(items)\` — return the sum of all numbers in a list that may contain **nested
+    prompt: `Implement \`sum_nested(items)\`: return the sum of all numbers in a list that may contain **nested
 lists**, to any depth. Recurse into each sub-list.
 
 \`[1, [2, 3], [4, [5]]]\` returns \`15\`.`,
@@ -2027,7 +2027,7 @@ lists**, to any depth. Recurse into each sub-list.
 export const level1: PythonLevel = {
   id: 1,
   slug: "fundamentals",
-  title: "Level 1 — Foundations",
+  title: "Level 1: Foundations",
   tagline: "Reference-style basics: variables, types, loops, and functions.",
   defaultExecutionMode: "single-file",
   estimatedHours: 4,
@@ -2053,7 +2053,7 @@ export const level1: PythonLevel = {
     {
       id: "py-l1-collections",
       title: "Collections",
-      description: "Lists, tuples, sets, and dictionaries — Python's core containers.",
+      description: "Lists, tuples, sets, and dictionaries (Python's core containers).",
       lessons: [
         listsLesson,
         tuplesSetsLesson,

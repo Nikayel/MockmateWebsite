@@ -1,5 +1,5 @@
 /**
- * Level 2 — Apply (single-file). Read a concept, then write it with an instant check.
+ * Level 2: Apply (single-file). Read a concept, then write it with an instant check.
  *
  * Authored by Agent 2 following the single-file authoring contract documented in
  * `../level1/index.ts` (first `def` is graded, keyed `input` passed positionally, avoid the
@@ -8,7 +8,7 @@
 import type { PythonLesson, PythonLevel } from "../../types"
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M1 — Comprehensions & Generators
+// L2-M1: Comprehensions & Generators
 // ───────────────────────────────────────────────────────────────────────────
 
 const comprehensionsLesson: PythonLesson = {
@@ -48,7 +48,7 @@ evens = [n for n in nums if n % 2 == 0]
 
 ### Dict and set comprehensions
 
-The same shape builds dicts and sets — just change the brackets:
+The same shape builds dicts and sets. Just change the brackets:
 
 \`\`\`python
 lengths = {word: len(word) for word in words}   # dict: key: value
@@ -58,7 +58,7 @@ distinct = {n % 3 for n in nums}                 # set: unique results
 ### Keep it readable
 
 Comprehensions shine for a single map and/or filter. If you need nested loops *and* multiple
-conditions, a plain \`for\` loop is often clearer — don't force everything onto one line.
+conditions, a plain \`for\` loop is often clearer. Don't force everything onto one line.
 
 ### Recap
 
@@ -72,7 +72,7 @@ print({n: n * n for n in nums})           # {1: 1, 2: 4, ...}`,
   apply: {
     id: "py-l2-comprehensions-apply",
     executionMode: "single-file",
-    prompt: `Implement \`squares(nums)\` — return a new list with each number in \`nums\` squared.
+    prompt: `Implement \`squares(nums)\`: return a new list with each number in \`nums\` squared.
 
 For \`[1, 2, 3]\` return \`[1, 4, 9]\`. Use a list comprehension.`,
     starterCode: `def squares(nums):
@@ -95,7 +95,7 @@ For \`[1, 2, 3]\` return \`[1, 4, 9]\`. Use a list comprehension.`,
   practice: {
     id: "py-l2-comprehensions-practice",
     executionMode: "single-file",
-    prompt: `Implement \`lengths(words)\` — return a dict mapping each word to its length.
+    prompt: `Implement \`lengths(words)\`: return a dict mapping each word to its length.
 
 For \`["hi", "abc"]\` return \`{"hi": 2, "abc": 3}\`. Use a dict comprehension.`,
     starterCode: `def lengths(words):
@@ -136,7 +136,7 @@ const generatorsLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Producing values lazily
 
-A **generator** produces values one at a time, only as they're needed — instead of building a whole
+A **generator** produces values one at a time, only as they're needed, instead of building a whole
 list in memory. A generator *function* uses \`yield\` instead of \`return\`:
 
 \`\`\`python
@@ -163,7 +163,7 @@ total = sum(n * n for n in range(1, 5))   # 1+4+9+16 = 30, nothing stored in a l
 ### Consuming lazily with next
 
 \`next(gen, default)\` pulls the next value (or a fallback). With a filter, it stops at the **first**
-match — perfect for "find the first one that…":
+match, perfect for "find the first one that…":
 
 \`\`\`python
 first_even = next((n for n in nums if n % 2 == 0), None)
@@ -185,7 +185,7 @@ print(sum(n * n for n in range(1, 5)))    # 30`,
   apply: {
     id: "py-l2-generators-apply",
     executionMode: "single-file",
-    prompt: `Implement \`sum_of_squares(n)\` — return the sum of the squares \`1² + 2² + ... + n²\`.
+    prompt: `Implement \`sum_of_squares(n)\`: return the sum of the squares \`1² + 2² + ... + n²\`.
 
 For \`n = 3\` that's \`1 + 4 + 9 = 14\`. Build it with a generator expression inside \`sum(...)\` (no
 list needed). For \`n = 0\`, return \`0\`.`,
@@ -209,7 +209,7 @@ list needed). For \`n = 0\`, return \`0\`.`,
   practice: {
     id: "py-l2-generators-practice",
     executionMode: "single-file",
-    prompt: `Implement \`first_truthy(items)\` — return the first **truthy** value in \`items\`, or \`None\` if
+    prompt: `Implement \`first_truthy(items)\`: return the first **truthy** value in \`items\`, or \`None\` if
 there isn't one.
 
 For \`[0, "", 5, 3]\` return \`5\`. Use \`next(...)\` over a generator expression so it stops at the
@@ -234,7 +234,7 @@ first match.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M2 — Functions in Depth
+// L2-M2: Functions in Depth
 // ───────────────────────────────────────────────────────────────────────────
 
 const argsKwargsLesson: PythonLesson = {
@@ -299,7 +299,7 @@ print("{name} is {age}".format(**{"name": "Ada", "age": 30}))  # Ada is 30`,
   apply: {
     id: "py-l2-args-kwargs-apply",
     executionMode: "single-file",
-    prompt: `Implement \`total(*nums)\` — accept **any number** of numbers and return their sum.
+    prompt: `Implement \`total(*nums)\`: accept **any number** of numbers and return their sum.
 
 \`total(1, 2, 3)\` is \`6\`; \`total()\` is \`0\`. Use a \`*nums\` parameter.`,
     starterCode: `def total(*nums):
@@ -313,7 +313,7 @@ print("{name} is {age}".format(**{"name": "Ada", "age": 30}))  # Ada is 30`,
     referenceSolution: `def total(*nums):
     return sum(nums)`,
     // The executor passes input values POSITIONALLY in key order, so these keyed objects expand to
-    // total(1, 2, 3) etc. The key names are arbitrary positional fillers for *nums — keep them in
+    // total(1, 2, 3) etc. The key names are arbitrary positional fillers for *nums. Keep them in
     // the intended argument order; do not alphabetize or reorder them.
     testCases: [
       { input: { a: 1, b: 2, c: 3 }, expected: 6, description: "three arguments" },
@@ -325,7 +325,7 @@ print("{name} is {age}".format(**{"name": "Ada", "age": 30}))  # Ada is 30`,
   practice: {
     id: "py-l2-args-kwargs-practice",
     executionMode: "single-file",
-    prompt: `Implement \`render(template, values)\` — fill the \`{placeholder}\` slots in \`template\` using the
+    prompt: `Implement \`render(template, values)\`: fill the \`{placeholder}\` slots in \`template\` using the
 \`values\` dict.
 
 For \`template = "{name} is {age}"\` and \`values = {"name": "Ada", "age": 30}\`, return
@@ -370,7 +370,7 @@ const lambdasHofLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Functions are values
 
-In Python a function is just a value — you can store it, pass it, and call it later. A function that
+In Python a function is just a value. You can store it, pass it, and call it later. A function that
 **takes or returns** a function is a **higher-order function**.
 
 ### Lambdas: tiny inline functions
@@ -382,7 +382,7 @@ square = lambda x: x * x
 square(5)            # 25
 \`\`\`
 
-You'll rarely assign one — they're meant to be passed *into* another function.
+You'll rarely assign one. They're meant to be passed *into* another function.
 
 ### sorted with a key
 
@@ -414,7 +414,7 @@ print(list(map(lambda w: w.upper(), words)))  # ['CCC', 'A', 'BB']`,
   apply: {
     id: "py-l2-lambdas-hof-apply",
     executionMode: "single-file",
-    prompt: `Implement \`sort_by_length(words)\` — return \`words\` sorted from shortest to longest.
+    prompt: `Implement \`sort_by_length(words)\`: return \`words\` sorted from shortest to longest.
 
 For \`["ccc", "a", "bb"]\` return \`["a", "bb", "ccc"]\`. Pass a \`key\` to \`sorted\`.`,
     starterCode: `def sort_by_length(words):
@@ -422,7 +422,7 @@ For \`["ccc", "a", "bb"]\` return \`["a", "bb", "ccc"]\`. Pass a \`key\` to \`so
     pass`,
     hints: [
       "`sorted(words, key=len)` sorts by each word's length.",
-      "`len` is itself a function — pass it as the key.",
+      "`len` is itself a function. Pass it as the key.",
       "`return sorted(words, key=len)`.",
     ],
     referenceSolution: `def sort_by_length(words):
@@ -445,7 +445,7 @@ For \`["ccc", "a", "bb"]\` return \`["a", "bb", "ccc"]\`. Pass a \`key\` to \`so
   practice: {
     id: "py-l2-lambdas-hof-practice",
     executionMode: "single-file",
-    prompt: `Implement \`shout_all(words)\` — return a new list where each word is uppercased with a \`"!"\`
+    prompt: `Implement \`shout_all(words)\`: return a new list where each word is uppercased with a \`"!"\`
 appended.
 
 For \`["hi", "go"]\` return \`["HI!", "GO!"]\`. Use \`map\` with a \`lambda\`.`,
@@ -480,7 +480,7 @@ const closuresDecoratorsLesson: PythonLesson = {
     markdown: `## Inner functions remember their world
 
 A function defined **inside** another can use the outer function's variables. When the inner
-function is returned or used later, it keeps a live link to those variables — that's a **closure**.
+function is returned or used later, it keeps a live link to those variables. That's a **closure**.
 
 \`\`\`python
 def scaled(factor, value):
@@ -542,7 +542,7 @@ the result.
         pass
     return multiply(value)`,
     hints: [
-      "Inside `multiply`, return `x * factor` — `factor` comes from the enclosing scope.",
+      "Inside `multiply`, return `x * factor`; `factor` comes from the enclosing scope.",
       "Then `return multiply(value)` from `scaled`.",
     ],
     referenceSolution: `def scaled(factor, value):
@@ -559,7 +559,7 @@ the result.
   practice: {
     id: "py-l2-closures-decorators-practice",
     executionMode: "single-file",
-    prompt: `Implement \`double_result(n)\` — write a decorator \`double\` that doubles whatever its wrapped
+    prompt: `Implement \`double_result(n)\`: write a decorator \`double\` that doubles whatever its wrapped
 function returns, apply it to a function that returns its argument, and return the result for \`n\`.
 
 \`double_result(5)\` is \`10\`.`,
@@ -598,7 +598,7 @@ function returns, apply it to a function that returns its argument, and return t
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M3 — OOP Foundations
+// L2-M3: OOP Foundations
 //
 // The grader runs the single top-level function (the class methods are excluded), so each lesson
 // seeds a small `run(...)` driver that exercises the class the learner implements.
@@ -947,7 +947,7 @@ Now \`Point(1, 2) == Point(1, 2)\` is \`True\`, and printing a point shows \`Poi
 
 ## Computed attributes with @property
 
-A \`@property\` turns a method into a read-only attribute — accessed **without** parentheses:
+A \`@property\` turns a method into a read-only attribute, accessed **without** parentheses:
 
 \`\`\`python
 class Circle:
@@ -1064,7 +1064,7 @@ def run(radius):
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M4 — Data Modeling
+// L2-M4: Data Modeling
 // ───────────────────────────────────────────────────────────────────────────
 
 const dataclassesEnumsLesson: PythonLesson = {
@@ -1221,7 +1221,7 @@ def run(name):
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M5 — Errors, Files & Modules
+// L2-M5: Errors, Files & Modules
 // (Single-file mode has no filesystem, so JSON/CSV are parsed from in-memory strings;
 //  real `with open()` file work arrives in Level 3's workspace lessons.)
 // ───────────────────────────────────────────────────────────────────────────
@@ -1237,7 +1237,7 @@ const exceptionsLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Handling things that go wrong
 
-Some operations can fail at runtime — dividing by zero, converting bad text, a missing key. A
+Some operations can fail at runtime: dividing by zero, converting bad text, a missing key. A
 \`try\`/\`except\` lets you **catch** the failure instead of crashing:
 
 \`\`\`python
@@ -1248,11 +1248,11 @@ except ZeroDivisionError:
 \`\`\`
 
 Catch the **specific** exception you expect (\`ZeroDivisionError\`, \`ValueError\`, \`KeyError\`),
-not a bare \`except\` — you don't want to hide unrelated bugs.
+not a bare \`except\`. You don't want to hide unrelated bugs.
 
 ### finally
 
-A \`finally\` block runs no matter what — success or failure — for cleanup:
+A \`finally\` block runs no matter what (success or failure) for cleanup:
 
 \`\`\`python
 try:
@@ -1290,7 +1290,7 @@ print(safe_divide(5, 0))    # None`,
   apply: {
     id: "py-l2-exceptions-apply",
     executionMode: "single-file",
-    prompt: `Implement \`safe_divide(a, b)\` — return \`a / b\`, but if \`b\` is \`0\` (a \`ZeroDivisionError\`),
+    prompt: `Implement \`safe_divide(a, b)\`: return \`a / b\`, but if \`b\` is \`0\` (a \`ZeroDivisionError\`),
 return \`None\` instead of crashing.`,
     starterCode: `def safe_divide(a, b):
     # Return a / b, or None if b is 0.
@@ -1410,7 +1410,7 @@ print(data["age"])    # 30`,
   apply: {
     id: "py-l2-files-json-csv-apply",
     executionMode: "single-file",
-    prompt: `Implement \`get_field(raw, field)\` — parse the JSON string \`raw\` and return the value stored at
+    prompt: `Implement \`get_field(raw, field)\`: parse the JSON string \`raw\` and return the value stored at
 \`field\`.
 
 For \`raw = '{"name": "Ada", "age": 30}'\` and \`field = "name"\`, return \`"Ada"\`.`,
@@ -1451,7 +1451,7 @@ def get_field(raw, field):
   practice: {
     id: "py-l2-files-json-csv-practice",
     executionMode: "single-file",
-    prompt: `Implement \`parse_csv(text)\` — parse the CSV string \`text\` into a list of rows, where each row
+    prompt: `Implement \`parse_csv(text)\`: parse the CSV string \`text\` into a list of rows, where each row
 is a list of its string values.
 
 For \`"a,b\\nc,d"\` return \`[["a", "b"], ["c", "d"]]\`. Use \`csv.reader\` over an \`io.StringIO\`.`,
@@ -1518,7 +1518,7 @@ Splitting code into modules keeps each file focused; \`import\` wires them toget
 
 ### Batteries included
 
-Python's **standard library** ships hundreds of ready-made modules — reach for them before writing
+Python's **standard library** ships hundreds of ready-made modules. Reach for them before writing
 your own:
 
 \`\`\`python
@@ -1547,7 +1547,7 @@ print(tally.most_common(1))   # [('b', 3)]`,
   apply: {
     id: "py-l2-modules-apply",
     executionMode: "single-file",
-    prompt: `Implement \`most_common_char(text)\` — return the character that appears most often in \`text\`.
+    prompt: `Implement \`most_common_char(text)\`: return the character that appears most often in \`text\`.
 
 Use \`collections.Counter\`. For \`"aabbbc"\` return \`"b"\`.`,
     starterCode: `from collections import Counter
@@ -1558,7 +1558,7 @@ def most_common_char(text):
     pass`,
     hints: [
       "`Counter(text)` tallies each character.",
-      "`.most_common(1)` returns `[(char, count)]` — a list with one pair.",
+      "`.most_common(1)` returns `[(char, count)]`, a list with one pair.",
       "Reach into it: `Counter(text).most_common(1)[0][0]`.",
     ],
     referenceSolution: `from collections import Counter
@@ -1575,7 +1575,7 @@ def most_common_char(text):
   practice: {
     id: "py-l2-modules-practice",
     executionMode: "single-file",
-    prompt: `Implement \`gcd_of(a, b)\` — return the greatest common divisor of \`a\` and \`b\`.
+    prompt: `Implement \`gcd_of(a, b)\`: return the greatest common divisor of \`a\` and \`b\`.
 
 Use \`math.gcd\` from the standard library. \`gcd_of(12, 8)\` is \`4\`.`,
     starterCode: `import math
@@ -1600,8 +1600,8 @@ def gcd_of(a, b):
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M6 — Standard Library Toolkit  (gap-fill: see CURRICULUM-GAP-ANALYSIS.md)
-// Regular expressions and specialized collections — high-use stdlib the original
+// L2-M6: Standard Library Toolkit  (gap-fill: see CURRICULUM-GAP-ANALYSIS.md)
+// Regular expressions and specialized collections: high-use stdlib the original
 // tree named but never taught directly.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -1638,7 +1638,7 @@ re.search(r"\\d+", "abc7")         # a Match at '7' (or None)  first match anywh
 re.sub(r"\\d", "#", "a1b2")        # 'a#b#'        replace matches
 \`\`\`
 
-\`re.findall\` returns a **list** of every match — perfect for pulling all the numbers, words, or
+\`re.findall\` returns a **list** of every match, perfect for pulling all the numbers, words, or
 codes out of a blob of text.
 
 ### Groups
@@ -1651,7 +1651,7 @@ re.findall(r"(\\w+)@(\\w+)", "a@x b@y")   # [('a', 'x'), ('b', 'y')]
 
 ### Recap
 
-\`re.findall\` pulls out every match, \`re.search\` finds the first, \`re.sub\` replaces — and raw
+\`re.findall\` pulls out every match, \`re.search\` finds the first, \`re.sub\` replaces. Raw
 strings (\`r"..."\`) keep your patterns readable. Next you'll extract numbers, then redact them.`,
     demoCode: `import re
 print(re.findall(r"\\d+", "order 12, item 345"))   # ['12', '345']
@@ -1660,7 +1660,7 @@ print(re.sub(r"\\d", "#", "PIN 4021"))             # 'PIN ####'`,
   apply: {
     id: "py-l2-regex-apply",
     executionMode: "single-file",
-    prompt: `Implement \`find_numbers(text)\` — return a list of every run of digits in \`text\`, in order, using
+    prompt: `Implement \`find_numbers(text)\`: return a list of every run of digits in \`text\`, in order, using
 \`re.findall\`.
 
 For \`"a1b22"\` return \`["1", "22"]\`. If there are no digits, return \`[]\`.`,
@@ -1688,7 +1688,7 @@ def find_numbers(text):
   practice: {
     id: "py-l2-regex-practice",
     executionMode: "single-file",
-    prompt: `Implement \`redact_digits(text)\` — return \`text\` with **every digit** replaced by \`"#"\`, using
+    prompt: `Implement \`redact_digits(text)\`: return \`text\` with **every digit** replaced by \`"#"\`, using
 \`re.sub\`.
 
 For \`"a1b2"\` return \`"a#b#"\`; for \`"2024"\` return \`"####"\`.`,
@@ -1728,7 +1728,7 @@ const collectionsToolkitLesson: PythonLesson = {
 
 The standard library's \`collections\` module has drop-in upgrades over plain dicts and lists.
 
-### Counter — tally things in one line
+### Counter: tally things in one line
 
 \`\`\`python
 from collections import Counter
@@ -1740,7 +1740,7 @@ Counter(words).most_common(2)      # the two most frequent (word, count) pairs
 
 What would be a 6-line manual counting loop is now one call.
 
-### defaultdict — grouping without "does the key exist yet?"
+### defaultdict: grouping without "does the key exist yet?"
 
 A plain dict raises \`KeyError\` on a missing key. A \`defaultdict(list)\` auto-creates an empty list
 the first time you touch a key, so grouping is clean:
@@ -1754,7 +1754,7 @@ for word in ["ant", "apple", "bee"]:
 # {'a': ['ant', 'apple'], 'b': ['bee']}
 \`\`\`
 
-### deque — a fast queue
+### deque: a fast queue
 
 A \`deque\` ("deck") adds/removes from **both ends** in \`O(1)\` (a list's \`pop(0)\` is \`O(n)\`):
 
@@ -1781,7 +1781,7 @@ print(dict(groups))   # {'a': ['ant', 'apple'], 'b': ['bee']}`,
   apply: {
     id: "py-l2-collections-apply",
     executionMode: "single-file",
-    prompt: `Implement \`word_counts(words)\` — return a dict mapping each word to how many times it appears in the
+    prompt: `Implement \`word_counts(words)\`: return a dict mapping each word to how many times it appears in the
 list \`words\`. Use \`Counter\`.
 
 For \`["a", "b", "a"]\` return \`{"a": 2, "b": 1}\`.`,
@@ -1811,7 +1811,7 @@ def word_counts(words):
   practice: {
     id: "py-l2-collections-practice",
     executionMode: "single-file",
-    prompt: `Implement \`group_by_first(words)\` — return a dict mapping each **first letter** to the list of words
+    prompt: `Implement \`group_by_first(words)\`: return a dict mapping each **first letter** to the list of words
 starting with it, preserving order. Use \`defaultdict(list)\`.
 
 \`["apple", "ant", "bee"]\` returns \`{"a": ["apple", "ant"], "b": ["bee"]}\`.`,
@@ -1847,7 +1847,7 @@ def group_by_first(words):
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
-  title: "Level 2 — Apply",
+  title: "Level 2: Apply",
   tagline: "Read a concept, then write it yourself with an instant check.",
   defaultExecutionMode: "single-file",
   estimatedHours: 5,

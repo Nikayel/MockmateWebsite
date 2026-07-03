@@ -1,5 +1,5 @@
 /**
- * Level 3 — Patterns (workspace). The syntax real codebases run on — drilled across real files.
+ * Level 3: Patterns (workspace). The syntax real codebases run on, drilled across real files.
  *
  * Agent 1 seeds ONE sample workspace lesson here (`py-l3-parse-config`) as proof of the multi-file
  * path; Agent 2 authors the rest. The lesson pairs a single-file warm-up (`apply`: implement the
@@ -161,7 +161,7 @@ const parseConfigLesson: PythonLevel["modules"][number]["lessons"][number] = {
     markdown: `## Real code lives in more than one file
 
 A program is rarely a single script. You split it into **modules** and \`import\` exactly what you
-need — small files with one job each.
+need. Each is a small file with one job.
 
 \`\`\`python
 # app/coerce.py
@@ -185,7 +185,7 @@ for line in text.splitlines():     # one line at a time
     key, value = stripped.split("=", 1)   # split on the FIRST "=" only
 \`\`\`
 
-The \`1\` in \`split("=", 1)\` is the **maxsplit** — it splits at most once, so a value like
+The \`1\` in \`split("=", 1)\` is the **maxsplit**: it splits at most once, so a value like
 \`http://x/?a=1\` stays intact.
 
 ### Keep it readable
@@ -229,13 +229,13 @@ otherwise return the trimmed string. Examples: \`"42"\` → \`42\`, \`"-3"\` →
     id: "py-l3-parse-config-practice",
     executionMode: "workspace",
     prompt: `Now build the real thing. Implement \`parse_config(text)\` in \`app/config.py\` so it parses
-\`key = value\` lines into a dict — skipping blanks and \`#\` comments, splitting on the first \`=\`,
+\`key = value\` lines into a dict, skipping blanks and \`#\` comments, splitting on the first \`=\`,
 trimming whitespace, and running each value through the read-only \`coerce\` helper. Open the visible
 test to see the expected behaviour; some tests are hidden.`,
     starterCode: "",
     hints: [
       "Loop `for line in text.splitlines():` and `continue` past blanks and comments.",
-      '`stripped.split("=", 1)` splits on the first `=` only — important for values like URLs.',
+      '`stripped.split("=", 1)` splits on the first `=` only. That matters for values like URLs.',
       "`coerce` is already imported for you; call it on the value before storing it.",
     ],
     workspace: {
@@ -392,7 +392,7 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L3-M1 — Project Structure & Packaging  (py-l3-packages)
+// L3-M1: Project Structure & Packaging  (py-l3-packages)
 // ───────────────────────────────────────────────────────────────────────────
 
 const PKG_README = `# A tiny store package
@@ -404,7 +404,7 @@ Implement \`cart_total(names)\` so it returns the **total price** of the items n
 looking up each price with the read-only \`price_of\` helper from \`store.catalog\`. Unknown items
 cost 0.
 
-Run the tests — some are hidden.
+Run the tests. Some are hidden.
 `
 
 const PKG_CATALOG = String.raw`PRICES = {"apple": 3, "bread": 2, "milk": 4}
@@ -527,8 +527,8 @@ from store.catalog import price_of
 
 ### Why split at all?
 
-One giant file is hard to navigate. Splitting by responsibility — \`catalog\` knows prices, \`cart\`
-knows totals — keeps each module short and makes imports document who depends on whom.
+One giant file is hard to navigate. Splitting by responsibility (\`catalog\` knows prices, \`cart\`
+knows totals) keeps each module short and makes imports document who depends on whom.
 
 ### The entry point
 
@@ -554,7 +554,7 @@ print(price_of("candy"))   # 0`,
   apply: {
     id: "py-l3-packages-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`cart_total(prices, names)\` — total the price of every name in
+    prompt: `Warm-up (one file): implement \`cart_total(prices, names)\`. Total the price of every name in
 \`names\`, looking each one up in the \`prices\` dict (missing items cost 0).
 
 For \`prices = {"apple": 3, "bread": 2}\` and \`names = ["apple", "bread"]\`, return \`5\`.`,
@@ -599,7 +599,7 @@ read-only \`price_of\` helper imported from \`store.catalog\`. Unknown items cos
 test to see expected behaviour; some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`price_of` is already imported from `store.catalog` — call it on each name.",
+      "`price_of` is already imported from `store.catalog`. Call it on each name.",
       "Sum across the cart: `sum(price_of(name) for name in names)`.",
       "The `store/__init__.py` is what makes `from store.catalog import ...` work.",
     ],
@@ -665,7 +665,7 @@ test to see expected behaviour; some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L3-M2 — Type Hints & Static Typing
+// L3-M2: Type Hints & Static Typing
 // ───────────────────────────────────────────────────────────────────────────
 
 const TH_README = `# A typed stats module
@@ -760,8 +760,8 @@ def average(values: list[float]) -> float:
     return sum(values) / len(values)
 \`\`\`
 
-- \`values: list[float]\` — the parameter is a list of floats.
-- \`-> float\` — the function returns a float.
+- \`values: list[float]\`: the parameter is a list of floats.
+- \`-> float\`: the function returns a float.
 
 ### Common shapes
 
@@ -783,13 +783,13 @@ class Account:
 
 ### Keep it honest
 
-A hint is a promise. If \`average\` can return \`0.0\` for an empty list, \`-> float\` still holds —
+A hint is a promise. If \`average\` can return \`0.0\` for an empty list, \`-> float\` still holds,
 but if it could return \`None\`, say so with \`-> float | None\`.
 
 ### Recap
 
 Hints like \`list[float]\` and \`-> float\` document intent and power static checkers without changing
-runtime behaviour. You'll implement and annotate \`average\` — first in one file, then across the
+runtime behaviour. You'll implement and annotate \`average\`, first in one file, then across the
 \`stats\` package.`,
     demoCode: `def average(values: list[float]) -> float:
     if not values:
@@ -803,7 +803,7 @@ print(average([]))       # 0.0`,
   apply: {
     id: "py-l3-type-hints-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`average(nums)\` — return the mean of \`nums\` **rounded to 2
+    prompt: `Warm-up (one file): implement \`average(nums)\`. Return the mean of \`nums\` **rounded to 2
 decimals**, or \`0.0\` for an empty list.
 
 For \`[10, 20, 35]\` return \`21.67\`. Add type hints: \`def average(nums: list[float]) -> float\`.`,
@@ -835,7 +835,7 @@ the mean rounded with the read-only \`round2\` helper imported from \`stats.roun
     starterCode: "",
     hints: [
       "Guard the empty list: `if not values: return 0.0`.",
-      "`round2` is imported for you — wrap the mean in it.",
+      "`round2` is imported for you. Wrap the mean in it.",
       "`return round2(sum(values) / len(values))`.",
     ],
     workspace: {
@@ -911,7 +911,7 @@ the mean rounded with the read-only \`round2\` helper imported from \`stats.roun
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// py-l3-typing-module — typing: Optional/Union, generics, Protocols
+// py-l3-typing-module: Optional/Union, generics, Protocols
 // ───────────────────────────────────────────────────────────────────────────
 
 const TM_README = `# Typed user lookup
@@ -994,15 +994,15 @@ const typingModuleLesson: PythonLevel["modules"][number]["lessons"][number] = {
 
 ### Optional and Union
 
-A value that might be missing is **Optional** — written \`X | None\` (older code uses
-\`Optional[X]\`). A value that can be one of several types is a **Union** — \`int | str\`.
+A value that might be missing is **Optional**, written \`X | None\` (older code uses
+\`Optional[X]\`). A value that can be one of several types is a **Union**: \`int | str\`.
 
 \`\`\`python
 def find_user(user_id: int) -> dict | None:
     ...        # returns a dict, or None when not found
 \`\`\`
 
-Returning \`None\` from a function annotated \`-> dict\` is a lie a type checker will catch — annotate
+Returning \`None\` from a function annotated \`-> dict\` is a lie a type checker will catch. Annotate
 the real contract, \`-> dict | None\`, and callers know to handle the \`None\`.
 
 ### Generics with TypeVar
@@ -1019,7 +1019,7 @@ def first(items: list[T]) -> T | None:
 
 ### Protocols (structural typing)
 
-A **Protocol** describes the *shape* an object must have — any object with the right attributes or
+A **Protocol** describes the *shape* an object must have. Any object with the right attributes or
 methods satisfies it, no inheritance required:
 
 \`\`\`python
@@ -1040,7 +1040,7 @@ as a contract the checker proves for you.
 ### Recap
 
 \`X | None\` marks optional values, \`TypeVar\` keeps generics honest, and \`Protocol\` types by shape.
-You'll implement a user lookup that returns \`dict | None\` — first standalone, then across the
+You'll implement a user lookup that returns \`dict | None\`, first standalone, then across the
 \`directory\` package.`,
     demoCode: `def first(items: list) -> object | None:
     return items[0] if items else None
@@ -1052,7 +1052,7 @@ print(first([]))         # None`,
   apply: {
     id: "py-l3-typing-module-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`find_by_id(rows, target)\` — return the first dict in \`rows\` whose
+    prompt: `Warm-up (one file): implement \`find_by_id(rows, target)\`. Return the first dict in \`rows\` whose
 \`"id"\` equals \`target\`, or \`None\` if none match.
 
 Annotate the return as \`-> dict | None\`.`,
@@ -1103,7 +1103,7 @@ read-only \`USERS\` list, or \`None\` when no user has that id. Annotate the ret
 Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`USERS` is imported for you — loop over it.",
+      "`USERS` is imported for you. Loop over it.",
       'Compare ids: `if user["id"] == user_id: return user`.',
       "Return `None` after the loop when nothing matched.",
     ],
@@ -1185,12 +1185,12 @@ Some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L3-M3 — Testing with pytest
+// L3-M3: Testing with pytest
 // ───────────────────────────────────────────────────────────────────────────
 
 const PT_README = `# TDD a bank balance
 
-The pytest tests already exist — make them pass. Implement \`balance_after(start, transactions)\` in
+The pytest tests already exist. Make them pass. Implement \`balance_after(start, transactions)\` in
 \`bank/account.py\` so it applies a list of signed \`transactions\` (deposits are positive,
 withdrawals negative) to a \`start\` balance and returns the new balance.
 
@@ -1244,8 +1244,8 @@ const pytestBasicsLesson: PythonLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Testing with pytest
 
-**pytest** runs functions whose names start with \`test_\` and checks plain \`assert\` statements —
-no boilerplate, no class required:
+**pytest** runs functions whose names start with \`test_\` and checks plain \`assert\` statements.
+No boilerplate, no class required:
 
 \`\`\`python
 # tests/test_account.py
@@ -1272,12 +1272,12 @@ def test_mixed():
 ### TDD: tests first
 
 Test-driven development writes the test, watches it fail, then writes just enough code to pass. Here
-the tests already exist — your job is to turn them green.
+the tests already exist. Your job is to turn them green.
 
 ### Recap
 
 pytest discovers \`test_*\` functions and checks \`assert\`s. You'll make a pytest suite pass by
-implementing \`balance_after\` — first in one file, then in a \`bank\` package with real test files.`,
+implementing \`balance_after\`, first in one file, then in a \`bank\` package with real test files.`,
     demoCode: `def balance_after(start, transactions):
     return start + sum(transactions)
 
@@ -1289,7 +1289,7 @@ print("all good")`,
   apply: {
     id: "py-l3-pytest-basics-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`balance_after(start, transactions)\` — add every signed amount in
+    prompt: `Warm-up (one file): implement \`balance_after(start, transactions)\`. Add every signed amount in
 \`transactions\` to \`start\` and return the result.
 
 \`balance_after(100, [10, -30, 5])\` is \`85\`.`,
@@ -1387,7 +1387,7 @@ to read the cases; some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// py-l3-pytest-fixtures — fixtures & parametrize (TDD a module)
+// py-l3-pytest-fixtures: fixtures & parametrize (TDD a module)
 // ───────────────────────────────────────────────────────────────────────────
 
 const FX_README = `# Restock with fixtures & parametrize
@@ -1469,7 +1469,7 @@ const pytestFixturesLesson: PythonLevel["modules"][number]["lessons"][number] = 
 ### Fixtures: shared setup
 
 A **fixture** builds a value your tests need, so you don't repeat setup. Mark it \`@pytest.fixture\`
-and name it as a parameter — pytest injects it:
+and name it as a parameter that pytest injects:
 
 \`\`\`python
 import pytest
@@ -1495,7 +1495,7 @@ def test_restock(stock, add, expected):
     assert restock(stock, add) == expected
 \`\`\`
 
-One function, many checks — with a clear per-case report.
+One function, many checks, with a clear per-case report.
 
 > In this sandbox the test files call the setup helper directly and loop over a list of cases (the
 > same patterns, without pytest's fixture injection), so they run without pytest installed.
@@ -1503,7 +1503,7 @@ One function, many checks — with a clear per-case report.
 ### Recap
 
 Fixtures remove duplicated setup; \`parametrize\` turns a table of cases into individual checks.
-You'll implement \`restock\` so a fixture-backed, parametrized suite passes — without mutating its
+You'll implement \`restock\` so a fixture-backed, parametrized suite passes, without mutating its
 input.`,
     demoCode: `def restock(stock, additions):
     result = dict(stock)
@@ -1517,7 +1517,7 @@ print(restock({"apple": 5}, {"apple": 5, "plum": 3}))  # {'apple': 10, 'plum': 3
   apply: {
     id: "py-l3-pytest-fixtures-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`restock(stock, additions)\` — return a **new** dict merging
+    prompt: `Warm-up (one file): implement \`restock(stock, additions)\`. Return a **new** dict merging
 \`additions\` into \`stock\`, summing quantities for shared items.
 
 \`restock({"apple": 5}, {"apple": 5, "plum": 3})\` is \`{"apple": 10, "plum": 3}\`.`,
@@ -1635,7 +1635,7 @@ quantities, never mutating the input). Some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L3-M4 — Files, Data & Robustness
+// L3-M4: Files, Data & Robustness
 // ───────────────────────────────────────────────────────────────────────────
 
 const PL_README = `# Total a scores file with pathlib
@@ -1711,7 +1711,7 @@ const pathlibLesson: PythonLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Files the modern way: pathlib
 
-\`pathlib.Path\` is the modern, object-oriented way to work with files and folders — cleaner than
+\`pathlib.Path\` is the modern, object-oriented way to work with files and folders, cleaner than
 string paths and \`os.path\`.
 
 \`\`\`python
@@ -1747,7 +1747,7 @@ for child in Path("data").iterdir():
 ### Recap
 
 \`Path(...).read_text()\` reads a file, \`/\` joins paths, and \`splitlines()\` + a blank-line guard
-turn text into clean data. You'll total a file's numbers — first from a string, then from real files
+turn text into clean data. You'll total a file's numbers, first from a string, then from real files
 in a \`data/\` folder.`,
     demoCode: `text = "10\\n20\\n30"
 numbers = [int(line) for line in text.splitlines() if line.strip()]
@@ -1756,7 +1756,7 @@ print(sum(numbers))   # 60`,
   apply: {
     id: "py-l3-pathlib-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`total_score(text)\` — sum the integer on each non-blank line of
+    prompt: `Warm-up (one file): implement \`total_score(text)\`. Sum the integer on each non-blank line of
 the string \`text\`.
 
 For \`"10\\n20\\n30"\` return \`60\`. Skip blank lines.`,
@@ -1964,7 +1964,7 @@ logger.warning("skipping bad record: %r", raw)
 
 ### Designing error boundaries
 
-Don't catch errors everywhere — decide *where* a failure is handled. A common pattern: a low-level
+Don't catch errors everywhere. Decide *where* a failure is handled. A common pattern: a low-level
 helper **raises** on bad input, and a higher-level loop **catches** and skips, so one bad record
 doesn't sink the whole batch:
 
@@ -1984,7 +1984,7 @@ def safe_total(raws):
 
 ### Catch narrowly
 
-Catch the *specific* exception you expect (\`ValueError\`), not a bare \`except\` — you don't want to
+Catch the *specific* exception you expect (\`ValueError\`), not a bare \`except\`. You don't want to
 swallow unrelated bugs like a typo'd name.
 
 ### Recap
@@ -2007,7 +2007,7 @@ print(safe_total(["1", "x", "3"]))   # 4`,
   apply: {
     id: "py-l3-logging-errors-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`safe_total(raws)\` — total the strings in \`raws\` that parse as
+    prompt: `Warm-up (one file): implement \`safe_total(raws)\`. Total the strings in \`raws\` that parse as
 integers, **skipping** any that don't.
 
 \`safe_total(["1", "x", "3"])\` is \`4\`.`,
@@ -2042,7 +2042,7 @@ integers, **skipping** any that don't.
 are hidden.`,
     starterCode: "",
     hints: [
-      "`to_amount` is imported for you — call it inside a `try`.",
+      "`to_amount` is imported for you. Call it inside a `try`.",
       "Catch `ValueError` and `continue` to skip bad records.",
       "Return the accumulated total.",
     ],
@@ -2124,7 +2124,7 @@ are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L3-M5 — Real Programs & Tooling
+// L3-M5: Real Programs & Tooling
 // ───────────────────────────────────────────────────────────────────────────
 
 const CLI_README = `# A tiny command dispatcher
@@ -2247,7 +2247,7 @@ without spawning a process.
 ### Recap
 
 argparse/typer turn arguments into typed values; underneath, a CLI dispatches a command name to a
-function. You'll write a \`run(argv)\` dispatcher — first inline, then over a \`cli\` package.`,
+function. You'll write a \`run(argv)\` dispatcher, first inline, then over a \`cli\` package.`,
     demoCode: `def run(argv):
     command, a, b = argv[0], int(argv[1]), int(argv[2])
     if command == "add":
@@ -2262,7 +2262,7 @@ print(run(["add", "2", "3"]))   # 5`,
   apply: {
     id: "py-l3-cli-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`run(argv)\` — \`argv\` is a list like \`["add", "2", "3"]\`. Read the
+    prompt: `Warm-up (one file): implement \`run(argv)\`: \`argv\` is a list like \`["add", "2", "3"]\`. Read the
 command and two integer arguments and return \`add\` or \`mul\` of them.
 
 \`run(["add", "2", "3"])\` is \`5\`; \`run(["mul", "4", "5"])\` is \`20\`.`,
@@ -2365,7 +2365,7 @@ hidden.`,
 
 const API_README = `# Fetch then validate
 
-Never trust raw external data — validate it at the boundary. \`api/client.py\` (read-only) simulates
+Never trust raw external data. Validate it at the boundary. \`api/client.py\` (read-only) simulates
 an HTTP fetch returning a raw dict. Implement \`parse_user(raw)\` in \`api/models.py\` so it coerces
 the fields into a typed \`User\` dataclass:
 
@@ -2479,7 +2479,7 @@ raw = response.json()      # a dict from the JSON body
 ### Never trust external data
 
 An API can send missing fields, wrong types, or extra junk. **pydantic** validates raw data into a
-typed model — coercing where sensible, raising where not:
+typed model, coercing where sensible, raising where not:
 
 \`\`\`python
 from pydantic import BaseModel
@@ -2498,12 +2498,12 @@ User(**raw)    # validates & coerces, or raises ValidationError
 objects.
 
 > This sandbox has no network and no pydantic, so you'll validate a **pre-fetched** dict into a
-> \`@dataclass\` by coercing each field — the same fetch-then-validate shape.
+> \`@dataclass\` by coercing each field, the same fetch-then-validate shape.
 
 ### Recap
 
 \`httpx\` fetches JSON; pydantic (or a dataclass + explicit coercion) turns untrusted data into a
-typed model at the boundary. You'll parse a raw user dict into a clean record — first as a dict, then
+typed model at the boundary. You'll parse a raw user dict into a clean record, first as a dict, then
 as a dataclass across an \`api\` package.`,
     demoCode: `from dataclasses import dataclass
 
@@ -2521,7 +2521,7 @@ print(User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
   apply: {
     id: "py-l3-rest-pydantic-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`parse_user(raw)\` — coerce a raw user dict into a clean dict with
+    prompt: `Warm-up (one file): implement \`parse_user(raw)\`. Coerce a raw user dict into a clean dict with
 \`id\` as an \`int\`, \`name\` as a \`str\`, and \`active\` as a \`bool\`.
 
 For \`{"id": "1", "name": "Ada", "active": 1}\` return \`{"id": 1, "name": "Ada", "active": True}\`.`,
@@ -2561,7 +2561,7 @@ should raise. Some tests are hidden.`,
     starterCode: "",
     hints: [
       'Build the dataclass: `User(id=int(raw["id"]), ...)`.',
-      'Indexing a missing key (`raw["active"]`) already raises `KeyError` — that\'s the desired behaviour.',
+      'Indexing a missing key (`raw["active"]`) already raises `KeyError`. That\'s the desired behaviour.',
       "Coerce `active` with `bool(...)`.",
     ],
     workspace: {
@@ -2638,7 +2638,7 @@ should raise. Some tests are hidden.`,
 
 const CAP_README = `# Capstone: a todo reporter
 
-Tie Level 3 together. This is a small, real project — a \`todo\` package with sample tasks, tests,
+Tie Level 3 together. This is a small, real project: a \`todo\` package with sample tasks, tests,
 and a \`pyproject.toml\`. Implement \`summary(tasks)\` in \`todo/report.py\` so it returns the counts a
 CLI or API would report:
 
@@ -2737,7 +2737,7 @@ dependencies = ["httpx>=0.27"]
 todo = "todo.cli:main"
 \`\`\`
 
-It names the project, pins dependencies, and wires console scripts — replacing the old
+It names the project, pins dependencies, and wires console scripts, replacing the old
 \`setup.py\`/\`requirements.txt\` sprawl.
 
 ### uv: fast packaging
@@ -2755,7 +2755,7 @@ It replaces pip / virtualenv / pip-tools with one fast tool and a reproducible l
 ### Your capstone
 
 You'll extend a small, real project: a \`todo\` package with sample tasks and a \`pyproject.toml\`.
-Implement \`summary(tasks)\` — the kind of reporting function a CLI or API would call — and make its
+Implement \`summary(tasks)\` (the kind of reporting function a CLI or API would call) and make its
 test suite pass.
 
 ### Recap
@@ -2772,7 +2772,7 @@ print(summary([{"title": "a", "done": True}, {"title": "b", "done": False}]))`,
   apply: {
     id: "py-l3-uv-pyproject-capstone-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`summary(tasks)\` — given a list of task dicts (each with a
+    prompt: `Warm-up (one file): implement \`summary(tasks)\`. Given a list of task dicts (each with a
 \`"done"\` flag), return \`{"total": n, "done": d, "pending": p}\`.
 
 For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
@@ -2895,8 +2895,8 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
 export const level3: PythonLevel = {
   id: 3,
   slug: "applied",
-  title: "Level 3 — Patterns",
-  tagline: "The production-shaped syntax — modules, imports, and working across real files.",
+  title: "Level 3: Patterns",
+  tagline: "The production-shaped syntax: modules, imports, and working across real files.",
   defaultExecutionMode: "workspace",
   estimatedHours: 6,
   modules: [

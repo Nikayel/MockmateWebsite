@@ -2,11 +2,11 @@ import type { SqlLevel } from "@/lib/tutorials/types"
 import { scriptExercise } from "./script-exercise"
 
 /**
- * Level 3 — Data Modeling & Schema Design (script/workspace grading).
+ * Level 3: Data Modeling & Schema Design (script/workspace grading).
  *
  * Workspace grading: the learner writes a multi-statement script (the single editable file); after it
- * runs, hidden **assertion queries** run — each returns the OFFENDING rows, so zero rows = pass (the
- * dbt "count of violations = 0" convention) — and `checkIdempotency` re-runs the script to assert a
+ * runs, hidden **assertion queries** run. Each returns the OFFENDING rows, so zero rows = pass (the
+ * dbt "count of violations = 0" convention). Then `checkIdempotency` re-runs the script to assert a
  * stable row count. The runner emits the byte-identical `__WORKSPACE_TEST_RESULTS__:` marker. The
  * `scriptExercise` builder (shared with Level 4) lives in `./script-exercise`.
  */
@@ -39,14 +39,14 @@ CREATE TABLE stg_customer (
 );
 \`\`\`
 
-Insert a **partial** row and the defaults fill in — \`is_active → 1\`, \`loaded_at → now\`.
+Insert a **partial** row and the defaults fill in: \`is_active → 1\`, \`loaded_at → now\`.
 
 \`DROP TABLE IF EXISTS stg_customer;\` is the safe, re-runnable form you put at the top of a script so
 a re-run doesn't error on "table already exists."
 
-> **In the warehouse this differs — SQLite type affinity is only advisory.** SQLite will store the
+> **In the warehouse this differs: SQLite type affinity is only advisory.** SQLite will store the
 > text \`'oops'\` in an \`INTEGER\` column; Postgres/Snowflake/BigQuery reject it. Declare the *intended*
-> type anyway — your DDL is documentation and must port to a strict engine unchanged.
+> type anyway. Your DDL is documentation and must port to a strict engine unchanged.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
 then hidden assertion queries check schema shape, defaults, and row counts.`,
@@ -66,8 +66,8 @@ current timestamp. Insert one row supplying every column, and one row (\`custome
     hints: [
       "Start with `DROP TABLE IF EXISTS dim_customer;` so the script re-runs cleanly.",
       "Put `DEFAULT 1` right after `is_active INTEGER`.",
-      "For the timestamp default use `DEFAULT (datetime('now'))` — the parentheses are required.",
-      "In the second INSERT, list only the columns you supply — the omitted ones pick up defaults.",
+      "For the timestamp default use `DEFAULT (datetime('now'))`. The parentheses are required.",
+      "In the second INSERT, list only the columns you supply. The omitted ones pick up defaults.",
     ],
     referenceSolution: `DROP TABLE IF EXISTS dim_customer;
 
@@ -137,8 +137,8 @@ DROP TABLE IF EXISTS stg_order;
 -- INSERT one row per table, omitting the defaulted columns ...`,
     hints: [
       "Lead every table with `DROP TABLE IF EXISTS …;` for a clean re-run.",
-      "`unit_price_cents INTEGER DEFAULT 0` and `total_cents INTEGER DEFAULT 0` — money as integer cents.",
-      "`status TEXT DEFAULT 'pending'` — string-literal defaults go in single quotes.",
+      "`unit_price_cents INTEGER DEFAULT 0` and `total_cents INTEGER DEFAULT 0`: money as integer cents.",
+      "`status TEXT DEFAULT 'pending'`. String-literal defaults go in single quotes.",
       "In each INSERT, name only the non-defaulted columns so the DEFAULTs take over.",
     ],
     seedSql: "",
@@ -196,10 +196,10 @@ const insertPopulate: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 8,
     markdown: `## Two ways to fill a table
 
-There are two ways to fill a table. \`INSERT … VALUES\` writes literal rows you type out — good for
+There are two ways to fill a table. \`INSERT … VALUES\` writes literal rows you type out: good for
 seeds and reference data. \`INSERT … SELECT\` writes rows *read from another table*, transforming them
 on the way in. That second form is the entire **"T" of ELT**: you read raw, clean/cast/rename in the
-\`SELECT\`, and land the result in a model table — all in one statement, all inside the database.
+\`SELECT\`, and land the result in a model table, all in one statement, all inside the database.
 
 ### Worked example
 
@@ -228,19 +228,19 @@ FROM raw_product
 WHERE ...;                               -- filter which source rows load
 \`\`\`
 
-The \`SELECT\` output columns map **positionally** to the target column list — the first select
+The \`SELECT\` output columns map **positionally** to the target column list. The first select
 expression fills the first named column, and so on. Types don't have to match names, only positions.
 
 ### Multi-row literal insert
 
-One statement, many rows — the compact seed form:
+One statement, many rows. The compact seed form:
 
 \`\`\`sql
 INSERT INTO dim_status (code, label) VALUES
     ('paid','Paid'), ('shipped','Shipped'), ('cancelled','Cancelled');
 \`\`\`
 
-> **In the warehouse this differs — barely.** \`INSERT … SELECT\` and multi-row \`VALUES\` are
+> **In the warehouse this differs, barely.** \`INSERT … SELECT\` and multi-row \`VALUES\` are
 > ANSI-standard and portable across Postgres/Snowflake/BigQuery essentially unchanged. The main
 > divergence is scale: warehouses discourage row-by-row \`VALUES\` inserts (they're slow columnar
 > writes) and favor bulk \`COPY\` / \`INSERT … SELECT\`. The pattern you're learning is exactly the right
@@ -336,7 +336,7 @@ into two normalized targets** with two \`INSERT … SELECT\` statements:
 
 Clean in flight: lowercase+trim emails, uppercase+trim SKUs, cast ids and price to \`INTEGER\`,
 uppercase country codes. **Deduplicate customers** so each \`customer_id\` appears once even though the
-feed repeats it per product line — and dedup products the same way.`,
+feed repeats it per product line. Dedup products the same way.`,
     starterCode: `-- raw_feed is already seeded. Split it into two clean dimensions.
 DROP TABLE IF EXISTS dim_customer;
 DROP TABLE IF EXISTS dim_product;
@@ -346,7 +346,7 @@ DROP TABLE IF EXISTS dim_product;
 -- INSERT … SELECT DISTINCT into dim_product from raw_feed ...`,
     hints: [
       "Create both target tables first, with `INTEGER` keys/price.",
-      "Customers: `SELECT DISTINCT CAST(cust_id AS INTEGER), LOWER(TRIM(email)), UPPER(TRIM(country)) FROM raw_feed` — `DISTINCT` collapses the repeats.",
+      "Customers: `SELECT DISTINCT CAST(cust_id AS INTEGER), LOWER(TRIM(email)), UPPER(TRIM(country)) FROM raw_feed`. `DISTINCT` collapses the repeats.",
       "Products: same idea keyed on `prod_id`, with `UPPER(TRIM(sku))` and `CAST(price_txt AS INTEGER)`.",
       "Watch the grain: each target `SELECT` should project only its own columns so the duplicates actually collapse.",
     ],
@@ -410,14 +410,14 @@ const primaryKeys: SqlLevel["modules"][number]["lessons"][number] = {
 
 A **primary key (PK)** is the column (or columns) that uniquely identifies each row. The database
 enforces it: two rows can never share a PK value, and a PK can't be NULL. This is the single most
-important guarantee in a schema — it's what makes "one row per thing" true.
+important guarantee in a schema. It's what makes "one row per thing" true.
 
 You get to choose *what* the key is. Two families:
 
-- **Natural key** — a business value that's already unique: an email, an ISBN, a country code.
+- **Natural key**: a business value that's already unique (an email, an ISBN, a country code).
   Meaningful, but risky: business values change (people change emails), can be reused, and are often
   wide (bad for joins/indexes).
-- **Surrogate key** — a system-generated integer with no business meaning, usually auto-incrementing.
+- **Surrogate key**: a system-generated integer with no business meaning, usually auto-incrementing.
   It never changes, is compact, and joins fast.
 
 **DEs strongly prefer surrogate keys** for warehouse dimensions. The natural key can change or arrive
@@ -450,18 +450,18 @@ customer_sk  INTEGER PRIMARY KEY
    name      affinity   and (in SQLite) auto-increment
 \`\`\`
 
-Declaring a PK **automatically creates a unique index** on it — lookups and joins by PK are fast for
+Declaring a PK **automatically creates a unique index** on it. Lookups and joins by PK are fast for
 free.
 
-> **In the warehouse this differs — surrogate generation.** SQLite gives you \`INTEGER PRIMARY KEY\`
+> **In the warehouse this differs: surrogate generation.** SQLite gives you \`INTEGER PRIMARY KEY\`
 > (and the stricter \`AUTOINCREMENT\`) for free surrogates. Postgres uses \`GENERATED ALWAYS AS IDENTITY\`
 > (or \`serial\`); Snowflake/BigQuery often use sequences or \`ROW_NUMBER()\`-assigned keys during the
-> load because they don't auto-increment the same way. The *concept* — a stable system integer — is
+> load because they don't auto-increment the same way. The *concept* (a stable system integer) is
 > identical; the syntax that mints it is per-engine.
 
 **Keep it readable / common pitfall.** Don't make a natural key the PK just because it's "obviously
 unique today." The day it isn't (a supplier reuses a SKU, a customer re-registers an email) your PK
-constraint blocks a legitimate load. Use a surrogate PK and add \`UNIQUE\` on the natural key — you get
+constraint blocks a legitimate load. Use a surrogate PK and add \`UNIQUE\` on the natural key. You get
 identity *and* a duplicate guard, decoupled.
 
 **Recap:** every row needs a stable identity; prefer a surrogate integer PK (auto-indexed, unchanging)
@@ -482,8 +482,8 @@ specifying \`customer_sk\` and let SQLite assign it.`,
 -- INSERT two customers WITHOUT listing customer_sk (let SQLite auto-assign it) ...`,
     hints: [
       "`customer_sk INTEGER PRIMARY KEY` is all you need for an auto-incrementing surrogate in SQLite.",
-      "Don't list `customer_sk` in your `INSERT` column list — let it auto-fill.",
-      "`email` is just `email TEXT` here (no PK) — identity rides on the surrogate, not the business value.",
+      "Don't list `customer_sk` in your `INSERT` column list. Let it auto-fill.",
+      "`email` is just `email TEXT` here (no PK). Identity rides on the surrogate, not the business value.",
     ],
     referenceSolution: `DROP TABLE IF EXISTS dim_customer;
 
@@ -520,7 +520,7 @@ INSERT INTO dim_customer (email, country_code) VALUES ('grace@example.com','US')
     id: "sql-l3-primary-keys-practice",
     prompt: `Design \`dim_product\` with a surrogate PK \`product_sk\` **and** a \`UNIQUE\` natural key
 \`sku\` (plus a \`name\`). Insert two valid products (use skus \`'A-1'\` and \`'B-2'\`). Then **attempt a
-third insert that duplicates an existing \`sku\`** and prove the database rejects it — the row count
+third insert that duplicates an existing \`sku\`** and prove the database rejects it. The row count
 must stay at 2 after the failed insert. Use \`INSERT OR IGNORE\` for the duplicate so the script keeps
 running and the assertions can execute.`,
     starterCode: `DROP TABLE IF EXISTS dim_product;
@@ -576,7 +576,7 @@ const foreignKeys: SqlLevel["modules"][number]["lessons"][number] = {
 
 A **foreign key (FK)** says: "the value in *this* column must exist as a key in *that* table." An
 \`orders.customer_id\` FK to \`customers.customer_id\` makes it **impossible** to insert an order for a
-customer who doesn't exist. That guarantee is **referential integrity** — the backbone of a
+customer who doesn't exist. That guarantee is **referential integrity**: the backbone of a
 trustworthy schema, and the thing that stops orphan rows from ever forming.
 
 **Worked example.**
@@ -614,23 +614,23 @@ FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT
        child column           parent table  parent key          delete policy
 \`\`\`
 
-> **In the warehouse this differs — and SQLite has a trap.** SQLite **does not enforce foreign keys
+> **In the warehouse this differs, and SQLite has a trap.** SQLite **does not enforce foreign keys
 > unless you turn them on** every connection: \`PRAGMA foreign_keys = ON;\`. Forget it and your
-> \`REFERENCES\` clauses parse fine but enforce nothing — orphans slip right in. Warehouses are the
+> \`REFERENCES\` clauses parse fine but enforce nothing. Orphans slip right in. Warehouses are the
 > opposite extreme: Redshift, Snowflake, and BigQuery let you *declare* FKs but **don't enforce them
 > at all** (they're informational, used by the planner). So in the real warehouse, referential
 > integrity is enforced by your *load logic and DQ tests*, not the engine. Here in SQLite you get
-> real enforcement — as long as you flip the pragma.
+> real enforcement, as long as you flip the pragma.
 
 > **A second SQLite gotcha:** \`INSERT OR IGNORE\` does **not** suppress a foreign-key violation. The
-> \`OR IGNORE\` conflict clause only skips \`UNIQUE\` / \`NOT NULL\` / \`CHECK\` / \`PRIMARY KEY\` conflicts —
-> an FK violation still raises \`FOREIGN KEY constraint failed\` and aborts the statement. So the
+> \`OR IGNORE\` conflict clause only skips \`UNIQUE\` / \`NOT NULL\` / \`CHECK\` / \`PRIMARY KEY\` conflicts.
+> An FK violation still raises \`FOREIGN KEY constraint failed\` and aborts the statement. So the
 > defensive way to "insert only if the parent exists" is a **guarded insert**:
 > \`INSERT INTO orders (...) SELECT ... WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = ...)\`.
 > The row lands only when the parent is present; otherwise it's a clean no-op instead of an error.
 
 **Keep it readable / common pitfall.** Two pitfalls dominate. First: forgetting
-\`PRAGMA foreign_keys = ON;\` — always the first line of an FK script. Second: reaching for \`CASCADE\`
+\`PRAGMA foreign_keys = ON;\` (always the first line of an FK script). Second: reaching for \`CASCADE\`
 by default. Cascading deletes are a foot-gun; a single parent delete can silently wipe thousands of
 children. Default to \`RESTRICT\` and only cascade where the child genuinely cannot outlive the parent.
 
@@ -647,7 +647,7 @@ policies, and that referential integrity actually held.`,
 \`customer_id\` NOT NULL, \`total_cents\`) with an FK \`orders.customer_id → customers.customer_id\` using
 \`ON DELETE RESTRICT\`. **Turn FK enforcement on** as the first line. Insert **one** customer and **one**
 valid order for that customer. Then attempt an order for a **non-existent** customer (\`customer_id = 999\`)
-with a **guarded insert** — \`INSERT ... SELECT ... WHERE EXISTS (the parent)\` — so the orphan cleanly
+with a **guarded insert**, \`INSERT ... SELECT ... WHERE EXISTS (the parent)\`, so the orphan cleanly
 does **not** land (a raw \`INSERT\`, even \`INSERT OR IGNORE\`, would raise an FK error and abort).`,
     starterCode: `PRAGMA foreign_keys = ON;
 DROP TABLE IF EXISTS orders;
@@ -658,10 +658,10 @@ DROP TABLE IF EXISTS customers;
 -- INSERT one customer, then one valid order for that customer ...
 -- Guarded orphan attempt: INSERT ... SELECT 2, 999, 100 WHERE EXISTS (customer 999) -> no-op ...`,
     hints: [
-      "First line: `PRAGMA foreign_keys = ON;` — without it your `REFERENCES` clause enforces nothing.",
+      "First line: `PRAGMA foreign_keys = ON;`. Without it your `REFERENCES` clause enforces nothing.",
       "Declare the FK inside `orders` with `FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT`.",
       "Insert the parent customer *before* the order, or even the valid order fails the FK check.",
-      "For the orphan, use a guarded `INSERT INTO orders (...) SELECT 2, 999, 100 WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999)` — it inserts nothing because customer 999 is absent.",
+      "For the orphan, use a guarded `INSERT INTO orders (...) SELECT 2, 999, 100 WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999)`. It inserts nothing because customer 999 is absent.",
     ],
     referenceSolution: `PRAGMA foreign_keys = ON;
 DROP TABLE IF EXISTS orders;
@@ -720,7 +720,7 @@ WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999);`,
   }),
   practice: scriptExercise({
     id: "sql-l3-foreign-keys-practice",
-    prompt: `Wire a **three-table order schema** — \`customers\`, \`orders\`, \`order_items\` — plus a
+    prompt: `Wire a **three-table order schema** (\`customers\`, \`orders\`, \`order_items\`) plus a
 \`products\` table, with a **defensible \`ON DELETE\` policy per relationship**:
 - \`orders.customer_id → customers\`: \`ON DELETE RESTRICT\` (never lose orders because a customer was deleted).
 - \`order_items.order_id → orders\`: \`ON DELETE CASCADE\` (line items are meaningless without their order).
@@ -729,9 +729,9 @@ WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999);`,
 Turn FK enforcement on. Insert one customer, two products, and **two** orders for that customer, each with
 **two** items referencing real products: **order 1** (which you will delete) and **order 2** (which must
 survive untouched). Then prove **three** things: (a) an \`order_items\` row for a **non-existent** order
-(\`order_id = 999\`) does not land — use a **guarded insert** (\`INSERT ... SELECT ... WHERE EXISTS (the
+(\`order_id = 999\`) does not land. Use a **guarded insert** (\`INSERT ... SELECT ... WHERE EXISTS (the
 order)\`), since \`INSERT OR IGNORE\` will *not* skip an FK error; (b) \`DELETE FROM orders WHERE order_id =
-1;\` **cascades** to remove order 1's two items; and (c) the cascade is **surgical** — order 2 keeps its
+1;\` **cascades** to remove order 1's two items; and (c) the cascade is **surgical**: order 2 keeps its
 two items, so exactly two \`order_items\` rows survive.`,
     starterCode: `PRAGMA foreign_keys = ON;
 DROP TABLE IF EXISTS order_items;
@@ -748,10 +748,10 @@ DROP TABLE IF EXISTS customers;
 -- Guarded orphan: INSERT ... SELECT 103, 999, ... WHERE EXISTS (order 999)  -> no-op ...
 -- DELETE FROM orders WHERE order_id = 1;  -- cascade clears order 1's items; order 2 survives ...`,
     hints: [
-      "`PRAGMA foreign_keys = ON;` first — the cascade won't fire without it.",
+      "`PRAGMA foreign_keys = ON;` first. The cascade won't fire without it.",
       "Insert in dependency order: `products` and `customers`, then both `orders`, then all four `order_items`.",
       "Give the `order_items.order_id` FK `ON DELETE CASCADE`; give the other two `ON DELETE RESTRICT`.",
-      "Give order 1 and order 2 two items each. Guard the orphan with `... SELECT 103, 999, 10, 1 WHERE EXISTS (SELECT 1 FROM orders WHERE order_id = 999)`, then run `DELETE FROM orders WHERE order_id = 1;` — the cascade clears order 1's two items while order 2 keeps its two before the assertions read.",
+      "Give order 1 and order 2 two items each. Guard the orphan with `... SELECT 103, 999, 10, 1 WHERE EXISTS (SELECT 1 FROM orders WHERE order_id = 999)`, then run `DELETE FROM orders WHERE order_id = 1;`. The cascade clears order 1's two items while order 2 keeps its two before the assertions read.",
     ],
     seedSql: "",
     checkIdempotency: true,
@@ -825,12 +825,12 @@ const constraints: SqlLevel["modules"][number]["lessons"][number] = {
     markdown: `## Constraints are the cheapest data-quality layer you have
 
 A \`CHECK\` or \`NOT NULL\` is enforced by the database *before* any dbt test, alert, or dashboard notices
-a problem — the bad row simply never lands. Three workhorses:
+a problem. The bad row simply never lands. Three workhorses:
 
-- \`NOT NULL\` — the column must always have a value.
-- \`UNIQUE\` — no two rows share this value (or this *combination* of values, for a **composite unique**).
-- \`CHECK (condition)\` — every row must satisfy a boolean condition: an enum whitelist, a non-negative
-  price, a valid date order.
+- \`NOT NULL\`: the column must always have a value.
+- \`UNIQUE\`: no two rows share this value (or this *combination* of values, for a **composite unique**).
+- \`CHECK (condition)\`: every row must satisfy a boolean condition (an enum whitelist, a non-negative
+  price, a valid date order).
 
 ### Worked example
 
@@ -864,23 +864,23 @@ Column-level constraints sit on one column; **table-level** constraints (\`UNIQU
 > **In the warehouse this differs.** SQLite enforces \`CHECK\`, \`NOT NULL\`, and \`UNIQUE\` reliably. Big
 > analytical warehouses are looser: BigQuery has **no** \`CHECK\`/\`UNIQUE\` enforcement, and Snowflake
 > enforces \`NOT NULL\` but treats \`UNIQUE\`/\`CHECK\` as *informational*. So in production these invariants
-> are re-expressed as **dbt / DQ tests** (you'll build those in L4). Author them in your DDL anyway —
+> are re-expressed as **dbt / DQ tests** (you'll build those in L4). Author them in your DDL anyway:
 > they document intent and they *are* enforced on strict engines like Postgres.
 
 ### Keep each CHECK to one clear invariant
 
 A giant compound \`CHECK\` is unreadable and hard to debug when it fires. Common trap: a \`CHECK\`
-**passes** when its condition evaluates to \`NULL\` (three-valued logic) — that's why the ship-date rule
+**passes** when its condition evaluates to \`NULL\` (three-valued logic). That's why the ship-date rule
 is written \`ship_date IS NULL OR ship_date >= order_date\`, so a *missing* ship date is allowed but a
 *wrong* one isn't.
 
-**Recap:** constraints are the cheapest DQ layer — use \`NOT NULL\` for required fields, \`UNIQUE\` (incl.
+**Recap:** constraints are the cheapest DQ layer. Use \`NOT NULL\` for required fields, \`UNIQUE\` (incl.
 composite) for identity/dedup, and \`CHECK\` for enums and invariants. Author them even where the
 warehouse won't enforce them.
 
 **Execution mode:** you write a multi-statement DDL+DML script. It runs against a fresh in-memory
 SQLite DB, then hidden assertion queries check the constraints and row counts. Use \`INSERT OR IGNORE\`
-for rows you *expect* to be rejected — a constraint violation is then silently skipped instead of
+for rows you *expect* to be rejected. A constraint violation is then silently skipped instead of
 aborting your whole script.`,
   },
   apply: scriptExercise({
@@ -892,7 +892,7 @@ aborting your whole script.`,
 - \`total_cents INTEGER NOT NULL\`.
 
 Insert **one valid row**. Then, using \`INSERT OR IGNORE\`, attempt a row with \`status = 'refunded'\` and
-prove it never lands — the table should end with exactly one row.`,
+prove it never lands. The table should end with exactly one row.`,
     starterCode: `DROP TABLE IF EXISTS orders;
 
 -- CREATE TABLE orders ( ... ) with a CHECK on status and NOT NULL columns ...
@@ -951,13 +951,13 @@ INSERT OR IGNORE INTO orders (order_id, status, total_cents) VALUES (2, 'refunde
     prompt: `Harden a \`dim_product\` dimension so three data-quality rules are enforced **by the schema
 itself**:
 
-1. a **composite** \`UNIQUE (supplier_id, sku)\` — the same SKU may exist under *different* suppliers,
+1. a **composite** \`UNIQUE (supplier_id, sku)\`: the same SKU may exist under *different* suppliers,
    but never twice under one;
 2. a **non-negative** price: \`CHECK (unit_price_cents >= 0)\`;
 3. an **enum**: \`CHECK (status IN ('active','discontinued'))\`.
 
-Insert **one fully valid row**. Then, with \`INSERT OR IGNORE\`, fire one violation of *each* rule — a
-duplicate \`(supplier_id, sku)\`, a negative price, and a bad status — and prove the table still holds
+Insert **one fully valid row**. Then, with \`INSERT OR IGNORE\`, fire one violation of *each* rule: a
+duplicate \`(supplier_id, sku)\`, a negative price, and a bad status. Prove the table still holds
 exactly one row.`,
     starterCode: `DROP TABLE IF EXISTS dim_product;
 
@@ -970,7 +970,7 @@ exactly one row.`,
     hints: [
       "Put the composite unique as a table-level constraint after the columns: `UNIQUE (supplier_id, sku)`.",
       "Two column-level checks: `CHECK (unit_price_cents >= 0)` and `CHECK (status IN ('active','discontinued'))`.",
-      "Insert the good row first — a whitelisted status, a non-negative price, and a unique supplier+sku.",
+      "Insert the good row first: a whitelisted status, a non-negative price, and a unique supplier+sku.",
       "Fire all three bad rows with `INSERT OR IGNORE`; each is silently skipped, leaving exactly one row.",
     ],
     seedSql: "",
@@ -1030,21 +1030,21 @@ const normalize1nf: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 8,
     markdown: `## First Normal Form: atomic values
 
-**First Normal Form (1NF)** demands two things: **one value per cell** (atomic — no comma-packed
+**First Normal Form (1NF)** demands two things: **one value per cell** (atomic: no comma-packed
 lists) and **one row per fact**. A spreadsheet export that crams \`"mouse:2, keyboard:1"\` into a single
 \`items\` column violates 1NF, and that single violation breaks *every* downstream join, aggregate, and
-filter — you can't \`SUM\` a price you can't isolate, or join on a product buried inside a string.
+filter. You can't \`SUM\` a price you can't isolate, or join on a product buried inside a string.
 
 ### The violation and the fix
 
-Raw — a repeating group packed into one cell:
+Raw, a repeating group packed into one cell:
 
 | order_id | items |
 |---|---|
 | 1 | \`mouse:2, keyboard:1\` |
 | 2 | \`mouse:1\` |
 
-1NF form — one row per line item, atomic columns, and a **composite key** \`(order_id, product)\`
+1NF form, one row per line item, atomic columns, and a **composite key** \`(order_id, product)\`
 because neither column alone is unique:
 
 | order_id | product | qty |
@@ -1057,15 +1057,15 @@ because neither column alone is unique:
 string becomes separate *columns* (\`product\`, \`qty\`); and the identity of a row is now the
 **combination** \`(order_id, product)\`.
 
-> **In the warehouse this differs — not really, but the tools do.** 1NF is a universal relational
+> **In the warehouse this differs: not really, but the tools do.** 1NF is a universal relational
 > principle. The mechanics of *unpacking* differ: SQLite has no array type, so packed data is \`TEXT\`
 > you split with string functions or a recursive CTE (Level 4). Postgres has real arrays and
 > \`unnest()\`; BigQuery/Snowflake have \`ARRAY\`/\`STRUCT\` and are often kept *semi-structured* on
 > purpose. But the moment you need to join or aggregate, you flatten to 1NF.
 
-### Keep it readable — a common pitfall
+### Keep it readable: a common pitfall
 
-Don't "solve" a multi-valued attribute by adding \`item1, item2, item3\` columns — that's still a
+Don't "solve" a multi-valued attribute by adding \`item1, item2, item3\` columns. That's still a
 repeating group and it caps you at three items. The fix is always *more rows, not more columns*. And
 once you unpack, a single column is no longer unique, so declare the **composite key**.
 
@@ -1079,7 +1079,7 @@ then hidden assertion queries check the unpacked grain, values, and keys.`,
     id: "sql-l3-normalize-1nf-apply",
     prompt: `The \`raw_order\` table stores **two line-item slots per order** in packed columns
 (\`product_a\`/\`qty_a\` and \`product_b\`/\`qty_b\`). Unpack it into a 1NF \`order_item\` table with columns
-\`(order_id, product, qty)\` and a composite primary key \`(order_id, product)\` — **one row per line
+\`(order_id, product, qty)\` and a composite primary key \`(order_id, product)\`: **one row per line
 item**. Use two \`INSERT … SELECT\` statements (one per slot); skip the empty second slot with a
 \`WHERE product_b IS NOT NULL\`. You're given exactly two slots to keep the SQL simple.`,
     starterCode: `DROP TABLE IF EXISTS order_item;
@@ -1091,7 +1091,7 @@ item**. Use two \`INSERT … SELECT\` statements (one per slot); skip the empty 
 -- INSERT … SELECT from the second slot (product_b, qty_b), skipping empty slots ...`,
     hints: [
       "First `INSERT … SELECT order_id, product_a, qty_a FROM raw_order` for every order.",
-      "Second `INSERT … SELECT order_id, product_b, qty_b FROM raw_order WHERE product_b IS NOT NULL` — the `WHERE` skips the empty slot.",
+      "Second `INSERT … SELECT order_id, product_b, qty_b FROM raw_order WHERE product_b IS NOT NULL`. The `WHERE` skips the empty slot.",
       "Target columns are `(order_id, product, qty)`; declare `PRIMARY KEY (order_id, product)` so the grain is enforced.",
     ],
     referenceSolution: `DROP TABLE IF EXISTS order_item;
@@ -1154,10 +1154,10 @@ INSERT INTO raw_order VALUES
     prompt: `A "sales spreadsheet" export stores **up to three line-item slots per order** in packed
 columns (\`product_1\`/\`qty_1\`/\`price_1\`, \`product_2\`/\`qty_2\`/\`price_2\`,
 \`product_3\`/\`qty_3\`/\`price_3\`). Unpack \`raw_sales\` into a 1NF \`order_line\` table
-\`(order_id, product, qty, unit_price_cents)\` with a composite primary key \`(order_id, product)\` —
+\`(order_id, product, qty, unit_price_cents)\` with a composite primary key \`(order_id, product)\`:
 **one row per line item**. Use **three** \`INSERT … SELECT\` statements (one per slot); skip the empty
 slots with a \`WHERE product_N IS NOT NULL\`. The slot columns are already \`INTEGER\`, so \`qty\` and
-\`price_N\` carry straight into \`unit_price_cents\` — no parsing, no \`CAST\`.`,
+\`price_N\` carry straight into \`unit_price_cents\`: no parsing, no \`CAST\`.`,
     starterCode: `DROP TABLE IF EXISTS order_line;
 
 -- CREATE TABLE order_line ( ... , PRIMARY KEY (order_id, product) );
@@ -1169,7 +1169,7 @@ slots with a \`WHERE product_N IS NOT NULL\`. The slot columns are already \`INT
       "First `INSERT … SELECT order_id, product_1, qty_1, price_1 FROM raw_sales WHERE product_1 IS NOT NULL` for every order.",
       "Add one more `INSERT … SELECT` per slot (product_2/qty_2/price_2, then product_3/qty_3/price_3), each with `WHERE product_N IS NOT NULL` so empty slots are skipped.",
       "Declare `PRIMARY KEY (order_id, product)` so the composite grain is enforced.",
-      "The slot columns are already `INTEGER`, so a plain `SELECT` carries `qty` and `price` over — no CAST needed.",
+      "The slot columns are already `INTEGER`, so a plain `SELECT` carries `qty` and `price` over: no CAST needed.",
     ],
     seedSql: `DROP TABLE IF EXISTS raw_sales;
 CREATE TABLE raw_sales (
@@ -1229,21 +1229,21 @@ const normalize2nf3nf: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["2NF (no partial dependency)", "3NF (no transitive dependency)", "table decomposition"],
   teach: {
     estimatedMinutes: 10,
-    markdown: `## 2NF and 3NF — "the key, the whole key, and nothing but the key"
+    markdown: `## 2NF and 3NF: "the key, the whole key, and nothing but the key"
 
 Once data is atomic (1NF), redundancy can still hide in *dependencies*. The memorable rule for a
 well-normalized table: **every non-key column depends on the key, the whole key, and nothing but the
 key.**
 
-### 2NF — the whole key
+### 2NF: the whole key
 
 No column may depend on only *part* of a composite key. In an
 \`order_item(order_id, product_id, qty, product_name)\` table keyed on \`(order_id, product_id)\`,
-\`product_name\` depends only on \`product_id\` — half the key. That's a **partial dependency**: it
+\`product_name\` depends only on \`product_id\`, half the key. That's a **partial dependency**: it
 repeats \`product_name\` on every line the product appears in. Fix: move \`product_name\` to a
 \`products\` table keyed on \`product_id\`.
 
-### 3NF — nothing but the key
+### 3NF: nothing but the key
 
 No non-key column may depend on *another non-key column*. In
 \`orders(order_id, customer_id, customer_email)\`, \`customer_email\` depends on \`customer_id\`, not on
@@ -1277,19 +1277,19 @@ CREATE TABLE order_items (
 Now \`product_name\` and \`email\` each live in exactly one place. Change an email once; every order
 reflects it. No update anomalies.
 
-> **In the warehouse this differs — by intent.** 3NF is the gold standard for OLTP systems (safe
+> **In the warehouse this differs, by intent.** 3NF is the gold standard for OLTP systems (safe
 > writes, no anomalies). Analytical warehouses often *stop short* of full normalization or
 > deliberately denormalize (next lesson) because joins are the expensive part of a read. So DEs
 > normalize the **source-of-truth / staging** layers and denormalize the **mart** layer. Same
 > engineer, two different targets.
 
-**Common pitfall — over- or under-splitting.** Under: leaving \`customer_email\` on \`orders\` (a real
+**Common pitfall: over- or under-splitting.** Under: leaving \`customer_email\` on \`orders\` (a real
 3NF violation that causes update anomalies). Over: decomposing attributes that genuinely *do* depend
 only on the key into needless tables. Test each column: "does this depend on the whole key and nothing
 but the key?" If no, split; if yes, leave it.
 
 **Recap.** 2NF removes partial dependencies (on part of a composite key); 3NF removes transitive
-dependencies (on another non-key column). Decompose so every fact is stored exactly once — the OLTP
+dependencies (on another non-key column). Decompose so every fact is stored exactly once: the OLTP
 ideal you'll later denormalize for analytics.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
@@ -1297,11 +1297,11 @@ then hidden assertion queries check that each fact now lives in exactly one tabl
   },
   apply: scriptExercise({
     id: "sql-l3-normalize-2nf-3nf-apply",
-    prompt: `The \`flat_line\` table repeats \`product_name\` on every row — a **2NF violation**, because
+    prompt: `The \`flat_line\` table repeats \`product_name\` on every row: a **2NF violation**, because
 \`product_name\` depends only on \`product_id\`, which is just *half* of the natural
 \`(order_id, product_id)\` grain. Normalize it:
 
-- Extract product attributes into a \`products\` table keyed on \`product_id\`, **deduplicated** — use
+- Extract product attributes into a \`products\` table keyed on \`product_id\`, **deduplicated**: use
 \`INSERT … SELECT DISTINCT\`.
 - Rebuild \`order_items\` with only \`(order_id, product_id, qty)\` and a composite primary key, then
 populate it from \`flat_line\`.
@@ -1315,9 +1315,9 @@ DROP TABLE IF EXISTS order_items;
 -- 3. CREATE order_items (order_id, product_id, qty) with a composite PRIMARY KEY ...
 -- 4. Populate order_items from flat_line (no product_name column) ...`,
     hints: [
-      "`INSERT INTO products (product_id, product_name) SELECT DISTINCT product_id, product_name FROM flat_line;` — DISTINCT collapses the repeats.",
-      "`order_items` gets `(order_id, product_id, qty)` only — no `product_name`. Declare `PRIMARY KEY (order_id, product_id)`.",
-      "Populate order_items with `SELECT order_id, product_id, qty FROM flat_line;` — the same three rows, minus the product name.",
+      "`INSERT INTO products (product_id, product_name) SELECT DISTINCT product_id, product_name FROM flat_line;`. DISTINCT collapses the repeats.",
+      "`order_items` gets `(order_id, product_id, qty)` only: no `product_name`. Declare `PRIMARY KEY (order_id, product_id)`.",
+      "Populate order_items with `SELECT order_id, product_id, qty FROM flat_line;`: the same three rows, minus the product name.",
     ],
     referenceSolution: `DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS order_items;
@@ -1371,14 +1371,14 @@ INSERT INTO flat_line VALUES
     prompt: `Fully normalize the single flat \`flat_sales\` table to **3NF**. It repeats customer *and*
 product attributes on every line. Produce four tables, each populated with \`INSERT … SELECT\`:
 
-- \`customers\` keyed on \`customer_id\`, **deduplicated by email** — the same person shows up under
+- \`customers\` keyed on \`customer_id\`, **deduplicated by email**. The same person shows up under
 different \`customer_id\`s in the raw feed, so keep one row per distinct email at the **lowest**
 \`customer_id\`.
 - \`products\` keyed on \`product_id\`, deduplicated.
-- \`orders\` keyed on \`order_id\` — one row per order, carrying the **surviving** \`customer_id\` from
+- \`orders\` keyed on \`order_id\`: one row per order, carrying the **surviving** \`customer_id\` from
 \`customers\` (map each raw id to the deduped one via email; never point an order at a \`customer_id\`
 you deduped away), and no customer attributes.
-- \`order_items\` keyed on \`(order_id, product_id)\` — carrying \`qty\` (not product attributes).`,
+- \`order_items\` keyed on \`(order_id, product_id)\`: carrying \`qty\` (not product attributes).`,
     starterCode: `DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS orders;
@@ -1389,10 +1389,10 @@ DROP TABLE IF EXISTS order_items;
 -- orders:      one row per order_id (carry customer_id, no customer attributes) ...
 -- order_items: (order_id, product_id, qty) at line grain, no product attributes ...`,
     hints: [
-      "Dedup customers with a grouped insert: `SELECT MIN(customer_id), email FROM flat_sales GROUP BY email` — one row per email, lowest id wins.",
-      "Don't load `orders` straight from the raw feed: order 3's raw customer_id (12) was deduped away in favor of 10, so `SELECT DISTINCT order_id, customer_id FROM flat_sales` would leave order 3 pointing at a customer that no longer exists — an orphaned foreign key. Remap through the dim on the natural key: `SELECT DISTINCT f.order_id, c.customer_id FROM flat_sales f JOIN customers c ON c.email = f.email` — every order now resolves to a surviving customer_id.",
+      "Dedup customers with a grouped insert: `SELECT MIN(customer_id), email FROM flat_sales GROUP BY email`. One row per email, lowest id wins.",
+      "Don't load `orders` straight from the raw feed: order 3's raw customer_id (12) was deduped away in favor of 10, so `SELECT DISTINCT order_id, customer_id FROM flat_sales` would leave order 3 pointing at a customer that no longer exists: an orphaned foreign key. Remap through the dim on the natural key: `SELECT DISTINCT f.order_id, c.customer_id FROM flat_sales f JOIN customers c ON c.email = f.email`. Every order now resolves to a surviving customer_id.",
       "`products` = `SELECT DISTINCT product_id, product_name FROM flat_sales`.",
-      "`order_items` = `SELECT order_id, product_id, qty FROM flat_sales` — atomic grain, no descriptive columns.",
+      "`order_items` = `SELECT order_id, product_id, qty FROM flat_sales`: atomic grain, no descriptive columns.",
     ],
     seedSql: `DROP TABLE IF EXISTS flat_sales;
 CREATE TABLE flat_sales (
@@ -1473,7 +1473,7 @@ const denormalization: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 9,
     markdown: `## Normalization is a trade-off, not a virtue
 
-Normalization is not a moral good — it's a **trade-off**. It optimizes for *safe writes*: each fact
+Normalization is not a moral good. It's a **trade-off**. It optimizes for *safe writes*: each fact
 stored once means no update anomalies. But it pays for that with *joins on every read*, and joins are
 the expensive part of analytics. The two worlds:
 
@@ -1481,12 +1481,12 @@ the expensive part of analytics. The two worlds:
 - **OLAP** (analytics/BI): few huge reads, join-heavy → **denormalize** (flatten so a report is one
   scan, not a six-table join).
 
-**Denormalization** deliberately reintroduces redundancy — copying \`product_name\`, \`category\`,
-\`customer_country\` *into* the fact/reporting table — so the read needs no joins. The cost is that if
+**Denormalization** deliberately reintroduces redundancy (copying \`product_name\`, \`category\`,
+\`customer_country\` *into* the fact/reporting table) so the read needs no joins. The cost is that if
 \`product_name\` changes you must update it in many places; in analytics that's fine because these
 tables are *rebuilt* by the loader, not hand-edited.
 
-**Worked example.** From the 3NF schema, build one wide, denormalized reporting *table* — a real,
+**Worked example.** From the 3NF schema, build one wide, denormalized reporting *table*, a real,
 physical table that stores its own rows (not a view):
 
 \`\`\`sql
@@ -1502,15 +1502,15 @@ JOIN products  p ON p.product_id = oi.product_id
 JOIN customers c ON c.customer_id = o.customer_id;
 \`\`\`
 
-A BI query against \`rpt_sales\` — "revenue by category by country" — now touches **one** table. The
+A BI query against \`rpt_sales\` ("revenue by category by country") now touches **one** table. The
 four-way join happened *once*, at build time, not on every dashboard load. \`CREATE TABLE … AS SELECT\`
-(CTAS) runs a query and stores its result set as a brand-new, **physical** table — real rows on disk,
+(CTAS) runs a query and stores its result set as a brand-new, **physical** table: real rows on disk,
 not a view. (A true **view**, by contrast, is just a *saved SELECT* that stores no data of its own and
-re-runs its query on every read — you'll build views in a later lesson; \`rpt_sales\` here is a
+re-runs its query on every read. You'll build views in a later lesson; \`rpt_sales\` here is a
 materialized *table*, which is exactly why its join cost is paid once at build time and never again on
 read.)
 
-> **In the warehouse this differs — this is the warehouse's whole point.** Columnar warehouses
+> **In the warehouse this differs. This is the warehouse's whole point.** Columnar warehouses
 > (Snowflake/BigQuery/Redshift) are built to scan wide denormalized tables fast, and storage is cheap,
 > so the redundancy barely costs anything. \`CREATE TABLE … AS SELECT\` (CTAS) is the standard build
 > verb there too. The star schema (Module 3.5) is the *disciplined* middle ground between full 3NF and
@@ -1518,7 +1518,7 @@ read.)
 
 **Keep it readable / common pitfall.** Denormalize the *mart*, never the *source of truth*. If you
 denormalize your write-path OLTP tables you'll corrupt data via update anomalies. Pitfall:
-denormalizing too early or everything — keep normalized staging/intermediate layers and denormalize
+denormalizing too early or everything. Keep normalized staging/intermediate layers and denormalize
 only the final reporting layer, rebuilt each run.
 
 **Recap:** normalization favors safe writes, denormalization favors fast reads; flatten the
@@ -1533,8 +1533,8 @@ check row counts, copied-in columns, and computed revenue.`,
     id: "sql-l3-denormalization-apply",
     prompt: `Given a normalized 3-table schema (\`orders\`, \`products\`, \`order_items\`), build one wide
 denormalized reporting table \`rpt_line\` via \`CREATE TABLE … AS SELECT\` that carries \`order_id\`,
-\`product_id\`, \`qty\`, \`product_name\`, \`category\`, and \`line_revenue_cents\` (= \`qty * unit_price_cents\`)
-— so a report needs **no joins** to read it. Lead your script with \`DROP TABLE IF EXISTS rpt_line;\` so
+\`product_id\`, \`qty\`, \`product_name\`, \`category\`, and \`line_revenue_cents\` (= \`qty * unit_price_cents\`),
+so a report needs **no joins** to read it. Lead your script with \`DROP TABLE IF EXISTS rpt_line;\` so
 it re-runs cleanly.`,
     starterCode: `-- Build a wide, join-free reporting table from the normalized source.
 DROP TABLE IF EXISTS rpt_line;
@@ -1676,11 +1676,11 @@ const cardinality: SqlLevel["modules"][number]["lessons"][number] = {
 
 An **entity** is a thing you store (customer, order, product); a **relationship** connects entities; **cardinality** says how many of one relate to how many of the other. Three shapes:
 
-- **1:N (one-to-many)** — one customer has many orders; one order belongs to one customer. The overwhelmingly common case.
-- **1:1 (one-to-one)** — one user has one profile. Rare; usually modeled as an optional table split.
-- **M:N (many-to-many)** — one order has many products, one product is in many orders. Cannot be expressed with a single FK.
+- **1:N (one-to-many)**: one customer has many orders; one order belongs to one customer. The overwhelmingly common case.
+- **1:1 (one-to-one)**: one user has one profile. Rare; usually modeled as an optional table split.
+- **M:N (many-to-many)**: one order has many products, one product is in many orders. Cannot be expressed with a single FK.
 
-**The one rule that resolves most modeling questions: the FK goes on the "many" side.** For customer 1:N orders, the FK \`customer_id\` lives on **orders** (the many side), pointing at customers. It cannot go the other way — a customer row can't hold a single \`order_id\` because a customer has *many* orders.
+**The one rule that resolves most modeling questions: the FK goes on the "many" side.** For customer 1:N orders, the FK \`customer_id\` lives on **orders** (the many side), pointing at customers. It cannot go the other way: a customer row can't hold a single \`order_id\` because a customer has *many* orders.
 
 **Worked example.**
 
@@ -1694,7 +1694,7 @@ CREATE TABLE orders (
 \`\`\`
 
 - **1:1** is a table *split*: put the FK (also \`UNIQUE\`) on the optional/less-common side, e.g. \`user_profile.user_id UNIQUE REFERENCES users\`. The \`UNIQUE\` is what turns 1:N into 1:1.
-- **M:N** needs a third table (next lesson) — a single FK can't represent it because *both* sides are "many."
+- **M:N** needs a third table (next lesson). A single FK can't represent it because *both* sides are "many."
 
 **Anatomy of encoding cardinality:**
 
@@ -1704,11 +1704,11 @@ CREATE TABLE orders (
 M:N   → junction table with two FKs (see next lesson)
 \`\`\`
 
-> **In the warehouse this differs — placement is universal.** ER modeling and FK placement are engine-independent design. The only warehouse wrinkle (from the FK lesson) is that many warehouses don't *enforce* the FK — but the *placement* decision (which table holds the key) is identical and drives how you join.
+> **In the warehouse this differs: placement is universal.** ER modeling and FK placement are engine-independent design. The only warehouse wrinkle (from the FK lesson) is that many warehouses don't *enforce* the FK, but the *placement* decision (which table holds the key) is identical and drives how you join.
 
-**Keep it readable / common pitfall.** The classic error is putting the FK on the wrong side of a 1:N — trying to store a list of order ids on the customer. If you're tempted to store "many ids in one column," that's the signal you've either got the FK backwards (put it on the many side) or you actually have M:N (needs a junction). Second pitfall: modeling a true M:N as 1:N and losing half the relationship.
+**Keep it readable / common pitfall.** The classic error is putting the FK on the wrong side of a 1:N: trying to store a list of order ids on the customer. If you're tempted to store "many ids in one column," that's the signal you've either got the FK backwards (put it on the many side) or you actually have M:N (needs a junction). Second pitfall: modeling a true M:N as 1:N and losing half the relationship.
 
-**Recap:** cardinality is how many relate to how many; the FK always sits on the many side, 1:1 adds a \`UNIQUE\` to the FK, and M:N can't be done with one FK — it needs a junction table.
+**Recap:** cardinality is how many relate to how many; the FK always sits on the many side, 1:1 adds a \`UNIQUE\` to the FK, and M:N can't be done with one FK: it needs a junction table.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB, then hidden assertion queries check FK placement, the \`UNIQUE\` that encodes 1:1, and that M:N was left for a junction table.`,
   },
@@ -1726,8 +1726,8 @@ DROP TABLE IF EXISTS authors;
 -- CREATE books — the many side: book_id PRIMARY KEY, title, author_id REFERENCES authors.
 -- INSERT one author, then two books that both point at that author.`,
     hints: [
-      "\`authors(author_id INTEGER PRIMARY KEY, name TEXT)\` — the one side carries no FK.",
-      "\`books(book_id INTEGER PRIMARY KEY, title TEXT, author_id INTEGER REFERENCES authors(author_id))\` — the FK lives on the many side.",
+      "\`authors(author_id INTEGER PRIMARY KEY, name TEXT)\`. The one side carries no FK.",
+      "\`books(book_id INTEGER PRIMARY KEY, title TEXT, author_id INTEGER REFERENCES authors(author_id))\`. The FK lives on the many side.",
       "Insert the author before the books so the reference resolves.",
     ],
     referenceSolution: `PRAGMA foreign_keys = ON;
@@ -1772,9 +1772,9 @@ INSERT INTO books VALUES (1, 'Notes', 1), (2, 'Engine', 1);`,
     id: "sql-l3-cardinality-practice",
     prompt: `Model a *playlists ↔ songs* feature with three relationships, encoded purely in DDL:
 
-1. **user 1:N playlists** — a user owns many playlists. Put the FK on the many side.
-2. **playlist 1:1 cover_image** — each playlist has at most one cover. Model it as a table split with a \`UNIQUE\` FK.
-3. **playlists M:N songs** — a playlist has many songs and a song appears on many playlists. A single FK **cannot** express this, so leave \`songs\` standalone (the junction table comes next lesson).
+1. **user 1:N playlists**: a user owns many playlists. Put the FK on the many side.
+2. **playlist 1:1 cover_image**: each playlist has at most one cover. Model it as a table split with a \`UNIQUE\` FK.
+3. **playlists M:N songs**: a playlist has many songs and a song appears on many playlists. A single FK **cannot** express this, so leave \`songs\` standalone (the junction table comes next lesson).
 
 Create \`users\`, \`playlists\`, \`cover_images\`, and \`songs\`, wire the 1:N and 1:1 FKs, and add a one-row
 \`model_notes\` table stating \`mn_needs_junction = 1\` to record that the playlist↔song link still needs a
@@ -1792,9 +1792,9 @@ DROP TABLE IF EXISTS model_notes;
 -- songs — standalone; the M:N link to playlists can't be a single FK.
 -- model_notes — record mn_needs_junction = 1.`,
     hints: [
-      "\`playlists.user_id INTEGER REFERENCES users(user_id)\` — FK on the many side.",
-      "\`cover_images.playlist_id INTEGER UNIQUE REFERENCES playlists(playlist_id)\` — the \`UNIQUE\` is what turns 1:N into 1:1.",
-      "Do **not** give \`songs\` a \`playlist_id\` FK — that would force each song into a single playlist. Leave it standalone; the M:N link is a junction table (next lesson).",
+      "\`playlists.user_id INTEGER REFERENCES users(user_id)\`: FK on the many side.",
+      "\`cover_images.playlist_id INTEGER UNIQUE REFERENCES playlists(playlist_id)\`. The \`UNIQUE\` is what turns 1:N into 1:1.",
+      "Do **not** give \`songs\` a \`playlist_id\` FK. That would force each song into a single playlist. Leave it standalone; the M:N link is a junction table (next lesson).",
       "\`CREATE TABLE model_notes AS SELECT 1 AS mn_needs_junction;\` records the decision the grader checks.",
     ],
     seedSql: "",
@@ -1842,19 +1842,19 @@ const junctionTables: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 9,
     markdown: `## A single foreign key can't model many-to-many
 
-A single FK can encode 1:N, never M:N — because M:N means *both* sides have many, and one column
+A single FK can encode 1:N, never M:N, because M:N means *both* sides have many, and one column
 can't hold many values. The resolution is a **junction table** (a.k.a. associative or bridge table):
 a third table whose job is to hold *pairs*, one row per related (A, B) combination.
 
 Its shape is stereotyped:
 
 - Two FK columns, one to each parent.
-- A **composite primary key** of those two FKs — this both identifies the pair *and* blocks the same
+- A **composite primary key** of those two FKs: this both identifies the pair *and* blocks the same
   pair from being stored twice.
 - Optionally, **relationship attributes**: facts that belong to the *pairing*, not to either entity
   alone.
 
-### Worked example — students M:N courses
+### Worked example: students M:N courses
 
 \`\`\`sql
 CREATE TABLE enrollments (
@@ -1867,7 +1867,7 @@ CREATE TABLE enrollments (
 \`\`\`
 
 \`enrolled_at\` and \`grade\` can't live on \`students\` (a student has many enrollments) or on
-\`courses\` — they describe the *relationship*. That's the tell for a junction attribute: "does this
+\`courses\`. They describe the *relationship*. That's the tell for a junction attribute: "does this
 fact depend on *both* entities together?"
 
 ### Anatomy
@@ -1879,14 +1879,14 @@ PRIMARY KEY (student_id, course_id)
        ▶ prevents a duplicate (student, course) row
 \`\`\`
 
-> **In the warehouse this differs — barely.** Junction tables are universal relational modeling. In
+> **In the warehouse this differs, barely.** Junction tables are universal relational modeling. In
 > dimensional/warehouse terms an M:N junction that carries measures becomes a **fact table** or a
-> **bridge table** (e.g. a many-to-many between a fact and a dimension). Same structure — two keys
-> plus attributes — different name for the role it plays.
+> **bridge table** (e.g. a many-to-many between a fact and a dimension). Same structure (two keys
+> plus attributes), different name for the role it plays.
 
 ### Keep it readable / common pitfall
 
-The composite PK is not optional decoration — without it, nothing stops the same student being
+The composite PK is not optional decoration. Without it, nothing stops the same student being
 enrolled in the same course twice, and every count doubles. Pitfall: putting relationship attributes
 on the wrong table (a \`grade\` column on \`students\` makes no sense once a student has many courses).
 Always ask "does this attribute need *both* keys to be meaningful?"
@@ -1905,7 +1905,7 @@ pairs are rejected.`,
 \`enrollments\` **junction table** that resolves their many-to-many relationship:
 
 - Two FK columns \`student_id\` and \`course_id\`, plus an \`enrolled_at TEXT\` relationship attribute.
-- A **composite primary key** \`(student_id, course_id)\` — one row per (student, course) pair.
+- A **composite primary key** \`(student_id, course_id)\`: one row per (student, course) pair.
 
 Insert **three** distinct enrollments: \`(1, 10)\`, \`(1, 11)\`, and \`(2, 10)\`. Then attempt to insert
 the \`(1, 10)\` pair a second time with \`INSERT OR IGNORE\` and prove the composite PK makes it a no-op
@@ -1916,7 +1916,7 @@ the \`(1, 10)\` pair a second time with \`INSERT OR IGNORE\` and prove the compo
 -- INSERT the three distinct pairs (1,10), (1,11), (2,10) ...
 -- INSERT OR IGNORE the duplicate (1,10) pair — it should be skipped, not error ...`,
     hints: [
-      "Declare the key at table level: `PRIMARY KEY (student_id, course_id)` — one composite key, not two separate primary keys.",
+      "Declare the key at table level: `PRIMARY KEY (student_id, course_id)`. One composite key, not two separate primary keys.",
       "Insert the three distinct pairs, then attempt an already-existing pair with `INSERT OR IGNORE`.",
       "`INSERT OR IGNORE` skips the row that would violate the composite PK instead of aborting the whole script.",
     ],
@@ -1967,7 +1967,7 @@ INSERT INTO courses  VALUES (10,'SQL'),(11,'Modeling');`,
 give it a **relationship attribute** \`position\` (a song's ordering within a playlist). The seed
 provides two playlists and four songs. Requirements:
 
-- A composite primary key \`(playlist_id, song_id)\` — a song can appear in a playlist only once.
+- A composite primary key \`(playlist_id, song_id)\`: a song can appear in a playlist only once.
 - A \`position INTEGER NOT NULL\` relationship attribute.
 - A composite \`UNIQUE (playlist_id, position)\` so two songs can't claim the same slot in one playlist.
 
@@ -1985,7 +1985,7 @@ claiming an already-taken position is rejected. Playlist 1 must stay at exactly 
 -- INSERT OR IGNORE a new song at an already-taken position — blocked by the UNIQUE ...`,
     hints: [
       "`PRIMARY KEY (playlist_id, song_id)` for the pair; separately `UNIQUE (playlist_id, position)` for slot uniqueness.",
-      "`position INTEGER NOT NULL` — the ordering fact depends on both the playlist and the song, so it lives on the junction.",
+      "`position INTEGER NOT NULL`. The ordering fact depends on both the playlist and the song, so it lives on the junction.",
       "Insert three rows in playlist 1 at positions 1, 2, 3; then `INSERT OR IGNORE` a repeat song (blocked by the PK) and a fourth song at position 1 (blocked by the position UNIQUE).",
       "Both `INSERT OR IGNORE` attempts should leave playlist 1 at exactly three rows.",
     ],
@@ -2042,12 +2042,12 @@ matching rows instead of *scanning* every row. On a filter like \`WHERE customer
 on \`customer_id\` turns an O(n) table scan into an O(log n) seek. The columns worth indexing are
 exactly the ones queries **filter, join, and sort on**:
 
-- **FK columns** — you join on them constantly.
-- **\`WHERE\` predicate columns** — the selective filters.
-- **\`ORDER BY\` / \`GROUP BY\` columns** — an index can supply pre-sorted rows.
+- **FK columns**: you join on them constantly.
+- **\`WHERE\` predicate columns**: the selective filters.
+- **\`ORDER BY\` / \`GROUP BY\` columns**: an index can supply pre-sorted rows.
 
 **Two things are auto-indexed for free.** \`PRIMARY KEY\` and \`UNIQUE\` constraints each create an
-index automatically, so you rarely index a PK yourself — you index the *other* hot columns,
+index automatically, so you rarely index a PK yourself. You index the *other* hot columns,
 especially FKs, which are **not** auto-indexed in SQLite.
 
 ### Worked example
@@ -2070,27 +2070,27 @@ CREATE INDEX  idx_fact_sales_customer  ON fact_sales (customer_sk)
 \`\`\`
 
 A **composite index** \`(a, b)\` speeds filters on \`a\` and on \`a, b\` together (the leftmost-prefix
-rule) — but not on \`b\` alone.
+rule), but not on \`b\` alone.
 
-### The trade-off — indexes cost writes
+### The trade-off: indexes cost writes
 
 Every index must be *updated* on every \`INSERT\` / \`UPDATE\` / \`DELETE\`. More indexes = faster reads,
 slower writes, more storage. So **index selectively**: the FK and filter columns queries actually
 use, not every column "just in case."
 
-> **In the warehouse this differs — a lot.** Columnar warehouses (Snowflake, BigQuery) generally
+> **In the warehouse this differs, a lot.** Columnar warehouses (Snowflake, BigQuery) generally
 > **don't have traditional B-tree indexes** at all; they rely on columnar storage, partitioning,
 > clustering keys, and micro-partition pruning. \`CREATE INDEX\` is a row-store
-> (SQLite / Postgres / MySQL) concept. The *principle* — help the engine skip data instead of
-> scanning — carries over, but the mechanism is partition/cluster design, not indexes.
+> (SQLite / Postgres / MySQL) concept. The *principle* (help the engine skip data instead of
+> scanning) carries over, but the mechanism is partition/cluster design, not indexes.
 
-**Common pitfall — over-indexing.** An index on a column no query filters on is pure write-cost with
+**Common pitfall: over-indexing.** An index on a column no query filters on is pure write-cost with
 zero read benefit. Before adding one, name the query it helps. The second pitfall: forgetting FKs
-aren't auto-indexed in SQLite — an unindexed FK makes every join scan. Leave a comment on
+aren't auto-indexed in SQLite. An unindexed FK makes every join scan. Leave a comment on
 non-obvious indexes explaining the query they serve.
 
 **Recap:** indexes turn scans into seeks on filter/join/sort columns; \`PRIMARY KEY\` and \`UNIQUE\` are
-auto-indexed but FKs are not — index those, index selectively because every index taxes writes, and
+auto-indexed but FKs are not: index those, index selectively because every index taxes writes, and
 remember warehouses use partitioning/clustering instead.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
@@ -2111,18 +2111,18 @@ EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer_id = 42;`,
   },
   apply: scriptExercise({
     id: "sql-l3-indexes-apply",
-    prompt: `A \`fact_sales\` table is joined to \`dim_customer\` on \`customer_sk\` in every mart — but
+    prompt: `A \`fact_sales\` table is joined to \`dim_customer\` on \`customer_sk\` in every mart, but
 \`customer_sk\` is a plain column, **not** the primary key, so SQLite has not auto-indexed it and the
 join scans all 500 rows. Add the one index that turns that join into a seek.
 
-You only need to **create the index** — the seed already loaded the 500 rows, and the grader checks
+You only need to **create the index**. The seed already loaded the 500 rows, and the grader checks
 that an index exists on the right column of \`fact_sales\`.`,
     starterCode: `-- fact_sales(customer_sk) is the FK the marts join on, and it is NOT auto-indexed.
 -- Add the index that makes that join a seek (convention: idx_<table>_<col>):
 
 -- CREATE INDEX idx_fact_sales_customer ON fact_sales(...);`,
     hints: [
-      "`CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);` — one statement is all you need.",
+      "`CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);`. One statement is all you need.",
       "Name it `idx_<table>_<col>` by convention.",
       "`customer_sk` is a plain FK-style column, not the PK, so it isn't auto-indexed; the PK `sale_id` already is.",
     ],
@@ -2158,8 +2158,8 @@ FROM (WITH RECURSIVE n(value) AS (
 \`fact_sales → dim_customer → dim_product\` join, filtered by \`dim_product.category\` and sorted by
 \`order_date\`. Add the **two indexes that matter** and deliberately **skip the ones that don't**:
 
-- Add an index on \`fact_sales(customer_sk)\` — an FK join column.
-- Add an index on \`fact_sales(product_sk)\` — an FK join column.
+- Add an index on \`fact_sales(customer_sk)\`: an FK join column.
+- Add an index on \`fact_sales(product_sk)\`: an FK join column.
 - Do **not** index \`revenue_cents\` (never filtered or joined) or \`dim_product.product_sk\` (already
   the PK, auto-indexed).
 - Add a SQL \`--\` comment noting each index taxes every \`INSERT\` / \`UPDATE\` / \`DELETE\`, which is why
@@ -2171,8 +2171,8 @@ FROM (WITH RECURSIVE n(value) AS (
 -- CREATE INDEX ... ON fact_sales(product_sk);`,
     hints: [
       "Two `CREATE INDEX` statements, one per FK column on `fact_sales`.",
-      "Skip `revenue_cents` — no query filters or joins on it, so an index there is pure write cost.",
-      "`product_sk` on `dim_product` is the PK — already indexed; don't duplicate it.",
+      "Skip `revenue_cents`: no query filters or joins on it, so an index there is pure write cost.",
+      "`product_sk` on `dim_product` is the PK: already indexed; don't duplicate it.",
       "Add a `--` comment noting every index slows `INSERT` / `UPDATE` / `DELETE` on `fact_sales`.",
     ],
     seedSql: `DROP TABLE IF EXISTS fact_sales;
@@ -2231,18 +2231,18 @@ const dimensionalIntro: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 10,
     markdown: `## Two kinds of table, one shape
 
-Full 3NF is great for safe writes but painful for analytics — a "revenue by category by month" report might join six tables. The **star schema** (Ralph Kimball's dimensional model) is the disciplined denormalization that BI runs on. It has exactly two kinds of table:
+Full 3NF is great for safe writes but painful for analytics: a "revenue by category by month" report might join six tables. The **star schema** (Ralph Kimball's dimensional model) is the disciplined denormalization that BI runs on. It has exactly two kinds of table:
 
-- **Fact table** — *narrow and tall*. Holds the **measures** (numeric, additive things you sum: revenue, quantity) plus **foreign keys** to dimensions. One fact table, millions of rows, few columns. \`fact_sales(customer_sk, product_sk, date_sk, quantity, revenue_cents)\`.
-- **Dimension tables** — *wide and short*. Hold the **descriptive context** you filter and group by: \`dim_customer(customer_sk, name, country, segment)\`, \`dim_product(product_sk, name, category, brand)\`, \`dim_date(date_sk, date, month, year, weekday)\`.
+- **Fact table**: *narrow and tall*. Holds the **measures** (numeric, additive things you sum: revenue, quantity) plus **foreign keys** to dimensions. One fact table, millions of rows, few columns. \`fact_sales(customer_sk, product_sk, date_sk, quantity, revenue_cents)\`.
+- **Dimension tables**: *wide and short*. Hold the **descriptive context** you filter and group by: \`dim_customer(customer_sk, name, country, segment)\`, \`dim_product(product_sk, name, category, brand)\`, \`dim_date(date_sk, date, month, year, weekday)\`.
 
-Drawn out, the fact sits in the center with dimensions radiating around it — hence **star**.
+Drawn out, the fact sits in the center with dimensions radiating around it, hence **star**.
 
-## Grain — declare it first, always
+## Grain: declare it first, always
 
-The **grain** is the precise meaning of one fact row: "one row per order line item," or "one row per order," or "one row per customer per day." *Everything* depends on getting this right — a measure only makes sense at a stated grain, and mixing grains double-counts. Kimball's first rule: **declare the grain before you add a single column.** Our fact's grain: **one row per order line item.**
+The **grain** is the precise meaning of one fact row: "one row per order line item," or "one row per order," or "one row per customer per day." *Everything* depends on getting this right: a measure only makes sense at a stated grain, and mixing grains double-counts. Kimball's first rule: **declare the grain before you add a single column.** Our fact's grain: **one row per order line item.**
 
-**Worked example — a minimal star:**
+**Worked example, a minimal star:**
 
 \`\`\`sql
 -- Dimensions: wide, descriptive, surrogate-keyed
@@ -2292,15 +2292,15 @@ GROUP BY p.category, d.year_month;
 
 ## Star vs snowflake
 
-A **star** keeps each dimension flat (denormalized) — \`dim_product\` holds \`category\` right on it. A **snowflake** normalizes dimensions further (\`dim_product → dim_category\`), saving space but re-introducing joins. Kimball's default is **star**: flatter dims, fewer joins, faster and simpler for analysts. Snowflake only when a dimension is huge and its sub-attributes are heavily reused.
+A **star** keeps each dimension flat (denormalized): \`dim_product\` holds \`category\` right on it. A **snowflake** normalizes dimensions further (\`dim_product → dim_category\`), saving space but re-introducing joins. Kimball's default is **star**: flatter dims, fewer joins, faster and simpler for analysts. Snowflake only when a dimension is huge and its sub-attributes are heavily reused.
 
-**Surrogate keys everywhere.** Dimensions use surrogate \`*_sk\` keys, and the fact references *those*, not the business keys. This is what makes slowly-changing dimensions possible later — the surrogate can point at the *version* of a dimension valid when the fact happened.
+**Surrogate keys everywhere.** Dimensions use surrogate \`*_sk\` keys, and the fact references *those*, not the business keys. This is what makes slowly-changing dimensions possible later: the surrogate can point at the *version* of a dimension valid when the fact happened.
 
-> **In the warehouse this differs — this is the warehouse's home turf.** Star schemas are the native modeling pattern of Snowflake, BigQuery, Redshift, and dbt projects. The SQL you write here is exactly what you'd write there (minus the un-enforced FKs). \`dim_date\` in particular is a warehouse staple — a pre-built calendar dimension every fact joins to.
+> **In the warehouse this differs. This is the warehouse's home turf.** Star schemas are the native modeling pattern of Snowflake, BigQuery, Redshift, and dbt projects. The SQL you write here is exactly what you'd write there (minus the un-enforced FKs). \`dim_date\` in particular is a warehouse staple: a pre-built calendar dimension every fact joins to.
 
-**Keep it readable / common pitfall.** The #1 pitfall is **not declaring the grain** and then mixing grains in one fact (e.g. line-item rows *and* order-total rows) — every sum double-counts. State the grain in a comment at the top of the fact DDL. Second pitfall: stuffing descriptive text into the fact ("just this once") — descriptions belong in dimensions; the fact stays numeric and narrow.
+**Keep it readable / common pitfall.** The #1 pitfall is **not declaring the grain** and then mixing grains in one fact (e.g. line-item rows *and* order-total rows). Every sum double-counts. State the grain in a comment at the top of the fact DDL. Second pitfall: stuffing descriptive text into the fact ("just this once"). Descriptions belong in dimensions; the fact stays numeric and narrow.
 
-**Recap:** a star schema is one narrow measure-and-FK fact surrounded by wide descriptive dimensions, all surrogate-keyed, around a single declared grain — the model BI queries are built for; default to star (flat dims) over snowflake.
+**Recap:** a star schema is one narrow measure-and-FK fact surrounded by wide descriptive dimensions, all surrogate-keyed, around a single declared grain: the model BI queries are built for; default to star (flat dims) over snowflake.
 
 **Execution mode:** you write a multi-statement DDL+DML script. It runs against a fresh in-memory SQLite DB, then hidden assertion queries check the star's shape, grain, and that every fact FK resolves.`,
   },
@@ -2324,9 +2324,9 @@ DROP TABLE IF EXISTS cat_revenue;
 
 -- 3. cat_revenue: materialize revenue-by-category from the star.`,
     hints: [
-      "`dim_product(product_sk INTEGER PRIMARY KEY, product_id INTEGER, name TEXT, category TEXT)` — load it from `raw_product` (let `product_sk` auto-assign).",
+      "`dim_product(product_sk INTEGER PRIMARY KEY, product_id INTEGER, name TEXT, category TEXT)`. Load it from `raw_product` (let `product_sk` auto-assign).",
       "Load `fact_sales` by joining `raw_sale` to `dim_product` on `product_id` to look up the `product_sk`.",
-      "The fact holds only `product_sk`, `quantity`, `revenue_cents` — no category text.",
+      "The fact holds only `product_sk`, `quantity`, `revenue_cents`: no category text.",
       "Materialize the BI result as `cat_revenue` (e.g. `CREATE TABLE cat_revenue AS SELECT p.category, SUM(f.revenue_cents) AS revenue FROM fact_sales f JOIN dim_product p … GROUP BY p.category`).",
     ],
     referenceSolution: `DROP TABLE IF EXISTS dim_product;
@@ -2402,7 +2402,7 @@ INSERT INTO raw_sale VALUES (100,2,4998),(101,1,19999),(100,3,7497);`,
 
 - \`dim_customer(customer_sk PK, customer_id, email, country_code)\`
 - \`dim_product(product_sk PK, product_id, product_name, category)\`
-- \`dim_date(date_sk PK, full_date, year_month)\` — derive \`date_sk\` as an integer \`YYYYMMDD\`,
+- \`dim_date(date_sk PK, full_date, year_month)\`: derive \`date_sk\` as an integer \`YYYYMMDD\`,
   \`year_month\` as \`'YYYY-MM'\`, one row per **distinct** order date.
 - \`fact_sales\` at **line-item grain**: \`(sale_sk PK, customer_sk, product_sk, date_sk, quantity, revenue_cents)\`,
   each FK looked up from its dimension by natural key, with **zero orphan facts**.
@@ -2426,7 +2426,7 @@ DROP TABLE IF EXISTS revenue_by_cat_month;
     hints: [
       "Load dims first so their surrogate keys exist before the fact looks them up: `dim_customer`/`dim_product` from the normalized tables; `dim_date` from `SELECT DISTINCT order_date`, deriving `date_sk = CAST(strftime('%Y%m%d', order_date) AS INTEGER)` and `year_month = strftime('%Y-%m', order_date)`.",
       "Compute `revenue_cents` at load as `oi.qty * p.unit_price_cents` (join `order_items` to `products`).",
-      "Build the fact by joining `order_items → orders → products` and then looking up each surrogate: join to `dim_customer` on `customer_id`, `dim_product` on `product_id`, `dim_date` on the order date. Insert `customer_sk`, `product_sk`, `date_sk` — never the natural keys or any text.",
+      "Build the fact by joining `order_items → orders → products` and then looking up each surrogate: join to `dim_customer` on `customer_id`, `dim_product` on `product_id`, `dim_date` on the order date. Insert `customer_sk`, `product_sk`, `date_sk`: never the natural keys or any text.",
       'Declare the grain in a comment ("one row per order line item") and keep the fact to measures + FKs only; the zero-orphan assertions fail if any surrogate lookup misses, so make sure all three dims are fully populated before loading the fact.',
     ],
     seedSql: `DROP TABLE IF EXISTS customers; DROP TABLE IF EXISTS products;
@@ -2488,42 +2488,42 @@ INSERT INTO order_items VALUES (1,100,2),(1,101,1),(2,100,1),(3,101,2);`,
 export const sqlLevel3: SqlLevel = {
   id: 3,
   slug: "modeling",
-  title: "Level 3 — Data Modeling & Schema Design",
-  tagline: "DDL, keys, constraints, and normalization — designing schemas the database enforces.",
+  title: "Level 3: Data Modeling & Schema Design",
+  tagline: "DDL, keys, constraints, and normalization: designing schemas the database enforces.",
   defaultExecutionMode: "workspace",
   estimatedHours: 6,
   modules: [
     {
       id: "sql-l3-ddl",
-      title: "Module 3.1 — DDL, Types, and Loading Data",
+      title: "Module 3.1: DDL, Types, and Loading Data",
       description:
         "The two verbs every pipeline is built on: CREATE TABLE to define, INSERT to fill.",
       lessons: [ddlCreate, insertPopulate],
     },
     {
       id: "sql-l3-keys",
-      title: "Module 3.2 — Keys and Constraints",
+      title: "Module 3.2: Keys and Constraints",
       description:
-        "Primary and foreign keys, UNIQUE / NOT NULL / CHECK — the rules the database enforces so bad rows can never land.",
+        "Primary and foreign keys, UNIQUE / NOT NULL / CHECK: the rules the database enforces so bad rows can never land.",
       lessons: [primaryKeys, foreignKeys, constraints],
     },
     {
       id: "sql-l3-normalization",
-      title: "Module 3.3 — Normalization",
+      title: "Module 3.3: Normalization",
       description:
         "From a flat export to 3NF and back: atomic values, removing redundancy, and deliberate denormalization for analytics.",
       lessons: [normalize1nf, normalize2nf3nf, denormalization],
     },
     {
       id: "sql-l3-er-indexes",
-      title: "Module 3.4 — ER Modeling, Relationships, and Indexes",
+      title: "Module 3.4: ER Modeling, Relationships, and Indexes",
       description:
         "Entities and cardinality, junction tables for many-to-many, and the indexes that keep reads fast.",
       lessons: [cardinality, junctionTables, indexes],
     },
     {
       id: "sql-l3-dimensional",
-      title: "Module 3.5 — Dimensional Modeling Introduction",
+      title: "Module 3.5: Dimensional Modeling Introduction",
       description: "Your first Kimball star: narrow facts, wide dimensions, and a declared grain.",
       lessons: [dimensionalIntro],
     },

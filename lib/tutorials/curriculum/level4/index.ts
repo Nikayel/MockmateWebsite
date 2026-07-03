@@ -1,11 +1,11 @@
 /**
- * Level 4 — Codebase (workspace). Senior-track depth across real files: advanced OOP, metaprogramming,
+ * Level 4: Codebase (workspace). Senior-track depth across real files: advanced OOP, metaprogramming,
  * concurrency, performance, and production tooling.
  *
  * Authored by Agent 2 following the workspace authoring contract documented in `../level3/index.ts`:
  * every package dir needs an `__init__.py`; the runner (`role:"test"`, `hidden:true`) prints
  * `__WORKSPACE_TEST_RESULTS__:` + JSON. Workspace tests run real Python `assert`s (so floats are
- * compared exactly — keep graded values integer or rounded). Each lesson pairs a single-file `apply`
+ * compared exactly, so keep graded values integer or rounded). Each lesson pairs a single-file `apply`
  * warm-up with a multi-file `practice` challenge.
  */
 import type { PythonLesson, PythonLevel } from "../../types"
@@ -51,14 +51,14 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L4-M1 — Advanced OOP & Design Patterns
+// L4-M1: Advanced OOP & Design Patterns
 // ───────────────────────────────────────────────────────────────────────────
 
 const ABC_README = `# Program to an interface with ABCs
 
 \`shapes/base.py\` (read-only) defines an abstract base class \`Shape\` with an abstract \`area()\`.
 \`shapes/square.py\` (read-only) is a worked example. Implement \`Rectangle(Shape)\` in
-\`shapes/rectangle.py\` — store \`width\` and \`height\` and return \`width * height\` from \`area()\`.
+\`shapes/rectangle.py\`: store \`width\` and \`height\` and return \`width * height\` from \`area()\`.
 
 The read-only \`total_area(shapes)\` sums any shapes' areas through the abstraction. Some tests are
 hidden.
@@ -184,12 +184,12 @@ class Rectangle(Shape):
 \`\`\`
 
 \`Shape()\` raises \`TypeError\`; \`Rectangle(3, 4)\` works. Code that takes "any \`Shape\`" works for
-every subclass — that's **polymorphism**.
+every subclass. That's **polymorphism**.
 
 ### Protocols (structural)
 
-\`abc\` uses **inheritance** (a class declares "I am a Shape"). A \`Protocol\` types by **shape** —
-any object with an \`area()\` method qualifies, no inheritance needed:
+\`abc\` uses **inheritance** (a class declares "I am a Shape"). A \`Protocol\` types by **shape**.
+Any object with an \`area()\` method qualifies, no inheritance needed:
 
 \`\`\`python
 from typing import Protocol
@@ -208,7 +208,7 @@ anything that already fits the shape.
 
 ABCs enforce an interface through inheritance and \`@abstractmethod\`; Protocols match by structure.
 Either way you "program to the abstraction" so one function handles many types. You'll implement a
-\`Rectangle\` shape — first standalone, then as a real \`Shape\` subclass in a package.`,
+\`Rectangle\` shape, first standalone, then as a real \`Shape\` subclass in a package.`,
     demoCode: `from abc import ABC, abstractmethod
 
 
@@ -278,7 +278,7 @@ with \`total_area\`. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Subclass the base: `class Rectangle(Shape):`.",
-      "Implement `area(self)` to satisfy the abstract method — return `self.width * self.height`.",
+      "Implement `area(self)` to satisfy the abstract method: return `self.width * self.height`.",
       "Because you override `area`, `Rectangle` becomes concrete and can be instantiated.",
     ],
     workspace: {
@@ -370,7 +370,7 @@ with \`total_area\`. Some tests are hidden.`,
 const SOLID_README = `# Strategy + factory pricing
 
 Refactor pricing toward SOLID: each discount is a **strategy** (a pluggable function) and a
-**factory** picks one by name — so adding a discount never edits the dispatcher (open/closed).
+**factory** picks one by name, so adding a discount never edits the dispatcher (open/closed).
 
 \`pricing/strategies.py\` (read-only) has \`regular\`, \`member\`, and \`vip\` strategies. Implement
 \`price_for(kind, amount)\` in \`pricing/checkout.py\` so it looks up the strategy for \`kind\` and
@@ -455,11 +455,11 @@ const solidPatternsLesson: PythonLesson = {
 
 **SOLID** is five design principles. The two you'll feel most:
 
-- **S**ingle responsibility — a module/class does one thing.
-- **O**pen/closed — open to extension, closed to modification: add behaviour *without* editing
+- **S**ingle responsibility: a module/class does one thing.
+- **O**pen/closed: open to extension, closed to modification, so you add behaviour *without* editing
   existing code.
 
-A long \`if/elif\` chain violates open/closed — every new case edits the same function. Two patterns
+A long \`if/elif\` chain violates open/closed. Every new case edits the same function. Two patterns
 fix that.
 
 ### Strategy: pluggable algorithms
@@ -483,13 +483,13 @@ def price_for(kind, amount):
     return strategy(amount)                     # apply the strategy
 \`\`\`
 
-Adding a "student" discount is one new function plus one dict entry — \`price_for\` never changes.
+Adding a "student" discount is one new function plus one dict entry. \`price_for\` never changes.
 That's open/closed.
 
 ### Recap
 
-Strategy makes behaviour a pluggable value; a factory selects it by key — together they replace
-branching with a lookup and keep code open for extension. You'll build \`price_for\` — first inline,
+Strategy makes behaviour a pluggable value; a factory selects it by key. Together they replace
+branching with a lookup and keep code open for extension. You'll build \`price_for\`, first inline,
 then over a \`pricing\` package.`,
     demoCode: `def regular(a):
     return round(a, 2)
@@ -505,7 +505,7 @@ print(STRATEGIES.get("member", regular)(100))   # 90.0`,
   apply: {
     id: "py-l4-solid-patterns-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`price_for(kind, amount)\` — apply a discount by \`kind\`. \`regular\`
+    prompt: `Warm-up (one file): implement \`price_for(kind, amount)\` that applies a discount by \`kind\`. \`regular\`
 is full price, \`member\` is 10% off, \`vip\` is 20% off, and any unknown kind is full price. Round to
 2 decimals.
 
@@ -542,7 +542,7 @@ strategy must not require editing \`price_for\`. Some tests are hidden.`,
     hints: [
       "`STRATEGIES.get(kind, regular)` returns the right strategy function (or the default).",
       "Call the returned function on `amount` and return the result.",
-      "Notice you never branch on `kind` — that's the open/closed win.",
+      "Notice you never branch on `kind`. That's the open/closed win.",
     ],
     workspace: {
       language: "python",
@@ -617,13 +617,13 @@ strategy must not require editing \`price_for\`. Some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L4-M2 — Decorators & Metaprogramming
+// L4-M2: Decorators & Metaprogramming
 // ───────────────────────────────────────────────────────────────────────────
 
 const DEC_README = `# A decorator that takes an argument
 
 Build a **parameterized** decorator. Implement \`multiply_by(factor)\` in
-\`decorators/wrappers.py\` — a decorator *factory* that returns a decorator which multiplies the
+\`decorators/wrappers.py\`, a decorator *factory* that returns a decorator which multiplies the
 wrapped function's result by \`factor\`. Use \`functools.wraps\` so the wrapped function keeps its
 name.
 
@@ -728,7 +728,7 @@ def add(a, b):
 add(2, 3)    # 15
 \`\`\`
 
-Read \`@multiply_by(3)\` as \`add = multiply_by(3)(add)\` — call the factory, then apply the decorator
+Read \`@multiply_by(3)\` as \`add = multiply_by(3)(add)\`: call the factory, then apply the decorator
 it returns.
 
 ### functools.wraps
@@ -748,13 +748,13 @@ def multiply_by(factor):
     return decorator
 \`\`\`
 
-Always add \`functools.wraps\` to real decorators — debuggers, logs, and \`help()\` depend on it.
+Always add \`functools.wraps\` to real decorators, because debuggers, logs, and \`help()\` depend on it.
 
 ### Recap
 
 A parameterized decorator is a factory returning a decorator returning a wrapper; \`*args/**kwargs\`
 forwards any call and \`functools.wraps\` preserves the original's identity. You'll build
-\`multiply_by\` — first inline, then over a \`decorators\` package.`,
+\`multiply_by\`, first inline, then over a \`decorators\` package.`,
     demoCode: `import functools
 
 
@@ -780,7 +780,7 @@ print(add.__name__)   # add`,
   apply: {
     id: "py-l4-decorators-advanced-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`multiply_by(factor)\` — a decorator factory that multiplies a
+    prompt: `Warm-up (one file): implement \`multiply_by(factor)\`, a decorator factory that multiplies a
 function's result by \`factor\`. It's applied to \`add\` below, and the \`run\` driver calls it.
 
 \`run(2, 3)\` should be \`15\` (because \`(2 + 3) * 3\`).`,
@@ -1031,7 +1031,7 @@ const descriptorsMetaclassesLesson: PythonLesson = {
 ### Descriptors
 
 A **descriptor** is a class that defines \`__get__\`/\`__set__\` and is used as a *class attribute*.
-Python routes attribute access through it — perfect for validation that lives in one place:
+Python routes attribute access through it, perfect for validation that lives in one place:
 
 \`\`\`python
 class Positive:
@@ -1050,13 +1050,13 @@ class Account:
     balance = Positive()       # the descriptor guards every Account.balance
 \`\`\`
 
-Now \`Account(100).balance\` is \`100\`, but \`Account(-5)\` raises — the validation can't be
+Now \`Account(100).balance\` is \`100\`, but \`Account(-5)\` raises. The validation can't be
 bypassed. \`__set_name__\` runs when the owning class is created and tells the descriptor which
 attribute name it's bound to.
 
 ### Metaclasses (the peek)
 
-A **metaclass** is "the class of a class" — it controls how classes themselves are built. The
+A **metaclass** is "the class of a class": it controls how classes themselves are built. The
 default is \`type\`; \`class Account:\` is roughly \`Account = type("Account", (), {...})\`.
 
 \`\`\`python
@@ -1069,14 +1069,14 @@ class Thing(metaclass=Meta):
     ...
 \`\`\`
 
-You'll rarely write one — dataclasses, ORMs, and \`abc\` use them under the hood — but knowing
+You'll rarely write one (dataclasses, ORMs, and \`abc\` use them under the hood), but knowing
 classes are objects built by \`type\` demystifies a lot of "magic".
 
 ### Recap
 
 Descriptors put reusable get/set logic behind a class attribute; metaclasses customize class
 creation itself (\`type\` is the default). You'll build a \`Positive\` descriptor that validates an
-account balance — first inline, then across a \`models\` package.`,
+account balance, first inline, then across a \`models\` package.`,
     demoCode: `class Positive:
     def __set_name__(self, owner, name):
         self.storage_name = "_" + name
@@ -1247,7 +1247,7 @@ from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidd
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L4-M3 — Concurrency & Async
+// L4-M3: Concurrency & Async
 // ───────────────────────────────────────────────────────────────────────────
 
 const CONC_README = `# Parallelize a batch with concurrent.futures
@@ -1257,7 +1257,7 @@ so it maps \`double\` over every number with a \`concurrent.futures.ThreadPoolEx
 the results **in input order**.
 
 Some runtimes have no OS threads (this in-browser sandbox is one), where starting a pool raises
-\`RuntimeError\`. Catch it and **fall back to a sequential map** — the ordered results are identical
+\`RuntimeError\`. Catch it and **fall back to a sequential map**. The ordered results are identical
 either way.
 
 \`run_all([1, 2, 3])\` is \`[2, 4, 6]\`. Some tests are hidden.
@@ -1337,9 +1337,9 @@ const concurrencyLesson: PythonLesson = {
 
 CPython's **Global Interpreter Lock** lets only one thread run Python bytecode at a time. So:
 
-- **I/O-bound** work (network, disk, waiting) — **threads help**: while one thread waits, another
+- **I/O-bound** work (network, disk, waiting): **threads help**, because while one thread waits, another
   runs.
-- **CPU-bound** work (number crunching) — threads *don't* speed it up; use **multiprocessing**
+- **CPU-bound** work (number crunching): threads *don't* speed it up; use **multiprocessing**
   (separate processes, separate GILs) or a native library.
 
 ### concurrent.futures: one clean API
@@ -1354,18 +1354,18 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     results = list(executor.map(fetch, urls))   # results stay in input order
 \`\`\`
 
-Swap \`ThreadPoolExecutor\` for \`ProcessPoolExecutor\` for CPU-bound work — same code. For finer
+Swap \`ThreadPoolExecutor\` for \`ProcessPoolExecutor\` for CPU-bound work. The code stays the same. For finer
 control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as
 they finish.
 
 ### Safety
 
 Independent tasks (no shared mutable state) are safe to parallelize. If threads share state, guard it
-with a \`Lock\` — but prefer designing the work so they don't.
+with a \`Lock\`, but prefer designing the work so they don't.
 
 ### When threads aren't available
 
-Some runtimes have no OS threads at all — notably this in-browser sandbox (Pyodide/WASM without
+Some runtimes have no OS threads at all, notably this in-browser sandbox (Pyodide/WASM without
 cross-origin isolation). There, building a pool raises \`RuntimeError: can't start new thread\`. A
 resilient \`run_all\` **tries the pool and falls back to a sequential map**, so it works everywhere
 and the ordered results are identical:
@@ -1399,7 +1399,7 @@ except RuntimeError:
   apply: {
     id: "py-l4-concurrency-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`run_all(numbers)\` — return a list with each number doubled, in
+    prompt: `Warm-up (one file): implement \`run_all(numbers)\` to return a list with each number doubled, in
 order. (This is the sequential baseline; the workspace step parallelizes it.)
 
 \`run_all([1, 2, 3])\` is \`[2, 4, 6]\`.`,
@@ -1425,7 +1425,7 @@ This sandbox has **no OS threads**, so catch the \`RuntimeError\` and fall back 
 Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Open a pool inside a `try:` — `with ThreadPoolExecutor(max_workers=4) as executor: return list(executor.map(double, numbers))`.",
+      "Open a pool inside a `try:`. `with ThreadPoolExecutor(max_workers=4) as executor: return list(executor.map(double, numbers))`.",
       "`executor.map(double, numbers)` runs the work and preserves order.",
       "Add `except RuntimeError: return [double(n) for n in numbers]` so it still works where threads are unavailable.",
     ],
@@ -1503,12 +1503,12 @@ Some tests are hidden.`,
 
 const AIO_README = `# Concurrent I/O with asyncio
 
-\`aio/fetch.py\` (read-only) has \`async def fetch_one(n)\` — a **coroutine** standing in for an async
+\`aio/fetch.py\` (read-only) has \`async def fetch_one(n)\`, a **coroutine** standing in for an async
 network call. Implement \`fetch_all(numbers)\` in \`aio/gather.py\` so it builds a \`fetch_one(n)\`
 coroutine for every number and runs them all, returning the results in order.
 
 Normally you'd write \`asyncio.run(asyncio.gather(*coros))\`. This in-browser sandbox is **already
-inside a running event loop**, so \`asyncio.run\` can't be called here — use the provided
+inside a running event loop**, so \`asyncio.run\` can't be called here. Use the provided
 \`run_coroutines\` helper from \`aio.loop\` to run the coroutines instead.
 
 \`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`. Some tests are hidden.
@@ -1593,11 +1593,11 @@ const asyncioLesson: PythonLesson = {
     markdown: `## Concurrency without threads
 
 \`asyncio\` runs many I/O-bound tasks on **one** thread by cooperatively switching whenever a task
-*awaits*. No locks, no GIL contention — ideal for thousands of network calls.
+*awaits*. No locks, no GIL contention: ideal for thousands of network calls.
 
 ### Coroutines
 
-An \`async def\` defines a **coroutine**. Calling it doesn't run it — it returns a coroutine object
+An \`async def\` defines a **coroutine**. Calling it doesn't run it; it returns a coroutine object
 you must \`await\` (or run on the event loop):
 
 \`\`\`python
@@ -1620,15 +1620,15 @@ async def main():
 asyncio.run(main())    # [10, 20, 30] — the three "waits" overlap
 \`\`\`
 
-\`asyncio.run(coro)\` starts the event loop, runs the coroutine to completion, and closes the loop —
-it's the one synchronous entry point into async code.
+\`asyncio.run(coro)\` starts the event loop, runs the coroutine to completion, and closes the loop.
+It's the one synchronous entry point into async code.
 
 ### Running it in this sandbox
 
 \`asyncio.run\` only works when **no** loop is already running. This in-browser sandbox runs your code
 *inside* an event loop, so calling \`asyncio.run\` here raises \`RuntimeError: cannot be called from a
 running event loop\`. So the exercise gives you a \`run_coroutines(coros)\` helper that runs
-already-created coroutines and collects their results — the sandbox's stand-in for
+already-created coroutines and collects their results. It's the sandbox's stand-in for
 \`asyncio.run(asyncio.gather(*coros))\`. You still build real coroutines with \`fetch_one(n)\`; you
 just hand them to \`run_coroutines\` instead of \`asyncio.run\`.
 
@@ -1640,7 +1640,7 @@ take about as long as the slowest one.
 ### Recap
 
 \`async def\` makes a coroutine, \`await\` suspends until it's ready, and \`asyncio.gather\` runs many
-concurrently — driven by \`asyncio.run\` in a normal program, or \`run_coroutines\` in this sandbox.
+concurrently, driven by \`asyncio.run\` in a normal program, or \`run_coroutines\` in this sandbox.
 You'll build a batch of \`fetch_one\` coroutines and collect their ordered results.`,
     demoCode: `# Normally: asyncio.run(asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3)))
 # This sandbox is already inside an event loop, so we drive the coroutines directly:
@@ -1663,7 +1663,7 @@ print(run_coroutines(fetch_one(n) for n in [1, 2, 3]))   # [10, 20, 30]`,
   apply: {
     id: "py-l4-asyncio-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`fetch_all(numbers)\` — build a \`fetch_one(n)\` coroutine for each
+    prompt: `Warm-up (one file): implement \`fetch_all(numbers)\` to build a \`fetch_one(n)\` coroutine for each
 number and run them all with the provided \`run_coroutines\` helper, returning the results in order.
 
 (In a normal program you'd write \`asyncio.run(asyncio.gather(*coros))\`; this sandbox is already
@@ -1748,7 +1748,7 @@ returning the results in order. Some tests are hidden.`,
           role: "readonly",
           language: "python",
           content: AIO_LOOP,
-          description: "run_coroutines helper — the sandbox's asyncio.run stand-in (read-only)",
+          description: "run_coroutines helper, the sandbox's asyncio.run stand-in (read-only)",
         },
         {
           path: "aio/gather.py",
@@ -1806,12 +1806,12 @@ returning the results in order. Some tests are hidden.`,
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L4-M4 — Performance & Production Practices
+// L4-M4: Performance & Production Practices
 // ───────────────────────────────────────────────────────────────────────────
 
 const PERF_README = `# Make a slow function fast
 
-\`fib\` computes Fibonacci numbers by naive recursion — which recomputes the same subproblems
+\`fib\` computes Fibonacci numbers by naive recursion, which recomputes the same subproblems
 exponentially. Implement \`fib(n)\` in \`perf/compute.py\` with \`functools.lru_cache\` so each \`n\`
 is computed once.
 
@@ -1875,11 +1875,11 @@ const performanceLesson: PythonLesson = {
   skills: ["performance", "lru-cache", "complexity", "profiling"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Making code fast — measure first
+    markdown: `## Making code fast: measure first
 
 ### Profile before optimizing
 
-Don't guess where time goes — measure. \`cProfile\` and \`timeit\` show the real hot spots:
+Don't guess where time goes. Measure. \`cProfile\` and \`timeit\` show the real hot spots:
 
 \`\`\`python
 import cProfile
@@ -1899,7 +1899,7 @@ if x in big_list:    # O(n)
 
 ### Caching with lru_cache
 
-Repeated calls with the same arguments? \`functools.lru_cache\` memoizes results — turning an
+Repeated calls with the same arguments? \`functools.lru_cache\` memoizes results, turning an
 exponential recursion into a linear one:
 
 \`\`\`python
@@ -1917,7 +1917,7 @@ is computed once.
 
 ### Generators for memory
 
-A generator streams values instead of building a giant list — constant memory for huge sequences:
+A generator streams values instead of building a giant list, using constant memory for huge sequences:
 
 \`\`\`python
 total = sum(x * x for x in range(10_000_000))   # no list materialized
@@ -1942,7 +1942,7 @@ print(fib(30))   # 832040 — instant, thanks to the cache`,
   apply: {
     id: "py-l4-performance-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`fib(n)\` — the nth Fibonacci number — and memoize it with
+    prompt: `Warm-up (one file): implement \`fib(n)\` (the nth Fibonacci number) and memoize it with
 \`@lru_cache\` so repeated subproblems are computed once.
 
 \`fib(10)\` is \`55\`.`,
@@ -2051,7 +2051,7 @@ memoized (each \`n\` computed once). It must return correct Fibonacci values, in
 
 const CFG_README = `# Load typed config from the environment
 
-Twelve-factor apps read config from the **environment**, with defaults and type coercion — and never
+Twelve-factor apps read config from the **environment**, with defaults and type coercion, and never
 leak secrets. \`config/defaults.py\` (read-only) holds the defaults. Implement \`load_config(env)\` in
 \`config/settings.py\` so it returns:
 
@@ -2133,7 +2133,7 @@ const configLoggingLesson: PythonLesson = {
 
 ### Config from the environment
 
-Twelve-factor apps read config from the **environment**, not hard-coded constants — so the same
+Twelve-factor apps read config from the **environment**, not hard-coded constants, so the same
 build runs in dev and prod. Provide sensible **defaults** and **coerce** types (env values are
 strings):
 
@@ -2145,7 +2145,7 @@ debug = env.get("DEBUG", "false").lower() == "true"
 ### Secrets
 
 Never hard-code or log secret values. Read them from the environment, and when logging, record
-*whether* something is set — not the value:
+*whether* something is set, not the value:
 
 \`\`\`python
 config = {"has_secret": "SECRET" in env}   # safe to log; the value never is
@@ -2153,7 +2153,7 @@ config = {"has_secret": "SECRET" in env}   # safe to log; the value never is
 
 ### Structured logging
 
-Log machine-readable records (key/value or JSON), not prose — so logs are searchable and
+Log machine-readable records (key/value or JSON), not prose, so logs are searchable and
 aggregatable:
 
 \`\`\`python
@@ -2178,7 +2178,7 @@ print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
   apply: {
     id: "py-l4-config-logging-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`load_config(env)\` — turn an env dict into
+    prompt: `Warm-up (one file): implement \`load_config(env)\` to turn an env dict into
 \`{"port": int, "debug": bool, "has_secret": bool}\`. Default \`PORT\` to \`8000\` and \`DEBUG\` to off.
 \`debug\` is \`True\` only when \`DEBUG\` is \`"true"\` (any case). \`has_secret\` records whether
 \`"SECRET"\` is present (never its value).
@@ -2219,7 +2219,7 @@ print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
     executionMode: "workspace",
     prompt: `Implement \`load_config(env)\` in \`config/settings.py\`: use the read-only \`DEFAULTS\` for \`PORT\`
 and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` case-insensitive), and set
-\`has_secret\` from whether \`"SECRET"\` is present — never its value. Some tests are hidden.`,
+\`has_secret\` from whether \`"SECRET"\` is present, never its value. Some tests are hidden.`,
     starterCode: "",
     hints: [
       'Port: `int(env.get("PORT", DEFAULTS["PORT"]))`.',
@@ -2299,7 +2299,7 @@ and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` 
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L4-M5 — Quality, Packaging & Capstone
+// L4-M5: Quality, Packaging & Capstone
 // ───────────────────────────────────────────────────────────────────────────
 
 const MOCK_README = `# Test with a mock, design for testability
@@ -2380,7 +2380,7 @@ const testingToolingLesson: PythonLesson = {
 ### Mocking dependencies
 
 Tests shouldn't hit the network, a database, or the clock. **Inject** the dependency so a test can
-pass a stand-in — \`unittest.mock.Mock\` records how it was called:
+pass a stand-in. \`unittest.mock.Mock\` records how it was called:
 
 \`\`\`python
 from unittest.mock import Mock
@@ -2405,9 +2405,9 @@ Designing for injection (passing the dependency in) is what makes code testable 
 
 ### Modern tooling
 
-- **ruff** — an extremely fast linter + formatter (replaces flake8/isort/black).
-- **mypy** / **ty** — static type checkers that read your hints.
-- **pre-commit** — runs ruff/mypy/tests automatically on \`git commit\`, so problems never land.
+- **ruff**: an extremely fast linter + formatter (replaces flake8/isort/black).
+- **mypy** / **ty**: static type checkers that read your hints.
+- **pre-commit**: runs ruff/mypy/tests automatically on \`git commit\`, so problems never land.
 
 \`\`\`toml
 # .pre-commit-config.yaml runs these on every commit
@@ -2435,7 +2435,7 @@ print(sender.call_count)              # 2`,
   apply: {
     id: "py-l4-testing-tooling-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`send_all(sender, messages)\` — call the injected \`sender\` once per
+    prompt: `Warm-up (one file): implement \`send_all(sender, messages)\` to call the injected \`sender\` once per
 message and return how many were sent. The provided \`run\` driver passes a recorder in as the
 \`sender\`, so this rehearses the dependency injection the workspace step then verifies with a mock.
 
@@ -2451,7 +2451,7 @@ def run(messages):
     hints: [
       "Loop the messages and call `sender(message)` for each.",
       "Keep a running count and return it.",
-      "`sender` is whatever the caller injects — here `run` passes a list's `.append`.",
+      "`sender` is whatever the caller injects; here `run` passes a list's `.append`.",
     ],
     referenceSolution: `def send_all(sender, messages):
     count = 0
@@ -2474,7 +2474,7 @@ def run(messages):
     id: "py-l4-testing-tooling-practice",
     executionMode: "workspace",
     prompt: `Implement \`send_all(sender, messages)\` in \`notify/service.py\`: call the injected \`sender\` once
-per message and return the number sent. The tests pass a \`Mock\` and assert how it was called — so
+per message and return the number sent. The tests pass a \`Mock\` and assert how it was called, so
 keep \`sender\` as an injected parameter. Some tests are hidden.`,
     starterCode: "",
     hints: [
@@ -2549,7 +2549,7 @@ keep \`sender\` as an injected parameter. Some tests are hidden.`,
 
 const CAPSTONE_README = `# Capstone: a typed, tested order service
 
-Bring it all together — packages, type hints, dataclasses, validation, and tests. The \`orders\`
+Bring it all together: packages, type hints, dataclasses, validation, and tests. The \`orders\`
 package has a \`pyproject.toml\`, a typed \`Order\` model with \`parse_order\` (read-only), and sample
 data. Implement \`summarize(raw_orders)\` in \`orders/report.py\` so it:
 
@@ -2678,16 +2678,16 @@ declares the name, version, Python requirement, and dependencies (including a \`
 
 A library ready to ship is:
 
-- **structured** — a clean package with a clear entry point
-- **typed** — hints on the public API so callers (and mypy) know the contract
-- **validated** — untrusted input parsed into typed models at the boundary
-- **tested** — pytest covering the real cases, run in CI
+- **structured**: a clean package with a clear entry point
+- **typed**: hints on the public API so callers (and mypy) know the contract
+- **validated**: untrusted input parsed into typed models at the boundary
+- **tested**: pytest covering the real cases, run in CI
 
 ### Your capstone
 
 This pulls the whole track together: a packaged \`orders\` service with a typed \`Order\` model and
-validation (read-only) and a real \`pyproject.toml\`. Implement \`summarize(raw_orders)\` — parse the
-raw orders and report total count, paid count, and paid revenue — and make the suite green.
+validation (read-only) and a real \`pyproject.toml\`. Implement \`summarize(raw_orders)\` (parse the
+raw orders and report total count, paid count, and paid revenue) and make the suite green.
 
 ### Recap
 
@@ -2710,7 +2710,7 @@ print({"count": len(orders), "paid": len(paid), "revenue": round(sum(o.amount fo
   apply: {
     id: "py-l4-packaging-capstone-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`summarize(raw_orders)\` — each raw order is a dict with
+    prompt: `Warm-up (one file): implement \`summarize(raw_orders)\`. Each raw order is a dict with
 \`"amount"\` (a numeric string) and \`"paid"\` (a bool). Return
 \`{"count": <all>, "paid": <paid>, "revenue": <sum of paid amounts, rounded to 2>}\`.
 
@@ -2847,8 +2847,8 @@ Some tests are hidden.`,
 export const level4: PythonLevel = {
   id: 4,
   slug: "engineering",
-  title: "Level 4 — Codebase",
-  tagline: "Work across real files — follow imports, change a function, prove it with a test.",
+  title: "Level 4: Codebase",
+  tagline: "Work across real files: follow imports, change a function, prove it with a test.",
   defaultExecutionMode: "workspace",
   estimatedHours: 8,
   modules: [
