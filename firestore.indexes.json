@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "subscription_tier",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "stripe_subscription_id",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "interview_sessions",
       "queryScope": "COLLECTION",
       "fields": [
