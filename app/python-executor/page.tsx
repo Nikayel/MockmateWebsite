@@ -78,7 +78,7 @@ export default function PythonExecutorPage() {
       <div className="flex h-full min-w-[940px] flex-col">
         <ExecutorTopBar />
 
-        <div className="flex min-h-0 flex-1">
+        <main className="flex min-h-0 flex-1">
           <ExecutorSidePanel />
 
           {/* Center — editor */}
@@ -117,7 +117,7 @@ export default function PythonExecutorPage() {
                   onChange={setCode}
                   language="python"
                   height="100%"
-                  className="h-full"
+                  className="cm-fill h-full"
                 />
               </CodeMirrorErrorBoundary>
             </div>
@@ -129,8 +129,12 @@ export default function PythonExecutorPage() {
               <span className="text-muted-foreground font-mono text-xs tracking-wide">OUTPUT</span>
               <RunStatus status={status} warming={warming} elapsedMs={elapsedMs} />
             </div>
-            <div className="flex-1 overflow-auto px-3 py-3 font-mono text-sm">
-              {output.length === 0 && result === undefined && !error && !running && (
+            <div
+              className="flex-1 overflow-auto px-3 py-3 font-mono text-sm"
+              aria-live="polite"
+              aria-label="Program output"
+            >
+              {status === "idle" && !running && (
                 <p className="text-muted-foreground/70">Run your code to see output here.</p>
               )}
               {warming && (
@@ -165,15 +169,22 @@ export default function PythonExecutorPage() {
                   <span className="whitespace-pre-wrap">{error}</span>
                 </p>
               )}
+              {status === "success" &&
+                output.length === 0 &&
+                (result === undefined || result === null) &&
+                !error && (
+                  <p className="text-muted-foreground/60">(ran successfully — no output)</p>
+                )}
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   )
 }
 
-/** The mono status pill in the Output header: ready / running… / ✓ Nms / error. */
+/** The mono status pill in the Output header: ready / running… / ✓ Nms / error. A polite live
+ * region so screen-reader users hear the run result (success + timing), not just sighted users. */
 function RunStatus({
   status,
   warming,
@@ -183,22 +194,21 @@ function RunStatus({
   warming: boolean
   elapsedMs: number | null
 }) {
+  let label = "ready"
+  let tone = "text-muted-foreground/60"
   if (status === "running") {
-    return (
-      <span className="text-muted-foreground font-mono text-xs">
-        {warming ? "starting…" : "running…"}
-      </span>
-    )
+    label = warming ? "starting…" : "running…"
+    tone = "text-muted-foreground"
+  } else if (status === "success") {
+    label = `✓ ${elapsedMs}ms`
+    tone = "text-emerald-600 dark:text-emerald-400"
+  } else if (status === "error") {
+    label = "error"
+    tone = "text-rose-600 dark:text-rose-400"
   }
-  if (status === "success") {
-    return (
-      <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400">
-        ✓ {elapsedMs}ms
-      </span>
-    )
-  }
-  if (status === "error") {
-    return <span className="font-mono text-xs text-rose-600 dark:text-rose-400">error</span>
-  }
-  return <span className="text-muted-foreground/60 font-mono text-xs">ready</span>
+  return (
+    <span role="status" aria-live="polite" className={`font-mono text-xs ${tone}`}>
+      {label}
+    </span>
+  )
 }

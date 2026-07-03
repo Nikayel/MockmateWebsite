@@ -949,6 +949,21 @@
   overflow: auto;
 }
 
+/* Full-height CodeMirror (height="100%"): @uiw/react-codemirror renders an
+   intermediate `.cm-theme-none` container between our wrapper and `.cm-editor`
+   that has no height, so a percentage `.cm-editor` height resolves against an
+   auto-height parent and collapses to content. Give that container a definite
+   height under `.cm-fill` so the editor fills its flex pane and scrolls
+   internally. Scoped to `.cm-fill` so fixed-px editors (lessons) are unaffected. */
+.cm-fill,
+.cm-fill > .cm-theme-none {
+  height: 100%;
+}
+
+.cm-fill .cm-scroller {
+  overflow: auto;
+}
+
 /* Responsive improvements */
 @media (max-width: 1024px) {
   .interview-grid {
