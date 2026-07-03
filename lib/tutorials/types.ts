@@ -171,8 +171,15 @@ export interface SqlWorkspaceGrading extends WorkspaceScenarioConfig {
   seedSql: string
   /** Run AFTER the learner's multi-statement script, in order. Zero rows returned = pass. */
   assertions: SqlAssertion[]
-  /** true → the grader runs the learner script twice and asserts identical row counts (idempotency). */
+  /** true → the grader runs the learner script twice and asserts a stable result (idempotency). */
   checkIdempotency?: boolean
+  /**
+   * When set, the idempotency double-run compares the CONTENT (all rows, order-independent) of exactly
+   * these graded tables between run 1 and run 2 — so a learner's scratch/staging tables don't perturb
+   * the check and a value-only change that preserves the row count is still caught. Omitted → falls
+   * back to summing row counts across all user tables.
+   */
+  idempotencyTables?: string[]
 }
 
 /** A graded SQL exercise. Mirrors `PythonExercise` (id-as-scenarioId, gated reference, mode union). */

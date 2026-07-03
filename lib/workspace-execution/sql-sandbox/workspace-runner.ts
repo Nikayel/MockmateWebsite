@@ -20,6 +20,7 @@ interface SqlWorkspaceConfig {
   seedSql?: string
   assertions?: Array<{ suite: string; name: string; sql: string; isHidden?: boolean }>
   checkIdempotency?: boolean
+  idempotencyTables?: string[]
 }
 
 export async function executeWorkspaceScenarioSqlClientSide(
@@ -44,6 +45,7 @@ export async function executeWorkspaceScenarioSqlClientSide(
       code: primary.content,
       assertions: config.assertions ?? [],
       checkIdempotency: config.checkIdempotency,
+      idempotencyTables: config.idempotencyTables,
     })
 
     if (!runResult.success || runResult.error) {

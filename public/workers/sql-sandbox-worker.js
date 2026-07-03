@@ -53,7 +53,7 @@ function runSelect(db, sql) {
   }
 }
 
-/** Sum of COUNT(*) across every user table — the idempotency signal (same script twice → same rows). */
+/** Sum of COUNT(*) across every user table — the coarse idempotency signal (same script twice → same rows). */
 function totalRowCount(db) {
   const tables = db.exec(
     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -68,7 +68,27 @@ function totalRowCount(db) {
   return total
 }
 
-function gradeWorkspace(SQL, { seedSql, code, assertions, checkIdempotency }) {
+/**
+ * Order-independent CONTENT snapshot of exactly the named graded tables — the precise idempotency
+ * signal. Scoping to graded tables ignores a learner's scratch/staging tables; comparing content
+ * (not just a row-count sum) also catches a value-only change that preserves the row count.
+ */
+function contentSnapshot(db, tables) {
+  const snap = {}
+  for (const name of tables) {
+    try {
+      const res = db.exec(`SELECT * FROM "${name}"`)
+      const rows = res.length ? res[0].values.map((r) => JSON.stringify(r)) : []
+      rows.sort()
+      snap[name] = rows
+    } catch (error) {
+      snap[name] = "ERR:" + (error && error.message ? error.message : String(error))
+    }
+  }
+  return JSON.stringify(snap)
+}
+
+function gradeWorkspace(SQL, { seedSql, code, assertions, checkIdempotency, idempotencyTables }) {
   const results = []
   const db = new SQL.Database()
   try {
@@ -117,20 +137,29 @@ function gradeWorkspace(SQL, { seedSql, code, assertions, checkIdempotency }) {
 
     if (checkIdempotency) {
       // A SECOND fresh DB, seeded identically, with the learner script run twice. An idempotent
-      // script (DROP IF EXISTS → CREATE → INSERT, or a MERGE/upsert) leaves the same row count.
+      // script (DROP IF EXISTS → CREATE → INSERT, or a MERGE/upsert) leaves the same result. When the
+      // lesson names its graded tables, compare their CONTENT (scratch tables ignored, value changes
+      // caught); otherwise fall back to the coarse all-table row-count sum.
+      const scoped = Array.isArray(idempotencyTables) && idempotencyTables.length > 0
       const twice = new SQL.Database()
       try {
         if (seedSql) twice.exec(seedSql)
         twice.exec(code)
-        const first = totalRowCount(twice)
+        const first = scoped ? contentSnapshot(twice, idempotencyTables) : totalRowCount(twice)
         twice.exec(code)
-        const second = totalRowCount(twice)
+        const second = scoped ? contentSnapshot(twice, idempotencyTables) : totalRowCount(twice)
         results.push({
           suite: "idempotency",
-          name: "Running your script twice yields the same row count",
+          name: scoped
+            ? "Running your script twice leaves the graded tables unchanged"
+            : "Running your script twice yields the same row count",
           passed: first === second,
           error:
-            first === second ? null : `First run left ${first} row(s); second run left ${second}`,
+            first === second
+              ? null
+              : scoped
+                ? "Second run changed the graded output — the load is not idempotent"
+                : `First run left ${first} row(s); second run left ${second}`,
           isHidden: false,
         })
       } catch (error) {
@@ -153,7 +182,7 @@ function gradeWorkspace(SQL, { seedSql, code, assertions, checkIdempotency }) {
 }
 
 self.onmessage = async function (event) {
-  const { mode, seedSql, code, assertions, checkIdempotency } = event.data || {}
+  const { mode, seedSql, code, assertions, checkIdempotency, idempotencyTables } = event.data || {}
 
   try {
     const SQL = await loadSqlRuntime()
@@ -169,7 +198,13 @@ self.onmessage = async function (event) {
     self.postMessage({ type: "exec-start", timestamp: Date.now() })
 
     if (mode === "workspace") {
-      const results = gradeWorkspace(SQL, { seedSql, code, assertions, checkIdempotency })
+      const results = gradeWorkspace(SQL, {
+        seedSql,
+        code,
+        assertions,
+        checkIdempotency,
+        idempotencyTables,
+      })
       // Emit the marker as a log line, exactly like the Python workspace runner's stdout — so the
       // main-thread runner parses it with the same scan and the results pipeline is reused verbatim.
       self.postMessage({

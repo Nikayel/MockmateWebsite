@@ -18,6 +18,8 @@ export function scriptExercise(input: {
   seedSql: string
   assertions: NonNullable<SqlExercise["workspace"]>["assertions"]
   checkIdempotency?: boolean
+  /** Graded tables whose content the idempotency double-run compares (see SqlWorkspaceGrading). */
+  idempotencyTables?: string[]
 }): SqlExercise {
   return {
     id: input.id,
@@ -46,6 +48,7 @@ export function scriptExercise(input: {
       seedSql: input.seedSql,
       assertions: input.assertions,
       checkIdempotency: input.checkIdempotency,
+      idempotencyTables: input.idempotencyTables,
     },
   }
 }

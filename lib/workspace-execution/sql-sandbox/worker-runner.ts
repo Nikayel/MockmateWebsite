@@ -14,6 +14,8 @@ export interface SqlWorkerData {
   code?: string
   assertions?: Array<{ suite: string; name: string; sql: string; isHidden?: boolean }>
   checkIdempotency?: boolean
+  /** Graded tables whose content the idempotency double-run compares (see SqlWorkspaceGrading). */
+  idempotencyTables?: string[]
 }
 
 interface PendingSqlRun {

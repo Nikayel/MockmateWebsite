@@ -1448,6 +1448,7 @@ INSERT INTO stg_customer VALUES
   ('a@x.com','Ada','London'),   -- corrected spelling
   ('b@x.com','Ben','Paris');`,
     checkIdempotency: true,
+    idempotencyTables: ["dim_customer"],
     assertions: [
       {
         suite: "rows",
@@ -1512,6 +1513,7 @@ INSERT INTO stg_customer VALUES
   ('b@x.com','Ben','Paris','gold'),       -- tier upgraded
   ('c@x.com','Cara','Berlin','bronze');   -- brand-new customer`,
     checkIdempotency: true,
+    idempotencyTables: ["dim_customer"],
     assertions: [
       {
         suite: "rows",
@@ -1783,6 +1785,7 @@ INSERT INTO stg_customer VALUES
   ('b@x.com','Ben','Paris', '2026-03-01'),
   ('d@x.com','Dan','Oslo',  '2026-03-01');`,
     checkIdempotency: true,
+    idempotencyTables: ["dim_customer"],
     assertions: [
       {
         suite: "current",
@@ -1950,6 +1953,7 @@ INSERT INTO stg_customer VALUES
   ('b@x.com','Ben','Paris','2026-02-01');
 CREATE TABLE clean_customer (email TEXT, name TEXT, city TEXT, updated_at TEXT);`,
     checkIdempotency: true,
+    idempotencyTables: ["clean_customer"],
     assertions: [
       {
         suite: "rows",
