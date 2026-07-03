@@ -7,12 +7,14 @@
 //   { type: "exec-start" }  boot done — the runner swaps its generous boot timeout for a tight one
 //   { type: "result" }      final payload
 //
-// Two grading modes:
+// Grading + preview modes:
 //   single-file → run seed, run the learner's SELECT via a PREPARED statement (so the column list
 //                 survives even a 0-row result), return { columns, rows }.
 //   workspace   → run seed + the learner's multi-statement script, run hidden assertion queries
 //                 (dbt "count of violations = 0"), and emit the byte-identical
 //                 "__WORKSPACE_TEST_RESULTS__:" + JSON marker the Python workspace runner emits.
+//   introspect  → run the seed ALONE (no learner code) and return every user table's schema + first
+//                 rows + true row count, so the lesson can SHOW the data a query runs against.
 let sqlReadyPromise = null
 
 function postStatus(message) {
@@ -51,6 +53,29 @@ function runSelect(db, sql) {
   } finally {
     stmt.free()
   }
+}
+
+/**
+ * Read-only preview of a seeded database: for every user table, its first `limit` rows (as a
+ * { columns, rows } set) plus its TRUE total row count. Drives the lesson "Data" panel so a learner
+ * can see the columns and sample rows a query runs against. Runs against the seed alone — no learner
+ * code is executed, so it is safe to call eagerly on lesson mount.
+ */
+function introspectTables(db, limit) {
+  const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 8
+  const listed = db.exec(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+  )
+  const tables = []
+  if (listed.length) {
+    for (const [name] of listed[0].values) {
+      const result = runSelect(db, `SELECT * FROM "${name}" LIMIT ${cap}`)
+      const counted = db.exec(`SELECT COUNT(*) FROM "${name}"`)
+      const totalRows = counted.length ? Number(counted[0].values[0][0]) : result.rows.length
+      tables.push({ name, result, totalRows })
+    }
+  }
+  return tables
 }
 
 /** Sum of COUNT(*) across every user table — the coarse idempotency signal (same script twice → same rows). */
@@ -182,7 +207,8 @@ function gradeWorkspace(SQL, { seedSql, code, assertions, checkIdempotency, idem
 }
 
 self.onmessage = async function (event) {
-  const { mode, seedSql, code, assertions, checkIdempotency, idempotencyTables } = event.data || {}
+  const { mode, seedSql, code, assertions, checkIdempotency, idempotencyTables, previewLimit } =
+    event.data || {}
 
   try {
     const SQL = await loadSqlRuntime()
@@ -196,6 +222,19 @@ self.onmessage = async function (event) {
 
     // Boot is done; tell the runner to start its (short) execution timeout.
     self.postMessage({ type: "exec-start", timestamp: Date.now() })
+
+    if (mode === "introspect") {
+      // Seed a fresh DB and read back its tables — no learner code runs. Powers the "Data" preview.
+      const db = new SQL.Database()
+      try {
+        if (seedSql) db.exec(seedSql)
+        const tables = introspectTables(db, previewLimit)
+        self.postMessage({ type: "result", success: true, result: { tables }, logs: [] })
+      } finally {
+        db.close()
+      }
+      return
+    }
 
     if (mode === "workspace") {
       const results = gradeWorkspace(SQL, {

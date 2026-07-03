@@ -9,13 +9,15 @@ export interface SqlWorkerRunResult {
 }
 
 export interface SqlWorkerData {
-  mode: "single-file" | "workspace" | "warm"
+  mode: "single-file" | "workspace" | "warm" | "introspect"
   seedSql?: string
   code?: string
   assertions?: Array<{ suite: string; name: string; sql: string; isHidden?: boolean }>
   checkIdempotency?: boolean
   /** Graded tables whose content the idempotency double-run compares (see SqlWorkspaceGrading). */
   idempotencyTables?: string[]
+  /** introspect mode: max sample rows returned per table (default 8). */
+  previewLimit?: number
 }
 
 interface PendingSqlRun {

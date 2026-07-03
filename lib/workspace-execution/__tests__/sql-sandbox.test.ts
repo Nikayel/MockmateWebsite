@@ -4,6 +4,7 @@ import { buildWorkspaceMarker, parseWorkspaceMarker } from "../sql-sandbox/works
 import { executeSqlClientSide } from "../sql-sandbox/single-file-runner"
 import { executeWorkspaceScenarioSqlClientSide } from "../sql-sandbox/workspace-runner"
 import { runSqlInWorker } from "../sql-sandbox/worker-runner"
+import { introspectSqlSeed } from "../sql-sandbox/introspect-runner"
 import type { WorkspaceScenario } from "../types"
 
 vi.mock("../sql-sandbox/worker-runner", () => ({
@@ -222,5 +223,81 @@ describe("executeWorkspaceScenarioSqlClientSide", () => {
     const result = await executeWorkspaceScenarioSqlClientSide(scenario, [])
     expect(result.success).toBe(false)
     expect(result.results[0].error).toContain("SQL engine failed")
+  })
+})
+
+describe("introspectSqlSeed", () => {
+  it("returns no tables for a blank seed without touching the worker", async () => {
+    vi.mocked(runSqlInWorker).mockClear()
+    const result = await introspectSqlSeed("   ")
+    expect(result).toEqual({ success: true, tables: [] })
+    expect(runSqlInWorker).not.toHaveBeenCalled()
+  })
+
+  it("calls the worker in introspect mode and narrows the table payload", async () => {
+    vi.mocked(runSqlInWorker).mockResolvedValue({
+      success: true,
+      result: {
+        tables: [
+          { name: "orders", result: { columns: ["id", "total"], rows: [[1, 500]] }, totalRows: 12 },
+          { name: "users", result: { columns: ["id"], rows: [[1], [2]] }, totalRows: 2 },
+        ],
+      },
+      logs: [],
+    })
+    const result = await introspectSqlSeed("CREATE TABLE orders (id, total);", 8)
+
+    expect(runSqlInWorker).toHaveBeenCalledWith({
+      mode: "introspect",
+      seedSql: "CREATE TABLE orders (id, total);",
+      previewLimit: 8,
+    })
+    expect(result.success).toBe(true)
+    expect(result.tables.map((t) => t.name)).toEqual(["orders", "users"])
+    expect(result.tables[0]).toEqual({
+      name: "orders",
+      result: { columns: ["id", "total"], rows: [[1, 500]] },
+      totalRows: 12,
+    })
+  })
+
+  it("defaults totalRows to the returned row count when the worker omits it", async () => {
+    vi.mocked(runSqlInWorker).mockResolvedValue({
+      success: true,
+      result: { tables: [{ name: "t", result: { columns: ["id"], rows: [[1], [2], [3]] } }] },
+      logs: [],
+    })
+    const result = await introspectSqlSeed("CREATE TABLE t (id);")
+    expect(result.tables[0].totalRows).toBe(3)
+  })
+
+  it("drops malformed table entries instead of throwing", async () => {
+    vi.mocked(runSqlInWorker).mockResolvedValue({
+      success: true,
+      result: {
+        tables: [
+          null,
+          { name: 42, result: { columns: [], rows: [] } },
+          { name: "ok", result: { columns: ["id"], rows: [] }, totalRows: 0 },
+          { name: "no-result" },
+        ],
+      },
+      logs: [],
+    })
+    const result = await introspectSqlSeed("CREATE TABLE ok (id);")
+    expect(result.success).toBe(true)
+    expect(result.tables.map((t) => t.name)).toEqual(["ok"])
+  })
+
+  it("surfaces a worker error", async () => {
+    vi.mocked(runSqlInWorker).mockResolvedValue({
+      success: false,
+      error: "no such table",
+      logs: [],
+    })
+    const result = await introspectSqlSeed("SELECT 1;")
+    expect(result.success).toBe(false)
+    expect(result.tables).toEqual([])
+    expect(result.error).toContain("no such table")
   })
 })

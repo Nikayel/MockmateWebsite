@@ -17,6 +17,8 @@ export {
   executeSqlClientSide,
   executeWorkspaceScenarioSqlClientSide,
   runSqlInWorker,
+  introspectSqlSeed,
+  DEFAULT_PREVIEW_LIMIT,
   compareResultSets,
   buildWorkspaceMarker,
   parseWorkspaceMarker,
@@ -24,7 +26,7 @@ export {
   markSqlRuntimeWarm,
   prewarmSqlRuntime,
 } from "./sql-sandbox"
-export type { SqlResultSet } from "./sql-sandbox"
+export type { SqlResultSet, SqlTablePreview, SqlIntrospectResult } from "./sql-sandbox"
 export { executeScenarioInBrowser } from "./browser-execution"
 export { overlayWorkspaceFiles, getVisibleWorkspaceFiles, getWorkspacePrimaryCode } from "./files"
 export { buildPistonWorkspaceFiles } from "./piston-builder"
