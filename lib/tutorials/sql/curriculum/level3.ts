@@ -1046,6 +1046,626 @@ exactly one row.`,
   }),
 }
 
+const normalize1nf: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-normalize-1nf",
+  title: "First Normal Form: Atomic Values",
+  summary: "Eliminate repeating groups and multi-valued cells.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["1NF", "atomic columns", "repeating-group removal", "composite key introduction"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## First Normal Form: atomic values
+
+**First Normal Form (1NF)** demands two things: **one value per cell** (atomic — no comma-packed
+lists) and **one row per fact**. A spreadsheet export that crams \`"mouse:2, keyboard:1"\` into a single
+\`items\` column violates 1NF, and that single violation breaks *every* downstream join, aggregate, and
+filter — you can't \`SUM\` a price you can't isolate, or join on a product buried inside a string.
+
+### The violation and the fix
+
+Raw — a repeating group packed into one cell:
+
+| order_id | items |
+|---|---|
+| 1 | \`mouse:2, keyboard:1\` |
+| 2 | \`mouse:1\` |
+
+1NF form — one row per line item, atomic columns, and a **composite key** \`(order_id, product)\`
+because neither column alone is unique:
+
+| order_id | product | qty |
+|---|---|---|
+| 1 | mouse | 2 |
+| 1 | keyboard | 1 |
+| 2 | mouse | 1 |
+
+**Anatomy of the change:** the repeating group inside one cell becomes multiple *rows*; the packed
+string becomes separate *columns* (\`product\`, \`qty\`); and the identity of a row is now the
+**combination** \`(order_id, product)\`.
+
+> **In the warehouse this differs — not really, but the tools do.** 1NF is a universal relational
+> principle. The mechanics of *unpacking* differ: SQLite has no array type, so packed data is \`TEXT\`
+> you split with string functions or a recursive CTE (Level 4). Postgres has real arrays and
+> \`unnest()\`; BigQuery/Snowflake have \`ARRAY\`/\`STRUCT\` and are often kept *semi-structured* on
+> purpose. But the moment you need to join or aggregate, you flatten to 1NF.
+
+### Keep it readable — a common pitfall
+
+Don't "solve" a multi-valued attribute by adding \`item1, item2, item3\` columns — that's still a
+repeating group and it caps you at three items. The fix is always *more rows, not more columns*. And
+once you unpack, a single column is no longer unique, so declare the **composite key**.
+
+**Recap:** 1NF means atomic cells and one row per fact; unpack repeating groups into rows (not extra
+columns) and give the finer grain a composite key.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
+then hidden assertion queries check the unpacked grain, values, and keys.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-normalize-1nf-apply",
+    prompt: `The \`raw_order\` table stores **two line-item slots per order** in packed columns
+(\`product_a\`/\`qty_a\` and \`product_b\`/\`qty_b\`). Unpack it into a 1NF \`order_item\` table with columns
+\`(order_id, product, qty)\` and a composite primary key \`(order_id, product)\` — **one row per line
+item**. Use two \`INSERT … SELECT\` statements (one per slot); skip the empty second slot with a
+\`WHERE product_b IS NOT NULL\`. You're given exactly two slots to keep the SQL simple.`,
+    starterCode: `DROP TABLE IF EXISTS order_item;
+
+-- CREATE TABLE order_item ( ... , PRIMARY KEY (order_id, product) );
+
+-- INSERT … SELECT from the first slot (product_a, qty_a) for every order ...
+
+-- INSERT … SELECT from the second slot (product_b, qty_b), skipping empty slots ...`,
+    hints: [
+      "First `INSERT … SELECT order_id, product_a, qty_a FROM raw_order` for every order.",
+      "Second `INSERT … SELECT order_id, product_b, qty_b FROM raw_order WHERE product_b IS NOT NULL` — the `WHERE` skips the empty slot.",
+      "Target columns are `(order_id, product, qty)`; declare `PRIMARY KEY (order_id, product)` so the grain is enforced.",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS order_item;
+
+CREATE TABLE order_item (
+    order_id INTEGER,
+    product  TEXT,
+    qty      INTEGER,
+    PRIMARY KEY (order_id, product)
+);
+
+INSERT INTO order_item (order_id, product, qty)
+SELECT order_id, product_a, qty_a FROM raw_order WHERE product_a IS NOT NULL;
+
+INSERT INTO order_item (order_id, product, qty)
+SELECT order_id, product_b, qty_b FROM raw_order WHERE product_b IS NOT NULL;`,
+    seedSql: `DROP TABLE IF EXISTS raw_order;
+CREATE TABLE raw_order (
+    order_id INTEGER, product_a TEXT, qty_a INTEGER, product_b TEXT, qty_b INTEGER
+);
+INSERT INTO raw_order VALUES
+    (1, 'mouse', 2, 'keyboard', 1),
+    (2, 'mouse', 1, NULL, NULL);   -- second slot empty`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "schema",
+        name: "order_item has the columns order_id, product, qty",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_table_info('order_item')
+          WHERE name IN ('order_id','product','qty')
+        ) <> 3`,
+      },
+      {
+        suite: "rows",
+        name: "exactly 3 line-item rows exist (order 2 has only one item)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_item) <> 3`,
+      },
+      {
+        suite: "quality",
+        name: "no NULL product landed (the empty slot was skipped)",
+        sql: `SELECT order_id FROM order_item WHERE product IS NULL`,
+      },
+      {
+        suite: "values",
+        name: "order 1 keyboard has qty 1",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT qty FROM order_item WHERE order_id = 1 AND product = 'keyboard'), -1) <> 1`,
+      },
+      {
+        suite: "keys",
+        name: "order_item is keyed on the composite (order_id, product)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('order_item') WHERE pk > 0) <> 2`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-normalize-1nf-practice",
+    prompt: `A "sales spreadsheet" export packs an entire order's items into **one comma-delimited
+string** like \`'mouse:2:2499,keyboard:1:4999'\` — each token is \`product:qty:price_cents\`. Unpack
+\`raw_sales\` into a 1NF \`order_line\` table \`(order_id, product, qty, unit_price_cents)\` with a
+composite primary key \`(order_id, product)\`. Orders have **up to three** items, and \`qty\` /
+\`unit_price_cents\` must be stored as \`INTEGER\`.
+
+SQLite has no split function, so the clean route is a \`WITH RECURSIVE\` that peels one token off the
+front of the string at a time, then splits each token on \`:\`. (A position-based \`substr\`/\`instr\`
+extraction per slot also works.)`,
+    starterCode: `DROP TABLE IF EXISTS order_line;
+
+-- CREATE TABLE order_line ( ... , PRIMARY KEY (order_id, product) );
+
+-- Split raw_sales.items into one token per line item (a WITH RECURSIVE peels one token
+-- off the front at a time), then split each token on ':' into product / qty / price,
+-- CAST qty and price to INTEGER, and INSERT the rows.`,
+    hints: [
+      "Declare `PRIMARY KEY (order_id, product)` so the grain is enforced.",
+      "One clean route: a `WITH RECURSIVE` that peels one `product:qty:price` token off the front of `items` at a time until the string is empty (append a trailing `,` in the anchor so every token ends with a delimiter).",
+      "Split each token on `:` with `instr`/`substr`: product before the first colon, qty between the colons, price after the last.",
+      "`CAST` qty and price to `INTEGER` — a purely `TEXT` price fails the numeric assertion downstream.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS raw_sales;
+CREATE TABLE raw_sales (order_id INTEGER, items TEXT);
+INSERT INTO raw_sales VALUES
+    (1, 'mouse:2:2499,keyboard:1:4999'),
+    (2, 'monitor:1:19999'),
+    (3, 'cable:3:599,hub:1:2999,mat:2:1499');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "exactly 6 line items were unpacked (2 + 1 + 3)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_line) <> 6`,
+      },
+      {
+        suite: "keys",
+        name: "order_line is keyed on the composite (order_id, product)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('order_line') WHERE pk > 0) <> 2`,
+      },
+      {
+        suite: "quality",
+        name: "every row has a non-empty product",
+        sql: `SELECT order_id FROM order_line WHERE product IS NULL OR product = ''`,
+      },
+      {
+        suite: "values",
+        name: "order 1 keyboard has unit_price_cents 4999",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT unit_price_cents FROM order_line WHERE order_id = 1 AND product = 'keyboard'), -1) <> 4999`,
+      },
+      {
+        suite: "values",
+        name: "order 3 mat has qty 2",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT qty FROM order_line WHERE order_id = 3 AND product = 'mat'), -1) <> 2`,
+      },
+    ],
+  }),
+}
+
+const normalize2nf3nf: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-normalize-2nf-3nf",
+  title: "Second and Third Normal Form",
+  summary: "Remove partial and transitive dependencies so each fact lives once.",
+  estimatedMinutes: 35,
+  difficulty: "hard",
+  skills: ["2NF (no partial dependency)", "3NF (no transitive dependency)", "table decomposition"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## 2NF and 3NF — "the key, the whole key, and nothing but the key"
+
+Once data is atomic (1NF), redundancy can still hide in *dependencies*. The memorable rule for a
+well-normalized table: **every non-key column depends on the key, the whole key, and nothing but the
+key.**
+
+### 2NF — the whole key
+
+No column may depend on only *part* of a composite key. In an
+\`order_item(order_id, product_id, qty, product_name)\` table keyed on \`(order_id, product_id)\`,
+\`product_name\` depends only on \`product_id\` — half the key. That's a **partial dependency**: it
+repeats \`product_name\` on every line the product appears in. Fix: move \`product_name\` to a
+\`products\` table keyed on \`product_id\`.
+
+### 3NF — nothing but the key
+
+No non-key column may depend on *another non-key column*. In
+\`orders(order_id, customer_id, customer_email)\`, \`customer_email\` depends on \`customer_id\`, not on
+\`order_id\`. That's a **transitive dependency** (key → customer_id → email). Fix: move
+\`customer_email\` to a \`customers\` table keyed on \`customer_id\`.
+
+### Worked 2NF/3NF split
+
+Start with one flat table:
+
+\`\`\`
+order_line(order_id, product_id, qty, product_name, customer_id, customer_email)
+\`\`\`
+
+Decompose:
+
+\`\`\`sql
+-- 2NF: product attributes depend only on product_id
+CREATE TABLE products  (product_id INTEGER PRIMARY KEY, product_name TEXT);
+-- 3NF: customer attributes depend only on customer_id (transitive via orders)
+CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, email TEXT);
+CREATE TABLE orders    (order_id INTEGER PRIMARY KEY, customer_id INTEGER REFERENCES customers);
+CREATE TABLE order_items (
+    order_id   INTEGER REFERENCES orders,
+    product_id INTEGER REFERENCES products,
+    qty        INTEGER,
+    PRIMARY KEY (order_id, product_id)
+);
+\`\`\`
+
+Now \`product_name\` and \`email\` each live in exactly one place. Change an email once; every order
+reflects it. No update anomalies.
+
+> **In the warehouse this differs — by intent.** 3NF is the gold standard for OLTP systems (safe
+> writes, no anomalies). Analytical warehouses often *stop short* of full normalization or
+> deliberately denormalize (next lesson) because joins are the expensive part of a read. So DEs
+> normalize the **source-of-truth / staging** layers and denormalize the **mart** layer. Same
+> engineer, two different targets.
+
+**Common pitfall — over- or under-splitting.** Under: leaving \`customer_email\` on \`orders\` (a real
+3NF violation that causes update anomalies). Over: decomposing attributes that genuinely *do* depend
+only on the key into needless tables. Test each column: "does this depend on the whole key and nothing
+but the key?" If no, split; if yes, leave it.
+
+**Recap.** 2NF removes partial dependencies (on part of a composite key); 3NF removes transitive
+dependencies (on another non-key column). Decompose so every fact is stored exactly once — the OLTP
+ideal you'll later denormalize for analytics.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
+then hidden assertion queries check that each fact now lives in exactly one table.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-normalize-2nf-3nf-apply",
+    prompt: `The \`flat_line\` table repeats \`product_name\` on every row — a **2NF violation**, because
+\`product_name\` depends only on \`product_id\`, which is just *half* of the natural
+\`(order_id, product_id)\` grain. Normalize it:
+
+- Extract product attributes into a \`products\` table keyed on \`product_id\`, **deduplicated** — use
+\`INSERT … SELECT DISTINCT\`.
+- Rebuild \`order_items\` with only \`(order_id, product_id, qty)\` and a composite primary key, then
+populate it from \`flat_line\`.
+
+After this, \`product_name\` is stored exactly once per product, not once per order line.`,
+    starterCode: `DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS order_items;
+
+-- 1. CREATE products (product_id PRIMARY KEY, product_name) ...
+-- 2. Populate it with DISTINCT product rows from flat_line ...
+-- 3. CREATE order_items (order_id, product_id, qty) with a composite PRIMARY KEY ...
+-- 4. Populate order_items from flat_line (no product_name column) ...`,
+    hints: [
+      "`INSERT INTO products (product_id, product_name) SELECT DISTINCT product_id, product_name FROM flat_line;` — DISTINCT collapses the repeats.",
+      "`order_items` gets `(order_id, product_id, qty)` only — no `product_name`. Declare `PRIMARY KEY (order_id, product_id)`.",
+      "Populate order_items with `SELECT order_id, product_id, qty FROM flat_line;` — the same three rows, minus the product name.",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS order_items;
+
+CREATE TABLE products (product_id INTEGER PRIMARY KEY, product_name TEXT);
+INSERT INTO products (product_id, product_name)
+SELECT DISTINCT product_id, product_name FROM flat_line;
+
+CREATE TABLE order_items (
+    order_id   INTEGER,
+    product_id INTEGER,
+    qty        INTEGER,
+    PRIMARY KEY (order_id, product_id)
+);
+INSERT INTO order_items (order_id, product_id, qty)
+SELECT order_id, product_id, qty FROM flat_line;`,
+    seedSql: `DROP TABLE IF EXISTS flat_line;
+CREATE TABLE flat_line (order_id INTEGER, product_id INTEGER, qty INTEGER, product_name TEXT);
+INSERT INTO flat_line VALUES
+    (1, 100, 2, 'Mouse'),
+    (1, 101, 1, 'Keyboard'),
+    (2, 100, 1, 'Mouse');`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "products",
+        name: "products holds one deduplicated row per product (2 rows)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM products) <> 2`,
+      },
+      {
+        suite: "products",
+        name: "product 100 resolves to its name 'Mouse'",
+        sql: `SELECT 1 WHERE COALESCE((SELECT product_name FROM products WHERE product_id = 100), '~') <> 'Mouse'`,
+      },
+      {
+        suite: "grain",
+        name: "order_items keeps every original line (3 rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items) <> 3`,
+      },
+      {
+        suite: "schema",
+        name: "product_name no longer lives on order_items",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('order_items') WHERE name = 'product_name') <> 0`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-normalize-2nf-3nf-practice",
+    prompt: `Fully normalize the single flat \`flat_sales\` table to **3NF**. It repeats customer *and*
+product attributes on every line. Produce four tables, each populated with \`INSERT … SELECT\`:
+
+- \`customers\` keyed on \`customer_id\`, **deduplicated by email** — the same person shows up under
+different \`customer_id\`s in the raw feed, so keep one row per distinct email at the **lowest**
+\`customer_id\`.
+- \`products\` keyed on \`product_id\`, deduplicated.
+- \`orders\` keyed on \`order_id\` — one row per order, carrying \`customer_id\` (not customer
+attributes).
+- \`order_items\` keyed on \`(order_id, product_id)\` — carrying \`qty\` (not product attributes).`,
+    starterCode: `DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS order_items;
+
+-- customers:   one row per DISTINCT email, keeping the lowest customer_id ...
+-- products:    one row per DISTINCT product_id ...
+-- orders:      one row per order_id (carry customer_id, no customer attributes) ...
+-- order_items: (order_id, product_id, qty) at line grain, no product attributes ...`,
+    hints: [
+      "Dedup customers with a grouped insert: `SELECT MIN(customer_id), email FROM flat_sales GROUP BY email` — one row per email, lowest id wins.",
+      "`orders` is `SELECT DISTINCT order_id, customer_id FROM flat_sales`. Order 3's customer_id is 12, which you dropped in favor of 10 — the assertions only check that orders has 3 rows and carries no attributes, so keeping the raw customer_id is acceptable here (a real SCD remap comes in L4).",
+      "`products` = `SELECT DISTINCT product_id, product_name FROM flat_sales`.",
+      "`order_items` = `SELECT order_id, product_id, qty FROM flat_sales` — atomic grain, no descriptive columns.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS flat_sales;
+CREATE TABLE flat_sales (
+    order_id INTEGER, customer_id INTEGER, email TEXT,
+    product_id INTEGER, product_name TEXT, qty INTEGER
+);
+INSERT INTO flat_sales VALUES
+    (1, 10, 'ada@x.com',   100, 'Mouse',    2),
+    (1, 10, 'ada@x.com',   101, 'Keyboard', 1),
+    (2, 11, 'grace@x.com', 100, 'Mouse',    1),
+    (3, 12, 'ada@x.com',   100, 'Mouse',    3);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "customers",
+        name: "customers is deduplicated by email (2 rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM customers) <> 2`,
+      },
+      {
+        suite: "customers",
+        name: "ada@x.com appears exactly once",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM customers WHERE email = 'ada@x.com') <> 1`,
+      },
+      {
+        suite: "customers",
+        name: "the surviving ada row keeps the lowest customer_id (10)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT MIN(customer_id) FROM customers WHERE email = 'ada@x.com'), -1) <> 10`,
+      },
+      {
+        suite: "products",
+        name: "products is deduplicated (2 rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM products) <> 2`,
+      },
+      {
+        suite: "orders",
+        name: "orders has one row per order (3 rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM orders) <> 3`,
+      },
+      {
+        suite: "grain",
+        name: "order_items sits at line grain (4 rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items) <> 4`,
+      },
+      {
+        suite: "schema",
+        name: "order_items carries no descriptive columns",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('order_items') WHERE name IN ('product_name','email')) <> 0`,
+      },
+      {
+        suite: "schema",
+        name: "orders carries no leaked attributes",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('orders') WHERE name IN ('email','product_name')) <> 0`,
+      },
+    ],
+  }),
+}
+
+const denormalization: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l3-denormalization",
+  title: "Denormalization Trade-offs",
+  summary: "Know when to flatten a normalized schema for analytics speed.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: ["OLTP vs OLAP", "denormalization", "read vs write trade-off", "join cost"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Normalization is a trade-off, not a virtue
+
+Normalization is not a moral good — it's a **trade-off**. It optimizes for *safe writes*: each fact
+stored once means no update anomalies. But it pays for that with *joins on every read*, and joins are
+the expensive part of analytics. The two worlds:
+
+- **OLTP** (transactional apps): many small writes, correctness-critical → **normalize** (3NF).
+- **OLAP** (analytics/BI): few huge reads, join-heavy → **denormalize** (flatten so a report is one
+  scan, not a six-table join).
+
+**Denormalization** deliberately reintroduces redundancy — copying \`product_name\`, \`category\`,
+\`customer_country\` *into* the fact/reporting table — so the read needs no joins. The cost is that if
+\`product_name\` changes you must update it in many places; in analytics that's fine because these
+tables are *rebuilt* by the loader, not hand-edited.
+
+**Worked example.** From the 3NF schema, build one wide reporting table:
+
+\`\`\`sql
+CREATE TABLE rpt_sales AS
+SELECT
+    oi.order_id, oi.product_id, oi.qty,
+    p.product_name, p.category,          -- copied from products
+    o.order_date,
+    c.email, c.country_code              -- copied from customers
+FROM order_items oi
+JOIN orders    o ON o.order_id   = oi.order_id
+JOIN products  p ON p.product_id = oi.product_id
+JOIN customers c ON c.customer_id = o.customer_id;
+\`\`\`
+
+A BI query against \`rpt_sales\` — "revenue by category by country" — now touches **one** table. The
+four-way join happened *once*, at build time, not on every dashboard load. \`CREATE TABLE … AS SELECT\`
+(CTAS) runs a query and stores its result set as a brand-new table.
+
+> **In the warehouse this differs — this is the warehouse's whole point.** Columnar warehouses
+> (Snowflake/BigQuery/Redshift) are built to scan wide denormalized tables fast, and storage is cheap,
+> so the redundancy barely costs anything. \`CREATE TABLE … AS SELECT\` (CTAS) is the standard build
+> verb there too. The star schema (Module 3.5) is the *disciplined* middle ground between full 3NF and
+> a fully-flat "one big table."
+
+**Keep it readable / common pitfall.** Denormalize the *mart*, never the *source of truth*. If you
+denormalize your write-path OLTP tables you'll corrupt data via update anomalies. Pitfall:
+denormalizing too early or everything — keep normalized staging/intermediate layers and denormalize
+only the final reporting layer, rebuilt each run.
+
+**Recap:** normalization favors safe writes, denormalization favors fast reads; flatten the
+analytics/mart layer (redundancy is fine because it's rebuilt) while keeping the source-of-truth
+normalized.
+
+**Execution mode:** you write a multi-statement script that builds a denormalized table with
+\`CREATE TABLE … AS SELECT\`. It runs against a fresh in-memory SQLite DB, then hidden assertion queries
+check row counts, copied-in columns, and computed revenue.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l3-denormalization-apply",
+    prompt: `Given a normalized 3-table schema (\`orders\`, \`products\`, \`order_items\`), build one wide
+denormalized reporting table \`rpt_line\` via \`CREATE TABLE … AS SELECT\` that carries \`order_id\`,
+\`product_id\`, \`qty\`, \`product_name\`, \`category\`, and \`line_revenue_cents\` (= \`qty * unit_price_cents\`)
+— so a report needs **no joins** to read it. Lead your script with \`DROP TABLE IF EXISTS rpt_line;\` so
+it re-runs cleanly.`,
+    starterCode: `-- Build a wide, join-free reporting table from the normalized source.
+DROP TABLE IF EXISTS rpt_line;
+
+-- CREATE TABLE rpt_line AS
+-- SELECT oi.order_id, oi.product_id, oi.qty,
+--        p.product_name, p.category,
+--        oi.qty * p.unit_price_cents AS line_revenue_cents
+-- FROM order_items oi JOIN products p ON ... ;`,
+    hints: [
+      "`CREATE TABLE rpt_line AS SELECT … FROM order_items oi JOIN products p ON p.product_id = oi.product_id`.",
+      "Compute revenue in the projection: `oi.qty * p.unit_price_cents AS line_revenue_cents`.",
+      "Copy `p.product_name` and `p.category` into the SELECT list so no join is needed to read them later.",
+    ],
+    referenceSolution: `DROP TABLE IF EXISTS rpt_line;
+
+CREATE TABLE rpt_line AS
+SELECT
+    oi.order_id, oi.product_id, oi.qty,
+    p.product_name, p.category,
+    oi.qty * p.unit_price_cents AS line_revenue_cents
+FROM order_items oi
+JOIN products p ON p.product_id = oi.product_id;`,
+    seedSql: `DROP TABLE IF EXISTS products; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS order_items;
+CREATE TABLE products (product_id INTEGER PRIMARY KEY, product_name TEXT, category TEXT, unit_price_cents INTEGER);
+CREATE TABLE orders (order_id INTEGER PRIMARY KEY, order_date TEXT);
+CREATE TABLE order_items (order_id INTEGER, product_id INTEGER, qty INTEGER);
+INSERT INTO products VALUES (100,'Mouse','peripherals',2499),(101,'Monitor','displays',19999);
+INSERT INTO orders VALUES (1,'2026-01-05'),(2,'2026-01-06');
+INSERT INTO order_items VALUES (1,100,2),(1,101,1),(2,100,3);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "shape",
+        name: "product_name is copied into rpt_line (no join needed to read it)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_table_info('rpt_line') WHERE name='product_name') <> 1`,
+      },
+      {
+        suite: "rows",
+        name: "rpt_line has one flattened row per order line (3)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM rpt_line) <> 3`,
+      },
+      {
+        suite: "denormalize",
+        name: "category was copied in from products ('displays' for product 101)",
+        sql: `SELECT 1 WHERE COALESCE((SELECT category FROM rpt_line WHERE product_id=101), '~') <> 'displays'`,
+      },
+      {
+        suite: "revenue",
+        name: "line_revenue_cents = qty * unit_price_cents (2 * 2499 = 4998)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT line_revenue_cents FROM rpt_line WHERE order_id=1 AND product_id=100), -1) <> 4998`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l3-denormalization-practice",
+    prompt: `From the 3NF schema (\`customers\`, \`products\`, \`orders\`, \`order_items\`), produce a flattened
+"one big table" \`obt_sales\` carrying every column a revenue dashboard needs: \`order_id\`, \`order_date\`,
+\`customer_id\`, \`country_code\`, \`product_id\`, \`product_name\`, \`category\`, \`qty\`, \`unit_price_cents\`,
+\`line_revenue_cents\` (= \`qty * unit_price_cents\`). Then materialize a tiny one-row table \`obt_compare\`
+with two constants that prove the flattening's value: \`joins_normalized\` = \`3\` (the joins a report
+would otherwise need) and \`joins_flattened\` = \`0\`. Lead your script with \`DROP TABLE IF EXISTS\` for both
+tables so it re-runs cleanly.`,
+    starterCode: `-- Flatten the 3NF schema into one big table, then prove the join-count win.
+DROP TABLE IF EXISTS obt_sales;
+DROP TABLE IF EXISTS obt_compare;
+
+-- CREATE TABLE obt_sales AS SELECT ...  (join all four source tables once) ...
+-- CREATE TABLE obt_compare AS SELECT 3 AS joins_normalized, 0 AS joins_flattened;`,
+    hints: [
+      "Build `obt_sales` with a four-table `CREATE TABLE … AS SELECT` that joins order_items, orders, products, and customers once.",
+      "`line_revenue_cents = oi.qty * p.unit_price_cents` in the SELECT list.",
+      "For the comparison, materialize a tiny table: `CREATE TABLE obt_compare AS SELECT 3 AS joins_normalized, 0 AS joins_flattened;`.",
+      "Confirm the whole point: the dashboard's `SUM(line_revenue_cents)` now runs over `obt_sales` alone, no joins.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS customers; DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS order_items;
+CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, email TEXT, country_code TEXT);
+CREATE TABLE products (product_id INTEGER PRIMARY KEY, product_name TEXT, category TEXT, unit_price_cents INTEGER);
+CREATE TABLE orders (order_id INTEGER PRIMARY KEY, customer_id INTEGER, order_date TEXT);
+CREATE TABLE order_items (order_id INTEGER, product_id INTEGER, qty INTEGER, PRIMARY KEY(order_id,product_id));
+INSERT INTO customers VALUES (10,'ada@x.com','GB'),(11,'grace@x.com','US');
+INSERT INTO products VALUES (100,'Mouse','peripherals',2499),(101,'Monitor','displays',19999);
+INSERT INTO orders VALUES (1,10,'2026-01-05'),(2,11,'2026-01-06');
+INSERT INTO order_items VALUES (1,100,2),(1,101,1),(2,100,3);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "shape",
+        name: "obt_sales carries all 10 flattened columns",
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_table_info('obt_sales')
+          WHERE name IN ('order_id','order_date','customer_id','country_code','product_id','product_name','category','qty','unit_price_cents','line_revenue_cents')
+        ) <> 10`,
+      },
+      {
+        suite: "rows",
+        name: "obt_sales has one flattened row per order line (3)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM obt_sales) <> 3`,
+      },
+      {
+        suite: "denormalize",
+        name: "customer country_code was flattened in ('US' for order 2)",
+        sql: `SELECT 1 WHERE COALESCE((SELECT country_code FROM obt_sales WHERE order_id=2), '~') <> 'US'`,
+      },
+      {
+        suite: "proof",
+        name: "obt_compare proves the join-count win (3 normalized -> 0 flattened)",
+        sql: `SELECT 1 WHERE COALESCE((SELECT joins_normalized FROM obt_compare), -1) <> 3
+          OR COALESCE((SELECT joins_flattened FROM obt_compare), -1) <> 0`,
+      },
+      {
+        suite: "revenue",
+        name: "line_revenue_cents = qty * unit_price_cents (1 * 19999 = 19999)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT line_revenue_cents FROM obt_sales WHERE order_id=1 AND product_id=101), -1) <> 19999`,
+      },
+      {
+        suite: "revenue",
+        name: "join-free aggregate over obt_sales alone sums to 32494",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT SUM(line_revenue_cents) FROM obt_sales), -1) <> 32494`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel3: SqlLevel = {
   id: 3,
   slug: "modeling",
@@ -1067,6 +1687,13 @@ export const sqlLevel3: SqlLevel = {
       description:
         "Primary and foreign keys, UNIQUE / NOT NULL / CHECK — the rules the database enforces so bad rows can never land.",
       lessons: [primaryKeys, foreignKeys, constraints],
+    },
+    {
+      id: "sql-l3-normalization",
+      title: "Module 3.3 — Normalization",
+      description:
+        "From a flat export to 3NF and back: atomic values, removing redundancy, and deliberate denormalization for analytics.",
+      lessons: [normalize1nf, normalize2nf3nf, denormalization],
     },
   ],
 }
