@@ -42,6 +42,17 @@ error. SQLite reads it as "select \`order_id\`, aliased to \`customer_id\`," sil
   cust_id AS customer_id,
   amt_c   AS amount_cents
 FROM orders;`,
+    demoSeedSql: `CREATE TABLE orders (
+  ord_id     INTEGER,
+  cust_id    INTEGER,
+  ord_status TEXT,
+  amt_c      INTEGER
+);
+INSERT INTO orders (ord_id, cust_id, ord_status, amt_c) VALUES
+  (1001, 7, 'paid',     4999),
+  (1002, 7, 'shipped',  1250),
+  (1003, 9, 'paid',    10000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-select-columns-apply",
@@ -217,6 +228,19 @@ Never rely on the source to store what you can derive.`,
   sku || '-' || category_code AS product_label,
   'ecommerce_raw'             AS source_system
 FROM order_items;`,
+    demoSeedSql: `CREATE TABLE order_items (
+  order_id         INTEGER,
+  product_id       INTEGER,
+  qty              INTEGER,
+  unit_price_cents INTEGER,
+  sku              TEXT,
+  category_code    TEXT
+);
+INSERT INTO order_items VALUES
+  (1001, 501, 2, 1500, 'SKU-AUDIO-01', 'AUD'),
+  (1001, 502, 1, 4999, 'SKU-AUDIO-02', 'AUD'),
+  (1002, 501, 3, 1500, 'SKU-AUDIO-01', 'AUD');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-expressions-apply",
@@ -353,6 +377,18 @@ Use single quotes for string *values* (\`'paid'\`); double quotes mean *identifi
 FROM orders
 WHERE status = 'paid'
   AND total_cents >= 5000;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id    INTEGER,
+  status      TEXT,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (1, 'paid',      9900),
+  (2, 'paid',      1500),
+  (3, 'cancelled', 8000),
+  (4, 'paid',      5000),
+  (5, 'shipped',  12000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-where-basics-apply",
@@ -485,6 +521,19 @@ FROM products
 WHERE category_code IN ('AUD','HOM')
   AND unit_price_cents BETWEEN 2000 AND 9000
   AND sku LIKE 'SKU-%';`,
+    demoSeedSql: `CREATE TABLE products (
+  product_id       INTEGER,
+  sku              TEXT,
+  category_code    TEXT,
+  unit_price_cents INTEGER
+);
+INSERT INTO products VALUES
+  (1, 'SKU-AUD-01', 'AUD', 2999),
+  (2, 'SKU-HOM-05', 'HOM', 4500),
+  (3, 'SKU-TOY-09', 'TOY', 1200),
+  (4, 'SKU-AUD-02', 'AUD', 8900),
+  (5, 'SKU-HOM-07', 'HOM', 15000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-in-between-like-apply",
@@ -655,6 +704,18 @@ Join several tests with \`OR\` to flag "any key missing" in one \`1\`/\`0\` colu
     demoCode: `SELECT customer_id, email
 FROM customers
 WHERE email IS NULL;`,
+    demoSeedSql: `CREATE TABLE customers (
+  customer_id INTEGER,
+  email       TEXT,
+  region      TEXT
+);
+INSERT INTO customers VALUES
+  (1, 'ana@example.com', 'EU'),
+  (2, NULL,              'US'),
+  (3, 'lee@example.com', NULL),
+  (4, NULL,              'EU'),
+  (5, 'kim@example.com', 'US');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-null-logic-apply",
@@ -786,6 +847,18 @@ WHERE ( A OR B )   -- group the alternatives first
 FROM orders
 WHERE (status = 'paid' OR status = 'shipped')
   AND region = 'EU';`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  status   TEXT,
+  region   TEXT
+);
+INSERT INTO orders VALUES
+  (1, 'paid',      'EU'),
+  (2, 'shipped',   'EU'),
+  (3, 'paid',      'US'),
+  (4, 'cancelled', 'EU'),
+  (5, 'shipped',   'UK');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-boolean-and-or-apply",
@@ -910,6 +983,19 @@ ORDER BY  order_ts DESC ,  total_cents DESC
     demoCode: `SELECT order_id, order_ts, total_cents
 FROM orders
 ORDER BY order_ts DESC, total_cents DESC;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id    INTEGER,
+  order_ts    TEXT,      -- ISO-8601, may repeat
+  region      TEXT,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (1, '2026-03-02T10:00:00Z', 'EU', 5000),
+  (2, '2026-03-02T10:00:00Z', 'US', 5000),
+  (3, '2026-03-03T08:30:00Z', 'EU', 3000),
+  (4, '2026-03-01T22:15:00Z', 'UK', 7000),
+  (5, '2026-03-02T10:00:00Z', 'EU', 8000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-order-by-apply",
@@ -1040,6 +1126,18 @@ LIMIT 10 OFFSET 0;               -- top 10 after sorting (OFFSET optional)
     demoCode: `SELECT DISTINCT status
 FROM orders
 ORDER BY status;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  status   TEXT
+);
+INSERT INTO orders VALUES
+  (1, 'paid'),
+  (2, 'shipped'),
+  (3, 'paid'),
+  (4, 'cancelled'),
+  (5, 'shipped'),
+  (6, 'paid');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-limit-distinct-apply",
@@ -1168,6 +1266,15 @@ CAST( total_cents_text  AS  INTEGER )
   CAST(total_cents_text AS INTEGER)         AS total_cents,
   CAST(total_cents_text AS INTEGER) / 100.0 AS total_dollars
 FROM orders_raw;`,
+    demoSeedSql: `CREATE TABLE orders_raw (
+  order_id         INTEGER,
+  total_cents_text TEXT     -- amounts stored as text
+);
+INSERT INTO orders_raw VALUES
+  (1, '4999'),
+  (2, '10000'),
+  (3, '250');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-cast-types-apply",
@@ -1298,6 +1405,15 @@ REPLACE('US-A', 'US-', '')   -> 'A'
 
 **Recap.** \`TRIM\` + \`LOWER\` build matchable join keys; \`SUBSTR\`/\`REPLACE\`/\`INSTR\` slice and rewrite messy source text. Standardize keys *before* any join or dedup.`,
     demoCode: `SELECT customer_id, LOWER(TRIM(email)) AS email_key FROM customers_raw;`,
+    demoSeedSql: `CREATE TABLE customers_raw (
+  customer_id INTEGER,
+  email       TEXT
+);
+INSERT INTO customers_raw VALUES
+  (1, '  Ana@Example.com '),
+  (2, 'LEE@example.COM'),
+  (3, 'kim@Example.com  ');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-strings-apply",
@@ -1421,6 +1537,15 @@ order_ts >= '2026-01-01'      -> string compare = chronological filter
   order_id,
   strftime('%Y-%m', order_ts) AS order_year_month
 FROM orders;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  order_ts TEXT       -- ISO-8601
+);
+INSERT INTO orders VALUES
+  (1, '2026-01-15T10:00:00Z'),
+  (2, '2026-02-03T14:30:00Z'),
+  (3, '2026-02-28T23:59:00Z');`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l1-dates-apply",

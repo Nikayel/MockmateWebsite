@@ -67,6 +67,20 @@ ones.`,
   AVG(total_cents)            AS avg_order_cents,
   MAX(total_cents)            AS largest_order_cents
 FROM orders;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,       -- NULL for guest checkout
+  total_cents INTEGER,       -- NULL for abandoned
+  status      TEXT
+);
+INSERT INTO orders VALUES
+  (100, 1,    2500, 'paid'),
+  (101, 1,    5000, 'paid'),
+  (102, 2,    9900, 'shipped'),
+  (103, NULL, 1500, 'paid'),      -- guest
+  (104, 3,    NULL, 'abandoned'), -- no total
+  (105, NULL, NULL, 'abandoned'); -- guest + no total`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-aggregates-apply",
@@ -222,6 +236,21 @@ One row per category **per month**. That's a monthly revenue mart in five lines.
   AVG(price_cents)  AS avg_price_cents
 FROM products
 GROUP BY category;`,
+    demoSeedSql: `CREATE TABLE products (
+  product_id  INTEGER PRIMARY KEY,
+  category    TEXT,
+  price_cents INTEGER
+);
+INSERT INTO products VALUES
+  (1, 'audio',      1500),
+  (2, 'audio',      3000),
+  (3, 'audio',      4500),
+  (4, 'cables',      500),
+  (5, 'cables',     1000),
+  (6, 'wearables',  9900),
+  (7, 'wearables', 19900),
+  (8, 'storage',    4900);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-group-by-apply",
@@ -376,6 +405,19 @@ Use \`WHERE\` for everything you *can*: filtering rows early shrinks the data be
 FROM order_items_wide
 GROUP BY category
 HAVING SUM(line_revenue_cents) > 100000;`,
+    demoSeedSql: `CREATE TABLE order_items_wide (
+  order_item_id      INTEGER PRIMARY KEY,
+  category           TEXT,
+  line_revenue_cents INTEGER
+);
+INSERT INTO order_items_wide VALUES
+  (1, 'audio',     60000),
+  (2, 'audio',     75000),
+  (3, 'wearables', 90000),
+  (4, 'wearables', 65000),
+  (5, 'cables',     5000),
+  (6, 'cables',     3000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-having-apply",
@@ -552,6 +594,25 @@ header-level \`SUM\`.`,
 FROM orders AS o
 INNER JOIN customers AS c
   ON o.customer_id = c.customer_id;`,
+    demoSeedSql: `CREATE TABLE customers (
+  customer_id   INTEGER PRIMARY KEY,
+  customer_name TEXT
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  total_cents INTEGER
+);
+INSERT INTO customers VALUES
+  (1, 'Ada Lovelace'),
+  (2, 'Grace Hopper'),
+  (3, 'Alan Turing');
+INSERT INTO orders VALUES
+  (100, 1, 2500),
+  (101, 2, 5000),
+  (102, 1, 9900),
+  (103, 9, 1500);   -- customer_id 9 does not exist, dropped by INNER JOIN`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-inner-join-apply",
@@ -740,6 +801,23 @@ FROM customers AS c
 LEFT JOIN orders AS o
   ON o.customer_id = c.customer_id
 GROUP BY c.customer_id, c.customer_name;`,
+    demoSeedSql: `CREATE TABLE customers (
+  customer_id   INTEGER PRIMARY KEY,
+  customer_name TEXT
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER
+);
+INSERT INTO customers VALUES
+  (1, 'Ada'),
+  (2, 'Grace'),
+  (3, 'Alan');    -- Alan has never ordered
+INSERT INTO orders VALUES
+  (100, 1),
+  (101, 1),
+  (102, 2);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-left-join-apply",
@@ -894,6 +972,20 @@ FROM orders AS o
 LEFT JOIN customers AS c
   ON o.customer_id = c.customer_id
 WHERE c.customer_id IS NULL;`,
+    demoSeedSql: `CREATE TABLE customers (
+  customer_id INTEGER PRIMARY KEY
+);
+CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER
+);
+INSERT INTO customers VALUES (1),(2),(3);
+INSERT INTO orders VALUES
+  (100, 1),
+  (101, 9),    -- orphan: customer 9 doesn't exist
+  (102, 2),
+  (103, 7);    -- orphan: customer 7 doesn't exist`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-anti-join-apply",
@@ -1068,6 +1160,17 @@ and every major warehouse.`,
 FROM employees AS e
 LEFT JOIN employees AS m
   ON e.manager_id = m.employee_id;`,
+    demoSeedSql: `CREATE TABLE employees (
+  employee_id   INTEGER PRIMARY KEY,
+  employee_name TEXT,
+  manager_id    INTEGER     -- NULL for the top of the org
+);
+INSERT INTO employees VALUES
+  (1, 'Ada',   NULL),
+  (2, 'Grace', 1),
+  (3, 'Alan',  1),
+  (4, 'Katherine', 2);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-self-join-apply",
@@ -1228,6 +1331,22 @@ Put \`ORDER BY\` only once, after the final \`SELECT\`. It sorts the whole combi
     demoCode: `SELECT order_id, total_cents FROM orders_eu
 UNION ALL
 SELECT order_id, total_cents FROM orders_us;`,
+    demoSeedSql: `CREATE TABLE orders_eu (
+  order_id    INTEGER,
+  total_cents INTEGER
+);
+CREATE TABLE orders_us (
+  order_id    INTEGER,
+  total_cents INTEGER
+);
+INSERT INTO orders_eu VALUES
+  (100, 2500),
+  (101, 5000),
+  (102, 9900);
+INSERT INTO orders_us VALUES
+  (200, 1500),
+  (201, 5000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-set-ops-apply",
@@ -1363,6 +1482,18 @@ correlated:     inner query references an outer alias (o), re-evaluated per oute
     demoCode: `SELECT order_id, total_cents
 FROM orders
 WHERE total_cents > (SELECT AVG(total_cents) FROM orders);`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (100, 1000),
+  (101, 2000),
+  (102, 9000),
+  (103, 3000),
+  (104,  500);
+-- average = (1000 + 2000 + 9000 + 3000 + 500) / 5 = 3100`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-subqueries-apply",
@@ -1516,6 +1647,19 @@ express the staging → intermediate → mart pipeline that production SQL is bu
 SELECT customer_id, SUM(total_cents) AS revenue
 FROM paid_orders
 GROUP BY customer_id;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  customer_id INTEGER,
+  status      TEXT,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (1, 1, 'paid',      3000),
+  (2, 1, 'paid',      4000),
+  (3, 2, 'paid',      1000),
+  (4, 2, 'cancelled', 9000),
+  (5, 3, 'paid',      6000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-ctes-apply",
@@ -1727,6 +1871,17 @@ it becomes conditional aggregation: the portable way to pivot categories into si
     ELSE 'small'
   END AS size_bucket
 FROM orders;`,
+    demoSeedSql: `CREATE TABLE orders (
+  order_id    INTEGER PRIMARY KEY,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (100,   500),
+  (101,  2000),
+  (102,  9900),
+  (103, 10000),
+  (104, 15000);`,
+    showDemoInput: true,
   },
   apply: {
     id: "sql-l2-case-apply",
