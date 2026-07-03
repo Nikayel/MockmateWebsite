@@ -1,21 +1,12 @@
 /**
- * SQL curriculum tree. AGENT-1 ships L1 + L3 each with ONE proof lesson (the single-file result-set
- * and workspace/marker pipelines); L2 and L4 are authored-but-empty shells. AGENT-2 fills every level
- * from `docs/sql-curriculum/CONTENT.md` (see `docs/sql-curriculum/AGENT-2-curriculum-developer.md`).
+ * SQL curriculum tree. L1 (Foundations) and L2 (Aggregation & Joins) are fully authored; L3 ships
+ * AGENT-1's DDL proof lesson and L4 is an authored-but-empty shell. AGENT-2 fills the rest from
+ * `docs/sql-curriculum/CONTENT.md` (see `docs/sql-curriculum/AGENT-2-curriculum-developer.md`).
  */
 import type { SqlLevel } from "@/lib/tutorials/types"
 import { sqlLevel1 } from "./level1"
+import { sqlLevel2 } from "./level2"
 import { sqlLevel3 } from "./level3"
-
-const sqlLevel2: SqlLevel = {
-  id: 2,
-  slug: "aggregation",
-  title: "Level 2 — Aggregation & Joins: Combining Source Data",
-  tagline: "Aggregates, GROUP BY/HAVING, every join flavor, subqueries, CTEs — building metrics.",
-  defaultExecutionMode: "single-file",
-  estimatedHours: 5,
-  modules: [],
-}
 
 const sqlLevel4: SqlLevel = {
   id: 4,
