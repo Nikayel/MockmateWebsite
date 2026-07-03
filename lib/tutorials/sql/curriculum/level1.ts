@@ -1116,6 +1116,386 @@ INSERT INTO orders VALUES
   },
 }
 
+const castTypes: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l1-cast-types",
+  title: "Data Types and CAST",
+  summary: "Convert values explicitly and understand SQLite's dynamic typing.",
+  estimatedMinutes: 13,
+  difficulty: "medium",
+  skills: ["CAST", "type affinity", "numeric vs text", "SQLite dynamic-typing caveat"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Data Types and CAST
+
+**Why a DE casts at the boundary.** Source data arrives with the wrong types constantly — an amount stored as the text \`'4999'\`, a flag as \`'1'\`.
+
+> **In the warehouse this differs.** SQLite has *dynamic typing with type affinity* — it will happily store the string \`'oops'\` in a column you declared \`INTEGER\`, and arithmetic on text may silently coerce or return \`0\`. Postgres and Snowflake are strict: they *reject* a bad value at write time. Because your DDL should port to those strict systems, the DE habit is to **\`CAST\` explicitly at the boundary** rather than trust the source's typing.
+
+**\`CAST\`.** \`CAST(expr AS type)\` converts a value. Common targets: \`INTEGER\`, \`REAL\` (float), \`TEXT\`. \`CAST('4999' AS INTEGER)\` → \`4999\`; you can now do arithmetic on it reliably.
+
+**Worked example:**
+
+\`\`\`sql
+SELECT
+  order_id,
+  CAST(total_cents_text AS INTEGER)            AS total_cents,
+  CAST(total_cents_text AS INTEGER) / 100.0    AS total_dollars
+FROM orders_raw;
+\`\`\`
+
+**Anatomy.**
+
+\`\`\`
+CAST( total_cents_text  AS  INTEGER )
+      └─ the value ──┘      └ target type ┘
+\`\`\`
+
+**Guarding junk.** If a text column may hold non-numeric junk, casting it in SQLite yields \`0\` (not an error), which can silently corrupt a sum. A portable guard is to only treat rows as numeric when they match a numeric shape (\`GLOB '[0-9]*'\` in SQLite / a regex in Postgres) or to \`CASE\` non-numeric values to NULL so they don't pollute a measure.
+
+**Pitfall.** \`CAST('12.99' AS INTEGER)\` → \`12\` (truncates, doesn't round). Cast to \`REAL\` first if you need the decimal, or cast the cents (an integer) rather than a dollar float. And remember SQLite won't *error* on a bad cast the way a warehouse does — test your assumptions.
+
+**Recap.** \`CAST(expr AS type)\` converts values explicitly at the trust boundary; SQLite's lax typing means you must cast (and guard junk) yourself so the model ports to strict warehouses.`,
+    demoCode: `SELECT
+  order_id,
+  CAST(total_cents_text AS INTEGER)         AS total_cents,
+  CAST(total_cents_text AS INTEGER) / 100.0 AS total_dollars
+FROM orders_raw;`,
+  },
+  apply: {
+    id: "sql-l1-cast-types-apply",
+    executionMode: "single-file",
+    prompt: `Cast the text \`total_cents_text\` to an integer and compute dollars. Return \`order_id\`, \`total_cents\` (the cast integer), and \`total_dollars\` (\`total_cents / 100.0\`, keeping decimals).`,
+    starterCode: `-- Cast total_cents_text to INTEGER, then compute dollars.
+SELECT
+  order_id,
+
+FROM orders_raw;`,
+    hints: [
+      "CAST(total_cents_text AS INTEGER) gives the integer cents.",
+      "Divide by 100.0 (not 100) to keep the fractional dollars.",
+      "Alias both computed columns.",
+    ],
+    referenceSolution: `SELECT
+  order_id,
+  CAST(total_cents_text AS INTEGER)         AS total_cents,
+  CAST(total_cents_text AS INTEGER) / 100.0 AS total_dollars
+FROM orders_raw;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders_raw (
+  order_id         INTEGER,
+  total_cents_text TEXT     -- amounts stored as text
+);
+INSERT INTO orders_raw VALUES
+  (1, '4999'),
+  (2, '10000'),
+  (3, '250');`,
+      orderMatters: false,
+      expected: {
+        columns: ["order_id", "total_cents", "total_dollars"],
+        rows: [
+          [1, 4999, 49.99],
+          [2, 10000, 100],
+          [3, 250, 2.5],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l1-cast-types-practice",
+    executionMode: "single-file",
+    prompt: `Clean the dirty numeric column into a typed, model-ready measure while keeping *every* row. Return \`payment_id\`, \`amount_cents\`, \`amount_dollars\` where:
+- \`amount_cents\` = the value cast to an integer **only when** \`amount_text\` is all digits; otherwise \`NULL\` (so junk like \`'N/A'\`, \`''\`, \`'pending'\` does not become a silent \`0\`),
+- \`amount_dollars\` = \`amount_cents / 100.0\` (which is \`NULL\` when \`amount_cents\` is \`NULL\`).`,
+    starterCode: `-- Guard the cast so junk becomes NULL, not 0.
+SELECT
+  payment_id,
+
+FROM payments_raw;`,
+    hints: [
+      "Guard the cast with a shape test: in SQLite, amount_text GLOB '[0-9]*' AND amount_text NOT GLOB '*[^0-9]*' is true only for all-digit strings. (In a warehouse you'd use a regex like ~ '^[0-9]+$'.)",
+      "Wrap it in CASE WHEN <all digits> THEN CAST(amount_text AS INTEGER) ELSE NULL END AS amount_cents.",
+      "Reuse the same guarded expression for amount_dollars by dividing by 100.0; NULL divided/propagated stays NULL.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE payments_raw (
+  payment_id  INTEGER,
+  amount_text TEXT     -- mostly numeric text, some junk
+);
+INSERT INTO payments_raw VALUES
+  (1, '4999'),
+  (2, '10000'),
+  (3, 'N/A'),
+  (4, ''),
+  (5, '750'),
+  (6, 'pending');`,
+      orderMatters: false,
+      expected: {
+        columns: ["payment_id", "amount_cents", "amount_dollars"],
+        rows: [
+          [1, 4999, 49.99],
+          [2, 10000, 100],
+          [3, null, null],
+          [4, null, null],
+          [5, 750, 7.5],
+          [6, null, null],
+        ],
+      },
+    },
+  },
+}
+
+const stringFns: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l1-strings",
+  title: "String Functions for Cleaning",
+  summary: "Trim, case-fold, and slice text to standardize messy source strings.",
+  estimatedMinutes: 14,
+  difficulty: "medium",
+  skills: ["LOWER/UPPER", "TRIM", "SUBSTR", "REPLACE", "LENGTH", "INSTR"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Standardize before you join
+
+Joins and dedup only work when keys match *exactly*. \`'  Ana@Example.com '\` and \`'ana@example.com'\` are different strings — a join on them fails, a dedup keeps both. Before any join, a staging model normalizes the key: trim whitespace, lowercase, strip prefixes. Getting this right is the difference between a clean dimension and a duplicated one.
+
+> In the warehouse this differs: a staging model normalizes keys — trim, lowercase, strip prefixes — *before* any join or dedup, so a clean dimension does not silently fragment into duplicate rows.
+
+## The toolkit
+
+- \`LOWER(s)\` / \`UPPER(s)\` — case-fold.
+- \`TRIM(s)\` — remove leading/trailing whitespace (\`LTRIM\`/\`RTRIM\` for one side; \`TRIM(s, chars)\` to trim specific characters).
+- \`SUBSTR(s, start, len)\` — slice (1-indexed in SQLite).
+- \`REPLACE(s, from, to)\` — swap all occurrences.
+- \`LENGTH(s)\` — character count. \`INSTR(s, sub)\` — 1-based position of \`sub\` (0 if absent).
+
+**Worked example — a cleaned email key:**
+
+\`\`\`sql
+SELECT
+  customer_id,
+  LOWER(TRIM(email)) AS email_key
+FROM customers_raw;
+\`\`\`
+
+**Anatomy.**
+
+\`\`\`
+LOWER( TRIM( email ) )
+       └ strip spaces ┘
+└─ then case-fold ─┘
+SUBSTR('SKU-AUD-01', 5)      -> 'AUD-01'   (from position 5 to end)
+REPLACE('US-A', 'US-', '')   -> 'A'
+\`\`\`
+
+**Pitfall.** \`SUBSTR\` is **1-indexed** in SQLite (and Oracle), but some languages/dialects are 0-indexed — count carefully. \`TRIM\` only removes whitespace by default, not interior spaces (\`'a b'\` stays \`'a b'\`); use \`REPLACE(s, ' ', '')\` to strip all spaces. And functions **nest inside-out**: \`LOWER(TRIM(x))\` trims first, then lowercases.
+
+**Recap.** \`TRIM\` + \`LOWER\` build matchable join keys; \`SUBSTR\`/\`REPLACE\`/\`INSTR\` slice and rewrite messy source text — standardize keys *before* any join or dedup.`,
+    demoCode: `SELECT customer_id, LOWER(TRIM(email)) AS email_key FROM customers_raw;`,
+  },
+  apply: {
+    id: "sql-l1-strings-apply",
+    executionMode: "single-file",
+    prompt: `Normalize each email to a trimmed, lowercase join key. Return \`customer_id\` and \`email_key\` = \`LOWER(TRIM(email))\`.`,
+    starterCode: `-- Return customer_id and a normalized email_key = LOWER(TRIM(email))
+SELECT
+
+FROM customers_raw;`,
+    hints: [
+      "TRIM(email) removes the leading/trailing spaces.",
+      "Wrap it in LOWER(...) to case-fold.",
+      "Order matters inside-out: trim first, then lowercase (either order works here, but be deliberate).",
+    ],
+    referenceSolution: `SELECT
+  customer_id,
+  LOWER(TRIM(email)) AS email_key
+FROM customers_raw;`,
+    singleFile: {
+      seedSql: `CREATE TABLE customers_raw (
+  customer_id INTEGER,
+  email       TEXT
+);
+INSERT INTO customers_raw VALUES
+  (1, '  Ana@Example.com '),
+  (2, 'LEE@example.COM'),
+  (3, 'kim@Example.com  ');`,
+      orderMatters: false,
+      expected: {
+        columns: ["customer_id", "email_key"],
+        rows: [
+          [1, "ana@example.com"],
+          [2, "lee@example.com"],
+          [3, "kim@example.com"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l1-strings-practice",
+    executionMode: "single-file",
+    prompt: `Build the cleaned join key set a staging model prepares before any join. Return \`customer_id\` and:
+- \`email_key\` — trimmed and lowercased email,
+- \`sku_clean\` — the \`sku\` with the leading \`'PRD-'\` prefix removed (e.g. \`PRD-AUD-01\` → \`AUD-01\`),
+- \`country_code_norm\` — the \`country_code\` trimmed and **uppercased** (e.g. \`' us '\` → \`US\`).`,
+    starterCode: `-- Return customer_id, email_key, sku_clean, country_code_norm
+SELECT
+
+FROM customers_raw;`,
+    hints: [
+      "email_key = LOWER(TRIM(email)), same as the Apply.",
+      "Strip the prefix with REPLACE(sku, 'PRD-', '') (or SUBSTR(sku, 5) since 'PRD-' is 4 chars, so start at position 5).",
+      "country_code_norm = UPPER(TRIM(country_code)).",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE customers_raw (
+  customer_id  INTEGER,
+  email        TEXT,
+  sku          TEXT,     -- has a 'PRD-' prefix to strip
+  country_code TEXT      -- messy case / spacing
+);
+INSERT INTO customers_raw VALUES
+  (1, '  Ana@Example.com ', 'PRD-AUD-01', ' us '),
+  (2, 'LEE@example.COM',    'PRD-HOM-05', 'Gb'),
+  (3, 'kim@Example.com  ',  'PRD-TOY-09', ' De ');`,
+      orderMatters: false,
+      expected: {
+        columns: ["customer_id", "email_key", "sku_clean", "country_code_norm"],
+        rows: [
+          [1, "ana@example.com", "AUD-01", "US"],
+          [2, "lee@example.com", "HOM-05", "GB"],
+          [3, "kim@example.com", "TOY-09", "DE"],
+        ],
+      },
+    },
+  },
+}
+
+const dates: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l1-dates",
+  title: "Dates and Times in SQLite",
+  summary: "Parse and format ISO-8601 date text — where dialects diverge most.",
+  estimatedMinutes: 15,
+  difficulty: "medium",
+  skills: ["date()", "strftime", "ISO-8601 text dates", "date filtering/truncation"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Dates and Times in SQLite
+
+> **In the warehouse this differs.** SQLite has **no dedicated DATE or TIMESTAMP type**. Dates live as **TEXT in ISO-8601** (\`'2026-03-01'\` or \`'2026-03-01T09:14:00Z'\`), and you manipulate them with the \`date()\`, \`datetime()\`, and \`strftime()\` functions. Real warehouses have native \`DATE\`/\`TIMESTAMP\` types and *different* function names — Postgres uses \`date_trunc('month', ts)\` and \`EXTRACT(YEAR FROM ts)\`; BigQuery uses \`DATE_TRUNC\`/\`FORMAT_DATE\`; Snowflake uses \`DATE_TRUNC\`/\`TO_CHAR\`. The **concepts** below (truncate, extract a part, filter a window) transfer everywhere; the exact syntax does not. Because ISO-8601 text also *sorts and compares* chronologically as plain strings, a lot of date filtering needs no functions at all.
+
+### The core functions (SQLite)
+
+- \`date(ts)\` — truncate a timestamp to the day: \`date('2026-03-01T09:14:00Z')\` → \`'2026-03-01'\`.
+- \`strftime(fmt, ts)\` — format/extract. \`strftime('%Y-%m', ts)\` → \`'2026-03'\` (year-month); \`%Y\` year, \`%m\` month, \`%d\` day, \`%w\` day-of-week (0=Sunday).
+
+**Worked example — extract year-month:**
+
+\`\`\`sql
+SELECT
+  order_id,
+  strftime('%Y-%m', order_ts) AS order_year_month
+FROM orders;
+\`\`\`
+
+**Anatomy.**
+
+\`\`\`
+strftime( '%Y-%m' , order_ts )
+          └ format ┘  └ ISO text timestamp ┘
+date( order_ts )              -> 'YYYY-MM-DD'  (day truncation)
+order_ts >= '2026-01-01'      -> string compare = chronological filter
+\`\`\`
+
+**Filtering a window.** Because ISO text sorts correctly, a rolling window is just a string range: \`WHERE order_ts >= '2026-01-01' AND order_ts < '2026-04-01'\`. Prefer half-open ranges (\`>= start AND < next_start\`) over \`BETWEEN\` for timestamps, so you don't accidentally include or exclude the boundary instant.
+
+**Pitfall.** \`strftime\` returns **text**, so \`strftime('%m', ts)\` is \`'03'\` (string), not the number \`3\` — cast if you need arithmetic. And \`strftime\`/\`date\` only work on *valid ISO-8601* strings; a malformed date like \`'03/01/2026'\` returns NULL silently. Validate/standardize date text before relying on these functions.
+
+**Recap.** In SQLite dates are ISO text: \`date()\` truncates to day, \`strftime()\` extracts/formats, and plain string comparison filters windows — but the function names change in every real warehouse, so lean on the portable concepts.`,
+    demoCode: `SELECT
+  order_id,
+  strftime('%Y-%m', order_ts) AS order_year_month
+FROM orders;`,
+  },
+  apply: {
+    id: "sql-l1-dates-apply",
+    executionMode: "single-file",
+    prompt: `Extract the year-month (\`YYYY-MM\`) from each order's timestamp. Return \`order_id\` and \`order_year_month\`.`,
+    starterCode: `-- Extract YYYY-MM from each order's ISO-8601 timestamp.
+SELECT
+
+FROM orders;`,
+    hints: [
+      "Use strftime('%Y-%m', order_ts).",
+      "%Y is the 4-digit year, %m the zero-padded month.",
+      "Alias the result order_year_month.",
+    ],
+    referenceSolution: `SELECT
+  order_id,
+  strftime('%Y-%m', order_ts) AS order_year_month
+FROM orders;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  order_ts TEXT       -- ISO-8601
+);
+INSERT INTO orders VALUES
+  (1, '2026-01-15T10:00:00Z'),
+  (2, '2026-02-03T14:30:00Z'),
+  (3, '2026-02-28T23:59:00Z');`,
+      orderMatters: false,
+      expected: {
+        columns: ["order_id", "order_year_month"],
+        rows: [
+          [1, "2026-01"],
+          [2, "2026-02"],
+          [3, "2026-02"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l1-dates-practice",
+    executionMode: "single-file",
+    prompt: `Build a date-spine preview for a daily mart, filtered to a rolling window of \`2026-01-01\` (inclusive) up to \`2026-04-01\` (exclusive). For each in-window order return:
+- \`order_id\`
+- \`order_date\` — the timestamp truncated to the day (\`YYYY-MM-DD\`)
+- \`order_year_month\` — \`YYYY-MM\`
+- \`day_of_week\` — the numeric day-of-week as text via \`strftime('%w', ...)\` (\`0\`=Sunday … \`6\`=Saturday)
+
+Sort the output by \`order_date\` ascending.`,
+    starterCode: `-- Windowed date-spine preview: filter 2026-01-01 (inclusive) to 2026-04-01 (exclusive),
+-- then sort by order_date ascending.
+SELECT
+
+FROM orders;`,
+    hints: [
+      "Filter with a half-open window: WHERE order_ts >= '2026-01-01' AND order_ts < '2026-04-01' — ISO text compares chronologically, so no parsing needed. The 2025 row drops.",
+      "date(order_ts) gives the day; strftime('%Y-%m', order_ts) the year-month; strftime('%w', order_ts) the day-of-week.",
+      "ORDER BY order_date (or order_ts) ascending for the deterministic spine.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  order_ts TEXT       -- ISO-8601
+);
+INSERT INTO orders VALUES
+  (1, '2026-01-05T08:00:00Z'),   -- Mon
+  (2, '2026-02-14T19:30:00Z'),   -- Sat
+  (3, '2026-03-01T12:00:00Z'),   -- Sun
+  (4, '2026-03-15T09:45:00Z'),   -- Sun
+  (5, '2025-12-31T23:00:00Z');   -- out of window (prior year)`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "order_date", "order_year_month", "day_of_week"],
+        rows: [
+          [1, "2026-01-05", "2026-01", "1"],
+          [2, "2026-02-14", "2026-02", "6"],
+          [3, "2026-03-01", "2026-03", "0"],
+          [4, "2026-03-15", "2026-03", "0"],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel1: SqlLevel = {
   id: 1,
   slug: "foundations",
@@ -1145,6 +1525,13 @@ export const sqlLevel1: SqlLevel = {
       description:
         "Order, limit, and de-duplicate output for deterministic previews and top-N inspection.",
       lessons: [orderBy, limitDistinct],
+    },
+    {
+      id: "sql-l1-types",
+      title: "Module 1.4 — Types, Casting, Strings, and Dates",
+      description:
+        "Coerce and clean raw values: type affinity and CAST, string functions, and SQLite date/time handling.",
+      lessons: [castTypes, stringFns, dates],
     },
   ],
 }
