@@ -133,6 +133,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
         <WorkspaceExerciseRunner
           exercise={exercise}
           workspace={exercise.workspace}
+          engine="sql"
           onPass={opts.onPass}
         />
       )
@@ -233,6 +234,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
               {active === "teach" && (
                 <TeachPanel
                   teach={lesson.teach}
+                  demoLanguage="sql"
                   onContinue={() => {
                     markComplete("teach")
                     goToSection("apply")

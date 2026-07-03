@@ -15,12 +15,15 @@ export interface TeachPanelProps {
   teach: TeachSection
   onContinue: () => void
   continueLabel?: string
+  /** Syntax-highlighting language for the demo block. Defaults to "python" (Python call sites unchanged). */
+  demoLanguage?: string
 }
 
 export function TeachPanel({
   teach,
   onContinue,
   continueLabel = "I've got it — let me try",
+  demoLanguage = "python",
 }: TeachPanelProps) {
   return (
     <div className="flex flex-col gap-5">
@@ -34,7 +37,12 @@ export function TeachPanel({
             Live example
           </div>
           <CodeMirrorErrorBoundary>
-            <CodeMirrorEditor value={teach.demoCode} language="python" height={140} readOnly />
+            <CodeMirrorEditor
+              value={teach.demoCode}
+              language={demoLanguage}
+              height={140}
+              readOnly
+            />
           </CodeMirrorErrorBoundary>
         </div>
       )}

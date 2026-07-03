@@ -24,6 +24,8 @@ export interface WorkspaceExerciseRunnerProps {
   onPass?: () => void
   /** Fires after each graded run with its pass/fail (drives Sable). */
   onRunResult?: (passed: boolean) => void
+  /** Which browser engine warms — drives the cold-start copy. Defaults to "python" (call sites unchanged). */
+  engine?: "python" | "sql"
 }
 
 export function WorkspaceExerciseRunner({
@@ -31,6 +33,7 @@ export function WorkspaceExerciseRunner({
   workspace,
   onPass,
   onRunResult,
+  engine = "python",
 }: WorkspaceExerciseRunnerProps) {
   const editablePaths = useMemo(() => new Set(workspace.editableFilePaths), [workspace])
   const isEditable = (file: WorkspaceScenarioFile) =>
@@ -123,9 +126,15 @@ export function WorkspaceExerciseRunner({
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={handleRun} disabled={running} className="gap-2">
           <Play className="h-4 w-4" />
-          {warming ? "Starting Python…" : running ? "Running…" : "Run tests"}
+          {warming
+            ? engine === "sql"
+              ? "Starting SQL engine…"
+              : "Starting Python…"
+            : running
+              ? "Running…"
+              : "Run tests"}
         </Button>
-        <ColdStartNote warming={warming} />
+        <ColdStartNote warming={warming} engine={engine} />
         {passed && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />

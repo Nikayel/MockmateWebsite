@@ -60,9 +60,16 @@ export function SqlExerciseRunner({
     canRevealReference && Boolean(exercise.referenceSolution) && attempts >= revealReferenceAfter
 
   // The single graded row carries the returned + expected result sets (see the SQL single-file runner).
+  // `actual` can be a non-result-set sentinel (the shared result mapper's "fail" string) on an errored
+  // run, so guard: only a real { columns, rows } object reaches the grid — else a failing query would
+  // throw in render and eject the learner to the error page instead of showing the failure.
   const graded = results[0]
-  const actualSet = graded?.actual as SqlResultSet | undefined
-  const expectedSet = graded?.expected as SqlResultSet | undefined
+  const isResultSet = (value: unknown): value is SqlResultSet =>
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as { columns?: unknown }).columns)
+  const actualSet = isResultSet(graded?.actual) ? graded.actual : undefined
+  const expectedSet = isResultSet(graded?.expected) ? graded.expected : undefined
 
   return (
     <div className="flex flex-col gap-4">

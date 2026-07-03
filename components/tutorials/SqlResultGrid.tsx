@@ -18,7 +18,8 @@ export function SqlResultGrid({
   /** "actual" tints the header when this is the learner's returned set; "expected" for the target. */
   tone?: "neutral" | "actual" | "expected"
 }) {
-  if (!result || result.columns.length === 0) {
+  // Defensive: a non-result-set value (e.g. an error sentinel) must render the empty state, never throw.
+  if (!result || !Array.isArray(result.columns) || result.columns.length === 0) {
     return (
       <div className="border-border text-muted-foreground rounded-lg border border-dashed p-3 text-center text-xs">
         {label ? `${label}: ` : ""}No result set.
@@ -40,13 +41,18 @@ export function SqlResultGrid({
           {label}
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div
+        className="overflow-x-auto"
+        role="region"
+        aria-label={label ? `${label} result table` : "Result table"}
+      >
         <table className="w-full border-collapse text-left font-mono text-xs">
           <thead>
             <tr>
               {result.columns.map((col, i) => (
                 <th
                   key={`${col}-${i}`}
+                  scope="col"
                   className={`${headerTone} border-border border-b px-3 py-1.5 font-semibold whitespace-nowrap`}
                 >
                   {col}
