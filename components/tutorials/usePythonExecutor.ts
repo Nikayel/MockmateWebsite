@@ -51,6 +51,8 @@ export function usePythonExecutor(): PythonExecutorState {
     setWarming(!isPythonRuntimeWarm())
     setError(null)
     setResult(undefined)
+    // Clear the previous run's stdout too, else it renders under the spinner as if it were this run.
+    setOutput([])
     const startedAt = performance.now()
     try {
       const outcome = await runPythonInWorker(code)
