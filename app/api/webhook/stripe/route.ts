@@ -113,9 +113,19 @@ async function updateQuotaForSubscriptionTierAdmin(
 
     // Reset usage if explicitly requested (new billing period) or if downgrading and usage exceeds new limit
     if (resetUsage) {
-      updateData.sessions_used = 0
-      updateData.free_opens_remaining = 0
-      paymentLogger.info("Resetting usage for new billing period", { userId, sessionsLimit })
+      // Idempotency guard: zero usage at most ONCE per billing period, so a RETRIED invoice.paid
+      // webhook cannot re-zero a user's sessions mid-period and hand them unpaid usage. (hardening)
+      if (currentData.last_reset_period_start === periodStart.toISOString()) {
+        paymentLogger.info("Usage already reset for this period — skipping duplicate reset", {
+          userId,
+          periodStart: periodStart.toISOString(),
+        })
+      } else {
+        updateData.sessions_used = 0
+        updateData.free_opens_remaining = 0
+        updateData.last_reset_period_start = periodStart.toISOString()
+        paymentLogger.info("Resetting usage for new billing period", { userId, sessionsLimit })
+      }
     } else if ((currentData.sessions_used as number) > sessionsLimit) {
       // If user has used more than new limit (e.g., downgrade from pro to free), cap it
       updateData.sessions_used = sessionsLimit
@@ -128,7 +138,8 @@ async function updateQuotaForSubscriptionTierAdmin(
 
     await currentQuotaDoc.ref.update(updateData)
   } else {
-    // Create new quota for this period
+    // Create new quota for this period. Stamp last_reset_period_start so a retried webhook that then
+    // finds this doc skips the usage reset (the period already starts at 0 here). (hardening)
     await adminDb.collection("profile_quota").add({
       user_id: userId,
       sessions_used: 0,
@@ -136,6 +147,7 @@ async function updateQuotaForSubscriptionTierAdmin(
       free_opens_remaining: 0,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
+      last_reset_period_start: periodStart.toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -161,7 +173,16 @@ async function recordPaymentHistory(
   }
 ): Promise<void> {
   try {
-    const paymentRef = adminDb.collection("payment_history").doc()
+    // Idempotent doc id from the payment's UNIQUE natural key + status, so a webhook RETRY upserts the
+    // same row instead of creating a duplicate (which would inflate admin revenue stats). The
+    // subscription id is intentionally NOT used as a key (it repeats across monthly invoices); we fall
+    // back to an auto id when no unique payment id is present, preserving prior behavior. (hardening)
+    const naturalKey = data.stripe_invoice_id || data.stripe_payment_intent_id
+    const paymentRef = naturalKey
+      ? adminDb
+          .collection("payment_history")
+          .doc(`${naturalKey}_${data.status}`.replace(/[^a-zA-Z0-9_-]/g, "_"))
+      : adminDb.collection("payment_history").doc()
     await paymentRef.set({
       id: paymentRef.id,
       user_id: userId,
@@ -178,6 +199,61 @@ async function recordPaymentHistory(
   } catch (error) {
     paymentLogger.error("Failed to record payment history", { userId, error })
     // Don't throw - payment recording is not critical
+  }
+}
+
+/**
+ * Dead-letter a failed webhook event so it is durable + VISIBLE. Handler failures used to be invisible
+ * (no non-2xx, no record); now they land in `webhook_failures` for admin inspection / replay, and the
+ * error is logged at error level to drive alerting. Best-effort: never throws. (hardening)
+ */
+async function recordWebhookFailure(
+  event: Stripe.Event,
+  stage: string,
+  error: unknown
+): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error)
+  paymentLogger.error("WEBHOOK_FAILURE — event dead-lettered for reconciliation", {
+    eventId: event.id,
+    eventType: event.type,
+    stage,
+    error: message,
+  })
+  try {
+    await adminDb
+      .collection("webhook_failures")
+      .doc(event.id)
+      .set(
+        {
+          event_id: event.id,
+          event_type: event.type,
+          stage,
+          error: message,
+          created: event.created,
+          failed_at: new Date().toISOString(),
+          raw_event: JSON.parse(JSON.stringify(event)),
+        },
+        { merge: true }
+      )
+  } catch (dlqError) {
+    paymentLogger.error("Failed to write webhook_failures record", {
+      eventId: event.id,
+      error: dlqError,
+    })
+  }
+}
+
+/**
+ * Release the idempotency marker so Stripe's automatic retry RE-RUNS a failed event, instead of the
+ * pre-written marker making the retry skip and silently dropping the entitlement update. Safe to pair
+ * with retries because the entitlement mutations are idempotent (fixed-value tier writes, keyed
+ * payment_history, guarded quota reset). Best-effort: never throws. (hardening)
+ */
+async function releaseIdempotencyMarker(eventKey: string): Promise<void> {
+  try {
+    await adminDb.collection("webhook_events").doc(eventKey).delete()
+  } catch (releaseError) {
+    paymentLogger.error("Failed to release idempotency marker", { eventKey, error: releaseError })
   }
 }
 
@@ -445,6 +521,8 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           paymentLogger.error("Error updating user profile", { userId, error })
+          await recordWebhookFailure(event, "checkout.session.completed:subscription", error)
+          await releaseIdempotencyMarker(eventKey)
           return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
         }
       } else {
@@ -705,6 +783,8 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           paymentLogger.error("Error updating user profile for yearly plan", { userId, error })
+          await recordWebhookFailure(event, "checkout.session.completed:yearly", error)
+          await releaseIdempotencyMarker(eventKey)
           return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
         }
       } else {
@@ -1249,6 +1329,8 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       paymentLogger.error("Error handling subscription update/deletion", { error })
+      await recordWebhookFailure(event, "customer.subscription.updated/deleted", error)
+      await releaseIdempotencyMarker(eventKey)
       return NextResponse.json({ error: "Failed to process subscription event" }, { status: 500 })
     }
   }
@@ -1379,6 +1461,9 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       paymentLogger.error("Error handling charge dispute", { error })
+      // Entitlement-affecting (downgrade to free): dead-letter so a dropped downgrade is visible and
+      // recoverable by the reconciliation cron, rather than silently swallowed. (hardening)
+      await recordWebhookFailure(event, "charge.dispute.created", error)
     }
   }
 
@@ -1424,6 +1509,9 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       paymentLogger.error("Error handling uncollectible invoice", { error })
+      // Entitlement-affecting (downgrade to free): dead-letter so a dropped downgrade is visible and
+      // recoverable by the reconciliation cron, rather than silently swallowed. (hardening)
+      await recordWebhookFailure(event, "invoice.marked_uncollectible", error)
     }
   }
 
