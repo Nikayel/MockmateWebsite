@@ -18,7 +18,7 @@ import {
 } from "firebase/firestore"
 import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
-import { calculateTechnicalScoreFromBreakdown } from "./constants"
+import { calculateTechnicalScoreFromBreakdown, SESSION } from "./constants"
 
 /**
  * Sanitize test results for Firestore storage
@@ -1221,8 +1221,11 @@ export async function createGuestInterviewSession(
     started_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    // Guest sessions expire after 48 hours if not claimed
-    expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    // Guest sessions expire after SESSION.GUEST_EXPIRY_DAYS if not claimed — kept consistent with the
+    // Admin-SDK write path (app/api/guest-session) so both agree on one lifetime. (chore #5)
+    expires_at: new Date(
+      Date.now() + SESSION.GUEST_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+    ).toISOString(),
   }
 
   await setDoc(sessionRef, sessionData)
