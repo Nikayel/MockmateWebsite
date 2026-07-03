@@ -809,6 +809,273 @@ CREATE TABLE trend (
   }),
 }
 
+const recursiveCte: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-recursive-cte",
+  title: "Recursive CTEs for Hierarchies",
+  summary: "Walk self-referencing trees like org charts and category paths.",
+  estimatedMinutes: 24,
+  difficulty: "hard",
+  skills: [
+    "WITH RECURSIVE",
+    "anchor + recursive member",
+    "UNION ALL",
+    "termination guard",
+    "depth tracking",
+  ],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Recursive CTEs: walk a tree of unknown depth
+
+A \`categories\` table where each row has a \`parent_id\` pointing at another row in the *same* table
+can nest arbitrarily deep: \`Electronics → Audio → Headphones → Over-ear\`. You can't write "join N
+times" when N is unknown at query time. A **recursive CTE** repeatedly applies a query to its own
+output until nothing new is produced.
+
+A recursive CTE has three parts:
+
+\`\`\`sql
+WITH RECURSIVE tree AS (
+  -- 1. ANCHOR: the starting rows (the roots)
+  SELECT id, name, parent_id, 0 AS depth
+  FROM categories
+  WHERE parent_id IS NULL
+
+  UNION ALL
+
+  -- 2. RECURSIVE MEMBER: joins the CTE back to the base table to go one level deeper
+  SELECT c.id, c.name, c.parent_id, t.depth + 1
+  FROM categories c
+  JOIN tree t ON c.parent_id = t.id
+  -- 3. TERMINATION: implicit — stops when the recursive member returns no new rows
+)
+SELECT * FROM tree ORDER BY depth, id;
+\`\`\`
+
+- **Anchor** runs once, seeding the working set (here, top-level categories at depth 0).
+- **Recursive member** runs repeatedly: each pass joins the base table to the rows produced by the
+  *previous* pass, emitting the children one level deeper. \`depth + 1\` tracks how far down you are.
+- **Termination** is automatic: when a pass produces zero new rows (you've hit the leaves), recursion
+  stops. A well-formed tree terminates on its own.
+
+### Building a breadcrumb path
+
+Carry an accumulating string down the recursion to build \`Electronics > Audio > Headphones\`:
+
+\`\`\`sql
+WITH RECURSIVE tree AS (
+  SELECT id, name, parent_id, name AS path, 0 AS depth
+  FROM categories WHERE parent_id IS NULL
+  UNION ALL
+  SELECT c.id, c.name, c.parent_id,
+         t.path || ' > ' || c.name AS path,
+         t.depth + 1
+  FROM categories c JOIN tree t ON c.parent_id = t.id
+)
+SELECT id, name, path, depth FROM tree;
+\`\`\`
+
+Each level appends its own name to the parent's path.
+
+### Common pitfalls
+
+- **Type mismatch between anchor and recursive member.** The two \`SELECT\`s must have the **same
+  number and types** of columns. If the anchor's \`path\` is declared narrower than the concatenated
+  recursive \`path\`, some engines truncate. Seed the anchor with the same expression type.
+- **Infinite loops on dirty data.** If the data has a cycle (A's parent is B, B's parent is A),
+  recursion never terminates. Guard with a depth cap (\`WHERE t.depth < 100\` in the recursive member)
+  or track a visited-path and stop on repeats.
+- **\`UNION\` vs \`UNION ALL\`.** Use \`UNION ALL\` — it's cheaper and correct for a tree. \`UNION\` would
+  dedupe every pass, which is wasteful and can mask cycles.
+
+> **In the warehouse:** Postgres, SQLite, Snowflake, BigQuery all require the \`RECURSIVE\` keyword;
+> **SQL Server omits it** — you write plain \`WITH tree AS (…)\` for a recursive CTE there. The
+> three-part structure is identical everywhere.
+
+**Recap:** \`WITH RECURSIVE\` = anchor (roots) \`UNION ALL\` recursive member (join the CTE back to the
+table for the next level), auto-terminating when no new rows appear; track \`depth\` and accumulate a
+\`path\` string for breadcrumbs, and cap depth to survive cyclic dirty data.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB
+that already holds the source tree plus an empty target table; then hidden assertion queries check
+depths, breadcrumbs, and row counts. Lead your load with \`DELETE FROM <target>;\` so a re-run stays
+idempotent.`,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-recursive-cte-apply",
+    prompt: `Traverse an \`employees\` → \`manager\` hierarchy and record each employee's **depth** from the
+top. Populate \`org_depth(emp_id, name, depth)\` where the CEO (no manager) is depth 0, their direct
+reports are depth 1, and so on.
+
+The \`employees\` table is seeded; the empty \`org_depth\` target already exists. Lead your load with
+\`DELETE FROM org_depth;\` so re-running the script keeps exactly six rows.`,
+    starterCode: `-- employees is already seeded; org_depth exists but is empty.
+DELETE FROM org_depth;   -- keep the load idempotent on re-run
+
+-- INSERT INTO org_depth (emp_id, name, depth)
+-- WITH RECURSIVE org_tree AS (
+--   anchor: the CEO (manager_id IS NULL) at depth 0
+--   UNION ALL
+--   recursive member: JOIN employees back to org_tree on manager_id = emp_id, depth + 1
+-- )
+-- SELECT emp_id, name, depth FROM org_tree;`,
+    hints: [
+      "Anchor: `WHERE manager_id IS NULL` seeds the CEO at `depth 0`.",
+      "Recursive member: `JOIN org_tree t ON e.manager_id = t.emp_id`, emitting `t.depth + 1`.",
+      "Use `UNION ALL`, then `INSERT INTO org_depth (emp_id, name, depth) SELECT emp_id, name, depth FROM org_tree`.",
+    ],
+    referenceSolution: `DELETE FROM org_depth;
+
+INSERT INTO org_depth (emp_id, name, depth)
+WITH RECURSIVE org_tree AS (
+  SELECT emp_id, name, manager_id, 0 AS depth
+  FROM employees
+  WHERE manager_id IS NULL
+  UNION ALL
+  SELECT e.emp_id, e.name, e.manager_id, t.depth + 1
+  FROM employees e
+  JOIN org_tree t ON e.manager_id = t.emp_id
+)
+SELECT emp_id, name, depth FROM org_tree;`,
+    seedSql: `DROP TABLE IF EXISTS employees;
+CREATE TABLE employees (
+  emp_id     INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  manager_id INTEGER          -- NULL for the CEO; FK to employees.emp_id
+);
+INSERT INTO employees VALUES
+  (1,'Ada', NULL),
+  (2,'Ben', 1),(3,'Cara',1),
+  (4,'Dan', 2),(5,'Eve', 2),
+  (6,'Finn',4);
+DROP TABLE IF EXISTS org_depth;
+CREATE TABLE org_depth (emp_id INTEGER, name TEXT, depth INTEGER);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "all six employees landed in org_depth",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM org_depth) <> 6`,
+      },
+      {
+        suite: "depth",
+        name: "the CEO (Ada) sits at depth 0",
+        sql: `SELECT 1 WHERE COALESCE((SELECT depth FROM org_depth WHERE name = 'Ada'), -1) <> 0`,
+      },
+      {
+        suite: "depth",
+        name: "Ada's two direct reports are both at depth 1",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM org_depth WHERE name IN ('Ben','Cara') AND depth = 1) <> 2`,
+      },
+      {
+        suite: "depth",
+        name: "the grandchildren (Dan, Eve) are at depth 2",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM org_depth WHERE name IN ('Dan','Eve') AND depth = 2) <> 2`,
+      },
+      {
+        suite: "depth",
+        name: "Finn nests to depth 3",
+        isHidden: true,
+        sql: `SELECT 1 WHERE COALESCE((SELECT depth FROM org_depth WHERE name = 'Finn'), -1) <> 3`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-recursive-cte-practice",
+    prompt: `From a self-referencing \`categories\` table, build a **catalog mart**
+\`category_path(category_id, name, breadcrumb, depth, root_name)\`:
+
+- \`breadcrumb\` is the full path from the root joined by \`' > '\` (e.g. \`Electronics > Audio > Headphones\`),
+- \`depth\` is the level (root = 0),
+- \`root_name\` is the top-level ancestor's name.
+
+Guard against a cyclic row in the data by **capping depth at 20** in the recursive member. The
+\`categories\` source is seeded and the empty \`category_path\` target already exists — lead your load
+with \`DELETE FROM category_path;\` so a re-run keeps exactly eight rows.`,
+    starterCode: `-- categories is already seeded; category_path exists but is empty.
+DELETE FROM category_path;   -- keep the load idempotent on re-run
+
+-- INSERT INTO category_path (category_id, name, breadcrumb, depth, root_name)
+-- WITH RECURSIVE cat_tree AS (
+--   anchor: roots (parent_id IS NULL) — seed breadcrumb = name, depth 0, root_name = name
+--   UNION ALL
+--   recursive member: breadcrumb = t.breadcrumb || ' > ' || c.name, depth + 1, carry t.root_name
+--   ... WHERE t.depth < 20   -- cycle guard
+-- )
+-- SELECT category_id, name, breadcrumb, depth, root_name FROM cat_tree;`,
+    hints: [
+      "Seed both `breadcrumb` (`= name`) and `root_name` (`= name`) in the anchor so `root_name` propagates down unchanged.",
+      "In the recursive member, `breadcrumb = t.breadcrumb || ' > ' || c.name`, but `root_name = t.root_name` — carry the root down, don't recompute it.",
+      "Add `WHERE t.depth < 20` to the recursive member's join as the cycle guard.",
+      "`UNION ALL`, then insert all five columns into `category_path`.",
+    ],
+    seedSql: `DROP TABLE IF EXISTS categories;
+CREATE TABLE categories (
+  category_id INTEGER PRIMARY KEY,
+  name        TEXT NOT NULL,
+  parent_id   INTEGER          -- NULL for a root category
+);
+INSERT INTO categories VALUES
+  (1,'Electronics',NULL),
+  (2,'Audio',1),(3,'Video',1),
+  (4,'Headphones',2),(5,'Speakers',2),
+  (6,'Over-ear',4),
+  (10,'Home',NULL),(11,'Kitchen',10);
+DROP TABLE IF EXISTS category_path;
+CREATE TABLE category_path (
+  category_id INTEGER, name TEXT, breadcrumb TEXT, depth INTEGER, root_name TEXT
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "every category landed — exactly eight rows",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM category_path) <> 8`,
+      },
+      {
+        suite: "breadcrumb",
+        name: "Over-ear carries its full four-level breadcrumb",
+        sql: `SELECT 1 WHERE COALESCE((SELECT breadcrumb FROM category_path WHERE name = 'Over-ear'), '~') <> 'Electronics > Audio > Headphones > Over-ear'`,
+      },
+      {
+        suite: "depth",
+        name: "Over-ear is depth 3 under root Electronics",
+        sql: `SELECT 1 WHERE COALESCE((SELECT depth FROM category_path WHERE name = 'Over-ear'), -1) <> 3
+          OR COALESCE((SELECT root_name FROM category_path WHERE name = 'Over-ear'), '~') <> 'Electronics'`,
+      },
+      {
+        suite: "breadcrumb",
+        name: "Kitchen resolves to 'Home > Kitchen' at depth 1 under Home",
+        sql: `SELECT 1 WHERE COALESCE((SELECT breadcrumb FROM category_path WHERE name = 'Kitchen'), '~') <> 'Home > Kitchen'
+          OR COALESCE((SELECT depth FROM category_path WHERE name = 'Kitchen'), -1) <> 1
+          OR COALESCE((SELECT root_name FROM category_path WHERE name = 'Kitchen'), '~') <> 'Home'`,
+      },
+      {
+        suite: "root",
+        name: "a root category is its own breadcrumb at depth 0",
+        sql: `SELECT category_id FROM category_path
+          WHERE name = 'Electronics' AND (breadcrumb <> 'Electronics' OR depth <> 0 OR root_name <> 'Electronics')`,
+      },
+      {
+        suite: "structure",
+        name: "root_name is carried from the ancestor, not recomputed per row",
+        isHidden: true,
+        sql: `SELECT category_id FROM category_path
+          WHERE root_name <> CASE WHEN instr(breadcrumb, ' > ') > 0
+                                  THEN substr(breadcrumb, 1, instr(breadcrumb, ' > ') - 1)
+                                  ELSE breadcrumb END`,
+      },
+      {
+        suite: "structure",
+        name: "depth equals the number of breadcrumb segments below the root",
+        isHidden: true,
+        sql: `SELECT category_id FROM category_path
+          WHERE depth <> (length(breadcrumb) - length(replace(breadcrumb, ' > ', ''))) / 3`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel4: SqlLevel = {
   id: 4,
   slug: "engineering",
@@ -824,6 +1091,13 @@ export const sqlLevel4: SqlLevel = {
       description:
         "Compute across related rows without collapsing them: ranking, period-over-period offsets, and running-total frames.",
       lessons: [windowRanking, windowOffset, windowFrames],
+    },
+    {
+      id: "sql-l4-recursive",
+      title: "Module 4.2 — Recursive CTEs",
+      description:
+        "Walk self-referencing hierarchies (org charts, category trees) to produce depth and breadcrumb paths.",
+      lessons: [recursiveCte],
     },
   ],
 }
