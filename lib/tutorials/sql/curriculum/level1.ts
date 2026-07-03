@@ -634,15 +634,17 @@ COALESCE(region, 'UNSPECIFIED')   -- region if present, else the fallback
 
 ## Keep it readable / the audit pattern
 
-A DE often wants to *keep* the NULL rows but *flag* them — never silently drop data during profiling. Combine a \`CASE\` flag (Level 2 formalizes \`CASE\`, but the idea is intuitive) with a \`COALESCE\` display so the row survives and its problem is visible:
+A DE often wants to *keep* the NULL rows but *flag* them — never silently drop data during profiling. You don't need any new syntax for the flag: a predicate like \`email IS NULL\` is itself a value — in SQLite it evaluates to \`1\` when true and \`0\` when false. So you can drop an \`IS NULL\` test (or several joined with \`OR\`) straight into the \`SELECT\` list, beside a \`COALESCE\` display, and the row survives with its problem made visible:
 
 \`\`\`sql
 SELECT
   customer_id,
   COALESCE(email, 'MISSING') AS email_display,
-  CASE WHEN email IS NULL THEN 1 ELSE 0 END AS email_is_missing
+  (email IS NULL) AS email_is_missing        -- 1 when missing, else 0
 FROM customers;
 \`\`\`
+
+Join several tests with \`OR\` to flag "any key missing" in one \`1\`/\`0\` column: \`(email IS NULL OR region IS NULL)\`.
 
 **Common pitfalls.**
 - \`= NULL\` / \`<> NULL\` are always \`unknown\` — use \`IS NULL\` / \`IS NOT NULL\`.
@@ -700,7 +702,9 @@ INSERT INTO customers VALUES
 - \`customer_id\`
 - \`email_display\` — the email, or \`'MISSING_EMAIL'\` when NULL
 - \`region_display\` — the region, or \`'UNSPECIFIED'\` when NULL
-- \`has_missing_key\` — \`1\` if **either** \`email\` **or** \`region\` **or** \`signup_date\` is NULL, else \`0\``,
+- \`has_missing_key\` — \`1\` if **either** \`email\` **or** \`region\` **or** \`signup_date\` is NULL, else \`0\`
+
+You don't need \`CASE\` for the flag: a predicate is itself a value, so an \`IS NULL\` test dropped into the \`SELECT\` list evaluates to \`1\` (true) or \`0\` (false).`,
     starterCode: `-- Null-audit projection: keep all rows, expose the missing values.
 -- Columns (in order): customer_id, email_display, region_display, has_missing_key
 SELECT
@@ -709,7 +713,7 @@ FROM customers_raw;`,
     hints: [
       "No `WHERE` — the audit keeps all five rows on purpose.",
       "Use `COALESCE(email, 'MISSING_EMAIL')` and `COALESCE(region, 'UNSPECIFIED')`.",
-      'For the flag, a `CASE WHEN email IS NULL OR region IS NULL OR signup_date IS NULL THEN 1 ELSE 0 END` covers "any key missing."',
+      "For the flag, put the predicate straight in the SELECT list — `(email IS NULL OR region IS NULL OR signup_date IS NULL)` evaluates to 1 when any key is missing, else 0. No CASE needed.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE customers_raw (
