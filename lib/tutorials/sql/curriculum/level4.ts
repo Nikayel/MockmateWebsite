@@ -1623,6 +1623,29 @@ The \`>= effective_from AND < effective_to\` is the **as-of** predicate — it s
 on the sale date. Use a **half-open interval** (\`< effective_to\`, not \`<=\`) so the boundary date belongs
 to exactly one version and rows never double-count.
 
+### Detecting a *changed* attribute safely (NULL-aware)
+
+A general apply compares today's dump to the current dimension row and versions only the keys whose
+tracked attribute **changed**. The trap: an attribute can go from **NULL to a value** (the city was
+unknown at first load, now it's filled in) or from a **value to NULL**. Plain \`<>\` is **not** null-safe —
+\`'Madrid' <> NULL\` evaluates to \`NULL\`, not \`TRUE\`, so the changed-set filter drops the row, treats it as
+*unchanged*, and **no new version is created**. That's a silently lost history record.
+
+Use a **null-safe** change predicate instead. In SQLite that's the two-operand \`IS\` / \`IS NOT\`, which
+compare NULLs as ordinary values: \`'Madrid' IS NOT NULL\` is \`TRUE\`, \`NULL IS NOT NULL\` is \`FALSE\`.
+
+\`\`\`sql
+-- WRONG: NULL <-> value transitions are missed (the predicate is NULL, not TRUE)
+WHERE stg.city <> dim.city
+-- RIGHT: null-safe — catches NULL->value and value->NULL as well as value->value
+WHERE stg.city IS NOT dim.city
+\`\`\`
+
+> **In the warehouse:** the ANSI spelling is \`a IS DISTINCT FROM b\` (Postgres, Snowflake, BigQuery, and
+> SQLite 3.39+ all support it) — the same null-safe "did it actually change?" test. dbt snapshots use it
+> to pick the rows to version, precisely so a NULL becoming populated still opens a new row. Never write
+> raw \`<>\` in SCD change detection.
+
 ### Common pitfalls
 
 - **More than one \`is_current = 1\` per key** is the #1 Type 2 bug — it means an update ran the insert
@@ -1737,6 +1760,8 @@ change. \`dim_customer\` holds the current dimension (one \`is_current = 1\` row
 is today's dump with a \`snapshot_date\`. For each email whose tracked attribute (\`city\`) **differs** from
 its current dimension row: expire the current row (\`effective_to = snapshot_date\`, \`is_current = 0\`) and
 insert a new version (\`effective_from = snapshot_date\`, \`effective_to = '9999-12-31'\`, \`is_current = 1\`).
+Detect "differs" **null-safely** — one customer's city is \`NULL\` in the dimension and set in today's dump,
+and a plain \`<>\` would silently miss that transition, so compare with \`stg.city IS NOT dim.city\`.
 Customers whose city is **unchanged** get no new row; customers **absent** from today's dump are left
 as-is; brand-new emails get a single current version. The step must be **idempotent** — running it twice
 must leave \`dim_customer\` byte-for-byte identical.`,
@@ -1748,7 +1773,7 @@ must leave \`dim_customer\` byte-for-byte identical.`,
 -- insert can't re-detect its own freshly written rows on a second run.
 
 -- Step 1: DROP + CREATE a temp table of changed emails
---   (stg.city <> the current dim row's city) ...
+--   (null-safe: stg.city IS NOT the current dim row's city, so a NULL->value change is caught) ...
 
 -- Step 2: expire the current row for those changed emails
 --   (effective_to = snapshot_date, is_current = 0) ...
@@ -1758,7 +1783,7 @@ must leave \`dim_customer\` byte-for-byte identical.`,
 
 -- Step 4: insert brand-new emails (present in stg, absent from dim) as one current version ...`,
     hints: [
-      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where `stg.city <> dim.city`.",
+      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where the city is null-safely different — `stg.city IS NOT dim.city`. Plain `<>` misses NULL↔value transitions (`'x' <> NULL` is NULL, not TRUE).",
       "Expire step: `UPDATE dim_customer SET effective_to = <snapshot>, is_current = 0 WHERE is_current = 1 AND email IN (<changed emails>)`.",
       "Insert step: insert new versions for changed emails **and** brand-new emails (emails in staging with no current dim row). Both get `is_current = 1`, `effective_from = snapshot_date`, `effective_to = '9999-12-31'`.",
       "Idempotency is the trap: after the first run the current city already equals staging, so the changed set is empty on the second run — compare against the **current** row, and compute the changed-set into a temp table first so the insert doesn't re-detect its own new rows.",
@@ -1776,22 +1801,24 @@ CREATE TABLE dim_customer (
 INSERT INTO dim_customer (email, name, city, effective_from, effective_to, is_current) VALUES
   ('a@x.com','Ada','London','2026-01-01','9999-12-31',1),
   ('b@x.com','Ben','Paris', '2026-01-01','9999-12-31',1),
-  ('c@x.com','Cara','Rome', '2026-01-01','9999-12-31',1);
+  ('c@x.com','Cara','Rome', '2026-01-01','9999-12-31',1),
+  ('e@x.com','Eve', NULL,   '2026-01-01','9999-12-31',1); -- city unknown at first load
 
 DROP TABLE IF EXISTS stg_customer;
 CREATE TABLE stg_customer (email TEXT, name TEXT, city TEXT, snapshot_date TEXT);
 INSERT INTO stg_customer VALUES
   ('a@x.com','Ada','Berlin','2026-03-01'),
   ('b@x.com','Ben','Paris', '2026-03-01'),
-  ('d@x.com','Dan','Oslo',  '2026-03-01');`,
+  ('d@x.com','Dan','Oslo',  '2026-03-01'),
+  ('e@x.com','Eve','Madrid','2026-03-01'); -- NULL -> Madrid: plain <> would miss this`,
     checkIdempotency: true,
     idempotencyTables: ["dim_customer"],
     assertions: [
       {
         suite: "current",
-        name: "exactly one current (is_current = 1) row per email a, b, c, d",
+        name: "exactly one current (is_current = 1) row per email a, b, c, d, e",
         sql: `SELECT e.email
-FROM (SELECT 'a@x.com' AS email UNION SELECT 'b@x.com' UNION SELECT 'c@x.com' UNION SELECT 'd@x.com') e
+FROM (SELECT 'a@x.com' AS email UNION SELECT 'b@x.com' UNION SELECT 'c@x.com' UNION SELECT 'd@x.com' UNION SELECT 'e@x.com') e
 WHERE (SELECT COALESCE(SUM(is_current), 0) FROM dim_customer d WHERE d.email = e.email) <> 1`,
       },
       {
@@ -1823,6 +1850,25 @@ WHERE (SELECT COUNT(*) FROM dim_customer d WHERE d.email = e.email) <> 1`,
       AND effective_from = '2026-03-01' AND effective_to = '9999-12-31'
   )
   OR (SELECT COUNT(*) FROM dim_customer WHERE email = 'd@x.com') <> 1`,
+      },
+      {
+        suite: "nullsafe",
+        name: "e@x.com's NULL→Madrid change was detected — now two versions, current = Madrid",
+        sql: `SELECT 1 WHERE
+  (SELECT COUNT(*) FROM dim_customer WHERE email = 'e@x.com') <> 2
+  OR NOT EXISTS (
+    SELECT 1 FROM dim_customer
+    WHERE email = 'e@x.com' AND is_current = 1 AND city = 'Madrid'
+      AND effective_from = '2026-03-01' AND effective_to = '9999-12-31'
+  )`,
+      },
+      {
+        suite: "nullsafe",
+        name: "e@x.com's NULL-city version was expired at 2026-03-01 (is_current = 0)",
+        isHidden: true,
+        sql: `SELECT customer_key FROM dim_customer
+WHERE email = 'e@x.com' AND city IS NULL
+  AND NOT (is_current = 0 AND effective_to = '2026-03-01')`,
       },
       {
         suite: "history",
@@ -2128,7 +2174,44 @@ ON CONFLICT(event_id) DO NOTHING;
 
 The \`WHERE event_ts > MAX(...)\` skips already-loaded rows; the \`ON CONFLICT DO NOTHING\` is the safety
 net for overlap at the boundary. Together they're both efficient **and** idempotent. (Whether you use
-\`>\` or \`>=\` at the boundary barely matters when \`ON CONFLICT\` is there to absorb any re-seen key.)
+\`>\` or \`>=\` at the *exact* boundary barely matters when \`ON CONFLICT\` absorbs any re-seen key — but a
+strict cutoff of *either* kind has a subtler failure mode, covered next.)
+
+### Late-arriving data: why a strict high-water mark silently drops rows
+
+A high-water mark of \`MAX(event_ts)\` quietly assumes events arrive **in event-time order** — that once
+you've recorded \`2026-03-02\`, nothing older will ever appear again. Real sources violate that
+constantly: a mobile client was offline, an upstream queue retried, a partner's nightly file ran a day
+late. The event *happened* at \`event_ts = 2026-02-28\`, but it only lands in your source **after** the
+load that already advanced the high-water to \`2026-03-02\`. A strict \`WHERE event_ts > high_water\` (or
+even \`>=\`) filters that row out on every future run — it is **silently dropped**, and no error is ever
+raised.
+
+The fix is a **lookback** (a "safety lag"): reprocess a trailing window instead of a hard cutoff.
+
+\`\`\`sql
+INSERT INTO fact_events (event_id, payload, event_ts)
+SELECT event_id, payload, event_ts
+FROM stg_events
+WHERE event_ts >= date(
+        (SELECT COALESCE(MAX(event_ts), '1970-01-01') FROM fact_events),
+        '-3 days'                      -- reprocess the last 3 days on every run
+      )
+ON CONFLICT(event_id) DO UPDATE SET payload = excluded.payload;
+\`\`\`
+
+You deliberately re-scan the last N days each run. Rows you've already loaded hit \`ON CONFLICT\` and
+update in place — **harmless, precisely because the load is idempotent** — while a genuinely late row
+inside the window finally gets inserted. The lookback trades a little repeated work for the guarantee
+that nothing older-than-cutoff is lost. Size N to your worst realistic lateness (an hour, a day, a
+week): too small and stragglers still slip through, too large and every run reprocesses more than it
+needs.
+
+> **In the warehouse:** production incremental models never trust a bare \`MAX\`. dbt's incremental
+> strategy exposes a \`lookback\` config for exactly this, and teams write an explicit
+> \`WHERE event_ts >= (SELECT MAX(event_ts) FROM {{ this }}) - INTERVAL 'N days'\`. Snowflake/BigQuery
+> streaming and Spark structured streaming call the same idea a **watermark with allowed lateness**.
+> The lookback only works *because* the merge underneath is idempotent — the two techniques are a pair.
 
 ### Common pitfalls
 
@@ -2148,8 +2231,9 @@ net for overlap at the boundary. Together they're both efficient **and** idempot
 
 **Recap:** an idempotent loader survives re-runs without duplicating rows; achieve it with
 \`INSERT … ON CONFLICT(<business key>) DO UPDATE / DO NOTHING\` backed by a real \`UNIQUE\` constraint,
-optionally scoped by a high-water-mark \`WHERE\`, and prove it with the "run twice, same count" test
-(warehouses spell the same operation \`MERGE\`).
+optionally scoped by a high-water-mark \`WHERE\` **with a lookback window so late-arriving rows aren't
+silently dropped**, and prove it with the "run twice, same count" test (warehouses spell the same
+operation \`MERGE\`).
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
 hidden assertion queries check the row count and the merged values, and the grader **re-runs your whole
@@ -2238,23 +2322,29 @@ INSERT INTO stg_product VALUES
   }),
   practice: scriptExercise({
     id: "sql-l4-idempotent-merge-practice",
-    prompt: `Write an **incremental upsert loader** and prove idempotency. \`fact_events\` accumulates
-events keyed by a unique \`event_id\`; \`stg_events\` is a fresh extract (both seeded). The extract
-**overlaps** already-loaded data (it repeats \`e2\`), contains a **duplicate \`event_id\` within itself**
-(\`e3\` appears twice with different \`ingested_at\`), and brings genuinely new events (\`e3\`, \`e4\`).
+    prompt: `Write an **incremental upsert loader with a lookback window** and prove idempotency.
+\`fact_events\` accumulates events keyed by a unique \`event_id\`; \`stg_events\` is a fresh extract
+(both seeded). The extract **overlaps** already-loaded data (it repeats \`e2\`), contains a
+**duplicate \`event_id\` within itself** (\`e3\` appears twice with different \`ingested_at\`), brings
+genuinely new events (\`e3\`, \`e4\`), and carries one **late-arriving** event \`e5\` whose \`event_ts\`
+(\`2026-02-28\`) is *before* the \`2026-03-02\` high-water — it happened in the past but only landed in
+the source now.
 
 In one \`INSERT … SELECT … ON CONFLICT\` load:
 
 1. **dedup the extract** so each \`event_id\` appears once, keeping the row with the **latest**
    \`ingested_at\`;
-2. apply a **high-water mark** on \`event_ts\` so you don't reprocess old rows;
-3. **upsert on \`event_id\`** so overlap at the boundary updates in place instead of duplicating.
+2. bound it with a **lookback window** on \`event_ts\` — \`>= date(MAX(event_ts), '-3 days')\`, *not* a
+   strict \`> MAX\` — so the late-arriving \`e5\` inside the window is still picked up instead of being
+   silently dropped;
+3. **upsert on \`event_id\`** so overlap re-seen inside the window updates in place instead of
+   duplicating.
 
-After one run \`fact_events\` must hold \`e1, e2, e3, e4\` (4 rows), \`e3\`'s payload must be the
-later-ingested \`{"a":3b}\`, and **running the whole script twice must still leave 4 rows** with the same
-\`e3\` payload.`,
+After one run \`fact_events\` must hold \`e1, e2, e3, e4, e5\` (5 rows), \`e3\`'s payload must be the
+later-ingested \`{"a":3b}\`, the late \`e5\` must be present, and **running the whole script twice must
+still leave 5 rows** with the same \`e3\` payload.`,
     starterCode: `-- fact_events (PK event_id) and stg_events are already seeded.
--- Load the extract idempotently: dedup -> high-water mark -> upsert on event_id.
+-- Load the extract idempotently: dedup -> lookback window -> upsert on event_id.
 
 -- INSERT INTO fact_events (event_id, payload, event_ts, ingested_at)
 -- SELECT event_id, payload, event_ts, ingested_at
@@ -2263,13 +2353,13 @@ later-ingested \`{"a":3b}\`, and **running the whole script twice must still lea
 --   FROM stg_events
 -- ) d
 -- WHERE d.rn = 1
---   AND d.event_ts >= (SELECT COALESCE(MAX(event_ts), '1970-01-01') FROM fact_events)
+--   AND d.event_ts >= date((SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events), '-3 days')
 -- ON CONFLICT(event_id) DO UPDATE SET ... ;`,
     hints: [
       "Dedup the extract first with `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ingested_at DESC, payload DESC)` and keep `rn = 1` (the dedup pattern from Module 4.4).",
-      "High-water mark: `WHERE d.event_ts >= (SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events)`. You can't filter a window function in `WHERE`, so put the `ROW_NUMBER()` in a subquery and filter its `rn` outside — the same subquery is the natural place for the high-water filter.",
+      "Bound it with a lookback window, not a strict cutoff: `AND d.event_ts >= date((SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events), '-3 days')`. A strict `> MAX` (or even `>= MAX`) silently drops the late-arriving `e5` (event_ts 2026-02-28, before the 2026-03-02 high-water); re-scanning the last few days catches it. You can't filter a window function in `WHERE`, so put the `ROW_NUMBER()` in a subquery and filter `rn` (and the lookback) outside.",
       "Upsert on the PK: `ON CONFLICT(event_id) DO UPDATE SET payload = excluded.payload, event_ts = excluded.event_ts, ingested_at = excluded.ingested_at`.",
-      "Idempotency trap: on run #2 the high-water mark has risen to the newest event_ts, so almost everything is filtered out; whatever still slips through hits `ON CONFLICT` and updates in place — never inserts. That's what keeps the row count at 4.",
+      "Idempotency trap: on run #2 the high-water has risen to the newest event_ts, so the lookback window slides forward and most rows fall outside it; whatever still slips through hits `ON CONFLICT` and updates in place — never inserts. `e5` is already loaded, so its dropping out of the window on run #2 is harmless. That's what keeps the row count at 5.",
     ],
     seedSql: `DROP TABLE IF EXISTS fact_events;
 DROP TABLE IF EXISTS stg_events;
@@ -2290,22 +2380,31 @@ CREATE TABLE stg_events (
   event_ts    TEXT,
   ingested_at TEXT
 );
+-- e5 is late-arriving: its event_ts (2026-02-28) is BEFORE the 2026-03-02 high-water,
+-- but it only shows up in this batch (ingested 2026-03-04). A strict > high-water drops it.
 INSERT INTO stg_events VALUES
   ('e2','{"a":2}','2026-03-02','2026-03-02'),
   ('e3','{"a":3}','2026-03-03','2026-03-03'),
   ('e3','{"a":3b}','2026-03-03','2026-03-04'),
-  ('e4','{"a":4}','2026-03-04','2026-03-04');`,
+  ('e4','{"a":4}','2026-03-04','2026-03-04'),
+  ('e5','{"a":5}','2026-02-28','2026-03-04');`,
     checkIdempotency: true,
     assertions: [
       {
         suite: "rows",
-        name: "fact_events holds exactly 4 rows after the load",
-        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_events) <> 4`,
+        name: "fact_events holds exactly 5 rows after the load",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_events) <> 5`,
       },
       {
         suite: "coverage",
-        name: "e1, e2, e3 and e4 are all present",
-        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_events WHERE event_id IN ('e1','e2','e3','e4')) <> 4`,
+        name: "e1, e2, e3, e4 and e5 are all present",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM fact_events WHERE event_id IN ('e1','e2','e3','e4','e5')) <> 5`,
+      },
+      {
+        suite: "late",
+        name: "the late-arriving e5 (event_ts before the high-water) was captured by the lookback",
+        sql: `SELECT 1 WHERE COALESCE((SELECT event_ts FROM fact_events WHERE event_id = 'e5'), '~') <> '2026-02-28'
+          OR COALESCE((SELECT payload FROM fact_events WHERE event_id = 'e5'), '~') <> '{"a":5}'`,
       },
       {
         suite: "untouched",
