@@ -13,6 +13,18 @@ export {
   isPythonRuntimeWarm,
   markPythonRuntimeWarm,
 } from "./python-sandbox"
+export {
+  executeSqlClientSide,
+  executeWorkspaceScenarioSqlClientSide,
+  runSqlInWorker,
+  compareResultSets,
+  buildWorkspaceMarker,
+  parseWorkspaceMarker,
+  isSqlRuntimeWarm,
+  markSqlRuntimeWarm,
+  prewarmSqlRuntime,
+} from "./sql-sandbox"
+export type { SqlResultSet } from "./sql-sandbox"
 export { executeScenarioInBrowser } from "./browser-execution"
 export { overlayWorkspaceFiles, getVisibleWorkspaceFiles, getWorkspacePrimaryCode } from "./files"
 export { buildPistonWorkspaceFiles } from "./piston-builder"

@@ -169,7 +169,8 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           let initialCode: string
           if (isWorkspaceScenario(scenario)) {
             const scenarioLanguage = scenario.workspace.language
-            if (scenarioLanguage !== opts.selectedLanguage) {
+            // SQL workspace lessons are tutorial-only and never enter the interview editor.
+            if (scenarioLanguage !== "sql" && scenarioLanguage !== opts.selectedLanguage) {
               opts.setSelectedLanguage(scenarioLanguage)
             }
             const contextFiles =

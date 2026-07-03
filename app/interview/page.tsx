@@ -728,7 +728,10 @@ function InterviewPageContent() {
         const primaryFile = contextFiles.find(
           (file) => file.path === selectedScenario.workspace.primaryFilePath
         )
-        if (selectedScenario.workspace.language !== selectedLanguage) {
+        if (
+          selectedScenario.workspace.language !== "sql" &&
+          selectedScenario.workspace.language !== selectedLanguage
+        ) {
           setSelectedLanguage(selectedScenario.workspace.language)
         }
         setWorkspaceContext(contextFiles)
@@ -764,7 +767,10 @@ function InterviewPageContent() {
       let codebaseFiles: any[] = []
 
       if (isWorkspaceScenario(selectedScenario)) {
-        if (selectedLanguage !== selectedScenario.workspace.language) {
+        if (
+          selectedScenario.workspace.language !== "sql" &&
+          selectedLanguage !== selectedScenario.workspace.language
+        ) {
           setSelectedLanguage(selectedScenario.workspace.language)
           toast.info(`Workspace scenarios run in ${selectedScenario.workspace.language}`)
         }

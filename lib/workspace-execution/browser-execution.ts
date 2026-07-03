@@ -7,6 +7,11 @@ import type {
 } from "./types"
 import { executeJsClientSide, executeWorkspaceScenarioJsClientSide } from "./js-sandbox"
 import { executePythonClientSide, executeWorkspaceScenarioPythonClientSide } from "./python-sandbox"
+import {
+  executeSqlClientSide,
+  executeWorkspaceScenarioSqlClientSide,
+  type SqlSingleFileScenario,
+} from "./sql-sandbox"
 import { isWorkspaceScenario } from "./validators"
 
 type BrowserExecutionResult = DsaExecutionResult | WorkspaceExecutionResult
@@ -16,7 +21,12 @@ type ScenarioWithCodebase = Scenario & {
 }
 
 function isBrowserExecutionLanguage(language: string): boolean {
-  return language === "javascript" || language === "typescript" || language === "python"
+  return (
+    language === "javascript" ||
+    language === "typescript" ||
+    language === "python" ||
+    language === "sql"
+  )
 }
 
 function buildFullCode(code: string, scenario: ScenarioWithCodebase, language: string): string {
@@ -78,9 +88,12 @@ export async function executeScenarioInBrowser(options: {
   language: string
   workspaceFiles?: WorkspaceFileEdit[]
 }): Promise<BrowserExecutionResult | null> {
+  // Single-file SQL scenarios declare their language on the scenario itself (the tutorial adapter
+  // sets `language: "sql"`), so the effective language comes from the scenario when present and
+  // falls back to the caller's `language` for Python/JS scenarios, which don't set it.
   const language = isWorkspaceScenario(options.scenario)
     ? options.scenario.workspace.language
-    : options.language
+    : ((options.scenario as { language?: string }).language ?? options.language)
 
   if (!isBrowserExecutionLanguage(language)) {
     return null
@@ -92,7 +105,9 @@ export async function executeScenarioInBrowser(options: {
     const result =
       language === "python"
         ? await executeWorkspaceScenarioPythonClientSide(scenario, edits)
-        : await executeWorkspaceScenarioJsClientSide(scenario, edits)
+        : language === "sql"
+          ? await executeWorkspaceScenarioSqlClientSide(scenario, edits)
+          : await executeWorkspaceScenarioJsClientSide(scenario, edits)
 
     return formatWorkspaceResult(result)
   }
@@ -116,5 +131,11 @@ export async function executeScenarioInBrowser(options: {
 
   return language === "python"
     ? executePythonClientSide(fullCode, testCases, options.scenario.id)
-    : executeJsClientSide(fullCode, language, testCases, options.scenario.id)
+    : language === "sql"
+      ? executeSqlClientSide(
+          fullCode,
+          testCases,
+          options.scenario as unknown as SqlSingleFileScenario
+        )
+      : executeJsClientSide(fullCode, language, testCases, options.scenario.id)
 }

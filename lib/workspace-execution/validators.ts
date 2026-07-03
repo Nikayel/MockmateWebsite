@@ -1,7 +1,7 @@
 import type { Scenario } from "@/lib/scenarios/types"
 import type { WorkspaceFileEdit, WorkspaceScenario } from "./types"
 
-const SUPPORTED_WORKSPACE_LANGUAGES = new Set(["javascript", "typescript", "python"])
+const SUPPORTED_WORKSPACE_LANGUAGES = new Set(["javascript", "typescript", "python", "sql"])
 
 export function isWorkspaceScenario(scenario: Scenario): scenario is WorkspaceScenario {
   return scenario.executionMode === "workspace" && Boolean(scenario.workspace)

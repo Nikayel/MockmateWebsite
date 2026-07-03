@@ -22,6 +22,10 @@ const languageLoaders: Record<string, () => Promise<Extension>> = {
   rust: async () => (await import("@codemirror/lang-rust")).rust(),
   rs: async () => (await import("@codemirror/lang-rust")).rust(),
   go: async () => (await import("@codemirror/lang-go")).go(),
+  sql: async () => {
+    const { sql, SQLite } = await import("@codemirror/lang-sql")
+    return sql({ dialect: SQLite })
+  },
 }
 
 export interface CodeMirrorEditorProps {
@@ -54,6 +58,7 @@ const languageIndentMap: Record<string, number> = {
   rust: 4,
   go: 4,
   rs: 4,
+  sql: 2,
 }
 
 const getIndentSize = (language: string): number => {

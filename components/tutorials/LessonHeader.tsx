@@ -1,6 +1,6 @@
 import { Clock } from "lucide-react"
 import type { DifficultyLevel } from "@/lib/scenarios/types"
-import type { PythonLesson } from "@/lib/tutorials/types"
+import type { TutorialLesson } from "@/lib/tutorials/types"
 
 /**
  * The lesson's identity header at the top of the workspace center column (HANDOFF §C/§134-147):
@@ -13,7 +13,7 @@ const DIFFICULTY_CLASS: Record<DifficultyLevel, string> = {
   hard: "border-rose-500/30 text-rose-600 dark:text-rose-400",
 }
 
-export function LessonHeader({ lesson }: { lesson: PythonLesson }) {
+export function LessonHeader({ lesson }: { lesson: TutorialLesson<unknown> }) {
   return (
     <header className="border-border mb-6 border-b pb-5">
       <h1 className="text-foreground text-2xl font-semibold tracking-tight text-balance">

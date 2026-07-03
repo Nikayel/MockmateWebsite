@@ -298,9 +298,12 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
     let activeLanguage = opts.selectedLanguage
     let initialBugfixFileEvent: BugfixEvidenceEvent | null = null
     if (isWorkspaceScenario(scenario)) {
-      activeLanguage = scenario.workspace.language
-      if (activeLanguage !== opts.selectedLanguage) {
-        opts.setSelectedLanguage(activeLanguage)
+      // SQL workspace lessons are tutorial-only and never enter the interview editor.
+      if (scenario.workspace.language !== "sql") {
+        activeLanguage = scenario.workspace.language
+        if (activeLanguage !== opts.selectedLanguage) {
+          opts.setSelectedLanguage(activeLanguage)
+        }
       }
       const contextFiles = toWorkspaceScenarioFiles(scenario)
       const primaryFile = contextFiles.find(

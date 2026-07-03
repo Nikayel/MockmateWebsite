@@ -95,7 +95,7 @@ export interface BaseScenario {
   workspace?: WorkspaceScenarioConfig
 }
 
-export type WorkspaceScenarioLanguage = "javascript" | "typescript" | "python"
+export type WorkspaceScenarioLanguage = "javascript" | "typescript" | "python" | "sql"
 export type WorkspaceScenarioFileRole = "editable" | "readonly" | "test" | "docs"
 
 export interface WorkspaceScenarioFile {

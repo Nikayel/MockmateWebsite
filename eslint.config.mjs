@@ -52,6 +52,8 @@ const eslintConfig = [
       "**/._*",
       "extension/**",
       "scripts/**",
+      // Vendored, minified WASM glue (sql.js) — self-hosted for the SQL runner, not our source.
+      "public/wasm/**",
     ],
   },
 ];

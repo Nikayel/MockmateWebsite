@@ -29,6 +29,9 @@ importers:
       '@codemirror/lang-rust':
         specifier: ^6.0.2
         version: 6.0.2
+      '@codemirror/lang-sql':
+        specifier: ^6.10.0
+        version: 6.10.0
       '@codemirror/language':
         specifier: ^6.11.1
         version: 6.12.1
@@ -272,6 +275,9 @@ importers:
       sonner:
         specifier: ^1.7.4
         version: 1.7.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      sql.js:
+        specifier: ^1.14.1
+        version: 1.14.1
       stripe:
         specifier: ^19.3.1
         version: 19.3.1(@types/node@22.19.3)
@@ -436,6 +442,9 @@ packages:
 
   '@codemirror/lang-rust@6.0.2':
     resolution: {integrity: sha512-EZaGjCUegtiU7kSMvOfEZpaCReowEf3yNidYu7+vfuGTm9ow4mthAparY5hisJqOHmJowVH3Upu+eJlUji6qqA==}
+
+  '@codemirror/lang-sql@6.10.0':
+    resolution: {integrity: sha512-6ayPkEd/yRw0XKBx5uAiToSgGECo/GY2NoJIHXIIQh1EVwLuKoU8BP/qK0qH5NLXAbtJRLuT73hx7P9X34iO4w==}
 
   '@codemirror/language@6.12.1':
     resolution: {integrity: sha512-Fa6xkSiuGKc8XC8Cn96T+TQHYj4ZZ7RdFmXA3i9xe/3hLHfwPZdM+dqfX0Cp0zQklBKhVD8Yzc8LS45rkqcwpQ==}
@@ -5823,6 +5832,9 @@ packages:
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
 
+  sql.js@1.14.1:
+    resolution: {integrity: sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==}
+
   stable-hash@0.0.5:
     resolution: {integrity: sha512-+L3ccpzibovGXFK+Ap/f8LOS0ahMrHTf3xu7mMLSpEGU0EO9ucaysSylKo9eRDFNhWve/y275iPmIZ4z39a9iA==}
 
@@ -6604,6 +6616,15 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.1
       '@lezer/rust': 1.0.2
+
+  '@codemirror/lang-sql@6.10.0':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.0
+      '@codemirror/language': 6.12.1
+      '@codemirror/state': 6.5.3
+      '@lezer/common': 1.5.0
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.5
 
   '@codemirror/language@6.12.1':
     dependencies:
@@ -12812,6 +12833,8 @@ snapshots:
   space-separated-tokens@2.0.2: {}
 
   sprintf-js@1.0.3: {}
+
+  sql.js@1.14.1: {}
 
   stable-hash@0.0.5: {}
 
