@@ -35,6 +35,35 @@ export default function PythonExecutorPage() {
     usePythonExecutor()
   const [cleared, setCleared] = useState(false)
 
+  // Draggable console height (HANDOFF-UX §1 nicety). Persisted in px; clamped against the center.
+  const centerRef = useRef<HTMLDivElement>(null)
+  const [outputHeightRaw, setOutputHeightRaw] = usePersistentState("cs_pyexec_output_h", "220")
+  const outputHeight = Math.max(130, Number(outputHeightRaw) || 220)
+
+  const clampHeight = (px: number) => {
+    const centerH = centerRef.current?.clientHeight ?? window.innerHeight
+    return Math.min(Math.max(130, centerH - 160), Math.max(130, px))
+  }
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startH = outputHeight
+    const onMove = (ev: PointerEvent) =>
+      setOutputHeightRaw(String(clampHeight(startH + (startY - ev.clientY))))
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      document.body.style.userSelect = ""
+    }
+    document.body.style.userSelect = "none"
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+  }
+  const nudgeResize = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowUp") setOutputHeightRaw(String(clampHeight(outputHeight + 24)))
+    else if (e.key === "ArrowDown") setOutputHeightRaw(String(clampHeight(outputHeight - 24)))
+  }
+
   // ⌘↵ / Ctrl↵ runs from anywhere in the tool. Refs keep the listener stable while reading latest.
   const codeRef = useRef(code)
   const runningRef = useRef(running)
@@ -88,7 +117,7 @@ export default function PythonExecutorPage() {
         <main className="flex min-h-0 flex-1">
           <ExecutorSidePanel />
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div ref={centerRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* Editor header — filename + the two actions (Run is the single clay primary). */}
             <div className="border-border bg-muted/40 flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
               <span className="text-muted-foreground font-mono text-xs">scratch.py</span>
@@ -135,8 +164,27 @@ export default function PythonExecutorPage() {
               </CodeMirrorErrorBoundary>
             </div>
 
+            {/* Drag handle to size the console — the WAI-ARIA window-splitter pattern
+                (focusable separator; ↑/↓ nudge). jsx-a11y doesn't model separator as interactive. */}
+            {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize output panel"
+              aria-valuenow={outputHeight}
+              aria-valuemin={130}
+              tabIndex={0}
+              onPointerDown={startResize}
+              onKeyDown={nudgeResize}
+              className="border-border hover:bg-accent/30 focus-visible:bg-accent/40 h-1.5 shrink-0 cursor-row-resize border-t transition-colors focus-visible:outline-none"
+            />
+            {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+
             {/* Output — stacked directly under the editor, sized + internally scrolling. */}
-            <div className="border-border bg-card flex h-[36%] max-h-[60%] min-h-[130px] shrink-0 flex-col border-t">
+            <div
+              className="bg-card flex min-h-[130px] shrink-0 flex-col"
+              style={{ height: outputHeight }}
+            >
               <div className="border-border bg-muted/40 flex shrink-0 items-center justify-between border-b px-3 py-1.5">
                 <span className="text-muted-foreground flex items-center gap-1.5 font-mono text-xs tracking-wide">
                   <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
