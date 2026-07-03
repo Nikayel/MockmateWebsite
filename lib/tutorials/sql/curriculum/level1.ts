@@ -859,6 +859,263 @@ INSERT INTO orders VALUES
   },
 }
 
+const orderBy: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l1-order-by",
+  title: "Sorting with ORDER BY",
+  summary: "Order output deterministically for previews and top-N inspection.",
+  estimatedMinutes: 11,
+  difficulty: "easy",
+  skills: ["ORDER BY", "ASC/DESC", "multi-key sort", "NULLS ordering behavior"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Rows have no inherent order
+
+A table is a *set* — without \`ORDER BY\`, the engine may return rows in any order, and that order can change between runs, after a reload, or when an index changes. For any preview, any "newest 10," any output a human or a test will eyeball, you **must** sort explicitly, and you must sort on enough columns to make the order *deterministic*.
+
+## Sort keys and tie-breaking
+
+\`ORDER BY order_ts DESC\` puts newest first. But if two orders share a timestamp, their relative order is still undefined — add a **tie-breaker**: \`ORDER BY order_ts DESC, order_id DESC\`. Now the output is stable every run.
+
+Worked example:
+
+\`\`\`sql
+SELECT order_id, order_ts, total_cents
+FROM orders
+ORDER BY order_ts DESC, total_cents DESC;
+\`\`\`
+
+Anatomy:
+
+\`\`\`
+ORDER BY  order_ts DESC ,  total_cents DESC
+          primary key       tie-breaker
+          DESC = high to low ; ASC (default) = low to high
+\`\`\`
+
+## Where NULLs land
+
+> **In the warehouse this differs:** SQLite sorts NULLs *first* under \`ASC\` (and last under \`DESC\`); Postgres defaults to NULLs *last* under \`ASC\`. If NULL placement matters, be explicit — standard SQL supports \`ORDER BY col ASC NULLS LAST\` (Postgres/Oracle), though SQLite only added \`NULLS FIRST/LAST\` in 3.30. Portable trick: \`ORDER BY (col IS NULL), col\` forces NULLs last everywhere.
+
+**Pitfall.** Sorting on a non-unique column alone is *not* deterministic — always add a unique tie-breaker (often the primary key) if the output must be stable.
+
+**Recap.** \`ORDER BY\` makes output deterministic; add a unique tie-breaker column, and be explicit about NULL placement across dialects.`,
+    demoCode: `SELECT order_id, order_ts, total_cents
+FROM orders
+ORDER BY order_ts DESC, total_cents DESC;`,
+  },
+  apply: {
+    id: "sql-l1-order-by-apply",
+    executionMode: "single-file",
+    prompt: `Sort \`orders\` by \`order_date\` descending, then by \`total_cents\` descending as a tie-breaker. Return \`order_id\`, \`order_date\`, \`total_cents\`. The output must come back in that exact sorted order.`,
+    starterCode: `-- Sort newest date first, higher total first on ties
+SELECT order_id, order_date, total_cents
+FROM orders
+`,
+    hints: [
+      "ORDER BY order_date DESC puts 2026-03-03 first.",
+      "Add , total_cents DESC so the two 03-01 rows come out 9000 before 5000.",
+      "ISO date text sorts correctly with a plain string comparison.",
+    ],
+    referenceSolution: `SELECT order_id, order_date, total_cents
+FROM orders
+ORDER BY order_date DESC, total_cents DESC;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER,
+  order_date  TEXT,     -- 'YYYY-MM-DD'
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (1, '2026-03-01', 5000),
+  (2, '2026-03-03', 2000),
+  (3, '2026-03-01', 9000),
+  (4, '2026-03-02', 4000);`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "order_date", "total_cents"],
+        rows: [
+          [2, "2026-03-03", 2000],
+          [4, "2026-03-02", 4000],
+          [3, "2026-03-01", 9000],
+          [1, "2026-03-01", 5000],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l1-order-by-practice",
+    executionMode: "single-file",
+    prompt: `Produce a deterministic **newest-first preview** whose order can never change between runs, even though several rows share a timestamp. Sort by \`order_ts\` descending, then \`total_cents\` descending, then \`order_id\` ascending as the final unique tie-breaker. Return \`order_id\`, \`order_ts\`, \`region\`, \`total_cents\`. The output must come back in that exact sorted order.`,
+    starterCode: `-- Three sort keys make this fully deterministic
+SELECT order_id, order_ts, region, total_cents
+FROM orders
+`,
+    hints: [
+      "Three sort keys, in order: order_ts DESC, total_cents DESC, order_id ASC.",
+      "Rows 1 and 2 tie on timestamp and total — only the order_id ASC key makes them deterministic (1 before 2).",
+      "ISO-8601 text sorts chronologically as a plain string, so no date parsing is needed.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id    INTEGER,
+  order_ts    TEXT,      -- ISO-8601, may repeat
+  region      TEXT,
+  total_cents INTEGER
+);
+INSERT INTO orders VALUES
+  (1, '2026-03-02T10:00:00Z', 'EU', 5000),
+  (2, '2026-03-02T10:00:00Z', 'US', 5000),
+  (3, '2026-03-03T08:30:00Z', 'EU', 3000),
+  (4, '2026-03-01T22:15:00Z', 'UK', 7000),
+  (5, '2026-03-02T10:00:00Z', 'EU', 8000);`,
+      orderMatters: true,
+      expected: {
+        columns: ["order_id", "order_ts", "region", "total_cents"],
+        rows: [
+          [3, "2026-03-03T08:30:00Z", "EU", 3000],
+          [5, "2026-03-02T10:00:00Z", "EU", 8000],
+          [1, "2026-03-02T10:00:00Z", "EU", 5000],
+          [2, "2026-03-02T10:00:00Z", "US", 5000],
+          [4, "2026-03-01T22:15:00Z", "UK", 7000],
+        ],
+      },
+    },
+  },
+}
+
+const limitDistinct: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l1-limit-distinct",
+  title: "LIMIT and DISTINCT",
+  summary: "Sample the top rows and collapse duplicates during exploration.",
+  estimatedMinutes: 11,
+  difficulty: "easy",
+  skills: ["LIMIT", "OFFSET", "DISTINCT", "distinct on multiple columns"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Two profiling reflexes
+
+When a fresh source lands, a DE does two things immediately:
+
+1. **Sample it** — \`LIMIT 10\` after an \`ORDER BY\` to eyeball the top rows without pulling millions.
+2. **Probe cardinality** — \`SELECT DISTINCT status FROM orders\` to learn what values a column *actually* contains (often not what the schema doc claims).
+
+## LIMIT (and OFFSET)
+
+\`LIMIT n\` returns at most \`n\` rows; \`LIMIT n OFFSET m\` skips \`m\` then returns \`n\` (basic pagination). Always pair \`LIMIT\` with \`ORDER BY\` — a limit on an unsorted set gives arbitrary rows.
+
+## DISTINCT
+
+\`DISTINCT\` removes duplicate rows from the result. \`SELECT DISTINCT region, status FROM orders\` returns each unique *combination* of the two columns — a fast way to map the value space.
+
+Worked example:
+
+\`\`\`sql
+SELECT DISTINCT status
+FROM orders
+ORDER BY status;
+\`\`\`
+
+Anatomy:
+
+\`\`\`sql
+SELECT DISTINCT region, status   -- unique (region, status) pairs
+FROM orders
+ORDER BY region, status
+LIMIT 10 OFFSET 0;               -- top 10 after sorting (OFFSET optional)
+\`\`\`
+
+> **In the warehouse (dialect note).** SQLite/Postgres/MySQL use \`LIMIT\`. SQL Server uses \`SELECT TOP 10 ...\` or the ANSI \`OFFSET ... FETCH NEXT 10 ROWS ONLY\`; Oracle also uses \`FETCH FIRST\`. \`LIMIT\` is the portable choice for this course but flag it when you move to SQL Server.
+
+**Pitfall.** \`DISTINCT\` applies to the *entire* row, not one column — \`SELECT DISTINCT region, status\` does **not** mean "distinct regions with any status." And \`LIMIT\` without \`ORDER BY\` is non-deterministic.
+
+**Recap.** \`LIMIT\`/\`OFFSET\` sample a sorted set; \`DISTINCT\` collapses duplicate *rows* (across all selected columns) to profile a source's real value space.`,
+    demoCode: `SELECT DISTINCT status
+FROM orders
+ORDER BY status;`,
+  },
+  apply: {
+    id: "sql-l1-limit-distinct-apply",
+    executionMode: "single-file",
+    prompt: `Return the **distinct** list of order statuses actually present in the source, sorted ascending. One column: \`status\`.`,
+    starterCode: `-- Return the distinct statuses, sorted A→Z
+SELECT
+
+FROM orders;`,
+    hints: [
+      "SELECT DISTINCT status.",
+      "Add ORDER BY status for a stable, alphabetical output.",
+      "Three unique values remain from six rows.",
+    ],
+    referenceSolution: `SELECT DISTINCT status
+FROM orders
+ORDER BY status;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  status   TEXT
+);
+INSERT INTO orders VALUES
+  (1, 'paid'),
+  (2, 'shipped'),
+  (3, 'paid'),
+  (4, 'cancelled'),
+  (5, 'shipped'),
+  (6, 'paid');`,
+      orderMatters: true,
+      expected: {
+        columns: ["status"],
+        rows: [["cancelled"], ["paid"], ["shipped"]],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l1-limit-distinct-practice",
+    executionMode: "single-file",
+    prompt: `Profile the raw table: return the **distinct \`(region, status)\` combinations** present, sorted by \`region\` ascending then \`status\` ascending, and take only the **top 10** with \`LIMIT\`. Columns: \`region\`, \`status\`.`,
+    starterCode: `-- Return distinct (region, status) pairs, sorted, top 10
+SELECT
+
+FROM orders;`,
+    hints: [
+      "SELECT DISTINCT region, status returns unique pairs, not unique single columns.",
+      "Sort by region, status so the output is deterministic before you LIMIT.",
+      "LIMIT 10 at the end — there are fewer than 10 distinct pairs, so all of them come through.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (
+  order_id INTEGER,
+  region   TEXT,
+  status   TEXT
+);
+INSERT INTO orders VALUES
+  (1, 'EU', 'paid'),
+  (2, 'EU', 'paid'),
+  (3, 'US', 'shipped'),
+  (4, 'EU', 'shipped'),
+  (5, 'US', 'paid'),
+  (6, 'UK', 'cancelled'),
+  (7, 'US', 'shipped'),
+  (8, 'EU', 'paid'),
+  (9, 'UK', 'paid'),
+  (10,'US', 'paid'),
+  (11,'EU', 'cancelled');`,
+      orderMatters: true,
+      expected: {
+        columns: ["region", "status"],
+        rows: [
+          ["EU", "cancelled"],
+          ["EU", "paid"],
+          ["EU", "shipped"],
+          ["UK", "cancelled"],
+          ["UK", "paid"],
+          ["US", "paid"],
+          ["US", "shipped"],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel1: SqlLevel = {
   id: 1,
   slug: "foundations",
@@ -881,6 +1138,13 @@ export const sqlLevel1: SqlLevel = {
       description:
         "Cut a scan down to the rows a model needs: comparisons, sets and ranges, NULL logic, and boolean predicates.",
       lessons: [whereBasics, inBetweenLike, nullLogic, booleanAndOr],
+    },
+    {
+      id: "sql-l1-shaping",
+      title: "Module 1.3 — Shaping the Result Set",
+      description:
+        "Order, limit, and de-duplicate output for deterministic previews and top-N inspection.",
+      lessons: [orderBy, limitDistinct],
     },
   ],
 }
