@@ -847,7 +847,7 @@ WITH RECURSIVE tree AS (
   SELECT c.id, c.name, c.parent_id, t.depth + 1
   FROM categories c
   JOIN tree t ON c.parent_id = t.id
-  -- 3. TERMINATION: implicit — stops when the recursive member returns no new rows
+  -- 3. TERMINATION: implicit, stops when the recursive member returns no new rows
 )
 SELECT * FROM tree ORDER BY depth, id;
 \`\`\`
@@ -998,7 +998,7 @@ DELETE FROM category_path;   -- keep the load idempotent on re-run
 
 -- INSERT INTO category_path (category_id, name, breadcrumb, depth, root_name)
 -- WITH RECURSIVE cat_tree AS (
---   anchor: roots (parent_id IS NULL) — seed breadcrumb = name, depth 0, root_name = name
+--   anchor: roots (parent_id IS NULL), seed breadcrumb = name, depth 0, root_name = name
 --   UNION ALL
 --   recursive member: breadcrumb = t.breadcrumb || ' > ' || c.name, depth + 1, carry t.root_name
 --   ... WHERE t.depth < 20   -- cycle guard
@@ -1030,7 +1030,7 @@ CREATE TABLE category_path (
     assertions: [
       {
         suite: "rows",
-        name: "every category landed — exactly eight rows",
+        name: "every category landed, exactly eight rows",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM category_path) <> 8`,
       },
       {
@@ -1453,7 +1453,7 @@ INSERT INTO stg_customer VALUES
     assertions: [
       {
         suite: "rows",
-        name: "no history rows added — dim_customer still holds exactly 2 rows",
+        name: "no history rows added, dim_customer still holds exactly 2 rows",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 2`,
       },
       {
@@ -1469,7 +1469,7 @@ INSERT INTO stg_customer VALUES
       },
       {
         suite: "identity",
-        name: "surrogate key preserved — a@x.com is still customer_key 1 (overwrite, not delete+reinsert)",
+        name: "surrogate key preserved, a@x.com is still customer_key 1 (overwrite, not delete+reinsert)",
         isHidden: true,
         sql: `SELECT 1 WHERE COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'a@x.com'), -1) <> 1`,
       },
@@ -1485,7 +1485,7 @@ rows are overwritten in place (keeping their \`customer_key\`) and the new custo
 fresh key. Re-running your script must leave the row count unchanged.`,
     starterCode: `-- dim_customer (with a tier column) and stg_customer are already seeded.
 -- Apply a Type 1 step that OVERWRITES existing customers and INSERTS brand-new ones,
--- leaving exactly one row per email — and idempotent on a re-run.
+-- leaving exactly one row per email, and idempotent on a re-run.
 
 -- INSERT INTO dim_customer (email, name, city, tier)
 -- SELECT email, name, city, tier FROM stg_customer WHERE true
@@ -1518,7 +1518,7 @@ INSERT INTO stg_customer VALUES
     assertions: [
       {
         suite: "rows",
-        name: "one row per email — dim_customer holds exactly 3 rows",
+        name: "one row per email, dim_customer holds exactly 3 rows",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 3`,
       },
       {
@@ -1539,7 +1539,7 @@ INSERT INTO stg_customer VALUES
       },
       {
         suite: "identity",
-        name: "existing surrogate keys stayed stable — a@x.com is still key 1, b@x.com still key 2 (upsert, not a key-churning replace)",
+        name: "existing surrogate keys stayed stable, a@x.com is still key 1, b@x.com still key 2 (upsert, not a key-churning replace)",
         isHidden: true,
         sql: `SELECT 1 WHERE COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'a@x.com'), -1) <> 1
           OR COALESCE((SELECT customer_key FROM dim_customer WHERE email = 'b@x.com'), -1) <> 2`,
@@ -1638,7 +1638,7 @@ compare NULLs as ordinary values: \`'Madrid' IS NOT NULL\` is \`TRUE\`, \`NULL I
 \`\`\`sql
 -- WRONG: NULL <-> value transitions are missed (the predicate is NULL, not TRUE)
 WHERE stg.city <> dim.city
--- RIGHT: null-safe — catches NULL->value and value->NULL as well as value->value
+-- RIGHT: null-safe, catches NULL->value and value->NULL as well as value->value
 WHERE stg.city IS NOT dim.city
 \`\`\`
 
@@ -1683,9 +1683,9 @@ with their validity windows meeting exactly.`,
     starterCode: `-- dim_customer already holds Ada's current London row (effective 2026-01-01).
 -- Apply the Type 2 change: as of 2026-03-01, Ada's city is Berlin.
 
--- Step 1: expire the current London row — SET effective_to = '2026-03-01', is_current = 0 ...
+-- Step 1: expire the current London row, SET effective_to = '2026-03-01', is_current = 0 ...
 
--- Step 2: insert the Berlin version — effective_from = '2026-03-01', effective_to = '9999-12-31', is_current = 1 ...`,
+-- Step 2: insert the Berlin version, effective_from = '2026-03-01', effective_to = '9999-12-31', is_current = 1 ...`,
     hints: [
       "Two statements: an `UPDATE` to expire, then an `INSERT` for the new version.",
       "Expire with `SET effective_to = '2026-03-01', is_current = 0 WHERE email = 'a@x.com' AND is_current = 1`.",
@@ -1737,7 +1737,7 @@ WHERE email = 'a@x.com' AND city = 'London'
       },
       {
         suite: "windows",
-        name: "the two versions meet exactly — no gap, no overlap",
+        name: "the two versions meet exactly, no gap, no overlap",
         isHidden: true,
         sql: `SELECT 1 WHERE
   COALESCE((SELECT effective_to FROM dim_customer WHERE email = 'a@x.com' AND city = 'London'), 'x')
@@ -1854,7 +1854,7 @@ WHERE (SELECT COUNT(*) FROM dim_customer d WHERE d.email = e.email) <> 1`,
       },
       {
         suite: "nullsafe",
-        name: "e@x.com's NULL→Madrid change was detected — now two versions, current = Madrid",
+        name: "e@x.com's NULL→Madrid change was detected, now two versions, current = Madrid",
         sql: `SELECT 1 WHERE
   (SELECT COUNT(*) FROM dim_customer WHERE email = 'e@x.com') <> 2
   OR NOT EXISTS (
@@ -2004,7 +2004,7 @@ CREATE TABLE clean_customer (email TEXT, name TEXT, city TEXT, updated_at TEXT);
     assertions: [
       {
         suite: "rows",
-        name: "clean_customer holds exactly two rows — one per email",
+        name: "clean_customer holds exactly two rows, one per email",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM clean_customer) <> 2`,
       },
       {
@@ -2081,7 +2081,7 @@ CREATE TABLE dedup_customer (
     assertions: [
       {
         suite: "rows",
-        name: "dedup_customer holds exactly three rows — one per customer_code",
+        name: "dedup_customer holds exactly three rows, one per customer_code",
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dedup_customer) <> 3`,
       },
       {
@@ -2584,7 +2584,7 @@ row per test**, each storing the **count of violating rows**:
 The suite **passes** only when all four \`violations\` are \`0\`. Lead with \`DELETE FROM dq_results;\` so a
 re-run recomputes the four rows instead of stacking eight.`,
     starterCode: `-- dim_customer, fact_sales, and an empty dq_results are already seeded.
--- Populate dq_results with one row per DQ test — each COUNTs only the VIOLATING rows.
+-- Populate dq_results with one row per DQ test, each COUNTs only the VIOLATING rows.
 DELETE FROM dq_results;   -- recompute cleanly on every run
 
 -- INSERT INTO dq_results (test_name, violations)
@@ -2742,7 +2742,7 @@ but the grader checks the **index and the result**, not the plan text.`,
 index that turns that scan into a \`SEARCH … USING INDEX\` seek**: index the column the query filters
 on. (In the real grader the table is large enough that the scan actually hurts.) Keep the script
 re-runnable so a second run doesn't error.`,
-    starterCode: `-- fact_sales is already seeded — there is no index on customer_key yet.
+    starterCode: `-- fact_sales is already seeded, there is no index on customer_key yet.
 -- Add the index that turns the SCAN in
 --   EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;
 -- into a SEARCH … USING INDEX seek.

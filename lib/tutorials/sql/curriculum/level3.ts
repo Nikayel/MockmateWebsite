@@ -805,7 +805,7 @@ DROP TABLE IF EXISTS customers;
       },
       {
         suite: "integrity",
-        name: "exactly two order_items remain — order 1's cascaded away, order 2's survived",
+        name: "exactly two order_items remain, order 1's cascaded away, order 2's survived",
         isHidden: true,
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_items) <> 2`,
       },
@@ -897,7 +897,7 @@ prove it never lands. The table should end with exactly one row.`,
 
 -- CREATE TABLE orders ( ... ) with a CHECK on status and NOT NULL columns ...
 -- INSERT one valid row (a whitelisted status) ...
--- INSERT OR IGNORE a row with status = 'refunded' — it should be rejected ...`,
+-- INSERT OR IGNORE a row with status = 'refunded', it should be rejected ...`,
     hints: [
       "`status TEXT NOT NULL CHECK (status IN ('pending','paid','shipped','cancelled'))` puts the enum right in the column definition.",
       "Insert the valid row with a whitelisted status like `'paid'`.",
@@ -1685,7 +1685,7 @@ An **entity** is a thing you store (customer, order, product); a **relationship*
 **Worked example.**
 
 \`\`\`sql
--- 1:N — FK on the many side (orders)
+-- 1:N, FK on the many side (orders)
 CREATE TABLE customers (customer_id INTEGER PRIMARY KEY);
 CREATE TABLE orders (
     order_id    INTEGER PRIMARY KEY,
@@ -1722,8 +1722,8 @@ direction by joining the books back to their author.`,
 DROP TABLE IF EXISTS books;
 DROP TABLE IF EXISTS authors;
 
--- CREATE authors — the one side: author_id PRIMARY KEY, name. No FK here.
--- CREATE books — the many side: book_id PRIMARY KEY, title, author_id REFERENCES authors.
+-- CREATE authors, the one side: author_id PRIMARY KEY, name. No FK here.
+-- CREATE books, the many side: book_id PRIMARY KEY, title, author_id REFERENCES authors.
 -- INSERT one author, then two books that both point at that author.`,
     hints: [
       "\`authors(author_id INTEGER PRIMARY KEY, name TEXT)\`. The one side carries no FK.",
@@ -1786,11 +1786,11 @@ DROP TABLE IF EXISTS songs;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS model_notes;
 
--- users — the one side of user 1:N playlists.
--- playlists — the many side: FK user_id REFERENCES users.
--- cover_images — the 1:1 split: playlist_id UNIQUE REFERENCES playlists.
--- songs — standalone; the M:N link to playlists can't be a single FK.
--- model_notes — record mn_needs_junction = 1.`,
+-- users, the one side of user 1:N playlists.
+-- playlists, the many side: FK user_id REFERENCES users.
+-- cover_images, the 1:1 split: playlist_id UNIQUE REFERENCES playlists.
+-- songs, standalone; the M:N link to playlists can't be a single FK.
+-- model_notes, record mn_needs_junction = 1.`,
     hints: [
       "\`playlists.user_id INTEGER REFERENCES users(user_id)\`: FK on the many side.",
       "\`cover_images.playlist_id INTEGER UNIQUE REFERENCES playlists(playlist_id)\`. The \`UNIQUE\` is what turns 1:N into 1:1.",
@@ -1812,7 +1812,7 @@ DROP TABLE IF EXISTS model_notes;
       },
       {
         suite: "one-to-one",
-        name: "the cover_images FK is UNIQUE — that is what encodes 1:1",
+        name: "the cover_images FK is UNIQUE, that is what encodes 1:1",
         isHidden: true,
         sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM pragma_index_list('cover_images') WHERE "unique" = 1) < 1`,
       },
@@ -1914,7 +1914,7 @@ the \`(1, 10)\` pair a second time with \`INSERT OR IGNORE\` and prove the compo
 
 -- CREATE TABLE enrollments ( ... ) with a composite PRIMARY KEY (student_id, course_id) ...
 -- INSERT the three distinct pairs (1,10), (1,11), (2,10) ...
--- INSERT OR IGNORE the duplicate (1,10) pair — it should be skipped, not error ...`,
+-- INSERT OR IGNORE the duplicate (1,10) pair, it should be skipped, not error ...`,
     hints: [
       "Declare the key at table level: `PRIMARY KEY (student_id, course_id)`. One composite key, not two separate primary keys.",
       "Insert the three distinct pairs, then attempt an already-existing pair with `INSERT OR IGNORE`.",
@@ -1934,7 +1934,7 @@ INSERT INTO enrollments (student_id, course_id, enrolled_at) VALUES
     (1, 11, '2026-01-02'),
     (2, 10, '2026-01-03');
 
--- Duplicate (student 1, course 10) pair — the composite PK makes this a no-op.
+-- Duplicate (student 1, course 10) pair, the composite PK makes this a no-op.
 INSERT OR IGNORE INTO enrollments (student_id, course_id, enrolled_at) VALUES (1, 10, '2026-02-09');`,
     seedSql: `DROP TABLE IF EXISTS enrollments; DROP TABLE IF EXISTS students; DROP TABLE IF EXISTS courses;
 CREATE TABLE students (student_id INTEGER PRIMARY KEY, name TEXT);
@@ -1981,8 +1981,8 @@ claiming an already-taken position is rejected. Playlist 1 must stay at exactly 
 --   position INTEGER NOT NULL
 --   UNIQUE (playlist_id, position)
 -- INSERT three rows into playlist 1 at positions 1, 2, 3 ...
--- INSERT OR IGNORE a repeat (playlist,song) pair — blocked by the PK ...
--- INSERT OR IGNORE a new song at an already-taken position — blocked by the UNIQUE ...`,
+-- INSERT OR IGNORE a repeat (playlist,song) pair, blocked by the PK ...
+-- INSERT OR IGNORE a new song at an already-taken position, blocked by the UNIQUE ...`,
     hints: [
       "`PRIMARY KEY (playlist_id, song_id)` for the pair; separately `UNIQUE (playlist_id, position)` for slot uniqueness.",
       "`position INTEGER NOT NULL`. The ordering fact depends on both the playlist and the song, so it lives on the junction.",
@@ -2164,7 +2164,7 @@ FROM (WITH RECURSIVE n(value) AS (
   the PK, auto-indexed).
 - Add a SQL \`--\` comment noting each index taxes every \`INSERT\` / \`UPDATE\` / \`DELETE\`, which is why
   you index selectively.`,
-    starterCode: `-- Index the two FK join columns on fact_sales — and nothing else.
+    starterCode: `-- Index the two FK join columns on fact_sales, and nothing else.
 -- Then leave a comment explaining the write-cost trade-off.
 
 -- CREATE INDEX ... ON fact_sales(customer_sk);
