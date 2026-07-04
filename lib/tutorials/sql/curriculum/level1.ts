@@ -11,32 +11,46 @@ const selectColumns: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Why a DE almost never ships \`SELECT *\`
 
-When a raw table lands in the warehouse, its column names are whatever the source system used:
-\`cust_nm\`, \`ord_dt\`, \`amt_c\`. Those names are cryptic and can change without warning. The first
-transform a data engineer writes, the **staging model**, selects only the columns downstream needs
-and renames each to a clean, predictable convention (usually \`snake_case\`).
+When a raw table lands in the warehouse, its columns are named whatever the source system chose: \`ord_id\`, \`cust_nm\`, \`amt_c\`. Those names are cryptic, and they can change without warning. The first transform a data engineer writes, the **staging model**, selects only the columns downstream needs and renames each to a clean, predictable convention (usually \`snake_case\`).
 
-\`SELECT *\` is the opposite of that discipline: it drags every column downstream, breaks the moment
-the source adds a column, and hides which fields a model depends on. **Explicit projection is a
-contract**: it documents exactly what you consume and insulates you from upstream churn.
+\`SELECT *\` is the opposite of that discipline. It drags every column downstream, silently gains a column the moment the source adds one, and hides which fields your model actually depends on. Explicit projection is a **contract**: it documents exactly what you consume and insulates you from upstream churn. That is why the Apply and Practice exercises ask you to name each column and drop the ones a mart does not need (\`ord_status\`, \`internal_flag\`).
 
-## The concept
+## What \`SELECT\` and \`AS\` actually do
 
-A \`SELECT\` names the columns you want, in order. \`AS\` gives a column a new output name (an *alias*).
+\`SELECT\` is the **projection** operator: it chooses which columns come back and in what order. It works row by row and never changes how many rows you get. Filtering rows is \`WHERE\`'s job; setting the grain is \`GROUP BY\`'s job. Projection only reshapes the columns.
+
+\`AS\` renames a column in the output. The alias becomes the output column's name, independent of what the source called it. Downstream models bind to your stable alias, not the source's cryptic identifier.
 
 \`\`\`sql
 SELECT
-  order_id      AS order_id,
-  cust_id       AS customer_id,
-  amt_c         AS amount_cents
+  ord_id  AS order_id,
+  cust_id AS customer_id,
+  amt_c   AS amount_cents
 FROM orders;
 \`\`\`
 
-The output columns are named by *you*, regardless of what the source called them. Downstream models
-depend on your stable names, not the source's.
+Against the seed rows, that returns:
 
-**Pitfall:** forgetting a comma between columns. \`SELECT order_id customer_id FROM orders\` doesn't
-error. SQLite reads it as "select \`order_id\`, aliased to \`customer_id\`," silently dropping a column.`,
+\`\`\`text
+order_id | customer_id | amount_cents
+1001     | 7           | 4999
+1002     | 7           | 1250
+1003     | 9           | 10000
+\`\`\`
+
+Three input columns become three cleanly named output columns. \`ord_status\` is simply not projected, so it never reaches downstream. Note the amounts are in cents (\`4999\` is 49.99), which is exactly why the alias \`amount_cents\` is worth writing: it encodes the unit for whoever reads the model next.
+
+### Pitfall: a missing comma silently drops a column
+
+\`AS\` is optional in SQL. \`ord_id order_id\` means the same as \`ord_id AS order_id\`. That convenience is a trap. If you forget a comma between two columns, the query still runs:
+
+\`\`\`sql
+SELECT ord_id cust_id FROM orders;   -- one column named cust_id, holding ord_id values
+\`\`\`
+
+SQLite reads \`cust_id\` as the alias of \`ord_id\`, so you get a single column named \`cust_id\` full of order-id values, and no error. The fix is a comma between every projected column. When a projection returns fewer columns than you expected, a swallowed comma is the first thing to check.
+
+**Interview nuance:** SQL's written order is not its execution order. The engine logically evaluates \`FROM\` and \`WHERE\` before it projects the \`SELECT\` list, so a \`SELECT\`-list alias is not yet visible in the same query's \`WHERE\` clause. In the SQL standard, and in PostgreSQL, MySQL, and SQL Server, \`SELECT amt_c AS amount_cents FROM orders WHERE amount_cents > 2000\` fails there with an unknown-column error. SQLite, the engine behind this lesson, is unusually lenient and resolves the alias anyway, so that exact query happens to run here. The portable habit is to filter on the real column, \`WHERE amt_c > 2000\`. Interviewers ask about alias-in-\`WHERE\` to check that you understand logical query order, and that engines differ on it.`,
     demoCode: `SELECT
   ord_id  AS order_id,
   cust_id AS customer_id,
@@ -179,24 +193,21 @@ const computedExpressions: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Derive, don't store
 
-A raw \`order_items\` row gives you \`qty\` and \`unit_price_cents\` but no line revenue. You *could* ask
-the source to store \`revenue\`, but that's a value that must be kept in sync forever. The DE default is
-to **derive it at query time**: \`qty * unit_price_cents AS line_revenue_cents\`. The formula lives in
-one place (your model), and it can never drift out of sync with its inputs.
+A row in \`order_items\` gives you \`qty\` and \`unit_price_cents\`, but there is no line-revenue column. You could ask the source system to store one, but then every write has to keep it in sync with its inputs forever, and the day someone updates \`qty\` without recomputing revenue, your table lies. The data-engineering default is to **derive the value at query time**: \`qty * unit_price_cents AS line_revenue_cents\`. The formula lives in one place, your model, and it can never drift from the columns it depends on.
 
-The same applies to labels. Instead of storing a \`full_name\`, you concatenate
-\`first_name || ' ' || last_name\` in the model: one source of truth, computed on read.
+The same logic applies to labels. Instead of storing a \`full_name\`, you build it on read with \`first_name || ' ' || last_name\`. One source of truth, computed when queried.
 
-## The building blocks
+## An expression is a per-row computation
 
-- **Arithmetic:** \`+\`, \`-\`, \`*\`, \`/\`. Integer division truncates in SQLite (\`7 / 2\` → \`3\`);
-  multiply by \`1.0\` or cast to force decimals.
-- **String concatenation:** \`||\` joins text. \`'A' || '-' || 'B'\` → \`'A-B'\`.
-- **Literal columns:** a constant becomes a column for every row: \`'raw' AS source_system\`.
+Each item in the \`SELECT\` list is an expression the engine evaluates once per row. A bare column like \`product_id\` is the simplest expression; \`qty * unit_price_cents\` is a richer one. The \`AS\` alias names the resulting output column. Nothing is written back to the table, so you are shaping the result set only.
 
-> **In the warehouse this differs: string concatenation.** Postgres/Snowflake also support \`||\`,
-> but SQL Server uses \`+\` and BigQuery uses \`CONCAT()\`. \`||\` is the portable ANSI choice and the one
-> SQLite understands, so we author with it here.
+Three building blocks cover most projections:
+
+- **Arithmetic:** \`+\`, \`-\`, \`*\`, \`/\` operate on numeric columns and literals, row by row.
+- **Concatenation:** \`||\` glues text together. You can splice in literal strings, so \`sku || ' (' || category_code || ')'\` yields values like \`SKU-AUDIO-01 (AUD)\`.
+- **Literal columns:** a constant becomes the same value on every row: \`'ecommerce_raw' AS source_system\`.
+
+> **In the warehouse this differs.** Postgres and Snowflake also use \`||\` for concatenation, but SQL Server uses \`+\` and BigQuery uses \`CONCAT()\`. \`||\` is the portable ANSI choice and what SQLite understands, so we author with it here.
 
 ## Worked example
 
@@ -209,19 +220,25 @@ SELECT
 FROM order_items;
 \`\`\`
 
-Every expression is just a computed value that gets an alias:
-
+\`\`\`text
+product_id  line_revenue_cents  product_label     source_system
+----------  ------------------  ----------------  -------------
+501         3000                SKU-AUDIO-01-AUD  ecommerce_raw
+502         4999                SKU-AUDIO-02-AUD  ecommerce_raw
+501         4500                SKU-AUDIO-01-AUD  ecommerce_raw
 \`\`\`
-qty * unit_price_cents   AS   line_revenue_cents
-└──── expression ──────┘  └──── output name ────┘
-\`\`\`
 
-**Pitfall.** Integer division silently truncates: \`unit_price_cents / 100\` for \`4999\` gives \`49\`, not
-\`49.99\`. To keep the cents, divide by \`100.0\`. And always alias a computed column: an un-aliased
-expression gets an ugly, unstable auto-name like \`qty * unit_price_cents\`.
+Every column is \`expression AS output_name\`: \`qty * unit_price_cents\` is the expression, \`line_revenue_cents\` is the name it lands under.
 
-**Recap.** Compute derived values (\`qty * price\`, \`a || b\`, constants) in the query and alias them.
-Never rely on the source to store what you can derive.`,
+## Pitfalls
+
+**Integer division truncates.** When both operands are integers, SQLite does integer math, so \`unit_price_cents / 100\` on \`4999\` gives \`49\`, not \`49.99\`. Force a decimal by dividing by \`100.0\` (or multiplying one side by \`1.0\`). The result type is inferred from the operands, so one decimal operand is enough.
+
+**\`NULL\` poisons the whole expression.** Any arithmetic or concatenation that touches a \`NULL\` returns \`NULL\`, so if \`last_name\` is \`NULL\`, then \`first_name || ' ' || last_name\` is \`NULL\`, not just the first name. Guard with \`COALESCE(last_name, '')\` when a missing part should not blank out the row.
+
+**Always alias a computed column.** An un-aliased expression gets an unstable auto-name like \`qty * unit_price_cents\` that downstream code cannot rely on.
+
+**Interview nuance:** aliases are minted in the \`SELECT\` step, which the engine logically evaluates *after* \`WHERE\` and \`GROUP BY\` but *before* \`ORDER BY\`. So in standard SQL (Postgres included) you cannot filter on \`line_revenue_cents\` by its alias in the same query's \`WHERE\`; you repeat the expression or wrap it in a subquery. \`ORDER BY line_revenue_cents\` works because ordering happens last. SQLite is lenient and will accept the alias in \`WHERE\`, but do not lean on that when portability matters.`,
     demoCode: `SELECT
   product_id,
   qty * unit_price_cents      AS line_revenue_cents,
@@ -339,40 +356,41 @@ const whereBasics: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["WHERE", "= <> < > <= >=", "filtering on numbers and text"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Filter early
+    markdown: `## Filter early, filter cheap
 
-The cheapest row is the one you never process. A staging model that only cares about paid orders should filter to \`status = 'paid'\` as early as possible.
+The cheapest row is the one you never process. A staging model that only cares about paid orders should drop everything else at the \`WHERE\` step, before any join, sort, or aggregate runs. \`WHERE\` evaluates a condition once per row and keeps only the rows where that condition is \`TRUE\`.
 
-> **In the warehouse this differs.** Filtering early is the intuition behind **predicate pushdown**: push the filter as close to the source scan as you can, so every downstream join, aggregate, and sort works on a smaller set. \`WHERE\` is where that starts.
+> **In the warehouse this differs.** Filtering early is the intuition behind **predicate pushdown**: the query planner tries to push your \`WHERE\` down to the source scan, so every downstream operator works on a smaller set. On a columnar warehouse a selective \`WHERE\` can also skip whole storage blocks it never has to read. \`WHERE\` is where that saving starts.
 
-## The operators
+## The comparison operators
 
-\`=\` (equal), \`<>\` or \`!=\` (not equal), \`<\`, \`>\`, \`<=\`, \`>=\`. Text comparisons use single quotes: \`status = 'paid'\`. Numbers are bare: \`total_cents >= 5000\`.
+\`=\` (equal), \`<>\` or \`!=\` (not equal, where \`<>\` is the SQL-standard spelling), \`<\`, \`>\`, \`<=\`, \`>=\`. Text values go in single quotes (\`status = 'paid'\`); numbers are bare (\`total_cents >= 5000\`).
 
-## Worked example: the "processable" slice
+The boundary matters. \`>= 5000\` keeps a row whose total is exactly \`5000\`; \`> 0\` excludes a row whose total is exactly \`0\`. Choosing the wrong one is a classic off-by-one at the data layer. Combine conditions with \`AND\` (both must hold) or \`OR\` (either):
 
 \`\`\`sql
 SELECT order_id, status, total_cents
 FROM orders
 WHERE status = 'paid'
   AND total_cents >= 5000;
+-- order_id | status | total_cents
+--    1     | paid   |    9900
+--    4     | paid   |    5000   <- passes because >= is inclusive
 \`\`\`
 
-## Anatomy
+Row 2 (\`paid\`, \`1500\`) fails the amount test; rows 3 and 5 fail the status test.
 
-\`\`\`
-WHERE  <column>  <operator>  <value>
-       status    =           'paid'   -- text: single quotes
-       total_cents >=        5000     -- number: no quotes
-\`\`\`
+## Pitfall: single vs double quotes
 
-## Pitfall
+Use single quotes for a string *value*. Double quotes mean *identifier* (a column or table name) in standard SQL. \`WHERE status = "paid"\` looks fine and even runs in SQLite, but only because there is no column named \`paid\`, so it quietly falls back to treating the text as a string. In Postgres the same query fails with \`column "paid" does not exist\`. Always write \`'paid'\`.
 
-Use single quotes for string *values* (\`'paid'\`); double quotes mean *identifier* in standard SQL. \`WHERE status = "paid"\` may work by accident in SQLite but is wrong and breaks in Postgres. Also: \`<>\` is the portable "not equal"; prefer it over \`!=\`.
+## When a filter drops rows you did not expect
+
+**Interview nuance:** SQL uses three-valued logic. A predicate can be \`TRUE\`, \`FALSE\`, or \`UNKNOWN\`, and \`WHERE\` keeps a row only when the result is \`TRUE\`. Any comparison against \`NULL\` returns \`UNKNOWN\`, so if \`status\` is \`NULL\` for some rows, both \`status = 'paid'\` and \`status <> 'paid'\` drop them. That surprises people who assume a "not equal" filter returns everything that is not paid. To include or target those rows you need \`IS NULL\` / \`IS NOT NULL\`, which are separate operators. \`status = NULL\` never matches anything.
 
 ## Recap
 
-\`WHERE col op value\` keeps only matching rows. Quote text values, filter as early as possible.`,
+\`WHERE col op value\` keeps rows where the condition is \`TRUE\`. Quote text with single quotes, decide whether your boundary is inclusive (\`>=\`) or strict (\`>\`), chain checks with \`AND\`, and remember that \`NULL\` satisfies neither \`=\` nor \`<>\`.`,
     demoCode: `SELECT order_id, status, total_cents
 FROM orders
 WHERE status = 'paid'
@@ -813,36 +831,50 @@ const booleanAndOr: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["AND", "OR", "NOT", "operator precedence", "parenthesizing conditions"],
   teach: {
     estimatedMinutes: 6,
-    markdown: `## Precedence is where filters silently break
+    markdown: `## A misplaced paren silently ships the wrong rows
 
-\`AND\` binds *tighter* than \`OR\`, just like \`*\` binds tighter than \`+\`. So this:
+A \`WHERE\` clause is where a business rule becomes code. "Paid or shipped orders in the EU" is one English sentence, but SQL does not read English. It applies a fixed precedence order, and if that order does not match what you meant, the query still runs, returns no error, and hands wrong rows to whatever reads the table next: a dashboard, a payout job, a training set. Filter bugs are quiet, and quiet bugs are the expensive ones.
+
+### Precedence: NOT, then AND, then OR
+
+SQL evaluates the logical operators in a fixed order: \`NOT\` binds tightest, then \`AND\`, then \`OR\`. \`AND\` relates to \`OR\` the way \`*\` relates to \`+\`. So this filter:
 
 \`\`\`sql
 WHERE status = 'paid' OR status = 'shipped' AND region = 'EU'
 \`\`\`
 
-does **not** mean "(paid or shipped) and in EU." SQL reads it as \`paid OR (shipped AND region='EU')\`, which lets in *every* paid order from *any* region. A missing pair of parentheses just silently widened your filter and let bad rows into the model. This is one of the most common real bugs in production SQL.
+does not mean "(paid or shipped) and in the EU." SQL groups the tighter \`AND\` first and reads it as:
 
-**The fix is always the same: parenthesize the OR branch.**
+\`\`\`sql
+WHERE status = 'paid' OR (status = 'shipped' AND region = 'EU')
+\`\`\`
+
+The \`paid\` branch now stands alone with no region test, so every paid order from every region slips through. Against the seed data, order 3 (\`paid\`, \`US\`) comes back even though it is not in the EU. The filter silently widened.
+
+### The fix: parenthesize the OR group
 
 \`\`\`sql
 WHERE (status = 'paid' OR status = 'shipped')
   AND region = 'EU';
 \`\`\`
 
-\`NOT\` negates a condition: \`NOT (status = 'test')\`, or more idiomatically \`status <> 'test'\`. Applied to a group, \`NOT (a OR b)\` means "neither a nor b."
+Now the alternatives are grouped before \`AND\` applies, so both branches must also satisfy \`region = 'EU'\`. This returns exactly orders 1 and 2. Parentheses override precedence, and they document intent, so a reviewer never has to recall the precedence table to trust the clause.
 
-## Anatomy
+When a rule stacks two independent choices, give each choice its own parenthesized group:
 
+\`\`\`sql
+WHERE (status = 'paid' OR status = 'shipped')
+  AND (region = 'EU'  OR region = 'UK')
+  AND account_type <> 'test';
 \`\`\`
-WHERE ( A OR B )   -- group the alternatives first
-  AND   C          -- AND applies to the whole group
-  AND NOT D        -- and exclude D
-\`\`\`
 
-**Keep it readable.** When a filter mixes \`AND\` and \`OR\`, *always* parenthesize, even where precedence would technically do the right thing. Explicit parens document intent and survive future edits. A reviewer should never have to recall the precedence table to know what a \`WHERE\` means.
+Each \`OR\` lives inside its own parentheses, and the \`AND\`s chain the independent conditions together.
 
-**Recap.** \`AND\` binds tighter than \`OR\`; wrap every \`OR\` group in parentheses so a business rule's grouping is exact and unambiguous.`,
+### Pitfall: NOT is tighter than you think
+
+\`NOT\` binds tighter than \`AND\`, so \`NOT status = 'paid' AND region = 'EU'\` parses as \`(NOT status = 'paid') AND region = 'EU'\`, not \`NOT (status = 'paid' AND region = 'EU')\`. When you mean to negate a whole group, wrap the group: \`NOT (status = 'paid' AND region = 'EU')\`.
+
+**Interview nuance:** SQL predicates are three-valued. Every condition evaluates to \`TRUE\`, \`FALSE\`, or \`UNKNOWN\`, and \`WHERE\` keeps only rows that come out \`TRUE\`. A \`NULL\` compared with anything yields \`UNKNOWN\`, and \`NOT UNKNOWN\` is still \`UNKNOWN\`. So \`account_type <> 'test'\` (equivalently \`NOT (account_type = 'test')\`) silently drops every row where \`account_type\` is \`NULL\`, even though those rows are not test accounts. To keep them, say so explicitly: \`(account_type <> 'test' OR account_type IS NULL)\`. Interviewers use this to check whether you actually understand three-valued logic instead of treating \`NULL\` like an ordinary value.`,
     demoCode: `SELECT order_id, status, region
 FROM orders
 WHERE (status = 'paid' OR status = 'shipped')
