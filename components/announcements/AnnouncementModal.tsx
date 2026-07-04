@@ -140,12 +140,6 @@ export function AnnouncementModal({ announcement, onClose, onDismiss }: Announce
     }
   }, [announcement.dismissible, handleDismiss])
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && announcement.dismissible) {
-      handleDismiss()
-    }
-  }
-
   const handleCtaClick = () => {
     if (announcement.cta?.url) {
       window.open(announcement.cta.url, "_blank", "noopener,noreferrer")
@@ -162,20 +156,32 @@ export function AnnouncementModal({ announcement, onClose, onDismiss }: Announce
         "transition-all duration-200 ease-out",
         isVisible && !isExiting ? "opacity-100" : "opacity-0"
       )}
-      onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="announcement-title"
       aria-describedby="announcement-message"
     >
-      {/* Backdrop */}
-      <div
-        className={cn(
-          "absolute inset-0 bg-background/60 backdrop-blur-sm",
-          "transition-opacity duration-200"
-        )}
-        aria-hidden="true"
-      />
+      {/* Backdrop (click to dismiss when allowed; Escape and the close button also dismiss) */}
+      {announcement.dismissible ? (
+        <button
+          type="button"
+          aria-label="Dismiss announcement"
+          tabIndex={-1}
+          onClick={handleDismiss}
+          className={cn(
+            "bg-background/60 absolute inset-0 backdrop-blur-sm",
+            "transition-opacity duration-200"
+          )}
+        />
+      ) : (
+        <div
+          className={cn(
+            "bg-background/60 absolute inset-0 backdrop-blur-sm",
+            "transition-opacity duration-200"
+          )}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Modal */}
       <div

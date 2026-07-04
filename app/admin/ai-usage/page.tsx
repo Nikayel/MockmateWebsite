@@ -808,6 +808,14 @@ export default function AIUsagePage() {
                     <div
                       key={user.userId}
                       onClick={() => openUserDrawer(user)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          openUserDrawer(user)
+                        }
+                      }}
                       className="flex cursor-pointer items-center justify-between rounded-lg bg-gray-800/30 p-3 transition-colors hover:bg-gray-800/50"
                     >
                       <div className="flex items-center gap-3">
@@ -909,7 +917,12 @@ export default function AIUsagePage() {
       {/* User Details Drawer */}
       {userDrawerOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setUserDrawerOpen(false)} />
+          <button
+            type="button"
+            aria-label="Close user details"
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setUserDrawerOpen(false)}
+          />
           <div className="relative w-full max-w-lg overflow-y-auto border-l border-gray-800 bg-gray-900">
             <div className="sticky top-0 flex items-center justify-between border-b border-gray-800 bg-gray-900 p-4">
               <div>

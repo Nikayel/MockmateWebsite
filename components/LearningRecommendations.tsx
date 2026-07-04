@@ -102,7 +102,7 @@ export function LearningRecommendations({
       case "declining":
         return <TrendingDown className="h-4 w-4 text-red-500" />
       default:
-        return <Minus className="h-4 w-4 text-muted-foreground" />
+        return <Minus className="text-muted-foreground h-4 w-4" />
     }
   }
 
@@ -216,6 +216,14 @@ export function LearningRecommendations({
             <div
               key={step.step}
               className="hover:bg-muted/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  e.currentTarget.click()
+                }
+              }}
               onClick={() => {
                 // Extract problem type from focus text
                 const focusLower = step.focus.toLowerCase()

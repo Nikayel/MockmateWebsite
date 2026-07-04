@@ -263,6 +263,14 @@ export default function RateLimitsPage() {
                     selectedFeedback?.id === item.id && "bg-gray-800/50"
                   )}
                   onClick={() => setSelectedFeedback(item)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      setSelectedFeedback(item)
+                    }
+                  }}
                 >
                   <div className="flex items-start gap-4">
                     {/* Type icon */}
@@ -396,9 +404,7 @@ export default function RateLimitsPage() {
 
             {/* System Message */}
             <div>
-              <label className="text-xs tracking-wider text-gray-500 uppercase">
-                System Message
-              </label>
+              <span className="text-xs tracking-wider text-gray-500 uppercase">System Message</span>
               <p className="mt-1 rounded-lg bg-gray-800/50 p-3 text-sm text-gray-300">
                 {selectedFeedback.systemMessage}
               </p>
@@ -407,9 +413,9 @@ export default function RateLimitsPage() {
             {/* User Message */}
             {selectedFeedback.userMessage && (
               <div>
-                <label className="text-xs tracking-wider text-gray-500 uppercase">
+                <span className="text-xs tracking-wider text-gray-500 uppercase">
                   User Feedback
-                </label>
+                </span>
                 <p className="mt-1 rounded-lg bg-gray-800/50 p-3 text-sm text-gray-300 italic">
                   "{selectedFeedback.userMessage}"
                 </p>
@@ -419,25 +425,23 @@ export default function RateLimitsPage() {
             {/* User Info */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs tracking-wider text-gray-500 uppercase">User</label>
+                <span className="text-xs tracking-wider text-gray-500 uppercase">User</span>
                 <p className="mt-1 text-sm text-gray-300">
                   {selectedFeedback.userEmail || selectedFeedback.userId || "Anonymous"}
                 </p>
               </div>
               <div>
-                <label className="text-xs tracking-wider text-gray-500 uppercase">Tier</label>
+                <span className="text-xs tracking-wider text-gray-500 uppercase">Tier</span>
                 <p className="mt-1 text-sm text-gray-300 capitalize">
                   {selectedFeedback.tier || "Unknown"}
                 </p>
               </div>
               <div>
-                <label className="text-xs tracking-wider text-gray-500 uppercase">IP Address</label>
+                <span className="text-xs tracking-wider text-gray-500 uppercase">IP Address</span>
                 <p className="mt-1 font-mono text-sm text-gray-300">{selectedFeedback.clientIp}</p>
               </div>
               <div>
-                <label className="text-xs tracking-wider text-gray-500 uppercase">
-                  Reported At
-                </label>
+                <span className="text-xs tracking-wider text-gray-500 uppercase">Reported At</span>
                 <p className="mt-1 text-sm text-gray-300">
                   {formatDate(selectedFeedback.createdAt)}
                 </p>
@@ -447,7 +451,7 @@ export default function RateLimitsPage() {
             {/* User Agent */}
             {selectedFeedback.userAgent && (
               <div>
-                <label className="text-xs tracking-wider text-gray-500 uppercase">User Agent</label>
+                <span className="text-xs tracking-wider text-gray-500 uppercase">User Agent</span>
                 <p className="mt-1 rounded bg-gray-800/50 p-2 font-mono text-xs break-all text-gray-400">
                   {selectedFeedback.userAgent}
                 </p>
@@ -456,9 +460,9 @@ export default function RateLimitsPage() {
 
             {/* Actions */}
             <div className="border-t border-gray-800 pt-4">
-              <label className="mb-3 block text-xs tracking-wider text-gray-500 uppercase">
+              <span className="mb-3 block text-xs tracking-wider text-gray-500 uppercase">
                 Update Status
-              </label>
+              </span>
               <div className="flex flex-wrap gap-2">
                 {["reviewed", "resolved", "dismissed"].map((status) => (
                   <Button

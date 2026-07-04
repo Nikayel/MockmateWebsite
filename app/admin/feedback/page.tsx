@@ -319,6 +319,14 @@ export default function FeedbackPage() {
                     key={item.id}
                     className="cursor-pointer rounded-lg border border-gray-700 bg-gray-800/50 p-4 hover:border-gray-600"
                     onClick={() => openDetails(item)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        openDetails(item)
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex flex-1 items-start gap-3">
@@ -419,8 +427,11 @@ export default function FeedbackPage() {
                 <p>Date: {new Date(selectedItem.createdAt).toLocaleString()}</p>
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-gray-400">Admin Notes</label>
+                <label htmlFor="admin-notes" className="text-sm text-gray-400">
+                  Admin Notes
+                </label>
                 <Textarea
+                  id="admin-notes"
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   placeholder="Add internal notes..."
@@ -428,7 +439,7 @@ export default function FeedbackPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-gray-400">Update Status</label>
+                <span className="text-sm text-gray-400">Update Status</span>
                 <div className="flex gap-2">
                   {(["new", "reviewed", "in_progress", "resolved", "declined"] as const).map(
                     (status) => (

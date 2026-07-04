@@ -268,29 +268,29 @@ export default function SessionFeedbackCard({
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* TL;DR & Score - Always Visible */}
-      <Card className="border border-border bg-background">
+      <Card className="border-border bg-background border">
         <div className="space-y-3 p-3 sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="mb-1 text-xs tracking-wider text-muted-foreground uppercase">TL;DR</p>
-              <p className="text-xs leading-relaxed text-foreground sm:text-sm">
+              <p className="text-muted-foreground mb-1 text-xs tracking-wider uppercase">TL;DR</p>
+              <p className="text-foreground text-xs leading-relaxed sm:text-sm">
                 {sections.tldr || "Review complete"}
               </p>
             </div>
             <div className="flex-shrink-0 text-center">
               <div className="flex items-baseline gap-1">
                 <span
-                  className="text-2xl font-bold text-foreground sm:text-3xl"
+                  className="text-foreground text-2xl font-bold sm:text-3xl"
                   aria-label={`Score: ${performanceScore || sections.scores.overall} out of 10`}
                 >
                   {performanceScore || sections.scores.overall}
                 </span>
-                <span className="text-sm text-muted-foreground" aria-hidden="true">
+                <span className="text-muted-foreground text-sm" aria-hidden="true">
                   /10
                 </span>
               </div>
               <Badge
-                className={`${getScoreBgColor(performanceScore || sections.scores.overall)} mt-1 text-[10px] text-foreground`}
+                className={`${getScoreBgColor(performanceScore || sections.scores.overall)} text-foreground mt-1 text-[10px]`}
               >
                 {(performanceScore || sections.scores.overall) >= 8
                   ? "Excellent"
@@ -302,55 +302,55 @@ export default function SessionFeedbackCard({
           </div>
 
           {/* Quick Stats - Always Visible */}
-          <div className="grid grid-cols-5 gap-1 border-t border-border pt-3 text-center sm:gap-2">
+          <div className="border-border grid grid-cols-5 gap-1 border-t pt-3 text-center sm:gap-2">
             <div>
-              <div className="text-xs font-bold text-foreground sm:text-sm">
+              <div className="text-foreground text-xs font-bold sm:text-sm">
                 {sections.scores.correctness}
               </div>
-              <div className="text-[9px] text-muted-foreground sm:text-[10px]">Correct</div>
+              <div className="text-muted-foreground text-[9px] sm:text-[10px]">Correct</div>
             </div>
             <div>
-              <div className="text-xs font-bold text-foreground sm:text-sm">
+              <div className="text-foreground text-xs font-bold sm:text-sm">
                 {sections.scores.efficiency}
               </div>
-              <div className="text-[9px] text-muted-foreground sm:text-[10px]">Efficient</div>
+              <div className="text-muted-foreground text-[9px] sm:text-[10px]">Efficient</div>
             </div>
             <div>
-              <div className="text-xs font-bold text-foreground sm:text-sm">
+              <div className="text-foreground text-xs font-bold sm:text-sm">
                 {sections.scores.codeQuality}
               </div>
-              <div className="text-[9px] text-muted-foreground sm:text-[10px]">Quality</div>
+              <div className="text-muted-foreground text-[9px] sm:text-[10px]">Quality</div>
             </div>
             <div>
-              <div className="text-xs font-bold text-foreground sm:text-sm">
+              <div className="text-foreground text-xs font-bold sm:text-sm">
                 {sections.scores.reasoning}
               </div>
-              <div className="text-[9px] text-muted-foreground sm:text-[10px]">Reason</div>
+              <div className="text-muted-foreground text-[9px] sm:text-[10px]">Reason</div>
             </div>
             <div>
-              <div className="text-xs font-bold text-foreground sm:text-sm">
+              <div className="text-foreground text-xs font-bold sm:text-sm">
                 {sections.scores.aiCollaboration}
               </div>
-              <div className="text-[9px] text-muted-foreground sm:text-[10px]">AI</div>
+              <div className="text-muted-foreground text-[9px] sm:text-[10px]">AI</div>
             </div>
           </div>
 
           {/* Radar Chart - Collapsible */}
           <Collapsible open={showRadarChart} onOpenChange={setShowRadarChart}>
-            <div className="border-t border-border pt-3">
+            <div className="border-border border-t pt-3">
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full cursor-pointer justify-between hover:bg-foreground/5"
+                  className="hover:bg-foreground/5 w-full cursor-pointer justify-between"
                   aria-expanded={showRadarChart}
                   aria-label={showRadarChart ? "Hide radar chart" : "Show radar chart"}
                 >
-                  <span className="text-xs text-muted-foreground">Radar Chart</span>
+                  <span className="text-muted-foreground text-xs">Radar Chart</span>
                   {showRadarChart ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <ChevronUp className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <ChevronDown className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                   )}
                 </Button>
               </CollapsibleTrigger>
@@ -388,15 +388,15 @@ export default function SessionFeedbackCard({
       {/* What Worked - Collapsible */}
       {sections.whatWorked.length > 0 && (
         <Collapsible open={showWhatWorked} onOpenChange={setShowWhatWorked}>
-          <Card className="border border-border bg-background">
+          <Card className="border-border bg-background border">
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full cursor-pointer justify-between rounded-lg p-3 transition-colors hover:bg-foreground/5 sm:p-4"
+                className="hover:bg-foreground/5 w-full cursor-pointer justify-between rounded-lg p-3 transition-colors sm:p-4"
                 aria-expanded={showWhatWorked}
                 aria-label={showWhatWorked ? "Hide what worked" : "Show what worked"}
               >
-                <span className="flex items-center gap-2 text-xs text-foreground sm:text-sm">
+                <span className="text-foreground flex items-center gap-2 text-xs sm:text-sm">
                   <CheckCircle
                     className="h-3 w-3 flex-shrink-0 text-green-500 sm:h-4 sm:w-4"
                     aria-hidden="true"
@@ -404,14 +404,14 @@ export default function SessionFeedbackCard({
                   What Worked
                 </span>
                 {showWhatWorked ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <ChevronUp className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <ChevronDown className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                 )}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
-              <ul className="mt-2 space-y-1.5 sm:space-y-2" role="list">
+              <ul className="mt-2 space-y-1.5 sm:space-y-2">
                 {sections.whatWorked.slice(0, 3).map((item, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <span
@@ -420,7 +420,7 @@ export default function SessionFeedbackCard({
                     >
                       ✓
                     </span>
-                    <span className="text-[10px] leading-relaxed text-foreground sm:text-xs">
+                    <span className="text-foreground text-[10px] leading-relaxed sm:text-xs">
                       {item}
                     </span>
                   </li>
@@ -433,16 +433,16 @@ export default function SessionFeedbackCard({
 
       {/* Fix Next - Always Visible */}
       {sections.fixNext.length > 0 && (
-        <Card className="border border-border bg-background">
+        <Card className="border-border bg-background border">
           <div className="p-3 sm:p-4">
             <div className="mb-2 flex items-center gap-2">
               <Target
                 className="h-3 w-3 flex-shrink-0 text-red-500 sm:h-4 sm:w-4"
                 aria-hidden="true"
               />
-              <h4 className="text-xs font-semibold text-foreground sm:text-sm">Fix Next</h4>
+              <h4 className="text-foreground text-xs font-semibold sm:text-sm">Fix Next</h4>
             </div>
-            <ul className="space-y-1.5 sm:space-y-2" role="list">
+            <ul className="space-y-1.5 sm:space-y-2">
               {sections.fixNext.slice(0, 3).map((item, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <span
@@ -451,7 +451,7 @@ export default function SessionFeedbackCard({
                   >
                     {index + 1}
                   </span>
-                  <span className="text-[10px] leading-relaxed text-foreground sm:text-xs">
+                  <span className="text-foreground text-[10px] leading-relaxed sm:text-xs">
                     {item}
                   </span>
                 </li>
@@ -464,15 +464,15 @@ export default function SessionFeedbackCard({
       {/* Action Plan - Collapsible */}
       {sections.actionPlan.length > 0 && (
         <Collapsible open={showActionPlan} onOpenChange={setShowActionPlan}>
-          <Card className="border border-border bg-background">
+          <Card className="border-border bg-background border">
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full cursor-pointer justify-between rounded-lg p-3 transition-colors hover:bg-foreground/5 sm:p-4"
+                className="hover:bg-foreground/5 w-full cursor-pointer justify-between rounded-lg p-3 transition-colors sm:p-4"
                 aria-expanded={showActionPlan}
                 aria-label={showActionPlan ? "Hide action plan" : "Show action plan"}
               >
-                <span className="flex items-center gap-2 text-xs text-foreground sm:text-sm">
+                <span className="text-foreground flex items-center gap-2 text-xs sm:text-sm">
                   <Zap
                     className="text-accent h-3 w-3 flex-shrink-0 sm:h-4 sm:w-4"
                     aria-hidden="true"
@@ -480,9 +480,9 @@ export default function SessionFeedbackCard({
                   Action Plan
                 </span>
                 {showActionPlan ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <ChevronUp className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <ChevronDown className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                 )}
               </Button>
             </CollapsibleTrigger>
@@ -491,15 +491,15 @@ export default function SessionFeedbackCard({
                 {sections.actionPlan.slice(0, 3).map((item, index) => (
                   <div
                     key={index}
-                    className="flex items-start gap-2 rounded border border-border bg-foreground/5 p-2"
+                    className="border-border bg-foreground/5 flex items-start gap-2 rounded border p-2"
                   >
                     <div
-                      className="bg-accent flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-foreground sm:h-5 sm:w-5"
+                      className="bg-accent text-foreground flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-bold sm:h-5 sm:w-5"
                       aria-hidden="true"
                     >
                       {index + 1}
                     </div>
-                    <span className="pt-0.5 text-[10px] leading-relaxed text-foreground sm:text-xs">
+                    <span className="text-foreground pt-0.5 text-[10px] leading-relaxed sm:text-xs">
                       {item}
                     </span>
                   </div>
@@ -513,15 +513,15 @@ export default function SessionFeedbackCard({
       {/* AI Watchlist - Collapsible */}
       {sections.aiWatchlist && (
         <Collapsible open={showAIWatchlist} onOpenChange={setShowAIWatchlist}>
-          <Card className="border border-border bg-background">
+          <Card className="border-border bg-background border">
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full cursor-pointer justify-between rounded-lg p-3 transition-colors hover:bg-foreground/5 sm:p-4"
+                className="hover:bg-foreground/5 w-full cursor-pointer justify-between rounded-lg p-3 transition-colors sm:p-4"
                 aria-expanded={showAIWatchlist}
                 aria-label={showAIWatchlist ? "Hide AI watchlist" : "Show AI watchlist"}
               >
-                <span className="flex items-center gap-2 text-xs text-foreground sm:text-sm">
+                <span className="text-foreground flex items-center gap-2 text-xs sm:text-sm">
                   <MessageSquare
                     className="text-accent h-3 w-3 flex-shrink-0 sm:h-4 sm:w-4"
                     aria-hidden="true"
@@ -529,14 +529,14 @@ export default function SessionFeedbackCard({
                   AI & Communication
                 </span>
                 {showAIWatchlist ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <ChevronUp className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <ChevronDown className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                 )}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
-              <p className="mt-2 text-[10px] leading-relaxed text-foreground sm:text-xs">
+              <p className="text-foreground mt-2 text-[10px] leading-relaxed sm:text-xs">
                 {sections.aiWatchlist}
               </p>
             </CollapsibleContent>
@@ -547,7 +547,7 @@ export default function SessionFeedbackCard({
       {/* Grading Verification - Shows AI self-review results */}
       {constitutionalAICritique && (
         <Collapsible open={showQualityCheck} onOpenChange={setShowQualityCheck}>
-          <Card className="overflow-hidden border border-indigo-500/20 bg-background">
+          <Card className="bg-background overflow-hidden border border-indigo-500/20">
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
@@ -557,13 +557,13 @@ export default function SessionFeedbackCard({
                   showQualityCheck ? "Hide grading verification" : "Show grading verification"
                 }
               >
-                <span className="flex items-center gap-2 text-xs text-foreground sm:text-sm">
+                <span className="text-foreground flex items-center gap-2 text-xs sm:text-sm">
                   <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 sm:h-7 sm:w-7">
                     <Shield className="h-3 w-3 text-indigo-400 sm:h-4 sm:w-4" aria-hidden="true" />
                   </div>
                   <div className="text-left">
                     <div className="font-medium">Grading Verified</div>
-                    <div className="text-[9px] font-normal text-muted-foreground sm:text-[10px]">
+                    <div className="text-muted-foreground text-[9px] font-normal sm:text-[10px]">
                       AI double-checked for fairness
                     </div>
                   </div>
@@ -582,9 +582,9 @@ export default function SessionFeedbackCard({
                     </span>
                   )}
                   {showQualityCheck ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <ChevronUp className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <ChevronDown className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                   )}
                 </div>
               </Button>
@@ -598,7 +598,7 @@ export default function SessionFeedbackCard({
                   const summary = scoreCritique?.userSummary || feedbackCritique?.userSummary
                   if (summary) {
                     return (
-                      <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
+                      <p className="text-muted-foreground text-[10px] leading-relaxed sm:text-[11px]">
                         {summary}
                       </p>
                     )
@@ -609,7 +609,7 @@ export default function SessionFeedbackCard({
                       scoreCritique.adjustedScores.overall - scoreCritique.originalScores.overall
                     if (delta !== 0) {
                       return (
-                        <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
+                        <p className="text-muted-foreground text-[10px] leading-relaxed sm:text-[11px]">
                           {delta > 0
                             ? `We reviewed your grading and adjusted your score by +${delta} points to better reflect your performance.`
                             : `We reviewed your grading and made adjustments for accuracy.`}
@@ -623,19 +623,23 @@ export default function SessionFeedbackCard({
                 {/* Score Change Summary */}
                 {constitutionalAICritique.scoreCritique && (
                   <div>
-                    <div className="mb-3 flex items-center justify-center gap-4 rounded-lg bg-foreground/5 p-3">
+                    <div className="bg-foreground/5 mb-3 flex items-center justify-center gap-4 rounded-lg p-3">
                       <div className="text-center">
-                        <div className="text-base font-semibold text-muted-foreground line-through sm:text-lg">
+                        <div className="text-muted-foreground text-base font-semibold line-through sm:text-lg">
                           {constitutionalAICritique.scoreCritique.originalScores.overall}
                         </div>
-                        <div className="text-[9px] text-muted-foreground sm:text-[10px]">Original</div>
+                        <div className="text-muted-foreground text-[9px] sm:text-[10px]">
+                          Original
+                        </div>
                       </div>
                       <div className="text-muted-foreground">→</div>
                       <div className="text-center">
                         <div className="text-base font-semibold text-emerald-400 sm:text-lg">
                           {constitutionalAICritique.scoreCritique.adjustedScores.overall}
                         </div>
-                        <div className="text-[9px] text-muted-foreground sm:text-[10px]">Verified</div>
+                        <div className="text-muted-foreground text-[9px] sm:text-[10px]">
+                          Verified
+                        </div>
                       </div>
                     </div>
 
@@ -703,16 +707,16 @@ export default function SessionFeedbackCard({
 
                       return (
                         <div className="space-y-2">
-                          <p className="text-[9px] font-medium tracking-wider text-muted-foreground uppercase sm:text-[10px]">
+                          <p className="text-muted-foreground text-[9px] font-medium tracking-wider uppercase sm:text-[10px]">
                             Score Adjustments
                           </p>
                           {changes.map((change: any, i: number) => (
                             <div
                               key={i}
-                              className="rounded-lg border border-border bg-foreground/5 p-2.5"
+                              className="border-border bg-foreground/5 rounded-lg border p-2.5"
                             >
                               <div className="mb-1 flex items-center justify-between">
-                                <span className="text-[10px] font-medium text-foreground sm:text-xs">
+                                <span className="text-foreground text-[10px] font-medium sm:text-xs">
                                   {change.category}
                                 </span>
                                 <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
@@ -736,7 +740,7 @@ export default function SessionFeedbackCard({
                                   )}
                                 </div>
                               </div>
-                              <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
+                              <p className="text-muted-foreground text-[10px] leading-relaxed sm:text-[11px]">
                                 {change.reason}
                               </p>
                             </div>
@@ -752,18 +756,16 @@ export default function SessionFeedbackCard({
                   !constitutionalAICritique.scoreCritique?.userSummary && (
                     <div
                       className={
-                        constitutionalAICritique.scoreCritique
-                          ? "border-t border-border pt-3"
-                          : ""
+                        constitutionalAICritique.scoreCritique ? "border-border border-t pt-3" : ""
                       }
                     >
-                      <p className="text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
+                      <p className="text-muted-foreground text-[10px] leading-relaxed sm:text-[11px]">
                         {constitutionalAICritique.feedbackCritique.userSummary}
                       </p>
                     </div>
                   )}
 
-                <p className="pt-2 text-[9px] text-muted-foreground sm:text-[10px]">
+                <p className="text-muted-foreground pt-2 text-[9px] sm:text-[10px]">
                   This verification helps ensure fair and accurate feedback for your interview
                   practice.
                 </p>

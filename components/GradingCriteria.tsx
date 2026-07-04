@@ -1,8 +1,8 @@
-'use client';
+"use client"
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import React, { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
 
 /**
  * GradingCriteriaIndicator - Shows what candidates are evaluated on
@@ -12,43 +12,43 @@ import { cn } from '@/lib/utils';
  */
 
 interface Criterion {
-  id: string;
-  label: string;
-  hint: string;
-  weight: number;
-  color: string;
+  id: string
+  label: string
+  hint: string
+  weight: number
+  color: string
 }
 
 const criteria: Criterion[] = [
   {
-    id: 'understanding',
-    label: 'Understanding',
-    hint: 'Explain your approach',
+    id: "understanding",
+    label: "Understanding",
+    hint: "Explain your approach",
     weight: 30,
-    color: '#c4703f',
+    color: "#c4703f",
   },
   {
-    id: 'problem-solving',
-    label: 'Problem-Solving',
-    hint: 'Break it down, debug it',
+    id: "problem-solving",
+    label: "Problem-Solving",
+    hint: "Break it down, debug it",
     weight: 25,
-    color: '#3fb883',
+    color: "#3fb883",
   },
   {
-    id: 'code-quality',
-    label: 'Code Quality',
-    hint: 'Working, efficient, readable',
+    id: "code-quality",
+    label: "Code Quality",
+    hint: "Working, efficient, readable",
     weight: 25,
-    color: '#a78bfa',
+    color: "#a78bfa",
   },
   {
-    id: 'communication',
-    label: 'Communication',
-    hint: 'Think out loud',
+    id: "communication",
+    label: "Communication",
+    hint: "Think out loud",
     weight: 20,
-    color: '#fbbf24',
+    color: "#fbbf24",
   },
-];
+]
 
 // Arc segment component for the radial display
 function ArcSegment({
@@ -60,18 +60,18 @@ function ArcSegment({
   isActive,
   onHover,
 }: {
-  criterion: Criterion;
-  startAngle: number;
-  sweepAngle: number;
-  radius?: number;
-  strokeWidth?: number;
-  isActive: boolean;
-  onHover: (id: string | null) => void;
+  criterion: Criterion
+  startAngle: number
+  sweepAngle: number
+  radius?: number
+  strokeWidth?: number
+  isActive: boolean
+  onHover: (id: string | null) => void
 }) {
-  const center = radius + strokeWidth;
-  const circumference = 2 * Math.PI * radius;
-  const offset = (startAngle / 360) * circumference;
-  const length = (sweepAngle / 360) * circumference;
+  const center = radius + strokeWidth
+  const circumference = 2 * Math.PI * radius
+  const offset = (startAngle / 360) * circumference
+  const length = (sweepAngle / 360) * circumference
 
   return (
     <g
@@ -93,29 +93,29 @@ function ArcSegment({
         className="transition-all duration-300"
       />
     </g>
-  );
+  )
 }
 
 // Full radial display for feedback page
 export function GradingCriteriaRadial({ className }: { className?: string }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const activeCriterion = criteria.find((c) => c.id === activeId);
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const activeCriterion = criteria.find((c) => c.id === activeId)
 
   // Calculate arc angles
-  let currentAngle = 0;
+  let currentAngle = 0
   const segments = criteria.map((criterion) => {
-    const sweepAngle = (criterion.weight / 100) * 360;
-    const segment = { criterion, startAngle: currentAngle, sweepAngle };
-    currentAngle += sweepAngle;
-    return segment;
-  });
+    const sweepAngle = (criterion.weight / 100) * 360
+    const segment = { criterion, startAngle: currentAngle, sweepAngle }
+    currentAngle += sweepAngle
+    return segment
+  })
 
-  const radius = 80;
-  const strokeWidth = 14;
-  const size = (radius + strokeWidth) * 2;
+  const radius = 80
+  const strokeWidth = 14
+  const size = (radius + strokeWidth) * 2
 
   return (
-    <div className={cn('flex items-center gap-6', className)}>
+    <div className={cn("flex items-center gap-6", className)}>
       {/* Radial chart */}
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size}>
@@ -144,13 +144,10 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="text-center"
               >
-                <div
-                  className="text-2xl font-bold"
-                  style={{ color: activeCriterion.color }}
-                >
+                <div className="text-2xl font-bold" style={{ color: activeCriterion.color }}>
                   {activeCriterion.weight}%
                 </div>
-                <div className="text-xs text-muted-foreground max-w-[80px]">
+                <div className="text-muted-foreground max-w-[80px] text-xs">
                   {activeCriterion.label}
                 </div>
               </motion.div>
@@ -162,9 +159,9 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
                 exit={{ opacity: 0 }}
                 className="text-center"
               >
-                <div className="text-sm font-medium text-muted-foreground">How</div>
-                <div className="text-sm font-medium text-muted-foreground">you're</div>
-                <div className="text-sm font-medium text-foreground">graded</div>
+                <div className="text-muted-foreground text-sm font-medium">How</div>
+                <div className="text-muted-foreground text-sm font-medium">you're</div>
+                <div className="text-foreground text-sm font-medium">graded</div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -177,17 +174,14 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
           <div
             key={criterion.id}
             className={cn(
-              'flex items-center gap-2 cursor-pointer transition-opacity',
-              activeId && activeId !== criterion.id ? 'opacity-40' : 'opacity-100'
+              "flex cursor-pointer items-center gap-2 transition-opacity",
+              activeId && activeId !== criterion.id ? "opacity-40" : "opacity-100"
             )}
             onMouseEnter={() => setActiveId(criterion.id)}
             onMouseLeave={() => setActiveId(null)}
           >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: criterion.color }}
-            />
-            <span className="text-xs text-muted-foreground">
+            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: criterion.color }} />
+            <span className="text-muted-foreground text-xs">
               {criterion.label}
               <span className="text-muted-foreground ml-1">· {criterion.hint}</span>
             </span>
@@ -195,13 +189,13 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
         ))}
       </div>
     </div>
-  );
+  )
 }
 
 // Compact inline version for interview page
 export function GradingCriteriaCompact({ className }: { className?: string }) {
   return (
-    <div className={cn('flex items-center gap-1', className)}>
+    <div className={cn("flex items-center gap-1", className)}>
       {criteria.map((criterion, idx) => (
         <div
           key={criterion.id}
@@ -219,35 +213,35 @@ export function GradingCriteriaCompact({ className }: { className?: string }) {
           />
 
           {/* Tooltip on hover */}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-            <div className="bg-card border border-border rounded px-2 py-1 whitespace-nowrap">
+          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="bg-card border-border rounded border px-2 py-1 whitespace-nowrap">
               <span className="text-[10px] font-medium" style={{ color: criterion.color }}>
                 {criterion.label}
               </span>
-              <span className="text-[10px] text-muted-foreground ml-1">{criterion.weight}%</span>
+              <span className="text-muted-foreground ml-1 text-[10px]">{criterion.weight}%</span>
             </div>
           </div>
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // Minimal tooltip trigger for interview coding panel
 export function GradingCriteriaTooltip({ className }: { className?: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn("relative", className)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground transition-colors"
+        className="text-muted-foreground hover:text-muted-foreground flex items-center gap-1 text-[10px] transition-colors"
       >
         <span className="flex gap-0.5">
           {criteria.map((c) => (
             <span
               key={c.id}
-              className="w-1 h-1 rounded-full"
+              className="h-1 w-1 rounded-full"
               style={{ backgroundColor: c.color, opacity: 0.6 }}
             />
           ))}
@@ -262,6 +256,15 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
             <div
               className="fixed inset-0 z-40"
               onClick={() => setIsOpen(false)}
+              role="button"
+              tabIndex={0}
+              aria-label="Close grading criteria"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
+                  e.preventDefault()
+                  setIsOpen(false)
+                }
+              }}
             />
 
             {/* Popover */}
@@ -270,33 +273,28 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 4, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute bottom-full left-0 mb-2 z-50"
+              className="absolute bottom-full left-0 z-50 mb-2"
             >
-              <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl min-w-[200px]">
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">
+              <div className="bg-card/95 border-border min-w-[200px] rounded-lg border p-3 shadow-xl backdrop-blur-sm">
+                <div className="text-muted-foreground mb-2 text-[10px] tracking-wider uppercase">
                   What matters
                 </div>
                 <div className="space-y-1.5">
                   {criteria.map((criterion) => (
                     <div key={criterion.id} className="flex items-center gap-2">
                       <div
-                        className="w-1 h-3 rounded-full"
+                        className="h-3 w-1 rounded-full"
                         style={{ backgroundColor: criterion.color }}
                       />
-                      <div className="flex-1 text-xs text-muted-foreground">
-                        {criterion.label}
-                      </div>
-                      <div
-                        className="text-[10px] font-medium"
-                        style={{ color: criterion.color }}
-                      >
+                      <div className="text-muted-foreground flex-1 text-xs">{criterion.label}</div>
+                      <div className="text-[10px] font-medium" style={{ color: criterion.color }}>
                         {criterion.weight}%
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 pt-2 border-t border-border">
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                <div className="border-border mt-2 border-t pt-2">
+                  <p className="text-muted-foreground text-[10px] leading-relaxed">
                     AI usage is optional. Explain your thinking.
                   </p>
                 </div>
@@ -306,7 +304,7 @@ export function GradingCriteriaTooltip({ className }: { className?: string }) {
         )}
       </AnimatePresence>
     </div>
-  );
+  )
 }
 
-export default GradingCriteriaRadial;
+export default GradingCriteriaRadial
