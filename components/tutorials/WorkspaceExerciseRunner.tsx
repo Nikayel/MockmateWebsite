@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Lock, Play } from "lucide-react"
+import { CheckCircle2, Lock, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
@@ -53,7 +53,8 @@ export function WorkspaceExerciseRunner({
 
   const visibleFiles = useMemo(() => workspace.files.filter((file) => !file.hidden), [workspace])
 
-  const [edits, setEdits] = useState<Record<string, string>>(() => {
+  // The starter content of every editable file — the reset target and the "dirty" baseline.
+  const starterEdits = useMemo(() => {
     const seed: Record<string, string> = {}
     for (const file of workspace.files) {
       if (file.role === "editable" || workspace.editableFilePaths.includes(file.path)) {
@@ -61,8 +62,15 @@ export function WorkspaceExerciseRunner({
       }
     }
     return seed
-  })
+  }, [workspace])
+
+  const [edits, setEdits] = useState<Record<string, string>>(starterEdits)
   const [activePath, setActivePath] = useState<string>(workspace.primaryFilePath)
+
+  const isDirty = useMemo(
+    () => Object.keys(starterEdits).some((path) => edits[path] !== starterEdits[path]),
+    [edits, starterEdits]
+  )
 
   const { running, warming, results, runError, passed, run } = useExerciseRun(exercise, {
     onPass,
@@ -145,7 +153,8 @@ export function WorkspaceExerciseRunner({
               readOnly={!isEditable(activeFile)}
               autoHeight
               minHeight={340}
-              maxHeight={600}
+              // Cap at ~22 lines (22px line-height + 16px content padding), then scroll internally.
+              maxHeight={500}
             />
           </CodeMirrorErrorBoundary>
         )}
@@ -163,6 +172,15 @@ export function WorkspaceExerciseRunner({
               : "Run tests"}
         </Button>
         <ColdStartNote warming={warming} engine={engine} />
+        <Button
+          variant="ghost"
+          onClick={() => setEdits(starterEdits)}
+          disabled={!isDirty}
+          className="gap-2"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </Button>
         {passed && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />

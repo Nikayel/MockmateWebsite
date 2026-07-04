@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Database, Eye, Lightbulb, Play } from "lucide-react"
+import { CheckCircle2, Database, Eye, Lightbulb, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
@@ -118,7 +118,8 @@ export function SqlExerciseRunner({
             language="sql"
             autoHeight
             minHeight={260}
-            maxHeight={640}
+            // Cap at ~22 lines (22px line-height + 16px content padding), then scroll internally.
+            maxHeight={500}
           />
         </CodeMirrorErrorBoundary>
       </div>
@@ -159,6 +160,15 @@ export function SqlExerciseRunner({
             Show solution
           </Button>
         )}
+        <Button
+          variant="ghost"
+          onClick={() => onCodeChange(exercise.starterCode)}
+          disabled={code === exercise.starterCode}
+          className="gap-2"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </Button>
         {passed && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />

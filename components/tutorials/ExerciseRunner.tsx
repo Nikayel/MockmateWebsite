@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Eye, FileCode2, Lightbulb, Play } from "lucide-react"
+import { CheckCircle2, Eye, FileCode2, Lightbulb, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
@@ -98,7 +98,8 @@ export function ExerciseRunner({
             language="python"
             autoHeight
             minHeight={260}
-            maxHeight={620}
+            // Cap at ~22 lines (22px line-height + 16px content padding), then scroll internally.
+            maxHeight={500}
           />
         </CodeMirrorErrorBoundary>
       </div>
@@ -139,6 +140,15 @@ export function ExerciseRunner({
             Show solution
           </Button>
         )}
+        <Button
+          variant="ghost"
+          onClick={() => onCodeChange(exercise.starterCode)}
+          disabled={code === exercise.starterCode}
+          className="gap-2"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </Button>
         {passed && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />
