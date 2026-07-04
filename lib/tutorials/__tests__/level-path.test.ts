@@ -79,14 +79,16 @@ describe("toLevelListModel", () => {
 })
 
 describe("computeLevelPath", () => {
-  it("fresh learner: lesson 1 is current, the rest are locked", () => {
+  it("fresh learner: lesson 1 is current, the rest are open (never locked)", () => {
     const path = computeLevelPath(makeModel(), new Set(), BASE)
     const [l1, l2] = path.sections[0]!.lessons
     const [l3] = path.sections[1]!.lessons
     expect(l1!.status).toBe("current")
-    expect(l2!.status).toBe("locked")
-    expect(l3!.status).toBe("locked")
-    expect(l2!.href).toBeNull()
+    expect(l2!.status).toBe("open")
+    expect(l3!.status).toBe("open")
+    // Every lesson is navigable — no gating.
+    expect(l2!.href).toBe("/learn/python/apply/l2")
+    expect(l3!.href).toBe("/learn/python/apply/l3")
     expect(path.percent).toBe(0)
     expect(path.minutesLeft).toBe(45)
     expect(path.continueTarget).toEqual({
@@ -97,26 +99,25 @@ describe("computeLevelPath", () => {
     expect(path.isComplete).toBe(false)
   })
 
-  it("mid-progress: done lessons resolve, next unlocks as current, later stays locked", () => {
+  it("mid-progress: done lessons resolve, next is current, later stays open", () => {
     const path = computeLevelPath(makeModel(), new Set(["l1"]), BASE)
     const [l1, l2] = path.sections[0]!.lessons
     const [l3] = path.sections[1]!.lessons
     expect(l1!.status).toBe("done")
     expect(l2!.status).toBe("current")
-    expect(l3!.status).toBe("locked")
+    expect(l3!.status).toBe("open")
     expect(path.percent).toBe(33)
     expect(path.minutesLeft).toBe(35)
     expect(path.continueTarget?.lessonId).toBe("l2")
   })
 
-  it("out-of-order completion produces an 'open' node (prereq met, not the resume target)", () => {
-    // l1 incomplete but l2 done → l3's prereq (l2) is met, and l3 isn't the first incomplete.
+  it("out-of-order completion: first incomplete is current, other incomplete is open", () => {
     const path = computeLevelPath(makeModel(), new Set(["l2"]), BASE)
     const [l1, l2] = path.sections[0]!.lessons
     const [l3] = path.sections[1]!.lessons
     expect(l1!.status).toBe("current") // first incomplete
     expect(l2!.status).toBe("done")
-    expect(l3!.status).toBe("open") // navigable, but not the resume target
+    expect(l3!.status).toBe("open") // navigable, not the resume target
     expect(l3!.href).toBe("/learn/python/apply/l3")
   })
 

@@ -66,18 +66,19 @@ export function toLevelListModel(level: TutorialLevel<unknown>): LevelListModel 
 // ---- computed path model (list model + the user's completion overlay) ----
 
 /**
- * The four meaningful states a lesson card can render — a real status, not a decorative circle.
- * `current` is the single resume target; `locked` is sequentially gated and not navigable.
+ * The meaningful states a lesson card can render — a real status, not a decorative circle.
+ * `current` is the single resume target. Every lesson is freely navigable (no gating): future
+ * lessons render as `open`, so a learner can jump anywhere.
  */
-export type LessonCardStatus = "done" | "current" | "open" | "locked"
+export type LessonCardStatus = "done" | "current" | "open"
 
 export interface LessonPathNode {
   item: LessonListItem
   /** 1-based running index across the whole level (reads like a path sequence). */
   index: number
   status: LessonCardStatus
-  /** Destination when navigable; `null` for a locked lesson. */
-  href: string | null
+  /** Destination — always navigable. */
+  href: string
 }
 
 export type SectionStatusDot = "complete" | "in_progress" | "untouched"
@@ -109,11 +110,8 @@ export interface LevelPathModel {
 /**
  * Overlay completion onto the list model to produce the full path model.
  *
- * Gating rule: a lesson is navigable when it is done, or it is the first lesson, or the lesson
- * immediately before it is done. Among the navigable-but-incomplete lessons, the earliest one is
- * `current` (the resume target); any later navigable-incomplete lesson is `open` (this arises when a
- * learner has completed lessons out of order). Everything else is `locked`. This keeps the path
- * guided without ever hard-locking a lesson whose prerequisite is already met.
+ * No gating: every lesson is navigable. A completed lesson is `done`; the first incomplete lesson is
+ * `current` (the resume target and Continue destination); every other incomplete lesson is `open`.
  */
 export function computeLevelPath(
   model: LevelListModel,
@@ -135,20 +133,17 @@ export function computeLevelPath(
   const statusFor = (lessonId: string): LessonCardStatus => {
     if (completed.has(lessonId)) return "done"
     const i = idToGlobalIndex.get(lessonId) ?? 0
-    const prevDone = i === 0 || completed.has(flat[i - 1]!.id)
-    if (!prevDone) return "locked"
     return i === firstIncompleteIndex ? "current" : "open"
   }
 
   const sections: SectionPathNode[] = model.sections.map((section) => {
     const lessons: LessonPathNode[] = section.lessons.map((item) => {
       runningIndex += 1
-      const status = statusFor(item.id)
       return {
         item,
         index: runningIndex,
-        status,
-        href: status === "locked" ? null : `${basePath}/${model.slug}/${item.id}`,
+        status: statusFor(item.id),
+        href: `${basePath}/${model.slug}/${item.id}`,
       }
     })
     const sectionDone = lessons.filter((l) => l.status === "done").length

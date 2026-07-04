@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Check, ChevronRight, Lock } from "lucide-react"
+import { ArrowRight, Check, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { DifficultyLevel } from "@/lib/scenarios/types"
 import type { LessonPathNode } from "@/lib/tutorials/level-path"
@@ -34,39 +34,28 @@ function StatusIndicator({ status }: { status: LessonPathNode["status"] }) {
       </span>
     )
   }
-  if (status === "locked") {
-    return (
-      <span className="border-border text-muted-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-full border">
-        <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-      </span>
-    )
-  }
   // open
   return <span className="border-border h-7 w-7 shrink-0 rounded-full border-2" aria-hidden="true" />
 }
 
 /**
- * One lesson in the level's path grid. Renders one of four meaningful states (done / current /
- * open / locked). Navigable states are a `<Link>`; a locked lesson is an inert `<div>` (sequential
- * gating). The `current` card is the Continue target: highlighted, badged "Up next", with a Start CTA.
+ * One lesson in the level's path grid. Renders one of three meaningful states (done / current /
+ * open) and is always a navigable `<Link>` — there is no gating. The `current` card is the Continue
+ * target: highlighted, badged "Up next", with a Start CTA.
  */
 export function LessonPathCard({ node }: { node: LessonPathNode }) {
   const { item, index, status, href } = node
-  const isLocked = status === "locked"
   const isCurrent = status === "current"
   const isDone = status === "done"
 
   const cardClass = cn(
     "group relative flex h-full flex-col rounded-xl border p-4 transition-all",
-    isCurrent && "border-accent bg-accent/[0.06] shadow-md shadow-accent/20",
-    isDone && "border-border bg-card",
-    status === "open" && "border-border bg-card",
-    isLocked && "border-border/60 bg-card/50 opacity-60",
-    !isLocked && "hover:border-accent/50 hover:-translate-y-0.5 hover:shadow-md"
+    "hover:border-accent/50 hover:-translate-y-0.5 hover:shadow-md",
+    isCurrent ? "border-accent bg-accent/[0.06] shadow-md shadow-accent/20" : "border-border bg-card"
   )
 
-  const body = (
-    <>
+  return (
+    <Link href={href} className={cardClass} aria-current={isCurrent ? "step" : undefined}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-muted-foreground text-[11px] font-semibold tracking-wide tabular-nums uppercase">
           Lesson {String(index).padStart(2, "0")}
@@ -74,11 +63,6 @@ export function LessonPathCard({ node }: { node: LessonPathNode }) {
         {isCurrent && (
           <span className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
             Up next
-          </span>
-        )}
-        {isLocked && (
-          <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-            Locked
           </span>
         )}
       </div>
@@ -109,38 +93,22 @@ export function LessonPathCard({ node }: { node: LessonPathNode }) {
           {item.estimatedMinutes} min
         </span>
 
-        {isCurrent && (
+        {isCurrent ? (
           <span className="text-accent inline-flex items-center gap-0.5 text-xs font-semibold">
             Start
             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </span>
-        )}
-        {isDone && (
+        ) : isDone ? (
           <span className="text-muted-foreground group-hover:text-foreground text-xs font-medium transition-colors">
             Review
           </span>
-        )}
-        {status === "open" && (
+        ) : (
           <ChevronRight
             className="text-muted-foreground group-hover:text-foreground h-4 w-4 transition-transform group-hover:translate-x-0.5"
             aria-hidden="true"
           />
         )}
       </div>
-    </>
-  )
-
-  if (isLocked || !href) {
-    return (
-      <div className={cn(cardClass, "cursor-not-allowed")} aria-disabled="true">
-        {body}
-      </div>
-    )
-  }
-
-  return (
-    <Link href={href} className={cardClass} aria-current={isCurrent ? "step" : undefined}>
-      {body}
     </Link>
   )
 }
