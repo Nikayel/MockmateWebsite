@@ -12,6 +12,14 @@ import {
 } from "@/lib/data/company-questions/types"
 import { DSAPattern } from "@/lib/types/dsa-patterns"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
+import { deferQuestionInPlans, type DeferBlockReason } from "@/lib/roadmap/defer-question"
+import { computeCompletionCounts } from "@/lib/roadmap/roadmap-progress"
+
+export interface DeferQuestionOutcome {
+  ok: boolean
+  reason?: DeferBlockReason
+  targetDayIndex?: number
+}
 
 interface RoadmapState {
   // Current roadmap
@@ -54,6 +62,7 @@ interface RoadmapState {
   setActiveRoadmap: (roadmap: PersonalizedRoadmap | null) => void
   markQuestionCompleted: (scenarioId: string, score?: number, timeSpentMinutes?: number) => void
   markQuestionSkipped: (scenarioId: string) => void
+  deferQuestion: (scenarioId: string) => DeferQuestionOutcome
   markQuestionPending: (scenarioId: string) => void
   markQuestionEvaluating: (scenarioId: string) => void
   selectDay: (index: number) => void
@@ -347,6 +356,62 @@ export const useRoadmapStore = create<RoadmapState>()(
           }
           syncToFirebase()
         }
+      },
+
+      // Defer (reschedule) a question to a later day. Unlike skip, this MOVES
+      // the question object off the current day and resets it to "pending" so
+      // it re-surfaces later instead of being counted as finished. Optimistic:
+      // update locally, sync in the background, revert if the server rejects.
+      deferQuestion: (scenarioId) => {
+        const state = get()
+        if (!state.activeRoadmap) return { ok: false, reason: "not_found" }
+
+        const move = deferQuestionInPlans(state.activeRoadmap.dailyPlans, scenarioId, new Date())
+        if (!move.ok) return { ok: false, reason: move.reason }
+
+        const previous = state.activeRoadmap
+        const counts = computeCompletionCounts(move.updatedPlans)
+        set({
+          activeRoadmap: {
+            ...previous,
+            dailyPlans: move.updatedPlans,
+            questionsCompleted: counts.questionsCompleted,
+            questionsSkipped: counts.questionsSkipped,
+            updatedAt: new Date(),
+          },
+        })
+
+        const roadmapId = previous.id
+        if (roadmapId) {
+          void (async () => {
+            try {
+              const token = await getCurrentUserToken()
+              if (!token) {
+                console.error("Failed to sync defer: No auth token")
+                set({ activeRoadmap: previous })
+                return
+              }
+              const response = await fetch("/api/roadmap/defer", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ roadmapId, scenarioId }),
+              })
+              if (!response.ok) {
+                // Revert optimistic move; the next page load reconciles from Firebase.
+                console.error("Roadmap defer sync failed for scenario:", scenarioId)
+                set({ activeRoadmap: previous })
+              }
+            } catch (error) {
+              console.error("Roadmap defer sync error:", error)
+              set({ activeRoadmap: previous })
+            }
+          })()
+        }
+
+        return { ok: true, targetDayIndex: move.targetDayIndex }
       },
 
       markQuestionPending: (scenarioId) =>

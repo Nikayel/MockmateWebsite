@@ -33,7 +33,7 @@ import { buildRoadmapContext, type RoadmapContextOptions } from "./context-build
 import { getAdvancedRetriever } from "./retrieval/advanced-retrieval"
 import { getPatternKnowledge } from "./knowledge-base/dsa-knowledge"
 import { getCompanyInterviewKnowledge } from "./knowledge-base/company-knowledge"
-import type { DSAScenario } from "@/lib/scenarios"
+import type { Scenario } from "@/lib/scenarios"
 import { adminDb } from "@/lib/firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
 import {
@@ -49,7 +49,9 @@ import {
 export interface RAGRoadmapOptions {
   userId: string
   assessment: UserRoadmapAssessment
-  scenarios: DSAScenario[]
+  // Full scenario library (DSA + bug-fix + feature-building); the base generator
+  // honors the assessment's category mix.
+  scenarios: Scenario[]
   enableRAG?: boolean
   enableAIInsights?: boolean
 }

@@ -749,9 +749,12 @@ export async function batchDeferProblems(
   targetLimit: number,
   maxDaysToSpread: number = 7
 ): Promise<BatchDeferralResult> {
-  // Get all due problems
+  // Get all due problems. Use an effectively unbounded limit so we operate on
+  // the same complete today-window set the overwhelmed banner counts; a smaller
+  // cap here would silently leave items un-deferred while the banner still
+  // reported the user as overwhelmed.
   const dueQueue = await getDueProblems(userId, {
-    limit: 100, // Get more than needed to see full picture
+    limit: Number.MAX_SAFE_INTEGER,
     includeUpcoming: false,
   })
 
@@ -772,7 +775,6 @@ export async function batchDeferProblems(
   const sorted = [...allDueItems].sort((a, b) => b.priority_score - a.priority_score)
 
   // Keep the top N items, defer the rest
-  const toKeep = sorted.slice(0, targetLimit)
   const toDefer = sorted.slice(targetLimit)
 
   // Get user's algorithm for proper deferral
@@ -803,34 +805,50 @@ export async function batchDeferProblems(
       daysToAdd = 3 + (remainingIndex % daysAvailable)
     }
 
-    maxDayUsed = Math.max(maxDayUsed, daysToAdd)
-
-    // Defer this item using algorithm-appropriate method
-    await deferSingleProblem(userId, item.problem_id, item.difficulty, daysToAdd, userAlgorithm)
-    deferredProblemIds.push(item.problem_id)
+    // Defer this item using algorithm-appropriate method. Only count it as
+    // deferred if a mastery record actually existed and was rescheduled, so
+    // deferred_count never overstates what happened.
+    const wasDeferred = await deferSingleProblem(
+      userId,
+      item.problem_id,
+      item.difficulty,
+      daysToAdd,
+      userAlgorithm
+    )
+    if (wasDeferred) {
+      deferredProblemIds.push(item.problem_id)
+      maxDayUsed = Math.max(maxDayUsed, daysToAdd)
+    }
   }
 
   return {
-    deferred_count: toDefer.length,
+    deferred_count: deferredProblemIds.length,
     deferred_problem_ids: deferredProblemIds,
-    remaining_due_count: toKeep.length,
-    spread_days: maxDayUsed,
+    remaining_due_count: allDueItems.length - deferredProblemIds.length,
+    spread_days: deferredProblemIds.length > 0 ? maxDayUsed : 0,
   }
 }
 
 /**
- * Defer a single problem using algorithm-integrated logic
+ * Defer a single problem by rescheduling it to a later day.
  *
- * Instead of manually adjusting ease_factor or FSRS difficulty,
- * this simulates a "struggled" review to get proper algorithm behavior.
+ * This is a pure postponement, NOT a review. It moves next_review_at forward
+ * without simulating a "struggled" review, so the user's memory state
+ * (ease_factor / FSRS stability / difficulty / lapses / mastery_level /
+ * confidence / review_count) is preserved and never penalized for deferring.
+ * The embedded FSRS card is kept consistent with the new next_review_at so
+ * future reviews still schedule correctly.
+ *
+ * Returns true if the problem was rescheduled, or false if no mastery record
+ * exists (so the caller can avoid over-counting deferrals).
  */
-async function deferSingleProblem(
+export async function deferSingleProblem(
   userId: string,
   problemId: string,
-  difficulty: Difficulty,
+  _difficulty: Difficulty,
   daysToDefer: number,
   algorithm: "sm2" | "fsrs"
-): Promise<void> {
+): Promise<boolean> {
   const masteryRef = adminDb
     .collection("problem_mastery")
     .doc(userId)
@@ -838,60 +856,53 @@ async function deferSingleProblem(
     .doc(problemId)
 
   const doc = await masteryRef.get()
-  if (!doc.exists) return
+  if (!doc.exists) return false
 
   const current = doc.data() as ProblemMastery
 
-  // Reconstruct current state for algorithm
-  const currentState = reconstructState(algorithm, {
-    interval_days: current.interval_days,
-    next_review_at: current.next_review_at,
-    review_count: current.review_count,
-    mastery_level: current.mastery_level as any,
-    confidence: current.confidence,
-    ease_factor: current.ease_factor,
-    fsrs_difficulty: (current as any).fsrs_difficulty,
-    fsrs_stability: (current as any).fsrs_stability,
-    fsrs_state: (current as any).fsrs_state,
-    fsrs_lapses: (current as any).fsrs_lapses,
-    last_reviewed_at: current.last_reviewed_at,
-    scores_history: current.scores_history,
-  })
+  // Compute the new review date in UTC so a +N-day defer lands strictly after
+  // today's UTC day window (getDueProblems bounds "today" with
+  // setUTCHours(23,59,59,999)). This guarantees a deferred item does not
+  // immediately re-surface as due, which the old local-time math could do.
+  const deferDate = new Date()
+  deferDate.setUTCHours(9, 0, 0, 0)
+  deferDate.setUTCDate(deferDate.getUTCDate() + daysToDefer)
 
-  // Simulate a "struggled" review (score=50 maps to quality=2 for SM-2, rating=2 for FSRS)
-  // This properly reduces ease_factor/stability without fully resetting progress
-  const deferInput = {
-    performance_score: 50, // "Struggled" score
-    time_spent_minutes: 0,
-    hints_used: 0,
-    problem_difficulty: difficulty,
-    is_early_review: false,
-    days_overdue: 0,
+  const update: Record<string, unknown> = {
+    next_review_at: deferDate.toISOString(),
+    interval_days: daysToDefer,
+    // Mark that this was a deferral, not a real review.
+    last_deferred_at: new Date().toISOString(),
+    // ease_factor / fsrs_difficulty / fsrs_stability / fsrs_lapses /
+    // mastery_level / confidence / review_count are intentionally preserved.
   }
 
-  const reviewResult = await calculateNextReview(userId, currentState, deferInput)
+  // Keep the embedded FSRS card in sync with the new date so the top-level
+  // next_review_at and the card's own schedule do not diverge.
+  if (algorithm === "fsrs") {
+    const state = reconstructState("fsrs", {
+      interval_days: current.interval_days,
+      next_review_at: current.next_review_at,
+      review_count: current.review_count,
+      mastery_level: current.mastery_level as SpacedRepetitionMasteryLevel,
+      confidence: current.confidence,
+      ease_factor: current.ease_factor,
+      fsrs_difficulty: (current as ProblemMastery & { fsrs_difficulty?: number }).fsrs_difficulty,
+      fsrs_stability: (current as ProblemMastery & { fsrs_stability?: number }).fsrs_stability,
+      fsrs_state: (current as ProblemMastery & { fsrs_state?: string }).fsrs_state,
+      fsrs_lapses: (current as ProblemMastery & { fsrs_lapses?: number }).fsrs_lapses,
+      last_reviewed_at: current.last_reviewed_at,
+      scores_history: current.scores_history,
+    })
+    const card = state.fsrs_state
+    if (card) {
+      card.nextReview = deferDate
+      card.scheduledDays = daysToDefer
+      card.elapsedDays = 0
+      update.fsrs_state = JSON.stringify(card)
+    }
+  }
 
-  // Override the next_review_at to spread items across days
-  const deferDate = new Date()
-  deferDate.setDate(deferDate.getDate() + daysToDefer)
-  deferDate.setHours(9, 0, 0, 0) // Set to 9 AM for consistent scheduling
-
-  // Prepare update data
-  const storageData = prepareStateForStorage({
-    algorithm: reviewResult.algorithm,
-    interval_days: daysToDefer, // Use the defer days as the new interval
-    next_review_at: deferDate.toISOString(),
-    review_count: currentState.review_count, // Don't increment - this wasn't a real review
-    mastery_level: reviewResult.mastery_level,
-    confidence: reviewResult.confidence,
-    ease_factor: reviewResult.ease_factor,
-    fsrs_state: reviewResult.fsrs_state,
-  })
-
-  // Update the mastery record
-  await masteryRef.update({
-    ...storageData,
-    // Mark that this was a deferral, not a real review
-    last_deferred_at: new Date().toISOString(),
-  })
+  await masteryRef.update(update)
+  return true
 }

@@ -145,6 +145,28 @@ export interface CompanyQuestionData {
  */
 export type CompanyTrack = "swe" | "fdse"
 
+/**
+ * Interview content categories a roadmap can schedule. "decomposition" is the
+ * learner-facing name for the add-functionality / feature-building scenario
+ * type. This axis sits alongside the DSA pattern axis so a roadmap can blend
+ * algorithms with debugging, feature building, and (future) system design.
+ */
+export type RoadmapCategory = "dsa" | "bugfix" | "decomposition" | "system-design"
+
+/** How the user chose to compose their roadmap during creation. */
+export type RoadmapMixMode = "full" | "dsa-only" | "custom"
+
+/**
+ * Resolved category composition for a roadmap. `weights` are percentages that
+ * sum to ~100 across the categories that are actually used.
+ */
+export interface RoadmapCategoryMix {
+  mode: RoadmapMixMode
+  weights: Record<RoadmapCategory, number>
+  selectedCategories?: RoadmapCategory[]
+  source: "research-default" | "user-custom"
+}
+
 export interface UserRoadmapAssessment {
   targetCompany: CompanyId
   interviewDate: Date
@@ -169,6 +191,10 @@ export interface UserRoadmapAssessment {
 
   // Goals
   targetScore: number // 0-100, what they want to achieve
+
+  // Optional category composition chosen at creation (full mix / DSA only /
+  // custom subset). Absent = legacy DSA-only roadmap.
+  categoryMix?: RoadmapCategoryMix
 }
 
 export interface PrioritizedQuestion {
@@ -181,6 +207,11 @@ export interface PrioritizedQuestion {
   reasons: string[] // Why this is prioritized
   isRequired: boolean // Must-do for this company
   dependencies: string[] // Prerequisite scenario IDs
+  // Category axis (defaults to "dsa"); non-DSA prioritized questions are
+  // modelled separately in the mix builder.
+  category?: RoadmapCategory
+  scenarioType?: "dsa" | "bugfix" | "system-design" | "add-functionality"
+  topic?: string // human label (pattern name for DSA, category label otherwise)
 }
 
 export interface DailyPlan {
@@ -189,15 +220,22 @@ export interface DailyPlan {
   targetMinutes: number
   theme: string // e.g., "Binary Search Day"
   focusPatterns: DSAPattern[]
+  focusCategories?: RoadmapCategory[]
   questions: {
     scenarioId: string
     title: string
-    pattern: DSAPattern
+    // Optional: DSA nodes carry a pattern; bugfix/decomposition/system-design
+    // nodes do not. Legacy nodes always have it.
+    pattern?: DSAPattern
     difficulty: "easy" | "medium" | "hard"
     estimatedMinutes: number
     status: "pending" | "in_progress" | "completed" | "skipped" | "evaluating"
     completedAt?: Date
     score?: number
+    // Category axis; absent on legacy nodes (defaulted to "dsa" at read time).
+    category?: RoadmapCategory
+    scenarioType?: "dsa" | "bugfix" | "system-design" | "add-functionality"
+    topic?: string
   }[]
   notes?: string
 }
@@ -241,6 +279,18 @@ export interface PersonalizedRoadmap {
     completed: number
     percentage: number
   }[]
+
+  // Category coverage (DSA / debugging / feature-building), parallel to
+  // patternCoverage. Optional so legacy roadmaps stay valid.
+  categoryCoverage?: {
+    category: RoadmapCategory
+    total: number
+    completed: number
+    percentage: number
+  }[]
+
+  // The resolved category composition (for display and recalculation).
+  categoryMix?: RoadmapCategoryMix
 
   // The actual plan
   dailyPlans: DailyPlan[]

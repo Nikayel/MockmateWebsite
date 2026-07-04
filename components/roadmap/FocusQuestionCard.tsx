@@ -1,7 +1,15 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { ArrowRight, Clock, Loader2, Play, RotateCcw, SkipForward } from "lucide-react"
+import {
+  ArrowRight,
+  CalendarClock,
+  Clock,
+  Loader2,
+  Play,
+  RotateCcw,
+  SkipForward,
+} from "lucide-react"
 import { DailyPlan } from "@/lib/data/company-questions/types"
 import { cn } from "@/lib/utils"
 import { DifficultyBadge } from "./FocusSharedComponents"
@@ -11,10 +19,20 @@ interface QuestionCardProps {
   index: number
   onStart: () => void
   onSkip: () => void
+  onDefer: () => void
+  canDefer: boolean
   isFirst: boolean
 }
 
-export function QuestionCard({ question, index, onStart, onSkip, isFirst }: QuestionCardProps) {
+export function QuestionCard({
+  question,
+  index,
+  onStart,
+  onSkip,
+  onDefer,
+  canDefer,
+  isFirst,
+}: QuestionCardProps) {
   const isSkipped = question.status === "skipped"
   const isInProgress = question.status === "in_progress"
   const isEvaluating = question.status === "evaluating"
@@ -72,7 +90,9 @@ export function QuestionCard({ question, index, onStart, onSkip, isFirst }: Ques
                   {question.estimatedMinutes} min
                 </span>
                 <span className="text-muted-foreground text-xs capitalize">
-                  {question.pattern.replace(/-/g, " ")}
+                  {question.pattern
+                    ? question.pattern.replace(/-/g, " ")
+                    : (question.topic ?? "Practice")}
                 </span>
               </div>
             </div>
@@ -81,6 +101,21 @@ export function QuestionCard({ question, index, onStart, onSkip, isFirst }: Ques
 
         {/* Actions */}
         <div className="flex shrink-0 items-center gap-2">
+          {!isEvaluating && (
+            <button
+              onClick={onDefer}
+              disabled={!canDefer}
+              className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg p-2 opacity-0 transition-colors group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              title={
+                canDefer
+                  ? "Do later (move to a later day)"
+                  : "No later day before your interview to move this to"
+              }
+              aria-label="Do later"
+            >
+              <CalendarClock className="h-4 w-4" />
+            </button>
+          )}
           {!isSkipped && !isEvaluating && (
             <button
               onClick={onSkip}

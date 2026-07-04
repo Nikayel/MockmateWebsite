@@ -12,10 +12,20 @@ import {
   DailyPlan,
   PersonalizedRoadmap,
   Milestone,
+  type RoadmapCategory,
+  type RoadmapCategoryMix,
 } from "@/lib/data/company-questions/types"
 import { getCompanyById } from "@/lib/data/company-questions"
-import { DSAScenario, RoleTag } from "@/lib/scenarios"
+import { DSAScenario, RoleTag, type Scenario } from "@/lib/scenarios"
 import { formatPatternLabel } from "@/lib/pattern-labels"
+import { resolveResearchMix, CATEGORY_LABELS } from "./category-weights"
+import {
+  prioritizeNonDsaQuestions,
+  allocateCategoryCounts,
+  countByCategory,
+  type NonDsaPrioritizedQuestion,
+  type CategoryCounts,
+} from "./category-mix"
 import {
   PRIORITY_WEIGHTS,
   BASE_TIME_ESTIMATES,
@@ -282,6 +292,9 @@ export function prioritizeQuestions(
       reasons,
       isRequired: isMustKnow,
       dependencies: [], // Will be populated based on pattern prerequisites
+      category: "dsa" as const,
+      scenarioType: "dsa" as const,
+      topic: formatPatternLabel(scenario.pattern as DSAPattern),
     }
   })
 
@@ -564,6 +577,253 @@ export function createMilestones(
 
 // Note: DAILY_QUESTION_LIMITS imported from ./constants as SHARED_DAILY_LIMITS
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Category-aware composition (DSA + bugfix + decomposition)
+//
+// The DSA pipeline above (prioritizeQuestions / buildDailySchedule) is left
+// untouched and still handles pure-DSA roadmaps. When a roadmap's mix includes
+// non-DSA categories, the helpers below interleave non-DSA nodes with the DSA
+// backbone.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Common shape the mixed scheduler uses to interleave DSA and non-DSA nodes. */
+interface ScheduledItem {
+  scenarioId: string
+  title: string
+  difficulty: "easy" | "medium" | "hard"
+  estimatedMinutes: number
+  category: RoadmapCategory
+  scenarioType: "dsa" | "bugfix" | "system-design" | "add-functionality"
+  topic: string
+  pattern?: DSAPattern
+}
+
+function dsaToItem(q: PrioritizedQuestion): ScheduledItem {
+  return {
+    scenarioId: q.scenarioId,
+    title: q.title,
+    difficulty: q.difficulty,
+    estimatedMinutes: q.estimatedMinutes,
+    category: "dsa",
+    scenarioType: "dsa",
+    topic: q.topic ?? formatPatternLabel(q.pattern),
+    pattern: q.pattern,
+  }
+}
+
+function nonDsaToItem(q: NonDsaPrioritizedQuestion): ScheduledItem {
+  return {
+    scenarioId: q.scenarioId,
+    title: q.title,
+    difficulty: q.difficulty,
+    estimatedMinutes: q.estimatedMinutes,
+    category: q.category,
+    scenarioType: q.scenarioType,
+    topic: q.topic,
+  }
+}
+
+/**
+ * Stratified interleave: spread each category evenly across the whole sequence
+ * (by fractional within-group position) so non-DSA nodes are sprinkled through
+ * the DSA-heavy list rather than clustered at the end. Within a category the
+ * incoming priority order is preserved.
+ */
+function interleaveByCategory(groups: ScheduledItem[][]): ScheduledItem[] {
+  const tagged = groups
+    .filter((group) => group.length > 0)
+    .flatMap((group) => group.map((item, i) => ({ item, pos: (i + 0.5) / group.length })))
+  return tagged.sort((a, b) => a.pos - b.pos).map((t) => t.item)
+}
+
+function itemToNode(item: ScheduledItem): DailyPlan["questions"][number] {
+  const node: DailyPlan["questions"][number] = {
+    scenarioId: item.scenarioId,
+    title: item.title,
+    difficulty: item.difficulty,
+    estimatedMinutes: item.estimatedMinutes,
+    status: "pending",
+    category: item.category,
+    scenarioType: item.scenarioType,
+    topic: item.topic,
+  }
+  // Only DSA nodes carry a pattern; never write undefined (Firestore rejects it).
+  if (item.pattern) node.pattern = item.pattern
+  return node
+}
+
+function themeForItems(items: ScheduledItem[]): string {
+  const categories = new Set(items.map((i) => i.category))
+  if (categories.size === 1) {
+    const only = [...categories][0]
+    if (only === "dsa") {
+      const patterns = new Set(items.map((i) => i.pattern).filter(Boolean) as DSAPattern[])
+      return patterns.size === 1 ? `${formatPatternLabel([...patterns][0])} Day` : "Mixed Practice"
+    }
+    return `${CATEGORY_LABELS[only]} Practice`
+  }
+  return "Mixed Practice"
+}
+
+/**
+ * Build a daily schedule from an already-limited, interleaved mix of DSA and
+ * non-DSA questions. Used when a roadmap includes non-DSA categories; pure-DSA
+ * roadmaps use buildDailySchedule (unchanged).
+ */
+export function buildMixedDailySchedule(
+  dsaPicked: PrioritizedQuestion[],
+  nonDsaPicked: NonDsaPrioritizedQuestion[],
+  assessment: UserRoadmapAssessment
+): DailyPlan[] {
+  const availableDays = Math.max(1, assessment.daysRemaining - CONFIG.reviewBufferDays)
+  const dailyMinutes = assessment.hoursPerDay * 60
+  const maxQuestionsPerDay = getDailyQuestionLimit(assessment.experienceLevel)
+
+  const ordered = interleaveByCategory([
+    dsaPicked.map(dsaToItem),
+    nonDsaPicked.filter((q) => q.category === "bugfix").map(nonDsaToItem),
+    nonDsaPicked.filter((q) => q.category === "decomposition").map(nonDsaToItem),
+    nonDsaPicked.filter((q) => q.category === "system-design").map(nonDsaToItem),
+  ])
+
+  const dailyPlans: DailyPlan[] = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  let currentDay = 0
+  let index = 0
+  while (index < ordered.length && currentDay < availableDays) {
+    const dayItems: ScheduledItem[] = []
+    let todaysMinutes = 0
+
+    while (index < ordered.length && dayItems.length < maxQuestionsPerDay) {
+      const item = ordered[index]
+      // Always allow at least one item per day so a long item cannot stall.
+      if (dayItems.length > 0 && todaysMinutes + item.estimatedMinutes > dailyMinutes) break
+      dayItems.push(item)
+      todaysMinutes += item.estimatedMinutes
+      index++
+    }
+
+    if (dayItems.length === 0) {
+      currentDay++
+      continue
+    }
+
+    const dayDate = new Date(today)
+    dayDate.setDate(dayDate.getDate() + currentDay)
+
+    dailyPlans.push({
+      date: dayDate,
+      dayNumber: currentDay + 1,
+      targetMinutes: todaysMinutes,
+      theme: themeForItems(dayItems),
+      focusPatterns: [...new Set(dayItems.map((i) => i.pattern).filter(Boolean) as DSAPattern[])],
+      focusCategories: [...new Set(dayItems.map((i) => i.category))],
+      questions: dayItems.map(itemToNode),
+    })
+    currentDay++
+  }
+
+  // Review days (mirrors buildDailySchedule).
+  const isCrunchMode = assessment.daysRemaining <= 7
+  const isFocusedMode = assessment.daysRemaining <= 14
+  const reviewDays = isCrunchMode ? 1 : isFocusedMode ? 2 : CONFIG.reviewBufferDays
+  for (let i = 0; i < reviewDays && currentDay < assessment.daysRemaining; i++) {
+    const dayDate = new Date(today)
+    dayDate.setDate(dayDate.getDate() + currentDay)
+    dailyPlans.push({
+      date: dayDate,
+      dayNumber: currentDay + 1,
+      targetMinutes: dailyMinutes,
+      theme:
+        i === 0
+          ? "Review Day - Weak Areas"
+          : i === 1
+            ? "Review Day - Must-Know Questions"
+            : "Final Review",
+      focusPatterns: [],
+      questions: [],
+      notes:
+        i === 0
+          ? "Re-attempt questions you struggled with"
+          : i === 1
+            ? "Review all must-know questions for this company"
+            : "Light review - get rest before your interview!",
+    })
+    currentDay++
+  }
+
+  return dailyPlans
+}
+
+/** Take the top-N non-DSA questions per category, respecting the allocated counts. */
+function pickNonDsaByCategory(
+  nonDsa: NonDsaPrioritizedQuestion[],
+  targetCounts: CategoryCounts
+): NonDsaPrioritizedQuestion[] {
+  const picked: NonDsaPrioritizedQuestion[] = []
+  const taken: Record<string, number> = {}
+  for (const q of nonDsa) {
+    const limit = targetCounts[q.category]
+    const used = taken[q.category] ?? 0
+    if (used < limit) {
+      picked.push(q)
+      taken[q.category] = used + 1
+    }
+  }
+  return picked
+}
+
+/**
+ * Compose the daily plans for an assessment: prioritize DSA and non-DSA
+ * questions, allocate per-category counts against real inventory, and schedule
+ * them. Shared by initial generation and recalculation so composition stays
+ * consistent. Falls back to the pure-DSA scheduler when the mix has no non-DSA.
+ */
+function composePlans(
+  scenarios: Scenario[],
+  assessment: UserRoadmapAssessment,
+  companyData: CompanyQuestionData
+): { dailyPlans: DailyPlan[]; mix: RoadmapCategoryMix } {
+  const mix: RoadmapCategoryMix = assessment.categoryMix ?? {
+    mode: "full",
+    weights: resolveResearchMix(
+      assessment.experienceLevel,
+      assessment.targetTrack,
+      assessment.targetCompany
+    ),
+    source: "research-default",
+  }
+
+  const dsaPool = scenarios.filter((s): s is DSAScenario => s.type === "dsa")
+  const dsaPrioritized = prioritizeQuestions(dsaPool, assessment, companyData)
+  const nonDsaPrioritized = prioritizeNonDsaQuestions(scenarios, assessment, companyData)
+
+  const availableDays = Math.max(1, assessment.daysRemaining - CONFIG.reviewBufferDays)
+  const totalSlots = availableDays * getDailyQuestionLimit(assessment.experienceLevel)
+
+  const available: CategoryCounts = {
+    ...countByCategory(nonDsaPrioritized),
+    dsa: dsaPrioritized.length,
+  }
+  const { targetCounts } = allocateCategoryCounts(mix.weights, totalSlots, available)
+
+  const nonDsaTotal =
+    targetCounts.bugfix + targetCounts.decomposition + targetCounts["system-design"]
+
+  const dailyPlans =
+    nonDsaTotal === 0
+      ? buildDailySchedule(dsaPrioritized, assessment)
+      : buildMixedDailySchedule(
+          dsaPrioritized.slice(0, targetCounts.dsa),
+          pickNonDsaByCategory(nonDsaPrioritized, targetCounts),
+          assessment
+        )
+
+  return { dailyPlans, mix }
+}
+
 /**
  * Generate a complete personalized roadmap
  *
@@ -571,7 +831,7 @@ export function createMilestones(
  * NOT the total number of relevant questions. This ensures realistic roadmaps.
  */
 export function generatePersonalizedRoadmap(
-  scenarios: DSAScenario[],
+  scenarios: Scenario[],
   assessment: UserRoadmapAssessment,
   userId: string
 ): PersonalizedRoadmap | null {
@@ -581,39 +841,30 @@ export function generatePersonalizedRoadmap(
     return null
   }
 
-  // Step 1: Prioritize questions
-  const prioritizedQuestions = prioritizeQuestions(scenarios, assessment, companyData)
-
-  // Step 2: Build daily schedule (this limits questions to what fits)
-  const dailyPlans = buildDailySchedule(prioritizedQuestions, assessment)
-
-  // Step 3: Create milestones
+  const { dailyPlans, mix } = composePlans(scenarios, assessment, companyData)
   const milestones = createMilestones(dailyPlans, assessment, companyData)
 
-  // CRITICAL FIX: Count ONLY questions that are actually scheduled
-  // This ensures we don't show unrealistic counts like "57 problems in 7 days"
-  const scheduledQuestionIds = new Set<string>()
-  for (const plan of dailyPlans) {
-    for (const q of plan.questions) {
-      scheduledQuestionIds.add(q.scenarioId)
-    }
-  }
+  // Count ONLY questions that are actually scheduled (realistic totals).
+  const scheduledNodes = dailyPlans.flatMap((plan) => plan.questions)
+  const totalMinutes = scheduledNodes.reduce((sum, q) => sum + q.estimatedMinutes, 0)
 
-  // Get only the scheduled questions for accurate stats
-  const scheduledQuestions = prioritizedQuestions.filter((q) =>
-    scheduledQuestionIds.has(q.scenarioId)
-  )
-
-  // Calculate pattern coverage from SCHEDULED questions only
+  // Pattern coverage from scheduled DSA nodes only (non-DSA carry no pattern).
   const patternCoverage = new Map<DSAPattern, { total: number; completed: number }>()
-  for (const q of scheduledQuestions) {
+  for (const q of scheduledNodes) {
+    if (!q.pattern) continue
     const existing = patternCoverage.get(q.pattern) || { total: 0, completed: 0 }
     existing.total++
     patternCoverage.set(q.pattern, existing)
   }
 
-  // Calculate total hours from SCHEDULED questions only
-  const totalMinutes = scheduledQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
+  // Category coverage from all scheduled nodes.
+  const categoryCoverageMap = new Map<RoadmapCategory, { total: number; completed: number }>()
+  for (const q of scheduledNodes) {
+    const category = (q.category ?? "dsa") as RoadmapCategory
+    const existing = categoryCoverageMap.get(category) || { total: 0, completed: 0 }
+    existing.total++
+    categoryCoverageMap.set(category, existing)
+  }
 
   const roadmap: PersonalizedRoadmap = {
     id: `roadmap-${userId}-${Date.now()}`,
@@ -623,8 +874,8 @@ export function generatePersonalizedRoadmap(
     interviewDate: assessment.interviewDate,
     createdAt: new Date(),
     updatedAt: new Date(),
-    assessment,
-    totalQuestions: scheduledQuestionIds.size, // FIXED: Only count scheduled questions
+    assessment: { ...assessment, categoryMix: mix },
+    totalQuestions: scheduledNodes.length,
     totalEstimatedHours: Math.round((totalMinutes / 60) * 10) / 10,
     questionsCompleted: 0,
     questionsSkipped: 0,
@@ -635,6 +886,13 @@ export function generatePersonalizedRoadmap(
       completed: stats.completed,
       percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
     })),
+    categoryCoverage: Array.from(categoryCoverageMap.entries()).map(([category, stats]) => ({
+      category,
+      total: stats.total,
+      completed: stats.completed,
+      percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
+    })),
+    categoryMix: mix,
     dailyPlans,
     milestones,
     status: "active",
@@ -650,7 +908,7 @@ export function generatePersonalizedRoadmap(
  */
 export function recalculateRoadmap(
   roadmap: PersonalizedRoadmap,
-  scenarios: DSAScenario[]
+  scenarios: Scenario[]
 ): PersonalizedRoadmap {
   const companyData = getCompanyById(roadmap.targetCompany)
   if (!companyData) return roadmap
@@ -678,21 +936,23 @@ export function recalculateRoadmap(
       .map((q) => q.scenarioId)
   )
 
-  // Update assessment with remaining time
+  // Update assessment with remaining time (preserving the chosen category mix)
   const updatedAssessment: UserRoadmapAssessment = {
     ...roadmap.assessment,
     daysRemaining,
   }
 
-  // Re-prioritize remaining questions
+  // Re-prioritize and re-schedule the remaining questions, keeping the same
+  // category composition as the original roadmap.
   const remainingScenarios = scenarios.filter(
     (s) => !completedIds.has(s.id) && !skippedIds.has(s.id)
   )
 
-  const prioritized = prioritizeQuestions(remainingScenarios, updatedAssessment, companyData)
-
-  // Rebuild schedule for remaining days
-  const newDailyPlans = buildDailySchedule(prioritized, updatedAssessment)
+  const { dailyPlans: newDailyPlans } = composePlans(
+    remainingScenarios,
+    updatedAssessment,
+    companyData
+  )
 
   // Calculate progress status
   const expectedProgress = (roadmap.dailyPlans.length - daysRemaining) / roadmap.dailyPlans.length

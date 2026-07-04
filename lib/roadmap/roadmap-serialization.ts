@@ -121,6 +121,13 @@ function serializeDailyPlans(
   return dailyPlans.map((plan) => ({
     ...plan,
     date: serializeDateValue(plan.date),
+    // Read-time defaulting so legacy DSA-only nodes (no category axis) stay
+    // valid without a data migration.
+    questions: (plan.questions ?? []).map((question) => ({
+      ...question,
+      category: question.category ?? "dsa",
+      scenarioType: question.scenarioType ?? "dsa",
+    })),
   }))
 }
 

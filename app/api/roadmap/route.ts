@@ -4,8 +4,14 @@ import { verifyAuth } from "@/lib/auth-helpers"
 import { requireTier } from "@/lib/quota-enforcement"
 import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
-import { scenarios, type DSAScenario } from "@/lib/scenarios"
-import { UserRoadmapAssessment, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
+import { scenarios } from "@/lib/scenarios"
+import {
+  UserRoadmapAssessment,
+  PersonalizedRoadmap,
+  type RoadmapCategory,
+  type RoadmapMixMode,
+} from "@/lib/data/company-questions/types"
+import { resolveCategoryMix } from "@/lib/roadmap/category-weights"
 import { logger } from "@/lib/logger"
 import {
   serializeRoadmapDocument,
@@ -26,6 +32,21 @@ interface CreateRoadmapRequestBody {
   problemsSolved?: number
   hoursPerDay?: number
   patternFamiliarity?: UserRoadmapAssessment["patternFamiliarity"]
+  // Category composition choice (full research mix / DSA only / custom subset).
+  mixMode?: RoadmapMixMode
+  selectedCategories?: RoadmapCategory[]
+}
+
+const VALID_MIX_MODES: RoadmapMixMode[] = ["full", "dsa-only", "custom"]
+const VALID_CATEGORIES: RoadmapCategory[] = ["dsa", "bugfix", "decomposition", "system-design"]
+
+function parseMixMode(value: unknown): RoadmapMixMode {
+  return VALID_MIX_MODES.includes(value as RoadmapMixMode) ? (value as RoadmapMixMode) : "full"
+}
+
+function parseSelectedCategories(value: unknown): RoadmapCategory[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((c): c is RoadmapCategory => VALID_CATEGORIES.includes(c as RoadmapCategory))
 }
 
 interface UpdateRoadmapRequestBody {
@@ -268,24 +289,34 @@ export async function POST(request: NextRequest) {
       Math.ceil((interview.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     )
 
+    // Resolve the category composition the user chose (defaults to the research
+    // full mix). Weighted by experience level, target track, and company.
+    const experience = experienceLevel || "intermediate"
+    const categoryMix = resolveCategoryMix({
+      mixMode: parseMixMode(body.mixMode),
+      selectedCategories: parseSelectedCategories(body.selectedCategories),
+      experienceLevel: experience,
+      targetTrack,
+      companyId: targetCompany,
+    })
+
     // Build assessment
     const assessment: UserRoadmapAssessment = {
       targetCompany,
       interviewDate: interview,
       daysRemaining,
-      experienceLevel: experienceLevel || "intermediate",
+      experienceLevel: experience,
       targetTrack,
       problemsSolvedEstimate: problemsSolved || 0,
       patternFamiliarity: patternFamiliarity || [],
       hoursPerDay: hoursPerDay || 2,
       preferredDifficulty: "mixed",
       targetScore: 80,
+      categoryMix,
     }
 
-    // Get DSA scenarios
-    const dsaScenarios = scenarios.filter((s) => s.type === "dsa") as DSAScenario[]
-
-    // Generate roadmap - use RAG-enhanced version if enabled
+    // Generate roadmap from the full scenario library (DSA + bug-fix +
+    // feature-building); the generator honors the resolved category mix.
     let roadmap: PersonalizedRoadmap | RAGEnhancedRoadmap | null
 
     if (enableRAG) {
@@ -293,13 +324,13 @@ export async function POST(request: NextRequest) {
       roadmap = await generateRAGEnhancedRoadmap({
         userId,
         assessment,
-        scenarios: dsaScenarios,
+        scenarios,
         enableRAG: true,
         enableAIInsights: true,
       })
     } else {
       logger.info("[Roadmap] Generating standard roadmap for user", { userId })
-      roadmap = generatePersonalizedRoadmap(dsaScenarios, assessment, userId)
+      roadmap = generatePersonalizedRoadmap(scenarios, assessment, userId)
     }
 
     if (!roadmap) {

@@ -5,11 +5,10 @@ import { requireTier } from "@/lib/quota-enforcement"
 import { logger } from "@/lib/logger"
 import {
   isRoadmapQuestionStatus,
-  toDateValue,
-  type FirestoreDailyPlan,
   type FirestoreRoadmapData,
   type RoadmapQuestionStatus,
 } from "@/lib/roadmap/roadmap-serialization"
+import { calculateIsOnTrack } from "@/lib/roadmap/roadmap-progress"
 
 const COLLECTION = "user_roadmaps"
 
@@ -160,40 +159,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-/**
- * Calculate if user is on track based on expected vs actual progress
- */
-function calculateIsOnTrack(dailyPlans: FirestoreDailyPlan[], interviewDate: unknown): boolean {
-  const now = new Date()
-  const interview = toDateValue(interviewDate)
-  const totalDays = dailyPlans.length
-
-  // Find today's index
-  let todayIndex = 0
-  for (let i = 0; i < dailyPlans.length; i++) {
-    const planDate = toDateValue(dailyPlans[i].date)
-    if (planDate <= now) {
-      todayIndex = i
-    }
-  }
-
-  // Calculate expected progress
-  const expectedProgress = (todayIndex + 1) / totalDays
-
-  // Calculate actual progress
-  let completedQuestions = 0
-  let totalQuestions = 0
-  dailyPlans.forEach((plan) => {
-    plan.questions?.forEach((q) => {
-      totalQuestions++
-      if (q.status === "completed") completedQuestions++
-    })
-  })
-
-  const actualProgress = totalQuestions > 0 ? completedQuestions / totalQuestions : 0
-
-  // Allow 10% buffer before marking as behind
-  return actualProgress >= expectedProgress - 0.1
 }

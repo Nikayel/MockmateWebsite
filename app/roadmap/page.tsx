@@ -51,6 +51,8 @@ import type { DailyPlan, Milestone, PersonalizedRoadmap } from "@/lib/data/compa
 import { getStudyRecommendations } from "@/lib/roadmap/prioritization-algorithm"
 import { generatePersonalizedGuide } from "@/lib/roadmap/personalized-guide-generator"
 import { cn, getStoredDateComponents, getLocalDateComponents } from "@/lib/utils"
+import { selectDeferTargetIndex } from "@/lib/roadmap/defer-question"
+import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
 import {
   EmptyState,
@@ -133,6 +135,7 @@ export default function RoadmapPage() {
     selectDay,
     markQuestionCompleted,
     markQuestionSkipped,
+    deferQuestion,
     setActiveRoadmap,
   } = useRoadmapStore()
   const [activeTab, setActiveTab] = useState<RoadmapTab>("today")
@@ -323,6 +326,25 @@ export default function RoadmapPage() {
     markQuestionCompleted(scenarioId)
     // Trigger day completion check after marking complete
     // Use setTimeout to allow state to update first
+    setTimeout(() => setShouldCheckDayCompletion(true), 100)
+  }
+
+  const handleDeferQuestion = (scenarioId: string) => {
+    const outcome = deferQuestion(scenarioId)
+    if (!outcome.ok) {
+      toast.error(
+        outcome.reason === "no_later_day"
+          ? "No later day before your interview to move this to."
+          : "Could not move this question."
+      )
+      return
+    }
+    const targetTheme =
+      outcome.targetDayIndex !== undefined
+        ? roadmap?.dailyPlans[outcome.targetDayIndex]?.theme
+        : undefined
+    toast.success(targetTheme ? `Moved to ${targetTheme}.` : "Moved to a later day.")
+    // Moving the question may leave the current day complete; check for the unlock modal.
     setTimeout(() => setShouldCheckDayCompletion(true), 100)
   }
 
@@ -675,6 +697,9 @@ export default function RoadmapPage() {
 
   const companyData = getCompanyById(roadmap.targetCompany)
   const selectedPlan = roadmap.dailyPlans[selectedDayIndex]
+  // A question can be deferred only when a later day exists to move it to.
+  const canDeferFromSelectedDay =
+    selectDeferTargetIndex(roadmap.dailyPlans, selectedDayIndex, new Date()) !== null
   // Use bestDayIndex which finds the most appropriate day to show
   // (exact match for today, or the most recent day if today isn't in the plan)
   const todayPlan = roadmap.dailyPlans[bestDayIndex]
@@ -820,7 +845,9 @@ export default function RoadmapPage() {
                             {nextQuestion.difficulty}
                           </span>
                           <span className="text-muted-foreground">
-                            {nextQuestion.pattern.replace(/-/g, " ")}
+                            {nextQuestion.pattern
+                              ? nextQuestion.pattern.replace(/-/g, " ")
+                              : (nextQuestion.topic ?? "Practice")}
                           </span>
                           <span className="text-muted-foreground">
                             • {nextQuestion.estimatedMinutes} min
@@ -942,7 +969,7 @@ export default function RoadmapPage() {
                 - User controls what they see
                 - Max 4 tabs (Miller's Law)
             ═══════════════════════════════════════════════════════════════ */}
-            <nav className="bg-muted/50 flex items-center gap-1 rounded-lg p-1" role="tablist">
+            <div className="bg-muted/50 flex items-center gap-1 rounded-lg p-1" role="tablist">
               <TabButton
                 active={activeTab === "today"}
                 onClick={() => setActiveTab("today")}
@@ -969,7 +996,7 @@ export default function RoadmapPage() {
                   label="Guide"
                 />
               )}
-            </nav>
+            </div>
 
             {/* ═══════════════════════════════════════════════════════════════
                 TAB CONTENT: One view at a time (Principle #3)
@@ -1004,6 +1031,8 @@ export default function RoadmapPage() {
                         onStartQuestion={handleStartQuestion}
                         onSkipQuestion={handleSkipQuestion}
                         onMarkComplete={handleMarkComplete}
+                        onDeferQuestion={handleDeferQuestion}
+                        canDefer={canDeferFromSelectedDay}
                         ragEnhancements={roadmap.ragEnhancements}
                         companyName={roadmap.companyName}
                       />

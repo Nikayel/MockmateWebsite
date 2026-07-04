@@ -69,6 +69,18 @@ export function verifyCSRFToken(request: NextRequest): boolean {
     return true // GET, HEAD, OPTIONS are safe
   }
 
+  // Bearer-token-authenticated requests are inherently immune to CSRF: a
+  // cross-site attacker cannot set an `Authorization: Bearer <token>` header on
+  // a forged request (it is not a simple header, so the browser will not attach
+  // it automatically and CORS blocks reading the response). The double-submit
+  // cookie pattern below only defends cookie/session auth, which these routes do
+  // not use. Without this exemption every Bearer-authed mutation 403s, because
+  // the csrf_token cookie is never minted and no client sends X-CSRF-Token.
+  const authHeader = request.headers.get("authorization")
+  if (authHeader?.startsWith("Bearer ")) {
+    return true
+  }
+
   const tokenFromHeader = request.headers.get(CSRF_TOKEN_HEADER)
   const tokenFromCookie = request.cookies.get(CSRF_COOKIE_NAME)?.value
 

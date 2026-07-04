@@ -31,8 +31,7 @@ export function OverwhelmedBanner({
             items to spread them across the next few days.
           </p>
           <p className="mt-2 text-xs text-amber-500/60">
-            Deferred items will be treated as &quot;struggled&quot; reviews, adjusting their
-            schedule through the spaced repetition algorithm.
+            Deferred items are simply moved to later days. Your memory scores are not penalized.
           </p>
         </div>
         <Button

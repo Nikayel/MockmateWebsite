@@ -10,27 +10,28 @@ import { type DueItem } from "@/components/practice"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Loader2, Lock, ArrowRight, HelpCircle, List, CalendarDays } from "lucide-react"
+import { toast } from "sonner"
 import Link from "next/link"
 
 // Dynamic imports for heavy components - reduces initial bundle size
 const StreakBanner = dynamic(
   () => import("@/components/practice").then((mod) => mod.StreakBanner),
-  { ssr: false, loading: () => <div className="h-16 animate-pulse rounded-lg bg-foreground/5" /> }
+  { ssr: false, loading: () => <div className="bg-foreground/5 h-16 animate-pulse rounded-lg" /> }
 )
 
 const DueForReview = dynamic(
   () => import("@/components/practice").then((mod) => mod.DueForReview),
-  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-lg bg-foreground/5" /> }
+  { ssr: false, loading: () => <div className="bg-foreground/5 h-64 animate-pulse rounded-lg" /> }
 )
 
 const PatternMastery = dynamic(
   () => import("@/components/practice").then((mod) => mod.PatternMastery),
-  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-foreground/5" /> }
+  { ssr: false, loading: () => <div className="bg-foreground/5 h-48 animate-pulse rounded-lg" /> }
 )
 
 const ReviewCalendar = dynamic(
   () => import("@/components/practice").then((mod) => mod.ReviewCalendar),
-  { ssr: false, loading: () => <div className="h-96 animate-pulse rounded-lg bg-foreground/5" /> }
+  { ssr: false, loading: () => <div className="bg-foreground/5 h-96 animate-pulse rounded-lg" /> }
 )
 
 interface StatsData {
@@ -212,7 +213,10 @@ export default function PracticePage() {
     try {
       setIsDeferring(true)
       const token = await getAuthToken()
-      if (!token) return
+      if (!token) {
+        toast.error("Please sign in again to defer your reviews.")
+        return
+      }
 
       const res = await fetch("/api/spaced-repetition/batch-defer", {
         method: "POST",
@@ -223,21 +227,27 @@ export default function PracticePage() {
         body: JSON.stringify({}), // Use user's default max_daily_reviews
       })
 
-      if (res.ok) {
-        // Refresh due items to show updated queue
-        const dueRes = await fetch("/api/spaced-repetition/due", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-        if (dueRes.ok) {
-          const dueData = await dueRes.json()
-          setDue(dueData)
-        }
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        toast.error(data?.message || data?.error || "Could not defer reviews. Please try again.")
+        return
       }
-    } catch (err) {
-      // Defer error is non-critical
+
+      // Refresh due items to show updated queue
+      const dueRes = await fetch("/api/spaced-repetition/due", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+      if (dueRes.ok) {
+        setDue(await dueRes.json())
+      }
+
+      toast.success(data?.message ?? `Deferred ${data?.deferred_count ?? 0} reviews.`)
+    } catch {
+      toast.error("Could not defer reviews. Please try again.")
     } finally {
       setIsDeferring(false)
     }
@@ -293,8 +303,8 @@ export default function PracticePage() {
 
   if (!initialized || authLoading || isPro === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-foreground" />
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <Loader2 className="text-foreground h-6 w-6 animate-spin" />
       </div>
     )
   }
@@ -302,15 +312,15 @@ export default function PracticePage() {
   // Upgrade prompt for non-Pro users
   if (!isPro) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="bg-background min-h-screen">
         <Header />
         <main className="container mx-auto px-4 pt-24 pb-16">
           <div className="mx-auto max-w-lg text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <Lock className="h-8 w-8 text-muted-foreground" />
+            <div className="bg-muted mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+              <Lock className="text-muted-foreground h-8 w-8" />
             </div>
-            <h1 className="mb-3 text-2xl font-bold text-foreground">Spaced Repetition Practice</h1>
-            <p className="mb-8 text-muted-foreground">
+            <h1 className="text-foreground mb-3 text-2xl font-bold">Spaced Repetition Practice</h1>
+            <p className="text-muted-foreground mb-8">
               Smart practice sessions with spaced repetition to maximize your learning and
               retention.
             </p>
@@ -321,8 +331,8 @@ export default function PracticePage() {
                 "Personalized recommendations",
                 "Daily goals and streaks",
               ].map((feature, i) => (
-                <div key={i} className="flex items-center gap-3 text-muted-foreground">
-                  <div className="h-1.5 w-1.5 rounded-full bg-card" />
+                <div key={i} className="text-muted-foreground flex items-center gap-3">
+                  <div className="bg-card h-1.5 w-1.5 rounded-full" />
                   <span>{feature}</span>
                 </div>
               ))}
@@ -341,13 +351,13 @@ export default function PracticePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background min-h-screen">
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="mx-auto max-w-5xl">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="mb-1 text-2xl font-bold text-foreground">Practice</h1>
+            <h1 className="text-foreground mb-1 text-2xl font-bold">Practice</h1>
             <p className="text-muted-foreground">Review problems at optimal intervals</p>
           </div>
 
@@ -358,7 +368,7 @@ export default function PracticePage() {
           )}
 
           {/* Streak Banner */}
-          <div className="mb-8 border-b border-border pb-6">
+          <div className="border-border mb-8 border-b pb-6">
             <StreakBanner
               streakDays={stats?.overall.streak_days || 0}
               dailyGoal={stats?.daily_goal || 5}
@@ -372,7 +382,7 @@ export default function PracticePage() {
           <div className="space-y-8">
             {/* View Toggle */}
             <div className="mb-4 flex items-center justify-end">
-              <div className="inline-flex rounded-lg border border-border bg-foreground/5 p-1">
+              <div className="border-border bg-foreground/5 inline-flex rounded-lg border p-1">
                 <button
                   onClick={() => setViewMode("list")}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -400,7 +410,7 @@ export default function PracticePage() {
 
             {/* Due for Review - List View */}
             {viewMode === "list" && (
-              <div className="rounded-xl border border-border bg-card/30 p-6">
+              <div className="border-border bg-card/30 rounded-xl border p-6">
                 <DueForReview
                   dueNow={due?.due_now || []}
                   dueInMinutes={due?.due_in_minutes || []}
@@ -424,7 +434,7 @@ export default function PracticePage() {
 
             {/* Due for Review - Calendar View */}
             {viewMode === "calendar" && (
-              <div className="rounded-xl border border-border bg-card/30 p-6">
+              <div className="border-border bg-card/30 rounded-xl border p-6">
                 <ReviewCalendar
                   dueItems={[
                     ...(due?.due_now || []),
@@ -437,7 +447,7 @@ export default function PracticePage() {
             )}
 
             {/* Pattern Mastery */}
-            <div className="rounded-xl border border-border bg-card/30 p-6">
+            <div className="border-border bg-card/30 rounded-xl border p-6">
               <PatternMastery patterns={stats?.by_pattern || []} isLoading={isLoading} />
             </div>
           </div>
@@ -446,26 +456,28 @@ export default function PracticePage() {
           {stats && !isLoading && (
             <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
               <div className="py-4 text-center">
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-foreground text-2xl font-bold">
                   {stats.overall.total_problems_seen}
                 </div>
-                <div className="text-sm text-muted-foreground">Problems</div>
+                <div className="text-muted-foreground text-sm">Problems</div>
               </div>
               <div className="py-4 text-center">
                 <div className="text-2xl font-bold text-emerald-400">
                   {stats.overall.problems_mastered}
                 </div>
-                <div className="text-sm text-muted-foreground">Mastered</div>
+                <div className="text-muted-foreground text-sm">Mastered</div>
               </div>
               <div className="py-4 text-center">
-                <div className="text-2xl font-bold text-foreground">{stats.overall.average_score}%</div>
-                <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                <div className="text-foreground text-2xl font-bold">
+                  {stats.overall.average_score}%
+                </div>
+                <div className="text-muted-foreground flex items-center justify-center gap-1 text-sm">
                   Review Avg
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <HelpCircle className="h-3 w-3 cursor-help text-muted-foreground" />
+                      <HelpCircle className="text-muted-foreground h-3 w-3 cursor-help" />
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-xs bg-muted text-foreground">
+                    <TooltipContent className="bg-muted text-foreground max-w-xs">
                       <p>
                         Review Average: Your average score across spaced repetition reviews. This
                         tracks how well you perform when revisiting problems over time.
@@ -475,10 +487,10 @@ export default function PracticePage() {
                 </div>
               </div>
               <div className="py-4 text-center">
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-foreground text-2xl font-bold">
                   {Math.round(stats.overall.total_time_minutes / 60)}h
                 </div>
-                <div className="text-sm text-muted-foreground">Practice Time</div>
+                <div className="text-muted-foreground text-sm">Practice Time</div>
               </div>
             </div>
           )}

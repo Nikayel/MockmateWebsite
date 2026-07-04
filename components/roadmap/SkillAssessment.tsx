@@ -12,8 +12,12 @@ import {
   GraduationCap,
   Code2,
   Compass,
+  Shuffle,
+  Bug,
+  Blocks,
 } from "lucide-react"
 import { DSAPattern, PATTERN_METADATA } from "@/lib/types/dsa-patterns"
+import type { RoadmapMixMode, RoadmapCategory } from "@/lib/data/company-questions/types"
 import { cn } from "@/lib/utils"
 
 interface SkillAssessmentProps {
@@ -30,9 +34,19 @@ export interface AssessmentResult {
     pattern: DSAPattern
     level: "unknown" | "seen" | "practiced" | "confident"
   }[]
+  mixMode: RoadmapMixMode
+  selectedCategories?: RoadmapCategory[]
 }
 
-type Step = "experience" | "track" | "problems" | "hours" | "patterns"
+type Step = "experience" | "track" | "focus" | "problems" | "hours" | "patterns"
+
+// Categories the user can pick in a custom mix (system design is not yet
+// schedulable, so it is not offered here).
+const CUSTOM_CATEGORIES: { category: RoadmapCategory; label: string }[] = [
+  { category: "dsa", label: "Algorithms" },
+  { category: "bugfix", label: "Debugging" },
+  { category: "decomposition", label: "Feature Build" },
+]
 
 const CORE_PATTERNS: DSAPattern[] = [
   "arrays-hashing",
@@ -51,13 +65,19 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
     "intern" | "beginner" | "intermediate" | "advanced" | null
   >(null)
   const [targetTrack, setTargetTrack] = useState<"swe" | "fdse" | null>(null)
+  const [mixMode, setMixMode] = useState<RoadmapMixMode>("full")
+  const [selectedCategories, setSelectedCategories] = useState<RoadmapCategory[]>([
+    "dsa",
+    "bugfix",
+    "decomposition",
+  ])
   const [problemsSolved, setProblemsSolved] = useState<number>(0)
   const [hoursPerDay, setHoursPerDay] = useState<number>(2)
   const [patternFamiliarity, setPatternFamiliarity] = useState<
     Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">
   >({} as Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">)
 
-  const steps: Step[] = ["experience", "track", "problems", "hours", "patterns"]
+  const steps: Step[] = ["experience", "track", "focus", "problems", "hours", "patterns"]
   const currentStepIndex = steps.indexOf(step)
 
   const canContinue = () => {
@@ -66,6 +86,9 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
         return experienceLevel !== null
       case "track":
         return true // Optional — users without a track preference can skip
+      case "focus":
+        // Custom requires at least one category; full and dsa-only are always valid.
+        return mixMode !== "custom" || selectedCategories.length >= 1
       case "problems":
         return true // Always can continue, default 0
       case "hours":
@@ -88,6 +111,8 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
           pattern: pattern as DSAPattern,
           level,
         })),
+        mixMode,
+        selectedCategories: mixMode === "custom" ? selectedCategories : undefined,
       })
     } else {
       const nextIndex = currentStepIndex + 1
@@ -133,6 +158,18 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
             <ExperienceStep selected={experienceLevel} onSelect={setExperienceLevel} />
           )}
           {step === "track" && <TrackStep selected={targetTrack} onSelect={setTargetTrack} />}
+          {step === "focus" && (
+            <FocusStep
+              mixMode={mixMode}
+              selectedCategories={selectedCategories}
+              onSelectMode={setMixMode}
+              onToggleCategory={(category) =>
+                setSelectedCategories((prev) =>
+                  prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+                )
+              }
+            />
+          )}
           {step === "problems" && (
             <ProblemsSolvedStep value={problemsSolved} onChange={setProblemsSolved} />
           )}
@@ -333,6 +370,140 @@ function TrackStep({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function FocusStep({
+  mixMode,
+  selectedCategories,
+  onSelectMode,
+  onToggleCategory,
+}: {
+  mixMode: RoadmapMixMode
+  selectedCategories: RoadmapCategory[]
+  onSelectMode: (mode: RoadmapMixMode) => void
+  onToggleCategory: (category: RoadmapCategory) => void
+}) {
+  const modes: {
+    mode: RoadmapMixMode
+    icon: typeof Shuffle
+    title: string
+    description: string
+    detail: string
+    badge?: string
+  }[] = [
+    {
+      mode: "full",
+      icon: Shuffle,
+      title: "Full mix",
+      description: "Research-driven blend for your role and company",
+      detail: "Algorithms plus debugging and feature-building, weighted to real interview loops",
+      badge: "Recommended",
+    },
+    {
+      mode: "dsa-only",
+      icon: Code2,
+      title: "Algorithms only",
+      description: "Classic LeetCode-style practice",
+      detail: "Just data structures and algorithms, no debugging or feature building",
+    },
+    {
+      mode: "custom",
+      icon: Blocks,
+      title: "Custom",
+      description: "Pick exactly which kinds of practice to include",
+      detail: "Choose any combination of the categories below",
+    },
+  ]
+
+  const categoryIcon: Record<RoadmapCategory, typeof Shuffle> = {
+    dsa: Code2,
+    bugfix: Bug,
+    decomposition: Blocks,
+    "system-design": Target,
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-foreground text-xl font-bold">What Should Your Roadmap Focus On?</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Modern interviews go beyond algorithms. Pick how much debugging and feature building to
+          include.
+        </p>
+      </div>
+
+      <div className="grid gap-3">
+        {modes.map((option) => {
+          const Icon = option.icon
+          const isSelected = mixMode === option.mode
+
+          return (
+            <button
+              key={option.mode}
+              onClick={() => onSelectMode(option.mode)}
+              className={cn(
+                "rounded-xl border-2 p-3 text-left transition-all hover:shadow-md",
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "shrink-0 rounded-lg p-1.5",
+                    isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold">{option.title}</h3>
+                    {option.badge && (
+                      <span className="bg-primary/10 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                        {option.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-xs">{option.description}</p>
+                  <p className="text-muted-foreground/70 mt-0.5 text-[10px]">{option.detail}</p>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {mixMode === "custom" && (
+        <div className="border-border rounded-xl border p-3">
+          <p className="text-muted-foreground mb-2 text-xs font-medium">
+            Include these categories (pick at least one):
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {CUSTOM_CATEGORIES.map(({ category, label }) => {
+              const Icon = categoryIcon[category]
+              const isOn = selectedCategories.includes(category)
+              return (
+                <button
+                  key={category}
+                  onClick={() => onToggleCategory(category)}
+                  aria-pressed={isOn}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                    isOn
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

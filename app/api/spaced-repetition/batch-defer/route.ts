@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       ...result,
       message:
         result.deferred_count > 0
-          ? `Deferred ${result.deferred_count} items across ${result.spread_days} days. They'll be treated as "struggled" reviews.`
+          ? `Moved ${result.deferred_count} low-priority reviews to the next ${result.spread_days} days. Your memory scores were not penalized.`
           : "No items needed to be deferred.",
     })
   } catch (error) {

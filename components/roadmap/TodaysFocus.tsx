@@ -16,6 +16,8 @@ interface TodaysFocusProps {
   onStartQuestion: (scenarioId: string) => void
   onSkipQuestion: (scenarioId: string) => void
   onMarkComplete: (scenarioId: string) => void
+  onDeferQuestion: (scenarioId: string) => void
+  canDefer: boolean
   ragEnhancements?: RAGEnhancements
   companyName?: string
 }
@@ -25,6 +27,8 @@ export function TodaysFocus({
   onStartQuestion,
   onSkipQuestion,
   onMarkComplete,
+  onDeferQuestion,
+  canDefer,
   ragEnhancements,
   companyName,
 }: TodaysFocusProps) {
@@ -99,6 +103,8 @@ export function TodaysFocus({
         completedQuestions={completedQuestions}
         onStartQuestion={onStartQuestion}
         onSkipQuestion={onSkipQuestion}
+        onDeferQuestion={onDeferQuestion}
+        canDefer={canDefer}
       />
 
       {allComplete && <FocusCompletionBanner completedMinutes={completedMinutes} />}

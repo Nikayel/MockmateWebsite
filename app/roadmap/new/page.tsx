@@ -106,6 +106,8 @@ export default function NewRoadmapPage() {
           problemsSolved: result.problemsSolved,
           hoursPerDay: result.hoursPerDay,
           patternFamiliarity: result.patternFamiliarity,
+          mixMode: result.mixMode,
+          selectedCategories: result.selectedCategories,
         }),
       })
 
