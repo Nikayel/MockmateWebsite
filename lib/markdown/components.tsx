@@ -54,29 +54,31 @@ export const markdownComponents: Components = {
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="border-b border-gray-700 bg-gray-800/50">{children}</thead>
+    <thead className="border-border bg-muted/50 border-b">{children}</thead>
   ),
   tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => <tr className="border-b border-gray-700/50">{children}</tr>,
+  tr: ({ children }) => <tr className="border-border/60 border-b">{children}</tr>,
   th: ({ children }) => (
-    <th className="px-3 py-2 text-left font-semibold text-gray-300">{children}</th>
+    <th className="text-foreground px-3 py-2 text-left font-semibold">{children}</th>
   ),
-  td: ({ children }) => <td className="px-3 py-2 text-gray-400">{children}</td>,
+  td: ({ children }) => <td className="text-muted-foreground px-3 py-2">{children}</td>,
 
   // Blockquotes - for notes/hints
   blockquote: ({ children }) => (
-    <blockquote className="my-2 border-l-2 border-blue-500/50 bg-blue-500/5 py-1 pl-3 text-gray-300 italic">
+    <blockquote className="text-foreground/80 my-2 border-l-2 border-blue-500/50 bg-blue-500/5 py-1 pl-3 italic">
       {children}
     </blockquote>
   ),
 
-  // Headings
-  h1: ({ children }) => <h1 className="mb-3 text-lg font-bold text-white">{children}</h1>,
-  h2: ({ children }) => <h2 className="mb-2 text-base font-semibold text-white">{children}</h2>,
-  h3: ({ children }) => <h3 className="mb-2 text-sm font-semibold text-gray-200">{children}</h3>,
+  // Headings — semantic tokens so they stay legible in light and dark
+  h1: ({ children }) => <h1 className="text-foreground mb-3 text-lg font-bold">{children}</h1>,
+  h2: ({ children }) => (
+    <h2 className="text-foreground mb-2 text-base font-semibold">{children}</h2>
+  ),
+  h3: ({ children }) => <h3 className="text-foreground mb-2 text-sm font-semibold">{children}</h3>,
 
   // Horizontal rule
-  hr: () => <hr className="my-4 border-gray-700" />,
+  hr: () => <hr className="border-border my-4" />,
 
   // Links
   a: ({ href, children }) => (
@@ -84,7 +86,7 @@ export const markdownComponents: Components = {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-400 underline hover:text-blue-300"
+      className="text-blue-600 underline hover:opacity-80 dark:text-blue-400"
     >
       {children}
     </a>
