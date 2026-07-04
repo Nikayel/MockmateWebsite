@@ -8,10 +8,11 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
 import { ExerciseLayout } from "./ExerciseLayout"
+import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
 import { useExerciseRun } from "./useExerciseRun"
-import type { SqlExercise, SqlResultSet } from "@/lib/tutorials/types"
+import { isSqlResultSet, type SqlExercise } from "@/lib/tutorials/types"
 
 /**
  * Single-query SQL runner (L1/L2): one SQL editor, graded in-browser via the SAME `useExerciseRun`
@@ -26,6 +27,10 @@ export interface SqlExerciseRunnerProps {
   onCodeChange: (value: string) => void
   onPass?: () => void
   onRunResult?: (passed: boolean) => void
+  /** Fires when the learner reveals a hint (1-based index, total available). Drives Sable. */
+  onHintReveal?: (index: number, total: number) => void
+  /** Fires when the gated reference solution is revealed. Drives Sable. */
+  onReferenceReveal?: () => void
   /** Guided steps (apply) reveal the reference after a few attempts; challenges (practice) never do. */
   canRevealReference?: boolean
   revealReferenceAfter?: number
@@ -37,6 +42,8 @@ export function SqlExerciseRunner({
   onCodeChange,
   onPass,
   onRunResult,
+  onHintReveal,
+  onReferenceReveal,
   canRevealReference = false,
   revealReferenceAfter = 2,
 }: SqlExerciseRunnerProps) {
@@ -66,12 +73,8 @@ export function SqlExerciseRunner({
   // run, so guard: only a real { columns, rows } object reaches the grid — else a failing query would
   // throw in render and eject the learner to the error page instead of showing the failure.
   const graded = results[0]
-  const isResultSet = (value: unknown): value is SqlResultSet =>
-    typeof value === "object" &&
-    value !== null &&
-    Array.isArray((value as { columns?: unknown }).columns)
-  const actualSet = isResultSet(graded?.actual) ? graded.actual : undefined
-  const expectedSet = isResultSet(graded?.expected) ? graded.expected : undefined
+  const actualSet = isSqlResultSet(graded?.actual) ? graded.actual : undefined
+  const expectedSet = isSqlResultSet(graded?.expected) ? graded.expected : undefined
 
   return (
     <ExerciseLayout
@@ -87,7 +90,14 @@ export function SqlExerciseRunner({
     >
       <div className="border-border overflow-hidden rounded-lg border">
         <CodeMirrorErrorBoundary>
-          <CodeMirrorEditor value={code} onChange={onCodeChange} language="sql" height={220} />
+          <CodeMirrorEditor
+            value={code}
+            onChange={onCodeChange}
+            language="sql"
+            autoHeight
+            minHeight={180}
+            maxHeight={520}
+          />
         </CodeMirrorErrorBoundary>
       </div>
 
@@ -100,7 +110,13 @@ export function SqlExerciseRunner({
         {hints.length > 0 && (
           <Button
             variant="outline"
-            onClick={() => setHintsShown((n) => Math.min(n + 1, hints.length))}
+            onClick={() =>
+              setHintsShown((n) => {
+                const next = Math.min(n + 1, hints.length)
+                if (next > n) onHintReveal?.(next, hints.length)
+                return next
+              })
+            }
             disabled={hintsShown >= hints.length}
             className="gap-2"
           >
@@ -109,7 +125,14 @@ export function SqlExerciseRunner({
           </Button>
         )}
         {canShowReference && !showReference && (
-          <Button variant="ghost" onClick={() => setShowReference(true)} className="gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setShowReference(true)
+              onReferenceReveal?.()
+            }}
+            className="gap-2"
+          >
             <Eye className="h-4 w-4" />
             Show solution
           </Button>
@@ -148,19 +171,11 @@ export function SqlExerciseRunner({
       )}
 
       {showReference && exercise.referenceSolution && (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <div className="border-border bg-muted/40 text-muted-foreground border-b px-3 py-1.5 text-xs font-medium">
-            Reference solution
-          </div>
-          <CodeMirrorErrorBoundary>
-            <CodeMirrorEditor
-              value={exercise.referenceSolution}
-              language="sql"
-              height={160}
-              readOnly
-            />
-          </CodeMirrorErrorBoundary>
-        </div>
+        <ReadOnlyCodeBlock
+          code={exercise.referenceSolution}
+          language="sql"
+          label="Reference solution"
+        />
       )}
 
       <TestResultsPanel results={results} isRunning={running} />
