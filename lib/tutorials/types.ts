@@ -143,6 +143,21 @@ export interface SqlResultSet {
   rows: unknown[][]
 }
 
+/**
+ * Runtime guard for {@link SqlResultSet}. A graded run's `actual`/`expected` can be a non-result-set
+ * sentinel (the shared result mapper's "fail" string) on an errored query, so callers must narrow
+ * before handing the value to a table renderer — otherwise a failing query throws in render. Checks
+ * BOTH `columns` and `rows` are arrays so a half-formed object can't slip through.
+ */
+export function isSqlResultSet(value: unknown): value is SqlResultSet {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as { columns?: unknown }).columns) &&
+    Array.isArray((value as { rows?: unknown }).rows)
+  )
+}
+
 /** Single-query grading (L1/L2): seed a DB, run the learner's SELECT, compare to one expected set. */
 export interface SqlSingleFileGrading {
   /** DDL + DML run once to build the DB the learner queries. */
