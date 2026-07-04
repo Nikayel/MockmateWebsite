@@ -24,9 +24,16 @@
 > - **Python content:** P1 real `while` example; P2 `__eq__`→unhashable note; P4 asyncio caveat; em
 >   dashes removed.
 > - **Verification:** `pnpm typecheck` clean, 60 tutorial/editor tests pass, lint clean (2 pre-existing
->   warnings only). AppleDouble `._*` already `.gitignore`d.
+>   warnings only). AppleDouble `._*` already `.gitignore`d. A 3-member validation council
+>   (React/logic, content, parity) reviewed the diff; it caught one real bug in the first S2 attempt
+>   (tiebreaker over-applied to RANK/DENSE_RANK, which collapsed the tie) — corrected and re-verified
+>   live in sqlite3 so the demo output matches the worked-example table.
+> - **U3 — DEFERRED, not fixed.** The `min-w-[1080px]` workspace still scrolls horizontally as one
+>   unit below ~1080px. A true fix is a responsive rewrite that stacks the 3-column tool on small
+>   screens; that is a separate, higher-risk piece of work and was consciously left for a follow-up
+>   rather than half-done here. It remains listed as P2 in §1.
 
-**Status:** FIXED (see Resolution above). Original findings retained below for the record.
+**Status:** FIXED except U3 (deferred). Original findings retained below for the record.
 **Date:** 2026-07-03
 **Method:** Manual review of the render/logic layer + three parallel deep-reads of all 8 curriculum files (SQL L1-L4, Python L1-L4), with expected-output math hand-verified and the two highest-severity content bugs reproduced first-hand.
 
