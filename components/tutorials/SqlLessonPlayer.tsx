@@ -23,6 +23,7 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
+import { LessonErrorBanner, LessonLoadingState } from "./LessonProgressStates"
 import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
 import { VerticalRail } from "./VerticalRail"
@@ -59,10 +60,12 @@ type NextStep =
   | { kind: "finished" }
 
 export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonPlayerProps) {
-  useTutorialProgressSync(lesson.id, level.id)
+  const { reload } = useTutorialProgressSync(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
   const isLoading = useTutorialStore((s) => s.isLoading)
+  const error = useTutorialStore((s) => s.error)
+  const startSection = useTutorialStore((s) => s.startSection)
 
   const [active, setActive] = useState<LessonSection>("teach")
   const centerRef = useRef<HTMLElement>(null)
@@ -141,7 +144,12 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
     if (next) setActive(next)
   }, [isLoading, sections])
 
-  const goToSection = (section: LessonSection) => setActive(section)
+  const goToSection = (section: LessonSection) => {
+    setActive(section)
+    // Entering a section is genuine engagement: persist it as in-progress so resume returns here.
+    // No-op once completed; bare visits aren't persisted (Read opens via useState, not this handler).
+    startSection(section)
+  }
 
   useEffect(() => {
     centerRef.current?.scrollTo({ top: 0 })
@@ -266,7 +274,11 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
             <div className="mx-auto max-w-2xl">
               <LessonHeader lesson={lesson} />
 
-              {active === "teach" && (
+              {error && <LessonErrorBanner error={error} onReload={reload} />}
+
+              {isLoading && <LessonLoadingState />}
+
+              {!isLoading && active === "teach" && (
                 <TeachPanel
                   teach={lesson.teach}
                   demoLanguage="sql"
@@ -277,7 +289,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                 />
               )}
 
-              {active === "apply" && (
+              {!isLoading && active === "apply" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.apply, {
                     canRevealReference: true,
@@ -299,7 +311,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                 </div>
               )}
 
-              {active === "practice" && (
+              {!isLoading && active === "practice" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.practice, {
                     onPass: () => markPassed("practice"),
@@ -312,7 +324,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                   {sections.practice === "completed" && (
                     <div className="flex flex-col gap-3">
                       <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                        Lesson complete — nice work. This idea resurfaces in 3 days for spaced
+                        Lesson complete. Nice work. This idea resurfaces in 3 days for spaced
                         practice.
                       </p>
                       <div>
@@ -327,10 +339,10 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                         {nextStep.kind === "level-complete" && (
                           <div className="border-accent/40 bg-accent/[0.07] flex flex-col gap-3 rounded-xl border p-4">
                             <p className="text-foreground text-sm font-semibold">
-                              Level {level.id} complete — you finished {level.title}.
+                              Level {level.id} complete. You finished {level.title}.
                             </p>
                             <p className="text-muted-foreground text-sm">
-                              Next up: Level {nextStep.levelId} — {nextStep.levelTitle}.
+                              Next up: Level {nextStep.levelId}, {nextStep.levelTitle}.
                             </p>
                             <div className="flex flex-wrap gap-2">
                               <Button asChild className="gap-2">
@@ -352,7 +364,7 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                           <Button asChild variant="outline" className="gap-2">
                             <Link href="/learn/sql">
                               <ArrowLeft className="h-4 w-4" />
-                              You finished the path — back to levels
+                              You finished the path. Back to levels
                             </Link>
                           </Button>
                         )}
