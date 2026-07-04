@@ -36,5 +36,8 @@ export default function SqlLessonPage() {
 
   const { level, lesson } = location
 
-  return <SqlLessonPlayer lesson={lesson} level={level} />
+  // `key={lesson.id}` forces a fresh player instance per lesson so navigating between lessons never
+  // carries over the previous lesson's open phase, resume flag, or runner results (local component
+  // state, not in the store).
+  return <SqlLessonPlayer key={lesson.id} lesson={lesson} level={level} />
 }
