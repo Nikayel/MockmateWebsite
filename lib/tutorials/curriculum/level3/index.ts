@@ -158,45 +158,65 @@ const parseConfigLesson: PythonLevel["modules"][number]["lessons"][number] = {
   skills: ["modules", "imports", "string-parsing", "type-coercion"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Real code lives in more than one file
+    markdown: `## Why one file stops being enough
 
-A program is rarely a single script. You split it into **modules** and \`import\` exactly what you
-need. Each is a small file with one job.
+A script that does everything in one file is easy to start and painful to grow. You cannot reuse a function without copying it, you cannot test a rule in isolation, and every edit risks breaking something unrelated. Splitting code into **modules** (one \`.py\` file per responsibility) fixes this. A config parser is a clean example: one module knows how to turn a string into the right type, another knows how to walk lines of text. Each part stays small, testable, and imported only where it is needed.
+
+## What \`import\` actually does
+
+\`import\` is not a copy-paste of code into your file. When Python first runs \`from app.coerce import coerce\`, it does three things:
+
+1. Finds \`app/coerce.py\`, creates a module object, and registers it in \`sys.modules\` so a repeat import reuses it instead of re-running the file.
+2. Executes the file top to bottom, once, populating that module object.
+3. Binds the name \`coerce\` into the current file's namespace.
+
+The two import forms differ in the name you get:
 
 \`\`\`python
-# app/coerce.py
-def coerce(raw):
-    value = raw.strip()
-    return int(value) if value.lstrip("-").isdigit() else value
-
-# app/config.py
-from app.coerce import coerce      # reach into another module
+import app.coerce              # call it as app.coerce.coerce(...)
+from app.coerce import coerce  # call it as coerce(...)
 \`\`\`
 
-### The \`key = value\` parsing idiom
+Here \`parse_config\` imports the read-only \`coerce\` helper and calls it. The type rule lives in exactly one place, so fixing it fixes every caller.
 
-Config files are lists of \`key = value\` lines. Parsing them is a loop with a few guards:
+## Coercing a raw string to a type
+
+Config values arrive as strings, so \`coerce\` has to decide whether a value is really an integer:
 
 \`\`\`python
-for line in text.splitlines():     # one line at a time
-    stripped = line.strip()        # drop surrounding whitespace
+>>> "  hi ".strip()
+'hi'
+>>> "-3".isdigit()               # the "-" makes this False
+False
+>>> "-3".lstrip("-").isdigit()   # strip the sign first, then test
+True
+>>> int("-3")
+-3
+\`\`\`
+
+The rule is: trim the string, strip a leading \`-\` before calling \`isdigit\`, return \`int(value)\` when it looks integer, otherwise return the trimmed string. That is your Apply warm-up.
+
+## Parsing \`key = value\` lines
+
+A config file is lines of \`key = value\`. The loop guards blanks and comments, then splits once:
+
+\`\`\`python
+for line in text.splitlines():
+    stripped = line.strip()
     if not stripped or stripped.startswith("#"):
-        continue                   # skip blanks and comments
-    key, value = stripped.split("=", 1)   # split on the FIRST "=" only
+        continue
+    key, value = stripped.split("=", 1)   # maxsplit=1
+    # store key.strip() -> coerce(value.strip())
 \`\`\`
 
-The \`1\` in \`split("=", 1)\` is the **maxsplit**: it splits at most once, so a value like
-\`http://x/?a=1\` stays intact.
+Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "localhost", "port": 8080}\`.
 
-### Keep it readable
+## Pitfalls
 
-Let each module own one idea: \`coerce\` knows about types, \`parse_config\` knows about lines.
-Importing \`coerce\` keeps \`parse_config\` short and the type rule in exactly one place.
+- **Splitting without \`maxsplit\`.** \`"url = a=b".split("=")\` returns three parts, so \`key, value = ...\` raises \`ValueError: too many values to unpack (expected 2)\`. Passing \`1\` splits on the first \`=\` only and keeps any \`=\` inside the value intact.
+- **Forgetting to trim the key.** \`"host = localhost".split("=", 1)\` gives \`["host ", " localhost"]\`. The value passes through \`coerce\`, which trims it, but the key does not. Store \`"host "\` (with the trailing space) as the key and a later \`config["host"]\` lookup raises \`KeyError\` instead of returning the value. Call \`.strip()\` on the key before storing it.
 
-### Recap
-
-Import the helper, loop the lines, guard the blanks/comments, split once, trim, coerce. First you'll
-write \`coerce\` on its own; then you'll wire it into \`parse_config\` across real files.`,
+**Interview nuance:** a module's top-level code runs exactly once per process. After the first import, Python serves the cached object from \`sys.modules\` and does not re-execute the file. That is why import side effects fire once, why a module-level constant is shared rather than recomputed across every importer, and why two modules that import each other at top level can fail with a circular-import error. Interviewers use this to check that you understand \`import\` as "execute the file once, then cache and bind a name," not as textually pasting code into the caller.`,
   },
   apply: {
     id: "py-l3-parse-config-apply",
@@ -509,37 +529,50 @@ const packagesLesson: PythonLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## From one file to a package
 
-A **module** is a single \`.py\` file. A **package** is a folder of modules with an \`__init__.py\`
-file (it can be empty) that marks the folder as importable.
+One 400-line \`.py\` file is where a project goes to die: you scroll forever, everything can touch everything, and nothing tells you who depends on whom. Splitting logic into **modules** fixes that. Each file owns one responsibility, and the imports at the top of a file become a readable map of its dependencies. This is the single most common way real Python codebases stay navigable, and interviewers notice when you reach for it.
+
+### Modules and packages
+
+A **module** is a single \`.py\` file. When you import it, Python runs the file top to bottom once and hands you a namespace object whose attributes are the names defined inside.
+
+A **package** is a directory of modules with an \`__init__.py\` file (it may be empty). That file marks the folder as importable and runs the first time the package is imported.
 
 \`\`\`text
 store/
-    __init__.py     # makes 'store' a package
-    catalog.py      # data + lookups
-    cart.py         # uses catalog
+    __init__.py     # marks 'store' as a package
+    catalog.py      # owns prices + lookups
+    cart.py         # depends on catalog
 \`\`\`
 
-Inside \`cart.py\` you reach into a sibling module with a package-qualified import:
+### Importing across modules
+
+Inside \`cart.py\`, reach a sibling module by its package-qualified path:
 
 \`\`\`python
+# store/cart.py
 from store.catalog import price_of
+
+
+def cart_total(names):
+    return sum(price_of(name) for name in names)
 \`\`\`
 
-### Why split at all?
+\`\`\`python
+# a test or app, run from the project root
+from store.cart import cart_total
 
-One giant file is hard to navigate. Splitting by responsibility (\`catalog\` knows prices, \`cart\`
-knows totals) keeps each module short and makes imports document who depends on whom.
+print(cart_total(["apple", "bread"]))   # 5
+\`\`\`
 
-### The entry point
+\`from store.catalog import price_of\` is an **absolute import**, spelled from the project root. Inside a package you can also write the **relative** form \`from .catalog import price_of\`, where the leading dot means "this package". Relative imports only work inside a package, not in a file you run directly as a script.
 
-Tests (and apps) import the package's public functions: \`from store.cart import cart_total\`. That
-import is the **entry point** into your package.
+### Pitfalls
 
-### Recap
+**Circular imports.** If \`catalog\` imports from \`cart\` while \`cart\` imports from \`catalog\`, whichever module loads second sees the first one only half-built, and you get an \`ImportError\` or \`AttributeError\`. The fix is to point dependencies one way. Here \`cart\` depends on \`catalog\`, never the reverse.
 
-A package is a folder of modules plus an \`__init__.py\`; modules import each other with
-\`from package.module import name\`. First you'll total a cart in one file, then wire the same logic
-across a real \`store/\` package.`,
+**Running a package file directly.** \`python store/cart.py\` fails with \`ModuleNotFoundError: No module named 'store'\`, because running a file puts its own folder (\`store/\`) on the import path instead of the project root, so \`store\` is not importable. Run it as a module from the project root with \`python -m store.cart\`, or import it from a top-level script instead. (Had \`cart.py\` used the relative \`from .catalog import price_of\`, the same command would fail differently, with \`attempted relative import with no known parent package\`.)
+
+**Interview nuance:** a module is a singleton. The first import runs the file body and caches the resulting module object in \`sys.modules\`; every later \`import\` returns that same cached object without re-running the file. So top-level code (a \`PRICES\` dict, a database connection) executes exactly once per process, and any module-level state is shared everywhere it is imported. Interviewers probe this when they ask why an import side effect runs only once, or how two modules end up mutating the same object.`,
     demoCode: `# one file now; a package next
 PRICES = {"apple": 3, "bread": 2}
 
@@ -749,19 +782,22 @@ const typeHintsLesson: PythonLevel["modules"][number]["lessons"][number] = {
   skills: ["type-hints", "annotations", "modules", "mypy"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Annotations document your types
+    markdown: `## Types you write down, but Python won't enforce
 
-A **type hint** records what a value is meant to be. Python doesn't enforce them at runtime, but
-they make code self-documenting and let tools like \`mypy\` or \`ty\` catch mismatches before you
-run.
+A **type hint** is a note you attach to a name saying what kind of value belongs there. When you review a stranger's function, the signature \`def average(values: list[float]) -> float\` states the contract in one line: pass a list of floats, get a float back. Without hints you are reverse-engineering intent from the body. On real teams, hints plus a checker like \`mypy\` or \`pyright\` catch a whole class of bugs (passing a \`str\` where an \`int\` was meant) in CI, before the code ever runs.
+
+### A hint is metadata, not a check
+
+Python records annotations but never acts on them at runtime. \`average(["a", "b"])\` will happily start executing and only blow up inside \`sum\` (a \`TypeError\` from \`0 + "a"\`), not at the call site. The payoff comes from tools that read the annotations: your editor's autocomplete, and static checkers run as a build step.
 
 \`\`\`python
 def average(values: list[float]) -> float:
+    if not values:
+        return 0.0
     return sum(values) / len(values)
 \`\`\`
 
-- \`values: list[float]\`: the parameter is a list of floats.
-- \`-> float\`: the function returns a float.
+\`values: list[float]\` annotates the parameter; \`-> float\` annotates the return. \`sum(values) / len(values)\` is always a \`float\` because \`/\` is true division, so the return hint is honest. (Passing \`[2, 4]\`, which are \`int\`, still type-checks: a checker treats \`int\` as an acceptable \`float\`.)
 
 ### Common shapes
 
@@ -769,11 +805,12 @@ def average(values: list[float]) -> float:
 name: str = "Ada"
 counts: dict[str, int] = {}
 pair: tuple[int, int] = (1, 2)
+scores: list[float] = []
 \`\`\`
 
 ### On classes
 
-Annotate attributes in \`__init__\` (or use a \`@dataclass\`):
+Annotate constructor parameters and the attributes they set. A \`@dataclass\` generates \`__init__\` from the annotations for you.
 
 \`\`\`python
 class Account:
@@ -781,16 +818,18 @@ class Account:
         self.balance: float = balance
 \`\`\`
 
-### Keep it honest
+\`-> None\` on \`__init__\` is the convention: it returns nothing.
 
-A hint is a promise. If \`average\` can return \`0.0\` for an empty list, \`-> float\` still holds,
-but if it could return \`None\`, say so with \`-> float | None\`.
+### Across modules
 
-### Recap
+Hints behave identically when code spans files. In the \`stats\` package, \`stats/summary.py\` can import a helper (\`from stats.rounding import round2\`) and annotate \`average\` exactly as it would in a single file. The annotation documents the boundary so a caller in another module knows the shape without opening the source.
 
-Hints like \`list[float]\` and \`-> float\` document intent and power static checkers without changing
-runtime behaviour. You'll implement and annotate \`average\`, first in one file, then across the
-\`stats\` package.`,
+### Pitfalls
+
+- **Hints are not runtime validation.** If you need to reject bad input at runtime, you still write an explicit check or reach for a validator like \`pydantic\`. \`-> float\` guarantees nothing on its own.
+- **\`round\` on floats can surprise you.** Two separate effects combine. First, \`round\` breaks exact ties to the nearest even digit, so \`round(2.5)\` is \`2\`, not \`3\`. Second, most decimals are not exactly representable: \`2.675\` is stored as \`2.67499...\`, so \`round(2.675, 2)\` returns \`2.67\`, not \`2.68\`, because the stored value is already below the tie. Expect small surprises when the Practice \`round2\` helper trims a mean to 2 decimals.
+
+**Interview nuance:** the interpreter ignores type hints at runtime. They are stored in a function's \`__annotations__\` and read only by tools and libraries that opt in (checkers, editors, \`@dataclass\`, \`pydantic\`); the interpreter itself does zero type checking. So typed Python buys a build-time guarantee, not a runtime one, which is exactly why teams pair hints with \`mypy\` in CI rather than trusting them at the call site.`,
     demoCode: `def average(values: list[float]) -> float:
     if not values:
         return 0.0
@@ -992,35 +1031,39 @@ const typingModuleLesson: PythonLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 6,
     markdown: `## Precise types for real APIs
 
+In a shared codebase, a function signature is the contract your teammates read before they read your code. \`def find_user(user_id): ...\` tells a caller nothing about what comes back. A precise return type like \`dict | None\` says "you might get nothing, handle it" before anyone runs the code. On a data team that is the difference between a null check you wrote on purpose and a \`NoneType\` crash in a nightly pipeline at 3am.
+
 ### Optional and Union
 
-A value that might be missing is **Optional**, written \`X | None\` (older code uses
-\`Optional[X]\`). A value that can be one of several types is a **Union**: \`int | str\`.
+A value that might be missing is \`Optional\`, written \`X | None\` (older code writes \`Optional[X]\`; they mean the same type). A value that can be one of several types is a \`Union\`: \`int | str\`.
+
+Returning \`None\` from a function you annotated \`-> dict\` is a lie a checker will flag. Annotate the honest contract \`-> dict | None\`, and every caller is told to handle the missing case. Once a value is \`dict | None\`, a checker will not let you subscript it until you narrow it:
 
 \`\`\`python
-def find_user(user_id: int) -> dict | None:
-    ...        # returns a dict, or None when not found
+u = find_user(7)          # u: dict | None
+if u is not None:
+    print(u["name"])      # here u is dict, so u["name"] is allowed
 \`\`\`
-
-Returning \`None\` from a function annotated \`-> dict\` is a lie a type checker will catch. Annotate
-the real contract, \`-> dict | None\`, and callers know to handle the \`None\`.
 
 ### Generics with TypeVar
 
-A **generic** keeps the relationship between input and output types. \`TypeVar\` is the placeholder:
+The demo below returns \`object | None\`, so the caller loses the element type. A generic keeps the link between the input type and the output type. \`TypeVar\` is the placeholder that stands in for "whatever type came in":
 
 \`\`\`python
 from typing import TypeVar
 T = TypeVar("T")
 
 def first(items: list[T]) -> T | None:
-    return items[0] if items else None   # list[int] in -> int | None out
+    return items[0] if items else None
+
+first([10, 20])   # a checker infers int | None, not object | None
 \`\`\`
+
+Python 3.12 and later write the same thing as \`def first[T](items: list[T]) -> T | None:\` with no import.
 
 ### Protocols (structural typing)
 
-A **Protocol** describes the *shape* an object must have. Any object with the right attributes or
-methods satisfies it, no inheritance required:
+A \`Protocol\` describes the shape an object must have. Any object with the right attributes or methods satisfies it, with no base class and no inheritance:
 
 \`\`\`python
 from typing import Protocol
@@ -1029,19 +1072,14 @@ class Named(Protocol):
     name: str
 
 def greet(who: Named) -> str:
-    return "Hi, " + who.name     # anything with a .name works
+    return "Hi, " + who.name   # any object with a .name: str fits
 \`\`\`
 
-### The mypy / ty mindset
+### Pitfall: Optional is not an optional argument
 
-Type checkers (\`mypy\`, \`ty\`) read these hints and flag mismatches before you run. Think of hints
-as a contract the checker proves for you.
+A common intern misread: \`X | None\` describes the allowed values, not whether the argument can be omitted. \`def find_user(user_id: int | None)\` still requires \`user_id\`; calling \`find_user()\` raises \`TypeError: find_user() missing 1 required positional argument: 'user_id'\`. Adding \`None\` to the type does not add a default. To make a parameter skippable you give it one: \`user_id: int | None = None\`. Keep the two ideas separate: the type says what values are legal, the default says whether the caller can leave it out.
 
-### Recap
-
-\`X | None\` marks optional values, \`TypeVar\` keeps generics honest, and \`Protocol\` types by shape.
-You'll implement a user lookup that returns \`dict | None\`, first standalone, then across the
-\`directory\` package.`,
+**Interview nuance:** Python type hints are not enforced at runtime. The interpreter records them in \`__annotations__\` but never checks them, so \`list[T]\` is no runtime guarantee that every element is a \`T\`, and a wrong annotation never raises on its own. A function annotated \`-> dict\` will happily return \`None\`; the crash only shows up later in the caller as \`TypeError: 'NoneType' object is not subscriptable\`. That is why teams gate merges on \`mypy\` or \`ty\`: the type check is a proof a static tool runs before the code ships, not a guard the interpreter performs. Contrast \`pydantic\`, which does validate values at runtime. So the payoff of \`-> dict | None\` is real only if you both annotate honestly and actually run the checker in CI.`,
     demoCode: `def first(items: list) -> object | None:
     return items[0] if items else None
 
@@ -1242,42 +1280,37 @@ const pytestBasicsLesson: PythonLevel["modules"][number]["lessons"][number] = {
   skills: ["pytest", "testing", "assertions", "tdd"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Testing with pytest
+    markdown: `## Why tests are the code that guards your code
 
-**pytest** runs functions whose names start with \`test_\` and checks plain \`assert\` statements.
-No boilerplate, no class required:
+When you change \`balance_after\` six months from now, the only thing standing between a clean refactor and a corrupted account balance is a test that still remembers what "correct" meant. On a real team, a pull request without tests is a pull request nobody can safely merge, because reviewers cannot tell whether it works, only that it compiles. \`pytest\` is the tool most Python shops reach for because it turns "I think this works" into a repeatable, machine-checkable claim.
+
+## The mental model: plain functions, plain asserts
+
+\`pytest\` has almost no ceremony. You write a normal function whose name starts with \`test_\`, put a plain \`assert\` inside it, and run \`pytest\`. Discovery is convention-based: \`pytest\` walks the directory, imports files named \`test_*.py\` (or \`*_test.py\`), and runs every \`test_\`-prefixed function it finds. No base class, no registration, no \`main\`.
+
+The magic is in the \`assert\`. \`pytest\` rewrites the \`assert\` statements in your test files as it imports them, so a failing \`assert\` reports the actual and expected values instead of a bare \`AssertionError\`. That is why \`assert balance_after(100, [10, -30, 5]) == 85\` is enough: on failure you see the number it actually got.
+
+### Arrange, act, assert
+
+A readable test has three beats: set up inputs, call the code, check the result.
 
 \`\`\`python
 # tests/test_account.py
 from bank.account import balance_after
 
-def test_applies_deposits():
-    assert balance_after(0, [10, 20]) == 30
+def test_mixed_transactions():
+    start, txns = 100, [10, -30, 5]   # arrange
+    result = balance_after(start, txns)  # act
+    assert result == 85               # assert
 \`\`\`
 
-Run \`pytest\` and it finds every \`test_*\` function, runs it, and reports which assertions failed,
-showing actual vs expected.
+Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). Here the tests already exist. Your job is to implement \`balance_after\` so \`start + sum(transactions)\` produces the expected total and the suite turns green. The Practice puts that same function in a \`bank/account.py\` package with a real test file, plus hidden cases you cannot peek at.
 
-### Arrange, act, assert
+## Pitfall: a test that never runs still "passes"
 
-A readable test has three beats:
+If you misspell the prefix and name a function \`check_deposits\` instead of \`test_deposits\`, \`pytest\` silently skips it. The suite goes green while testing nothing, which is worse than a red suite because it hands you false confidence. The same trap hits a file named \`account_tests.py\` (wrong pattern) or a helper that raises but is never called. The fix: keep the \`test_\` prefix, name files \`test_*.py\`, and run \`pytest -v\` to read the count of collected tests. If the number looks low, something is not being discovered.
 
-\`\`\`python
-def test_mixed():
-    start, txns = 100, [10, -30, 5]       # arrange
-    result = balance_after(start, txns)   # act
-    assert result == 85                   # assert
-\`\`\`
-
-### TDD: tests first
-
-Test-driven development writes the test, watches it fail, then writes just enough code to pass. Here
-the tests already exist. Your job is to turn them green.
-
-### Recap
-
-pytest discovers \`test_*\` functions and checks \`assert\`s. You'll make a pytest suite pass by
-implementing \`balance_after\`, first in one file, then in a \`bank\` package with real test files.`,
+**Interview nuance:** never compare floats with \`==\` in a test. \`balance_after(0.0, [0.1, 0.2]) == 0.3\` is \`False\`, because IEEE 754 stores \`0.1 + 0.2\` as \`0.30000000000000004\`. An interviewer asking "how would you test a function that returns a float" wants to hear about tolerance, not exact equality. In \`pytest\` you write \`assert result == pytest.approx(0.3)\`, which passes if the values are within a small relative tolerance. Integer transactions dodge this, but the moment money becomes \`float\`, exact-equality tests get flaky and the real bug hides behind the noise.`,
     demoCode: `def balance_after(start, transactions):
     return start + sum(transactions)
 
@@ -1466,10 +1499,13 @@ const pytestFixturesLesson: PythonLevel["modules"][number]["lessons"][number] = 
     estimatedMinutes: 6,
     markdown: `## Fixtures and parametrize
 
-### Fixtures: shared setup
+### Why this matters
 
-A **fixture** builds a value your tests need, so you don't repeat setup. Mark it \`@pytest.fixture\`
-and name it as a parameter that pytest injects:
+Every test for an inventory module needs the same starting state: a stock dict, maybe a temp file or a DB connection. Copy that setup into each test and one change to the shape breaks twenty tests at once. \`pytest\` fixtures give you one named source for that setup, and \`parametrize\` lets a single test body cover a whole table of cases so a failure points at the exact row that broke. Interviewers watch for this. Writing five near-identical \`test_\` functions signals you do not know the tooling.
+
+### Fixtures: named, injected setup
+
+A fixture is a function decorated with \`@pytest.fixture\` that builds a value your tests need. Any test that names the fixture as a parameter receives the returned value. \`pytest\` matches by name and injects it.
 
 \`\`\`python
 import pytest
@@ -1478,33 +1514,43 @@ import pytest
 def base_stock():
     return {"apple": 5, "pear": 2}
 
-def test_adds_item(base_stock):          # pytest passes the fixture in
-    assert restock(base_stock, {"plum": 3})["plum"] == 3
+def test_restock_adds_item(base_stock):        # pytest passes base_stock in
+    result = restock(base_stock, {"plum": 3})
+    assert result["plum"] == 3
 \`\`\`
 
-### Parametrize: one test, many cases
+By default a fixture has function scope: \`pytest\` calls it fresh for every test, so \`base_stock\` is a brand-new dict each time and tests cannot leak state into one another. A fixture that uses \`yield\` instead of \`return\` runs the code after \`yield\` as teardown once the test finishes.
 
-\`@pytest.mark.parametrize\` runs the same test for each row of inputs:
+### Parametrize: one body, many cases
+
+\`@pytest.mark.parametrize\` takes a string of parameter names and a list of value rows. \`pytest\` runs the test once per row and reports each as its own case.
 
 \`\`\`python
-@pytest.mark.parametrize("stock, add, expected", [
-    ({"a": 1}, {"a": 1}, {"a": 2}),
-    ({}, {"x": 4}, {"x": 4}),
+@pytest.mark.parametrize("stock, additions, expected", [
+    ({"a": 1}, {"a": 1}, {"a": 2}),        # shared key sums
+    ({}, {"x": 4}, {"x": 4}),              # new key added
 ])
-def test_restock(stock, add, expected):
-    assert restock(stock, add) == expected
+def test_restock(stock, additions, expected):
+    assert restock(stock, additions) == expected
 \`\`\`
 
-One function, many checks, with a clear per-case report.
+Two rows means two independent results, so a failure names the row instead of just "\`test_restock\` failed".
 
-> In this sandbox the test files call the setup helper directly and loop over a list of cases (the
-> same patterns, without pytest's fixture injection), so they run without pytest installed.
+The demo below shows the \`restock\` you will build. It copies \`stock\` with \`dict(stock)\`, then adds each quantity onto \`result.get(item, 0)\`, returning a new dict. This sandbox has no \`pytest\` installed, so the practice tests express the same ideas directly: a helper builds the base stock and a list of case tuples is looped over. The concepts (shared setup, a table of cases) are identical; only the injection machinery differs.
 
-### Recap
+### Pitfall: shared mutable fixtures
 
-Fixtures remove duplicated setup; \`parametrize\` turns a table of cases into individual checks.
-You'll implement \`restock\` so a fixture-backed, parametrized suite passes, without mutating its
-input.`,
+A fixture that returns a mutable object at function scope is safe, but widen the scope and that object is shared:
+
+\`\`\`python
+@pytest.fixture(scope="module")
+def base_stock():
+    return {"apple": 5}
+\`\`\`
+
+Now every test in the module gets the same dict. If \`restock\` mutates its input (for example \`result = stock\` instead of \`result = dict(stock)\`, which makes \`result\` and \`stock\` the same object), one test's change bleeds into the next, and tests pass or fail depending on order. The Practice suite checks exactly this: return a new dict and never touch \`stock\`.
+
+**Interview nuance:** \`parametrize\` is not a loop inside one test. A \`for\` loop stops at the first failing \`assert\` and hides every case after it. \`parametrize\` generates N separate tests, so all N run, each gets its own id in the report, and you can \`xfail\` or \`skip\` a single case with \`pytest.param\`. That independence, together with function-scope fixture isolation, is what makes a suite deterministic no matter what order it runs in.`,
     demoCode: `def restock(stock, additions):
     result = dict(stock)
     for item, qty in additions.items():
@@ -1709,46 +1755,58 @@ const pathlibLesson: PythonLevel["modules"][number]["lessons"][number] = {
   skills: ["pathlib", "files", "text-processing", "io"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Files the modern way: pathlib
+    markdown: `## Why file paths break in production
 
-\`pathlib.Path\` is the modern, object-oriented way to work with files and folders, cleaner than
-string paths and \`os.path\`.
+The bug that ruins a data pipeline at 2am is rarely the algorithm. It is a path. A script that reads \`data/scores.txt\` works on your laptop and fails on the server because the two machines were launched from different directories. Hardcoded string paths are also fragile across operating systems, where the path separator differs. \`pathlib.Path\` exists to make paths a real object with methods instead of fragile strings you glue together by hand. As a data engineer you touch files constantly (CSVs, logs, exports), so getting this layer right is table stakes.
+
+## The mental model
+
+A \`Path\` is an object that represents a location, not the file's contents. Building one does no I/O and does not require the file to exist. You only touch disk when you call a method like \`read_text()\` or \`exists()\`.
 
 \`\`\`python
 from pathlib import Path
 
-p = Path("data/scores.txt")
-p.read_text()                 # the whole file as a string
-p.write_text("hi")            # (over)write it
-p.exists()                    # True / False
-Path("data") / "scores.txt"   # join paths with /
+p = Path("data") / "scores.txt"   # "/" joins path parts, OS-correct
+p.exists()                        # True / False, cheap check
+p.suffix                          # ".txt"
+text = p.read_text(encoding="utf-8")   # whole file -> one str
 \`\`\`
 
-### Processing a file
+The \`/\` operator is real: \`Path\` overloads it so \`Path("data") / "scores.txt"\` builds the joined path with the correct separator on any OS. Prefer it over \`"data/" + name\`.
 
-Read, split into lines, transform:
+## Turning text into data
+
+\`read_text()\` hands you the entire file as one string. Split it into lines, then convert:
 
 \`\`\`python
-text = Path(path).read_text()
+text = "10\\n20\\n30"
 numbers = [int(line) for line in text.splitlines() if line.strip()]
+print(sum(numbers))   # 60
 \`\`\`
 
-\`splitlines()\` drops the newline characters; the \`if line.strip()\` guard skips blank lines so
-\`int()\` never sees an empty string.
+\`splitlines()\` breaks on line boundaries and drops the \`\\n\` characters. The \`if line.strip()\` guard skips blank or whitespace-only lines so \`int()\` never receives an empty string. \`int()\` itself strips surrounding whitespace, so \`int(" 10 ")\` returns \`10\` without extra work. This is exactly the shape both exercises want: first sum the numbers in a string, then read a real file with \`Path(path).read_text()\` and run the same pipeline.
 
-### Walking a folder
+## Pitfalls
+
+Real files almost always end with a trailing newline, and that is where interns get burned. Compare:
 
 \`\`\`python
-for child in Path("data").iterdir():
-    if child.suffix == ".txt":
-        ...
+"10\\n20\\n30\\n".split("\\n")     # ['10', '20', '30', '']  <- trailing ''
+"10\\n20\\n30\\n".splitlines()    # ['10', '20', '30']       <- clean
 \`\`\`
 
-### Recap
+If you use \`split("\\n")\` you get a phantom empty string at the end, and \`int("")\` raises \`ValueError\`. Use \`splitlines()\`, or keep the \`if line.strip()\` guard, or both. That guard is your safety net for blank lines anywhere in the file, not just the last one.
 
-\`Path(...).read_text()\` reads a file, \`/\` joins paths, and \`splitlines()\` + a blank-line guard
-turn text into clean data. You'll total a file's numbers, first from a string, then from real files
-in a \`data/\` folder.`,
+The second trap: a relative path like \`Path("data/scores.txt")\` resolves against the current working directory, which is wherever the process was launched, not where your script file lives. Run the same code from a different folder and it fails. When it matters, anchor to the file with \`Path(__file__).parent / "data" / "scores.txt"\`.
+
+**Interview nuance:** \`read_text()\` loads the whole file into memory at once, so its memory cost is O(n) in file size. That is fine for a scores file, but if an interviewer swaps in a multi-gigabyte log, stream it instead and keep memory O(1):
+
+\`\`\`python
+with Path(path).open(encoding="utf-8") as f:
+    total = sum(int(line) for line in f if line.strip())
+\`\`\`
+
+Iterating a file object yields one line at a time without holding the whole file in memory. Knowing when to read all versus stream is exactly the tradeoff data-engineering interviewers probe.`,
     demoCode: `text = "10\\n20\\n30"
 numbers = [int(line) for line in text.splitlines() if line.strip()]
 print(sum(numbers))   # 60`,
@@ -1949,49 +2007,52 @@ const loggingErrorsLesson: PythonLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 5,
     markdown: `## Logging and where to handle errors
 
-### Logging beats print
+### Why this matters
 
-In real programs, use the \`logging\` module instead of \`print\`. It adds levels
-(DEBUG/INFO/WARNING/ERROR), timestamps, and can be turned up or down without touching call sites:
+\`print\` is fine for a script you run once and watch. It falls apart in anything that runs unattended: a batch job, a web handler, a scheduled ETL. You cannot filter \`print\` by severity, cannot silence it in production without deleting lines, and cannot tell an error apart from a debug trace in a log file. \`logging\` fixes all three. The other half of robustness is deciding *where* a failure is handled. Get that wrong and one malformed row aborts a job that should have processed the other 99,999.
+
+### The logging model
+
+A logger is a named channel. You grab one per module with \`logging.getLogger(__name__)\` and emit at a level: \`debug\`, \`info\`, \`warning\`, \`error\`, \`critical\`. Where those messages go (console, file, or both) and how verbose they are is configured once, at program start, not at each call site:
 
 \`\`\`python
 import logging
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 logger.info("processing %d records", len(records))
 logger.warning("skipping bad record: %r", raw)
 \`\`\`
 
-### Designing error boundaries
+Note the \`%d\` and \`%r\` with trailing args instead of an f-string. \`logging\` interpolates the message only if the record is actually emitted (more on that below).
 
-Don't catch errors everywhere. Decide *where* a failure is handled. A common pattern: a low-level
-helper **raises** on bad input, and a higher-level loop **catches** and skips, so one bad record
-doesn't sink the whole batch:
+### Error boundaries: raise low, catch high
+
+Do not wrap every line in \`try\`/\`except\`. Decide the *boundary* that can actually recover. The common shape: a low-level helper raises on bad input, and the loop that owns the batch catches and skips, so one bad record does not sink the rest.
 
 \`\`\`python
-def to_amount(raw):
-    return int(raw)        # raises ValueError on bad input
-
 def safe_total(raws):
     total = 0
     for raw in raws:
         try:
-            total += to_amount(raw)
+            total += int(raw)     # raises ValueError on "x"
         except ValueError:
-            continue        # skip + (in real code) logger.warning(...)
+            continue              # skip; real code would logger.warning(...)
     return total
+
+print(safe_total(["1", "x", "3"]))   # 4
 \`\`\`
 
-### Catch narrowly
+\`int("x")\` raises \`ValueError\`, the loop swallows just that one, and \`1 + 3\` gives \`4\`.
 
-Catch the *specific* exception you expect (\`ValueError\`), not a bare \`except\`. You don't want to
-swallow unrelated bugs like a typo'd name.
+### Pitfalls
 
-### Recap
+- **Catching too broadly.** \`except Exception:\` hides a typo'd name (\`NameError\`) alongside the errors you meant to skip; a bare \`except:\` is worse, also catching \`KeyboardInterrupt\` so you cannot even Ctrl-C out. Catch the specific type you expect (\`ValueError\`) and real bugs still surface.
+- **\`int\` is pickier than you think.** \`int("3.5")\` raises \`ValueError\` (it is not an integer literal), so \`safe_total(["3.5"])\` returns \`0\`, not \`3\`. And \`int(None)\` raises \`TypeError\`, which \`except ValueError\` will not catch at all.
+- **Silent logs.** A fresh logger's effective level defaults to \`WARNING\`, so \`logger.info(...)\` prints nothing until you call \`basicConfig(level=logging.INFO)\`. "My logs vanished" is almost always this.
 
-\`logging\` replaces \`print\` with levelled, configurable output; good error design puts the
-\`raise\` low and the \`try/except\` at the boundary that can recover. You'll build \`safe_total\` so
-one bad record never sinks the batch.`,
+**Interview nuance:** prefer \`logger.info("n=%d", n)\` over \`logger.info(f"n={n}")\`. \`logging\` checks \`isEnabledFor(level)\` first and only formats the message if the record will actually be emitted, so the \`%\`-style call skips string building when that level is off. The f-string builds the string eagerly on every call, including calls that log nothing. On a hot path with expensive \`%r\` values, that difference is measurable.`,
     demoCode: `def safe_total(raws):
     total = 0
     for raw in raws:
@@ -2204,9 +2265,21 @@ const cliLesson: PythonLevel["modules"][number]["lessons"][number] = {
   skills: ["cli", "dispatch", "arguments", "commands"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Command-line tools
+    markdown: `## From arguments to commands
 
-A CLI reads arguments and runs the right command. The stdlib **argparse** builds one declaratively:
+Every real tool you use, \`git\`, \`pytest\`, \`pip\`, \`uv\`, is a CLI: it reads a list of strings the shell hands it and runs the matching command. When you write one, the valuable skill is not memorizing a library. It is keeping the parsing separate from the logic so you can test the logic without launching a whole process. That separation is exactly what this lesson drills.
+
+### A CLI is a function from strings to a result
+
+When you type \`mytool add 2 3\`, Python receives \`sys.argv\`, a list of strings: \`["mytool", "add", "2", "3"]\`. \`sys.argv[0]\` is the program name; the real arguments start at index \`1\`. Everything arrives as text, even \`"2"\`. A CLI does three things with that list:
+
+1. Collect the raw string arguments.
+2. Parse them into typed values (\`"2"\` to \`2\`).
+3. Dispatch the command name to the function that handles it.
+
+### Two ways to parse
+
+The stdlib \`argparse\` builds the parser declaratively. \`parser.parse_args()\` reads \`sys.argv[1:]\` for you and applies each \`type=\` converter:
 
 \`\`\`python
 import argparse
@@ -2215,10 +2288,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("command")
 parser.add_argument("a", type=int)
 parser.add_argument("b", type=int)
-args = parser.parse_args()      # reads sys.argv
+args = parser.parse_args()   # args.a is an int
 \`\`\`
 
-Modern projects often use **typer** (built on click), where a function's type hints become the CLI:
+\`typer\` (built on \`click\`) turns a function's type hints into the CLI, so \`a: int\` becomes a required, int-converted argument:
 
 \`\`\`python
 import typer
@@ -2229,25 +2302,31 @@ def add(a: int, b: int):
     print(a + b)
 \`\`\`
 
-### Dispatching
+### The part worth isolating: dispatch
 
-At heart, a CLI maps a command name to a function:
+Underneath any parser, a CLI maps a command name to a function. Write that core as a plain function that takes \`argv\` as a parameter instead of reaching for \`sys.argv\` itself:
 
 \`\`\`python
 def run(argv):
     command, a, b = argv[0], int(argv[1]), int(argv[2])
     if command == "add":
-        return add(a, b)
-    ...
+        return a + b
+    if command == "mul":
+        return a * b
+    return 0
+
+print(run(["add", "2", "3"]))   # 5
 \`\`\`
 
-Writing it as \`run(argv)\` (instead of reading \`sys.argv\` directly) makes the logic **testable**
-without spawning a process.
+Because \`run\` receives its input, a test can call \`run(["mul", "4", "5"])\` and assert it returns \`20\`, with no subprocess and no shell.
 
-### Recap
+### Pitfalls
 
-argparse/typer turn arguments into typed values; underneath, a CLI dispatches a command name to a
-function. You'll write a \`run(argv)\` dispatcher, first inline, then over a \`cli\` package.`,
+- Arguments are strings. Skip \`int()\` and \`argv[1]\` is \`"2"\`, not \`2\`. Then \`"2" + "3"\` is \`"23"\` and \`"2" * "3"\` raises \`TypeError\`. Convert at the boundary.
+- Off-by-one on \`argv\`. In a real \`main\`, the command is \`sys.argv[1]\`, not \`sys.argv[0]\` (that is the program name). Slicing \`sys.argv[1:]\` avoids the mistake.
+- An unknown command should do something defined (here, return \`0\`), not fall through and crash.
+
+**Interview nuance:** this is the "thin shell, pure core" pattern interviewers look for. Keep argument reading and I/O at the edge (\`sys.argv\`, \`print\`) and put the decision logic in a pure function that takes \`argv\` and returns a value. A pure function is deterministic and trivial to unit-test: you assert on its return value. Once the logic reads global state or prints instead of returning, testing it means patching \`sys.argv\` and capturing stdout, which is slower and more brittle than checking a returned value.`,
     demoCode: `def run(argv):
     command, a, b = argv[0], int(argv[1]), int(argv[2])
     if command == "add":
@@ -2466,20 +2545,27 @@ const restPydanticLesson: PythonLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 6,
     markdown: `## Fetching and validating external data
 
-### httpx: HTTP for humans
+### Why the boundary is where bugs get caught
 
-\`httpx\` is the modern HTTP client (sync or async):
+An external API is code you do not control. It can rename a field, send \`"1"\` where you expected \`1\`, drop \`active\` entirely, or add junk you never asked for. If that raw JSON flows deep into your program, a wrong type surfaces as a crash three functions away from the real cause. The discipline that prevents this: fetch, then immediately turn the untrusted \`dict\` into a typed object you can trust. Everything downstream then works with clean, known values.
+
+### httpx: fetch the raw JSON
+
+\`httpx\` is the modern HTTP client (sync or async, same API):
 
 \`\`\`python
 import httpx
+
 response = httpx.get("https://api.example.com/users/1")
-raw = response.json()      # a dict from the JSON body
+response.raise_for_status()   # raise on 4xx/5xx instead of parsing an error page
+raw = response.json()         # a plain dict, still untrusted
 \`\`\`
 
-### Never trust external data
+\`response.json()\` gives you a \`dict\`. Nothing about it is validated yet. The types are whatever the server chose to send.
 
-An API can send missing fields, wrong types, or extra junk. **pydantic** validates raw data into a
-typed model, coercing where sensible, raising where not:
+### pydantic validates and coerces
+
+In production you hand that \`dict\` to a \`pydantic\` model. \`pydantic\` reads the declared field types, coerces where it is safe, and raises \`ValidationError\` where it is not:
 
 \`\`\`python
 from pydantic import BaseModel
@@ -2489,22 +2575,26 @@ class User(BaseModel):
     name: str
     active: bool
 
-User(**raw)    # validates & coerces, or raises ValidationError
+User(**raw)   # "1" becomes 1, 1 becomes True, a missing field raises ValidationError
 \`\`\`
 
-### The pipeline
+### This sandbox: a dataclass plus explicit coercion
 
-\`fetch → validate → use\`. Validate immediately so the rest of your code works with clean, typed
-objects.
+There is no network and no \`pydantic\` here, so you do the same job by hand with a \`@dataclass\`. That difference matters: a \`@dataclass\` gives you the shape, but its type annotations are not enforced at runtime. Building a plain dataclass with \`id="1"\` stores the string \`"1"\` with no error at all. So you coerce each field yourself, exactly like the demo below:
 
-> This sandbox has no network and no pydantic, so you'll validate a **pre-fetched** dict into a
-> \`@dataclass\` by coercing each field, the same fetch-then-validate shape.
+\`\`\`python
+raw = {"id": "1", "name": "Ada", "active": 1}
+User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
+# User(id=1, name='Ada', active=True)
+\`\`\`
 
-### Recap
+Reach for \`raw["id"]\` (indexing), not \`raw.get("id")\`. Indexing raises \`KeyError\` on a missing field, which is the "a missing field should raise" behavior the Practice wants. \`.get\` would silently hand you \`None\` and push the failure downstream.
 
-\`httpx\` fetches JSON; pydantic (or a dataclass + explicit coercion) turns untrusted data into a
-typed model at the boundary. You'll parse a raw user dict into a clean record, first as a dict, then
-as a dataclass across an \`api\` package.`,
+### Pitfall: \`bool()\` of a string is almost always \`True\`
+
+\`bool(1)\` is \`True\` and \`bool(0)\` is \`False\`, so coercing a 0/1 flag works. But \`bool\` of any non-empty string is \`True\`: \`bool("false")\` is \`True\`, and even \`bool("0")\` is \`True\`. If the API ever sends \`active\` as the string \`"false"\`, a naive \`bool()\` silently flips it to \`True\`. Know your source's shape, and when a flag can arrive as text, map it explicitly (for example \`raw["active"] in (1, "1", "true", True)\`) instead of trusting \`bool()\`.
+
+**Interview nuance:** Python type hints are not enforced at runtime. \`id: int\` on a \`@dataclass\` is documentation the interpreter ignores. The constructor will happily store a \`str\` in that field. Runtime guarantees come only from something that actually checks, like \`pydantic\`, or from explicit coercion you write yourself. That is the whole reason the "validate at the boundary" pattern exists: annotations describe intent, boundary code enforces it.`,
     demoCode: `from dataclasses import dataclass
 
 
@@ -2721,11 +2811,13 @@ const capstoneLesson: PythonLevel["modules"][number]["lessons"][number] = {
   skills: ["pyproject", "uv", "packaging", "capstone"],
   teach: {
     estimatedMinutes: 6,
-    markdown: `## Dependencies, pyproject.toml & uv
+    markdown: `## Why one file and one lockfile
 
-### pyproject.toml
+A project that only runs on your laptop is a liability. The moment a teammate clones it, CI builds it, or you deploy it, "works on my machine" has to become "installs the same way everywhere." \`pyproject.toml\` plus a lockfile is how modern Python gets there. One file declares what the project is and what it needs, and the lockfile pins the exact versions that got resolved, so every install is byte-for-byte identical.
 
-Modern Python projects declare everything in one file, \`pyproject.toml\`:
+### \`pyproject.toml\`: the single source of truth
+
+\`pyproject.toml\` is the standard, tool-agnostic place to describe a Python project. It replaces the old \`setup.py\` plus \`requirements.txt\` sprawl.
 
 \`\`\`toml
 [project]
@@ -2737,31 +2829,42 @@ dependencies = ["httpx>=0.27"]
 todo = "todo.cli:main"
 \`\`\`
 
-It names the project, pins dependencies, and wires console scripts, replacing the old
-\`setup.py\`/\`requirements.txt\` sprawl.
+The \`[project]\` table holds metadata: the package \`name\`, its \`version\`, and its \`dependencies\`. Note that \`dependencies\` are ranges (\`httpx>=0.27\`), a statement of intent, not exact pins. The \`[project.scripts]\` table wires a console command (\`todo\`) to a function (\`main\` in \`todo.cli\`), so installing the package gives you a runnable CLI.
 
-### uv: fast packaging
+Your capstone project is laid out this way: a \`todo/\` package directory holds modules like \`tasks.py\` (sample tasks) and \`report.py\` (where \`summary\` lives), with \`pyproject.toml\` at the root naming the package.
 
-**uv** is a fast, modern package manager and resolver. Day to day:
+### \`uv\`: resolve, lock, run
+
+\`uv\` is a fast package manager that replaces \`pip\`, \`virtualenv\`, and \`pip-tools\` with one tool. The day-to-day loop:
 
 \`\`\`bash
-uv add httpx          # add a dependency (updates pyproject.toml + lockfile)
-uv run pytest         # run a command in the project environment
-uv sync               # install exactly what the lockfile pins
+uv add httpx     # add a dep: updates pyproject.toml AND uv.lock
+uv sync          # install exactly what uv.lock pins
+uv run pytest    # run a command inside the project's .venv
 \`\`\`
 
-It replaces pip / virtualenv / pip-tools with one fast tool and a reproducible lockfile.
+The mental model is two tiers. \`pyproject.toml\` declares intent as version ranges. \`uv.lock\` records the one exact resolution that satisfied those ranges. Commit both files; never commit \`.venv\`. That split is what makes builds reproducible: your teammate runs \`uv sync\` and gets your exact versions, not "whatever \`pip\` resolved today."
 
-### Your capstone
+### The reporting function
 
-You'll extend a small, real project: a \`todo\` package with sample tasks and a \`pyproject.toml\`.
-Implement \`summary(tasks)\` (the kind of reporting function a CLI or API would call) and make its
-test suite pass.
+\`summary(tasks)\` is the kind of function a CLI or API endpoint calls to report state. Given task dicts with a \`"done"\` flag, it returns totals in one pass:
 
-### Recap
+\`\`\`python
+def summary(tasks):
+    done = sum(1 for task in tasks if task["done"])
+    return {"total": len(tasks), "done": done, "pending": len(tasks) - done}
 
-\`pyproject.toml\` declares a project and its dependencies; \`uv\` installs and runs them reproducibly.
-Your capstone ties Level 3 together: read the package, implement \`summary\`, and prove it with tests.`,
+print(summary([{"title": "a", "done": True}, {"title": "b", "done": False}]))
+# {'total': 2, 'done': 1, 'pending': 1}
+\`\`\`
+
+Deriving \`pending\` as \`total - done\` (rather than a second filtered loop) guarantees the invariant \`total == done + pending\` always holds, even if the two filters ever disagreed.
+
+### Pitfall: truthiness is not equality
+
+\`if task["done"]\` tests truthiness, not "is this the boolean \`True\`." A flag of \`0\` or \`""\` is falsy, but a flag of \`"false"\` (a non-empty string) is truthy and counts as done. If your data might carry non-bool flags, be explicit: \`if task["done"] is True\`. Silent truthiness bugs like this survive tests that only use clean \`True\`/\`False\` fixtures.
+
+**Interview nuance:** in Python, \`bool\` is a subclass of \`int\`, so \`True == 1\` and \`False == 0\`. That means \`sum(task["done"] for task in tasks)\` counts the done tasks without the literal \`1\`, because the booleans add up directly. It is a clean one-pass, O(n) idiom that interviewers like, but flag its fragility: it assumes every flag is a real boolean (or at least an \`int\`). On the pitfall's own bad input, a string flag like \`"false"\` makes \`sum\` raise \`TypeError\` instead of counting, while a non-bool number like \`2\` silently overcounts. Correct behavior here rests on knowing your data's type, not just its shape.`,
     demoCode: `def summary(tasks):
     done = sum(1 for task in tasks if task["done"])
     return {"total": len(tasks), "done": done, "pending": len(tasks) - done}
