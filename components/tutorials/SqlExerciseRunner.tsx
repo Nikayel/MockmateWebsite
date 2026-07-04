@@ -8,6 +8,7 @@ import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
 import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExerciseLayout } from "./ExerciseLayout"
+import { HintList } from "./HintList"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
@@ -177,16 +178,7 @@ export function SqlExerciseRunner({
         )}
       </div>
 
-      {hintsShown > 0 && (
-        <ul className="border-border bg-muted/40 space-y-1.5 rounded-lg border p-3 text-sm">
-          {hints.slice(0, hintsShown).map((hint, i) => (
-            <li key={i} className="flex gap-2">
-              <span className="text-muted-foreground">{i + 1}.</span>
-              <span>{hint}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <HintList hints={hints.slice(0, hintsShown)} total={hints.length} />
 
       {(emptyWarning || runError) && (
         <p
