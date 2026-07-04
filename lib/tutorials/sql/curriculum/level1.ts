@@ -1286,7 +1286,7 @@ CAST( total_cents_text  AS  INTEGER )
       └─ the value ──┘      └ target type ┘
 \`\`\`
 
-**Guarding junk.** If a text column may hold non-numeric junk, casting it in SQLite yields \`0\` (not an error), which can silently corrupt a sum. A portable guard is to only treat rows as numeric when they match a numeric shape (\`GLOB '[0-9]*'\` in SQLite / a regex in Postgres) or to \`CASE\` non-numeric values to NULL so they don't pollute a measure.
+**Guarding junk.** If a text column may hold non-numeric junk, casting it in SQLite yields \`0\` (not an error), which can silently corrupt a sum. The DE fix is to screen non-numeric values out to \`NULL\` before they reach a measure. That screening needs conditional logic (\`CASE\`) and pattern matching, which you meet later in the course; until then, assume the upstream hands you clean numeric text or a genuine \`NULL\`.
 
 **Pitfall.** \`CAST('12.99' AS INTEGER)\` → \`12\` (truncates, doesn't round). Cast to \`REAL\` first if you need the decimal, or cast the cents (an integer) rather than a dollar float. And remember SQLite won't *error* on a bad cast the way a warehouse does. Test your assumptions.
 
@@ -1348,41 +1348,37 @@ INSERT INTO orders_raw VALUES
   practice: {
     id: "sql-l1-cast-types-practice",
     executionMode: "single-file",
-    prompt: `Clean the dirty numeric column into a typed, model-ready measure while keeping *every* row. Return \`payment_id\`, \`amount_cents\`, \`amount_dollars\` where:
-- \`amount_cents\` = the value cast to an integer **only when** \`amount_text\` is all digits; otherwise \`NULL\` (so junk like \`'N/A'\`, \`''\`, \`'pending'\` does not become a silent \`0\`),
-- \`amount_dollars\` = \`amount_cents / 100.0\` (which is \`NULL\` when \`amount_cents\` is \`NULL\`).`,
-    starterCode: `-- Guard the cast so junk becomes NULL, not 0.
+    prompt: `Write a query that returns \`payment_id\`, \`amount_cents\`, and \`amount_dollars\`. Cast \`amount_text\` to an integer for \`amount_cents\`, but when \`amount_text\` is missing (\`NULL\`) show \`0\` instead of \`NULL\`. \`amount_dollars\` = \`amount_cents / 100.0\`.`,
+    starterCode: `-- Cast the amount to integer cents; default a missing amount to 0.
 SELECT
   payment_id,
 
 FROM payments_raw;`,
     hints: [
-      "Guard the cast with a shape test: in SQLite, amount_text GLOB '[0-9]*' AND amount_text NOT GLOB '*[^0-9]*' is true only for all-digit strings. (In a warehouse you'd use a regex like ~ '^[0-9]+$'.)",
-      "Wrap it in CASE WHEN <all digits> THEN CAST(amount_text AS INTEGER) ELSE NULL END AS amount_cents.",
-      "Reuse the same guarded expression for amount_dollars by dividing by 100.0; NULL divided/propagated stays NULL.",
+      "CAST(amount_text AS INTEGER) gives the integer cents for a numeric string.",
+      "Wrap it in COALESCE(CAST(amount_text AS INTEGER), 0) so a NULL amount becomes 0, not NULL.",
+      "Compute amount_dollars by dividing that same expression by 100.0 to keep the decimal.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE payments_raw (
   payment_id  INTEGER,
-  amount_text TEXT     -- mostly numeric text, some junk
+  amount_text TEXT     -- numeric text, or NULL when the source had no amount
 );
 INSERT INTO payments_raw VALUES
   (1, '4999'),
   (2, '10000'),
-  (3, 'N/A'),
-  (4, ''),
-  (5, '750'),
-  (6, 'pending');`,
+  (3, NULL),
+  (4, '750'),
+  (5, NULL);`,
       orderMatters: false,
       expected: {
         columns: ["payment_id", "amount_cents", "amount_dollars"],
         rows: [
           [1, 4999, 49.99],
           [2, 10000, 100],
-          [3, null, null],
-          [4, null, null],
-          [5, 750, 7.5],
-          [6, null, null],
+          [3, 0, 0],
+          [4, 750, 7.5],
+          [5, 0, 0],
         ],
       },
     },
