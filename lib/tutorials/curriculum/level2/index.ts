@@ -958,7 +958,7 @@ class Circle:
     def area(self):
         return 3.14159 * self.radius ** 2
 
-Circle(2).area   # 12.56636  — no ()
+Circle(2).area   # 12.56636 , no ()
 \`\`\`
 
 ### Recap
@@ -1092,8 +1092,8 @@ class Point:
     y: int
 
 Point(1, 2)                 # __init__ for free
-Point(1, 2) == Point(1, 2)  # True — __eq__ for free
-print(Point(1, 2))          # Point(x=1, y=2) — __repr__ for free
+Point(1, 2) == Point(1, 2)  # True, __eq__ for free
+print(Point(1, 2))          # Point(x=1, y=2), __repr__ for free
 \`\`\`
 
 Each \`name: type\` line is a **field**.

@@ -86,7 +86,7 @@ class Square(Shape):
 `
 
 const ABC_REPORT = String.raw`def total_area(shapes):
-    """Sum the area of every shape — programming to the Shape abstraction."""
+    """Sum the area of every shape, programming to the Shape abstraction."""
     return sum(shape.area() for shape in shapes)
 `
 
@@ -1062,7 +1062,7 @@ default is \`type\`; \`class Account:\` is roughly \`Account = type("Account", (
 \`\`\`python
 class Meta(type):
     def __new__(mcls, name, bases, namespace):
-        # runs once, when the class is defined — register it, validate it, inject methods
+        # runs once, when the class is defined, register it, validate it, inject methods
         return super().__new__(mcls, name, bases, namespace)
 
 class Thing(metaclass=Meta):
@@ -1290,7 +1290,7 @@ def run_all(numbers):
         with ThreadPoolExecutor(max_workers=4) as executor:
             return list(executor.map(double, numbers))
     except RuntimeError:
-        # No OS threads here (e.g. the browser sandbox) — same ordered results, run sequentially.
+        # No OS threads here (e.g. the browser sandbox), same ordered results, run sequentially.
         return [double(n) for n in numbers]
 `
 
@@ -1617,7 +1617,7 @@ order:
 async def main():
     return await asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3))
 
-asyncio.run(main())    # [10, 20, 30] — the three "waits" overlap
+asyncio.run(main())    # [10, 20, 30], the three "waits" overlap
 \`\`\`
 
 \`asyncio.run(coro)\` starts the event loop, runs the coroutine to completion, and closes the loop.
@@ -1822,7 +1822,7 @@ const PERF_COMPUTE_STARTER = String.raw`from functools import lru_cache
 
 
 def fib(n):
-    """Return the nth Fibonacci number (0, 1, 1, 2, 3, 5, ...) — see README.md."""
+    """Return the nth Fibonacci number (0, 1, 1, 2, 3, 5, ...), see README.md."""
     # TODO: add @lru_cache above this def, and recurse: fib(n-1) + fib(n-2) with a base case.
     return 0
 `
@@ -1937,7 +1937,7 @@ def fib(n):
     return fib(n - 1) + fib(n - 2)
 
 
-print(fib(30))   # 832040 — instant, thanks to the cache`,
+print(fib(30))   # 832040, instant, thanks to the cache`,
   },
   apply: {
     id: "py-l4-performance-apply",

@@ -514,8 +514,8 @@ Give a parameter a **default** so callers can leave it out:
 def power(base, exp=2):
     return base ** exp
 
-power(5)       # 25  — exp defaults to 2
-power(2, 3)    # 8   — exp given explicitly
+power(5)       # 25 , exp defaults to 2
+power(2, 3)    # 8  , exp given explicitly
 \`\`\`
 
 ### Reading a traceback
@@ -727,7 +727,7 @@ Python has two everyday number types: **integers** (whole numbers like \`3\`, \`
 7 + 2     # 9    addition
 7 - 2     # 5    subtraction
 7 * 2     # 14   multiplication
-7 / 2     # 3.5  division — ALWAYS gives a float
+7 / 2     # 3.5  division, ALWAYS gives a float
 \`\`\`
 
 ### Floor division and modulo
@@ -853,8 +853,8 @@ memorising: \`0\`, \`""\` (empty string), \`[]\` (empty list), \`None\`, and \`F
 else is truthy.
 
 \`\`\`python
-"yes" if "hello" else "no"   # "yes"  — non-empty string is truthy
-"yes" if "" else "no"        # "no"   — empty string is falsy
+"yes" if "hello" else "no"   # "yes" , non-empty string is truthy
+"yes" if "" else "no"        # "no"  , empty string is falsy
 \`\`\`
 
 That \`A if condition else B\` form is a **conditional expression**: it evaluates to \`A\` when the
@@ -1260,8 +1260,8 @@ A **set** is an unordered collection with **no duplicates**, written with curly 
 \`set(...)\`):
 
 \`\`\`python
-seen = {1, 2, 2, 3}   # {1, 2, 3}  — duplicates collapse
-3 in seen             # True       — fast membership test
+seen = {1, 2, 2, 3}   # {1, 2, 3} , duplicates collapse
+3 in seen             # True      , fast membership test
 \`\`\`
 
 Building a set from a list is the quickest way to drop duplicates or count distinct values:
@@ -1359,7 +1359,7 @@ Indexing a missing key is an error. \`.get(key, default)\` returns a fallback in
 
 \`\`\`python
 prices.get("apple", 0)    # 3
-prices.get("banana", 0)   # 0   — not found, so the default
+prices.get("banana", 0)   # 0  , not found, so the default
 \`\`\`
 
 ### Add, update, and merge
@@ -1472,8 +1472,8 @@ same object?"** They usually agree, but they answer different questions:
 \`\`\`python
 a = [1, 2, 3]
 b = [1, 2, 3]
-a == b     # True  — same contents
-a is b     # False — two different lists
+a == b     # True , same contents
+a is b     # False, two different lists
 \`\`\`
 
 ### Always check None with \`is\`
@@ -1483,7 +1483,7 @@ a is b     # False — two different lists
 \`\`\`python
 if value is None:      # the right way
     ...
-if value == None:      # works, but reviewers will flag it — don't
+if value == None:      # works, but reviewers will flag it, don't
     ...
 \`\`\`
 
@@ -1495,7 +1495,7 @@ silently break on bigger values:
 \`\`\`python
 x = 1000
 y = 1000
-x == y    # True  — always use == for values
+x == y    # True , always use == for values
 x is y    # may be False! never rely on this
 \`\`\`
 
@@ -1579,7 +1579,7 @@ Assigning one list to another name does **not** copy it. Both names label the **
 a = [1, 2, 3]
 b = a            # b labels the SAME list
 b.append(4)
-a                # [1, 2, 3, 4]  — a changed too!
+a                # [1, 2, 3, 4] , a changed too!
 \`\`\`
 
 This "spooky action at a distance" is the #1 source of *"why did my other list change?"* bugs.
@@ -1609,7 +1609,7 @@ deep = copy.deepcopy(grid)   # fully independent, nested included
 A default value is created **once**, so a mutable default is shared across every call:
 
 \`\`\`python
-def bad(item, bucket=[]):     # the SAME list every call — a classic bug
+def bad(item, bucket=[]):     # the SAME list every call, a classic bug
     bucket.append(item)
     return bucket
 
@@ -1628,7 +1628,7 @@ inside. Next you'll double a list without touching it, then write a safe accumul
     demoCode: `a = [1, 2, 3]
 b = a
 b.append(4)
-print(a)          # [1, 2, 3, 4] — same list!
+print(a)          # [1, 2, 3, 4], same list!
 
 c = a[:]          # a real (shallow) copy
 c.append(99)
@@ -1704,9 +1704,9 @@ Checking \`x in some_list\` makes Python **scan every element**. On a list of a 
 a million comparisons. Checking \`x in some_set\` (or a dict) jumps almost straight to the answer:
 
 \`\`\`python
-x in a_list    # O(n)  — walks the whole list  (slow for big data)
-x in a_set     # O(1)  — near-instant, any size (fast)
-x in a_dict    # O(1)  — key lookup is instant too
+x in a_list    # O(n) , walks the whole list  (slow for big data)
+x in a_set     # O(1) , near-instant, any size (fast)
+x in a_dict    # O(1) , key lookup is instant too
 \`\`\`
 
 \`O(n)\` means "cost grows with the size"; \`O(1)\` means "cost stays flat". This is the single most
@@ -1743,8 +1743,8 @@ a set turns a slow \`O(n^2)\` loop into a fast \`O(n)\` one. Next you'll detect 
 the first repeat.`,
     demoCode: `nums = [3, 1, 4, 1, 5, 9, 2, 6]
 distinct = set(nums)
-print(1 in distinct)               # True  — O(1) membership
-print(len(distinct) != len(nums))  # True  — there was a duplicate`,
+print(1 in distinct)               # True , O(1) membership
+print(len(distinct) != len(nums))  # True , there was a duplicate`,
   },
   apply: {
     id: "py-l1-complexity-choice-apply",
@@ -1754,7 +1754,7 @@ otherwise \`False\`. Use a set so it stays fast.
 
 \`[1, 2, 2]\` returns \`True\`; \`[1, 2, 3]\` returns \`False\`.`,
     starterCode: `def has_duplicates(nums):
-    # A set drops duplicates — compare its size to the list's.
+    # A set drops duplicates, compare its size to the list's.
     pass`,
     hints: [
       "`set(nums)` removes duplicates.",

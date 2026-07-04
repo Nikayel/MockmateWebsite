@@ -54,7 +54,7 @@ const CONFIG_STARTER = String.raw`from app.coerce import coerce
 
 def parse_config(text):
     """Parse "key = value" lines into a dict (see README.md)."""
-    # TODO: implement me — split lines, skip blanks/comments, split on the first
+    # TODO: implement me, split lines, skip blanks/comments, split on the first
     # "=", strip whitespace, and coerce the value.
     return {}
 `
