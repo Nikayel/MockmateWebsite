@@ -99,13 +99,16 @@ export function getFirstLessonOfNextLevel(
 }
 
 /**
- * Find an exercise by id across every lesson's `apply` and `practice`. This is what the
- * execution layer resolves a `scenarioId` against. Returns `undefined` for unknown ids.
+ * Find an exercise by id across every lesson's `apply`, `practice`, and optional `extraPractice`.
+ * This is what the execution layer resolves a `scenarioId` against. Returns `undefined` for unknown
+ * ids.
  */
 export function getExerciseById(exerciseId: string): PythonExercise | undefined {
   for (const lesson of listAllLessons()) {
     if (lesson.apply.id === exerciseId) return lesson.apply
     if (lesson.practice.id === exerciseId) return lesson.practice
+    const extra = lesson.extraPractice?.find((ex) => ex.id === exerciseId)
+    if (extra) return extra
   }
   return undefined
 }

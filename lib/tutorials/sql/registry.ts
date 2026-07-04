@@ -94,11 +94,13 @@ export function getFirstLessonOfNextSqlLevel(
   return { level: nextLevel, lesson: firstLesson }
 }
 
-/** Find a SQL exercise by id across every lesson's `apply` and `practice`. */
+/** Find a SQL exercise by id across every lesson's `apply`, `practice`, and optional `extraPractice`. */
 export function getSqlExerciseById(exerciseId: string): SqlExercise | undefined {
   for (const lesson of listAllSqlLessons()) {
     if (lesson.apply.id === exerciseId) return lesson.apply
     if (lesson.practice.id === exerciseId) return lesson.practice
+    const extra = lesson.extraPractice?.find((ex) => ex.id === exerciseId)
+    if (extra) return extra
   }
   return undefined
 }
