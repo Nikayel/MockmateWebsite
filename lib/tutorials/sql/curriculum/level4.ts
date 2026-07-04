@@ -31,8 +31,9 @@ Seed a tiny \`product_revenue\` table and rank within each category with all thr
 run this exact example yourself. The input table, the query, and its live output render at the
 bottom of this reading.
 
-For the \`audio\` category (two products tied at 500), ranking by \`revenue DESC, product\` (a
-tiebreaker keeps the output deterministic) produces:
+For the \`audio\` category (two products tied at 500), ranking by \`revenue DESC\` produces the classic
+contrast. ROW_NUMBER adds \`, product\` as a tiebreaker so its unique numbering is deterministic; RANK
+and DENSE_RANK order by revenue alone, so the tied rows stay peers and share a rank:
 
 | product | revenue | rn (ROW_NUMBER) | rnk (RANK) | dense (DENSE_RANK) |
 |---|---|---|---|---|
@@ -103,9 +104,11 @@ then hidden assertion queries check the ranks, tie handling, and row counts. Lea
 \`DELETE FROM <target>;\` so a re-run doesn't double the rows.`,
     demoCode: `SELECT
   category, product, revenue,
+  -- ROW_NUMBER gets a tiebreaker so its unique numbering is deterministic.
   ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rn,
-  RANK()       OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rnk,
-  DENSE_RANK() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS dense
+  -- RANK / DENSE_RANK order by revenue ALONE, so tied revenues stay peers and share a rank.
+  RANK()       OVER (PARTITION BY category ORDER BY revenue DESC) AS rnk,
+  DENSE_RANK() OVER (PARTITION BY category ORDER BY revenue DESC) AS dense
 FROM product_revenue
 ORDER BY category, revenue DESC, product;`,
     demoSeedSql: `CREATE TABLE product_revenue (
