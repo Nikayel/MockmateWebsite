@@ -59,8 +59,21 @@ function Button({
       aria-busy={loading}
       {...props}
     >
-      {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
-      {children}
+      {/*
+       * When `asChild`, Radix `Slot` requires EXACTLY ONE child — so pass the caller's element
+       * straight through. Adding the spinner as a sibling makes the children `[false|spinner, child]`
+       * (count > 1), which makes `Slot` throw "React.Children.only expected a single child" and crashes
+       * the whole subtree. The loading spinner is therefore only rendered for a real <button>; you
+       * cannot inject a sibling into an arbitrary slotted element anyway.
+       */}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
+          {children}
+        </>
+      )}
     </Comp>
   )
 }
