@@ -27,32 +27,11 @@ classic interview question.
 
 ### A worked example
 
-Seed a tiny revenue table and rank within each category:
+Seed a tiny \`product_revenue\` table and rank within each category with all three functions. You can
+run this exact example yourself — the input table, the query, and its live output render at the
+bottom of this reading.
 
-\`\`\`sql
-CREATE TABLE product_revenue (
-  category TEXT,
-  product  TEXT,
-  revenue  INTEGER
-);
-INSERT INTO product_revenue VALUES
-  ('audio', 'Headphones', 500),
-  ('audio', 'Earbuds',    500),   -- tie with Headphones
-  ('audio', 'Speaker',    300),
-  ('audio', 'Cable',      100),
-  ('video', 'Monitor',    900),
-  ('video', 'Webcam',     400);
-
-SELECT
-  category, product, revenue,
-  ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC) AS rn,
-  RANK()       OVER (PARTITION BY category ORDER BY revenue DESC) AS rnk,
-  DENSE_RANK() OVER (PARTITION BY category ORDER BY revenue DESC) AS dense
-FROM product_revenue
-ORDER BY category, revenue DESC;
-\`\`\`
-
-For the \`audio\` category (two products tied at 500), the three columns produce:
+For the \`audio\` category (two products tied at 500), the three ranking columns produce:
 
 | product | revenue | rn (ROW_NUMBER) | rnk (RANK) | dense (DENSE_RANK) |
 |---|---|---|---|---|
@@ -120,6 +99,26 @@ in this level.
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
 then hidden assertion queries check the ranks, tie handling, and row counts. Lead your load with
 \`DELETE FROM <target>;\` so a re-run doesn't double the rows.`,
+    demoCode: `SELECT
+  category, product, revenue,
+  ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC) AS rn,
+  RANK()       OVER (PARTITION BY category ORDER BY revenue DESC) AS rnk,
+  DENSE_RANK() OVER (PARTITION BY category ORDER BY revenue DESC) AS dense
+FROM product_revenue
+ORDER BY category, revenue DESC;`,
+    demoSeedSql: `CREATE TABLE product_revenue (
+  category TEXT,
+  product  TEXT,
+  revenue  INTEGER
+);
+INSERT INTO product_revenue VALUES
+  ('audio', 'Headphones', 500),
+  ('audio', 'Earbuds',    500),
+  ('audio', 'Speaker',    300),
+  ('audio', 'Cable',      100),
+  ('video', 'Monitor',    900),
+  ('video', 'Webcam',     400);`,
+    showDemoInput: true,
   },
   apply: scriptExercise({
     id: "sql-l4-window-ranking-apply",
