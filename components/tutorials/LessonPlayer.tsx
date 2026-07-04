@@ -23,6 +23,7 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
+import { ExtraPracticeSection } from "./ExtraPracticeSection"
 import { LessonErrorBanner, LessonLoadingState } from "./LessonProgressStates"
 import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
@@ -326,6 +327,14 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                     completed={sections.practice === "completed"}
                     onMarkDone={() => markComplete("practice")}
                   />
+                  {lesson.extraPractice && lesson.extraPractice.length > 0 && (
+                    <ExtraPracticeSection
+                      exercises={lesson.extraPractice}
+                      renderExercise={(exercise) =>
+                        renderExercise(exercise, { canRevealReference: true, onPass: () => {} })
+                      }
+                    />
+                  )}
                   {sections.practice === "completed" && (
                     <div className="flex flex-col gap-3">
                       <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
