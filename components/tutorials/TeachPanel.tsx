@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
-import { isSqlRuntimeWarm, runSqlInWorker, type SqlResultSet } from "@/lib/workspace-execution"
+import { isSqlRuntimeWarm, runSqlInWorker } from "@/lib/workspace-execution"
 import { ColdStartNote } from "./ColdStartNote"
+import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
-import type { TeachSection } from "@/lib/tutorials/types"
+import { isSqlResultSet, type SqlResultSet, type TeachSection } from "@/lib/tutorials/types"
 
 /**
  * The "Read" phase: self-contained teaching markdown plus an optional worked example. For SQL
@@ -51,7 +51,7 @@ export function TeachPanel({
       .then((res) => {
         if (cancelled) return
         setWarming(false)
-        if (res.success && isResultSet(res.result)) {
+        if (res.success && isSqlResultSet(res.result)) {
           setOutput(res.result)
           setStatus("done")
         } else {
@@ -81,14 +81,11 @@ export function TeachPanel({
       )}
 
       {demoCode && (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <div className="border-border bg-muted/40 text-muted-foreground border-b px-3 py-1.5 text-xs font-medium">
-            {canRunDemo ? "Example query" : "Live example"}
-          </div>
-          <CodeMirrorErrorBoundary>
-            <CodeMirrorEditor value={demoCode} language={demoLanguage} height={140} readOnly />
-          </CodeMirrorErrorBoundary>
-        </div>
+        <ReadOnlyCodeBlock
+          code={demoCode}
+          language={demoLanguage}
+          label={canRunDemo ? "Example query" : "Live example"}
+        />
       )}
 
       {canRunDemo && (
@@ -117,14 +114,5 @@ export function TeachPanel({
         </Button>
       </div>
     </div>
-  )
-}
-
-function isResultSet(value: unknown): value is SqlResultSet {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Array.isArray((value as { columns?: unknown }).columns) &&
-    Array.isArray((value as { rows?: unknown }).rows)
   )
 }
