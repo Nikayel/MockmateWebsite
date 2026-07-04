@@ -10,7 +10,11 @@ import {
   LESSON_SECTION_ORDER,
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
-import { getLessonLocation, getNextLesson, listAllLessons } from "@/lib/tutorials/registry"
+import {
+  getFirstLessonOfNextLevel,
+  getNextLessonInLevel,
+  listLessonsInLevel,
+} from "@/lib/tutorials/registry"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
@@ -44,6 +48,19 @@ export interface LessonPlayerProps {
   level: PythonLevel
   onSectionComplete?: (section: LessonSection) => void
 }
+
+/** What the post-Practice CTA offers, kept level-aware so a boundary is a deliberate hand-off. */
+type NextStep =
+  | { kind: "lesson"; id: string; title: string; slug: string }
+  | {
+      kind: "level-complete"
+      id: string
+      title: string
+      slug: string
+      levelId: PythonLevel["id"]
+      levelTitle: string
+    }
+  | { kind: "finished" }
 
 export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerProps) {
   useTutorialProgressSync(lesson.id, level.id)
@@ -86,26 +103,39 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
   const completedIds = useCompletedLessons()
 
   const { lessonNumber, totalInLevel, upNext } = useMemo(() => {
-    const inLevel = level.modules.flatMap((mod) => mod.lessons)
+    // "Up next" is scoped to the current level: it must never bleed into another level. At the
+    // level's last lesson this is empty, and the deliberate level hand-off (`nextStep`) takes over.
+    const inLevel = listLessonsInLevel(level)
     const idx = inLevel.findIndex((l) => l.id === lesson.id)
-    const all = listAllLessons()
-    const globalIdx = all.findIndex((l) => l.id === lesson.id)
-    const next: UpNextLesson[] = all
-      .slice(globalIdx + 1, globalIdx + 1 + UP_NEXT_COUNT)
-      .map((l) => ({
-        id: l.id,
-        title: l.title,
-        levelSlug: getLessonLocation(l.id)?.level.slug ?? level.slug,
-        isCompleted: completedIds.has(l.id),
-      }))
+    const next: UpNextLesson[] = inLevel.slice(idx + 1, idx + 1 + UP_NEXT_COUNT).map((l) => ({
+      id: l.id,
+      title: l.title,
+      levelSlug: level.slug,
+      isCompleted: completedIds.has(l.id),
+    }))
     return { lessonNumber: idx + 1, totalInLevel: inLevel.length, upNext: next }
   }, [level, lesson.id, completedIds])
 
-  const nextLesson = useMemo(() => {
-    const next = getNextLesson(lesson.id)
-    if (!next) return null
-    return { id: next.id, title: next.title, slug: getLessonLocation(next.id)?.level.slug }
-  }, [lesson.id])
+  // Where the "Next lesson" CTA points after Practice: the next in-level lesson, a deliberate
+  // level-complete hand-off at a boundary, or the end of the path. Crossing a level is never silent.
+  const nextStep = useMemo((): NextStep => {
+    const withinLevel = getNextLessonInLevel(lesson.id)
+    if (withinLevel) {
+      return { kind: "lesson", id: withinLevel.id, title: withinLevel.title, slug: level.slug }
+    }
+    const nextLevel = getFirstLessonOfNextLevel(lesson.id)
+    if (nextLevel) {
+      return {
+        kind: "level-complete",
+        id: nextLevel.lesson.id,
+        title: nextLevel.lesson.title,
+        slug: nextLevel.level.slug,
+        levelId: nextLevel.level.id,
+        levelTitle: nextLevel.level.title,
+      }
+    }
+    return { kind: "finished" }
+  }, [lesson.id, level.slug])
 
   // Resume: once saved progress loads, open the first not-completed section (once).
   const didResume = useRef(false)
@@ -289,22 +319,47 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                   {sections.practice === "completed" && (
                     <div className="flex flex-col gap-3">
                       <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                        Lesson complete — nice work. This idea resurfaces in 3 days for spaced
+                        Lesson complete. Nice work. This idea resurfaces in 3 days for spaced
                         practice.
                       </p>
                       <div>
-                        {nextLesson?.slug ? (
+                        {nextStep.kind === "lesson" && (
                           <Button asChild className="gap-2">
-                            <Link href={`/learn/python/${nextLesson.slug}/${nextLesson.id}`}>
-                              Next lesson: {nextLesson.title}
+                            <Link href={`/learn/python/${nextStep.slug}/${nextStep.id}`}>
+                              Next lesson: {nextStep.title}
                               <ArrowRight className="h-4 w-4" />
                             </Link>
                           </Button>
-                        ) : (
+                        )}
+                        {nextStep.kind === "level-complete" && (
+                          <div className="border-accent/40 bg-accent/[0.07] flex flex-col gap-3 rounded-xl border p-4">
+                            <p className="text-foreground text-sm font-semibold">
+                              Level {level.id} complete. You finished {level.title}.
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                              Next up: Level {nextStep.levelId}, {nextStep.levelTitle}.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <Button asChild className="gap-2">
+                                <Link href={`/learn/python/${nextStep.slug}/${nextStep.id}`}>
+                                  Start Level {nextStep.levelId}
+                                  <ArrowRight className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button asChild variant="outline" className="gap-2">
+                                <Link href="/learn/python">
+                                  <ArrowLeft className="h-4 w-4" />
+                                  All levels
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {nextStep.kind === "finished" && (
                           <Button asChild variant="outline" className="gap-2">
                             <Link href="/learn/python">
                               <ArrowLeft className="h-4 w-4" />
-                              You finished the path — back to levels
+                              You finished the path. Back to levels
                             </Link>
                           </Button>
                         )}
