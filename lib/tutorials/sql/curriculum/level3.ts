@@ -22,17 +22,19 @@ const ddlCreate: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 8,
     markdown: `## A \`CREATE TABLE\` is a contract
 
-Every table in a warehouse began as a \`CREATE TABLE\` someone wrote. That statement fixes the columns, their types, which values may be missing, and what a row looks like when the loader does not supply every field. Downstream models, dashboards, and joins all inherit whatever shape you declare here. Get it wrong and a bad type or a missing default leaks into a hundred queries.
-
-As a data engineer, your first move on a new source is usually a **staging table**: a clean, typed landing zone that the raw feed lands in before any transformation.
+Every table in a warehouse began as a \`CREATE TABLE\` someone wrote. That statement fixes the columns, their types, and the value the engine fills in for a column a load leaves unset. Downstream models, dashboards, and joins all inherit whatever shape you declare here, so a wrong type or a missing default leaks into a hundred queries. This lesson is only about *defining* that structure; the next one loads rows into it.
 
 ### Reading the declaration
 
-Each line is \`column_name TYPE [DEFAULT expr]\`. The type documents intent. \`DEFAULT\` names the value the engine substitutes when an \`INSERT\` **omits** that column, so partial rows still land complete. \`DROP TABLE IF EXISTS stg_customer;\` at the top of a script makes it re-runnable: a second run drops the old table instead of erroring on "table already exists."
+Each line is \`column_name TYPE [DEFAULT expr]\`. The type documents intent. \`DEFAULT\` declares the value the engine substitutes for a column a later load does not supply, so partial rows still land complete. \`DROP TABLE IF EXISTS stg_customer;\` at the top of a script makes it re-runnable: a second run drops the old table instead of erroring on "table already exists."
 
-### Worked example
+### Worked example: defining a staging table
+
+A staging table is just a typed landing zone you *define* before any data arrives. Here is the DDL for one:
 
 \`\`\`sql
+DROP TABLE IF EXISTS stg_customer;
+
 CREATE TABLE stg_customer (
     customer_id   INTEGER,
     email         TEXT,
@@ -41,56 +43,44 @@ CREATE TABLE stg_customer (
     is_active     INTEGER DEFAULT 1,  -- 0/1 boolean-as-int
     loaded_at     TEXT DEFAULT (datetime('now'))
 );
-
--- Row 1 supplies every column:
-INSERT INTO stg_customer VALUES
-    (1, 'a@x.com', 'US', '2026-01-15', 0, '2026-01-15 09:00:00');
-
--- Row 2 omits is_active and loaded_at, so the defaults fire:
-INSERT INTO stg_customer (customer_id, email, country_code, signup_date)
-    VALUES (2, 'b@y.com', 'CA', '2026-02-20');
-
-SELECT customer_id, is_active, loaded_at FROM stg_customer;
--- 1 | 0 | 2026-01-15 09:00:00
--- 2 | 1 | 2026-07-03 14:22:05   <- datetime('now') in UTC, at insert time
 \`\`\`
+
+Read it top to bottom: six columns, each with a declared type, and two of them carry a \`DEFAULT\`. \`is_active\` defaults to the integer \`1\`; \`loaded_at\` defaults to the timestamp at the moment a row is written.
 
 Note the parentheses in \`DEFAULT (datetime('now'))\`. A function-call default must be wrapped in \`()\`; writing \`DEFAULT datetime('now')\` is a syntax error. The bare keyword \`CURRENT_TIMESTAMP\` is the one exception that needs no parentheses.
 
-### Pitfall: a \`DEFAULT\` fires on omission, not on \`NULL\`
+### Declaring defaults: literals, strings, and expressions
 
-The trap the Apply and Practice exercises probe: a \`DEFAULT\` only applies when the column is **left out** of the \`INSERT\` column list. If you explicitly pass \`NULL\`, you store \`NULL\`, not the default.
+- Numbers: \`INTEGER DEFAULT 0\`, \`INTEGER DEFAULT 1\`.
+- Strings: \`TEXT DEFAULT 'pending'\` (string-literal defaults go in single quotes).
+- Expressions and functions: wrapped in parentheses, \`TEXT DEFAULT (datetime('now'))\`.
 
-\`\`\`sql
-INSERT INTO stg_customer (customer_id, is_active) VALUES (3, NULL);
--- is_active is NULL, NOT 1
-\`\`\`
+A declared default is a promise the schema keeps, so a load never has to remember to supply that column.
 
-So to prove your defaults work, omit those columns entirely (\`is_active\`, \`loaded_at\`, \`status\`, the \`*_cents\` columns) rather than passing \`NULL\`.
+### Type affinity is advisory in SQLite
 
-One more portability note: SQLite type affinity is only advisory. SQLite will happily store the text \`'oops'\` in an \`INTEGER\` column; Postgres, Snowflake, and BigQuery reject it. Declare the intended type anyway. Your DDL is documentation and should port to a strict engine unchanged.
+SQLite type affinity is only advisory: it will happily store the text \`'oops'\` in an \`INTEGER\` column, while Postgres, Snowflake, and BigQuery reject it. Declare the intended type anyway. Your DDL is documentation and should port to a strict engine unchanged.
 
-**Interview nuance:** a \`DEFAULT\` does not make a column \`NOT NULL\`. \`is_active INTEGER DEFAULT 1\` still accepts an explicit \`NULL\`, as shown above. If a column must never be null, you need \`NOT NULL DEFAULT 1\`: the constraint forbids nulls, and the default supplies a value for omitted inserts. Interviewers ask this to check that you see the two as independent guarantees, one about presence and one about substitution.
+**Interview nuance:** a \`DEFAULT\` is about *substitution*, not *presence*. Declaring \`is_active INTEGER DEFAULT 1\` supplies a value when a load omits the column, but it does not force the column to always hold one. Making a column mandatory is a separate \`NOT NULL\` constraint, which you will pair with \`DEFAULT\` in the constraints lesson later this level. Interviewers ask this to check that you treat substitution and required-ness as two independent guarantees.
 
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite database, then hidden assertion queries check the schema shape, the defaults, and the row counts.`,
+**Execution mode:** you write a multi-statement DDL script. It runs against a fresh in-memory SQLite database, then hidden assertion queries inspect the schema you defined: the columns, their declared types, and their declared defaults.`,
   },
   apply: scriptExercise({
     id: "sql-l3-ddl-create-apply",
-    prompt: `Write a script that creates a cleaned \`dim_customer\` table and inserts two rows to prove
-the defaults work. The table must have: \`customer_id\` INTEGER, \`email\` TEXT, \`country_code\` TEXT,
-\`signup_date\` TEXT, an \`is_active\` column defaulting to \`1\`, and a \`loaded_at\` column defaulting to the
-current timestamp. Insert one row supplying every column, and one row (\`customer_id = 2\`) that **omits**
-\`is_active\` and \`loaded_at\` so the defaults fire.`,
+    prompt: `Write a DDL script that **defines** a \`dim_customer\` table (just the definition, no rows).
+Declare these columns with the right types: \`customer_id\` INTEGER, \`email\` TEXT, \`country_code\` TEXT,
+\`signup_date\` TEXT, an \`is_active\` INTEGER that **defaults to \`1\`**, and a \`loaded_at\` TEXT that
+**defaults to the current timestamp**. Lead with \`DROP TABLE IF EXISTS dim_customer;\` so the script
+re-runs cleanly.`,
     starterCode: `DROP TABLE IF EXISTS dim_customer;
 
 -- CREATE TABLE dim_customer ( ... );
--- INSERT the full row (customer_id = 1) ...
--- INSERT the partial row (customer_id = 2), omitting is_active and loaded_at ...`,
+-- Give is_active a DEFAULT of 1 and loaded_at a DEFAULT of (datetime('now')).`,
     hints: [
       "Start with `DROP TABLE IF EXISTS dim_customer;` so the script re-runs cleanly.",
       "Put `DEFAULT 1` right after `is_active INTEGER`.",
       "For the timestamp default use `DEFAULT (datetime('now'))`. The parentheses are required.",
-      "In the second INSERT, list only the columns you supply. The omitted ones pick up defaults.",
+      "Types matter: `customer_id` and `is_active` are `INTEGER`, the rest `TEXT`.",
     ],
     referenceSolution: `DROP TABLE IF EXISTS dim_customer;
 
@@ -101,13 +91,7 @@ CREATE TABLE dim_customer (
     signup_date  TEXT,
     is_active    INTEGER DEFAULT 1,
     loaded_at    TEXT DEFAULT (datetime('now'))
-);
-
-INSERT INTO dim_customer (customer_id, email, country_code, signup_date, is_active, loaded_at)
-VALUES (1, 'ada@example.com', 'GB', '2026-01-14', 1, '2026-01-14 09:00:00');
-
-INSERT INTO dim_customer (customer_id, email, country_code, signup_date)
-VALUES (2, 'grace@example.com', 'US', '2026-02-03');`,
+);`,
     seedSql: "",
     checkIdempotency: true,
     assertions: [
@@ -121,52 +105,93 @@ VALUES (2, 'grace@example.com', 'US', '2026-02-03');`,
         ) <> 6`,
       },
       {
+        suite: "types",
+        name: "declared types are correct (INTEGER keys, TEXT audit column)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (
+          SELECT COUNT(*) FROM pragma_table_info('dim_customer')
+          WHERE (name = 'customer_id' AND type <> 'INTEGER')
+             OR (name = 'is_active'   AND type <> 'INTEGER')
+             OR (name = 'loaded_at'   AND type <> 'TEXT')
+        ) <> 0`,
+      },
+      {
         suite: "defaults",
-        name: "is_active defaults to 1 on the row that omitted it",
+        name: "is_active is declared DEFAULT 1",
         isHidden: true,
-        sql: `SELECT 1 WHERE COALESCE((SELECT is_active FROM dim_customer WHERE customer_id = 2), -1) <> 1`,
+        sql: `SELECT 1 WHERE COALESCE((SELECT dflt_value FROM pragma_table_info('dim_customer') WHERE name = 'is_active'), '') <> '1'`,
       },
       {
-        suite: "audit",
-        name: "loaded_at is stamped on the defaulted row",
+        suite: "defaults",
+        name: "loaded_at is declared with a datetime() default",
         isHidden: true,
-        sql: `SELECT 1 WHERE (SELECT loaded_at FROM dim_customer WHERE customer_id = 2) IS NULL`,
-      },
-      {
-        suite: "rows",
-        name: "exactly two rows were inserted",
-        isHidden: true,
-        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_customer) <> 2`,
+        sql: `SELECT 1 WHERE COALESCE((SELECT dflt_value FROM pragma_table_info('dim_customer') WHERE name = 'loaded_at'), '') NOT LIKE '%datetime%'`,
       },
     ],
   }),
   practice: scriptExercise({
     id: "sql-l3-ddl-create-practice",
-    prompt: `Create a **three-table staging schema** in DDL: \`stg_customer\`, \`stg_product\`, and
-\`stg_order\`. Every table must carry sensible types and a \`loaded_at TEXT DEFAULT (datetime('now'))\`
-audit column.
+    prompt: `Define a **three-table staging schema** in DDL: \`stg_customer\`, \`stg_product\`, and
+\`stg_order\` (definitions only, no rows). Give each table sensible column types and a
+\`loaded_at TEXT DEFAULT (datetime('now'))\` audit column.
 
 - \`stg_customer\`: \`customer_id INTEGER\`, \`email TEXT\`, \`country_code TEXT\`, \`signup_date TEXT\`, plus \`loaded_at\`.
 - \`stg_product\`: \`product_id INTEGER\`, \`sku TEXT\`, \`name TEXT\`, \`category TEXT\`, \`unit_price_cents INTEGER DEFAULT 0\`, plus \`loaded_at\`.
 - \`stg_order\`: \`order_id INTEGER\`, \`customer_id INTEGER\`, \`order_ts TEXT\`, \`status TEXT DEFAULT 'pending'\`, \`total_cents INTEGER DEFAULT 0\`, plus \`loaded_at\`.
 
-Then insert **one row per table**, omitting the defaulted columns (\`status\`, both \`*_cents\`, every
-\`loaded_at\`) to prove the defaults fire.`,
+Lead each table with \`DROP TABLE IF EXISTS …;\` so the script re-runs cleanly.`,
     starterCode: `DROP TABLE IF EXISTS stg_customer;
 DROP TABLE IF EXISTS stg_product;
 DROP TABLE IF EXISTS stg_order;
 
--- CREATE the three tables with their defaults + loaded_at audit column ...
--- INSERT one row per table, omitting the defaulted columns ...`,
+-- CREATE the three tables with their declared types, defaults, and loaded_at audit column ...`,
     hints: [
       "Lead every table with `DROP TABLE IF EXISTS …;` for a clean re-run.",
       "`unit_price_cents INTEGER DEFAULT 0` and `total_cents INTEGER DEFAULT 0`: money as integer cents.",
       "`status TEXT DEFAULT 'pending'`. String-literal defaults go in single quotes.",
-      "In each INSERT, name only the non-defaulted columns so the DEFAULTs take over.",
+      "Give every table `loaded_at TEXT DEFAULT (datetime('now'))`; the parentheses are required.",
     ],
+    referenceSolution: `DROP TABLE IF EXISTS stg_customer;
+DROP TABLE IF EXISTS stg_product;
+DROP TABLE IF EXISTS stg_order;
+
+CREATE TABLE stg_customer (
+    customer_id  INTEGER,
+    email        TEXT,
+    country_code TEXT,
+    signup_date  TEXT,
+    loaded_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE stg_product (
+    product_id       INTEGER,
+    sku              TEXT,
+    name             TEXT,
+    category         TEXT,
+    unit_price_cents INTEGER DEFAULT 0,
+    loaded_at        TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE stg_order (
+    order_id    INTEGER,
+    customer_id INTEGER,
+    order_ts    TEXT,
+    status      TEXT DEFAULT 'pending',
+    total_cents INTEGER DEFAULT 0,
+    loaded_at   TEXT DEFAULT (datetime('now'))
+);`,
     seedSql: "",
     checkIdempotency: true,
     assertions: [
+      {
+        suite: "schema",
+        name: "each staging table has its required columns",
+        isHidden: true,
+        sql: `SELECT 1 WHERE
+          (SELECT COUNT(*) FROM pragma_table_info('stg_customer') WHERE name IN ('customer_id','email','country_code','signup_date','loaded_at')) <> 5
+          OR (SELECT COUNT(*) FROM pragma_table_info('stg_product') WHERE name IN ('product_id','sku','name','category','unit_price_cents','loaded_at')) <> 6
+          OR (SELECT COUNT(*) FROM pragma_table_info('stg_order') WHERE name IN ('order_id','customer_id','order_ts','status','total_cents','loaded_at')) <> 6`,
+      },
       {
         suite: "audit",
         name: "all three staging tables carry a loaded_at column",
@@ -178,31 +203,12 @@ DROP TABLE IF EXISTS stg_order;
       },
       {
         suite: "defaults",
-        name: "unit_price_cents / status / total_cents defaults fired",
+        name: "unit_price_cents / total_cents / status defaults are declared",
         isHidden: true,
         sql: `SELECT 1 WHERE
-          COALESCE((SELECT unit_price_cents FROM stg_product), -1) <> 0
-          OR COALESCE((SELECT status FROM stg_order), 'x') <> 'pending'
-          OR COALESCE((SELECT total_cents FROM stg_order), -1) <> 0`,
-      },
-      {
-        suite: "audit",
-        name: "loaded_at is stamped on every inserted row",
-        isHidden: true,
-        sql: `SELECT 1 WHERE
-          (SELECT loaded_at FROM stg_customer) IS NULL
-          OR (SELECT loaded_at FROM stg_product) IS NULL
-          OR (SELECT loaded_at FROM stg_order) IS NULL`,
-      },
-      {
-        suite: "rows",
-        name: "exactly one row landed in each table",
-        isHidden: true,
-        sql: `SELECT 1 WHERE (
-          (SELECT COUNT(*) FROM stg_customer)
-          + (SELECT COUNT(*) FROM stg_product)
-          + (SELECT COUNT(*) FROM stg_order)
-        ) <> 3`,
+          COALESCE((SELECT dflt_value FROM pragma_table_info('stg_product') WHERE name='unit_price_cents'), '') <> '0'
+          OR COALESCE((SELECT dflt_value FROM pragma_table_info('stg_order') WHERE name='total_cents'), '') <> '0'
+          OR COALESCE((SELECT dflt_value FROM pragma_table_info('stg_order') WHERE name='status'), '') NOT LIKE '%pending%'`,
       },
     ],
   }),
@@ -594,6 +600,8 @@ customer 999 doesn't exist.
 | \`RESTRICT\` (or \`NO ACTION\`) | **Block** the parent delete while children exist. Safest default. |
 | \`CASCADE\` | **Delete the children too.** Use only when children are meaningless without the parent (e.g. order line items when the order dies). |
 | \`SET NULL\` | Null out the child's FK. Requires the FK column be nullable. |
+
+An \`ON DELETE\` policy only fires when you actually remove a parent row, and the statement for that is \`DELETE FROM <table> WHERE <predicate>\`: the mirror of the \`SELECT ... WHERE\` you already know, except it removes the matching rows instead of returning them. With \`ON DELETE CASCADE\`, deleting a parent order also clears its child line items in the same step.
 
 **Anatomy:**
 
