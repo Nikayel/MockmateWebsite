@@ -5,13 +5,16 @@
 import { describe, it, expect } from "vitest"
 import {
   getExerciseById,
+  getFirstLessonOfNextLevel,
   getLesson,
   getLessonLocation,
   getLevel,
   getLevelBySlug,
   getModule,
   getNextLesson,
+  getNextLessonInLevel,
   listAllLessons,
+  listLessonsInLevel,
   listLevels,
 } from "../registry"
 import type { PythonLevelId } from "../types"
@@ -57,6 +60,42 @@ describe("tutorial registry", () => {
     }
     expect(getNextLesson(lessons[lessons.length - 1].id)).toBeUndefined()
     expect(getNextLesson("nope")).toBeUndefined()
+  })
+
+  it("scopes 'next lesson in level' to the level and stops at its last lesson", () => {
+    for (const level of listLevels()) {
+      const inLevel = listLessonsInLevel(level)
+      expect(inLevel.length).toBeGreaterThan(0)
+      // Every non-last lesson points to the next lesson IN THE SAME LEVEL.
+      for (let i = 0; i < inLevel.length - 1; i++) {
+        expect(getNextLessonInLevel(inLevel[i].id)?.id).toBe(inLevel[i + 1].id)
+      }
+      // The level's last lesson has no in-level successor — the level hand-off takes over.
+      expect(getNextLessonInLevel(inLevel[inLevel.length - 1].id)).toBeUndefined()
+    }
+    expect(getNextLessonInLevel("nope")).toBeUndefined()
+  })
+
+  it("hands off to the first lesson of the next level only at a level boundary", () => {
+    const levels = listLevels()
+    for (let i = 0; i < levels.length; i++) {
+      const inLevel = listLessonsInLevel(levels[i])
+      const lastId = inLevel[inLevel.length - 1].id
+      const firstId = inLevel[0].id
+      const handoff = getFirstLessonOfNextLevel(lastId)
+      if (i < levels.length - 1) {
+        // From a level's last lesson, the hand-off is the NEXT level's first lesson.
+        expect(handoff?.level.id).toBe(levels[i + 1].id)
+        expect(handoff?.lesson.id).toBe(listLessonsInLevel(levels[i + 1])[0].id)
+      } else {
+        // The final level has no next level.
+        expect(handoff).toBeUndefined()
+      }
+      // A non-boundary lesson (the level's first) still resolves its own next-level correctly, but
+      // the player only consults this once `getNextLessonInLevel` returns undefined.
+      expect(getFirstLessonOfNextLevel(firstId)?.level.id).toBe(handoff?.level.id)
+    }
+    expect(getFirstLessonOfNextLevel("nope")).toBeUndefined()
   })
 
   it("has globally unique lesson and exercise ids", () => {
