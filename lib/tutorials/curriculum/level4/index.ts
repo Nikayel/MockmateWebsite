@@ -162,10 +162,13 @@ const abcProtocolsLesson: PythonLesson = {
     estimatedMinutes: 6,
     markdown: `## Programming to an interface
 
-### Abstract base classes (abc)
+### Why interfaces matter
 
-An **abstract base class** defines an interface that subclasses must implement. Mark methods
-\`@abstractmethod\` and the class can't be instantiated until they're all provided:
+When a function says "give me any \`Shape\`", it should not care whether the object is a \`Rectangle\`, a \`Circle\`, or a type a coworker adds next month. You write a consumer like \`total_area\` once against the abstraction \`area()\`, and every conforming type flows through it unchanged. That is the point of an interface: you add new types without editing the code that consumes them, instead of stacking \`if isinstance(...)\` branches. Interviewers use this to check whether you design for extension. Python gives you two tools here, and they differ in how a type "counts" as conforming.
+
+### Abstract base classes: conform by inheritance
+
+An abstract base class declares the methods a subclass must provide. Decorate them with \`@abstractmethod\` and the base becomes non-instantiable until every abstract method is overridden:
 
 \`\`\`python
 from abc import ABC, abstractmethod
@@ -183,13 +186,11 @@ class Rectangle(Shape):
         return self.width * self.height
 \`\`\`
 
-\`Shape()\` raises \`TypeError\`; \`Rectangle(3, 4)\` works. Code that takes "any \`Shape\`" works for
-every subclass. That's **polymorphism**.
+\`Shape()\` raises \`TypeError\` because you cannot instantiate a class that still has unimplemented abstract methods. \`Rectangle(3, 4)\` works and \`.area()\` returns \`12\`, as the demo below shows. This is nominal typing: \`Rectangle\` conforms because it explicitly declares \`class Rectangle(Shape)\`. Reach for an ABC when you own the hierarchy and want to share concrete helper code on the base or force implementers to fill in the blanks.
 
-### Protocols (structural)
+### Protocols: conform by shape
 
-\`abc\` uses **inheritance** (a class declares "I am a Shape"). A \`Protocol\` types by **shape**.
-Any object with an \`area()\` method qualifies, no inheritance needed:
+A \`Protocol\` flips the rule. Any object with a matching \`area()\` method qualifies, with no inheritance and no import of your type:
 
 \`\`\`python
 from typing import Protocol
@@ -201,14 +202,14 @@ def total_area(shapes: list[HasArea]) -> float:
     return sum(s.area() for s in shapes)
 \`\`\`
 
-Use an **ABC** when you control the hierarchy and want shared code; a **Protocol** to accept
-anything that already fits the shape.
+This is structural (duck) typing made checkable. A third-party \`Circle\` you cannot subclass still passes \`total_area\` as long as it has an \`area()\` method. Reach for a Protocol to accept things that already fit the shape, especially across library boundaries you do not control.
 
-### Recap
+### Pitfalls
 
-ABCs enforce an interface through inheritance and \`@abstractmethod\`; Protocols match by structure.
-Either way you "program to the abstraction" so one function handles many types. You'll implement a
-\`Rectangle\` shape, first standalone, then as a real \`Shape\` subclass in a package.`,
+- A subclass that forgets even one abstract method stays abstract itself. Remove \`area\` from \`Rectangle\` and \`Rectangle(3, 4)\` raises \`TypeError\`. The failure comes at construction time, not when the class is defined, so a broken subclass can look fine until someone builds one.
+- A \`Protocol\` is not enforced at runtime by default. \`isinstance(obj, HasArea)\` raises \`TypeError\` unless you decorate the protocol with \`@runtime_checkable\`, and even then the check only confirms the method name exists, never its signature or return type.
+
+**Interview nuance:** ABCs use nominal subtyping (you conform by declaring the parent) while Protocols use structural subtyping (you conform by having the right members). Protocol conformance is verified by a static type checker such as \`mypy\` or \`pyright\`, not by the interpreter. At runtime \`total_area\` runs on anything with an \`area()\` method regardless of annotations, because Python is already duck-typed. The Protocol does not add a runtime gate; it makes the contract explicit and machine-checkable before you ship.`,
     demoCode: `from abc import ABC, abstractmethod
 
 
@@ -451,46 +452,52 @@ const solidPatternsLesson: PythonLesson = {
   skills: ["solid", "strategy-pattern", "factory-pattern", "design"],
   teach: {
     estimatedMinutes: 6,
-    markdown: `## SOLID, in practice
+    markdown: `## Why SOLID shows up in code review
 
-**SOLID** is five design principles. The two you'll feel most:
+Almost every service has a spot where behavior branches by a key: pick a discount by customer tier, a parser by file type, a shipping rate by region. It usually starts as a three-line \`if/elif\`. A year later it is forty branches, every teammate edits the same function, and every edit risks breaking a case that already worked. **SOLID** is five design principles for arranging code so that new behavior is additive instead of invasive. Two of them do most of the work here.
 
-- **S**ingle responsibility: a module/class does one thing.
-- **O**pen/closed: open to extension, closed to modification, so you add behaviour *without* editing
-  existing code.
+- **S**ingle responsibility: each function or class has one reason to change.
+- **O**pen/closed: code is open to extension but closed to modification. You add a case by adding code, not by editing code that already passed its tests.
 
-A long \`if/elif\` chain violates open/closed. Every new case edits the same function. Two patterns
-fix that.
+A long \`if/elif\` chain violates open/closed: every new tier reopens \`price_for\` and puts a tested function back on the table. Two patterns remove the chain.
 
-### Strategy: pluggable algorithms
+### Strategy: behavior as a value
 
-A **strategy** is an interchangeable piece of behaviour, passed as a value (here, a function):
+A **strategy** is one interchangeable unit of behavior. In Python, functions are first-class objects, so the simplest strategy is just a function you can store and pass around:
 
 \`\`\`python
-def member(amount):
-    return round(amount * 0.9, 2)
+def regular(a):
+    return round(a, 2)
+
+def member(a):
+    return round(a * 0.9, 2)   # 10% off
 \`\`\`
 
-### Factory: pick a strategy by name
+Each strategy has the same shape (\`amount\` in, price out), so a caller can swap one for another without knowing which one it holds.
 
-A **factory** maps a key to the right strategy, so the caller stays ignorant of the choices:
+### Factory: pick the strategy by key
+
+A **factory** maps a key to a strategy so the caller never sees the choices:
 
 \`\`\`python
-STRATEGIES = {"regular": regular, "member": member, "vip": vip}
+STRATEGIES = {"regular": regular, "member": member}
 
 def price_for(kind, amount):
-    strategy = STRATEGIES.get(kind, regular)   # factory lookup
-    return strategy(amount)                     # apply the strategy
+    strategy = STRATEGIES.get(kind, regular)  # default to full price
+    return strategy(amount)
+
+print(price_for("member", 100))   # 90.0
 \`\`\`
 
-Adding a "student" discount is one new function plus one dict entry. \`price_for\` never changes.
-That's open/closed.
+Adding a \`vip\` tier is one new function plus one dict entry. \`price_for\` itself never changes. That is open/closed in three lines, and it is exactly what you will build: first inline, then behind a \`pricing\` package.
 
-### Recap
+### Two traps interns hit
 
-Strategy makes behaviour a pluggable value; a factory selects it by key. Together they replace
-branching with a lookup and keep code open for extension. You'll build \`price_for\`, first inline,
-then over a \`pricing\` package.`,
+Store the function, not its result. \`{"member": member}\` stores the callable; \`{"member": member(100)}\` calls it immediately and stores the number \`90.0\`, so a later \`strategy(amount)\` raises \`TypeError: 'float' object is not callable\`.
+
+Handle the unknown key. \`STRATEGIES[kind]\` raises \`KeyError\` for a tier you have not registered. Use \`STRATEGIES.get(kind, regular)\` so an unknown \`kind\` falls back to full price, which is what the exercises require.
+
+**Interview nuance:** an \`if/elif\` chain does up to \`k\` comparisons for \`k\` branches, while the dict dispatch is one average-case \`O(1)\` hash lookup no matter how many strategies exist. But interviewers care more about the design consequence than the constant factor: with the table, adding a strategy touches zero existing lines, so nothing that already passed can regress. Named dispatch tables like this are how real routers, command handlers, and plugin registries stay open for extension as they grow.`,
     demoCode: `def regular(a):
     return round(a, 2)
 
@@ -710,51 +717,56 @@ const decoratorsAdvancedLesson: PythonLesson = {
     estimatedMinutes: 6,
     markdown: `## Decorators that take arguments
 
-A plain decorator takes a function. A **decorator with arguments** is one level deeper: a *factory*
-that takes the arguments and *returns* a decorator.
+Real decorators almost always need configuration. \`@retry(times=3)\`, \`@lru_cache(maxsize=128)\`, and Flask's \`@app.route("/users")\` all take arguments, because you cannot hardcode a retry count or a route into the decorator itself. A decorator that accepts arguments is called a decorator factory, and it is the pattern you reach for whenever the behavior you are adding needs to be tuned per function.
+
+### The three-layer model
+
+A plain decorator is one function: it takes \`fn\` and returns a replacement. A parameterized decorator adds one outer layer that takes the config and returns that plain decorator. So there are three nested callables, each taking a different thing:
 
 \`\`\`python
-def multiply_by(factor):          # 1. takes the argument
-    def decorator(fn):            # 2. the actual decorator
-        def wrapper(*args, **kwargs):
-            return fn(*args, **kwargs) * factor   # 3. wraps the call
-        return wrapper
-    return decorator
-
-@multiply_by(3)
-def add(a, b):
-    return a + b
-
-add(2, 3)    # 15
-\`\`\`
-
-Read \`@multiply_by(3)\` as \`add = multiply_by(3)(add)\`: call the factory, then apply the decorator
-it returns.
-
-### functools.wraps
-
-A wrapper hides the original's \`__name__\` and docstring. \`@functools.wraps(fn)\` copies them across
-so the wrapped function still looks like itself:
-
-\`\`\`python
-import functools
-
-def multiply_by(factor):
-    def decorator(fn):
-        @functools.wraps(fn)          # keep fn's name/doc
-        def wrapper(*args, **kwargs):
+def multiply_by(factor):              # factory: takes the config
+    def decorator(fn):                # decorator: takes the function
+        def wrapper(*args, **kwargs): # wrapper: takes the call
             return fn(*args, **kwargs) * factor
         return wrapper
     return decorator
 \`\`\`
 
-Always add \`functools.wraps\` to real decorators, because debuggers, logs, and \`help()\` depend on it.
+Read \`@multiply_by(3)\` written above \`add\` as two steps:
 
-### Recap
+\`\`\`python
+add = multiply_by(3)(add)
+# step 1: multiply_by(3) runs and returns \`decorator\`
+# step 2: decorator(add) runs and returns \`wrapper\`, rebound to the name \`add\`
+\`\`\`
 
-A parameterized decorator is a factory returning a decorator returning a wrapper; \`*args/**kwargs\`
-forwards any call and \`functools.wraps\` preserves the original's identity. You'll build
-\`multiply_by\`, first inline, then over a \`decorators\` package.`,
+\`factor\` stays reachable inside \`wrapper\` because \`wrapper\` is a closure over the factory's scope. \`*args, **kwargs\` in \`wrapper\` forwards any call signature through untouched, so \`multiply_by\` works on \`add\`, on a one-argument function, or on anything else.
+
+### functools.wraps
+
+\`wrapper\` is a brand-new function object, so by default it reports itself, not the function it replaced:
+
+\`\`\`python
+print(add.__name__)   # 'wrapper'  (wrong: this corrupts logs, help(), and tracebacks)
+\`\`\`
+
+\`@functools.wraps(fn)\` copies \`fn\`'s \`__name__\`, \`__qualname__\`, \`__doc__\`, and \`__module__\` onto \`wrapper\`, updates \`wrapper.__dict__\`, and sets \`wrapper.__wrapped__ = fn\` so introspection tools can still find the original. With it in place, the demo below prints \`add\`, which is exactly what the second \`print\` verifies. Add \`functools.wraps\` to every real decorator you write.
+
+### Pitfall: forgetting the parentheses
+
+A factory must be called. \`@multiply_by(3)\` is correct; \`@multiply_by\` is not. If you drop the \`(3)\`, Python runs \`multiply_by(add)\`, binds \`factor = add\`, and replaces \`add\` with the inner \`decorator\`. Nothing fails at definition time, so the bug hides until the next call:
+
+\`\`\`python
+@multiply_by          # missing (3)
+def add(a, b):
+    return a + b
+
+add(2, 3)   # TypeError: multiply_by.<locals>.decorator() takes 1 positional argument but 2 were given
+\`\`\`
+
+The plain \`@name\` form (no call) is only for decorators that take a function directly. Anything parameterized needs the call.
+
+**Interview nuance:** know when each layer runs. The factory and the \`decorator\` run exactly once, at definition time, when \`@multiply_by(3)\` is evaluated. Only \`wrapper\` runs on every call. So expensive setup (compiling a regex, opening a connection) belongs in the outer layers where it happens once, not inside \`wrapper\`. Each call to \`multiply_by\` also creates a fresh scope, so \`multiply_by(3)\` and \`multiply_by(5)\` capture independent \`factor\` values. The classic late-binding closure bug, where every closure shares one variable, only bites when you reuse the same name, for example building decorators inside a \`for\` loop.`,
     demoCode: `import functools
 
 
@@ -1026,57 +1038,53 @@ const descriptorsMetaclassesLesson: PythonLesson = {
   skills: ["descriptors", "metaclasses", "attributes", "metaprogramming"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Customizing attribute access
+    markdown: `## Attribute access you can't route around
 
-### Descriptors
+When a rule like "a balance is never negative" lives in one setter, someone eventually assigns the field from another code path and skips the check. A **descriptor** moves that rule off the value and onto the *attribute itself*, so every read and write of an account's \`balance\` goes through the same code no matter who touches it. This is how ORMs, typed config, and form fields validate assignments in real systems. It is also a favorite interview topic because it reveals whether you understand Python's attribute machinery instead of just its syntax.
 
-A **descriptor** is a class that defines \`__get__\`/\`__set__\` and is used as a *class attribute*.
-Python routes attribute access through it, perfect for validation that lives in one place:
+### The mental model
+
+A descriptor is any object that defines \`__get__\`, \`__set__\`, or \`__delete__\` and is stored as a **class attribute**. When you write \`acct.balance\`, Python does not just look in \`acct.__dict__\`. It finds \`balance\` on the class, sees it is a descriptor, and calls \`type(acct).__dict__['balance'].__get__(acct, Account)\`. Assignment calls \`__set__\` the same way.
+
+One detail drives everything: the descriptor object is created **once**, when the class is defined, and shared by every instance. So the per-instance value must be stored on the instance, not on the descriptor. In the demo, \`__set_name__\` runs at class-creation time and records \`storage_name = "_balance"\`, then \`__set__\` stashes the value with \`setattr(instance, "_balance", value)\` and \`__get__\` reads it back. \`Account(100).balance\` returns \`100\`; \`Account(0)\` is fine; \`Account(-5)\` raises \`ValueError\` and cannot be bypassed.
+
+### Pitfalls
+
+- **Storing state on the descriptor.** Writing \`self.value = value\` inside \`__set__\` looks natural but shares one slot across all instances:
 
 \`\`\`python
-class Positive:
-    def __set_name__(self, owner, name):
-        self.storage_name = "_" + name          # remember where to stash the value
+class Broken:
+    def __get__(self, instance, owner): return self.value
+    def __set__(self, instance, value): self.value = value  # shared!
 
-    def __get__(self, instance, owner):
-        return getattr(instance, self.storage_name)
-
-    def __set__(self, instance, value):
-        if value < 0:
-            raise ValueError("must be non-negative")
-        setattr(instance, self.storage_name, value)
-
-class Account:
-    balance = Positive()       # the descriptor guards every Account.balance
+class C: x = Broken()
+a, b = C(), C()
+a.x = 1
+b.x = 2
+print(a.x)   # 2  (b clobbered a)
 \`\`\`
 
-Now \`Account(100).balance\` is \`100\`, but \`Account(-5)\` raises. The validation can't be
-bypassed. \`__set_name__\` runs when the owning class is created and tells the descriptor which
-attribute name it's bound to.
+  The fix is exactly what the demo does: store on \`instance\` under a separate name.
 
-### Metaclasses (the peek)
+- **Same storage name as the attribute.** If \`storage_name\` were \`"balance"\` instead of \`"_balance"\`, then \`setattr(instance, "balance", value)\` re-triggers \`__set__\` forever and you get a \`RecursionError\`. The \`_\` prefix is what breaks the loop.
 
-A **metaclass** is "the class of a class": it controls how classes themselves are built. The
-default is \`type\`; \`class Account:\` is roughly \`Account = type("Account", (), {...})\`.
+- **Descriptor as an instance attribute.** \`balance = Positive()\` must sit in the class body. Assign it inside \`__init__\` and Python never invokes the protocol; it is just a normal attribute.
+
+**Interview nuance:** descriptors come in two flavors and the difference decides precedence. A **data descriptor** defines \`__set__\` or \`__delete__\` and *wins over* the instance \`__dict__\`. A **non-data descriptor** defines only \`__get__\` and *loses to* it. That is why \`@property\` (data) cannot be shadowed by an instance attribute, while \`functools.cached_property\` (non-data) writes its result into \`instance.__dict__\` on first access and is then read straight from the dict on later calls, skipping recomputation.
+
+### The peek at metaclasses
+
+A metaclass is "the class of a class". The default is \`type\`, and \`class Account: ...\` is roughly \`Account = type("Account", (), namespace)\`. A custom metaclass hooks class creation to register, validate, or inject methods:
 
 \`\`\`python
 class Meta(type):
     def __new__(mcls, name, bases, namespace):
-        # runs once, when the class is defined, register it, validate it, inject methods
         return super().__new__(mcls, name, bases, namespace)
 
-class Thing(metaclass=Meta):
-    ...
+class Thing(metaclass=Meta): ...
 \`\`\`
 
-You'll rarely write one (dataclasses, ORMs, and \`abc\` use them under the hood), but knowing
-classes are objects built by \`type\` demystifies a lot of "magic".
-
-### Recap
-
-Descriptors put reusable get/set logic behind a class attribute; metaclasses customize class
-creation itself (\`type\` is the default). You'll build a \`Positive\` descriptor that validates an
-account balance, first inline, then across a \`models\` package.`,
+You will rarely write one. \`abc.ABCMeta\`, \`enum.Enum\`, and Django models use them under the hood. Note that \`@dataclass\` is a class *decorator*, not a metaclass, so \`type(SomeDataclass) is type\`. Knowing classes are objects built by \`type\` is what dissolves the "magic".`,
     demoCode: `class Positive:
     def __set_name__(self, owner, name):
         self.storage_name = "_" + name
@@ -1333,42 +1341,38 @@ const concurrencyLesson: PythonLesson = {
     estimatedMinutes: 7,
     markdown: `## Doing more than one thing at once
 
-### The GIL
+Every real service waits: on a database, an HTTP API, a file, a message queue. If you fetch 100 URLs one at a time, your program spends nearly all its wall-clock time blocked, doing nothing. Concurrency lets those waits overlap, so 100 slow calls finish in roughly the time of the slowest one instead of the sum of all of them. Choosing the right model (threads, processes, or \`async\`) is a classic interview question because the wrong choice makes code either no faster or outright wrong.
 
-CPython's **Global Interpreter Lock** lets only one thread run Python bytecode at a time. So:
+### The GIL: one bytecode at a time
 
-- **I/O-bound** work (network, disk, waiting): **threads help**, because while one thread waits, another
-  runs.
-- **CPU-bound** work (number crunching): threads *don't* speed it up; use **multiprocessing**
-  (separate processes, separate GILs) or a native library.
+CPython protects its internal memory with a **Global Interpreter Lock**. Only one thread executes Python bytecode at any instant, so pure-Python threads never run *in parallel* across cores. What rescues threading is that the GIL is **released during blocking I/O** (and inside many C extensions like \`numpy\`). While one thread waits on a socket, it drops the lock and another thread runs. That gives you the decision rule:
 
-### concurrent.futures: one clean API
+- **I/O-bound** work (network, disk, waiting): threads help, because the waits overlap.
+- **CPU-bound** work (hashing, parsing, pure-Python math): threads do not help. Use \`ProcessPoolExecutor\` (separate processes, each with its own GIL) or push the work into a native library.
 
-\`concurrent.futures\` gives the same interface for both pools. The simplest pattern maps a function
-over inputs:
+### concurrent.futures: one API for both
+
+\`concurrent.futures\` gives threads and processes the same interface. The common pattern maps a function over inputs:
 
 \`\`\`python
 from concurrent.futures import ThreadPoolExecutor
 
+def double(n):
+    return n * 2
+
 with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(fetch, urls))   # results stay in input order
+    print(list(executor.map(double, [1, 2, 3])))   # [2, 4, 6]
 \`\`\`
 
-Swap \`ThreadPoolExecutor\` for \`ProcessPoolExecutor\` for CPU-bound work. The code stays the same. For finer
-control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as
-they finish.
+\`executor.map\` returns results in **input order**, not completion order, even though the tasks finish out of order. Swap in \`ProcessPoolExecutor\` and the code is identical. For finer control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as they finish. Two things to remember about \`map\`: it returns a **lazy iterator**, so wrap it in \`list(...)\` when you need a real list (the exercise does), and it re-raises a worker's exception when you iterate to that result, not when you call \`map\`.
 
-### Safety
+### Pitfall: threads sharing state
 
-Independent tasks (no shared mutable state) are safe to parallelize. If threads share state, guard it
-with a \`Lock\`, but prefer designing the work so they don't.
+Independent tasks are safe to parallelize. Shared mutable state is not. \`count += 1\` is read, add, write: three steps, and the interpreter can switch threads between them, so two threads read the same value and one increment is lost. The GIL does not make your code thread-safe. Fix it with a \`Lock\`, or better, design the work so tasks never touch shared state (as \`double\` does here).
 
-### When threads aren't available
+### Running where there are no threads
 
-Some runtimes have no OS threads at all, notably this in-browser sandbox (Pyodide/WASM without
-cross-origin isolation). There, building a pool raises \`RuntimeError: can't start new thread\`. A
-resilient \`run_all\` **tries the pool and falls back to a sequential map**, so it works everywhere
-and the ordered results are identical:
+This in-browser sandbox (Pyodide/WASM) has no OS threads, so building a pool raises \`RuntimeError: can't start new thread\`. A portable \`run_all\` tries the pool and falls back to a sequential map, producing identical ordered results everywhere:
 
 \`\`\`python
 try:
@@ -1378,11 +1382,7 @@ except RuntimeError:
     return [double(n) for n in numbers]
 \`\`\`
 
-### Recap
-
-The GIL means threads help I/O-bound but not CPU-bound work; \`concurrent.futures\` maps work over a
-pool with order preserved; and capability-detecting a missing feature (here, threads) keeps code
-portable. You'll run a batch through a \`ThreadPoolExecutor\` with a sequential fallback.`,
+**Interview nuance:** Interviewers often follow up with "what is the difference between concurrency and parallelism?" Concurrency is structuring work so tasks make progress by interleaving, which is what a thread pool and \`async\` give you under the GIL. Parallelism is tasks running at the same instant on different cores, which is what a process pool gives you (or the experimental free-threaded no-GIL build added in Python 3.13). So a \`ThreadPoolExecutor\` buys you concurrency and overlaps I/O waits, but only processes buy you CPU parallelism. Naming that distinction, and tying it to the GIL, is exactly the signal they are listening for.`,
     demoCode: `from concurrent.futures import ThreadPoolExecutor
 
 
@@ -1590,61 +1590,48 @@ const asyncioLesson: PythonLesson = {
   skills: ["asyncio", "async-await", "coroutines", "concurrency"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Concurrency without threads
+    markdown: `## Concurrency on one thread
 
-\`asyncio\` runs many I/O-bound tasks on **one** thread by cooperatively switching whenever a task
-*awaits*. No locks, no GIL contention: ideal for thousands of network calls.
+A web service that fetches 50 URLs spends almost all its time *waiting* on the network, not computing. Threads can overlap that waiting, but you pay for context switches, GIL contention, and locks around shared state. \`asyncio\` overlaps it on a single thread: while one task waits, the loop runs another. Because a task runs uninterrupted until its next \`await\`, you rarely reach for a lock. This is the default tool for I/O-bound fan-out (many network calls or database queries) in modern Python.
 
-### Coroutines
+### Coroutines are values, not running code
 
-An \`async def\` defines a **coroutine**. Calling it doesn't run it; it returns a coroutine object
-you must \`await\` (or run on the event loop):
+\`async def\` defines a coroutine function. Calling it does not run the body; it returns a coroutine object that is suspended at the top, waiting to be driven:
 
 \`\`\`python
 import asyncio
 
 async def fetch_one(n):
-    await asyncio.sleep(0.1)   # yields control while "waiting"
+    await asyncio.sleep(0.1)   # hands control back to the loop while "waiting"
     return n * 10
+
+coro = fetch_one(1)   # nothing has run yet; coro is a coroutine object
 \`\`\`
 
-### Running concurrently with gather
+\`await\` is the only place a coroutine gives up control. Between awaits it runs straight through like ordinary code.
 
-\`asyncio.gather\` schedules many coroutines at once and waits for all of them, returning results in
-order:
+### Overlapping the waiting with gather
+
+\`asyncio.gather\` schedules many coroutines at once and waits for all of them, returning results in **argument order** (not finish order):
 
 \`\`\`python
 async def main():
     return await asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3))
 
-asyncio.run(main())    # [10, 20, 30], the three "waits" overlap
+asyncio.run(main())   # [10, 20, 30] after ~0.1s total, not 0.3s
 \`\`\`
 
-\`asyncio.run(coro)\` starts the event loop, runs the coroutine to completion, and closes the loop.
-It's the one synchronous entry point into async code.
+\`asyncio.run(coro)\` is the one synchronous door into async code: it starts a fresh event loop, runs the coroutine to completion, and closes the loop.
 
-### Running it in this sandbox
+### Why this sandbox uses a helper
 
-\`asyncio.run\` only works when **no** loop is already running. This in-browser sandbox runs your code
-*inside* an event loop, so calling \`asyncio.run\` here raises \`RuntimeError: cannot be called from a
-running event loop\`. So the exercise gives you a \`run_coroutines(coros)\` helper that runs
-already-created coroutines and collects their results. It's the sandbox's stand-in for
-\`asyncio.run(asyncio.gather(*coros))\`. You still build real coroutines with \`fetch_one(n)\`; you
-just hand them to \`run_coroutines\` instead of \`asyncio.run\`.
+\`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so it hands you \`run_coroutines(coros)\` instead. It drives each coroutine with \`coro.send(None)\` and reads the return value off the resulting \`StopIteration\`. That works because the sandbox \`fetch_one\` awaits nothing, so a single \`send\` finishes it. You still build real coroutines with \`fetch_one(n)\`; you just pass them to \`run_coroutines\` in place of \`asyncio.run(asyncio.gather(*coros))\`.
 
-### await vs sequential
+### Pitfall: a coroutine you never drive
 
-Awaiting each call one-by-one would be sequential; \`gather\` overlaps the waiting, so N slow calls
-take about as long as the slowest one, **but only when each coroutine actually \`await\`s real I/O**
-(a network or disk call that yields control). The \`fetch_one\` coroutines in this sandbox don't await
-anything real, so \`run_coroutines\` here just runs them in order to show the shape of the code; the
-speedup you get in production comes entirely from overlapping real waiting, not from \`gather\` itself.
+Calling \`fetch_one(5)\` and treating the result like a number does nothing useful. The body never runs, and Python warns \`RuntimeWarning: coroutine 'fetch_one' was never awaited\`. A coroutine only executes when something awaits it, gathers it, or runs it on a loop. The reverse trap is just as common: never put a blocking call (\`time.sleep\`, a synchronous DB driver, a heavy compute loop) inside a coroutine, because it freezes the whole thread and no other task can make progress.
 
-### Recap
-
-\`async def\` makes a coroutine, \`await\` suspends until it's ready, and \`asyncio.gather\` runs many
-concurrently, driven by \`asyncio.run\` in a normal program, or \`run_coroutines\` in this sandbox.
-You'll build a batch of \`fetch_one\` coroutines and collect their ordered results.`,
+**Interview nuance:** asyncio is *cooperative*, not preemptive. The event loop can only switch tasks at an \`await\`; it cannot interrupt running code. So \`gather\` speeds up work that spends its time awaiting real I/O, but a CPU-bound coroutine (or a stray \`time.sleep\`) starves every other task on the loop. That is the core reason asyncio scales I/O-bound fan-out yet does nothing for CPU-bound work, where you reach for processes instead.`,
     demoCode: `# Normally: asyncio.run(asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3)))
 # This sandbox is already inside an event loop, so we drive the coroutines directly:
 async def fetch_one(n):
@@ -1878,32 +1865,38 @@ const performanceLesson: PythonLesson = {
   skills: ["performance", "lru-cache", "complexity", "profiling"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Making code fast: measure first
+    markdown: `## Make it fast: measure, then fix the right thing
 
-### Profile before optimizing
+Slow code costs money and latency in production, and the human instinct for *where* it is slow is almost always wrong. Engineers waste hours micro-optimizing a loop that runs once while an accidental \`O(n^2)\` scan buried three functions away eats the request budget. The discipline is: measure first, fix algorithmic complexity, then cache repeated work. Only after that do you tune lines.
 
-Don't guess where time goes. Measure. \`cProfile\` and \`timeit\` show the real hot spots:
+### Profile before you touch anything
+
+\`cProfile\` runs your code and reports, per function, how many times it was called and how much time it took. \`timeit\` runs a tiny snippet many times for a stable microbenchmark.
 
 \`\`\`python
 import cProfile
-cProfile.run("slow_function()")   # per-call counts and time
+cProfile.run("slow_function()")
+# ncalls  tottime  cumtime  filename:lineno(function)
+#  1  0.002  0.900  app.py:12(slow_function)
+# 900000  0.850  0.850  app.py:30(lookup)   <- the real hot path
 \`\`\`
 
-Optimize the few lines that dominate, not the ones that *look* slow.
+Read \`tottime\` (time in that function itself) and \`ncalls\`. A function called 900,000 times is your target, not the one that merely *looks* heavy.
 
-### Complexity is the big lever
+### Complexity is the biggest lever
 
-Algorithmic complexity beats micro-tuning. A set lookup is O(1) vs a list scan's O(n):
+No micro-tuning beats a better data structure. A \`set\` and a \`dict\` are hash maps: membership is average \`O(1)\`. A \`list\` scan is \`O(n)\`.
 
 \`\`\`python
-if x in big_set:     # O(1)
-if x in big_list:    # O(n)
+if x in big_set:    # O(1) average
+if x in big_list:   # O(n), linear scan every time
 \`\`\`
 
-### Caching with lru_cache
+Turning an \`O(n^2)\` nested loop into an \`O(n)\` pass with a \`set\` lookup is the difference between a request that returns and one that times out.
 
-Repeated calls with the same arguments? \`functools.lru_cache\` memoizes results, turning an
-exponential recursion into a linear one:
+### Cache repeated work with \`lru_cache\`
+
+When a pure function is called repeatedly with the same arguments, \`functools.lru_cache\` stores results keyed by the arguments. Naive \`fib\` recomputes \`fib(n-1)\` and \`fib(n-2)\` down overlapping trees, so it runs in roughly \`O(phi^n)\` time (\`fib(35)\` already triggers tens of millions of calls). Memoization computes each distinct \`n\` exactly once:
 
 \`\`\`python
 from functools import lru_cache
@@ -1913,23 +1906,28 @@ def fib(n):
     if n < 2:
         return n
     return fib(n - 1) + fib(n - 2)
+
+print(fib(10))   # 55
+print(fib(30))   # 832040, instant thanks to the cache
 \`\`\`
 
-Without the cache, \`fib(35)\` recomputes the same subproblems billions of times; with it, each \`n\`
-is computed once.
+\`@lru_cache(maxsize=None)\` keeps every result; in Python 3.9+ the shorthand is \`@functools.cache\`. This is exactly what the exercises ask for: a memoized \`fib\` where each \`n\` is computed once.
 
 ### Generators for memory
 
-A generator streams values instead of building a giant list, using constant memory for huge sequences:
+A generator streams values instead of building a list, so it uses constant memory over huge sequences:
 
 \`\`\`python
-total = sum(x * x for x in range(10_000_000))   # no list materialized
+total = sum(x * x for x in range(10_000_000))   # no 10M-element list
 \`\`\`
 
-### Recap
+### Pitfalls
 
-Profile to find the hot path, fix complexity first, memoize repeated work with \`lru_cache\`, and
-stream with generators to save memory. You'll make a slow recursive \`fib\` fast with \`lru_cache\`.`,
+- \`lru_cache\` keys on the arguments, so every argument must be **hashable**. \`fib(2)\` is fine; passing a \`list\` or \`dict\` raises \`TypeError: unhashable type\`.
+- With \`maxsize=None\` the cache never evicts. That is perfect for \`fib\`, but calling a cached function with millions of distinct arguments leaks memory.
+- Recursive \`fib\` recurses \`n\` frames deep, so a cold \`fib(3000)\` hits Python's default recursion limit (\`RecursionError\`) before the cache helps. Warm it incrementally (\`fib(500)\`, then \`fib(1000)\`, ...) so each call only recurses to the first uncached \`n\`, or convert to a loop.
+
+**Interview nuance:** memoization works because \`fib\` has *overlapping subproblems*. There are only \`n + 1\` distinct inputs (\`0\` through \`n\`), each solved once, so the cache collapses exponential time to \`O(n)\` time and \`O(n)\` space. Being able to name that space cost, and the recursion-depth limit, is what separates "I added a decorator" from understanding why it works.`,
     demoCode: `from functools import lru_cache
 
 
@@ -2132,32 +2130,34 @@ const configLoggingLesson: PythonLesson = {
   skills: ["configuration", "secrets", "structured-logging", "twelve-factor"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Configuration, secrets & logging
+    markdown: `## Config lives in the environment, not in your code
 
-### Config from the environment
+A service that hard-codes its port, database URL, or feature flags can only run in one place. Twelve-factor apps push all of that into environment variables so a single build artifact runs unchanged in dev, staging, and prod. You change behavior by changing the environment, never by editing and redeploying code. That is also why the demo's \`load_config\` takes an \`env\` dict as an argument instead of reaching into \`os.environ\` directly: passing the environment in keeps the function pure and trivial to test.
 
-Twelve-factor apps read config from the **environment**, not hard-coded constants, so the same
-build runs in dev and prod. Provide sensible **defaults** and **coerce** types (env values are
-strings):
+### Environment values are always strings
+
+\`os.environ\` (and the \`env\` dict here) maps strings to strings. There are no ints, bools, or lists inside it. Reading config is therefore two steps: supply a default for missing keys, then coerce the string into the type you actually want.
 
 \`\`\`python
-port = int(env.get("PORT", "8000"))
+port = int(env.get("PORT", "8000"))          # "9000" becomes 9000
 debug = env.get("DEBUG", "false").lower() == "true"
 \`\`\`
 
-### Secrets
+\`env.get("PORT", "8000")\` returns the default only when \`"PORT"\` is absent. If the key exists, you get its string value and must convert it yourself.
 
-Never hard-code or log secret values. Read them from the environment, and when logging, record
-*whether* something is set, not the value:
+### Secrets: record presence, never the value
+
+API keys, tokens, and passwords come from the environment too, but they must never appear in source control or in logs. The safe pattern is to log whether a secret is configured, not what it is:
 
 \`\`\`python
-config = {"has_secret": "SECRET" in env}   # safe to log; the value never is
+has_secret = "SECRET" in env    # a True/False flag is safe to emit; the value is not
 \`\`\`
+
+\`"SECRET" in env\` tests key membership, so it stays \`False\` until the key exists and never reads the value.
 
 ### Structured logging
 
-Log machine-readable records (key/value or JSON), not prose, so logs are searchable and
-aggregatable:
+Log machine-readable records, not sentences. Key/value fields let a log system filter and aggregate (for example, find every \`startup\` where \`debug\` was \`True\`):
 
 \`\`\`python
 import logging
@@ -2165,11 +2165,15 @@ logger = logging.getLogger(__name__)
 logger.info("startup", extra={"port": port, "debug": debug})
 \`\`\`
 
-### Recap
+The \`extra\` fields attach to the log record, but they only surface if your handler uses a structured (often JSON) formatter. The default formatter prints just the message text.
 
-Read config from the environment with defaults and type coercion, keep secrets out of code and logs
-(track presence, not value), and log structured records. You'll build a \`load_config\` that turns an
-env dict into typed settings.`,
+### Pitfalls
+
+- \`bool("false")\` is \`True\`. Every non-empty string is truthy, so never coerce a flag with \`bool(...)\`. Compare the lowered string explicitly, as above.
+- \`int(env.get("PORT", "8000"))\` raises \`ValueError\` if \`PORT\` is set to \`""\` or \`"abc"\`. A present-but-empty variable is not the same as a missing one, and \`.get\` only defends against the missing case.
+- Reusing a reserved field name in \`extra\` (like \`message\` or \`name\`) raises \`KeyError\`. Choose your own keys.
+
+**Interview nuance:** interviewers probe why config should be loaded once, at startup, into a typed object rather than read from \`os.environ\` all over the codebase. Loading once gives you a single place to validate and fail fast, makes the code testable (you inject an \`env\` dict, exactly like this exercise), and guarantees every request sees one consistent snapshot instead of values that could change mid-run.`,
     demoCode: `def load_config(env):
     port = int(env.get("PORT", "8000"))
     debug = env.get("DEBUG", "false").lower() == "true"
@@ -2378,50 +2382,57 @@ const testingToolingLesson: PythonLesson = {
   skills: ["mocking", "testing", "ruff", "mypy"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Robust tests & clean tooling
+    markdown: `## Why fake a dependency
 
-### Mocking dependencies
+A test that reaches out to the network, a database, or \`datetime.now()\` is slow, flaky, and non-deterministic. It goes red when the wifi drops, not when your code is wrong. The fix is a design choice, not a testing trick: pass collaborators in as arguments so a test can hand your function a stand-in it fully controls. That is dependency injection, and it is the single habit that makes code testable.
 
-Tests shouldn't hit the network, a database, or the clock. **Inject** the dependency so a test can
-pass a stand-in. \`unittest.mock.Mock\` records how it was called:
+Compare a \`send_all\` that hard-codes its sender:
 
 \`\`\`python
-from unittest.mock import Mock
+import smtplib
 
-def send_all(sender, messages):     # sender is injected
-    for m in messages:
-        sender(m)
-    return len(messages)
+def send_all(messages):
+    server = smtplib.SMTP("smtp.example.com")   # untestable: opens a real socket
+    ...
+\`\`\`
 
-sender = Mock()
-send_all(sender, ["a", "b"])
+with the injectable version you build here, where \`sender\` arrives as a parameter. Now a test can supply any callable, including a mock.
+
+## Mock: a recorder you assert against
+
+\`unittest.mock.Mock\` is a stand-in that answers every attribute access and every call, and records what happened. You do not tell it what to return; you inspect it afterward. The demo below runs \`send_all(sender, ["a", "b"])\`, which calls \`sender("a")\` then \`sender("b")\` and returns \`2\`. That return is an ordinary \`int\` (\`len(messages)\`), because the mock is never asked for its own result.
+
+After the run, the mock carries the whole call history:
+
+\`\`\`python
 sender.call_count            # 2
-sender.assert_any_call("a")  # was it called with "a"?
+sender.assert_any_call("a")  # passes: "a" appears in the history
+sender.call_args_list        # [call('a'), call('b')]
 \`\`\`
 
-Designing for injection (passing the dependency in) is what makes code testable in the first place.
+This is why the Apply and Practice steps keep \`sender\` as a parameter: the driver passes in a recorder (Apply) or a real \`Mock\` (Practice), then asserts how you called it.
 
-### Coverage
+## Pitfalls
 
-\`pytest --cov\` (coverage.py) reports which lines your tests actually exercise. Aim to cover the
-**branches that matter**, not chase 100% for its own sake.
+A plain \`Mock\` answers to anything. Call a method that does not exist and it silently hands back another \`Mock\` instead of failing:
 
-### Modern tooling
-
-- **ruff**: an extremely fast linter + formatter (replaces flake8/isort/black).
-- **mypy** / **ty**: static type checkers that read your hints.
-- **pre-commit**: runs ruff/mypy/tests automatically on \`git commit\`, so problems never land.
-
-\`\`\`toml
-# .pre-commit-config.yaml runs these on every commit
-- ruff check --fix
-- mypy .
+\`\`\`python
+m = Mock()
+m.snd("hi")   # typo of .send: no error, and the test still "passes"
 \`\`\`
 
-### Recap
+So a test can be green while production crashes. Two fixes: \`Mock(spec=Emailer)\` rejects attributes the real class does not have (\`m.snd\` now raises \`AttributeError\`), and \`create_autospec(Emailer)\` additionally checks call signatures, so calling \`send()\` with the wrong arguments raises \`TypeError\` inside the test.
 
-Inject dependencies so you can mock them; measure with coverage; and let ruff/mypy/pre-commit keep
-quality high automatically. You'll build an injectable \`send_all\` that a \`Mock\` can verify.`,
+Also watch \`assert_called_with\`: it checks only the most recent call. After the demo, \`sender.assert_called_with("a")\` fails because the last call was \`sender("b")\`. Use \`assert_any_call\` when you mean "somewhere in the history."
+
+## The modern tool stack
+
+- \`ruff\`: one very fast tool that lints and formats, replacing \`flake8\`, \`isort\`, and \`black\`.
+- \`mypy\` (or \`ty\`): reads your type hints and flags mismatches before runtime.
+- \`pytest --cov\` (coverage.py): reports which lines your tests exercised. Cover the branches that matter, not a 100% badge.
+- \`pre-commit\`: runs all of these on \`git commit\`, so nothing broken lands.
+
+**Interview nuance:** know what a coverage number does not tell you. \`pytest --cov\` reports line coverage by default, so a line counts as covered the moment it runs once. An \`if\` with no \`else\` can show 100% while the case where the condition is false never executes. Add \`--cov-branch\` to require both directions of each branch, and remember that even full branch coverage only proves the lines ran, not that your assertions checked the right thing.`,
     demoCode: `from unittest.mock import Mock
 
 
@@ -2662,40 +2673,48 @@ const packagingCapstoneLesson: PythonLesson = {
   skills: ["packaging", "capstone", "type-hints", "testing"],
   teach: {
     estimatedMinutes: 7,
-    markdown: `## Packaging & distribution
+    markdown: `## Packaging: the last mile
 
-### From project to package
+Your code only creates value once someone else can run it. Packaging is how you hand a colleague \`pip install orders\` instead of a folder and a prayer. A published package pins your version, declares its dependencies, and installs the same way on every machine, which is exactly what CI, Docker images, and teammates depend on.
 
-A library others can install is built from your \`pyproject.toml\` into a **wheel**:
+### What a wheel actually is
+
+A **wheel** (\`.whl\`) is a zip of your importable code plus metadata, named to a fixed convention. \`pyproject.toml\` is the single source of truth: the \`[project]\` table declares \`name\`, \`version\`, \`requires-python\`, and \`dependencies\`, plus a \`dev\` extra for \`pytest\`, \`ruff\`, and \`mypy\`. A \`[build-system]\` table names the build backend that turns the project into artifacts.
 
 \`\`\`bash
-uv build            # produces dist/orders-1.0.0-py3-none-any.whl
-uv publish          # (or twine upload) to a package index
+uv build        # writes dist/orders-1.0.0.tar.gz and dist/orders-1.0.0-py3-none-any.whl
+uv publish      # uploads those artifacts to a package index (PyPI)
 \`\`\`
 
-The wheel bundles your code + metadata so \`pip install orders\` just works. \`pyproject.toml\`
-declares the name, version, Python requirement, and dependencies (including a \`dev\` extra for
-\`pytest\`/\`ruff\`/\`mypy\`).
+The \`py3-none-any\` tag means pure Python, any interpreter, any OS. Nothing to compile.
 
 ### The production checklist
 
-A library ready to ship is:
+A shippable library is **structured** (a clean package with clear entry points), **typed** (hints on the public API so callers and \`mypy\` know the contract), **validated** (untrusted input parsed into typed values at the boundary), and **tested** (\`pytest\` over the real cases, run in CI). Your capstone hits all four.
 
-- **structured**: a clean package with a clear entry point
-- **typed**: hints on the public API so callers (and mypy) know the contract
-- **validated**: untrusted input parsed into typed models at the boundary
-- **tested**: pytest covering the real cases, run in CI
+### Parsing at the boundary
 
-### Your capstone
+Raw input is not your model. Each raw order arrives as a dict whose \`"amount"\` is a *string*, so \`summarize\` must parse it into a number before it can do arithmetic:
 
-This pulls the whole track together: a packaged \`orders\` service with a typed \`Order\` model and
-validation (read-only) and a real \`pyproject.toml\`. Implement \`summarize(raw_orders)\` (parse the
-raw orders and report total count, paid count, and paid revenue) and make the suite green.
+\`\`\`python
+def summarize(raw_orders):
+    paid = [o for o in raw_orders if o["paid"]]
+    revenue = round(sum(float(o["amount"]) for o in paid), 2)
+    return {"count": len(raw_orders), "paid": len(paid), "revenue": revenue}
 
-### Recap
+rows = [{"amount": "10.0", "paid": True}, {"amount": "5.0", "paid": False}]
+print(summarize(rows))
+# {'count': 2, 'paid': 1, 'revenue': 10.0}
+\`\`\`
 
-\`pyproject.toml\` + \`uv build\` turn a project into an installable wheel; a production-ready library
-is structured, typed, validated, and tested. Finish the capstone to complete the Python path.`,
+\`count\` is every order, \`paid\` is how many cleared, and \`revenue\` sums only the paid amounts. In the capstone, a read-only \`parse_order\` does this coercion for you, turning each raw dict into a typed \`Order\`.
+
+### Pitfalls
+
+- \`int("10.0")\` raises \`ValueError\` because \`"10.0"\` is not an integer literal. Parse decimal strings with \`float("10.0")\`.
+- Round once, at the very end. Sum first, then \`round(total, 2)\`. Floats cannot hold most decimals exactly, so \`0.1 + 0.2 == 0.3\` is \`False\` (it is \`0.30000000000000004\`), and rounding after each addition compounds that error.
+
+**Interview nuance:** \`float\` cannot represent most base-10 fractions exactly, so a long chain of price additions drifts. \`round(total, 2)\` cleans up the display but not the stored value, and \`round\` uses banker's rounding, so \`round(0.125, 2)\` gives \`0.12\` (rounded to even), not \`0.13\`. Production money code stores integer cents or uses \`Decimal\`; reach for \`float\` only when a tiny rounding error is acceptable.`,
     demoCode: `from dataclasses import dataclass
 
 
