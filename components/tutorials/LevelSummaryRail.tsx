@@ -37,6 +37,7 @@ export function LevelSummaryRail({
 }) {
   const { continueTarget, isComplete } = path
   const firstLessonHref = path.sections[0]?.lessons[0]?.href ?? null
+  const hasLessons = path.total > 0
 
   return (
     <aside className="flex flex-col gap-5 lg:sticky lg:top-20 lg:self-start">
@@ -46,18 +47,20 @@ export function LevelSummaryRail({
         <p className="text-muted-foreground mt-1.5 text-sm text-pretty">{tagline}</p>
       </div>
 
-      {/* Progress card */}
-      <div className="border-border bg-card/60 flex items-center gap-4 rounded-2xl border p-4 shadow-sm">
-        <LevelProgressRing percent={path.percent} />
-        <div className="min-w-0">
-          <p className="text-foreground text-sm font-semibold">
-            {path.done} of {path.total} {path.total === 1 ? "lesson" : "lessons"}
-          </p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {isComplete ? "Level complete" : `~${formatMinutes(path.minutesLeft)} left`}
-          </p>
+      {/* Progress card — omitted for an unauthored (coming-soon) level. */}
+      {hasLessons && (
+        <div className="border-border bg-card/60 flex items-center gap-4 rounded-2xl border p-4 shadow-sm">
+          <LevelProgressRing percent={path.percent} />
+          <div className="min-w-0">
+            <p className="text-foreground text-sm font-semibold">
+              {path.done} of {path.total} {path.total === 1 ? "lesson" : "lessons"}
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {isComplete ? "Level complete" : `~${formatMinutes(path.minutesLeft)} left`}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Continue — the primary, resume action */}
       {continueTarget ? (
