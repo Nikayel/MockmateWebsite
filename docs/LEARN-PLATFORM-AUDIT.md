@@ -1,21 +1,5 @@
 # /learn Platform Audit — Python + SQL
 
-> **READ-SECTION DEEPENING (2026-07-04):** A follow-up pass rewrote the thin `teach.markdown`
-> ("Read") sections across both curricula. Measurement showed all 53 Python read sections were
-> under 280 words (syntax + demo, but missing the "why it matters", pitfalls, complexity, and
-> interview nuance the strong SQL lessons carry), while SQL was progressively richer. **73 of 99**
-> read sections were enriched to full explanations: **all 53 Python** (avg 194 -> 502 words) and
-> **20 of 46 SQL** (an audit gate kept the 26 already-strong L2-L4 sections; enriched ones went
-> 391 -> 564 words). Each rewrite followed one house bar (why-it-matters framing, the concept as a
-> mental model, a worked example with output aligned to the lesson's demo, at least one real pitfall,
-> and one labelled "Interview nuance") and was research-drafted then **adversarially verified** by a
-> second agent for correctness + style. Verification caught and corrected real errors, e.g. a false
-> "SELECT-alias not visible in WHERE" claim (disproved by running it in SQLite), a false
-> "Postgres supports QUALIFY" claim, a money-column-as-timestamp category error, and a wrong
-> `ModuleNotFoundError` message. Only `teach.markdown` changed; demos, exercises, and grading are
-> untouched. Live SQL demo output was spot-checked to match the new prose. Shipped to `main` as 8
-> per-file commits (`f8a57b96`..`97e7f742`). `pnpm typecheck` + curriculum tests green throughout.
-
 > **RESOLUTION (2026-07-03):** Every finding below has been fixed on branch
 > `claude/sql-curriculum-and-python-gaps` **except U3**, which is a deliberate deferral (see note at
 > the end of this box). The fixes were built systematically (root-cause, not patch) and centralized
