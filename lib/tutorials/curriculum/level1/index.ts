@@ -30,56 +30,65 @@ const helloLesson: PythonLesson = {
   skills: ["print", "comments", "strings", "functions"],
   teach: {
     estimatedMinutes: 3,
-    markdown: `## Your first lines of Python
+    markdown: `## Why the return value is the thing we check
 
-Python runs a program **top to bottom**, one line at a time. The simplest thing a program can do is
-*show* something with \`print(...)\`:
+In real code a function exists to hand a value back to whatever called it. \`print(...)\` is a side effect for a human watching a terminal. \`return\` is how one piece of code passes a result to another piece of code. Tests, callers, and data pipelines read the returned value and never look at the screen, so a function that prints the right answer but forgets to \`return\` it is still broken. That distinction is the whole point of this lesson.
 
-\`\`\`python
-print("Hello, world!")
-print("Learning Python")
-\`\`\`
+## Running top to bottom
 
-Each \`print\` writes its text on its own line.
-
-### Comments
-
-A line that starts with \`#\` is a **comment**. Python ignores it. Comments are notes for humans:
+Python executes a file one line at a time, from the top down. \`print(...)\` writes its argument to output, then moves to the next line.
 
 \`\`\`python
-# This is a comment. Python skips it.
-print("but this runs")   # a comment can also sit after code
+print("Python runs top to bottom")
+print("one line at a time")
+# output:
+# Python runs top to bottom
+# one line at a time
 \`\`\`
 
-### print vs return
+A line starting with \`#\` is a comment. Python ignores everything after the \`#\` on that line, so comments are notes for humans, not instructions for the machine.
 
-\`print\` shows text on the screen. But when we **check** your code, we don't watch the screen. We
-call your function and look at the value it hands back with \`return\`.
+\`\`\`python
+# this whole line is skipped
+print("this runs")   # a comment can also trail real code
+\`\`\`
+
+## Building strings with \`+\`
+
+A string is text in quotes. The \`+\` operator on two strings joins them into one new string (this is called concatenation).
+
+\`\`\`python
+greeting = "Hello, " + "world" + "!"
+print(greeting)   # Hello, world!
+\`\`\`
+
+Note the exact characters: \`"Hello, "\` already includes a comma and a trailing space, so you do not add spacing yourself. Getting that spacing right is exactly what the Apply and Practice exercises check.
+
+## Functions that return
+
+A function packages code under a name so you can reuse it. \`def\` starts the definition, the name and parameters follow, and \`return\` sends a value back to the caller.
 
 \`\`\`python
 def greet(name):
-    return "Hello, " + name + "!"   # hand the string back to the caller
+    return "Hello, " + name + "!"   # hand the finished string back
+
+print(greet("Ada"))   # Hello, Ada!
 \`\`\`
 
-The \`+\` glues strings together, so \`greet("Ada")\` produces \`"Hello, Ada!"\`.
+Calling \`greet("Ada")\` substitutes \`"Ada"\` for \`name\`, builds \`"Hello, Ada!"\`, and returns it. The same shape covers \`banner(name)\`: wrap the name by returning \`"=== " + name + " ==="\`.
 
-### Anatomy
+## Pitfall: \`+\` will not mix a string and a number
 
-\`\`\`text
-def  greet (name)  :     return  "Hello, " + name + "!"
-└┬┘   └─┬─┘ └─┬─┘  │      └─┬──┘  └──────────┬─────────┘
-keyword name  param colon  keyword     the string sent back
+\`+\` only concatenates string with string. If one side is a number you get a crash, not automatic conversion:
+
+\`\`\`python
+"Room " + 12
+# TypeError: can only concatenate str (not "int") to str
 \`\`\`
 
-### Keep it readable
+The fix is to convert the number first with \`str(...)\`: \`"Room " + str(12)\` gives \`"Room 12"\`. In these exercises \`name\` is already a string, so plain \`+\` is safe.
 
-Build the message once and return it. You can still \`print()\` while you experiment, just remember
-the grader reads the **return** value, not the printout.
-
-### Recap
-
-\`print(...)\` shows output, \`#\` starts a comment, and \`return\` hands a value back. Next you'll
-return a greeting of your own.`,
+**Interview nuance:** every Python function returns something. If you never write \`return\`, or you only \`print(...)\` inside it, the function hands back \`None\`, and \`print(...)\` itself evaluates to \`None\`. So \`return print("Hello")\` returns \`None\`, not the text. Interviewers use this to check that you separate a value (what \`return\` produces) from a side effect (what \`print\` does). The grader here calls your function and inspects the returned string, so always \`return\` the message rather than printing it.`,
     demoCode: `# Comments start with # and are ignored.
 print("Python runs top to bottom")
 print("one line at a time")
@@ -147,55 +156,68 @@ const variablesLesson: PythonLesson = {
   skills: ["variables", "assignment", "naming", "arithmetic"],
   teach: {
     estimatedMinutes: 3,
-    markdown: `## Variables: names for values
+    markdown: `## Names for values, and why they matter
 
-A **variable** is a name bound to a value with \`=\`. Read \`=\` as "gets":
+Every nontrivial program builds a result in steps: read an input, transform it, combine it, return it. A **variable** pins an intermediate value to a name so you can reuse it without recomputing, and so the next person (often you, a week later) can read what the code means. \`total_price\` tells a reviewer what a number is. \`x\` makes them guess. A good name is the cheapest documentation you will ever write.
+
+### Assignment binds a name to a value
+
+Read \`=\` as "gets", not "equals":
 
 \`\`\`python
-score = 10        # score gets 10
-name = "Ada"      # name gets the string "Ada"
+score = 10        # the name score now refers to 10
+name = "Ada"      # name refers to the string "Ada"
 \`\`\`
 
-Once a value has a name, you use it by that name, and you can **reassign** it later:
+The right-hand side is evaluated **first**, then the name is pointed at the result. That is why rebuilding a value from its old self works:
 
 \`\`\`python
 score = 10
-score = score + 5     # re-bind score to 15
+score = score + 5   # RHS 10 + 5 runs first, then score is re-pointed to 15
 \`\`\`
 
-The right-hand side runs first, then the name is pointed at the result.
+\`=\` is an instruction ("make this name refer to that value"), not a claim that two things are already equal.
 
-### Names that explain themselves
+### A worked example
 
-Use lowercase words joined by underscores (**snake_case**), and pick names that say what they hold:
+\`\`\`python
+width = 4
+height = 3
+area = width * height
+print(area)            # 12
+
+width = 10             # reassign width only
+print(width * height)  # 30
+\`\`\`
+
+Notice that \`area\` is computed once and stays \`12\`. Rebinding \`width\` to \`10\` does not reach back and update \`area\`, because \`area\` holds the number that \`width * height\` produced at that instant, not a live formula.
+
+### Name things clearly
+
+Use lowercase words joined by underscores (**snake_case**) and pick names that say what the value holds:
 
 \`\`\`python
 total_price = 4.99
-items_in_cart = 3       # clear intent
-x = 3                   # vague: what is x?
+items_in_cart = 3
 \`\`\`
 
-### The long way vs the idiom
-
-You can compute step by step into well-named variables, then return:
+You can compute into a well-named variable and then return it, or return the expression directly when it is a one-liner. Both are clear:
 
 \`\`\`python
 def rectangle_area(width, height):
-    area = width * height
+    area = width * height   # store, then return
     return area
-\`\`\`
 
-When it's a one-liner, returning the expression directly is just as clear:
-
-\`\`\`python
 def rectangle_area(width, height):
-    return width * height
+    return width * height   # return the expression directly
 \`\`\`
 
-### Recap
+### Pitfalls
 
-\`=\` binds a name to a value, reassigning re-points the name, and good names make code read like
-prose. Next you'll store a couple of values and return a result.`,
+- **Reassignment does not recompute earlier results.** As above, \`area\` stays \`12\` after \`width\` changes. If you need the updated area, recompute it: \`area = width * height\`.
+- **Using a name before it is assigned** raises \`NameError\`. The name must be bound on some line that actually runs before you read it, so \`score = score + 5\` fails if \`score\` was never given a starting value.
+
+**Interview nuance:** in Python a variable is a name bound to an object, not a box that stores the value. Assignment never copies the object; it just points a name at it. For numbers and strings this is invisible, but the same rule means two names can refer to the *same* list, so mutating through one name is visible through the other. Remembering that "assignment rebinds, it does not copy" is what saves you from aliasing bugs later.`,
     demoCode: `width = 4
 height = 3
 area = width * height
@@ -267,25 +289,29 @@ const conditionalsLesson: PythonLesson = {
   skills: ["conditionals", "comparisons", "boolean-logic"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Making decisions with if
+    markdown: `## Why branching is the core of every program
 
-An **if statement** runs a block only when a condition is true. Add \`elif\` for more cases and
-\`else\` for "none of the above":
+Software makes decisions. A login route checks whether a token is valid, an ETL job sends a row to "clean" or "quarantine", a pricing function picks a tier. All of that is \`if\`/\`elif\`/\`else\`. Getting the branch order and the boolean logic right is the difference between code that handles every case and code that silently mishandles one.
+
+### The mental model: first true branch wins
+
+Python evaluates the conditions top to bottom and runs the block under the **first** one that is \`True\`. Every later branch is skipped, even if it would also be true. \`else\` is the catch-all that runs when nothing above it matched.
 
 \`\`\`python
+score = 85
 if score >= 90:
-    grade = "A"
+    print("A")
 elif score >= 80:
-    grade = "B"
+    print("B")
 else:
-    grade = "F"
+    print("F")        # prints B
 \`\`\`
 
-Python checks the branches top to bottom and takes the **first** one that's true.
+\`score\` is \`85\`, so \`score >= 90\` is \`False\`, \`score >= 80\` is \`True\`, and Python stops there and prints \`B\`. Order matters. If you had checked \`score >= 80\` first, a \`95\` would also match it and wrongly print \`B\`. Put the tightest condition first.
 
-### Comparisons
+### Comparisons produce booleans
 
-Conditions are usually comparisons, which produce \`True\`/\`False\`:
+Each comparison evaluates to \`True\` or \`False\`:
 
 \`\`\`text
 ==  equal        !=  not equal
@@ -293,23 +319,23 @@ Conditions are usually comparisons, which produce \`True\`/\`False\`:
 <=  at most      >=  at least
 \`\`\`
 
-(Remember: \`==\` compares, a single \`=\` assigns.)
+Use \`==\` to compare and a single \`=\` to assign. Swapping them is a classic bug. Python also allows chained comparisons, so \`0 < x < 10\` means "x is between 0 and 10" and reads exactly like math.
 
-### Combining conditions
-
-\`and\`, \`or\`, and \`not\` join conditions:
+### Combining conditions with \`and\` / \`or\` / \`not\`
 
 \`\`\`python
-age >= 18 and citizen     # both must be true
-is_weekend or is_holiday  # either is enough
-not finished              # flips true/false
+age >= 18 and citizen     # True only if both are True
+is_weekend or is_holiday  # True if at least one is True
+not finished              # flips the boolean
 \`\`\`
 
-### Recap
+That first line is the shape of the \`can_vote\` exercise: return \`age >= 18 and citizen\`. For \`sign(n)\` you branch on three ranges. Check \`n > 0\`, then \`elif n < 0\`, then \`else\` for \`"zero"\`. Because the first true branch wins, \`else\` safely means "exactly 0" without you re-testing it.
 
-\`if\`/\`elif\`/\`else\` pick a branch by the first true condition; comparisons and
-\`and\`/\`or\`/\`not\` build those conditions. Next you'll label a number's sign, then decide if
-someone can vote.`,
+### Pitfall: truthiness and short-circuiting
+
+\`if\`, \`and\`, and \`or\` do not require real booleans. Python treats \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`None\` as falsy and nearly everything else as truthy, so \`if items:\` means "if the list is non-empty". Watch the trap: writing \`if age == 18\` when you meant \`age >= 18\` rejects everyone older. And \`and\`/\`or\` short-circuit, stopping as soon as the answer is known, which is why \`user and user.name\` never crashes on a \`None\` user.
+
+**Interview nuance:** \`and\` and \`or\` return one of their operands, not a coerced \`True\`/\`False\`. \`x and y\` gives \`x\` when \`x\` is falsy, otherwise \`y\`. \`x or y\` gives \`x\` when \`x\` is truthy, otherwise \`y\`. So \`"" or "guest"\` returns \`"guest"\` (a common default-value trick) and \`3 and 5\` returns \`5\`. In \`age >= 18 and citizen\`, both operands are booleans (\`age >= 18\` is a comparison result and \`citizen\` is \`True\` or \`False\`), so the expression evaluates to a clean \`True\`/\`False\`, which is exactly what \`can_vote\` should return.`,
     demoCode: `score = 85
 if score >= 90:
     print("A")
@@ -378,58 +404,83 @@ const loopsLesson: PythonLesson = {
   skills: ["loops", "for", "range", "accumulator"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Repeating work with loops
+    markdown: `## Why loops are the workhorse of real code
 
-A **for loop** runs its body once for each item in a collection:
+Almost nothing useful happens exactly once. You process every row in a file, retry a request until it succeeds, sum a column, or scan a list for the values you care about. A loop is how you say "do this for each of these" without copying the same line a thousand times. In data and backend work, most of your logic lives inside some loop over records, so knowing exactly how each loop starts, advances, and stops is core mechanics, not trivia.
+
+## \`for\`: run the body once per item
+
+A \`for\` loop binds a variable to each element of a collection in turn and runs its body:
 
 \`\`\`python
 for name in ["Ada", "Sam"]:
-    print(name)
+    print(name)      # Ada, then Sam
 \`\`\`
 
-### range
+The loop variable (\`name\`) is reassigned each pass. When the collection is exhausted, the loop ends on its own. You never manage an index by hand unless you actually need one.
 
-\`range(start, stop)\` produces the numbers from \`start\` up to *but not including* \`stop\`:
+## \`range\`: count without building a list
+
+\`range(start, stop)\` produces the integers from \`start\` up to but not including \`stop\`:
 
 \`\`\`python
 for i in range(1, 4):
-    print(i)        # 1, 2, 3
+    print(i)         # 1, 2, 3
 \`\`\`
 
-### The accumulator pattern
+That excluded \`stop\` is the single most common source of off-by-one bugs. To count \`1\` through \`n\` inclusive, you need \`range(1, n + 1)\`. With one argument, \`range(n)\` starts at \`0\` and gives \`n\` values: \`0, 1, ..., n - 1\`.
 
-Keep a running total in a variable and update it each pass:
+## The accumulator pattern
+
+Most "compute a result over many items" problems share one shape: start a variable at a neutral value, then update it every pass. The demo below sums \`1\` through \`5\`:
 
 \`\`\`python
 total = 0
 for i in range(1, 6):
-    total = total + i    # 1+2+3+4+5
-# total is now 15
+    total = total + i   # total += i does the same
+print(total)            # 15
 \`\`\`
 
-### while, break, continue
+The starting value matters. \`total = 0\` is the correct answer when nothing is added, so if the range is empty the loop body never runs and you get \`0\` back. That is exactly the \`n = 0\` case you will handle.
 
-A **while loop** runs as long as its condition holds, so you must change something inside the loop or
-it never stops. \`break\` exits early; \`continue\` skips to the next pass:
+To count instead of sum, keep a counter and bump it only when a condition holds. The even test uses the modulo operator \`%\`, which gives the remainder of a division:
+
+\`\`\`python
+count = 0
+for n in [1, 2, 3, 4]:
+    if n % 2 == 0:      # remainder 0 means even
+        count += 1
+print(count)            # 2
+\`\`\`
+
+## \`while\`, \`break\`, \`continue\`
+
+A \`while\` loop repeats as long as its condition is \`True\`, so something inside must move toward making it \`False\` or it runs forever:
 
 \`\`\`python
 n = 3
-while n > 0:            # repeat while the condition is True
-    print(n)
-    n = n - 1          # move toward the exit, or it loops forever
-
-for n in nums:
-    if n < 0:
-        continue        # skip negatives
-    if n > 100:
-        break           # stop entirely
+while n > 0:
+    print(n)            # 3, then 2, then 1
+    n = n - 1           # move toward the exit, or it loops forever
 \`\`\`
 
-### Recap
+\`break\` exits the loop immediately, and \`continue\` skips the rest of the current pass and jumps to the next one:
 
-\`for\` walks a collection or a \`range\`, the accumulator pattern builds up a result, and
-\`while\`/\`break\`/\`continue\` give finer control. Next you'll sum the numbers up to n, then count
-the evens in a list.`,
+\`\`\`python
+for n in nums:
+    if n < 0:
+        continue        # skip this value, keep looping
+    if n > 100:
+        break           # stop the whole loop now
+    process(n)
+\`\`\`
+
+## Pitfalls
+
+- Off-by-one: \`range(1, n)\` stops at \`n - 1\`. Summing \`1\` to \`n\` needs \`range(1, n + 1)\`.
+- Infinite \`while\`: if you forget to update the variable in the condition, the loop never ends. Always change state that moves toward the exit.
+
+**Interview nuance:** \`range\` is a lazy sequence, not a list. \`range(1_000_000_000)\` costs constant memory because it stores only \`start\`, \`stop\`, and \`step\` and computes each value on demand, rather than materializing a billion integers. That is why looping with \`range(n)\` is O(n) time but O(1) extra space, while \`list(range(n))\` would allocate all \`n\` values up front. Interviewers use this to check whether you understand that iterating over data is not the same as storing it.`,
     demoCode: `total = 0
 for i in range(1, 6):
     total = total + i
@@ -501,46 +552,62 @@ const functionsLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Functions, defaults, and reading errors
 
-You've called functions already; now write richer ones. A function packages logic behind a name so
-you can reuse it:
+A function is how you stop copy-pasting the same logic into ten places. Name a block of code once, and every caller reuses it. Defaults take this further: they let one function serve many call sites without forcing every caller to spell out every argument. Picking a good default is real API design. When you call \`int("10")\` and get \`10\`, that is \`int(x, base=10)\` quietly defaulting \`base\` to \`10\`; give \`int("ff", 16)\` instead and you get \`255\`. Most functions you use daily lean on defaults you never think about.
 
-\`\`\`python
-def power(base, exp):
-    return base ** exp
+### The mental model
 
-power(2, 3)    # 8
-\`\`\`
-
-### Default parameters
-
-Give a parameter a **default** so callers can leave it out:
+\`def\` binds a name to a parameter list plus a body. The words in the parentheses are **parameters** (the names inside the function); the values you pass are **arguments**. Positional arguments fill parameters left to right. A **default** gives a parameter a fallback value that is used only when the caller omits that argument.
 
 \`\`\`python
 def power(base, exp=2):
     return base ** exp
 
-power(5)       # 25 , exp defaults to 2
-power(2, 3)    # 8  , exp given explicitly
+print(power(5))      # 25   exp falls back to 2, so 5 ** 2
+print(power(2, 3))   # 8    exp is given as 3, so 2 ** 3
 \`\`\`
+
+\`power(5)\` binds \`base\` to \`5\` and lets \`exp\` default to \`2\`. \`power(2, 3)\` binds \`base\` to \`2\` and \`exp\` to \`3\`. You can also pass by name in any order: \`power(exp=3, base=2)\` also returns \`8\`.
+
+A function can \`return\` any value, not just numbers. Your Practice builds and returns a string, so keep in mind that the result of a function is whatever object you hand to \`return\`.
 
 ### Reading a traceback
 
-When code raises an error, Python prints a **traceback**. Read it bottom-up:
+When code raises an error, Python prints a **traceback**. Read it bottom-up.
 
 \`\`\`text
 Traceback (most recent call last):
-  File "main.py", line 2, in <module>
+  File "main.py", line 4, in <module>
     print(power("2", 3))
-TypeError: unsupported operand type(s) for ** : 'str' and 'int'
+  File "main.py", line 2, in power
+    return base ** exp
+TypeError: unsupported operand type(s) for ** or pow(): 'str' and 'int'
 \`\`\`
 
-The **last line** names the problem (here a \`TypeError\`: a string can't be raised to a power), and
-the lines above show where it happened. Most bugs are solved by reading that last line carefully.
+The **last line** names the error type and message: a \`TypeError\` because \`"2"\` is a \`str\`, and you cannot raise a string to a power. The frames above it are the call chain, newest at the bottom. Here they say the failure happened at \`return base ** exp\`, called from \`print(power("2", 3))\`. Read the last line first, then walk up only as far as you need.
 
-### Recap
+### Pitfall: default parameters must come last
 
-\`def\` packages reusable logic, defaults make parameters optional, and a traceback's last line tells
-you what went wrong. Next you'll write a power function with a default, then build an HTML tag.`,
+Every parameter with a default has to appear after every parameter without one:
+
+\`\`\`python
+def power(exp=2, base):   # SyntaxError: non-default argument follows default argument
+    return base ** exp
+\`\`\`
+
+Python cannot fill positional arguments left to right if a required parameter sits behind an optional one. Fix it by ordering required parameters first: \`def power(base, exp=2)\`.
+
+**Interview nuance:** a default value is evaluated **once**, when \`def\` runs, not on each call. That is harmless for immutable defaults like \`2\`, but a mutable default is shared across every call:
+
+\`\`\`python
+def append_to(item, bucket=[]):
+    bucket.append(item)
+    return bucket
+
+print(append_to(1))   # [1]
+print(append_to(2))   # [1, 2]   same list reused!
+\`\`\`
+
+The fix is the standard sentinel pattern: default to \`None\`, then create a fresh object inside the body (\`if bucket is None: bucket = []\`). Interviewers use this to check whether you understand that \`def\` runs once but the body runs every call.`,
     demoCode: `def power(base, exp=2):
     return base ** exp
 
@@ -610,53 +677,51 @@ const temperatureLesson: PythonLesson = {
     estimatedMinutes: 3,
     markdown: `## Functions turn input into output
 
-A **function** is a named block of code that takes some input, does work, and hands back a
-result. You define one with \`def\`, name its inputs (its *parameters*), and use \`return\` to
-send a value back to whoever called it.
+Every real codebase is functions calling functions. A function packages a computation under a name so you write it once and call it from a hundred places. That is the whole point: no copy-pasted arithmetic, one place to fix a bug, and a name that says what the code does. Interview questions are phrased this way too, almost always "write a function that takes X and returns Y", so getting the input-to-output contract right is the skill being tested.
+
+### The mental model
+
+Think of a function as a machine with a labeled input slot and one output chute. You hand it arguments, it runs its body, and \`return\` sends one value back to the caller. You define it with \`def\`, name the inputs (its \`parameters\`), and use \`return\` to hand back the result.
 
 \`\`\`python
 def square(n):
     return n * n
 
-square(5)   # -> 25
+print(square(5))   # 25
+print(square(9))   # 81
 \`\`\`
 
-### Anatomy
+- \`def\` starts the definition, and \`square\` is the name you call.
+- \`n\` is a \`parameter\`, a placeholder filled in by the \`argument\` you pass at the call site.
+- Everything indented under \`def\` is the \`body\`.
+- \`return\` immediately exits the function and produces its result. A function that never hits a \`return\` hands back \`None\`.
 
-\`\`\`text
-def  square (n)  :        return  n * n
-└┬┘   └──┬─┘ └┬┘ │          └┬─┘   └──┬──┘
-keyword name  param colon  keyword  the value sent back
-\`\`\`
+### \`return\` is not \`print\`
 
-- \`def\` starts the definition.
-- \`square\` is the name you'll call.
-- \`n\` is a **parameter**, a placeholder filled in when the function is called.
-- Everything indented under the \`def\` is the **body**.
-- \`return\` ends the function and produces its result. A function with no \`return\` hands back
-  \`None\`.
-
-### The long way vs the idiom
-
-You *could* stash the answer in a variable and print it:
+This trips up almost everyone once. \`print\` draws text on the screen and hands back \`None\`. \`return\` gives a value to the surrounding code.
 
 \`\`\`python
-def square(n):
-    answer = n * n
-    print(answer)     # shows it, but hands back None
+def bad(n):
+    print(n * n)     # shows it, returns None
+
+x = bad(5)           # prints 25
+print(x + 1)         # TypeError: NoneType + int
 \`\`\`
 
-Printing is **not** the same as returning. The grader checks what you \`return\`, so reach for
-\`return\` whenever a function should produce a value.
+The grader checks what you \`return\`, and only a returned value can be fed into other code. When a function should produce a value, \`return\` it.
 
-### Keep it readable
+### Pitfall: float vs floor division
 
-Give parameters names that say what they hold (\`f\` for Fahrenheit, \`c\` for Celsius), and
-return the expression directly when it's a one-liner. No temporary variable is needed.
+Both of your exercises divide, so watch the division operator. In Python 3, \`/\` is float division and always yields a \`float\`, even when it divides evenly.
 
-### Recap
+\`\`\`python
+print(9 / 4)     # 2.25   float division
+print(9 // 4)    # 2      floor division, throws away the remainder
+\`\`\`
 
-A function = \`def name(params):\` + a body + a \`return\`. Next, you'll write two of them.`,
+Two traps in your formulas. First, use \`/\`, not \`//\`. Floor division like \`(f - 32) * 5 // 9\` rounds down (\`//\` floors toward negative infinity), so a result that should be \`37.777...\` comes back as \`37\`. Second, keep the parentheses. \`f - 32 * 5 / 9\` evaluates \`32 * 5 / 9\` first, because \`*\` and \`/\` bind tighter than \`-\`, which is not the conversion you want. Write \`(f - 32)\` so the subtraction happens before the multiply.
+
+**Interview nuance:** interviewers favor pure functions, ones whose output depends only on their arguments and that cause no side effects (no printing, no mutating globals). \`to_celsius(212)\` returns \`100.0\` every time, so it is trivial to test, cache, and compose, as in \`to_fahrenheit(to_celsius(212))\`. A function that prints instead of returning cannot be reused or asserted on, which is exactly why "return, do not print" is the first thing a reviewer checks.`,
     demoCode: `def square(n):
     return n * n
 
@@ -723,50 +788,42 @@ const numbersLesson: PythonLesson = {
   skills: ["numbers", "arithmetic", "floor-division", "modulo"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Numbers and arithmetic
+    markdown: `## Why arithmetic types matter
 
-Python has two everyday number types: **integers** (whole numbers like \`3\`, \`-7\`) and **floats**
-(decimals like \`3.14\`, \`2.0\`). You combine them with the usual operators:
+Every counter, price, average, and timestamp your code touches is a number, and Python has two everyday flavors: **integers** (\`int\`, whole numbers like \`3\` or \`-7\`) and **floats** (\`float\`, decimals like \`3.14\` or \`2.0\`). The distinction is not cosmetic. An \`int\` is exact and can grow arbitrarily large; a \`float\` is a fixed-width binary approximation that trades exactness for a decimal point. Pick the wrong one and a report that should read \`2 hours\` reads \`2.0833333 hours\`, or a total that should be \`100\` drifts to \`99.99999999\`. Interviewers and data pipelines both care which type you end up holding.
 
-\`\`\`python
-7 + 2     # 9    addition
-7 - 2     # 5    subtraction
-7 * 2     # 14   multiplication
-7 / 2     # 3.5  division, ALWAYS gives a float
-\`\`\`
-
-### Floor division and modulo
-
-Two operators are easy to miss but show up constantly:
+### The operators, and the type each returns
 
 \`\`\`python
-17 // 5   # 3   floor division: how many whole 5s fit
-17 % 5    # 2   modulo: the remainder left over
+7 + 2     # 9     int + int -> int
+7 - 2     # 5
+7 * 2     # 14
+7 / 2     # 3.5   true division ALWAYS returns a float
+2 ** 10   # 1024  power
 \`\`\`
 
-Together they split a number into a whole part and a remainder, perfect for "125 minutes is 2
-hours and 5 minutes":
+The one to memorize: \`/\` always gives a \`float\`, even when the result is whole. \`6 / 2\` is \`3.0\`, not \`3\`. That is exactly what your \`average(a, b, c)\` exercise wants: sum the three numbers and divide by \`3\`, and a decimal answer is correct.
+
+### Floor division and modulo: splitting into groups
+
+\`//\` gives the whole number of times the divisor fits, and \`%\` gives what is left over. Together they split one number into a quotient and a remainder:
 
 \`\`\`python
 total = 125
-hours = total // 60    # 2
-mins = total % 60      # 5
+hours = total // 60   # 2   whole hours
+mins  = total % 60    # 5   leftover minutes
 \`\`\`
 
-### Powers
+That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[total_minutes // 60, total_minutes % 60]\`, which is \`[2, 5]\` for \`125\`. Reach for \`//\` and \`%\` whenever you mean "how many whole groups" and "what is left".
 
-\`**\` raises to a power: \`2 ** 10\` is \`1024\`.
+### Pitfalls
 
-### Keep it readable
+**Float equality lies.** Because floats are binary approximations, \`0.1 + 0.2 == 0.3\` evaluates to \`False\` (\`0.1 + 0.2\` is actually \`0.30000000000000004\`). Never compare floats with \`==\`. Compare with a tolerance, for example \`abs(x - y) < 1e-9\`, or use \`math.isclose(x, y)\`.
 
-Reach for \`//\` and \`%\` when you mean "whole groups" and "what's left". Use plain \`/\` when you
-want an exact decimal answer.
+**\`//\` is not truncation.** \`//\` floors toward negative infinity, so \`-7 // 2\` is \`-4\`, not \`-3\`. And \`%\` takes the sign of the divisor: \`-7 % 2\` is \`1\` in Python. This surprises people coming from C or Java. For your minute problems the inputs are non-negative, so \`//\` and \`%\` line up with everyday intuition, but know the edge case exists.
 
-### Recap
-
-\`+ - * /\` do the obvious thing (\`/\` returns a float), \`//\` floor-divides, \`%\` gives the
-remainder, and \`**\` is power. Next you'll split minutes into hours and minutes, then average three
-numbers.`,
+**Interview nuance:** the identity \`a == (a // b) * b + (a % b)\` always holds in Python, and because \`//\` floors (rather than truncating toward zero like C, Java, and Go), Python's \`%\` result always carries the sign of the divisor \`b\`, never the sign of \`a\`. Interviewers use this to test whether you actually know your language's division semantics: \`-7 % 3\` is \`2\` in Python but \`-1\` in C. When you need clock-style wraparound (an index that stays in range), Python's flooring \`%\` is the behavior you want.
+`,
     demoCode: `total = 125
 print(total // 60)   # 2  (whole hours)
 print(total % 60)    # 5  (leftover minutes)
@@ -830,46 +887,51 @@ const boolNoneConvertLesson: PythonLesson = {
   skills: ["booleans", "none", "type-conversion", "truthiness"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## True, False, None, and changing types
+    markdown: `## True, False, None, and turning one type into another
 
-A **boolean** is one of two values: \`True\` or \`False\`. Comparisons produce booleans:
+Real programs live at boundaries where data arrives as text. A form field, a CSV cell, a query string, a JSON body from an API: all of it shows up as \`str\`, even when it means a number. Before you can add, compare, or store it you have to convert it, and you have to decide what "missing" looks like. Get the conversion or the missing-value check wrong and you either crash on bad input or silently treat empty data as real data. That is exactly the kind of edge case an interviewer builds a test around.
+
+### Booleans come from asking questions
+
+A **boolean** is one of two values, \`True\` or \`False\`, and it is what a comparison hands back:
 
 \`\`\`python
 3 > 2     # True
-3 == 4    # False   (== tests equality; = assigns)
+3 == 4    # False   (\`==\` compares; \`=\` assigns)
 \`\`\`
 
-\`None\` is Python's "nothing here" value, a deliberate placeholder for "no result yet".
+You use booleans to drive branches (\`if\`), loops (\`while\`), and filters. Keep \`==\` (compare) and \`=\` (assign) straight, because swapping them is a classic typo.
+
+### \`None\` means "there is nothing here"
+
+\`None\` is Python's single "no value" object, used for "not set yet" or "no result". It is not \`0\` and not \`""\`, which are both real values. Test for it with identity, \`x is None\`, not \`x == None\`, because \`None\` is a unique singleton and \`is\` checks for that exact object.
 
 ### Converting between types
 
-Input often arrives as text. Convert it with \`int()\`, \`float()\`, or \`str()\`:
+Input often arrives as text, so convert it explicitly:
 
 \`\`\`python
-int("42")     # 42      text -> integer
-float("3.5")  # 3.5     text -> float
-str(42)       # "42"    number -> text
+int("42")     # 42     text -> integer
+float("3.5")  # 3.5    text -> float
+str(42)       # "42"   number -> text
 \`\`\`
+
+\`int()\` is strict. It parses \`"42"\` but raises \`ValueError\` on \`""\`, \`"3.5"\`, or \`"12a"\`. That strictness is why a function like \`parse_or_zero\` has to check for the empty string *before* it calls \`int()\`, not after.
 
 ### Truthiness
 
-Every value is either "truthy" or "falsy" when used in a condition. The falsy ones are worth
-memorising: \`0\`, \`""\` (empty string), \`[]\` (empty list), \`None\`, and \`False\`. Everything
-else is truthy.
+In a condition, every value is either **truthy** or **falsy**. Memorise the falsy ones: \`False\`, \`None\`, \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`()\`. Everything else is truthy.
 
 \`\`\`python
-"yes" if "hello" else "no"   # "yes" , non-empty string is truthy
-"yes" if "" else "no"        # "no"  , empty string is falsy
+"yes" if "hello" else "no"   # "yes"   non-empty string is truthy
+"yes" if "" else "no"        # "no"    empty string is falsy
 \`\`\`
 
-That \`A if condition else B\` form is a **conditional expression**: it evaluates to \`A\` when the
-condition is truthy, otherwise \`B\`.
+That \`A if condition else B\` shape is a **conditional expression**: it evaluates to \`A\` when the condition is truthy, otherwise \`B\`. It is the whole answer to a \`yes_no\`-style helper.
 
-### Recap
+One trap: \`bool("False")\` is \`True\` and \`bool("0")\` is \`True\`, because both are non-empty strings. Truthiness asks whether the container is empty, not what the text spells. If you ever need to interpret the *word* \`"false"\`, you must compare the string yourself.
 
-\`True\`/\`False\` come from comparisons, \`None\` means "nothing", \`int()/float()/str()\` convert
-types, and empty/zero/None values are falsy. Next you'll guard a conversion and branch on
-truthiness.`,
+**Interview nuance:** \`bool\` is a subclass of \`int\` in Python, so \`True\` equals \`1\` and \`False\` equals \`0\`. That means \`sum([True, False, True])\` is \`2\`, a common one-liner for counting how many items pass a test. Interviewers probe this to see if you know \`isinstance(True, int)\` is \`True\`, and that a stray boolean can quietly do arithmetic instead of raising.`,
     demoCode: `print(int("42") + 8)   # 50
 print(str(42) + "!")   # 42!
 print(3 > 2)           # True
@@ -938,9 +1000,13 @@ const stringsIndexLesson: PythonLesson = {
   skills: ["strings", "indexing", "slicing", "len"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## A string is a sequence of characters
+    markdown: `## Why reaching into text by position matters
 
-Each character in a string has a **position** (an *index*), counted from \`0\`:
+Almost every parsing task starts with position. You pull a fixed-width field out of a log line, strip a known bracket or prefix off an ID, grab the last four characters of an order number, or read a file extension off the end of a name. Before you reach for fancy string methods or regular expressions, indexing and slicing are the cheapest, most predictable way to get at part of a string. Get these solid and half of "clean up this messy text" work becomes trivial.
+
+## A string is an indexed sequence
+
+A Python string is an ordered sequence of characters. Every character has a **position**, called an *index*, counted from \`0\` at the front. You can also count from the back with negative indices, where \`-1\` is the last character:
 
 \`\`\`text
  p  y  t  h  o  n
@@ -948,36 +1014,41 @@ Each character in a string has a **position** (an *index*), counted from \`0\`:
 -6 -5 -4 -3 -2 -1      <- index from the back
 \`\`\`
 
-Reach in with square brackets:
+Reach in with square brackets, and use \`len()\` to count characters:
 
 \`\`\`python
 word = "python"
 word[0]    # "p"   first character
-word[-1]   # "n"   last character (negative counts from the end)
-len(word)  # 6     how many characters
+word[-1]   # "n"   last character
+len(word)  # 6     number of characters
 \`\`\`
 
-### Slicing
+To build the first-and-last string you will need in the Apply, you combine two indexed characters with \`+\`: \`word[0] + word[-1]\` gives \`"pn"\`. For a one-character string like \`"a"\`, both \`word[0]\` and \`word[-1]\` point at the same character, so you get \`"aa"\`.
 
-\`text[start:stop]\` takes a **slice**, from \`start\` up to *but not including* \`stop\`:
+## Slicing: half-open ranges
+
+\`text[start:stop]\` returns a **slice**, a new string running from \`start\` up to *but not including* \`stop\`:
 
 \`\`\`python
 word[0:3]   # "pyt"   indices 0, 1, 2
 word[2:]    # "thon"  from 2 to the end
-word[:2]    # "py"    from the start to 2
+word[:2]    # "py"    start up to index 2
 word[1:-1]  # "ytho"  drop the first and last character
 \`\`\`
 
-### Immutability
+That \`word[1:-1]\` pattern is exactly what the Practice needs. \`text[1:-1]\` starts at the second character and stops just before the last, so \`"[hi]"\` becomes \`"hi"\`.
 
-Strings can't be changed in place: \`word[0] = "P"\` is an error. Instead you build a **new**
-string (you'll do that with methods in the next lesson).
+## Strings are immutable
 
-### Recap
+You cannot change a character in place. \`word[0] = "P"\` raises \`TypeError\`. Every operation that "modifies" a string actually builds a **new** string and leaves the original untouched. That is why slicing returns a fresh value instead of editing \`word\`.
 
-Index with \`[i]\` (0-based, negatives from the end), slice with \`[start:stop]\`, count with
-\`len()\`, and remember strings are immutable. Next you'll grab the ends of a word, then trim them
-off.`,
+### Pitfalls
+
+- **Indexing out of range raises, slicing does not.** \`"hi"[5]\` raises \`IndexError\`, but \`"hi"[0:5]\` quietly clamps and returns \`"hi"\`. Slicing never errors on out-of-range bounds; single-character indexing does.
+- **The empty string has no characters.** \`""[0]\` raises \`IndexError\`, so \`first_and_last("")\` would blow up. Both exercises assume at least one character, but in real code you check for empty input first.
+- **A short slice can go empty, not error.** \`"ab"[1:-1]\` is \`""\`, because \`start\` (1) is not before \`stop\` (-1, meaning index 1). No exception, just an empty result.
+
+**Interview nuance:** Python slicing uses a *half-open* interval \`[start, stop)\`. This is not a quirk; it makes the boundary math clean. With non-negative, in-range bounds where \`start\` is at or before \`stop\`, the slice length is exactly \`stop - start\`, and for any index \`i\`, \`s[:i] + s[i:] == s\` reconstructs the original with no overlap and no gap. Interviewers lean on this half-open convention to check whether you reason about boundaries correctly, the same off-by-one discipline that shows up in array windows and pagination.`,
     demoCode: `word = "python"
 print(word[0])     # p
 print(word[-1])    # n
@@ -1041,28 +1112,27 @@ const stringsMethodsLesson: PythonLesson = {
   skills: ["strings", "string-methods", "f-strings"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Methods reshape text
+    markdown: `## Text methods return new strings
 
-A **method** is a function attached to a value, called with a dot. Strings come with handy ones.
-Each returns a **new** string (the original is untouched):
+Real code rarely gets clean text. User input has stray spaces, CSV columns mix cases, log lines carry delimiters. Normalizing text before you compare it, store it, or use it as a key prevents a whole class of bugs where \`"Ada"\`, \`"ada "\`, and \`" ADA"\` get treated as three different users. String methods are the everyday tools for that cleanup.
+
+Start from one fact: a Python string is **immutable**. Once created, its characters never change. So a string method never edits the value in place. It reads the original and returns a brand-new value, leaving the original untouched. That single property explains everything below.
+
+Common methods. Most return a new string; \`.split()\` returns a list. None of them touch the original:
 
 \`\`\`python
-"  Hello  ".strip()        # "Hello"   remove surrounding whitespace
+"  Hello  ".strip()        # "Hello"   trim surrounding whitespace
 "Hello".lower()            # "hello"
 "Hello".upper()            # "HELLO"
-"a,b,c".split(",")         # ["a", "b", "c"]   text -> list
-"cat".replace("c", "b")    # "bat"
+"a,b,c".split(",")         # ["a", "b", "c"]   string -> list
+"aca".replace("a", "b")    # "bcb"   replaces every match, not just the first
 \`\`\`
 
-Because each returns a string, you can **chain** them left to right:
+Because \`.strip()\` and \`.lower()\` each return a string, you can **chain** them left to right. The demo below runs \`messy.strip().lower()\` on \`"  PyThOn  "\`: \`.strip()\` yields \`"PyThOn"\`, then \`.lower()\` turns that into \`"python"\`.
 
-\`\`\`python
-"  PyThOn  ".strip().lower()   # "python"
-\`\`\`
+### f-strings build text from values
 
-### f-strings
-
-An **f-string** builds text by dropping values straight into \`{ }\`. Put an \`f\` before the quote:
+An **f-string** drops values straight into \`{ }\`. Put an \`f\` before the opening quote:
 
 \`\`\`python
 name = "Ada"
@@ -1070,13 +1140,23 @@ count = 3
 f"{name} has {count} messages"   # "Ada has 3 messages"
 \`\`\`
 
-You can even call methods inside the braces: \`f"Hi {name.upper()}"\` → \`"Hi ADA"\`.
+You can run expressions inside the braces, including method calls. The demo uses \`f"Hi {name.upper()}!"\`, which evaluates \`name.upper()\` to \`"ADA"\` and produces \`"Hi ADA!"\`.
 
-### Recap
+### Pitfall: methods do not mutate
 
-\`.strip()\`, \`.lower()\`, \`.upper()\`, \`.split()\`, and \`.replace()\` return new strings (and
-chain), while f-strings interpolate values into text. Next you'll normalise some text, then build a
-greeting with an f-string.`,
+Because strings are immutable, this looks like it cleans \`text\` but does nothing:
+
+\`\`\`python
+text = "  Hello  "
+text.strip()        # returns "Hello", but the result is discarded
+print(text)         # "  Hello  "   still unchanged
+\`\`\`
+
+You have to **capture** the return value: \`text = text.strip().lower()\`, or \`return\` the chained expression directly. That is exactly the move \`normalize\` needs. Forgetting it is the single most common string bug interns ship.
+
+**Interview nuance:** immutability carries a cost interviewers probe. Building a string with repeated \`+=\` in a loop is O(n squared), because each concatenation copies the entire string so far into a fresh one. For \`n\` pieces that is quadratic work. The fix is \`"".join(parts)\`, which walks the pieces once for O(n). Reach for \`str.join\` over \`+=\` whenever you assemble text from many parts.
+
+You will now normalize some text by stripping and lowercasing it, then build an uppercased greeting with an f-string.`,
     demoCode: `messy = "  PyThOn  "
 print(messy.strip().lower())   # python
 
@@ -1143,42 +1223,52 @@ const listsLesson: PythonLesson = {
   skills: ["lists", "indexing", "append", "mutability"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Lists hold an ordered collection
+    markdown: `## Why lists are the default container
 
-A **list** is an ordered, changeable collection written with square brackets:
+Reach for a list any time you have an ordered sequence you will read, grow, or reshape: rows streamed from a query, tokens parsed from a line, a batch of records waiting to be written. It is the collection you build up in a loop and hand off to the next stage of a pipeline. Because it is both ordered and changeable, one list can serve as your accumulator, your buffer, and your result all at once.
+
+### The mental model: a dynamic array of references
+
+A Python list is a dynamic array. Under the hood it holds a contiguous block of slots pointing at your objects, and the interpreter resizes that block for you as the list grows. Two consequences follow. First, reaching any position by index is a direct jump, so \`nums[i]\` costs the same whether the list has 3 items or 3 million. Second, the list stores references, not copies, so the same object can sit in more than one list at once.
+
+You write a list with square brackets and index it like a string, starting at \`0\`:
 
 \`\`\`python
 nums = [10, 20, 30]
-nums[0]      # 10          index like a string (0-based)
+nums[0]      # 10          first item
 nums[-1]     # 30          negative counts from the end
-nums[1:]     # [20, 30]    slicing works too
-len(nums)    # 3
+nums[1:]     # [20, 30]    a slice returns a new list
+len(nums)    # 3           how many items
 \`\`\`
 
-### Changing a list
+### Mutability: changing in place
 
-Unlike strings, lists are **mutable**. You can change them in place:
+Unlike strings and tuples, lists are mutable. The methods below change the existing list rather than returning a new one:
 
 \`\`\`python
 nums.append(40)     # [10, 20, 30, 40]      add to the end
 nums.insert(0, 5)   # [5, 10, 20, 30, 40]   add at an index
-nums.remove(20)     # [5, 10, 30, 40]       remove the first 20
+nums.remove(20)     # [5, 10, 30, 40]        remove the first 20
 \`\`\`
 
-### Building from scratch
+The demo below starts from \`[10, 20, 30]\`, calls \`append(40)\`, and prints \`[10, 20, 30, 40]\`, so \`nums[-1]\` is \`40\` and \`len(nums)\` is \`4\`. Notice \`append\` returns \`None\`: it mutates the list and hands nothing back, which is exactly why the Apply task asks you to \`append\` and then \`return items\` on a separate step.
 
-Start empty and grow:
+### Pitfall: aliasing shares one object
+
+Assignment copies the reference, not the list. Both names then point at the same object:
 
 \`\`\`python
-picked = []
-picked.append("a")
-picked.append("b")   # ["a", "b"]
+a = [1, 2, 3]
+b = a
+b.append(4)
+print(a)        # [1, 2, 3, 4]   a changed too
 \`\`\`
 
-### Recap
+If you wanted an independent copy, make one explicitly with \`a[:]\`, \`list(a)\`, or \`a.copy()\`. Interns lose hours to a helper that quietly mutates the caller's list.
 
-Lists are ordered and mutable: index/slice like strings, \`append\`/\`insert\`/\`remove\` to change
-them, \`len()\` to size them. Next you'll grow a list, then reach into the middle of one.`,
+For the Practice task, the middle index is \`len(items) // 2\`. Integer division \`//\` floors the result, so a 5-item list gives index \`2\`, landing on the true center \`30\`. On an even-length list it picks the right-of-center item, which is the intended, deterministic rule.
+
+**Interview nuance:** know the cost of each operation. Indexing and \`append\` are effectively O(1) (append is amortized O(1) because the backing array over-allocates), but \`insert(0, x)\`, \`remove\`, and \`pop(0)\` are O(n) because every later element shifts one slot. If a problem needs fast inserts or removes at the front, that is the signal to reach for \`collections.deque\` instead of a list.`,
     demoCode: `nums = [10, 20, 30]
 nums.append(40)
 print(nums)        # [10, 20, 30, 40]
@@ -1246,45 +1336,47 @@ const tuplesSetsLesson: PythonLesson = {
   skills: ["tuples", "sets", "uniqueness", "membership"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Tuples: fixed records
+    markdown: `## Why tuples and sets earn their own types
 
-A **tuple** is like a list but **immutable**: once created it can't change. Use one for a fixed
-group of values that belong together (a point, a row):
+A \`list\` is your default container, but two jobs deserve a sharper tool. When a group of values forms one fixed record (a \`(latitude, longitude)\` pair, one database row, the several results a function returns), a \`tuple\` signals "this shape will not change." When you only care whether something is present or how many distinct things you saw (unique user IDs in a log, an allow-list of permitted roles), a \`set\` answers in one fast step instead of a scan.
+
+## Tuples: fixed records
+
+A \`tuple\` is an ordered, immutable sequence. You index it like a list, but you cannot reassign, append to, or grow it after creation:
 
 \`\`\`python
 point = (3, 4)
-point[0]      # 3
-x, y = point  # unpack into two names: x = 3, y = 4
+point[0]        # 3
+x, y = point    # unpack: x = 3, y = 4
 \`\`\`
 
-Many functions hand back tuples. For example, \`divmod(17, 5)\` returns \`(3, 2)\`.
+That unpacking is why functions return tuples to hand back several values at once. \`divmod(17, 5)\` returns \`(3, 2)\`, and you can catch it as \`q, r = divmod(17, 5)\`. A tuple of hashable values is itself hashable, so tuples can live inside a \`set\` or serve as \`dict\` keys (lists cannot).
 
-## Sets: unique membership
+## Sets: a hash table of unique keys
 
-A **set** is an unordered collection with **no duplicates**, written with curly braces (or
-\`set(...)\`):
+A \`set\` is an unordered collection of unique, hashable values, backed by the same hash table that powers \`dict\` keys. Duplicates collapse on the way in, and membership is answered by hashing, not scanning:
 
 \`\`\`python
-seen = {1, 2, 2, 3}   # {1, 2, 3} , duplicates collapse
-3 in seen             # True      , fast membership test
+seen = {1, 2, 2, 3}      # stored as {1, 2, 3}
+3 in seen                # True
+len(set([1, 2, 2, 3]))   # 3   distinct count
 \`\`\`
 
-Building a set from a list is the quickest way to drop duplicates or count distinct values:
-
-\`\`\`python
-len(set([1, 2, 2, 3]))   # 3   how many distinct items
-\`\`\`
+Wrapping a list in \`set(...)\` is the idiomatic way to drop duplicates or count distinct values.
 
 ### When to use which
 
-- **Tuple**: a small fixed record whose shape won't change.
-- **Set**: you care about uniqueness or "is this in here?", not order.
+- \`tuple\`: a small fixed record whose fields will not change.
+- \`set\`: you care about uniqueness or membership, not order or position.
 
-### Recap
+### Pitfalls
 
-Tuples are immutable ordered records (and unpack into names); sets are unordered, unique, and great
-for membership and de-duplication. Next you'll count distinct items, then find the smallest and
-largest.`,
+- Empty braces \`{}\` make an empty \`dict\`, not a \`set\`. Use \`set()\` for an empty set.
+- A one-element tuple needs a trailing comma. \`(3)\` is just the integer \`3\`; \`(3,)\` is a tuple.
+- Sets are unordered. Never rely on iteration order or index a set (\`my_set[0]\` raises \`TypeError\`). If you need order, sort into a list.
+- Set elements must be hashable, so a \`set\` of \`list\`s fails, but a \`set\` of \`tuple\`s works.
+
+**Interview nuance:** membership cost is the reason to reach for a set. \`x in some_list\` is \`O(n)\` because Python checks each element in turn, while \`x in some_set\` is \`O(1)\` on average because it hashes straight to a bucket. That is exactly why counting distinct values through a \`set\` beats comparing every pair, and why de-duplication loops that build a set as they go run in linear time.`,
     demoCode: `nums = [1, 2, 2, 3, 3, 3]
 print(len(set(nums)))   # 3   distinct values
 print(2 in set(nums))   # True
@@ -1348,39 +1440,45 @@ const dictsLesson: PythonLesson = {
   skills: ["dictionaries", "key-value", "get", "merge"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Dictionaries map keys to values
+    markdown: `## Why dictionaries matter
 
-A **dictionary** stores **key → value** pairs in curly braces. Look a value up by its key, not by
-position:
+When your question is "what value goes with this key?", a dictionary answers it fast. A list forces you to scan element by element to find a match, and that cost grows with the list. A dict jumps straight to the value. Real systems lean on this everywhere: counting events, caching results, indexing rows by \`id\`, grouping records, and passing named config around. Any "user id to profile" map or word-count tally is a dict.
+
+## The mental model: a hash map
+
+A dictionary stores \`key: value\` pairs. Under the hood it is a hash map. Python runs each key through a hash function to find the slot where its value lives, so a lookup takes about the same time whether the dict holds 10 pairs or 10 million. That average \`O(1)\` lookup, insert, and delete is the reason the type exists.
+
+Two consequences of the hash-map design:
+- Keys must be hashable, which in practice means immutable. \`str\`, \`int\`, and \`tuple\` work as keys; a \`list\` does not and raises \`TypeError\`.
+- Since Python 3.7 a dict keeps insertion order, so iterating returns keys in the order you added them.
+
+## Reading and writing
+
+Index a key with \`d[key]\`, but a missing key raises \`KeyError\`. Reach for \`.get(key, default)\` when the key might be absent and you want a fallback instead of a crash:
 
 \`\`\`python
 prices = {"apple": 3, "pear": 2}
-prices["apple"]    # 3
+prices["apple"]            # 3
+prices.get("banana", 0)    # 0, the default, because "banana" is absent
+prices["plum"] = 4         # bracket assignment adds a new pair
+prices["apple"] = 5        # the same syntax updates an existing key
 \`\`\`
 
-### Safe lookups with .get
+That \`.get(name, 0)\` pattern is exactly what the \`lookup\` exercise needs.
 
-Indexing a missing key is an error. \`.get(key, default)\` returns a fallback instead:
+Merge two dicts into a brand new one with \`{**a, **b}\`. The demo below spreads \`{"fig": 6}\` into \`prices\` and leaves both originals untouched. When both sides share a key, the right-hand dict wins:
 
 \`\`\`python
-prices.get("apple", 0)    # 3
-prices.get("banana", 0)   # 0  , not found, so the default
+{**{"x": 1}, **{"x": 9}}   # {'x': 9}, b overrides a on the shared key
 \`\`\`
 
-### Add, update, and merge
+That is the \`merge_two\` exercise in one line. Python 3.9+ also offers \`a | b\` for the same result.
 
-\`\`\`python
-prices["plum"] = 4                    # add a new pair
-prices["apple"] = 5                   # update an existing key
-combined = {**prices, **{"fig": 6}}   # merge into a NEW dict
-\`\`\`
+## Pitfalls
 
-When two dicts share a key, the **right-hand** one wins in a merge.
+\`.get\` with no default returns \`None\`, not an error, when the key is missing, so \`prices.get("banana")\` gives \`None\` rather than \`0\`. Always pass the fallback you actually want. Watch the direction too: \`key in d\` tests keys, not values, so \`"apple" in prices\` is \`True\` but \`3 in prices\` is \`False\`. And bracket assignment overwrites silently, so \`d[key] = value\` replaces any existing value with no warning. That same rule is why the right operand wins in a merge.
 
-### Recap
-
-Dicts map keys to values: read with \`d[key]\` or the safer \`d.get(key, default)\`, assign with
-\`d[key] = value\`, and merge with \`{**a, **b}\`. Next you'll look up a price, then merge two dicts.`,
+**Interview nuance:** interviewers probe why dict lookup is \`O(1)\` while list membership (\`x in some_list\`) is \`O(n)\`. The dict hashes the key and jumps to a slot; the list compares element by element. When a solution repeatedly asks "have I seen this before?", swapping a list for a dict or \`set\` is often the entire optimization, turning an \`O(n^2)\` loop into \`O(n)\`.`,
     demoCode: `prices = {"apple": 3, "pear": 2}
 print(prices["apple"])          # 3
 print(prices.get("banana", 0))  # 0
@@ -1469,47 +1567,68 @@ const identityEqualityLesson: PythonLesson = {
   skills: ["identity", "equality", "none", "is-operator"],
   teach: {
     estimatedMinutes: 3,
-    markdown: `## Two different questions: "equal?" vs "the same object?"
+    markdown: `## Identity and equality answer different questions
 
-\`==\` asks **"are these two values equal?"**. \`is\` asks **"are these two names pointing at the exact
-same object?"** They usually agree, but they answer different questions:
+\`==\` asks "do these two objects hold the same value?" \`is\` asks "are these two names bound to the exact same object in memory?" Most of the time they agree, so it is tempting to treat them as interchangeable, right up until the day they disagree and a bug slips through code review.
+
+Every value in Python is an object with a fixed identity, which you can inspect with \`id()\`. A variable is just a name pointing at one of those objects. \`is\` compares identities (roughly \`id(a) == id(b)\`), while \`==\` asks the left object to compare itself to the right one by calling its \`__eq__\` method.
 
 \`\`\`python
 a = [1, 2, 3]
 b = [1, 2, 3]
-a == b     # True , same contents
-a is b     # False, two different lists
+print(a == b)   # True  (same contents)
+print(a is b)   # False (two separate list objects)
 \`\`\`
 
-### Always check None with \`is\`
+\`a\` and \`b\` hold equal contents, so \`==\` is \`True\`. But they are two different lists built at two different moments, so their identities differ and \`is\` is \`False\`.
 
-\`None\` is a single, unique object, so the idiomatic (and correct) test is \`is None\`:
+### \`None\` is a singleton, so test it with \`is\`
+
+There is exactly one \`None\` object in a running program. \`NoneType\` never creates a second one. That is why \`value is None\` is the idiomatic and correct test: you are checking against the one true \`None\`, not against something that merely equals it.
 
 \`\`\`python
-if value is None:      # the right way
-    ...
-if value == None:      # works, but reviewers will flag it, don't
-    ...
+value = None
+print(value is None)   # True
 \`\`\`
 
-### Why not use \`is\` for numbers or strings?
+Style guides (PEP 8) and linters flag \`value == None\`. It usually works, but it routes through \`__eq__\`, which any class is free to override.
 
-Python *sometimes* reuses small ints and short strings, so \`is\` may look like it works, then
-silently break on bigger values:
+### Why \`== None\` can bite you
+
+\`==\` runs the object's own \`__eq__\`. A NumPy array, for instance, defines \`==\` to compare elementwise:
+
+\`\`\`python
+import numpy as np
+arr = np.array([1, 2, 3])
+arr == None            # array([False, False, False]), not a plain bool
+\`\`\`
+
+Now \`if arr == None:\` raises a \`ValueError\` about the truth value of an array being ambiguous. Writing \`arr is None\` sidesteps all of that: it is a pure identity check that no class can redefine, and it is exactly what \`is_missing(value)\` should use.
+
+### Do not use \`is\` for numbers or strings
+
+CPython caches small integers and some short strings, so \`is\` can look correct and then fail on larger values:
 
 \`\`\`python
 x = 1000
 y = 1000
-x == y    # True , always use == for values
-x is y    # may be False! never rely on this
+print(x == y)   # True  (always trust this for values)
+print(x is y)   # may print False; never rely on it
 \`\`\`
 
-**Rule of thumb:** \`is\` only for \`None\` (and \`True\`/\`False\`); \`==\` for everything else.
+Whether two equal ints share identity is an implementation detail. Use \`==\` for values, and reserve \`is\` for \`None\` (and \`True\`/\`False\`).
 
-### Recap
+### Guard before you touch a maybe-\`None\`
 
-\`==\` compares values, \`is\` compares identity, and you check for \`None\` with \`is None\`. Next
-you'll flag a missing value, then safely measure one that might be \`None\`.`,
+\`None\` supports very few operations. \`len(None)\` raises \`TypeError: object of type 'NoneType' has no len()\`. So check first, then act:
+
+\`\`\`python
+if value is None:
+    return 0
+return len(value)
+\`\`\`
+
+**Interview nuance:** interviewers probe why \`is None\` beats \`== None\`. Identity is a constant-time pointer comparison that cannot be overridden and leans on \`None\` being a guaranteed singleton, so it is both faster and impossible to fool. Equality dispatches to \`__eq__\`, which is arbitrary user code whose result and cost you do not control.`,
     demoCode: `a = [1, 2, 3]
 b = [1, 2, 3]
 print(a == b)   # True  (equal contents)
@@ -1576,60 +1695,74 @@ const referencesCopyLesson: PythonLesson = {
   skills: ["references", "mutability", "copying", "default-arguments"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## A name is a label on an object, not a box
+    markdown: `## A name is a label, not a box
 
-Assigning one list to another name does **not** copy it. Both names label the **same** list:
+You pass lists and dicts between functions all day. If you believe assignment copies them, you get the worst class of bug: a value mutates somewhere you never touched, and the broken read is nowhere near the accidental write. Knowing exactly what shares an object is what separates code that scales from code that corrupts state under you.
+
+### The model: names bind to objects
+
+Every value in Python is an object living somewhere in memory. A variable is just a name bound to that object, not a box holding a copy. Assignment binds a second name to the *same* object:
 
 \`\`\`python
 a = [1, 2, 3]
-b = a            # b labels the SAME list
+b = a            # b binds to the SAME list, no copy happens
 b.append(4)
-a                # [1, 2, 3, 4] , a changed too!
+print(a)         # [1, 2, 3, 4]
+print(a is b)    # True, one list with two names
 \`\`\`
 
-This "spooky action at a distance" is the #1 source of *"why did my other list change?"* bugs.
+\`a is b\` asks "same object?" (identity), while \`a == b\` asks "same value?" (equality). The demo below shows this exactly: mutating through \`b\` is visible through \`a\` because there is only one list.
 
-### Build a new list instead of mutating
+### Build new instead of mutating
 
-When a function should return a changed version, build a **new** list and leave the input alone:
+When a function should return a changed version, build a fresh list and leave the input alone. This is what the Apply exercise wants:
 
 \`\`\`python
-def with_doubled(nums):
-    return [n * 2 for n in nums]   # new list; nums untouched
+def doubled(nums):
+    return [n * 2 for n in nums]   # new list; nums is untouched
 \`\`\`
 
-### Copying on purpose
+The comprehension allocates a new list, so the caller's data is safe. Prefer this over looping and calling \`nums.append(...)\`, which would edit the caller's list in place.
 
-Need a genuine copy? Shallow copy with a slice or \`list(...)\`; deep copy (nested) with
-\`copy.deepcopy\`:
+### Copy on purpose: shallow vs deep
+
+When you genuinely need a separate copy, do it deliberately. A slice \`a[:]\` or \`list(a)\` makes a shallow copy: a new outer list holding the *same* inner objects.
 
 \`\`\`python
-shallow = nums[:]            # new outer list, same inner objects
+c = a[:]         # new outer list
+c.append(99)
+print(a is c)    # False, independent outer lists
+\`\`\`
+
+For nested structures, a shallow copy still shares the inner objects, so editing \`grid[0][0]\` through the copy changes the original. Use \`copy.deepcopy\` when you need full independence:
+
+\`\`\`python
 import copy
-deep = copy.deepcopy(grid)   # fully independent, nested included
+deep = copy.deepcopy(grid)   # inner lists copied too
 \`\`\`
 
-### The mutable-default-argument trap
+### The mutable-default trap
 
-A default value is created **once**, so a mutable default is shared across every call:
+A default value is evaluated once, when the \`def\` statement runs, not on each call. So a mutable default is one shared object reused across every call:
 
 \`\`\`python
-def bad(item, bucket=[]):     # the SAME list every call, a classic bug
+def bad(item, bucket=[]):     # the SAME list every call
     bucket.append(item)
     return bucket
 
-def good(item, bucket=None):  # fresh list when none is given
+bad("a")   # ["a"]
+bad("b")   # ["a", "b"], the previous call leaked in
+
+def append_new(value, bucket=None):   # the safe pattern
     if bucket is None:
-        bucket = []
-    bucket.append(item)
+        bucket = []                    # fresh list each call
+    bucket.append(value)
     return bucket
 \`\`\`
 
-### Recap
+\`append_new\` is the Practice exercise: use \`None\` as the sentinel and create the list inside.
 
-Names share objects, so prefer building new values over mutating shared ones, copy deliberately
-(\`[:]\` or \`copy.deepcopy\`), and never use \`[]\`/\`{}\` as a default: use \`None\` and create it
-inside. Next you'll double a list without touching it, then write a safe accumulator.`,
+**Interview nuance:** default arguments are evaluated exactly once at function-definition time and stored on the function object (you can inspect \`bad.__defaults__\`, a tuple holding that one shared list). That is why \`bucket=[]\` accumulates across calls and \`bucket=None\` plus an inside-the-body \`[]\` does not. Interviewers use this to check whether you understand *when* Python evaluates expressions, not just what the syntax looks like.`,
     demoCode: `a = [1, 2, 3]
 b = a
 b.append(4)
@@ -1703,49 +1836,42 @@ const complexityChoiceLesson: PythonLesson = {
   skills: ["sets", "membership", "big-o", "data-structures"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Not all lookups cost the same
+    markdown: `## Why membership cost decides your data structure
 
-Checking \`x in some_list\` makes Python **scan every element**. On a list of a million items that's
-a million comparisons. Checking \`x in some_set\` (or a dict) jumps almost straight to the answer:
+Reach for the wrong container and a fast function turns slow without a single line looking "wrong." The trap is \`x in collection\`. It reads the same for a list, a set, and a dict, but it does very different amounts of work. On a list, Python compares \`x\` against elements one at a time until it finds a match or runs out. On a million-element list that is up to a million comparisons for one lookup. Do that inside a loop and you have an \`O(n^2)\` function that crawls on real data. Interviewers hand you exactly this shape and watch whether you notice.
+
+### The mental model
+
+A \`list\` is a dynamic array: values laid out in order, great for indexing and iteration, but membership means scanning. A \`set\` (and a \`dict\`) is a hash table: each element runs through a hash function that computes where it lives, so \`x in a_set\` jumps almost straight to the right slot instead of walking everything.
 
 \`\`\`python
-x in a_list    # O(n) , walks the whole list  (slow for big data)
-x in a_set     # O(1) , near-instant, any size (fast)
-x in a_dict    # O(1) , key lookup is instant too
+x in a_list    # O(n): walk the list until found or exhausted
+x in a_set     # O(1) average: hash x, look in one slot
+x in a_dict    # O(1) average: same hashing, keyed lookup
 \`\`\`
 
-\`O(n)\` means "cost grows with the size"; \`O(1)\` means "cost stays flat". This is the single most
-useful performance instinct: **when you repeatedly ask 'have I seen this?', reach for a set.**
+\`O(n)\` means cost grows with size; \`O(1)\` means it stays flat whether the set holds ten items or ten million. That is the instinct to build: when you repeatedly ask "have I seen this?", reach for a set.
 
 ### The classic upgrade
 
-\`\`\`python
-# slow: membership against a list, inside a loop -> O(n^2)
-seen = []
-for x in items:
-    if x in seen:   # scans seen every time
-        ...
-    seen.append(x)
+The demo below turns a list into a set and compares lengths. \`set(nums)\` drops duplicates, so if the set is shorter than the list, something repeated. That is the whole idea behind \`has_duplicates\`: \`len(set(nums)) != len(nums)\`. When you need the scan itself, grow a \`seen\` set as you go:
 
-# fast: same logic, a set -> O(n)
+\`\`\`python
 seen = set()
-for x in items:
-    if x in seen:   # instant
-        ...
+for x in nums:
+    if x in seen:      # O(1) check, not a rescan
+        ...            # x is a repeat, handle it here
     seen.add(x)
 \`\`\`
 
-### Pick by the question you're asking
+That loop is \`O(n)\`: one pass, each check flat. The list version, \`if x in seen\` against a growing list, would be \`O(n^2)\`.
 
-- **"Is it in here?" / "have I seen it?"** -> **set**
-- **"What value maps to this key?"** -> **dict**
-- **"What's the order / can there be duplicates?"** -> **list**
+### Pitfalls
 
-### Recap
+- \`set(nums)\` throws away order. It can tell you THAT a value repeated, but not WHICH one repeated first. For \`first_repeated\` you must scan left to right and test a growing \`seen\` set, returning the first \`x\` that is already inside it.
+- Set and dict elements must be hashable, which in practice means immutable. \`{[1, 2]}\` raises \`TypeError: unhashable type: 'list'\`. Numbers, strings, and tuples are fine; lists, dicts, and sets are not.
 
-List membership is \`O(n)\`; set and dict membership is \`O(1)\`. When you test membership repeatedly,
-a set turns a slow \`O(n^2)\` loop into a fast \`O(n)\` one. Next you'll detect duplicates, then find
-the first repeat.`,
+**Interview nuance:** \`O(1)\` membership is average case, not a guarantee. A hash table is fast because elements scatter across many slots, but adversarial or unlucky inputs can collide into one slot and degrade a single lookup toward \`O(n)\`. You also trade memory for that speed. So the honest answer to "why not always use a set?" is that sets cost extra memory, accept only hashable values, and keep no order.`,
     demoCode: `nums = [3, 1, 4, 1, 5, 9, 2, 6]
 distinct = set(nums)
 print(1 in distinct)               # True , O(1) membership
@@ -1818,43 +1944,55 @@ const loopIdiomsLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Loop over what you have, not over indexes
 
-Beginners often reach for \`range(len(...))\` and index back in. Python has cleaner idioms.
+Reaching for \`range(len(items))\` and indexing back with \`items[i]\` is the beginner tell. It reads noisily, breaks the moment you rename or reorder things, and is the classic home of off-by-one bugs. Python hands you iterators that give you exactly what you need, so you loop over the data itself instead of bookkeeping positions.
 
-### enumerate: when you need the index *and* the value
+### \`enumerate\`: the value plus its position
 
-\`\`\`python
-for i, name in enumerate(["Ada", "Sam"]):
-    print(i, name)     # 0 Ada / 1 Sam
-\`\`\`
-
-Compare the clunky version (\`for i in range(len(names)): names[i]\`), which is easy to get wrong.
-
-### zip: walk two lists in lockstep
+\`enumerate(iterable)\` wraps any iterable and yields \`(index, value)\` pairs, lazily, one at a time.
 
 \`\`\`python
-names = ["Ada", "Sam"]
-scores = [90, 85]
-for name, score in zip(names, scores):
-    print(name, score)    # Ada 90 / Sam 85
+for i, letter in enumerate(["a", "b", "c"]):
+    print(i, letter)
+# 0 a
+# 1 b
+# 2 c
 \`\`\`
 
-\`zip\` stops at the shorter list.
+Counting starts at \`0\`. Need 1-based numbering (line numbers, ranks)? Pass \`start\`: \`enumerate(items, start=1)\`. Do not hand-roll \`i + 1\`, and do not fall back to \`range\`. Each pair is a tuple, so \`i, letter\` unpacks it. When you actually need a \`[index, value]\` list (the Apply asks for exactly this), build one per item: \`[i, value]\`.
 
-### .items(): loop a dict's keys and values together
+### \`zip\`: walk several sequences in lockstep
+
+\`zip(a, b)\` pairs items by position: first of \`a\` with first of \`b\`, second with second, and so on. It is how you iterate two parallel lists without indexing either.
+
+\`\`\`python
+for name, score in zip(["Ada", "Sam"], [90, 85]):
+    print(name, score)
+# Ada 90
+# Sam 85
+\`\`\`
+
+To collect \`[name, score]\` lists (the Practice), build \`[name, score]\` inside the loop or a comprehension.
+
+### \`.items()\`: keys and values from a dict together
+
+Iterating a dict directly gives only keys. \`.items()\` gives both:
 
 \`\`\`python
 prices = {"apple": 3, "pear": 2}
 for fruit, price in prices.items():
     print(fruit, price)
+# apple 3
+# pear 2
 \`\`\`
 
-(\`.keys()\` and \`.values()\` give just one side.)
+\`.keys()\` and \`.values()\` give one side each. Since Python 3.7, all three iterate in insertion order.
 
-### Recap
+### Pitfalls
 
-\`enumerate\` gives you \`index, value\`; \`zip\` pairs up two sequences; \`.items()\` gives \`key,
-value\` from a dict. Reach for these instead of manual index bookkeeping. Next you'll number a list,
-then pair two lists together.`,
+- **\`zip\` silently truncates to the shortest input.** \`zip(["a", "b", "c"], [1, 2])\` yields only two pairs and drops \`"c"\` with no error. If your lists are meant to be the same length, that hides a data bug. Fix: assert \`len(a) == len(b)\` first, or use \`zip(a, b, strict=True)\` (Python 3.10+), which raises \`ValueError\` on a length mismatch.
+- **\`enumerate\` yields tuples, not lists.** \`list(enumerate(["a"]))\` is \`[(0, "a")]\`. If the caller expects \`[0, "a"]\`, convert explicitly.
+
+**Interview nuance:** both \`enumerate\` and \`zip\` return lazy iterators in Python 3, not lists. They pull one item at a time and use O(1) extra memory regardless of input size, which is why they scale to large or streaming data. The catch is single-pass: an iterator is exhausted after one loop. \`z = zip(a, b); list(z)\` gives the pairs, but a second \`list(z)\` gives \`[]\`, because the first pass consumed it. Wrap in \`list(...)\` once if you need to iterate the result more than once.`,
     demoCode: `for i, letter in enumerate(["a", "b", "c"]):
     print(i, letter)
 
@@ -1932,35 +2070,41 @@ const recursionLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Recursion: solve it in terms of a smaller self
 
-A **recursive** function calls itself on a smaller input until it hits a **base case** that stops the
-chain. Every recursion needs two parts:
+Some data has no fixed depth. A folder holds files and more folders. A JSON payload nests objects inside arrays inside objects. A comment thread has replies to replies to replies. You cannot write a \`for\` loop with the "right" number of levels, because you do not know the depth ahead of time. Recursion handles this: a function solves a problem by calling itself on a smaller piece, until the pieces are small enough to answer outright.
 
-1. **Base case**: the smallest input, answered directly (no further call).
-2. **Recursive case**: reduce the problem and call yourself.
+### The mental model
+
+Every recursive function needs exactly two parts:
+
+1. A **base case**: the smallest input you can answer directly, with no further call. This is what stops the chain.
+2. A **recursive case**: reduce the problem toward the base case, call yourself on the smaller input, and combine that result.
+
+The trick is to *trust* the recursive call. When you write \`factorial(n - 1)\`, assume it already returns the correct answer for \`n - 1\`, then build the answer for \`n\` on top of it. You do not trace the whole thing in your head. You define one honest step plus a stopping point, and the machine does the rest.
 
 \`\`\`python
 def factorial(n):
-    if n <= 1:                    # base case
+    if n <= 1:                     # base case: 0 and 1 both give 1
         return 1
-    return n * factorial(n - 1)   # recursive case
+    return n * factorial(n - 1)    # recursive case
+
+print(factorial(5))   # 120
 \`\`\`
 
-\`factorial(3)\` -> \`3 * factorial(2)\` -> \`3 * 2 * factorial(1)\` -> \`3 * 2 * 1\` = \`6\`.
+\`factorial(5)\` becomes \`5 * factorial(4)\`, then \`5 * 4 * factorial(3)\`, and so on down to \`factorial(1)\`, which returns \`1\` directly. Then the paused multiplications finish on the way back up: \`5 * 4 * 3 * 2 * 1 = 120\`.
 
 ### The call stack
 
-Each call waits for the one it made, stacking up until the base case returns and they unwind. Forget
-the base case and the calls never stop: Python raises \`RecursionError\`.
+Each call pauses and waits for the call it made. Python stacks these paused frames until the base case returns, then unwinds them one at a time, applying each pending multiply. If the base case is never reached, the stack keeps growing and Python raises \`RecursionError\` after roughly 1000 nested calls (the default \`sys.getrecursionlimit()\`).
 
-### When it shines
+### Pitfalls
 
-Recursion is natural for **nested / tree-shaped** data (folders inside folders, a list of lists)
-where each part looks like a smaller version of the whole.
+**A base case that skips 0.** Writing \`if n == 1\` looks fine until you call \`factorial(0)\`: it does not match, so you compute \`0 * factorial(-1) * factorial(-2) ...\` forever, straight to \`RecursionError\`. Use \`if n <= 1\` so both \`0\` and \`1\` hit the base case and return \`1\` directly. That is exactly why the exercise pins \`factorial(0)\` to \`1\`.
 
-### Recap
+**Not shrinking toward the base.** The recursive call must move closer to the base case every time. A \`factorial(n)\` that calls \`factorial(n)\` never ends.
 
-A recursive function has a **base case** (stop) and a **recursive case** (shrink + call itself). Miss
-the base case and it never ends. Next you'll write factorial, then sum a nested list.`,
+For the nested-sum exercise, your base case is a plain number and your recursive case is a list. Check which one you have with \`isinstance(x, list)\`: if it is a list, recurse into it and add the pieces; otherwise it is a number, so add it directly. That single \`isinstance\` check is what lets one function reach any depth without knowing the shape in advance.
+
+**Interview nuance:** Python has no tail-call optimization, so a recursive solution uses \`O(n)\` call-stack space, one frame per pending call, while an equivalent loop uses \`O(1)\`. Interviewers probe this: recursion over a length-\`n\` structure can overflow the stack where a loop would not, which is why tree and graph problems often call out the depth explicitly. Recursion buys clarity on nested data. It does not buy free memory.`,
     demoCode: `def factorial(n):
     if n <= 1:
         return 1
