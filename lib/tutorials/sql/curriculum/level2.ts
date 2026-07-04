@@ -1109,29 +1109,23 @@ Add \`ORDER BY e.employee_name\` when output order matters. Row order is not gua
 
 Now the two inputs are different tables: yesterday's snapshot and today's. To see what was *added*, *dropped*, or *changed*, you need every key from *both* sides. That is a \`FULL OUTER JOIN\`: keep all left rows, all right rows, and \`NULL\`-pad wherever a match is missing. A \`RIGHT JOIN\` is simply a \`LEFT JOIN\` with the operands swapped (keep every right-side row).
 
-Because an unmatched key is \`NULL\` on the missing side, recover one clean key with \`COALESCE(y.customer_id, t.customer_id)\`, and classify each row by testing which side is \`NULL\`:
+Because an unmatched key is \`NULL\` on the missing side, recover one clean key with \`COALESCE(y.customer_id, t.customer_id)\`, then put yesterday's and today's values side by side and let the \`NULL\`s tell the story:
 
 \`\`\`sql
 SELECT
   COALESCE(y.customer_id, t.customer_id) AS customer_id,
-  CASE
-    WHEN y.customer_id IS NULL THEN 'added'
-    WHEN t.customer_id IS NULL THEN 'dropped'
-    WHEN y.tier <> t.tier      THEN 'changed'
-    ELSE 'unchanged'
-  END AS change_type
+  y.tier AS tier_yesterday,
+  t.tier AS tier_today
 FROM yesterday AS y
 FULL OUTER JOIN today AS t
   ON y.customer_id = t.customer_id;
 \`\`\`
 
+Read the result a row at a time: a \`NULL\` \`tier_yesterday\` means the customer is new *today* (added); a \`NULL\` \`tier_today\` means they vanished (dropped); two different non-\`NULL\` tiers means the tier *changed*. Collapsing those three tests into a single \`change_type\` label is a job for \`CASE\`, which you meet later this level; for now the two columns carry the full diff.
+
 \`RIGHT\` and \`FULL OUTER JOIN\` only arrived in SQLite 3.39 (2022); Postgres, Snowflake, BigQuery, and SQL Server have had them for years. Older engines emulate \`FULL OUTER\` as a \`LEFT JOIN\` unioned with the reversed \`LEFT JOIN\`.
 
-## Pitfall: order the \`CASE\` so \`NULL\` checks come first
-
-If you test \`y.tier <> t.tier\` before the \`IS NULL\` branches, added and dropped rows classify wrong. For an added customer the whole \`y\` row is \`NULL\`-padded, so \`y.tier <> t.tier\` is \`NULL <> 'gold'\`, which evaluates to *unknown*, not \`true\`. That branch is skipped and the row silently falls into \`ELSE 'unchanged'\`. Put both \`IS NULL\` tests ahead of any payload comparison.
-
-**Interview nuance:** SQL uses three-valued logic. Any comparison involving \`NULL\`, including \`NULL = NULL\` and \`NULL <> NULL\`, returns \`unknown\` rather than \`true\` or \`false\`, and only \`true\` passes a \`WHERE\`, \`ON\`, or \`CASE WHEN\`. This one rule explains the reconciliation ordering above, why \`col NOT IN (subquery_with_a_null)\` returns zero rows, and why you match missing keys with \`IS NULL\` instead of \`= NULL\`.`,
+**Interview nuance:** SQL uses three-valued logic. Any comparison involving \`NULL\`, including \`NULL = NULL\` and \`NULL <> NULL\`, returns \`unknown\` rather than \`true\` or \`false\`, and only \`true\` passes a \`WHERE\` or \`ON\`. This one rule explains why an added customer's \`NULL\`-padded tier never compares equal to today's, why \`col NOT IN (subquery_with_a_null)\` returns zero rows, and why you match missing keys with \`IS NULL\` instead of \`= NULL\`.`,
     demoCode: `SELECT
   e.employee_name AS employee,
   m.employee_name AS manager
@@ -1200,16 +1194,9 @@ INSERT INTO employees VALUES
   practice: {
     id: "sql-l2-self-join-practice",
     executionMode: "single-file",
-    prompt: `You run a daily diff on the customer dimension to feed a slowly-changing-dimension loader. Comparing yesterday's and today's snapshots, write a query that returns one row per customer with \`customer_id\` (the non-NULL id from whichever snapshot has it) and \`change_type\`. Sort by \`customer_id\`. \`change_type\` is one of:
-
-- \`'added'\`: in today but not yesterday,
-- \`'dropped'\`: in yesterday but not today,
-- \`'changed'\`: in both, but \`tier\` differs,
-- \`'unchanged'\`: in both with the same \`tier\`.
-
-Use a \`FULL OUTER JOIN\` on \`customer_id\` so rows present on only one side are still surfaced.`,
+    prompt: `You run a daily diff on the customer dimension to feed a slowly-changing-dimension loader. Comparing yesterday's and today's snapshots, write a query that returns one row per customer with \`customer_id\` (the non-NULL id from whichever snapshot has it), \`tier_yesterday\`, and \`tier_today\`. A \`NULL\` on one side flags a customer added or dropped that day. Use a \`FULL OUTER JOIN\` on \`customer_id\` so rows present on only one side are still surfaced, and sort by \`customer_id\`.`,
     starterCode: `-- FULL OUTER JOIN the two snapshots on customer_id.
--- Return a non-NULL customer_id and a change_type; sort by customer_id.
+-- Return the non-NULL customer_id plus each side's tier; sort by customer_id.
 SELECT
 
 FROM snapshot_yesterday AS y
@@ -1217,8 +1204,8 @@ FROM snapshot_yesterday AS y
     hints: [
       "`FROM snapshot_yesterday y FULL OUTER JOIN snapshot_today t ON y.customer_id = t.customer_id` (SQLite 3.39+ supports this).",
       "Get a single id with `COALESCE(y.customer_id, t.customer_id) AS customer_id`.",
-      "Build `change_type` with a `CASE`: test `y.customer_id IS NULL` -> `'added'`; `t.customer_id IS NULL` -> `'dropped'`; `y.tier <> t.tier` -> `'changed'`; else `'unchanged'`.",
-      "Order the `CASE` branches so the NULL-side checks come *before* the `tier` comparison (comparing a NULL tier would otherwise fall through).",
+      "Expose both sides: `y.tier AS tier_yesterday`, `t.tier AS tier_today`. A `NULL` on one side means the customer was added (only today) or dropped (only yesterday).",
+      "Finish with `ORDER BY customer_id`.",
     ],
     singleFile: {
       seedSql: `CREATE TABLE snapshot_yesterday (
@@ -1241,13 +1228,13 @@ INSERT INTO snapshot_today VALUES
   (5, 'bronze');    -- added; customer 3 dropped`,
       orderMatters: true,
       expected: {
-        columns: ["customer_id", "change_type"],
+        columns: ["customer_id", "tier_yesterday", "tier_today"],
         rows: [
-          [1, "unchanged"],
-          [2, "changed"],
-          [3, "dropped"],
-          [4, "unchanged"],
-          [5, "added"],
+          [1, "gold", "gold"],
+          [2, "silver", "gold"],
+          [3, "bronze", null],
+          [4, "silver", "silver"],
+          [5, null, "bronze"],
         ],
       },
     },
