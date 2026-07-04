@@ -1635,7 +1635,10 @@ just hand them to \`run_coroutines\` instead of \`asyncio.run\`.
 ### await vs sequential
 
 Awaiting each call one-by-one would be sequential; \`gather\` overlaps the waiting, so N slow calls
-take about as long as the slowest one.
+take about as long as the slowest one, **but only when each coroutine actually \`await\`s real I/O**
+(a network or disk call that yields control). The \`fetch_one\` coroutines in this sandbox don't await
+anything real, so \`run_coroutines\` here just runs them in order to show the shape of the code; the
+speedup you get in production comes entirely from overlapping real waiting, not from \`gather\` itself.
 
 ### Recap
 
