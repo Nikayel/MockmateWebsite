@@ -20,13 +20,17 @@ const ddlCreate: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["CREATE TABLE", "column types", "DEFAULT", "DROP TABLE"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## \`CREATE TABLE\` is a contract
+    markdown: `## A \`CREATE TABLE\` is a contract
 
-Every table in a warehouse started as a \`CREATE TABLE\` someone wrote. That statement declares the
-columns, their types, which values may be missing, and what a row looks like when the loader doesn't
-supply every field. Get it right and downstream models inherit clean, predictable data.
+Every table in a warehouse began as a \`CREATE TABLE\` someone wrote. That statement fixes the columns, their types, which values may be missing, and what a row looks like when the loader does not supply every field. Downstream models, dashboards, and joins all inherit whatever shape you declare here. Get it wrong and a bad type or a missing default leaks into a hundred queries.
 
-As a DE, your first job on a new source is usually a **staging table**: a clean, typed landing zone.
+As a data engineer, your first move on a new source is usually a **staging table**: a clean, typed landing zone that the raw feed lands in before any transformation.
+
+### Reading the declaration
+
+Each line is \`column_name TYPE [DEFAULT expr]\`. The type documents intent. \`DEFAULT\` names the value the engine substitutes when an \`INSERT\` **omits** that column, so partial rows still land complete. \`DROP TABLE IF EXISTS stg_customer;\` at the top of a script makes it re-runnable: a second run drops the old table instead of erroring on "table already exists."
+
+### Worked example
 
 \`\`\`sql
 CREATE TABLE stg_customer (
@@ -37,19 +41,38 @@ CREATE TABLE stg_customer (
     is_active     INTEGER DEFAULT 1,  -- 0/1 boolean-as-int
     loaded_at     TEXT DEFAULT (datetime('now'))
 );
+
+-- Row 1 supplies every column:
+INSERT INTO stg_customer VALUES
+    (1, 'a@x.com', 'US', '2026-01-15', 0, '2026-01-15 09:00:00');
+
+-- Row 2 omits is_active and loaded_at, so the defaults fire:
+INSERT INTO stg_customer (customer_id, email, country_code, signup_date)
+    VALUES (2, 'b@y.com', 'CA', '2026-02-20');
+
+SELECT customer_id, is_active, loaded_at FROM stg_customer;
+-- 1 | 0 | 2026-01-15 09:00:00
+-- 2 | 1 | 2026-07-03 14:22:05   <- datetime('now') in UTC, at insert time
 \`\`\`
 
-Insert a **partial** row and the defaults fill in: \`is_active → 1\`, \`loaded_at → now\`.
+Note the parentheses in \`DEFAULT (datetime('now'))\`. A function-call default must be wrapped in \`()\`; writing \`DEFAULT datetime('now')\` is a syntax error. The bare keyword \`CURRENT_TIMESTAMP\` is the one exception that needs no parentheses.
 
-\`DROP TABLE IF EXISTS stg_customer;\` is the safe, re-runnable form you put at the top of a script so
-a re-run doesn't error on "table already exists."
+### Pitfall: a \`DEFAULT\` fires on omission, not on \`NULL\`
 
-> **In the warehouse this differs: SQLite type affinity is only advisory.** SQLite will store the
-> text \`'oops'\` in an \`INTEGER\` column; Postgres/Snowflake/BigQuery reject it. Declare the *intended*
-> type anyway. Your DDL is documentation and must port to a strict engine unchanged.
+The trap the Apply and Practice exercises probe: a \`DEFAULT\` only applies when the column is **left out** of the \`INSERT\` column list. If you explicitly pass \`NULL\`, you store \`NULL\`, not the default.
 
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
-then hidden assertion queries check schema shape, defaults, and row counts.`,
+\`\`\`sql
+INSERT INTO stg_customer (customer_id, is_active) VALUES (3, NULL);
+-- is_active is NULL, NOT 1
+\`\`\`
+
+So to prove your defaults work, omit those columns entirely (\`is_active\`, \`loaded_at\`, \`status\`, the \`*_cents\` columns) rather than passing \`NULL\`.
+
+One more portability note: SQLite type affinity is only advisory. SQLite will happily store the text \`'oops'\` in an \`INTEGER\` column; Postgres, Snowflake, and BigQuery reject it. Declare the intended type anyway. Your DDL is documentation and should port to a strict engine unchanged.
+
+**Interview nuance:** a \`DEFAULT\` does not make a column \`NOT NULL\`. \`is_active INTEGER DEFAULT 1\` still accepts an explicit \`NULL\`, as shown above. If a column must never be null, you need \`NOT NULL DEFAULT 1\`: the constraint forbids nulls, and the default supplies a value for omitted inserts. Interviewers ask this to check that you see the two as independent guarantees, one about presence and one about substitution.
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite database, then hidden assertion queries check the schema shape, the defaults, and the row counts.`,
   },
   apply: scriptExercise({
     id: "sql-l3-ddl-create-apply",
@@ -194,70 +217,61 @@ const insertPopulate: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["INSERT INTO … VALUES", "INSERT … SELECT", "multi-row insert", "column lists"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Two ways to fill a table
+    markdown: `## Why loading is where data quality is won or lost
 
-There are two ways to fill a table. \`INSERT … VALUES\` writes literal rows you type out: good for
-seeds and reference data. \`INSERT … SELECT\` writes rows *read from another table*, transforming them
-on the way in. That second form is the entire **"T" of ELT**: you read raw, clean/cast/rename in the
-\`SELECT\`, and land the result in a model table, all in one statement, all inside the database.
+Every table starts empty. \`INSERT\` is how rows get in, and the form you choose decides whether your warehouse stays clean. \`INSERT ... VALUES\` writes literal rows you type out, which is how you seed small reference tables (status codes, country lists). \`INSERT ... SELECT\` writes rows read from another table and transforms them on the way in. That second form is the entire "T" in ELT: you read raw, cast, trim, and rename inside the \`SELECT\`, then land a clean result in a model table. One statement, no application code, no temp files, all inside the database.
+
+### The mental model: positional mapping
+
+Both forms fill a named target column list, and neither matches on column names. They map by **position**: the first output expression fills the first named column, the second fills the second, and so on. The \`SELECT\` column names do not have to match the target names, only the order matters. That is why the target column list is not decoration. It is the contract that says which slot each value lands in.
 
 ### Worked example
 
-A raw feed stores prices as text cents and mixed-case emails. Load a cleaned dimension straight from it:
+\`raw_product\` holds dirty text (padded SKUs, prices as strings, some \`NULL\` ids). Load a clean dimension straight from it:
 
 \`\`\`sql
+-- raw_product:
+--   prod_id | sku     | prod_name   | price_txt
+--   '10'    | ' a12 ' | ' Widget '  | '1999'
+--   NULL    | 'x9'    | 'junk'      | '0'
+--   '11'    | 'b7'    | 'Gadget'    | '4950'
+
 INSERT INTO dim_product (product_id, sku, name, unit_price_cents)
-SELECT
-    CAST(prod_id AS INTEGER),
-    UPPER(TRIM(sku)),
-    TRIM(prod_name),
-    CAST(price_txt AS INTEGER)
+SELECT CAST(prod_id AS INTEGER),
+       UPPER(TRIM(sku)),
+       TRIM(prod_name),
+       CAST(price_txt AS INTEGER)
 FROM raw_product
-WHERE prod_id IS NOT NULL;   -- drop junk rows at the boundary
+WHERE prod_id IS NOT NULL;   -- drop junk at the boundary
+
+-- dim_product now holds:
+--   product_id | sku | name   | unit_price_cents
+--   10         | A12 | Widget | 1999
+--   11         | B7  | Gadget | 4950
 \`\`\`
 
-Every row that survives the \`WHERE\` is cast, trimmed, and inserted. No temp files, no application code.
+Every surviving row is cast, trimmed, and inserted as one set. The \`NULL\`-id row never lands.
 
-### Anatomy
+### Seeding with multi-row \`VALUES\`
 
-\`\`\`
-INSERT INTO dim_product (product_id, sku, name, unit_price_cents)
-                         └──── target column list ────┘
-SELECT  CAST(prod_id AS INTEGER), ...   -- positionally maps to the target columns
-FROM raw_product
-WHERE ...;                               -- filter which source rows load
-\`\`\`
-
-The \`SELECT\` output columns map **positionally** to the target column list. The first select
-expression fills the first named column, and so on. Types don't have to match names, only positions.
-
-### Multi-row literal insert
-
-One statement, many rows. The compact seed form:
+For small static data, one statement carries many rows:
 
 \`\`\`sql
 INSERT INTO dim_status (code, label) VALUES
-    ('paid','Paid'), ('shipped','Shipped'), ('cancelled','Cancelled');
+    ('paid', 'Paid'),
+    ('shipped', 'Shipped'),
+    ('cancelled', 'Cancelled');
 \`\`\`
 
-> **In the warehouse this differs, barely.** \`INSERT … SELECT\` and multi-row \`VALUES\` are
-> ANSI-standard and portable across Postgres/Snowflake/BigQuery essentially unchanged. The main
-> divergence is scale: warehouses discourage row-by-row \`VALUES\` inserts (they're slow columnar
-> writes) and favor bulk \`COPY\` / \`INSERT … SELECT\`. The pattern you're learning is exactly the right
-> one there.
+### Pitfalls
 
-### Keep it readable / common pitfalls
+- **Skipping the column list.** \`INSERT INTO t SELECT ...\` with no list binds to the table's physical column order. The day someone adds or reorders a column in the DDL, values silently slide into the wrong slots. Always name the target columns.
+- **No boundary \`WHERE\`.** Forget it and \`NULL\`-keyed junk rows load straight into a clean model. Filter garbage at load time, not later.
+- **Column count mismatch.** If the \`SELECT\` returns a different number of expressions than the target list names, the statement errors instead of loading. That is a feature: it catches the mistake at the boundary.
 
-Always write the explicit **column list** in \`INSERT INTO t (a, b, c)\`. Relying on column *order*
-(\`INSERT INTO t SELECT …\` with no list) silently breaks the day someone adds a column or reorders the
-DDL. Second pitfall: forgetting the boundary \`WHERE\` and loading NULL-keyed junk rows into a clean
-model.
+**Interview nuance:** to load one row per key (the dedup the Practice asks for), \`SELECT DISTINCT customer_id, email, country_code\` is the usual first reach, but \`DISTINCT\` collapses on the *entire* projected row, not on \`customer_id\` alone. It works here only because you clean the columns first, so a customer's repeated feed lines become byte-identical and fold into one. If a single \`customer_id\` carried two different emails, \`DISTINCT\` would keep both rows and you would still have duplicate keys. True one-row-per-key needs \`GROUP BY customer_id\` with an aggregate, or \`ROW_NUMBER() OVER (PARTITION BY customer_id ...)\` filtered to \`= 1\`.
 
-**Recap:** \`INSERT … SELECT\` is the transform-load step of ELT; always name target columns explicitly
-and filter junk at the boundary.
-
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
-then hidden assertion queries check row counts, cleaned values, and column types.`,
+**Execution mode:** you write a multi-statement script against a fresh in-memory SQLite database. Hidden assertions then check row counts, cleaned values, and column types.`,
   },
   apply: scriptExercise({
     id: "sql-l3-insert-populate-apply",
@@ -406,69 +420,44 @@ const primaryKeys: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["PRIMARY KEY", "surrogate keys", "natural keys", "UNIQUE"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Primary keys give a row its identity
+    markdown: `## Primary keys give a row a stable identity
 
-A **primary key (PK)** is the column (or columns) that uniquely identifies each row. The database
-enforces it: two rows can never share a PK value, and a PK can't be NULL. This is the single most
-important guarantee in a schema. It's what makes "one row per thing" true.
+Every table needs one honest answer to "which row is this?" A \`PRIMARY KEY\` is that answer: the column (or set of columns) the database uses to identify a row. It enforces a contract you can build on. No two rows share a primary key value, and the key is never NULL. That guarantee is what makes "one row per customer" actually true, and it is what every join and foreign key relies on. Get identity wrong and a nightly load can silently create two rows for the same customer, so every downstream count drifts.
 
-You get to choose *what* the key is. Two families:
+You choose what the key is. There are two families.
 
-- **Natural key**: a business value that's already unique (an email, an ISBN, a country code).
-  Meaningful, but risky: business values change (people change emails), can be reused, and are often
-  wide (bad for joins/indexes).
-- **Surrogate key**: a system-generated integer with no business meaning, usually auto-incrementing.
-  It never changes, is compact, and joins fast.
+- **Natural key**: a business value that is already unique (an \`email\`, an \`ISBN\`, a \`country_code\`). It is meaningful, but business values change (people change emails), get reused, and are often wide text, which makes joins and indexes slower.
+- **Surrogate key**: a system-generated integer with no business meaning, usually auto-assigned. It never changes, is compact, and joins fast.
 
-**DEs strongly prefer surrogate keys** for warehouse dimensions. The natural key can change or arrive
-dirty; the surrogate stays stable so facts that reference it never break. You keep the natural key as
-a regular attribute (often \`UNIQUE\`), but *identity* rides on the surrogate.
+Data engineers prefer a **surrogate** primary key for warehouse dimensions and keep the natural key as a separate attribute (often \`UNIQUE\`). Identity rides on the surrogate; the business value is just data.
 
 ### Worked example
 
 \`\`\`sql
 CREATE TABLE dim_customer (
     customer_sk  INTEGER PRIMARY KEY,   -- surrogate: system identity
-    email        TEXT UNIQUE,           -- natural key kept as a UNIQUE attribute
+    email        TEXT UNIQUE,           -- natural key kept as an attribute
     country_code TEXT
 );
+
+INSERT INTO dim_customer (email, country_code) VALUES ('ada@example.com',   'GB');
+INSERT INTO dim_customer (email, country_code) VALUES ('grace@example.com', 'US');
+SELECT customer_sk, email FROM dim_customer;
+-- 1|ada@example.com
+-- 2|grace@example.com
 \`\`\`
 
-In SQLite, \`INTEGER PRIMARY KEY\` auto-assigns rowids, so an insert can omit it:
+In SQLite, \`INTEGER PRIMARY KEY\` is special: that column becomes the table's \`rowid\`, so an insert can omit it and SQLite fills in the next integer. The table is physically stored in \`rowid\` order, so lookups and joins on that key are fast with no extra index. Every *other* \`PRIMARY KEY\` and every \`UNIQUE\` column instead gets an automatic unique index created behind the scenes.
 
-\`\`\`sql
-INSERT INTO dim_customer (email, country_code) VALUES ('ada@example.com','GB');
--- customer_sk auto-filled to 1
-\`\`\`
+### Pitfalls
 
-**Anatomy:**
+**Do not promote a natural key to the primary key just because it looks unique today.** The day it is not (a supplier reuses a SKU, a customer re-registers an email), the constraint rejects a legitimate load and your pipeline breaks. Use a surrogate \`PRIMARY KEY\` and add \`UNIQUE\` on the natural key. You get stable identity and a duplicate guard, decoupled. Inserting a row that collides with a \`UNIQUE\` value raises a constraint error; \`INSERT OR IGNORE\` tells SQLite to skip just that row instead of aborting the whole script.
 
-\`\`\`
-customer_sk  INTEGER PRIMARY KEY
-    │           │        │
- surrogate   integer   uniqueness + not-null + auto-index,
-   name      affinity   and (in SQLite) auto-increment
-\`\`\`
+**\`UNIQUE\` still allows many NULLs.** In SQL, NULL is never equal to NULL, so a \`UNIQUE\` column accepts any number of NULL rows. \`email TEXT UNIQUE\` does not force an email to exist. If a business key must always be present, add \`NOT NULL\` alongside \`UNIQUE\`.
 
-Declaring a PK **automatically creates a unique index** on it. Lookups and joins by PK are fast for
-free.
+**Interview nuance:** the reason DEs reach for surrogate keys is stability under change. When a customer edits their email, you update that one attribute and the \`customer_sk\` stays the same, so every fact row already pointing at that surrogate stays valid. If identity rode on the email, changing it would orphan or force a rewrite of every referencing row. Surrogate keys decouple *identity* from *attributes*, which is exactly what slowly changing dimensions depend on.
 
-> **In the warehouse this differs: surrogate generation.** SQLite gives you \`INTEGER PRIMARY KEY\`
-> (and the stricter \`AUTOINCREMENT\`) for free surrogates. Postgres uses \`GENERATED ALWAYS AS IDENTITY\`
-> (or \`serial\`); Snowflake/BigQuery often use sequences or \`ROW_NUMBER()\`-assigned keys during the
-> load because they don't auto-increment the same way. The *concept* (a stable system integer) is
-> identical; the syntax that mints it is per-engine.
-
-**Keep it readable / common pitfall.** Don't make a natural key the PK just because it's "obviously
-unique today." The day it isn't (a supplier reuses a SKU, a customer re-registers an email) your PK
-constraint blocks a legitimate load. Use a surrogate PK and add \`UNIQUE\` on the natural key. You get
-identity *and* a duplicate guard, decoupled.
-
-**Recap:** every row needs a stable identity; prefer a surrogate integer PK (auto-indexed, unchanging)
-and keep the natural key as a separate \`UNIQUE\` attribute.
-
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
-then hidden assertion queries check the primary key, the unique index, and the row counts.`,
+**Execution mode:** you write a multi-statement script against a fresh in-memory SQLite database. Hidden assertions then check the primary key, the unique constraint, and the row counts.`,
   },
   apply: scriptExercise({
     id: "sql-l3-primary-keys-apply",
@@ -1028,52 +1017,58 @@ const normalize1nf: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["1NF", "atomic columns", "repeating-group removal", "composite key introduction"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## First Normal Form: atomic values
+    markdown: `## Why atomic values are the floor for every query
 
-**First Normal Form (1NF)** demands two things: **one value per cell** (atomic: no comma-packed
-lists) and **one row per fact**. A spreadsheet export that crams \`"mouse:2, keyboard:1"\` into a single
-\`items\` column violates 1NF, and that single violation breaks *every* downstream join, aggregate, and
-filter. You can't \`SUM\` a price you can't isolate, or join on a product buried inside a string.
+Relational operations (\`JOIN\`, \`SUM\`, \`GROUP BY\`, \`WHERE\`) and the indexes that speed them up all work on whole column values. The moment one cell hides several facts, those operations stop working. You cannot \`SUM\` a quantity trapped inside the string \`'mouse:2, keyboard:1'\`, and you cannot \`JOIN\` on a \`product\` that is buried next to another product in the same row. First Normal Form (1NF) is the rule that keeps every value reachable: one value per cell, and one row per fact.
 
-### The violation and the fix
+## What 1NF requires
 
-Raw, a repeating group packed into one cell:
+Two conditions:
 
-| order_id | items |
-|---|---|
-| 1 | \`mouse:2, keyboard:1\` |
-| 2 | \`mouse:1\` |
+- Every cell holds a single, atomic value. No comma-packed lists, no \`key:value\` blobs.
+- There are no repeating groups. A table must not store the same kind of fact in parallel columns like \`product_a\`, \`product_b\`, \`product_c\`.
 
-1NF form, one row per line item, atomic columns, and a **composite key** \`(order_id, product)\`
-because neither column alone is unique:
+Both failures are the same mistake in different clothes: a one-to-many relationship (one order has many line items) crammed into one row. 1NF fixes it by moving the "many" side into its own rows. More rows, never more columns.
+
+The grain of the table changes when you fix it. \`raw_order\` has one row per order. The 1NF table has one row per line item, so \`order_id\` alone now repeats and can no longer identify a row. You declare a composite key \`(order_id, product)\`: the pair is unique even though neither column is on its own.
+
+## Unpacking parallel slots
+
+\`raw_order\` stores two slots per order:
+
+| order_id | product_a | qty_a | product_b | qty_b |
+|---|---|---|---|---|
+| 1 | mouse | 2 | keyboard | 1 |
+| 2 | mouse | 1 | \`NULL\` | \`NULL\` |
+
+Unpack one slot per \`INSERT ... SELECT\`, and skip empty slots so they do not become phantom rows:
+
+\`\`\`sql
+INSERT INTO order_item (order_id, product, qty)
+SELECT order_id, product_a, qty_a FROM raw_order;
+
+INSERT INTO order_item (order_id, product, qty)
+SELECT order_id, product_b, qty_b FROM raw_order
+WHERE product_b IS NOT NULL;
+\`\`\`
+
+Result (one row per line item):
 
 | order_id | product | qty |
 |---|---|---|
 | 1 | mouse | 2 |
-| 1 | keyboard | 1 |
 | 2 | mouse | 1 |
+| 1 | keyboard | 1 |
 
-**Anatomy of the change:** the repeating group inside one cell becomes multiple *rows*; the packed
-string becomes separate *columns* (\`product\`, \`qty\`); and the identity of a row is now the
-**combination** \`(order_id, product)\`.
+Row order in a table is not meaningful; only \`ORDER BY\` at read time defines it.
 
-> **In the warehouse this differs: not really, but the tools do.** 1NF is a universal relational
-> principle. The mechanics of *unpacking* differ: SQLite has no array type, so packed data is \`TEXT\`
-> you split with string functions or a recursive CTE (Level 4). Postgres has real arrays and
-> \`unnest()\`; BigQuery/Snowflake have \`ARRAY\`/\`STRUCT\` and are often kept *semi-structured* on
-> purpose. But the moment you need to join or aggregate, you flatten to 1NF.
+## Pitfall: the empty second slot
 
-### Keep it readable: a common pitfall
+Order 2 has no slot B, so its \`product_b\` and \`qty_b\` are \`NULL\`. Without \`WHERE product_b IS NOT NULL\`, the second \`INSERT\` would add a row like \`(2, NULL, NULL)\`: a line item for nothing. That row is meaningless, and a \`NULL\` in a key column defeats the composite key you are trying to build. Filtering empty slots is not optional cleanup; it is what keeps the grain honest.
 
-Don't "solve" a multi-valued attribute by adding \`item1, item2, item3\` columns. That's still a
-repeating group and it caps you at three items. The fix is always *more rows, not more columns*. And
-once you unpack, a single column is no longer unique, so declare the **composite key**.
+The mirror pitfall is "fixing" a multi-valued column by adding more slot columns. That is still a repeating group, and it hard-caps you at however many slots you defined. The answer is always more rows.
 
-**Recap:** 1NF means atomic cells and one row per fact; unpack repeating groups into rows (not extra
-columns) and give the finer grain a composite key.
-
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
-then hidden assertion queries check the unpacked grain, values, and keys.`,
+**Interview nuance:** "atomic" is defined relative to how the domain queries the value, not by whether the string looks divisible. A full name in one \`name\` column is fine until you need to filter or join by last name, at which point it is a 1NF violation for that domain. A \`DATE\` is atomic even though it contains a year, month, and day, because you query it as one value. Interviewers probe this: atomicity is a modeling decision about access patterns, not a syntactic property of the data.`,
   },
   apply: scriptExercise({
     id: "sql-l3-normalize-1nf-apply",
@@ -1672,45 +1667,59 @@ const cardinality: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["ER modeling", "cardinality (1:1/1:N/M:N)", "FK placement on the many side"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Entities, relationships, and cardinality
+    markdown: `## Cardinality decides which table holds the foreign key
 
-An **entity** is a thing you store (customer, order, product); a **relationship** connects entities; **cardinality** says how many of one relate to how many of the other. Three shapes:
+Before you can write a single \`JOIN\`, someone decided which table holds which key. That decision is data modeling, and getting it wrong is expensive: a foreign key on the wrong side forces application code to fake relationships, and a missing \`UNIQUE\` lets a "one profile per user" rule silently allow five. The whole schema either falls out cleanly or fights you forever, and it starts with cardinality.
 
-- **1:N (one-to-many)**: one customer has many orders; one order belongs to one customer. The overwhelmingly common case.
-- **1:1 (one-to-one)**: one user has one profile. Rare; usually modeled as an optional table split.
-- **M:N (many-to-many)**: one order has many products, one product is in many orders. Cannot be expressed with a single FK.
+### The three shapes
 
-**The one rule that resolves most modeling questions: the FK goes on the "many" side.** For customer 1:N orders, the FK \`customer_id\` lives on **orders** (the many side), pointing at customers. It cannot go the other way: a customer row can't hold a single \`order_id\` because a customer has *many* orders.
+An **entity** is a thing you store (a \`customer\`, an \`order\`, a \`product\`). A **relationship** links entities. **Cardinality** says how many rows on one side can link to how many on the other:
 
-**Worked example.**
+- **1:N (one-to-many)**: one \`customer\` has many \`orders\`; each \`order\` belongs to one \`customer\`. By far the most common shape.
+- **1:1 (one-to-one)**: one \`user\` has one \`profile\`. Rare, usually a deliberate table split.
+- **M:N (many-to-many)**: one \`order\` contains many \`products\`, and one \`product\` appears in many \`orders\`.
+
+### The rule: a foreign key is a single-valued pointer
+
+A foreign key column holds exactly one value per row. So it can only encode a "to-one" direction, which means **the FK lives on the "many" side**. In a 1:N, each \`order\` points at exactly one \`customer\`, so \`customer_id\` sits on \`orders\`. It cannot go the other way: a \`customer\` row has no single \`order_id\` to store, because a customer has many orders.
 
 \`\`\`sql
--- 1:N, FK on the many side (orders)
-CREATE TABLE customers (customer_id INTEGER PRIMARY KEY);
+CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);
 CREATE TABLE orders (
     order_id    INTEGER PRIMARY KEY,
-    customer_id INTEGER REFERENCES customers(customer_id)   -- FK here, on 'orders'
+    customer_id INTEGER NOT NULL REFERENCES customers(customer_id)  -- FK on the many side
 );
+
+INSERT INTO customers VALUES (1, 'Ada');
+INSERT INTO orders   VALUES (100, 1), (101, 1);   -- Ada placed two orders
+
+SELECT c.name, o.order_id
+FROM customers c JOIN orders o ON o.customer_id = c.customer_id;
+-- name | order_id
+-- Ada  | 100
+-- Ada  | 101
 \`\`\`
 
-- **1:1** is a table *split*: put the FK (also \`UNIQUE\`) on the optional/less-common side, e.g. \`user_profile.user_id UNIQUE REFERENCES users\`. The \`UNIQUE\` is what turns 1:N into 1:1.
-- **M:N** needs a third table (next lesson). A single FK can't represent it because *both* sides are "many."
+**1:1** is the same FK plus a \`UNIQUE\` constraint. Split the optional columns into their own table and put a \`UNIQUE\` FK on it, e.g. \`profiles.user_id INTEGER UNIQUE REFERENCES users(user_id)\`. Without \`UNIQUE\`, two profile rows could share one \`user_id\`, which is just a 1:N. The \`UNIQUE\` is what forbids the duplicate and pins the relationship to one.
 
-**Anatomy of encoding cardinality:**
+**M:N** cannot be expressed with a single FK, because neither side is "to-one." It needs a third **junction table** holding two FKs (one pointing at each side), which is the next lesson. That is why a playlists-to-songs feature leaves \`songs\` standalone for now.
 
+\`\`\`text
+1:N   FK on the many side (no UNIQUE)
+1:1   FK on one side, plus UNIQUE on that FK
+M:N   junction table with two FKs (next lesson)
 \`\`\`
-1:N   → FK on many side (no UNIQUE)
-1:1   → FK on one side  + UNIQUE on that FK
-M:N   → junction table with two FKs (see next lesson)
-\`\`\`
 
-> **In the warehouse this differs: placement is universal.** ER modeling and FK placement are engine-independent design. The only warehouse wrinkle (from the FK lesson) is that many warehouses don't *enforce* the FK, but the *placement* decision (which table holds the key) is identical and drives how you join.
+### Pitfalls
 
-**Keep it readable / common pitfall.** The classic error is putting the FK on the wrong side of a 1:N: trying to store a list of order ids on the customer. If you're tempted to store "many ids in one column," that's the signal you've either got the FK backwards (put it on the many side) or you actually have M:N (needs a junction). Second pitfall: modeling a true M:N as 1:N and losing half the relationship.
+- **FK on the wrong side of a 1:N.** The tell is wanting to store "a list of order ids" in one \`customers\` column. A column holds one value, so that list does not fit. Move the FK to the many side.
+- **Forgetting \`UNIQUE\` on a 1:1.** A plain FK on the split table is a 1:N in disguise; nothing stops two children from sharing one parent. Add \`UNIQUE\` to the FK column to enforce the "one."
 
-**Recap:** cardinality is how many relate to how many; the FK always sits on the many side, 1:1 adds a \`UNIQUE\` to the FK, and M:N can't be done with one FK: it needs a junction table.
+> **Warehouse note:** ER modeling and FK placement are engine-independent. Many warehouses declare but do not *enforce* foreign keys, yet the placement decision (which table holds the key) is identical and still drives how you join.
 
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB, then hidden assertion queries check FK placement, the \`UNIQUE\` that encodes 1:1, and that M:N was left for a junction table.`,
+**Interview nuance:** the FK's *direction* encodes cardinality (which side is "many"), but its *nullability* encodes participation, a separate axis. \`orders.customer_id NOT NULL\` means every order must have a customer (mandatory participation); making it nullable allows an order with no customer at all (optional). On a 1:1 split, \`UNIQUE\` already caps each parent at one child no matter what; adding \`NOT NULL\` to that FK is what forces every child to have a parent, giving exactly one parent per child instead of zero-or-one. Interviewers probe this to see whether you separate "how many" (cardinality) from "is it required" (participation).
+
+**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite database, then hidden assertion queries check FK placement, the \`UNIQUE\` that encodes 1:1, and that M:N was left for a junction table.`,
   },
   apply: scriptExercise({
     id: "sql-l3-cardinality-apply",
@@ -1840,64 +1849,45 @@ const junctionTables: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["junction/associative table", "composite PK of paired FKs", "relationship attributes"],
   teach: {
     estimatedMinutes: 9,
-    markdown: `## A single foreign key can't model many-to-many
+    markdown: `## A single foreign key cannot model many-to-many
 
-A single FK can encode 1:N, never M:N, because M:N means *both* sides have many, and one column
-can't hold many values. The resolution is a **junction table** (a.k.a. associative or bridge table):
-a third table whose job is to hold *pairs*, one row per related (A, B) combination.
+Every real schema hits this. One student takes many courses, and each course holds many students. One song belongs to many playlists, and each playlist holds many songs. You cannot store that with a foreign key, because an FK is a single column holding a single value: it points one child row at one parent, so it models one-to-many and nothing more. To let *both* sides be "many," you add a third table whose entire job is to hold the pairs.
 
-Its shape is stereotyped:
+### The mental model: two one-to-many relationships pointing into a bridge
+
+A junction table (also called an associative or bridge table) has one row per related \`(A, B)\` pair. Read it as two one-to-many relationships aimed inward: each parent owns many junction rows, and each junction row points at exactly one row in each parent. Its shape is stereotyped:
 
 - Two FK columns, one to each parent.
-- A **composite primary key** of those two FKs: this both identifies the pair *and* blocks the same
-  pair from being stored twice.
-- Optionally, **relationship attributes**: facts that belong to the *pairing*, not to either entity
-  alone.
+- A **composite primary key** over those two FKs. It does double duty: it identifies the pair, and it blocks the same pair from being stored twice.
+- Optional **relationship attributes**: facts that belong to the pairing, not to either entity alone.
 
-### Worked example: students M:N courses
+An attribute belongs on the junction when it needs *both* keys to be meaningful. \`grade\` and \`enrolled_at\` depend on a specific \`(student, course)\` pair, so they cannot live on \`students\` (a student has many grades) or on \`courses\`. The test is always "does this fact require both entities together?"
+
+### Worked example
 
 \`\`\`sql
 CREATE TABLE enrollments (
-    student_id INTEGER REFERENCES students(student_id),
-    course_id  INTEGER REFERENCES courses(course_id),
-    enrolled_at TEXT,                    -- relationship attribute: when THIS pair formed
-    grade       TEXT,                    -- belongs to the pairing, not to student or course alone
-    PRIMARY KEY (student_id, course_id)  -- composite PK: one row per (student, course)
+    student_id  INTEGER REFERENCES students(student_id),
+    course_id   INTEGER REFERENCES courses(course_id),
+    enrolled_at TEXT,
+    PRIMARY KEY (student_id, course_id)   -- one row per (student, course)
 );
+
+INSERT INTO enrollments VALUES (1, 10, '2026-01-15');
+INSERT INTO enrollments VALUES (1, 11, '2026-01-15');
+INSERT OR IGNORE INTO enrollments VALUES (1, 10, '2026-02-01');  -- pair already exists
+
+SELECT COUNT(*) FROM enrollments;  -- 2, not 3: the composite PK made the repeat a no-op
 \`\`\`
 
-\`enrolled_at\` and \`grade\` can't live on \`students\` (a student has many enrollments) or on
-\`courses\`. They describe the *relationship*. That's the tell for a junction attribute: "does this
-fact depend on *both* entities together?"
+\`INSERT OR IGNORE\` is the clean way to prove the guard: a duplicate pair violates the primary key, and \`OR IGNORE\` skips that row silently instead of raising an error. You can layer more guards the same way. In the playlist exercise, a second constraint \`UNIQUE (playlist_id, position)\` stops two songs from claiming the same slot, which is separate from the PK that stops one song appearing twice in a playlist.
 
-### Anatomy
+### Pitfall: drop the composite PK and everything double-counts
 
-\`\`\`
-PRIMARY KEY (student_id, course_id)
-             └──── two FKs together ────┘
-       ▶ identifies the pair
-       ▶ prevents a duplicate (student, course) row
-\`\`\`
+Without the composite PK, nothing stops \`(1, 10)\` from being inserted twice, and every \`COUNT\` and \`SUM\` over \`enrollments\` silently inflates. A subtler trap on SQLite specifically: a \`PRIMARY KEY\` column still accepts \`NULL\` (a long-standing engine quirk), and SQLite treats \`NULL\`s as distinct, so \`(NULL, 10)\` can be stored repeatedly. Declare the FK columns \`NOT NULL\` when a partial pair should never exist.
 
-> **In the warehouse this differs, barely.** Junction tables are universal relational modeling. In
-> dimensional/warehouse terms an M:N junction that carries measures becomes a **fact table** or a
-> **bridge table** (e.g. a many-to-many between a fact and a dimension). Same structure (two keys
-> plus attributes), different name for the role it plays.
-
-### Keep it readable / common pitfall
-
-The composite PK is not optional decoration. Without it, nothing stops the same student being
-enrolled in the same course twice, and every count doubles. Pitfall: putting relationship attributes
-on the wrong table (a \`grade\` column on \`students\` makes no sense once a student has many courses).
-Always ask "does this attribute need *both* keys to be meaningful?"
-
-**Recap:** M:N is resolved by a junction table of two FKs with a composite PK (which also blocks
-duplicate pairs); attributes that depend on *both* entities live on the junction, not on either
-parent.
-
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
-then hidden assertion queries check the composite key, the relationship attribute, and that duplicate
-pairs are rejected.`,
+**Interview nuance:** a composite primary key \`(student_id, course_id)\` builds one index sorted by \`student_id\` first, then \`course_id\`. It answers "which courses does student 1 take?" with a fast seek, but "which students are in course 10?" filters on the non-leading column and falls back to a scan. This is the leftmost-prefix rule, and it is why a many-to-many queried in both directions usually needs a second index on \`(course_id, student_id)\`.
+`,
   },
   apply: scriptExercise({
     id: "sql-l3-junction-tables-apply",
