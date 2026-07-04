@@ -361,14 +361,11 @@ const windowOffset: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 8,
     markdown: `## Compare a row to its neighbor without a self-join
 
-"Month-over-month revenue change" and "days since the customer's previous order" are two of the
-most-requested analytics metrics, and juniors reach for a self-join: join the table to itself on
-\`month = month - 1\`. That works but is verbose, slow, and breaks on gaps. \`LAG\` and \`LEAD\` do it in
-one line.
+"Month-over-month revenue change" and "days since a customer's previous order" are two of the most-requested analytics metrics, and the naive approach is a self-join: join the table to itself on \`month = month - 1\`. That works, but it is verbose, scans the table twice, and silently breaks when a period is missing. \`LAG\` and \`LEAD\` express the same idea in one line and one pass.
 
-\`LAG(col, n)\` returns \`col\` from the row **n positions before** the current row within the window
-(default \`n = 1\`); \`LEAD(col, n)\` looks **forward**. "Before" and "after" are defined by the window's
-\`ORDER BY\`.
+### The mental model
+
+Think of a window as one ordered filmstrip per group. \`PARTITION BY customer_id\` splits rows into a separate strip per customer, and \`ORDER BY order_month\` decides which frame comes "before" and "after." \`LAG(col, n)\` reads \`col\` from the frame \`n\` positions back (default \`n = 1\`); \`LEAD(col, n)\` reads \`n\` positions forward. Nothing is joined. Each row just peeks at a neighbor inside its own ordered strip.
 
 \`\`\`sql
 SELECT
@@ -378,41 +375,28 @@ SELECT
   LAG(revenue) OVER (PARTITION BY customer_id ORDER BY order_month) AS prev_revenue,
   revenue - LAG(revenue) OVER (PARTITION BY customer_id ORDER BY order_month) AS mom_delta
 FROM monthly_revenue;
+
+-- customer_id | order_month | revenue | prev_revenue | mom_delta
+--      1       |  2024-01    |   100   |    NULL      |   NULL
+--      1       |  2024-02    |   150   |    100       |    50
+--      1       |  2024-04    |    90   |    150       |   -60
 \`\`\`
 
-For a customer's first month there is no previous row, so \`LAG\` returns \`NULL\` and the delta is
-\`NULL\`, a real "no prior period" signal, not a bug. Supply a default third argument to replace it:
-\`LAG(revenue, 1, 0)\` yields \`0\` instead of \`NULL\` for the first row.
+A customer's first month has no earlier frame, so \`LAG\` returns \`NULL\` and the delta is \`NULL\`. That is a real "no prior period" signal, not a bug. To substitute a value, pass a third argument: \`LAG(revenue, 1, 0)\` yields \`0\` instead of \`NULL\`.
 
-### Anatomy
+Notice the last row. March is missing, so April's \`LAG\` returns February (\`150\`), not "one calendar month back." \`LAG\` is positional in the result, never calendar-aware.
 
-\`\`\`
-LAG( revenue , 1 , 0 ) OVER ( PARTITION BY customer_id ORDER BY order_month )
-     └──┬──┘  └┬┘ └┬┘          └───────── one series per customer ─────────┘
-     column  offset default    ORDER BY defines "previous": ASC = time order
-\`\`\`
+### Pitfalls
 
-### Common pitfalls
+- **No \`ORDER BY\` means a meaningless offset.** Without it the window has no defined order, so "previous" is arbitrary. Always order by your time key.
+- **Gaps are positional.** If a month is missing, \`LAG\` still returns the previous *row*, not the previous *calendar month*. When you need strict calendar adjacency, left-join onto a dense date spine (\`dim_date\`) first so every month exists.
+- **Percent-change division.** \`pct_change = (revenue - prev_revenue) * 100.0 / prev_revenue\` breaks two ways: it is \`NULL\` when \`prev_revenue\` is \`NULL\`, and dividing by \`0\` raises an error in Postgres and most warehouses (SQLite quietly returns \`NULL\`). Guard with \`NULLIF(prev_revenue, 0)\`, and keep the \`100.0\` so integer division does not truncate the result to a whole number.
 
-- **No \`ORDER BY\` in the window = meaningless offset.** \`LAG\` over an unordered window returns an
-  arbitrary neighbor. Always order by your time key.
-- **Gaps are positional, not calendar-aware.** \`LAG\` returns the *previous row in the result*, not
-  "one calendar month back." If March is missing, \`LAG\` on April returns February. For strict
-  calendar adjacency, build a dense month spine (a \`dim_date\`) and left-join onto it first.
-- **Growth-rate divide-by-zero / NULL:** \`(revenue - prev) * 1.0 / prev\` is \`NULL\` when \`prev\` is
-  \`NULL\` and blows up when \`prev\` is \`0\`. Guard with \`NULLIF(prev, 0)\`.
+To flag a customer's **most recent** month, check whether the row has no successor. \`LEAD(order_month) OVER (PARTITION BY customer_id ORDER BY order_month) IS NULL\` is true only on the last frame of each strip.
 
-> **In the warehouse:** identical syntax in Postgres, Snowflake, BigQuery, and SQL Server. Only the
-> \`FIRST_VALUE\`/\`LAST_VALUE\` frame defaults differ across engines; plain \`LAG\`/\`LEAD\` behave the
-> same everywhere.
+**Interview nuance:** window functions are computed after \`WHERE\`, \`GROUP BY\`, and \`HAVING\` have run, as part of evaluating the \`SELECT\` list. You therefore cannot filter on \`LAG\`/\`LEAD\` (or reference their aliases) in a \`WHERE\` or \`HAVING\` clause at the same query level. Wrap the window query in a CTE or subquery, then filter or flag on its output. That evaluation order is the single most common thing interviewers probe about window functions.
 
-**Recap:** \`LAG\`/\`LEAD\` pull a value from an earlier/later row in the ordered window, replacing
-self-joins for deltas and growth. The first row's \`LAG\` is \`NULL\` (or your supplied default), and
-gaps are positional.
-
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
-then hidden assertion queries check the offsets, deltas, and row count. Lead your load with
-\`DELETE FROM <target>;\` so a re-run doesn't double the rows.`,
+This lesson runs a multi-statement script against a fresh in-memory SQLite database, then hidden queries check your offsets, deltas, and row count. Lead your load with \`DELETE FROM <target>;\` so a re-run does not stack duplicate rows.`,
   },
   apply: scriptExercise({
     id: "sql-l4-window-offset-apply",
@@ -583,60 +567,50 @@ const windowFrames: SqlLevel["modules"][number]["lessons"][number] = {
   ],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Frames: aggregate over a sliding window of rows
+    markdown: `## Why frames earn their keep
 
-\`LAG\` looks at one neighbor. A **frame** lets an aggregate see a *range* of neighbors: "sum of this row and all rows before it" (running total), "average of this row and the 6 before it" (7-day moving average), or "sum of everything" (grand total for percent-of-total). The frame clause is the third piece of \`OVER\`, after \`PARTITION BY\` and \`ORDER BY\`.
+"Revenue to date," "7-day moving average," "each row's share of the total": three of the most common analytics asks, and all three are the same tool. A **frame** lets a window aggregate see a *range* of rows around the current one and collapse them into a single value per row, while keeping every original row intact. \`LAG\` peeks at one neighbor. A frame sums or averages a whole sliding stretch, with no self-join and no \`GROUP BY\` that would flatten your row-level detail away.
+
+## The frame is the third piece of \`OVER\`
+
+\`PARTITION BY\` chooses the group, \`ORDER BY\` fixes the sequence inside it, and the frame decides which of those ordered rows the aggregate actually sees for the current row. Bounds run from \`UNBOUNDED PRECEDING\` (start of the partition) through \`n PRECEDING\`, \`CURRENT ROW\`, \`n FOLLOWING\`, to \`UNBOUNDED FOLLOWING\` (end).
 
 \`\`\`sql
 SELECT
-  customer_id, order_date, revenue,
+  order_date, revenue,
   SUM(revenue) OVER (
-    PARTITION BY customer_id
     ORDER BY order_date
-    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW      -- running total
-  ) AS lifetime_revenue,
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW   -- running total
+  ) AS running_total,
   AVG(revenue) OVER (
-    PARTITION BY customer_id
     ORDER BY order_date
-    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW              -- 7-row moving avg
-  ) AS moving_avg_7,
-  revenue * 1.0 / SUM(revenue) OVER () AS pct_of_grand_total  -- no ORDER BY = whole set
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW           -- current + 2 prior = 3-row avg
+  ) AS moving_avg_3,
+  ROUND(revenue * 100.0 / SUM(revenue) OVER (), 1) AS pct_of_total  -- empty OVER() = whole set
 FROM daily_revenue;
+-- order_date  revenue  running_total  moving_avg_3  pct_of_total
+-- 2024-01-01      100            100         100.0          16.7
+-- 2024-01-02      200            300         150.0          33.3
+-- 2024-01-03      300            600         200.0          50.0
 \`\`\`
 
 Three shapes, one clause:
 
-- **Running total:** \`ORDER BY\` + \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`. Accumulates from the first row up to the current one.
-- **Moving average:** \`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\` = current row plus the 6 before it (7 rows). Early rows average over fewer rows, and that's correct behavior.
-- **Grand total / percent-of-total:** \`SUM(revenue) OVER ()\` with **no \`ORDER BY\` and no frame** sums the entire partition (or whole set), so \`revenue / SUM(revenue) OVER ()\` is each row's share.
+- **Running total:** \`ORDER BY\` plus \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\` accumulates the first row through the current one.
+- **Moving average:** \`ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\` is the current row plus the 2 before it (3 rows). Early rows average over fewer rows, and that is correct.
+- **Per-group or grand total:** with **no \`ORDER BY\` and no frame**, the aggregate spans the entire partition. \`SUM(revenue) OVER ()\` totals the whole result set, while \`SUM(revenue) OVER (PARTITION BY customer_id)\` totals just that customer. Divide by it for percent-of-total. Add an \`ORDER BY\` and it silently turns into a running total instead.
 
-### The subtle default that bites everyone
+To make any of these per-customer, add \`PARTITION BY customer_id\` inside \`OVER\`.
 
-When you add \`ORDER BY\` to an aggregate window **without** an explicit frame, SQL supplies a default frame of \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`. With ties in the \`ORDER BY\` key, \`RANGE\` includes **all peer rows with the same order value**, which can make a "running total" jump. Writing \`ROWS BETWEEN …\` instead gives you deterministic row-by-row accumulation. **Rule of thumb: for running totals and moving averages, always spell out \`ROWS BETWEEN\`; don't rely on the default.**
+## Pitfalls
 
-### Anatomy
+- **Integer division zeroes your percentages.** \`revenue / SUM(...)\` on integer columns floors to \`0\`. Multiply by \`100.0\` (a float) first, as above. \`AVG\` already returns a float, so moving averages are safe.
+- **\`OVER ()\` is not \`OVER (PARTITION BY customer_id)\`.** The empty version totals everyone. The practice wants each customer's own total, so partition it.
+- **You cannot filter a window result in \`WHERE\`.** Windows are computed after \`WHERE\` runs. Snowflake and BigQuery offer a \`QUALIFY\` clause for this shorthand. Postgres and SQLite have none, so wrap the window in a CTE and filter outside it.
 
-\`\`\`
-SUM(revenue) OVER (PARTITION BY customer_id ORDER BY order_date
-                   ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
-                   └──────────────────┬──────────────────┘
-        frame: lower bound ── upper bound. Bounds: UNBOUNDED PRECEDING,
-        n PRECEDING, CURRENT ROW, n FOLLOWING, UNBOUNDED FOLLOWING.
-\`\`\`
+**Interview nuance:** if you write \`ORDER BY\` on an aggregate window but omit the frame, SQL fills in \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`, not \`ROWS\`. With duplicate \`ORDER BY\` values, \`RANGE\` pulls in *all* peer rows sharing that value, so two rows on the same date land on the identical "running" total. For deterministic row-by-row accumulation, always spell out \`ROWS BETWEEN\`.
 
-### Common pitfalls
-
-- **\`ROWS\` vs \`RANGE\`:** \`ROWS\` counts physical rows; \`RANGE\` groups by value peers. Use \`ROWS\` for counts-of-rows windows (moving averages).
-- **Integer division:** \`revenue / SUM(...)\` on integer columns floors to \`0\`. Multiply by \`1.0\` (or \`CAST(... AS REAL)\`) for a real fraction.
-- **Grand total needs empty \`OVER ()\`:** the moment you add \`ORDER BY\`, it becomes a running total, not a grand total.
-
-> **In the warehouse:** frame syntax is ANSI-standard and identical across Postgres/Snowflake/BigQuery. BigQuery spells unbounded frames the same way. No divergence to memorize here.
-
-> **In the warehouse:** you can't filter a window value in a \`WHERE\` clause. The window is computed *after* \`WHERE\` runs. Postgres/Snowflake/BigQuery add a \`QUALIFY\` clause for exactly this ("keep rows whose window value passes a test"); SQLite has no \`QUALIFY\`, so wrap the window in a subquery/CTE and filter outside it.
-
-**Recap:** the frame clause (\`ROWS BETWEEN …\`) turns a window aggregate into a running total (\`UNBOUNDED PRECEDING\`→\`CURRENT ROW\`), a moving average (\`n PRECEDING\`→\`CURRENT ROW\`), or, with an empty \`OVER ()\`, a grand total for percent-of-total; always spell out \`ROWS\` for row-count windows.
-
-**Execution mode:** you write a multi-statement script. The seed creates \`daily_revenue\` and an empty target table for you; your script populates the target with a single \`INSERT … SELECT\`. Lead with \`DELETE FROM <target>;\` so a re-run stays idempotent, then hidden assertion queries check the frame math and the row count.`,
+**Execution mode:** these exercises have you write a multi-statement script. Lead with \`DELETE FROM <target>;\` so a re-run stays idempotent, then a single \`INSERT ... SELECT\` carries the window expressions, and hidden assertions check both the frame math and the row count.`,
   },
   apply: scriptExercise({
     id: "sql-l4-window-frames-apply",
@@ -832,81 +806,67 @@ const recursiveCte: SqlLevel["modules"][number]["lessons"][number] = {
   ],
   teach: {
     estimatedMinutes: 9,
-    markdown: `## Recursive CTEs: walk a tree of unknown depth
+    markdown: `## Why you can't just "join N times"
 
-A \`categories\` table where each row has a \`parent_id\` pointing at another row in the *same* table
-can nest arbitrarily deep: \`Electronics → Audio → Headphones → Over-ear\`. You can't write "join N
-times" when N is unknown at query time. A **recursive CTE** repeatedly applies a query to its own
-output until nothing new is produced.
+Some tables point at themselves. An \`employees\` row has a \`manager\` that is another \`emp_id\`; a \`categories\` row has a \`parent_id\` that is another \`id\`. That models a tree of unknown depth: \`Electronics > Audio > Headphones > Over-ear\` today, one level deeper tomorrow. To walk it with plain joins you would need one \`JOIN\` per level, but you do not know the level count when you write the query. A **recursive CTE** solves this by applying one query to its own output over and over until it stops producing rows.
 
-A recursive CTE has three parts:
+## The mental model: anchor, recursive member, working table
+
+Read \`WITH RECURSIVE\` as a loop with three moving parts.
 
 \`\`\`sql
-WITH RECURSIVE tree AS (
-  -- 1. ANCHOR: the starting rows (the roots)
-  SELECT id, name, parent_id, 0 AS depth
-  FROM categories
-  WHERE parent_id IS NULL
+WITH RECURSIVE org AS (
+  -- ANCHOR: the seed rows, run once
+  SELECT emp_id, name, 0 AS depth
+  FROM employees
+  WHERE manager IS NULL              -- the CEO(s)
 
   UNION ALL
 
-  -- 2. RECURSIVE MEMBER: joins the CTE back to the base table to go one level deeper
-  SELECT c.id, c.name, c.parent_id, t.depth + 1
-  FROM categories c
-  JOIN tree t ON c.parent_id = t.id
-  -- 3. TERMINATION: implicit, stops when the recursive member returns no new rows
+  -- RECURSIVE MEMBER: run repeatedly, one level deeper each pass
+  SELECT e.emp_id, e.name, o.depth + 1
+  FROM employees e
+  JOIN org o ON e.manager = o.emp_id
 )
-SELECT * FROM tree ORDER BY depth, id;
+SELECT * FROM org ORDER BY depth, emp_id;
+-- Ada 0 | Bob 1 | Cy 1 | Di 2 | Fay 2 | Eve 3
 \`\`\`
 
-- **Anchor** runs once, seeding the working set (here, top-level categories at depth 0).
-- **Recursive member** runs repeatedly: each pass joins the base table to the rows produced by the
-  *previous* pass, emitting the children one level deeper. \`depth + 1\` tracks how far down you are.
-- **Termination** is automatic: when a pass produces zero new rows (you've hit the leaves), recursion
-  stops. A well-formed tree terminates on its own.
+The engine keeps a **working table**. The anchor fills it once. Then each pass runs the recursive member against **only the rows the previous pass produced**, not the whole accumulated result, appends the new rows, and repeats. When a pass yields zero rows (every leaf is reached), the loop stops. That "previous pass only" rule is the whole model: it is why \`depth + 1\` counts levels correctly and why a clean tree terminates on its own.
 
-### Building a breadcrumb path
+### Carry values down the recursion
 
-Carry an accumulating string down the recursion to build \`Electronics > Audio > Headphones\`:
+Anything you want per node, compute it in the anchor and thread it through the recursive member. A breadcrumb plus its root ancestor:
 
 \`\`\`sql
 WITH RECURSIVE tree AS (
-  SELECT id, name, parent_id, name AS path, 0 AS depth
+  SELECT id, name, parent_id, name AS breadcrumb, name AS root_name, 0 AS depth
   FROM categories WHERE parent_id IS NULL
   UNION ALL
   SELECT c.id, c.name, c.parent_id,
-         t.path || ' > ' || c.name AS path,
+         t.breadcrumb || ' > ' || c.name,   -- append this level's name
+         t.root_name,                        -- copy the root down unchanged
          t.depth + 1
   FROM categories c JOIN tree t ON c.parent_id = t.id
 )
-SELECT id, name, path, depth FROM tree;
+SELECT breadcrumb, root_name, depth FROM tree ORDER BY depth, id;
+-- Electronics > Audio > Headphones | Electronics | 2
 \`\`\`
 
-Each level appends its own name to the parent's path.
+\`breadcrumb\` grows one segment per level; \`root_name\`, set once in the anchor, rides along untouched.
 
-### Common pitfalls
+### Pitfalls
 
-- **Type mismatch between anchor and recursive member.** The two \`SELECT\`s must have the **same
-  number and types** of columns. If the anchor's \`path\` is declared narrower than the concatenated
-  recursive \`path\`, some engines truncate. Seed the anchor with the same expression type.
-- **Infinite loops on dirty data.** If the data has a cycle (A's parent is B, B's parent is A),
-  recursion never terminates. Guard with a depth cap (\`WHERE t.depth < 100\` in the recursive member)
-  or track a visited-path and stop on repeats.
-- **\`UNION\` vs \`UNION ALL\`.** Use \`UNION ALL\`: it's cheaper and correct for a tree. \`UNION\` would
-  dedupe every pass, which is wasteful and can mask cycles.
+- **Cycles loop forever.** If dirty data has \`A\`'s parent as \`B\` and \`B\`'s parent as \`A\`, no pass ever returns zero rows. SQLite will not rescue you here: it has no default recursion-depth limit, so an unguarded cycle runs until it exhausts memory (in the browser it just freezes the tab). Add your own guard in the recursive member, \`WHERE t.depth < 20\`, so it stops.
+- **Join direction decides up vs down.** \`JOIN ... ON c.parent_id = t.id\` walks parents to children (down). Flip it to \`c.id = t.parent_id\` and you climb toward the root instead. Getting this backward is the classic first bug.
+- **Use \`UNION ALL\`, not \`UNION\`.** \`UNION\` deduplicates on every pass, which is wasted work on a tree and can hide a cycle you wanted the depth cap to catch.
+- **Anchor and recursive member must line up** in column count and order, and each column's type is fixed by the anchor. On strict engines a too-narrow anchor text column truncates the growing \`breadcrumb\`.
 
-> **In the warehouse:** Postgres, SQLite, Snowflake, BigQuery all require the \`RECURSIVE\` keyword;
-> **SQL Server omits it**: you write plain \`WITH tree AS (…)\` for a recursive CTE there. The
-> three-part structure is identical everywhere.
+**Interview nuance:** a recursive CTE is not "the CTE can read all of its own rows." Each iteration joins against only the immediately preceding iteration's output (the working table), and default evaluation is breadth-first: all of depth 1, then all of depth 2. That semantics is why \`depth\` comes out exact, why the result order without an explicit \`ORDER BY\` is level order rather than \`id\` order, and why an unbounded self-reference on cyclic data never converges.
 
-**Recap:** \`WITH RECURSIVE\` = anchor (roots) \`UNION ALL\` recursive member (join the CTE back to the
-table for the next level), auto-terminating when no new rows appear; track \`depth\` and accumulate a
-\`path\` string for breadcrumbs, and cap depth to survive cyclic dirty data.
+> **Portability:** Postgres, MySQL, and BigQuery require the \`RECURSIVE\` keyword. SQL Server and Oracle omit it (plain \`WITH cte AS (...)\`). SQLite accepts it either way. Write \`WITH RECURSIVE\` regardless: it is required on the engines that demand it and documents intent on the ones that do not.
 
-**Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB
-that already holds the source tree plus an empty target table; then hidden assertion queries check
-depths, breadcrumbs, and row counts. Lead your load with \`DELETE FROM <target>;\` so a re-run stays
-idempotent.`,
+**Execution mode:** you write a multi-statement script against a fresh in-memory SQLite database that already holds the source tree plus an empty target table; hidden queries then check depths, breadcrumbs, and row counts. Lead your load with \`DELETE FROM <target>;\` so a re-run stays idempotent.`,
   },
   apply: scriptExercise({
     id: "sql-l4-recursive-cte-apply",
@@ -1093,70 +1053,42 @@ const starBuild: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["dimension load", "surrogate-key assignment", "fact load", "key lookup join"],
   teach: {
     estimatedMinutes: 9,
-    markdown: `## The fact stores surrogate keys, so the dimensions load first
+    markdown: `## Why the fact table loads last
 
-A star schema's fact table stores **surrogate keys** (small integers like \`product_key\`), not
-business/natural keys (\`sku\`, \`email\`). That keeps the fact narrow and decouples it from messy
-source keys. But it forces a strict **load order**:
+A star schema splits your data into one narrow fact table of measurements (the numbers you sum, like \`amount\` or \`revenue\`) surrounded by \`dim\` tables that describe them. The fact does not store the messy business keys from your source (\`email\`, \`sku\`). It stores a **surrogate key**: a small integer like \`customer_key\` that the warehouse itself mints. That keeps the fact narrow, decouples it from source systems that recycle or reformat their keys, and lets a customer change their email without rewriting a billion fact rows.
 
-1. **Load the dimensions first.** Each dimension row gets a surrogate key: an \`INTEGER PRIMARY KEY\`
-   in SQLite auto-assigns one.
-2. **Load the fact second**, and for each fact row **look up** the surrogate key by joining the
-   staging row's *natural* key to the dimension.
+That design dictates a strict **load order**. Surrogate keys are born in the dimension, so:
 
-If you load the fact first, there are no surrogate keys to point at. If a fact's natural key has no
-matching dimension row, you get an **orphan fact**: an inner join drops it, a left join leaves a
-\`NULL\` key. A correct load has **zero orphan facts**.
+1. Load every dimension first. Each new row gets a surrogate key.
+2. Load the fact second. For each staging row, look up the surrogate key by joining on the natural key.
 
-### Worked pattern
+Reverse that and step 2 has nothing to point at. The lookup join is the whole game: it swaps a source \`email\` for a warehouse \`customer_key\`. You never type a surrogate key literally in the fact insert. You always fetch one.
+
+### How the surrogate key gets minted
+
+In SQLite, a column declared \`INTEGER PRIMARY KEY\` is an alias for the row's \`rowid\`, so it auto-assigns a sequential integer whenever you omit it from the insert.
 
 \`\`\`sql
--- 1. dims first: surrogate key auto-assigned, natural key kept as an attribute
-CREATE TABLE dim_product (
-  product_key INTEGER PRIMARY KEY,   -- surrogate
-  sku         TEXT UNIQUE NOT NULL,  -- natural key
-  name        TEXT
-);
-INSERT INTO dim_product (sku, name)
-SELECT DISTINCT sku, name FROM stg_products;
+-- 1. dimension first: omit customer_key so it auto-assigns; keep the natural key
+INSERT INTO dim_customer (email, name)
+SELECT DISTINCT email, name FROM stg_customers;
 
--- 2. fact second: join staging natural key -> dim to fetch the surrogate key
-CREATE TABLE fact_sales (
-  sale_id     INTEGER PRIMARY KEY,
-  product_key INTEGER NOT NULL REFERENCES dim_product(product_key),
-  qty         INTEGER,
-  revenue     INTEGER
-);
-INSERT INTO fact_sales (product_key, qty, revenue)
-SELECT dp.product_key, s.qty, s.revenue
+-- 2. fact second: join staging's natural key to the dim to fetch the surrogate key
+INSERT INTO fact_sales (customer_key, amount)
+SELECT dc.customer_key, s.amount
 FROM stg_sales s
-JOIN dim_product dp ON dp.sku = s.sku;   -- INNER JOIN = orphans excluded
+JOIN dim_customer dc ON dc.email = s.email;
 \`\`\`
 
-The \`JOIN … ON dp.sku = s.sku\` is the **key lookup**: it swaps the source \`sku\` for the warehouse
-\`product_key\`. Notice the fact insert never types a surrogate key literally; it always *looks one up*.
+With customers \`Ann (a@x.com)\` and \`Bob (b@x.com)\`, \`dim_customer\` gets \`customer_key\` \`1\` and \`2\`. A sale for \`a@x.com\` lands in \`fact_sales\` with \`customer_key = 1\`. The fact never sees the email again.
 
-### Common pitfalls
+### Pitfalls
 
-- **Inner join silently drops orphans.** An inner join *is* the right choice when the rule is "every
-  fact must match a dimension," but you should **assert** the dropped count is zero rather than
-  silently lose rows. A common defense is loading an \`UNKNOWN\` dimension member (surrogate key
-  \`-1\`) and left-joining with \`COALESCE(dp.product_key, -1)\` so orphans are *counted*, not vanished.
-- **Duplicate natural keys in the dimension.** If \`stg_products\` has the same \`sku\` twice, an
-  \`INSERT … SELECT DISTINCT\` (or a dedup step) is required, or the lookup join fans out and inflates
-  the fact.
+- **Deduplicate on the key alone, not the whole row.** \`SELECT DISTINCT email, name\` dedupes distinct *pairs*. If \`a@x.com\` arrives once as \`Ann\` and once as \`Anne\`, you get two dimension rows for one customer, and the lookup join fans out: one sale becomes two fact rows and your totals inflate. Dedup by the natural key so each customer maps to exactly one surrogate key. \`GROUP BY email\` collapses every row for one email into a single dimension row.
+- **Inner join silently drops orphans.** A fact row whose natural key has no dimension match vanishes from an inner join. That is often the correct rule, but verify the dropped count is zero rather than trusting it. An **orphan fact** is a load bug, not a data feature.
+- **Re-runnability.** Lead with \`DELETE FROM\` each target so a second run reproduces the same counts instead of doubling the fact. Delete the fact first, then the dimensions, because the fact references them.
 
-> **In the warehouse:** Snowflake/BigQuery mint surrogate keys with \`IDENTITY\`/\`AUTOINCREMENT\` or
-> sequences and often generate them during a \`MERGE\`. The dims-then-fact-with-lookup pattern is
-> universal.
-
-**Recap:** load dims first (mint surrogate keys), then load the fact by joining each staging row's
-natural key to its dimension to fetch the surrogate key; a correct load produces zero orphan facts.
-Assert it rather than trusting the inner join.
-
-**Execution mode:** you write a multi-statement script. The dimension and fact tables are pre-created
-but **empty**; your script populates them. Lead with \`DELETE FROM\` each target so the load is
-**re-runnable**: a second run must leave the same row counts, not double the fact.`,
+**Interview nuance:** each fact row must match exactly one dimension row, and that guarantee lives in the dimension, not the fact query. If a dimension holds duplicate natural keys, the inner join becomes a fan-out that multiplies your measures, so the correctness of \`SUM(revenue)\` depends on the dimension's natural key being unique. Interviewers probe exactly this by asking what happens when a dimension load forgets to dedupe.`,
   },
   apply: scriptExercise({
     id: "sql-l4-star-build-apply",
@@ -1364,57 +1296,57 @@ const scdType1: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["SCD Type 1", "in-place UPDATE", "correction semantics"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Slowly Changing Dimensions: Type 1 overwrites in place
+    markdown: `## Why Type 1 exists
 
-A **dimension** describes an entity (a customer, a product) and its attributes drift over time: a
-customer moves city, a product gets renamed. How you *handle* that drift is the **Slowly Changing
-Dimension (SCD)** question. **Type 1** is the simplest answer: **overwrite the old value in place and
-keep no history.** The row count never changes: you just \`UPDATE\` the changed columns to their new
-values.
+A **dimension** table describes an entity, like a customer or a product, and stores its attributes: \`name\`, \`city\`, \`tier\`. Those attributes drift. A customer moves, a product gets renamed, and someone fat-fingers a city at data entry. The **Slowly Changing Dimension (SCD)** question is simple to state: when an attribute changes, what do you do with the old value?
 
-Type 1 is the right choice when the old value was **wrong**: a typo, a misspelled city, a data-entry
-error nobody ever needs to see again. You don't want a history *of a mistake*; you want it corrected
-everywhere, retroactively.
+**Type 1** is the bluntest answer. Overwrite the old value in place and keep no history. You reach for it when the old value was simply **wrong**: a typo, a misspelled city, a value nobody should ever see again. You do not want a durable record of a mistake. You want it corrected everywhere, as if it had always been right.
 
-### Worked example: the in-place overwrite
+## The mental model: match on the natural key, overwrite, add no rows
 
-A fresh source dump lands in \`stg_customer\`; apply a Type 1 overwrite to \`dim_customer\`:
+Every dimension row carries two kinds of key. The **surrogate key** (\`customer_key\`) is a stable integer that fact tables join on. The **natural key** (\`email\`) identifies the real-world entity. A Type 1 apply step matches incoming rows to existing ones on the **natural key** and overwrites the changed attributes in place, adding no new row to preserve the old value. The surrogate key never moves, so fact tables keep pointing at the same \`customer_key\` and nothing downstream breaks. A genuinely new customer is still inserted with a fresh key: that is a new row for a new entity, not a second row for a change.
+
+## Worked example
 
 \`\`\`sql
+-- dim_customer before         stg_customer (corrected dump)
+-- key email          city       email          city
+-- 1   ana@shop.com   Sanfran    ana@shop.com   San Francisco
+-- 2   ben@shop.com   Austin
+
 UPDATE dim_customer
 SET name = (SELECT s.name FROM stg_customer s WHERE s.email = dim_customer.email),
     city = (SELECT s.city FROM stg_customer s WHERE s.email = dim_customer.email)
 WHERE email IN (SELECT email FROM stg_customer);
+
+-- dim_customer after:
+-- 1   ana@shop.com   San Francisco   <- fixed, same customer_key
+-- 2   ben@shop.com   Austin          <- untouched, absent from the dump
 \`\`\`
 
-Match on the **natural key** (\`email\`), overwrite the attributes, add **no rows** for the change.
+Row count stays at 2, \`customer_key\` 1 is unchanged, and Ben, who is not in the dump, is left alone.
 
-A cleaner, portable form uses \`INSERT … ON CONFLICT(key) DO UPDATE\` (an *upsert*) so brand-new
-customers are inserted and existing ones overwritten in a single statement. You'll write exactly that
-in the practice. Either way the essence is identical: **match on the natural key, overwrite the
-attributes, add no rows for changes.**
+The portable one-statement form is an **upsert**, which the practice uses to overwrite existing customers and insert brand-new ones together:
 
-### Common pitfalls
+\`\`\`sql
+INSERT INTO dim_customer (email, name, city, tier)
+SELECT email, name, city, tier FROM stg_customer
+WHERE true
+ON CONFLICT(email) DO UPDATE SET
+  name = excluded.name,
+  city = excluded.city,
+  tier = excluded.tier;
+\`\`\`
 
-- **Type 1 destroys the ability to answer "what was the value on date X."** If finance ever needs the
-  customer's city *at the time of sale*, Type 1 is wrong: you need **Type 2** (next lesson). Choosing
-  Type 1 is a **business decision**, not a default.
-- **The correlated-subquery \`UPDATE\` needs its guard.** The \`WHERE email IN (SELECT email FROM
-  stg_customer)\` clause matters: without it, every customer *absent* from the new dump has its
-  \`name\`/\`city\` set to \`NULL\`: the subquery returns nothing, so the assignment is NULL.
+\`excluded\` is the row that would have been inserted. On a key collision SQLite runs the \`DO UPDATE\` branch instead. This requires a \`UNIQUE\` index on \`email\`.
 
-> **In the warehouse:** Snowflake and BigQuery express Type 1 as a \`MERGE … WHEN MATCHED THEN UPDATE\`.
-> SQLite and Postgres use \`INSERT … ON CONFLICT DO UPDATE\` or a plain \`UPDATE\`. Same semantics:
-> overwrite, no history.
+## Pitfalls
 
-**Recap:** SCD Type 1 overwrites changed attributes in place: match on the natural key, \`UPDATE\`, add
-zero new rows. It's correct for fixing errors where no history is wanted; if you need "the value as of
-date X," reach for Type 2 instead.
+- **Drop the \`WHERE ... IN\` guard and you nuke everyone.** In the correlated \`UPDATE\`, a customer absent from the dump has a subquery that returns nothing, so \`city\` is set to \`NULL\`. The guard restricts the update to emails that actually exist in staging.
+- **The \`WHERE true\` before \`ON CONFLICT\` is not decoration.** In \`INSERT ... SELECT ... ON CONFLICT\`, SQLite's parser can misread \`ON\` as a join clause. Inserting a \`WHERE\` (even \`WHERE true\`) between the \`SELECT\` and \`ON CONFLICT\` disambiguates it.
+- **Type 1 destroys "what was the value on date X."** If finance ever needs the city at the time of sale, Type 1 is the wrong tool and you need **Type 2** (next lesson). Choosing Type 1 is a business decision, not a silent default.
 
-**Execution mode:** you write a multi-statement script against a fresh in-memory SQLite DB already
-seeded with \`dim_customer\` and \`stg_customer\`. Hidden assertion queries then check the row count, the
-overwritten values, and that surrogate keys stayed put. Running your script twice must leave the
-same number of rows.`,
+**Interview nuance:** a production apply step must be **idempotent**, because pipelines retry and backfill and will run the same batch twice. Type 1 is idempotent by construction. Overwriting \`city\` with the value it already holds is a no-op, and on the second run the "new" customer already exists, so the upsert takes the \`DO UPDATE\` branch instead of inserting a duplicate. That is exactly why the hidden checks re-run your script and assert the row count did not move.`,
   },
   apply: scriptExercise({
     id: "sql-l4-scd-type1-apply",
@@ -1908,61 +1840,60 @@ const dedup: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["ROW_NUMBER() dedup", "partition-by-key", "keep-rank-1 subquery", "QUALIFY note"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Deduplicate to one row per business key
+    markdown: `## Keep exactly one row per business key
 
-Source feeds are dirty. A daily customer dump often contains the same \`email\` several times: an old
-record plus one or more updates. Before you load it, you must reduce it to **one row per business
-key**, keeping the **right** one (usually the most recently updated). The portable pattern is
-\`ROW_NUMBER\` (from Module 4.1) plus a wrapping filter:
+Raw feeds arrive dirty. A daily customer dump routinely carries the same \`email\` two or three times: one stale record plus a couple of updates. If you load all of them, every downstream join fans out, \`COUNT(DISTINCT email)\` stops matching \`COUNT(*)\`, and a metric like revenue per customer silently double counts. Deduplication is the gate that guarantees exactly one row per business key before the data lands, and it has to keep the *right* row, usually the most recently updated one.
+
+### The pattern: rank inside, filter outside
+
+The portable move is to number the rows within each key, then keep number one:
 
 \`\`\`sql
-SELECT * FROM (
+SELECT email, name, city, updated_at
+FROM (
   SELECT *,
          ROW_NUMBER() OVER (
-           PARTITION BY email          -- the business key
-           ORDER BY updated_at DESC     -- newest wins
+           PARTITION BY email             -- one counter per business key
+           ORDER BY updated_at DESC       -- newest row gets rn = 1
          ) AS rn
   FROM stg_customer
 ) ranked
-WHERE rn = 1;                          -- keep only the freshest row per email
+WHERE rn = 1;
 \`\`\`
 
-\`PARTITION BY email\` groups the duplicates; \`ORDER BY updated_at DESC\` puts the freshest first;
-\`WHERE rn = 1\` keeps it. Because \`ROW_NUMBER\` assigns **unique** ranks, you get exactly one row per
-key: never zero, never two.
+Read it as a grain change. \`PARTITION BY email\` restarts the counter for every distinct \`email\`; \`ORDER BY updated_at DESC\` decides who counts as "first"; \`WHERE rn = 1\` keeps that single winner. Because \`ROW_NUMBER\` hands out *unique* integers inside each partition, you get exactly one row per key: never zero, never two.
 
-### Common pitfalls
+Concretely, three raw rows (two for \`a@x.com\`, one for \`b@x.com\`):
 
-- **Ties in the \`ORDER BY\` make the winner nondeterministic.** If two rows share the same
-  \`updated_at\`, add a deterministic tiebreaker (\`ORDER BY updated_at DESC, id DESC\`) so the same row
-  wins every run, critical for idempotency.
-- **\`DISTINCT\` is not dedup-by-key.** \`SELECT DISTINCT\` removes rows that are identical across *all*
-  columns; it will **not** collapse two rows with the same \`email\` but different \`updated_at\`. Reach
-  for \`ROW_NUMBER\` whenever "duplicate" means "same key, possibly different attributes."
-- **Filtering \`rn\` inline fails.** You can't write \`WHERE ROW_NUMBER() OVER(...) = 1\`: a window
-  function isn't allowed in \`WHERE\`. Wrap the window in a subquery/CTE and filter the \`rn\` alias
-  outside it.
+\`\`\`text
+email      name    updated_at
+a@x.com    Ann     2024-01-01
+a@x.com    Ann R.  2024-03-02
+b@x.com    Bo      2024-02-10
+\`\`\`
 
-> **In the warehouse:** Snowflake and BigQuery let you drop the wrapping subquery entirely:
-> \`… QUALIFY ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) = 1\`. SQLite and Postgres
-> have no \`QUALIFY\`, so wrap in a subquery/CTE as above.
+collapse to one row per \`email\`, keeping each key's newest \`updated_at\`:
 
-**One more SQLite detail worth knowing:** \`NULL\` sorts as the *lowest* value, so \`ORDER BY updated_at
-DESC\` puts every real timestamp first and pushes the \`NULL\`s last. A row whose \`updated_at\` is missing
-therefore loses to any row that has one, exactly the behavior you want when a missing timestamp means
-"unknown / oldest." (Some engines need an explicit \`NULLS LAST\` to get this; SQLite gives it to you
-for free under \`DESC\`.)
+\`\`\`text
+email      name    updated_at
+a@x.com    Ann R.  2024-03-02
+b@x.com    Bo      2024-02-10
+\`\`\`
 
-**Recap:** dedup to one row per business key with
-\`ROW_NUMBER() OVER (PARTITION BY key ORDER BY updated_at DESC)\`, then keep \`rn = 1\` in a wrapping
-query. Add a deterministic tiebreaker so the same row wins every run, and reach for this (not
-\`DISTINCT\`) whenever "duplicate" means the same key with differing attributes.
+The two \`a@x.com\` rows reduce to the March 2 update; \`b@x.com\` was already unique, so it passes through untouched.
 
-**Execution mode:** you write a multi-statement script. The target table is pre-created and may already
-hold rows from a prior run, so **lead your load with \`DELETE FROM <target>;\`**. The grader runs your
-script twice and checks the row count is identical, so a repeat must not double the rows. Hidden
-assertion queries then check the row count, which row won each key, and that zero duplicate keys
-remain.`,
+### Pitfalls
+
+- **\`DISTINCT\` is not dedup-by-key.** \`SELECT DISTINCT\` only collapses rows that match on *every* selected column. Two rows with the same \`email\` but a different \`updated_at\` are not identical, so \`DISTINCT\` keeps both. Reach for \`ROW_NUMBER\` whenever "duplicate" means "same key, different attributes."
+- **A window function is illegal in \`WHERE\`.** You cannot write \`WHERE ROW_NUMBER() OVER (...) = 1\`, because windows are computed after \`WHERE\` runs. Wrap the window in a subquery or CTE and filter the \`rn\` alias in the outer query.
+- **Unbroken ties are nondeterministic.** If two rows share the same \`updated_at\`, the engine may pick either one as \`rn = 1\`, so a rerun can swap winners. Add a tiebreaker: \`ORDER BY updated_at DESC, source_row_id DESC\`. Now the same row wins every run, which is what keeps the load idempotent.
+- **\`NULL\` timestamps.** In SQLite \`NULL\` sorts below every real value, so \`ORDER BY updated_at DESC\` naturally pushes missing timestamps to the bottom and any real \`updated_at\` beats a \`NULL\` one. (Postgres defaults the other way under \`DESC\` and needs an explicit \`NULLS LAST\`; SQLite gives you the behavior you want for free.)
+
+> **In the warehouse:** Snowflake and BigQuery let you skip the wrapper with \`QUALIFY ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) = 1\`. SQLite and Postgres have no \`QUALIFY\`, so keep the subquery.
+
+**Interview nuance:** know why it must be \`ROW_NUMBER\` and not \`RANK\` or \`DENSE_RANK\`. On a tie, \`RANK\` and \`DENSE_RANK\` assign the *same* number to both rows, so \`WHERE rank = 1\` returns both and your duplicates come right back. Only \`ROW_NUMBER\` guarantees a strict \`1, 2, 3\` with no repeats, which is exactly the "one row per key" contract dedup depends on.
+
+**Execution mode:** you write a multi-statement script against a pre-created target that may already hold rows from a previous run. Lead with \`DELETE FROM <target>;\`, then insert the deduped rows. The grader runs your script twice and checks the row count is unchanged, so a rerun must not double the data. Hidden assertions then verify the row count, which row won each key, and that zero duplicate keys remain.`,
   },
   apply: scriptExercise({
     id: "sql-l4-dedup-apply",
@@ -2448,69 +2379,63 @@ const dataQuality: SqlLevel["modules"][number]["lessons"][number] = {
   ],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## A successful load can still be wrong
+    markdown: `## A load that "succeeds" can still be wrong
 
-A loader that runs without error can still produce **wrong** data: a duplicated key, a NULL where a
-NULL can't be, an orphan fact pointing at a customer who doesn't exist. Data-quality (DQ) tests catch
-this before the bad data reaches a dashboard. The universal pattern (the one dbt is built on) is the
-**zero-rows assertion**: write a query that returns the **violating** rows; if it returns **any** rows,
-the test fails. **Healthy data → zero rows → pass.**
+A loader can finish with a green checkmark and still hand you garbage: a \`customer_code\` that appears twice, a \`NULL\` \`email\` where every row needs one, an order that points at a customer who was never inserted. Nothing threw an error, so nothing stopped it, and the bad rows flow straight into a dashboard where someone trusts them. Data-quality (DQ) tests are the guardrail. They run right after the load and fail the pipeline before corrupt data reaches a mart.
 
-### The dbt four: each as a "count of violations = 0" query
+## The zero-rows assertion
+
+Every DQ test in dbt is built on one idea: write a query that returns the rows that violate your expectation. If the query returns any rows, the test fails. Healthy data returns zero rows and passes.
+
+This flips your instinct. Do not query the good rows and hope the count looks big. Query the bad rows and require exactly zero. That is unambiguous and threshold-free: zero orphans, zero duplicates, zero unexpected values, or the load is broken.
+
+## The dbt four
+
+Four tests cover most real defects. Each is a "violations = 0" query.
 
 \`\`\`sql
--- 1. not_null: rows where a required column is NULL
-SELECT COUNT(*) AS violations FROM dim_customer WHERE email IS NULL;
+-- not_null: a required column is missing
+SELECT customer_key FROM dim_customer WHERE email IS NULL;
 
--- 2. unique: keys that appear more than once
-SELECT customer_code FROM dim_customer
-GROUP BY customer_code HAVING COUNT(*) > 1;
+-- unique: a key appears more than once
+SELECT customer_key FROM dim_customer
+GROUP BY customer_key HAVING COUNT(*) > 1;
 
--- 3. accepted_values: rows whose status is outside the allowed set
-SELECT COUNT(*) AS violations FROM fact_order
-WHERE status NOT IN ('paid','shipped','cancelled');
+-- accepted_values: a value outside the allowed set (NULL counts as a violation)
+SELECT customer_key FROM dim_customer
+WHERE status NOT IN ('active','churned','prospect')
+   OR status IS NULL;
 
--- 4. relationships (referential integrity): fact rows with no matching dimension
-SELECT f.customer_key FROM fact_sales f
+-- relationships: a fact row with no matching dimension (the orphan anti-join)
+SELECT f.customer_key
+FROM fact_sales f
 LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
 WHERE d.customer_key IS NULL;
 \`\`\`
 
-Each returns rows **only when something is wrong**. Wire them into CI (or a workspace grader) as "this
-query must return zero rows," and a bad load fails loudly instead of silently corrupting downstream
-marts.
+The last one is the anti-join from Level 2 repurposed as referential integrity, the highest-value check in a star schema. Walk it: the \`LEFT JOIN\` keeps every fact row, a missing dimension leaves \`d.customer_key\` as \`NULL\`, and the \`WHERE\` keeps only those unmatched rows.
 
-### Anatomy of the relationships (orphan) test
+Worked example, matching the seeds in your exercises:
 
-\`\`\`
+\`\`\`sql
+-- dim_customer keys: 1, 2
+-- fact_sales   keys: 1, 2, 99   (99 has no dimension row)
 SELECT f.customer_key
 FROM fact_sales f
-LEFT JOIN dim_customer d ON d.customer_key = f.customer_key   -- keep all fact rows
-WHERE d.customer_key IS NULL;                                 -- ...where the dim match is missing
+LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+WHERE d.customer_key IS NULL;
+-- customer_key
+-- 99
 \`\`\`
 
-This is the anti-join from Level 2, repurposed as a referential-integrity assertion, the most valuable
-DQ check in a star schema.
+One row comes back, so the test fails and names key \`99\` as the orphan. On clean data the result is empty, which is the pass state your Apply writes into \`orphan_facts\`.
 
-### Common pitfalls
+## Pitfalls
 
-- **Asserting the happy path instead of the violations.** A test that does
-  \`SELECT COUNT(*) FROM dim WHERE email IS NOT NULL\` and checks it's "large" is fragile. Always count
-  the **bad** rows and require **zero**; it's unambiguous and threshold-free.
-- **NULLs in \`NOT IN\`.** \`status NOT IN ('paid','shipped')\` returns nothing for a \`NULL\` status
-  (three-valued logic), silently passing a null. Add \`OR status IS NULL\` if a null is also a violation.
+- **Asserting the happy path.** \`SELECT COUNT(*) FROM dim_customer WHERE email IS NOT NULL\` and checking it is "large enough" is fragile and needs an arbitrary threshold. Count the bad rows and require zero instead.
+- **\`NULL\` swallowed by \`NOT IN\`.** \`status NOT IN ('active','churned','prospect')\` returns nothing for a \`NULL\` status, because \`NULL\` compared to any value is \`UNKNOWN\`, not \`TRUE\`, and \`WHERE\` keeps only \`TRUE\` rows. The null silently passes. When a null is also invalid, add \`OR status IS NULL\`, exactly as the \`accepted_values\` query above does.
 
-> **In the warehouse:** dbt ships these four as one-line YAML (\`unique\`, \`not_null\`,
-> \`accepted_values\`, \`relationships\`) that compile to exactly these zero-row SQL queries. The SQL is
-> identical across engines.
-
-**Recap:** encode each expectation as a query that returns only the violating rows and require **zero
-rows** to pass; the dbt four, \`not_null\`, \`unique\`, \`accepted_values\`, \`relationships\` (the orphan
-anti-join) are the standard suite, always counting the bad rows rather than asserting the good ones.
-
-**Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
-hidden assertion queries check your DQ output, and, true to the discipline, each grader assertion is
-itself a zero-rows violation query.`,
+**Interview nuance:** interviewers ask why the orphan check uses \`LEFT JOIN ... WHERE d.customer_key IS NULL\` instead of \`WHERE f.customer_key NOT IN (SELECT customer_key FROM dim_customer)\`. If the dimension holds even one \`NULL\` \`customer_key\`, the \`NOT IN\` version returns zero rows for every fact and hides real orphans, because \`x NOT IN (..., NULL)\` evaluates to \`UNKNOWN\`. The anti-join is NULL-safe: it matches keys with \`=\` in the \`ON\` clause and is unaffected by nulls elsewhere in the column. Same intent, one silently wrong.`,
   },
   apply: scriptExercise({
     id: "sql-l4-data-quality-apply",
