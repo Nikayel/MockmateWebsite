@@ -1,4 +1,12 @@
 import type { SqlLevel } from "@/lib/tutorials/types"
+import {
+  sqlAggregatesDrills,
+  sqlCtesDrills,
+  sqlHavingDrills,
+  sqlInnerJoinDrills,
+  sqlLeftJoinDrills,
+  sqlSubqueryDrills,
+} from "./extra-practice"
 
 const aggregates: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l2-aggregates",
@@ -170,6 +178,7 @@ INSERT INTO orders VALUES
       },
     },
   },
+  extraPractice: sqlAggregatesDrills,
 }
 
 const groupBy: SqlLevel["modules"][number]["lessons"][number] = {
@@ -507,6 +516,7 @@ INSERT INTO orders VALUES
       },
     },
   },
+  extraPractice: sqlHavingDrills,
 }
 
 const innerJoin: SqlLevel["modules"][number]["lessons"][number] = {
@@ -748,6 +758,7 @@ INSERT INTO order_items VALUES
       },
     },
   },
+  extraPractice: sqlInnerJoinDrills,
 }
 
 const leftJoin: SqlLevel["modules"][number]["lessons"][number] = {
@@ -924,6 +935,7 @@ INSERT INTO order_items VALUES
       },
     },
   },
+  extraPractice: sqlLeftJoinDrills,
 }
 
 const antiJoin: SqlLevel["modules"][number]["lessons"][number] = {
@@ -1570,6 +1582,7 @@ INSERT INTO orders VALUES
       },
     },
   },
+  extraPractice: sqlSubqueryDrills,
 }
 
 const ctes: SqlLevel["modules"][number]["lessons"][number] = {
@@ -1777,6 +1790,7 @@ INSERT INTO order_items VALUES
       },
     },
   },
+  extraPractice: sqlCtesDrills,
 }
 
 const caseExpr: SqlLevel["modules"][number]["lessons"][number] = {
