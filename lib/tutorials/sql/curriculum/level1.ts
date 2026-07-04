@@ -119,9 +119,7 @@ INSERT INTO orders (ord_id, cust_id, ord_status, amt_c) VALUES
   practice: {
     id: "sql-l1-select-columns-practice",
     executionMode: "single-file",
-    prompt: `Write a query over \`orders_raw\` that returns six columns, each raw column renamed to the
-warehouse alias below and kept in exactly this order; **drop** \`internal_flag\`. This is the
-"clean orders" staging projection a mart depends on:
+    prompt: `You're standing up the \`stg_orders\` staging model, and every downstream mart depends on it exposing clean, renamed columns. Write a query over \`orders_raw\` that returns six columns, each raw column renamed to the warehouse alias below and kept in exactly this order; **drop** \`internal_flag\`:
 
 | raw column | output alias |
 |---|---|
@@ -1487,7 +1485,7 @@ INSERT INTO customers_raw VALUES
   practice: {
     id: "sql-l1-strings-practice",
     executionMode: "single-file",
-    prompt: `Write a query that returns \`customer_id\`, \`email_key\`, \`sku_clean\`, and \`country_code_norm\` from \`customers_raw\`, the cleaned join keys a staging model prepares before any join. The three derived columns are:
+    prompt: `A staging model has to clean its join keys before anything downstream can join on them. Write a query that returns \`customer_id\`, \`email_key\`, \`sku_clean\`, and \`country_code_norm\` from \`customers_raw\`. The three derived columns are:
 - \`email_key\`: trimmed and lowercased email,
 - \`sku_clean\`: the \`sku\` with the leading \`'PRD-'\` prefix removed (e.g. \`PRD-AUD-01\` → \`AUD-01\`),
 - \`country_code_norm\`: the \`country_code\` trimmed and **uppercased** (e.g. \`' us '\` → \`US\`).`,

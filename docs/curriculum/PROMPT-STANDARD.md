@@ -53,6 +53,37 @@ The technique ("three CTE stages") is still there. It just moved **after** the g
 
 ---
 
+## Voice by phase: Apply is direct, Practice is a real-world scenario
+
+Apply and Practice teach the same skill but read differently on purpose.
+
+- **Apply** is the guided first rep. Keep it **direct and deliverable-first** (the golden rule
+  above): `Write a query against \`order_items\` that returns a single summary row with \`total_revenue\`
+  and \`order_count\`…`. No preamble. It can read a little "robotic"; that clarity is the point while
+  the learner is still forming the pattern.
+
+- **Practice** is the transfer test, so frame it like a **real interview / on-the-job question**: open
+  with one sentence of concrete business scenario (who you are, what the business needs), then state
+  the deliverable and exact outputs immediately after. This is still the deliverable-led rule in
+  spirit — the scenario is one sentence, and the required output appears right after it, so the
+  learner never has to hunt.
+
+  > **Good (Practice):** You're a data engineer who owns the nightly `orders` load. Before anything
+  > downstream reads the table, you run a one-row source-health scorecard. Write a query that returns
+  > `total_rows`, `distinct_customers`, `total_revenue` (NULL totals count as `0`), and
+  > `avg_order_value` (plain `AVG`), in that order.
+
+  The scenario sets stakes; the second sentence is a normal deliverable-led prompt. The blocklisted
+  framing verbs (Author/Model/Assemble/Reconcile/Wire) are still banned as openers — a business
+  scenario ("You're a DE…", "Finance needs…", "After a backfill…") is different from technique
+  framing and is what we want for Practice.
+
+Do not force a scenario onto an Apply, and do not let a Practice scenario grow past a sentence or two
+or bury the deliverable. Extra-practice **Drills** keep their difficulty tag first and stay terse
+(no scenario).
+
+---
+
 ## Structure of a good prompt
 
 1. **Lead sentence:** the imperative + the exact output. Name the output columns (and their order),

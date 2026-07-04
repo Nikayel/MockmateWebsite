@@ -73,13 +73,13 @@ INSERT INTO orders VALUES
   apply: {
     id: "sql-l2-aggregates-apply",
     executionMode: "single-file",
-    prompt: `From \`order_items\`, return a **single row** with two columns:
+    prompt: `Write a query against \`order_items\` (one row per line item) that returns a **single summary row** with two columns:
 
 - \`total_revenue\`: the sum of \`quantity * unit_price_cents\` across every line
-- \`order_count\`: the number of **distinct** \`order_id\` values present
+- \`order_count\`: the count of **distinct** \`order_id\` values
 
-Alias the columns exactly as named.`,
-    starterCode: `-- One summary row: total revenue and the count of distinct orders.
+Alias the output columns exactly \`total_revenue\` and \`order_count\`.`,
+    starterCode: `-- One summary row: total revenue and the number of distinct orders.
 SELECT
 
 FROM order_items;`,
@@ -116,7 +116,7 @@ INSERT INTO order_items VALUES
   practice: {
     id: "sql-l2-aggregates-practice",
     executionMode: "single-file",
-    prompt: `**Source-health scorecard.** After a nightly load you want one summary row. From \`orders\`,
+    prompt: `**Source-health scorecard.** You own the nightly \`orders\` load. Before anything downstream reads the table, you run a one-row scorecard to catch a broken load in seconds. From \`orders\`,
 return these four columns, in order:
 
 - \`total_rows\`: every row in the table
@@ -663,7 +663,7 @@ INSERT INTO orders VALUES
   practice: {
     id: "sql-l2-inner-join-practice",
     executionMode: "single-file",
-    prompt: `Write a query that returns one row **per order item** with columns \`order_item_id\`, \`order_id\`, \`product_name\`, \`category\`, \`order_status\`, and \`line_revenue\` (that item's \`quantity * unit_price_cents\`), sorted by \`order_item_id\`. Build it by inner-joining \`order_items\` to \`orders\` on \`order_id\` and then to \`products\` on \`product_id\`, so an item with no matching order or no matching product drops out.
+    prompt: `The analytics team needs a line-item fact preview that ties each sale back to its order and its product. Write a query that returns one row **per order item** with columns \`order_item_id\`, \`order_id\`, \`product_name\`, \`category\`, \`order_status\`, and \`line_revenue\` (that item's \`quantity * unit_price_cents\`), sorted by \`order_item_id\`. Build it by inner-joining \`order_items\` to \`orders\` on \`order_id\` and then to \`products\` on \`product_id\`, so an item with no matching order or no matching product drops out.
 
 Because this is a 1:N chain, prove to yourself the grain stays at the line-item level: the output row count must equal the number of \`order_items\` rows that have a matching order **and** a matching product (inner joins on both). Do **not** sum anything; this is a preview at line grain.`,
     starterCode: `-- Line-item fact: order_items -> orders -> products (inner joins on both keys).
@@ -1220,9 +1220,7 @@ INSERT INTO employees VALUES
   practice: {
     id: "sql-l2-self-join-practice",
     executionMode: "single-file",
-    prompt: `Write a query that returns one row per customer with \`customer_id\` (the non-NULL id from
-whichever snapshot has it) and \`change_type\`, comparing yesterday's and today's customer dimension
-snapshots. Sort by \`customer_id\`. \`change_type\` is one of:
+    prompt: `You run a daily diff on the customer dimension to feed a slowly-changing-dimension loader. Comparing yesterday's and today's snapshots, write a query that returns one row per customer with \`customer_id\` (the non-NULL id from whichever snapshot has it) and \`change_type\`. Sort by \`customer_id\`. \`change_type\` is one of:
 
 - \`'added'\`: in today but not yesterday,
 - \`'dropped'\`: in yesterday but not today,
