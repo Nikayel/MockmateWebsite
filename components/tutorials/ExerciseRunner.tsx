@@ -8,6 +8,7 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
 import { ExerciseLayout } from "./ExerciseLayout"
+import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { useExerciseRun } from "./useExerciseRun"
 import type { PythonExercise } from "@/lib/tutorials/types"
 
@@ -76,7 +77,14 @@ export function ExerciseRunner({
     >
       <div className="border-border overflow-hidden rounded-lg border">
         <CodeMirrorErrorBoundary>
-          <CodeMirrorEditor value={code} onChange={onCodeChange} language="python" height={280} />
+          <CodeMirrorEditor
+            value={code}
+            onChange={onCodeChange}
+            language="python"
+            autoHeight
+            minHeight={220}
+            maxHeight={520}
+          />
         </CodeMirrorErrorBoundary>
       </div>
 
@@ -145,19 +153,11 @@ export function ExerciseRunner({
       )}
 
       {showReference && exercise.referenceSolution && (
-        <div className="border-border overflow-hidden rounded-lg border">
-          <div className="border-border bg-muted/40 text-muted-foreground border-b px-3 py-1.5 text-xs font-medium">
-            Reference solution
-          </div>
-          <CodeMirrorErrorBoundary>
-            <CodeMirrorEditor
-              value={exercise.referenceSolution}
-              language="python"
-              height={140}
-              readOnly
-            />
-          </CodeMirrorErrorBoundary>
-        </div>
+        <ReadOnlyCodeBlock
+          code={exercise.referenceSolution}
+          language="python"
+          label="Reference solution"
+        />
       )}
 
       <TestResultsPanel results={results} isRunning={running} />
