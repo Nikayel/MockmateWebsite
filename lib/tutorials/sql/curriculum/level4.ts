@@ -31,19 +31,21 @@ Seed a tiny \`product_revenue\` table and rank within each category with all thr
 run this exact example yourself — the input table, the query, and its live output render at the
 bottom of this reading.
 
-For the \`audio\` category (two products tied at 500), the three ranking columns produce:
+For the \`audio\` category (two products tied at 500), ranking by \`revenue DESC, product\` (a
+tiebreaker keeps the output deterministic) produces:
 
 | product | revenue | rn (ROW_NUMBER) | rnk (RANK) | dense (DENSE_RANK) |
 |---|---|---|---|---|
-| Headphones | 500 | 1 | 1 | 1 |
-| Earbuds | 500 | 2 | 1 | 1 |
+| Earbuds | 500 | 1 | 1 | 1 |
+| Headphones | 500 | 2 | 1 | 1 |
 | Speaker | 300 | 3 | **3** | **2** |
 | Cable | 100 | 4 | 4 | 3 |
 
 Read the tie row carefully. This **is** the exam question:
 
-- **ROW_NUMBER** -> \`1, 2, 3, 4\`. Always unique, **breaks ties arbitrarily**. Use it when you must
-  pick exactly one row ("the latest record per customer").
+- **ROW_NUMBER** -> \`1, 2, 3, 4\`. Always unique. With a tiebreaker it is deterministic; **without one
+  it breaks ties arbitrarily**. Use it when you must pick exactly one row ("the latest record per
+  customer").
 - **RANK** -> \`1, 1, 3, 4\`. Ties share a rank, then it **skips** (no rank 2). Use it for "Olympic"
   standings where a shared gold means no silver.
 - **DENSE_RANK** -> \`1, 1, 2, 3\`. Ties share a rank, then it **does not skip**. Use it for "distinct
@@ -101,11 +103,11 @@ then hidden assertion queries check the ranks, tie handling, and row counts. Lea
 \`DELETE FROM <target>;\` so a re-run doesn't double the rows.`,
     demoCode: `SELECT
   category, product, revenue,
-  ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC) AS rn,
-  RANK()       OVER (PARTITION BY category ORDER BY revenue DESC) AS rnk,
-  DENSE_RANK() OVER (PARTITION BY category ORDER BY revenue DESC) AS dense
+  ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rn,
+  RANK()       OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rnk,
+  DENSE_RANK() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS dense
 FROM product_revenue
-ORDER BY category, revenue DESC;`,
+ORDER BY category, revenue DESC, product;`,
     demoSeedSql: `CREATE TABLE product_revenue (
   category TEXT,
   product  TEXT,
