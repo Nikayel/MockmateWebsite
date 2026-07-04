@@ -2449,7 +2449,7 @@ the test fails. **Healthy data → zero rows → pass.**
 
 ### The dbt four: each as a "count of violations = 0" query
 
-\\\`\\\`\\\`sql
+\`\`\`sql
 -- 1. not_null: rows where a required column is NULL
 SELECT COUNT(*) AS violations FROM dim_customer WHERE email IS NULL;
 
@@ -2465,7 +2465,7 @@ WHERE status NOT IN ('paid','shipped','cancelled');
 SELECT f.customer_key FROM fact_sales f
 LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
 WHERE d.customer_key IS NULL;
-\\\`\\\`\\\`
+\`\`\`
 
 Each returns rows **only when something is wrong**. Wire them into CI (or a workspace grader) as "this
 query must return zero rows," and a bad load fails loudly instead of silently corrupting downstream
@@ -2473,12 +2473,12 @@ marts.
 
 ### Anatomy of the relationships (orphan) test
 
-\\\`\\\`\\\`
+\`\`\`
 SELECT f.customer_key
 FROM fact_sales f
 LEFT JOIN dim_customer d ON d.customer_key = f.customer_key   -- keep all fact rows
 WHERE d.customer_key IS NULL;                                 -- ...where the dim match is missing
-\\\`\\\`\\\`
+\`\`\`
 
 This is the anti-join from Level 2, repurposed as a referential-integrity assertion, the most valuable
 DQ check in a star schema.
@@ -2486,17 +2486,17 @@ DQ check in a star schema.
 ### Common pitfalls
 
 - **Asserting the happy path instead of the violations.** A test that does
-  \\\`SELECT COUNT(*) FROM dim WHERE email IS NOT NULL\\\` and checks it's "large" is fragile. Always count
+  \`SELECT COUNT(*) FROM dim WHERE email IS NOT NULL\` and checks it's "large" is fragile. Always count
   the **bad** rows and require **zero**; it's unambiguous and threshold-free.
-- **NULLs in \\\`NOT IN\\\`.** \\\`status NOT IN ('paid','shipped')\\\` returns nothing for a \\\`NULL\\\` status
-  (three-valued logic), silently passing a null. Add \\\`OR status IS NULL\\\` if a null is also a violation.
+- **NULLs in \`NOT IN\`.** \`status NOT IN ('paid','shipped')\` returns nothing for a \`NULL\` status
+  (three-valued logic), silently passing a null. Add \`OR status IS NULL\` if a null is also a violation.
 
-> **In the warehouse:** dbt ships these four as one-line YAML (\\\`unique\\\`, \\\`not_null\\\`,
-> \\\`accepted_values\\\`, \\\`relationships\\\`) that compile to exactly these zero-row SQL queries. The SQL is
+> **In the warehouse:** dbt ships these four as one-line YAML (\`unique\`, \`not_null\`,
+> \`accepted_values\`, \`relationships\`) that compile to exactly these zero-row SQL queries. The SQL is
 > identical across engines.
 
 **Recap:** encode each expectation as a query that returns only the violating rows and require **zero
-rows** to pass; the dbt four, \\\`not_null\\\`, \\\`unique\\\`, \\\`accepted_values\\\`, \\\`relationships\\\` (the orphan
+rows** to pass; the dbt four, \`not_null\`, \`unique\`, \`accepted_values\`, \`relationships\` (the orphan
 anti-join) are the standard suite, always counting the bad rows rather than asserting the good ones.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh seeded SQLite DB, then
