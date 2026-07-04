@@ -5,9 +5,13 @@
  * so they render with proper monospace formatting.
  */
 
-// Characters that indicate ASCII art diagrams
-const ASCII_ART_CHARS = /[─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬→←↑↓↔⟶⟵▲▼◀▶●○◉■□▪▫]/
-const ARROW_PATTERN = /[→←↑↓↔]|->|<-|-->/
+// Characters that indicate ASCII art diagrams. Box-drawing and geometric glyphs
+// essentially never appear in prose, so they stay a safe diagram signal.
+// Arrows are deliberately excluded: `->` / `→` show up constantly in ordinary lesson
+// prose ("ROW_NUMBER -> 1,2,3", "input → output"), and a lone arrow used to make this
+// preprocessor fence the whole line, rendering it as raw monospace and breaking lists.
+// A genuine arrow diagram is still caught by its box-drawing chars or indented structure.
+const ASCII_ART_CHARS = /[─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬▲▼◀▶●○◉■□▪▫]/
 const TREE_PATTERN = /^\s{2,}[\/\\|]|[\/\\]\s*$/
 const BOX_PATTERN = /^\s*[\+\-\|]+\s*$/
 const DIAGRAM_INDENT = /^\s{4,}\S/ // Lines with 4+ spaces of indent
@@ -21,7 +25,6 @@ function isAsciiArtLine(line: string, inBlock: boolean): boolean {
 
   // Check for ASCII art indicators
   if (ASCII_ART_CHARS.test(line)) return true
-  if (ARROW_PATTERN.test(line)) return true
   if (TREE_PATTERN.test(line)) return true
   if (BOX_PATTERN.test(line)) return true
 

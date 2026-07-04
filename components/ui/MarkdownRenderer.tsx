@@ -6,7 +6,7 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 
-import { preprocessAsciiArt, markdownComponents } from "@/lib/markdown"
+import { preprocessAsciiArt, markdownComponents, remarkNoIndentedCode } from "@/lib/markdown"
 
 interface MarkdownRendererProps {
   content: string
@@ -28,7 +28,9 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        // remarkNoIndentedCode is hand-typed (unified's Processor type isn't importable
+        // under pnpm), so cast it to the same Plugin shape remarkGfm already satisfies.
+        remarkPlugins={[remarkGfm, remarkMath, remarkNoIndentedCode as unknown as typeof remarkGfm]}
         rehypePlugins={[rehypeKatex]}
         components={markdownComponents}
       >

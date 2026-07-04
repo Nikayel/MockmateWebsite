@@ -33,10 +33,15 @@ export const markdownComponents: Components = {
       )
     }
 
-    // Inline code
+    // Inline code — a quiet tinted chip that reads in BOTH themes. The old style was a
+    // single dark chip (bg-zinc-800/text-zinc-300) that inverted badly in light mode.
+    // `box-decoration-clone` keeps the chip's background/border intact when a long
+    // expression wraps across lines; `break-words` lets those long spans wrap instead
+    // of overflowing. Block code (inside <pre>) takes the branch above, so this is the
+    // one source of truth for inline `code` everywhere it renders.
     return (
       <code
-        className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300"
+        className="rounded border border-[#e7dfd1] bg-[#f0eae0] box-decoration-clone px-1.5 py-0.5 font-mono text-[0.85em] break-words text-[#4f4a42] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
         {...props}
       >
         {children}
@@ -53,9 +58,7 @@ export const markdownComponents: Components = {
       <table className="min-w-full border-collapse font-mono text-xs">{children}</table>
     </div>
   ),
-  thead: ({ children }) => (
-    <thead className="border-border bg-muted/50 border-b">{children}</thead>
-  ),
+  thead: ({ children }) => <thead className="border-border bg-muted/50 border-b">{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => <tr className="border-border/60 border-b">{children}</tr>,
   th: ({ children }) => (
