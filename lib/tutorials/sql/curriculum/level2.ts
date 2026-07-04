@@ -1984,35 +1984,35 @@ INSERT INTO orders VALUES
 export const sqlLevel2: SqlLevel = {
   id: 2,
   slug: "aggregation",
-  title: "Level 2 — Aggregation & Joins: Combining Source Data",
+  title: "Level 2: Aggregation & Joins (Combining Source Data)",
   tagline: "Aggregates, GROUP BY/HAVING, every join flavor, subqueries, CTEs: building metrics.",
   defaultExecutionMode: "single-file",
   estimatedHours: 5,
   modules: [
     {
       id: "sql-l2-aggregation",
-      title: "Module 2.1 — Aggregation and Grouping",
+      title: "Module 2.1: Aggregation and Grouping",
       description:
         "Collapse rows into metrics: the aggregate functions, GROUP BY for per-category rollups, and HAVING to filter groups.",
       lessons: [aggregates, groupBy, having],
     },
     {
       id: "sql-l2-joins",
-      title: "Module 2.2 — Joining Tables",
+      title: "Module 2.2: Joining Tables",
       description:
         "Combine source tables: inner joins on keys, LEFT joins that preserve rows, anti-joins for gaps, and self/outer joins.",
       lessons: [innerJoin, leftJoin, antiJoin, selfJoin],
     },
     {
       id: "sql-l2-sets-subqueries",
-      title: "Module 2.3 — Set Operations and Subqueries",
+      title: "Module 2.3: Set Operations and Subqueries",
       description:
         "Stack and compare result sets with UNION/INTERSECT/EXCEPT, and nest queries as scalar, IN, and correlated subqueries.",
       lessons: [setOps, subqueries],
     },
     {
       id: "sql-l2-readability",
-      title: "Module 2.4 — Readability and Conditional Logic",
+      title: "Module 2.4: Readability and Conditional Logic",
       description: "Make complex SQL legible with CTEs, and branch per-row with CASE expressions.",
       lessons: [ctes, caseExpr],
     },
