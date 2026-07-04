@@ -1,5 +1,6 @@
 import type { SqlLevel } from "@/lib/tutorials/types"
 import { scriptExercise } from "./script-exercise"
+import { sqlWindowOffsetDrills, sqlWindowRankingDrills } from "./extra-practice"
 
 const windowRanking: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-window-ranking",
@@ -345,6 +346,7 @@ WHERE category = 'audio' AND revenue = 500
       },
     ],
   }),
+  extraPractice: sqlWindowRankingDrills,
 }
 
 const windowOffset: SqlLevel["modules"][number]["lessons"][number] = {
@@ -562,6 +564,7 @@ CREATE TABLE churn_signal (
       },
     ],
   }),
+  extraPractice: sqlWindowOffsetDrills,
 }
 
 const windowFrames: SqlLevel["modules"][number]["lessons"][number] = {
