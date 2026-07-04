@@ -28,7 +28,7 @@ classic interview question.
 ### A worked example
 
 Seed a tiny \`product_revenue\` table and rank within each category with all three functions. You can
-run this exact example yourself — the input table, the query, and its live output render at the
+run this exact example yourself. The input table, the query, and its live output render at the
 bottom of this reading.
 
 For the \`audio\` category (two products tied at 500), ranking by \`revenue DESC, product\` (a
