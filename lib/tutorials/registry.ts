@@ -62,6 +62,42 @@ export function getNextLesson(lessonId: string): PythonLesson | undefined {
   return lessons[index + 1]
 }
 
+/** Every lesson in a level, in curriculum order (module → lesson). */
+export function listLessonsInLevel(level: PythonLevel): PythonLesson[] {
+  return level.modules.flatMap((mod) => mod.lessons)
+}
+
+/**
+ * The next lesson *within the same level*, or `undefined` at the level's last lesson. "Up next" and
+ * the in-lesson "Next lesson" button use this so navigation never silently bleeds into another level
+ * — crossing a level boundary is a deliberate step (see {@link getFirstLessonOfNextLevel}), not a
+ * linear continuation. Parity with the SQL registry.
+ */
+export function getNextLessonInLevel(lessonId: string): PythonLesson | undefined {
+  const location = getLessonLocation(lessonId)
+  if (!location) return undefined
+  const lessonsInLevel = listLessonsInLevel(location.level)
+  const index = lessonsInLevel.findIndex((lesson) => lesson.id === lessonId)
+  if (index === -1) return undefined
+  return lessonsInLevel[index + 1]
+}
+
+/**
+ * The first lesson of the level immediately after `lessonId`'s level, or `undefined` when the lesson
+ * is already in the last level. Powers the deliberate "level complete → start next level" hand-off.
+ */
+export function getFirstLessonOfNextLevel(
+  lessonId: string
+): { level: PythonLevel; lesson: PythonLesson } | undefined {
+  const location = getLessonLocation(lessonId)
+  if (!location) return undefined
+  const levelIndex = PYTHON_LEVELS.findIndex((level) => level.id === location.level.id)
+  const nextLevel = levelIndex === -1 ? undefined : PYTHON_LEVELS[levelIndex + 1]
+  const firstLesson = nextLevel && listLessonsInLevel(nextLevel)[0]
+  if (!nextLevel || !firstLesson) return undefined
+  return { level: nextLevel, lesson: firstLesson }
+}
+
 /**
  * Find an exercise by id across every lesson's `apply` and `practice`. This is what the
  * execution layer resolves a `scenarioId` against. Returns `undefined` for unknown ids.
