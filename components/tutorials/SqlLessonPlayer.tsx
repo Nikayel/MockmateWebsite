@@ -23,6 +23,7 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
+import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
 import { VerticalRail } from "./VerticalRail"
 import { usePersistentState } from "./usePersistentState"
@@ -71,6 +72,12 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
   })
 
   const [tutorOpen, setTutorOpen] = usePersistentState("cs_sql_tutor_open", "1")
+
+  // Which exercises passed this session — gates the "Mark as done" control (grading stays the bar to
+  // complete; the learner saves the section when they choose to).
+  const [passedSections, setPassedSections] = useState<Partial<Record<LessonSection, boolean>>>({})
+  const markPassed = (section: LessonSection) =>
+    setPassedSections((prev) => ({ ...prev, [section]: true }))
 
   // Compile the sql.js engine on mount so the learner's first Run isn't the first compile.
   useEffect(() => {
@@ -274,8 +281,13 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.apply, {
                     canRevealReference: true,
-                    onPass: () => markComplete("apply"),
+                    onPass: () => markPassed("apply"),
                   })}
+                  <SectionDoneButton
+                    passed={Boolean(passedSections.apply)}
+                    completed={sections.apply === "completed"}
+                    onMarkDone={() => markComplete("apply")}
+                  />
                   {sections.apply === "completed" && (
                     <div>
                       <Button onClick={() => goToSection("practice")} className="gap-2">
@@ -290,8 +302,13 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
               {active === "practice" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.practice, {
-                    onPass: () => markComplete("practice"),
+                    onPass: () => markPassed("practice"),
                   })}
+                  <SectionDoneButton
+                    passed={Boolean(passedSections.practice)}
+                    completed={sections.practice === "completed"}
+                    onMarkDone={() => markComplete("practice")}
+                  />
                   {sections.practice === "completed" && (
                     <div className="flex flex-col gap-3">
                       <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">

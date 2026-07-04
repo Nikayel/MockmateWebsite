@@ -19,6 +19,7 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
+import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
 import { VerticalRail } from "./VerticalRail"
 import { usePersistentState } from "./usePersistentState"
@@ -57,6 +58,12 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
     [lesson.apply.id]: lesson.apply.starterCode,
     [lesson.practice.id]: lesson.practice.starterCode,
   })
+
+  // Which exercises passed this session — gates the "Mark as done" control (grading stays the bar to
+  // complete; the learner saves the section when they choose to).
+  const [passedSections, setPassedSections] = useState<Partial<Record<LessonSection, boolean>>>({})
+  const markPassed = (section: LessonSection) =>
+    setPassedSections((prev) => ({ ...prev, [section]: true }))
 
   // The AI tutor (Sable) is locked / "coming soon"; its column is collapsible and the state persists.
   const [tutorOpen, setTutorOpen] = usePersistentState("cs_py_tutor_open", "1")
@@ -251,8 +258,13 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.apply, "apply", {
                     canRevealReference: true,
-                    onPass: () => markComplete("apply"),
+                    onPass: () => markPassed("apply"),
                   })}
+                  <SectionDoneButton
+                    passed={Boolean(passedSections.apply)}
+                    completed={sections.apply === "completed"}
+                    onMarkDone={() => markComplete("apply")}
+                  />
                   {sections.apply === "completed" && (
                     <div>
                       <Button onClick={() => goToSection("practice")} className="gap-2">
@@ -267,8 +279,13 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
               {active === "practice" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.practice, "practice", {
-                    onPass: () => markComplete("practice"),
+                    onPass: () => markPassed("practice"),
                   })}
+                  <SectionDoneButton
+                    passed={Boolean(passedSections.practice)}
+                    completed={sections.practice === "completed"}
+                    onMarkDone={() => markComplete("practice")}
+                  />
                   {sections.practice === "completed" && (
                     <div className="flex flex-col gap-3">
                       <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
