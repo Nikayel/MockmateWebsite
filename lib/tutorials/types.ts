@@ -66,6 +66,13 @@ export interface TutorialLesson<E> {
   apply: E
   /** Combined challenge: hidden reference + (workspace) hidden tests. */
   practice: E
+  /**
+   * Optional bonus drills for the practice phase, ordered easy → hard. Rendered below the main
+   * practice problem as "Extra practice (optional)"; they do NOT gate lesson completion, so the
+   * progress model is unchanged. Each is graded independently by the same runner. Absent on most
+   * lessons.
+   */
+  extraPractice?: E[]
 }
 
 export interface TutorialModule<E> {
