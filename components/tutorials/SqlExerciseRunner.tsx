@@ -7,6 +7,7 @@ import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { ExerciseLayout } from "./ExerciseLayout"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
 import { useExerciseRun } from "./useExerciseRun"
@@ -73,14 +74,17 @@ export function SqlExerciseRunner({
   const expectedSet = isResultSet(graded?.expected) ? graded.expected : undefined
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        <MarkdownRenderer content={exercise.prompt} />
-      </div>
-
-      {/* Show the tables this query runs against — the learner can't transform data they can't see. */}
-      <SqlDataPreview seedSql={exercise.singleFile?.seedSql} />
-
+    <ExerciseLayout
+      aside={
+        <>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <MarkdownRenderer content={exercise.prompt} />
+          </div>
+          {/* Show the tables this query runs against — the learner can't transform data they can't see. */}
+          <SqlDataPreview seedSql={exercise.singleFile?.seedSql} />
+        </>
+      }
+    >
       <div className="border-border overflow-hidden rounded-lg border">
         <CodeMirrorErrorBoundary>
           <CodeMirrorEditor value={code} onChange={onCodeChange} language="sql" height={220} />
@@ -160,6 +164,6 @@ export function SqlExerciseRunner({
       )}
 
       <TestResultsPanel results={results} isRunning={running} />
-    </div>
+    </ExerciseLayout>
   )
 }

@@ -7,6 +7,7 @@ import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { ExerciseLayout } from "./ExerciseLayout"
 import { useExerciseRun } from "./useExerciseRun"
 import type { PythonExercise } from "@/lib/tutorials/types"
 
@@ -66,11 +67,13 @@ export function ExerciseRunner({
     canRevealReference && Boolean(exercise.referenceSolution) && attempts >= revealReferenceAfter
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        <MarkdownRenderer content={exercise.prompt} />
-      </div>
-
+    <ExerciseLayout
+      aside={
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <MarkdownRenderer content={exercise.prompt} />
+        </div>
+      }
+    >
       <div className="border-border overflow-hidden rounded-lg border">
         <CodeMirrorErrorBoundary>
           <CodeMirrorEditor value={code} onChange={onCodeChange} language="python" height={280} />
@@ -158,6 +161,6 @@ export function ExerciseRunner({
       )}
 
       <TestResultsPanel results={results} isRunning={running} />
-    </div>
+    </ExerciseLayout>
   )
 }
