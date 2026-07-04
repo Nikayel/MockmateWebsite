@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Eye, Lightbulb, Play } from "lucide-react"
+import { CheckCircle2, Database, Eye, Lightbulb, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExerciseLayout } from "./ExerciseLayout"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { SqlDataPreview } from "./SqlDataPreview"
@@ -34,6 +34,8 @@ export interface SqlExerciseRunnerProps {
   /** Guided steps (apply) reveal the reference after a few attempts; challenges (practice) never do. */
   canRevealReference?: boolean
   revealReferenceAfter?: number
+  /** Phase framing for the left brief (eyebrow + title + resurfaces chip). */
+  brief?: ExerciseBriefMeta
 }
 
 export function SqlExerciseRunner({
@@ -46,6 +48,7 @@ export function SqlExerciseRunner({
   onReferenceReveal,
   canRevealReference = false,
   revealReferenceAfter = 2,
+  brief,
 }: SqlExerciseRunnerProps) {
   const { running, warming, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
     onPass,
@@ -75,28 +78,47 @@ export function SqlExerciseRunner({
   const graded = results[0]
   const actualSet = isSqlResultSet(graded?.actual) ? graded.actual : undefined
   const expectedSet = isSqlResultSet(graded?.expected) ? graded.expected : undefined
+  // Show the target result only while the learner hasn't matched it yet.
+  const showExpected = Boolean(!passed && graded && expectedSet)
+  const goal =
+    hints.length > 0
+      ? "Write your query, then Run it. Stuck? Tap Hint or check the data panel."
+      : "Write your query, then Run it. Your result is checked against the expected one."
 
   return (
     <ExerciseLayout
       aside={
-        <>
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <MarkdownRenderer content={exercise.prompt} />
-          </div>
-          {/* Show the tables this query runs against — the learner can't transform data they can't see. */}
-          <SqlDataPreview seedSql={exercise.singleFile?.seedSql} />
-        </>
+        <ExerciseBrief
+          eyebrow={brief?.eyebrow ?? "Apply"}
+          title={brief?.title ?? "Your turn"}
+          resurfaces={brief?.resurfaces}
+          prompt={exercise.prompt}
+          goal={goal}
+          // The tables this query runs against — the learner can't transform data they can't see.
+          // Apply opens the panel; Practice starts it collapsed to keep the brief compact.
+          data={
+            <SqlDataPreview
+              seedSql={exercise.singleFile?.seedSql}
+              title="Schema & data"
+              defaultOpen={!brief?.resurfaces}
+            />
+          }
+        />
       }
     >
       <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-1.5">
+          <Database className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="text-muted-foreground font-mono text-xs">query.sql</span>
+        </div>
         <CodeMirrorErrorBoundary>
           <CodeMirrorEditor
             value={code}
             onChange={onCodeChange}
             language="sql"
             autoHeight
-            minHeight={180}
-            maxHeight={520}
+            minHeight={260}
+            maxHeight={640}
           />
         </CodeMirrorErrorBoundary>
       </div>
@@ -165,9 +187,21 @@ export function SqlExerciseRunner({
         </p>
       )}
 
-      {actualSet && <SqlResultGrid result={actualSet} label="Your result" tone="actual" />}
-      {!passed && graded && expectedSet && (
-        <SqlResultGrid result={expectedSet} label="Expected result" tone="expected" />
+      {(actualSet || showExpected) && (
+        <div className="@container">
+          <div
+            className={
+              actualSet && showExpected
+                ? "grid gap-3 @min-[520px]:grid-cols-2"
+                : "flex flex-col gap-3"
+            }
+          >
+            {actualSet && <SqlResultGrid result={actualSet} label="Your result" tone="actual" />}
+            {showExpected && (
+              <SqlResultGrid result={expectedSet} label="Expected result" tone="expected" />
+            )}
+          </div>
+        </div>
       )}
 
       {showReference && exercise.referenceSolution && (

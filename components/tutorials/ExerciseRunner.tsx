@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Eye, Lightbulb, Play } from "lucide-react"
+import { CheckCircle2, Eye, FileCode2, Lightbulb, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExerciseLayout } from "./ExerciseLayout"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { useExerciseRun } from "./useExerciseRun"
@@ -33,6 +33,8 @@ export interface ExerciseRunnerProps {
   canRevealReference?: boolean
   /** Failed attempts before the reference becomes revealable. */
   revealReferenceAfter?: number
+  /** Phase framing for the left brief (eyebrow + title + resurfaces chip). */
+  brief?: ExerciseBriefMeta
 }
 
 export function ExerciseRunner({
@@ -45,6 +47,7 @@ export function ExerciseRunner({
   onReferenceReveal,
   canRevealReference = false,
   revealReferenceAfter = 2,
+  brief,
 }: ExerciseRunnerProps) {
   const { running, warming, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
     onPass,
@@ -66,24 +69,36 @@ export function ExerciseRunner({
   const hints = exercise.hints ?? []
   const canShowReference =
     canRevealReference && Boolean(exercise.referenceSolution) && attempts >= revealReferenceAfter
+  const goal =
+    hints.length > 0
+      ? "Edit the code, then Run & check to grade it. Stuck? Tap Hint for a nudge."
+      : "Edit the code, then Run & check to grade it against the tests."
 
   return (
     <ExerciseLayout
       aside={
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <MarkdownRenderer content={exercise.prompt} />
-        </div>
+        <ExerciseBrief
+          eyebrow={brief?.eyebrow ?? "Apply"}
+          title={brief?.title ?? "Your turn"}
+          resurfaces={brief?.resurfaces}
+          prompt={exercise.prompt}
+          goal={goal}
+        />
       }
     >
       <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-1.5">
+          <FileCode2 className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="text-muted-foreground font-mono text-xs">solution.py</span>
+        </div>
         <CodeMirrorErrorBoundary>
           <CodeMirrorEditor
             value={code}
             onChange={onCodeChange}
             language="python"
             autoHeight
-            minHeight={220}
-            maxHeight={520}
+            minHeight={260}
+            maxHeight={620}
           />
         </CodeMirrorErrorBoundary>
       </div>

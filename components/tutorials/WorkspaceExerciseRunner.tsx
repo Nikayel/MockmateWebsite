@@ -4,9 +4,10 @@ import { useMemo, useState } from "react"
 import { CheckCircle2, Lock, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
+import { ExerciseLayout } from "./ExerciseLayout"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { useExerciseRun } from "./useExerciseRun"
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
@@ -33,6 +34,8 @@ export interface WorkspaceExerciseRunnerProps {
    * it). Omitted for Python workspaces, where the preview renders nothing.
    */
   seedSql?: string
+  /** Phase framing for the left brief (eyebrow + title + resurfaces chip). */
+  brief?: ExerciseBriefMeta
 }
 
 export function WorkspaceExerciseRunner({
@@ -42,6 +45,7 @@ export function WorkspaceExerciseRunner({
   onRunResult,
   engine = "python",
   seedSql,
+  brief,
 }: WorkspaceExerciseRunnerProps) {
   const editablePaths = useMemo(() => new Set(workspace.editableFilePaths), [workspace])
   const isEditable = (file: WorkspaceScenarioFile) =>
@@ -76,14 +80,25 @@ export function WorkspaceExerciseRunner({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        <MarkdownRenderer content={exercise.prompt} />
-      </div>
-
-      {/* SQL workspaces: preview the seeded input tables. No-op (renders nothing) for Python. */}
-      <SqlDataPreview seedSql={seedSql} />
-
+    <ExerciseLayout
+      aside={
+        <ExerciseBrief
+          eyebrow={brief?.eyebrow ?? "Apply"}
+          title={brief?.title ?? "Your turn"}
+          resurfaces={brief?.resurfaces}
+          prompt={exercise.prompt}
+          goal={`Edit ${workspace.primaryFilePath}, then run the tests. A failing test shows exactly what's expected.`}
+          // SQL workspaces: preview the seeded input tables. No-op (renders nothing) for Python.
+          data={
+            <SqlDataPreview
+              seedSql={seedSql}
+              title="Schema & data"
+              defaultOpen={!brief?.resurfaces}
+            />
+          }
+        />
+      }
+    >
       <div className="border-border overflow-hidden rounded-lg border">
         <div
           role="tablist"
@@ -166,6 +181,6 @@ export function WorkspaceExerciseRunner({
       )}
 
       <TestResultsPanel results={results} isRunning={running} />
-    </div>
+    </ExerciseLayout>
   )
 }

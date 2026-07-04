@@ -23,6 +23,7 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
+import type { ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExtraPracticeSection } from "./ExtraPracticeSection"
 import { LessonErrorBanner, LessonLoadingState } from "./LessonProgressStates"
 import { SectionDoneButton } from "./SectionDoneButton"
@@ -173,13 +174,14 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const renderExercise = (
     exercise: PythonExercise,
-    opts: { canRevealReference?: boolean; onPass: () => void }
+    opts: { canRevealReference?: boolean; brief?: ExerciseBriefMeta; onPass: () => void }
   ) => {
     if (exercise.executionMode === "workspace" && exercise.workspace) {
       return (
         <WorkspaceExerciseRunner
           exercise={exercise}
           workspace={exercise.workspace}
+          brief={opts.brief}
           onPass={opts.onPass}
         />
       )
@@ -190,6 +192,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
         code={codeByExercise[exercise.id] ?? exercise.starterCode}
         onCodeChange={(value) => setCode(exercise.id, value)}
         canRevealReference={opts.canRevealReference}
+        brief={opts.brief}
         onPass={opts.onPass}
       />
     )
@@ -275,10 +278,12 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             id="lesson-main"
             ref={centerRef}
             tabIndex={-1}
-            className="overflow-y-auto px-6 py-6 focus:outline-none"
+            className="overflow-y-auto px-8 py-6 focus:outline-none"
             aria-label="Lesson content"
           >
-            <div className="mx-auto max-w-2xl">
+            {/* Read keeps a ~720px reading measure; Apply/Practice go full-width so the two-column
+                workspace can give the editor the room it needs. */}
+            <div className={active === "teach" ? "mx-auto w-full max-w-[45rem]" : "w-full"}>
               <LessonHeader lesson={lesson} />
 
               {error && <LessonErrorBanner error={error} onReload={reload} />}
@@ -299,6 +304,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.apply, {
                     canRevealReference: true,
+                    brief: { eyebrow: "Apply", title: "Your turn" },
                     onPass: () => markPassed("apply"),
                   })}
                   <SectionDoneButton
@@ -320,6 +326,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
               {!isLoading && active === "practice" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.practice, {
+                    brief: { eyebrow: "Practice", title: "Make it stick", resurfaces: true },
                     onPass: () => markPassed("practice"),
                   })}
                   <SectionDoneButton
@@ -331,7 +338,11 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                     <ExtraPracticeSection
                       exercises={lesson.extraPractice}
                       renderExercise={(exercise) =>
-                        renderExercise(exercise, { canRevealReference: true, onPass: () => {} })
+                        renderExercise(exercise, {
+                          canRevealReference: true,
+                          brief: { eyebrow: "Drill", title: "Extra practice" },
+                          onPass: () => {},
+                        })
                       }
                     />
                   )}
