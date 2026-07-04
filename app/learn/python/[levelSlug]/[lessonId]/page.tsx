@@ -36,6 +36,9 @@ export default function LessonPage() {
 
   const { level, lesson } = location
 
-  // The workspace is a full-height 3-column tool that owns its own top bar (§C).
-  return <LessonPlayer lesson={lesson} level={level} />
+  // The workspace is a full-height 3-column tool that owns its own top bar (§C). `key={lesson.id}`
+  // forces a fresh player instance per lesson so navigating between lessons never carries over the
+  // previous lesson's open phase, resume flag, or runner results (which are local component state,
+  // not in the store).
+  return <LessonPlayer key={lesson.id} lesson={lesson} level={level} />
 }
