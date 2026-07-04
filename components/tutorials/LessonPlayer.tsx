@@ -23,6 +23,7 @@ import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
+import { LessonErrorBanner, LessonLoadingState } from "./LessonProgressStates"
 import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
 import { VerticalRail } from "./VerticalRail"
@@ -63,11 +64,13 @@ type NextStep =
   | { kind: "finished" }
 
 export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerProps) {
-  useTutorialProgressSync(lesson.id, level.id)
+  const { reload } = useTutorialProgressSync(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
   const isLoading = useTutorialStore((s) => s.isLoading)
+  const error = useTutorialStore((s) => s.error)
   const completeSection = useTutorialStore((s) => s.completeSection)
+  const startSection = useTutorialStore((s) => s.startSection)
 
   const [active, setActive] = useState<LessonSection>("teach")
   const centerRef = useRef<HTMLElement>(null)
@@ -148,6 +151,10 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const goToSection = (section: LessonSection) => {
     setActive(section)
+    // Entering a section is genuine engagement: mark it in-progress so partial work (read Read,
+    // opened Apply) persists and resume returns here. No-op once completed. (Bare visits aren't
+    // persisted because the default Read section is opened via useState, not this handler.)
+    startSection(section)
   }
 
   // Reset the reading area to the top whenever the phase changes (revisit or advance).
@@ -274,7 +281,11 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
             <div className="mx-auto max-w-2xl">
               <LessonHeader lesson={lesson} />
 
-              {active === "teach" && (
+              {error && <LessonErrorBanner error={error} onReload={reload} />}
+
+              {isLoading && <LessonLoadingState />}
+
+              {!isLoading && active === "teach" && (
                 <TeachPanel
                   teach={lesson.teach}
                   onContinue={() => {
@@ -284,7 +295,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                 />
               )}
 
-              {active === "apply" && (
+              {!isLoading && active === "apply" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.apply, "apply", {
                     canRevealReference: true,
@@ -306,7 +317,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
                 </div>
               )}
 
-              {active === "practice" && (
+              {!isLoading && active === "practice" && (
                 <div className="flex flex-col gap-4">
                   {renderExercise(lesson.practice, "practice", {
                     onPass: () => markPassed("practice"),
