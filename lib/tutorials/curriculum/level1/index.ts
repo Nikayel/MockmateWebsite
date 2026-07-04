@@ -409,10 +409,15 @@ for i in range(1, 6):
 
 ### while, break, continue
 
-A **while loop** runs as long as its condition holds. \`break\` exits early; \`continue\` skips to
-the next pass:
+A **while loop** runs as long as its condition holds, so you must change something inside the loop or
+it never stops. \`break\` exits early; \`continue\` skips to the next pass:
 
 \`\`\`python
+n = 3
+while n > 0:            # repeat while the condition is True
+    print(n)
+    n = n - 1          # move toward the exit, or it loops forever
+
 for n in nums:
     if n < 0:
         continue        # skip negatives
