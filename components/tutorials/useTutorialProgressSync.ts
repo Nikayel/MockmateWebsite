@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTutorialStore } from "@/lib/stores/tutorial-store"
 import { fetchLessonProgress, saveLessonProgress } from "@/lib/tutorials/progress-client"
+import type { TutorialProgressInput } from "@/lib/tutorials/progress"
 import type { PythonLevelId } from "@/lib/tutorials/types"
 
 /**
@@ -64,10 +65,13 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Python
   // Debounced autosave of the persisted fields only.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSaved = useRef<string>("")
+  // The latest save-eligible payload, mirrored to a ref so the unmount flush can read it. Non-null
+  // only while a change is scheduled but not yet written.
+  const pending = useRef<{ snapshot: string; payload: TutorialProgressInput } | null>(null)
   useEffect(() => {
     if (!lessonId || !levelId) return
-    // Never autosave before the initial load resolved — otherwise a failed/in-flight load would let a
-    // reset store overwrite the real server doc (audit #4).
+    // Never autosave before the initial load resolved, or a failed/in-flight load would let a reset
+    // store overwrite the real server doc (audit #4).
     if (!hasLoaded.current) return
     // Only save once the store is pointed at THIS lesson (avoids a stale cross-lesson save).
     if (storeLessonId !== lessonId) return
@@ -79,24 +83,59 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Python
     if (untouched) return
 
     const snapshot = JSON.stringify({ sections, lessonStatus, lastExerciseScore })
-    if (snapshot === lastSaved.current) return
+    if (snapshot === lastSaved.current) {
+      pending.current = null
+      return
+    }
+
+    const payload: TutorialProgressInput = {
+      lessonId,
+      levelId,
+      sections,
+      lessonStatus,
+      ...(lastExerciseScore !== undefined ? { lastExerciseScore } : {}),
+    }
+    pending.current = { snapshot, payload }
 
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       lastSaved.current = snapshot
-      saveLessonProgress({
-        lessonId,
-        levelId,
-        sections,
-        lessonStatus,
-        ...(lastExerciseScore !== undefined ? { lastExerciseScore } : {}),
-      }).catch(() => setError("Couldn't save your progress."))
+      pending.current = null
+      saveLessonProgress(payload).catch(() => setError("Couldn't save your progress."))
     }, SAVE_DEBOUNCE_MS)
 
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
   }, [lessonId, levelId, storeLessonId, sections, lessonStatus, lastExerciseScore, setError])
+
+  // Flush a pending save on unmount or when the tab is hidden. Marking a section complete (especially
+  // the final Practice) and then clicking "Next lesson" unmounts the player within the 1s debounce;
+  // hiding/closing the tab does the same. Without a flush the scheduled save is cleared and the
+  // completion is lost. It fires only when there is a genuine unsaved change (`pending`), so a plain
+  // tab switch is a no-op. Client navigation does not unload the page, so the fetch completes.
+  useEffect(() => {
+    const flushPending = () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+      const flush = pending.current
+      if (flush) {
+        lastSaved.current = flush.snapshot
+        pending.current = null
+        void saveLessonProgress(flush.payload).catch(() => {})
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushPending()
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+      flushPending()
+    }
+  }, [])
 
   return { reload }
 }
