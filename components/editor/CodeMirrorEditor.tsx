@@ -5,7 +5,7 @@ import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror"
 import { useTheme } from "next-themes"
 import { javascript } from "@codemirror/lang-javascript"
 import { EditorView, keymap } from "@codemirror/view"
-import { Extension } from "@codemirror/state"
+import { Extension, Prec } from "@codemirror/state"
 import { indentUnit, syntaxHighlighting } from "@codemirror/language"
 import { classHighlighter } from "@lezer/highlight"
 import { insertNewlineAndIndent, indentMore, indentLess } from "@codemirror/commands"
@@ -33,6 +33,16 @@ export interface CodeMirrorEditorProps {
   onChange?: (value: string) => void
   language: string
   height?: string | number
+  /**
+   * Grow the editor to fit its content instead of using a fixed `height`. The editor sizes to the
+   * code between `minHeight` and `maxHeight`, and only scrolls internally once content exceeds
+   * `maxHeight`. Set this (or either bound) whenever hiding trailing lines behind a short fixed box
+   * would be wrong — read-only worked examples, reference solutions, and starter code that varies in
+   * length. `height` is ignored when this is on.
+   */
+  autoHeight?: boolean
+  minHeight?: string | number
+  maxHeight?: string | number
   readOnly?: boolean
   // Support both CodeMirror style ("dark"/"light") and Monaco style ("vs-dark"/"vs-light"/"hc-black")
   theme?: "dark" | "light" | "vs-dark" | "vs-light" | "hc-black"
@@ -177,6 +187,9 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       onChange,
       language,
       height = "100%",
+      autoHeight = false,
+      minHeight,
+      maxHeight,
       readOnly = false,
       theme,
       className = "",
@@ -309,8 +322,15 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       // there's no rainbow to mute); it's retained in deps for parity.
       exts.push(isDarkTheme ? darkTheme : lightTheme, calmSyntax)
 
+      // In auto-height mode, neutralize the base themes' `height: 100%` so the editor sizes to its
+      // content (capped by @uiw's `maxHeight`) instead of collapsing to its parent. Highest precedence
+      // so it wins over the theme rule above.
+      if (autoHeight || minHeight !== undefined || maxHeight !== undefined) {
+        exts.push(Prec.highest(EditorView.theme({ "&": { height: "auto" } })))
+      }
+
       return exts
-    }, [loadedLangExt, indentSize, isDarkTheme, isCalm])
+    }, [loadedLangExt, indentSize, isDarkTheme, isCalm, autoHeight, minHeight, maxHeight])
 
     // Handle value changes
     const handleChange = useCallback(
@@ -322,13 +342,19 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       [onChange]
     )
 
-    // Convert height to CSS string
-    const cssHeight = typeof height === "number" ? `${height}px` : height
+    // Convert a height-like value to a CSS string.
+    const toCss = (v: string | number | undefined): string | undefined =>
+      v === undefined ? undefined : typeof v === "number" ? `${v}px` : v
+
+    // Auto-height when explicitly requested, or implied by either bound. In that mode the wrapper
+    // does not impose a fixed height; CodeMirror grows to content and scrolls only past `maxHeight`.
+    const isAuto = autoHeight || minHeight !== undefined || maxHeight !== undefined
+    const cssHeight = toCss(height)
 
     return (
       <div
         style={{
-          height: cssHeight,
+          ...(isAuto ? {} : { height: cssHeight }),
           width: "100%",
         }}
         className={className}
@@ -336,7 +362,9 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
         <CodeMirror
           ref={editorRef}
           value={value}
-          height="100%"
+          height={isAuto ? undefined : "100%"}
+          minHeight={isAuto ? toCss(minHeight) : undefined}
+          maxHeight={isAuto ? toCss(maxHeight) : undefined}
           theme="none"
           extensions={extensions}
           onChange={handleChange}
