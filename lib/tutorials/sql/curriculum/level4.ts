@@ -1791,7 +1791,7 @@ must leave \`dim_customer\` byte-for-byte identical.`,
 
 -- Step 4: insert brand-new emails (present in stg, absent from dim) as one current version ...`,
     hints: [
-      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where the city is null-safely different: `stg.city IS NOT dim.city`. Plain `<>` misses NULL↔value transitions (`'x' <> NULL` is NULL, not TRUE).",
+      "Identify **changed** emails first: join `stg_customer` to the current dimension row (`is_current = 1`) on `email` and keep where the city is null-safely different: `stg.city IS NOT dim.city`. Plain `<>` misses NULL-to-value transitions (`'x' <> NULL` is NULL, not TRUE).",
       "Expire step: `UPDATE dim_customer SET effective_to = <snapshot>, is_current = 0 WHERE is_current = 1 AND email IN (<changed emails>)`.",
       "Insert step: insert new versions for changed emails **and** brand-new emails (emails in staging with no current dim row). Both get `is_current = 1`, `effective_from = snapshot_date`, `effective_to = '9999-12-31'`.",
       "Idempotency is the trap: after the first run the current city already equals staging, so the changed set is empty on the second run. Compare against the **current** row, and compute the changed-set into a temp table first so the insert doesn't re-detect its own new rows.",

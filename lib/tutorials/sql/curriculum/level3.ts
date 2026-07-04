@@ -119,7 +119,7 @@ VALUES (2, 'grace@example.com', 'US', '2026-02-03');`,
   }),
   practice: scriptExercise({
     id: "sql-l3-ddl-create-practice",
-    prompt: `Author the DDL for a **three-table staging schema**: \`stg_customer\`, \`stg_product\`, and
+    prompt: `Create a **three-table staging schema** in DDL: \`stg_customer\`, \`stg_product\`, and
 \`stg_order\`. Every table must carry sensible types and a \`loaded_at TEXT DEFAULT (datetime('now'))\`
 audit column.
 
@@ -720,7 +720,7 @@ WHERE EXISTS (SELECT 1 FROM customers WHERE customer_id = 999);`,
   }),
   practice: scriptExercise({
     id: "sql-l3-foreign-keys-practice",
-    prompt: `Wire a **three-table order schema** (\`customers\`, \`orders\`, \`order_items\`) plus a
+    prompt: `Create a **three-table order schema** (\`customers\`, \`orders\`, \`order_items\`) plus a
 \`products\` table, with a **defensible \`ON DELETE\` policy per relationship**:
 - \`orders.customer_id → customers\`: \`ON DELETE RESTRICT\` (never lose orders because a customer was deleted).
 - \`order_items.order_id → orders\`: \`ON DELETE CASCADE\` (line items are meaningless without their order).
@@ -1963,7 +1963,7 @@ INSERT INTO courses  VALUES (10,'SQL'),(11,'Modeling');`,
   }),
   practice: scriptExercise({
     id: "sql-l3-junction-tables-practice",
-    prompt: `Build the \`playlist_songs\` junction that resolves a playlists ↔ songs many-to-many, and
+    prompt: `Build the \`playlist_songs\` junction that resolves a playlists-to-songs many-to-many, and
 give it a **relationship attribute** \`position\` (a song's ordering within a playlist). The seed
 provides two playlists and four songs. Requirements:
 
