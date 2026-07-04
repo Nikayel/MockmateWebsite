@@ -20,50 +20,57 @@ const comprehensionsLesson: PythonLesson = {
   skills: ["comprehensions", "lists", "dicts", "filtering"],
   teach: {
     estimatedMinutes: 4,
-    markdown: `## Build a collection in one expression
+    markdown: `## One expression that says exactly what you want
 
-A **comprehension** turns a loop-and-append into a single readable line.
+Reach for a comprehension whenever you are building a new collection out of an existing one by transforming or filtering it. That is most of the collection code you will ever write: pull one field out of a list of API records, drop the rows that fail a validation check, build a lookup table keyed by id. The comprehension puts the result on one line, so a reviewer reads *what* you are producing instead of tracing an accumulator through a loop body.
 
-### The long way vs the idiom
+### The mental model
+
+A list comprehension is a loop-and-collect fused into a single expression. Python still runs the loop; it just builds the list for you. Read it left to right as *"this expression, for each item in the source."*
 
 \`\`\`python
-# the long way
-squares = []
-for n in nums:
-    squares.append(n * n)
-
-# the comprehension
+nums = [1, 2, 3, 4, 5]
 squares = [n * n for n in nums]
+print(squares)   # [1, 4, 9, 16, 25]
 \`\`\`
 
-Read it left to right: *"\`n * n\` for each \`n\` in \`nums\`"*.
+That is the exact shape the Apply exercise wants: take each \`n\`, square it, collect the results.
 
-### Filtering
+### Filter with a trailing \`if\`
 
-Add an \`if\` to keep only some items:
+Add \`if <condition>\` after the loop to keep only the items that pass:
 
 \`\`\`python
 evens = [n for n in nums if n % 2 == 0]
+print(evens)     # [2, 4]
 \`\`\`
 
-### Dict and set comprehensions
+### Same shape, different brackets
 
-The same shape builds dicts and sets. Just change the brackets:
+Swap \`[ ]\` for \`{ }\` to build a dict or a set. A dict comprehension needs a \`key: value\` pair:
 
 \`\`\`python
-lengths = {word: len(word) for word in words}   # dict: key: value
-distinct = {n % 3 for n in nums}                 # set: unique results
+squares_map = {n: n * n for n in nums}
+print(squares_map)   # {1: 1, 2: 4, 3: 9, 4: 16, 5: 25}
+distinct = {n % 3 for n in nums}   # {0, 1, 2}
 \`\`\`
 
-### Keep it readable
+The \`{word: len(word) for word in words}\` form is precisely what the Practice exercise builds.
 
-Comprehensions shine for a single map and/or filter. If you need nested loops *and* multiple
-conditions, a plain \`for\` loop is often clearer. Don't force everything onto one line.
+### Pitfall: two different \`if\` positions
 
-### Recap
+\`if\` at the **end** filters. \`if ... else\` at the **front** is a conditional expression that transforms every item and drops nothing:
 
-\`[expr for x in it if cond]\` maps and filters in one expression; swap the brackets for \`{ }\` to
-build dicts (\`key: value\`) or sets. Next you'll square a list, then map words to their lengths.`,
+\`\`\`python
+[n for n in nums if n > 2]         # [3, 4, 5]        -> filter, shorter
+[n if n > 2 else 0 for n in nums]  # [0, 0, 3, 4, 5]  -> map, same length
+\`\`\`
+
+Interns mix these up constantly. If your output got shorter, you filtered. If it stayed the same length, you mapped.
+
+One more, for dicts: duplicate keys silently overwrite, and the last one wins. \`{len(w): w for w in ["hi", "by", "ok"]}\` keeps only \`{2: "ok"}\` because all three keys are \`2\`. In the Practice exercise the words are the keys, so you are safe, but flip the mapping and you will quietly lose data.
+
+**Interview nuance:** a comprehension is eager. It runs to completion and materializes the whole collection in memory, so it costs O(n) time and O(n) space. That is fine for thousands of items and wasteful for a billion-row scan. The lazy cousin is the generator expression \`(n * n for n in nums)\`, the same syntax with \`( )\`, which yields one value at a time in O(1) extra space. When an interviewer asks what you would run over a huge stream, "a generator, because the full list would not fit in memory" is the answer they are listening for.`,
     demoCode: `nums = [1, 2, 3, 4, 5]
 print([n * n for n in nums])              # [1, 4, 9, 16, 25]
 print([n for n in nums if n % 2 == 0])    # [2, 4]
@@ -134,10 +141,13 @@ const generatorsLesson: PythonLesson = {
   skills: ["generators", "yield", "iterators", "laziness"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Producing values lazily
+    markdown: `## Why laziness matters
 
-A **generator** produces values one at a time, only as they're needed, instead of building a whole
-list in memory. A generator *function* uses \`yield\` instead of \`return\`:
+When you scan a 10 GB log file to count errors, you do not want the whole file sitting in memory at once. A generator lets you process one line at a time, so memory stays flat no matter how large the input grows. That is why streaming pipelines, database cursors, and \`csv.reader\` all hand you values lazily instead of returning a giant list. Building the full list first is often the difference between a job that finishes and a job that gets killed for using too much memory.
+
+### A generator is a paused function
+
+A generator function uses \`yield\` instead of \`return\`. Calling it does not run the body. It hands you a generator object. Each time you ask for a value (via \`for\`, \`next\`, \`sum\`, and friends), the body runs until it hits a \`yield\`, hands back that value, and freezes right there with every local variable intact. The next request resumes on the line after the \`yield\`.
 
 \`\`\`python
 def countdown(n):
@@ -145,35 +155,45 @@ def countdown(n):
         yield n          # hand back one value, then pause here
         n -= 1
 
-for x in countdown(3):
-    print(x)             # 3, 2, 1
+print(list(countdown(3)))   # [3, 2, 1]
 \`\`\`
 
-Each \`yield\` pauses the function and resumes where it left off on the next request. Nothing is
-computed until you iterate.
+Nothing is computed until you iterate. \`list(...)\` drives the generator to exhaustion; a \`for\` loop pulls exactly one value per pass.
 
 ### Generator expressions
 
-The compact form looks like a comprehension with **parentheses**:
+Same laziness, compact syntax: a comprehension with parentheses instead of brackets. No intermediate list is built.
 
 \`\`\`python
-total = sum(n * n for n in range(1, 5))   # 1+4+9+16 = 30, nothing stored in a list
+print(sum(n * n for n in range(1, 5)))   # 1 + 4 + 9 + 16 = 30
 \`\`\`
 
-### Consuming lazily with next
+\`range(1, 5)\` yields \`1, 2, 3, 4\`, so this sums the first four squares. For the Apply exercise you will want \`range(1, n + 1)\` so that \`n\` itself is included, and \`n = 0\` produces an empty range whose \`sum\` is \`0\`.
 
-\`next(gen, default)\` pulls the next value (or a fallback). With a filter, it stops at the **first**
-match, perfect for "find the first one that…":
+### Stop at the first match with next
+
+\`next(gen)\` pulls one value. \`next(gen, default)\` returns \`default\` instead of raising when the generator is empty. Paired with a filtered generator expression, it stops at the first hit and never touches the rest.
 
 \`\`\`python
-first_even = next((n for n in nums if n % 2 == 0), None)
+nums = [0, 0, 7, 3]
+print(next((x for x in nums if x), None))   # 7
 \`\`\`
 
-### Recap
+That is exactly the shape for finding the first truthy value: the \`if x\` filter keeps only truthy items, and \`next(..., None)\` supplies the fallback when nothing qualifies.
 
-Generators stream values via \`yield\` (or a \`(... for ...)\` expression) instead of materialising a
-list; consume them with \`for\`, \`sum\`, or \`next\`. Next you'll sum squares lazily, then find the
-first truthy value.`,
+### Pitfall: a generator is single-use
+
+Iterating a generator consumes it. There is no rewind.
+
+\`\`\`python
+g = (n * n for n in range(1, 5))
+print(sum(g))   # 30
+print(sum(g))   # 0   <- already exhausted, nothing left to yield
+\`\`\`
+
+The second \`sum\` sees an empty generator, not a fresh one. Also, \`next(gen)\` with no default raises \`StopIteration\` on an empty generator, so always pass a default when "not found" is a real outcome.
+
+**Interview nuance:** a generator *is* an iterator. It implements \`__iter__\` (returning itself) and \`__next__\`, holds one value at a time, and runs in O(1) extra memory no matter how many values it produces. A list comprehension is O(n) memory and re-iterable; a generator is O(1) memory and single-pass. Interviewers probe that trade-off directly: reach for a generator when you consume the sequence once and streaming saves memory, and for a list when you need indexing, \`len\`, or more than one pass.`,
     demoCode: `def countdown(n):
     while n > 0:
         yield n
@@ -247,48 +267,59 @@ const argsKwargsLesson: PythonLesson = {
   skills: ["args", "kwargs", "unpacking", "functions"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Flexible argument lists
+    markdown: `## Why flexible signatures matter
 
-Sometimes a function should accept *any number* of arguments.
+Some functions cannot know their arity ahead of time. A decorator has to wrap a function whose signature it has never seen, so it must forward whatever it is given. A logging helper should accept \`log("saved", user, count)\` with as many values as the caller has. \`print\`, \`max\`, and \`str.format\` all take a variable number of arguments for the same reason. Without \`*args\` and \`**kwargs\` you would hard-code a fixed parameter count and rewrite the function every time a caller needs one more slot. These two features let one function absorb any call shape, and the mirror-image \`*\` and \`**\` at the call site let you feed a collection you already hold into any function.
 
-### \`*args\` collects extra positionals
+### \`*args\`: collect extra positionals into a tuple
 
-A parameter written \`*args\` gathers every extra positional argument into a **tuple**:
+A parameter written \`*name\` sweeps up every positional argument that did not match an earlier parameter and binds them as a \`tuple\`:
 
 \`\`\`python
 def total(*nums):
-    return sum(nums)        # nums is a tuple like (1, 2, 3)
+    return sum(nums)   # nums is a tuple, e.g. (1, 2, 3)
 
 total(1, 2, 3)   # 6
-total()          # 0
+total()          # 0  (nums is the empty tuple ())
 \`\`\`
 
-### \`**kwargs\` collects extra keywords
+The name \`args\` is only a convention. What matters is the leading \`*\`. Because \`nums\` is a real tuple, \`sum(nums)\` works, and \`total()\` gives \`sum(()) == 0\`.
 
-A parameter written \`**kwargs\` gathers extra keyword arguments into a **dict**:
+### \`**kwargs\`: collect extra keywords into a dict
+
+A parameter written \`**name\` gathers keyword arguments that did not match a named parameter into a \`dict\`:
 
 \`\`\`python
 def tag(name, **attrs):
     return name, attrs
 
-tag("a", href="/x")   # ("a", {"href": "/x"})
+tag("a", href="/x", id=3)   # ("a", {"href": "/x", "id": 3})
 \`\`\`
 
-### Unpacking at the call site
+### \`*\` and \`**\` at the call site: spread a collection into a call
 
-The mirror image: \`*\` spreads a list into positional arguments, \`**\` spreads a dict into keyword
-arguments. This is how \`str.format\` fills a template from a dict:
+The same symbols run in reverse when you call a function. \`*seq\` spreads an iterable into positional arguments, and \`**mapping\` spreads a dict into keyword arguments. This is how you fill a template from a dict you already have:
 
 \`\`\`python
 values = {"name": "Ada", "age": 30}
 "{name} is {age}".format(**values)   # "Ada is 30"
 \`\`\`
 
-### Recap
+\`format(**values)\` is exactly \`format(name="Ada", age=30)\`. One pair of symbols, two mirror roles: \`*\` and \`**\` collect inside a \`def\`, and spread inside a call.
 
-\`*args\` captures positionals into a tuple, \`**kwargs\` captures keywords into a dict, and \`*\`/\`**\`
-unpack a list/dict back into a call. Next you'll sum any number of values, then fill a template from
-a dict.`,
+### Pitfall: passing a container where you meant to unpack it
+
+\`total(*nums)\` collects loose numbers, not a list. If you already hold a list, you must spread it, or it arrives as a single argument:
+
+\`\`\`python
+nums = [1, 2, 3]
+total(nums)    # nums bound as ONE arg -> sum(([1, 2, 3],)) -> TypeError
+total(*nums)   # 6  (spreads to total(1, 2, 3))
+\`\`\`
+
+The formatting side has its own traps. A placeholder in the template with no matching key raises \`KeyError\`, and a literal brace in the text must be doubled as \`{{\` so \`format\` does not read it as a slot.
+
+**Interview nuance:** any parameter listed after \`*args\` becomes keyword-only. It can no longer be filled positionally, because \`*args\` has already claimed every remaining positional argument. So \`def f(a, *args, b)\` requires \`b\` to be passed by name, and \`f(1, 2, 3)\` raises \`TypeError: f() missing 1 required keyword-only argument: 'b'\`. Interviewers use this to check that you understand the argument-binding order (named parameters fill first, \`*args\` sweeps the rest, then keyword-only parameters and \`**kwargs\`), not just the syntax.`,
     demoCode: `def total(*nums):
     return sum(nums)
 
@@ -368,45 +399,52 @@ const lambdasHofLesson: PythonLesson = {
   skills: ["lambdas", "higher-order-functions", "sorted", "map"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Functions are values
+    markdown: `## Why passing functions is worth learning
 
-In Python a function is just a value. You can store it, pass it, and call it later. A function that
-**takes or returns** a function is a **higher-order function**.
+Half of real Python data code is "sort these records by the right field," "transform every row," or "keep the rows that match." You could write a loop each time, but the standard library already has fast, tested tools for this: \`sorted\`, \`map\`, and \`filter\`. The catch is that they need you to hand them a function that describes the rule. Learn to pass a function as an argument and a page of loops collapses into one clear line.
 
-### Lambdas: tiny inline functions
+### Functions are values
 
-A \`lambda\` is a one-expression function with no name:
+In Python a function is an ordinary value, like an \`int\` or a \`list\`. You can store it in a variable, put it in a list, and pass it into another function to call later. A function that takes or returns a function is a **higher-order function**. \`sorted\`, \`map\`, and \`filter\` are all higher-order: they do the looping, you supply the rule.
+
+### Lambdas: a rule with no name
+
+A \`lambda\` is a one-expression function you write inline, without a \`def\` and without a name:
 
 \`\`\`python
 square = lambda x: x * x
-square(5)            # 25
+square(5)   # 25
 \`\`\`
 
-You'll rarely assign one. They're meant to be passed *into* another function.
+\`lambda x: x * x\` is the same idea as \`def square(x): return x * x\`, just shorter and anonymous. You will rarely assign one to a variable (use \`def\` for that). Lambdas exist to be passed straight into a higher-order function.
 
 ### sorted with a key
 
-\`sorted\` takes a \`key\` function that says *what to sort by*:
+\`sorted\` returns a **new** sorted list and never changes the original. Its \`key\` argument is a function applied to each element to decide what to sort by:
 
 \`\`\`python
-sorted(words, key=len)               # shortest first (pass the built-in len)
-sorted(words, key=lambda w: w[-1])   # by last character (a custom lambda)
+words = ["ccc", "a", "bb"]
+sorted(words, key=len)              # ['a', 'bb', 'ccc']  (shortest first)
+sorted(words, key=lambda w: w[-1])  # sort by last character
 \`\`\`
+
+You can pass a built-in like \`len\` directly, or write a \`lambda\` for a custom rule. This is exactly what the Apply asks for.
 
 ### map and filter
 
-\`map\` applies a function to every item; \`filter\` keeps items where a function is truthy. Both
-return lazy iterators, so wrap them in \`list(...)\`:
+\`map\` applies a function to every item; \`filter\` keeps the items where the function returns a truthy value. Both return lazy iterators, so wrap them in \`list(...)\` to get a real list:
 
 \`\`\`python
-list(map(lambda x: x * 2, nums))         # double each
-list(filter(lambda x: x % 2 == 0, nums)) # keep evens
+list(map(lambda w: w.upper(), words))     # ['CCC', 'A', 'BB']
+list(filter(lambda x: x % 2 == 0, nums))  # keep even numbers
 \`\`\`
 
-### Recap
+### Pitfalls
 
-A lambda is an inline function; \`sorted(key=...)\`, \`map\`, and \`filter\` are higher-order functions
-that take one. Next you'll sort words by length, then shout each one with \`map\`.`,
+- **\`sort\` versus \`sorted\`.** \`sorted(x)\` returns a new list; \`x.sort()\` sorts in place and returns \`None\`. Writing \`result = words.sort()\` gives you \`None\`, a bug interns hit constantly. In the Apply, \`return sorted(words, key=len)\`, not \`words.sort()\`.
+- **Iterators are one-shot.** A \`map\` or \`filter\` object is exhausted after you walk it once. \`m = map(...); list(m)\` works, but a second \`list(m)\` returns \`[]\`. Call \`list(...)\` once and keep that list.
+
+**Interview nuance:** Python's \`sorted\` is **stable** and computes each \`key\` exactly once per element (the decorate-sort-undecorate strategy). Stable means elements with equal keys stay in their original relative order, which lets you sort by a secondary field first and a primary field second to build a multi-key sort. Computing \`key\` once means \`n\` key calls plus \`O(n log n)\` comparisons on those cheap precomputed keys, so an expensive \`key\` is evaluated \`n\` times, not on every comparison.`,
     demoCode: `words = ["ccc", "a", "bb"]
 print(sorted(words, key=len))                 # ['a', 'bb', 'ccc']
 print(list(map(lambda w: w.upper(), words)))  # ['CCC', 'A', 'BB']`,
@@ -477,46 +515,59 @@ const closuresDecoratorsLesson: PythonLesson = {
   skills: ["closures", "scope", "decorators", "functions"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Inner functions remember their world
+    markdown: `## Why closures and decorators are everywhere
 
-A function defined **inside** another can use the outer function's variables. When the inner
-function is returned or used later, it keeps a live link to those variables. That's a **closure**.
+Every time you write \`@app.route\`, \`@pytest.fixture\`, or \`@functools.lru_cache\`, you are using both ideas at once. A closure lets a function carry state without a class or a global variable. A decorator lets you add behaviour (timing, retries, auth checks, caching) around a function without touching its body. In real codebases these keep cross-cutting logic in one place instead of copy-pasted into every function.
+
+## Scope: how Python resolves a name
+
+When you use a name, Python searches four scopes in order: Local, Enclosing, Global, Built-in (LEGB). An inner function can *read* names from the enclosing function for free. To *rebind* one, you must declare it \`nonlocal\`; otherwise any assignment inside the function marks that name as local for the whole function, so reading it before the assignment runs raises \`UnboundLocalError\`.
+
+## A closure captures its enclosing scope
+
+A closure is an inner function plus a live link to the variables it read from the function that created it. Those variables stay alive after the outer function returns.
 
 \`\`\`python
-def scaled(factor, value):
+def make_multiplier(factor):
     def multiply(x):
-        return x * factor    # 'factor' comes from the enclosing scope
-    return multiply(value)
+        return x * factor      # 'factor' comes from the enclosing scope
+    return multiply
+
+triple = make_multiplier(3)
+print(triple(5))               # 15
 \`\`\`
 
-\`multiply\` *closes over* \`factor\`. (To **reassign** an enclosing variable, you'd mark it
-\`nonlocal\`.)
+\`multiply\` *closes over* \`factor\`. Because it keeps a reference to that variable (not a snapshot copy), you can build state that survives between calls:
+
+\`\`\`python
+def make_counter():
+    count = 0
+    def step():
+        nonlocal count         # rebind the enclosing variable, not just read it
+        count += 1
+        return count
+    return step
+
+c = make_counter()
+print(c(), c(), c())           # 1 2 3
+\`\`\`
 
 ## Decorators wrap a function
 
-A **decorator** is a higher-order function that takes a function and returns a new one with extra
-behaviour around it:
+A decorator is a higher-order function: it takes a function and returns a replacement. The demo below defines \`double\`, whose inner \`wrapper\` calls the original \`fn\` and doubles the result. Writing \`@double\` above \`identity\` is exactly \`identity = double(identity)\`, so the name \`identity\` now points at \`wrapper\`, and \`identity(5)\` returns \`10\`.
+
+### Pitfall: late binding in loops
+
+Closures capture the *variable*, not its value at definition time:
 
 \`\`\`python
-def double(fn):
-    def wrapper(x):
-        return fn(x) * 2     # call the original, then add behaviour
-    return wrapper
-
-@double                      # same as: triple = double(triple)
-def identity(x):
-    return x
-
-identity(5)                  # 10
+funcs = [lambda: i for i in range(3)]
+print([f() for f in funcs])    # [2, 2, 2], not [0, 1, 2]
 \`\`\`
 
-The \`@double\` line above a \`def\` rewires the name to the wrapped version.
+Every lambda shares the same \`i\`, which has reached \`2\` by the time you call them. Bind the value eagerly with a default argument: \`lambda i=i: i\` gives \`[0, 1, 2]\`.
 
-### Recap
-
-A closure is an inner function that captures enclosing variables; a decorator wraps a function to
-add behaviour, applied with \`@\`. Next you'll use a closure to scale a value, then write a decorator
-that doubles a result.`,
+**Interview nuance:** a naive decorator hides the function it wraps. After \`@double\`, \`identity.__name__\` is \`"wrapper"\` and its docstring is \`None\`, which breaks debuggers, introspection, and some frameworks. The fix is to decorate \`wrapper\` with \`functools.wraps(fn)\`, which copies \`__name__\` and \`__doc__\` from the original and sets \`__wrapped__\` to point back at it, so the wrapped function still looks like itself.`,
     demoCode: `def double(fn):
     def wrapper(x):
         return fn(x) * 2
@@ -613,36 +664,36 @@ const classesLesson: PythonLesson = {
   skills: ["classes", "init", "methods", "self"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Bundling state with behaviour
+    markdown: `## Why bundle state with behaviour
 
-A **class** is a blueprint that bundles data (**attributes**) with the functions that act on it
-(**methods**). Each object built from the class is an **instance** with its own data.
+Real systems track things that own both data and the rules for changing that data. A bank account has a balance plus rules for depositing. A shopping cart has items plus rules for adding them. You could keep a loose \`balance\` variable and pass it to standalone functions, but then nothing keeps the data and its rules together, and every caller has to remember which functions are allowed to touch it. A \`class\` ties the data and the operations that act on it into one named type, so the \`balance\` and the sanctioned way to change it travel together.
+
+### The mental model
+
+A \`class\` is a template that describes a kind of object. Each object you build from it is an \`instance\` with its own copy of the data (its \`attributes\`). The functions defined inside the class are \`methods\`: the behaviour that acts on one instance's data.
 
 \`\`\`python
 class BankAccount:
-    def __init__(self, balance):   # the constructor
-        self.balance = balance     # store data on the instance
+    def __init__(self, balance):   # runs at construction
+        self.balance = balance     # store data on THIS instance
 
     def deposit(self, amount):
-        self.balance += amount     # a method changes that data
+        self.balance += amount     # read and update that data
+
+account = BankAccount(100)   # __init__ runs, balance = 100
+account.deposit(50)          # self is account; balance becomes 150
+print(account.balance)       # 150
 \`\`\`
 
-### \`self\` and \`__init__\`
+### \`__init__\` and \`self\`
 
-- \`__init__\` runs when you create an instance: \`BankAccount(100)\`.
-- \`self\` is the instance the method is working on. Every method takes it as its first parameter,
-  and you store/read data through \`self.attribute\`.
+\`__init__\` is the initializer. Python calls it automatically when you write \`BankAccount(100)\`, passing \`100\` in as \`balance\`. Its job is to set the instance's starting attributes. \`self\` is the instance the method is currently working on. It is the first parameter of every method, and \`self.balance\` is how you reach that specific instance's data. Two accounts each carry their own \`balance\`, and writing \`self.balance\` on one never touches the other.
 
-\`\`\`python
-account = BankAccount(100)   # __init__ sets balance = 100
-account.deposit(50)          # self is 'account'; balance becomes 150
-account.balance              # 150
-\`\`\`
+### Pitfall: forgetting \`self\`
 
-### Recap
+Inside a method, \`balance = amount\` creates a throwaway local variable that vanishes when the method returns. The attribute is never touched. You must write \`self.balance = amount\`, and read it back the same way with \`self.balance\`, not a bare \`balance\`. Every method also needs \`self\` as its first parameter, even when the method takes no other argument. In Practice, \`increment(self)\` has no extra parameters, but \`self\` still comes first.
 
-A class groups attributes and methods; \`__init__\` sets up each instance and \`self\` is how methods
-reach that instance's data. Next you'll finish a \`BankAccount\`, then build a \`Counter\`.`,
+**Interview nuance:** \`account.deposit(50)\` is shorthand. Python looks up \`deposit\` on the class and calls \`BankAccount.deposit(account, 50)\`, binding \`account\` to \`self\`. That is why \`self\` is an ordinary first parameter and not magic: the dot syntax just passes the instance in for you. Knowing that a call is really \`Class.method(instance, ...)\` explains a common error too. If you omit \`self\` from a method's parameter list, calling it raises \`TypeError\` complaining that too many positional arguments were given, because Python still passes the instance.`,
     demoCode: `class BankAccount:
     def __init__(self, balance):
         self.balance = balance
@@ -756,12 +807,15 @@ const inheritanceCompositionLesson: PythonLesson = {
   skills: ["inheritance", "super", "composition", "classes"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Two ways to reuse classes
+    markdown: `## Two ways to reuse a class
 
-### Inheritance (is-a)
+Every real codebase reuses behavior. The question an interviewer cares about is *how* you reuse it, because the wrong choice locks a system into a rigid shape that is painful to change later. There are two tools: inheritance (an "is-a" relationship) and composition (a "has-a" relationship). Reaching for inheritance by reflex is one of the most common junior mistakes, so knowing when each fits is the actual skill here.
 
-A subclass \`class Dog(Animal)\` **is an** Animal and inherits its methods. Override a method to
-specialise it, and call \`super()\` to reuse the parent's version:
+## Inheritance: a subclass *is a* kind of its parent
+
+When you write \`class LoudGreeter(Greeter)\`, a \`LoudGreeter\` **is a** \`Greeter\`. It automatically gets every attribute and method defined on \`Greeter\`, and you only write the parts that differ. When Python looks up \`obj.greet\`, it walks the class chain (the method resolution order) from the subclass upward and uses the first match it finds. Defining \`greet\` on \`LoudGreeter\` therefore **overrides** the parent version.
+
+To *extend* the parent instead of replacing it, call \`super()\`. \`super()\` returns a proxy that dispatches to the next class up the chain, so \`super().greet()\` runs \`Greeter.greet(self)\` and hands you its return value to build on:
 
 \`\`\`python
 class Greeter:
@@ -773,32 +827,39 @@ class Greeter:
 
 class LoudGreeter(Greeter):
     def greet(self):
-        return super().greet() + "!!!"   # extend the parent's behaviour
+        return super().greet() + "!!!"
+
+print(LoudGreeter("Ada").greet())   # Hi, Ada!!!
 \`\`\`
 
-\`LoudGreeter("Ada").greet()\` → \`"Hi, Ada!!!"\`.
+Notice \`LoudGreeter\` never redefines \`__init__\`. Because it inherits the parent's, \`LoudGreeter("Ada")\` still stores \`self.name = "Ada"\`. That is exactly the Apply exercise: override \`greet\`, call \`super().greet()\`, and append \`"!!!"\`.
 
-### Composition (has-a)
+## Composition: an object *has* another object
 
-Instead of inheriting, an object can **hold** other objects. A \`Person\` *has a* \`Wallet\`:
+Composition means an object holds other objects as attributes instead of inheriting from them. A \`Person\` is not a kind of \`Wallet\`, so inheritance is wrong here. A \`Person\` **has a** \`Wallet\`:
 
 \`\`\`python
 class Person:
     def __init__(self, name):
         self.name = name
-        self.wallet = Wallet()   # composed in
+        self.wallet = Wallet()   # a fresh Wallet, owned by this person
+
+p = Person("Ada")
+p.wallet.add(50)
+print(p.wallet.balance)          # 50
 \`\`\`
 
-### Which to use
+The \`Person\` delegates money handling to the \`Wallet\` and stays small. That is the Practice exercise: set both \`self.name\` and a brand-new \`self.wallet = Wallet()\`.
 
-Prefer **composition** when one thing *contains* another; use **inheritance** only for a genuine
-"is-a" relationship. Composition keeps classes small and swappable.
+## Which to use
 
-### Recap
+Prefer composition when one thing *contains* or *uses* another. Reserve inheritance for a genuine "is-a" relationship where the subclass is fully substitutable for its parent. Composition keeps classes small and lets you swap a part out without touching a whole hierarchy.
 
-Inheritance shares behaviour down an is-a hierarchy (with \`super()\` to reuse the parent);
-composition builds an object out of other objects. Next you'll extend a greeter, then compose a
-person with a wallet.`,
+## Pitfalls
+
+The classic trap: a subclass defines its own \`__init__\` but forgets to call \`super().__init__(...)\`. The parent's setup never runs, so attributes like \`self.name\` are silently missing and you get an \`AttributeError\` only later, when some method reads them. If you override \`__init__\`, call the parent's inside it. (\`LoudGreeter\` sidesteps this by not defining \`__init__\` at all.)
+
+**Interview nuance:** know why "prefer composition over inheritance" is standard advice. Inheritance couples a subclass to the parent's internals, so a change in the base class can quietly break every subclass (the fragile base class problem), and deep chains make method lookup hard to trace through the MRO. Composition swaps that inheritance coupling for a narrow "uses" boundary you can test and replace in isolation.`,
     demoCode: `class Greeter:
     def __init__(self, name):
         self.name = name
@@ -925,10 +986,13 @@ const dunderPropertiesLesson: PythonLesson = {
   skills: ["dunder-methods", "eq", "property", "classes"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Make objects feel built-in
+    markdown: `## Why give a class built-in behaviour
 
-**Dunder** ("double underscore") methods let your objects work with Python's built-in operators and
-functions.
+Print a plain object and you get \`<__main__.Point object at 0x10f3c2a90>\`. Compare two of them with \`==\` and you get \`False\` unless they are literally the same object in memory. That is useless in tests, logs, and debugging. Dunder methods let your class plug into the same protocols the built-in types use, so \`==\`, \`print()\`, \`len()\`, \`[]\`, and more behave the way callers expect.
+
+## Dunder methods: hooking into Python's protocols
+
+A **dunder** ("double underscore") method has a name like \`__eq__\`. Python calls it for you when the matching syntax runs. \`a == b\` calls \`a.__eq__(b)\`, and \`repr(a)\` (and \`print(a)\`, when no \`__str__\` exists) calls \`a.__repr__()\`.
 
 \`\`\`python
 class Point:
@@ -937,22 +1001,23 @@ class Point:
         self.y = y
 
     def __repr__(self):
-        return f"Point({self.x}, {self.y})"     # how it prints
+        return f"Point({self.x}, {self.y})"
 
     def __eq__(self, other):
-        return self.x == other.x and self.y == other.y   # how == behaves
+        if not isinstance(other, Point):
+            return NotImplemented
+        return self.x == other.x and self.y == other.y
+
+print(Point(1, 2))                 # Point(1, 2)
+print(Point(1, 2) == Point(1, 2))  # True
+print(Point(1, 2) == Point(3, 4))  # False
 \`\`\`
 
-Now \`Point(1, 2) == Point(1, 2)\` is \`True\`, and printing a point shows \`Point(1, 2)\`.
-
-> **Interview gotcha:** defining \`__eq__\` sets \`__hash__\` to \`None\`, so your objects become
-> **unhashable**, they can no longer be dict keys or set members. If you need that, either add a
-> matching \`__hash__\` (equal objects must hash equal) or make the type immutable. \`@dataclass\` has
-> the same rule: use \`@dataclass(frozen=True)\` to keep it hashable.
+By default \`==\` compares identity (the same check as \`is\`), so two freshly built points are unequal. Defining \`__eq__\` replaces that with value equality: compare the coordinates that actually matter.
 
 ## Computed attributes with @property
 
-A \`@property\` turns a method into a read-only attribute, accessed **without** parentheses:
+A \`@property\` turns a method into a read-only attribute, accessed without parentheses. Reach for it when a value is derived from other fields and you do not want to store it or recompute it by hand.
 
 \`\`\`python
 class Circle:
@@ -963,14 +1028,18 @@ class Circle:
     def area(self):
         return 3.14159 * self.radius ** 2
 
-Circle(2).area   # 12.56636 , no ()
+print(Circle(2).area)   # 12.56636
 \`\`\`
 
-### Recap
+\`Circle(2).area\` runs the method and hands back the number. Writing \`Circle(2).area()\` would raise \`TypeError: 'float' object is not callable\`, because \`area\` already returned a \`float\`.
 
-Dunder methods (\`__eq__\`, \`__repr__\`) hook objects into operators and printing; \`@property\` exposes
-a computed value as an attribute. Next you'll make two points compare equal, then add an \`area\`
-property.`,
+### Pitfalls
+
+- **\`__eq__\` that crashes on foreign types.** \`self.x == other.x\` raises \`AttributeError\` when \`other\` has no \`.x\` (for example \`Point(1, 2) == "hi"\`). Guard with \`isinstance\` and \`return NotImplemented\` so Python falls back to a safe \`False\` instead of blowing up.
+- **Calling a property.** A \`@property\` is read like data (\`circle.area\`), never called (\`circle.area()\`).
+- **Unhashable objects.** Defining \`__eq__\` sets \`__hash__\` to \`None\`, so instances can no longer be dict keys or set members. Add a matching \`__hash__\` (equal objects must hash equal) or use \`@dataclass(frozen=True)\`.
+
+**Interview nuance:** the hash invariant says objects that compare equal must return the same \`hash()\`. That is exactly why Python drops \`__hash__\` the moment you define \`__eq__\`: keeping the old identity-based hash would let two equal points land in different buckets and quietly break \`set\` and \`dict\` lookups. If you do make a value type hashable, base both \`__eq__\` and \`__hash__\` on the same fields (here, \`(self.x, self.y)\`).`,
     demoCode: `class Circle:
     def __init__(self, radius):
         self.radius = radius
@@ -1081,12 +1150,13 @@ const dataclassesEnumsLesson: PythonLesson = {
   skills: ["dataclasses", "enums", "type-hints", "data-modeling"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Less boilerplate for data
+    markdown: `## Model your data, don't hand-write it
 
-### Dataclasses
+Real backends move records around: a \`User\`, an \`Order\`, an API payload. If you write those as plain classes, you hand-write an \`__init__\` to store fields, a \`__repr__\` so logs are readable, and an \`__eq__\` so two equal records compare equal. That is boilerplate you will get subtly wrong (forget one field in \`__eq__\` and dedup silently breaks). \`@dataclass\` generates all three from a typed field list, so the class is the schema.
 
-A class that mostly holds data needs an \`__init__\`, a \`__repr__\`, and often \`__eq__\`. The
-\`@dataclass\` decorator writes all three from a list of typed fields:
+### Dataclasses: fields become the constructor
+
+Each \`name: type\` line under a \`@dataclass\` is a **field**. The decorator reads those fields and writes \`__init__\`, \`__repr__\`, and \`__eq__\` for you, in field order.
 
 \`\`\`python
 from dataclasses import dataclass
@@ -1096,28 +1166,26 @@ class Point:
     x: int
     y: int
 
-Point(1, 2)                 # __init__ for free
-Point(1, 2) == Point(1, 2)  # True, __eq__ for free
-print(Point(1, 2))          # Point(x=1, y=2), __repr__ for free
+print(Point(1, 2))                  # Point(x=1, y=2)
+print(Point(1, 2) == Point(1, 2))   # True
 \`\`\`
 
-Each \`name: type\` line is a **field**.
+The generated \`__eq__\` compares instances field by field, which is exactly what the Apply exercise leans on: two points built from the same coordinates are equal because their \`(x, y)\` tuples are equal.
 
-### Type hints
+### Type hints describe intent, they do not enforce it
 
-Annotations describe what a value should be. Python doesn't enforce them, but they guide readers and
-tools like \`mypy\`:
+Annotations like \`x: int\` are metadata. Python does not check them at runtime; passing \`Point("a", "b")\` still constructs an object. Their value is for readers and tools like \`mypy\` or your editor, which flag mismatches before you run.
 
 \`\`\`python
 def total(prices: list[int]) -> int:
     return sum(prices)
 
-note: int | None = None     # Optional: an int or None
+note: int | None = None   # int or None; int | None is the modern Optional
 \`\`\`
 
-### Enums
+### Enums: name a fixed set of choices
 
-An \`Enum\` gives a fixed set of named choices, each with a \`.value\`:
+When a field has a small closed set of valid values (a status, a color, a role), a bare string invites typos like \`"gren"\`. An \`Enum\` names each choice once. Members carry a \`.value\`, and you can look one up by name.
 
 \`\`\`python
 from enum import Enum
@@ -1125,15 +1193,33 @@ from enum import Enum
 class Color(Enum):
     RED = "red"
     GREEN = "green"
+    BLUE = "blue"
 
-Color.RED.value     # "red"
-Color["RED"]        # look up by name -> Color.RED
+print(Color.RED.value)   # red
+print(Color["RED"])      # Color.RED   (look up by name)
 \`\`\`
 
-### Recap
+That name lookup is what the Practice driver does: \`Color[name].value\` turns \`"RED"\` into \`"red"\`.
 
-\`@dataclass\` generates \`__init__\`/\`__repr__\`/\`__eq__\` from typed fields; type hints document
-intent; \`Enum\` names a fixed set of choices. Next you'll make a dataclass, then define an enum.`,
+### Pitfall: mutable default fields
+
+You cannot give a dataclass field a mutable default like \`[]\` or \`{}\` directly. Python evaluates the default once, so every instance would share one list. The dataclass machinery blocks it outright:
+
+\`\`\`python
+from dataclasses import dataclass, field
+
+@dataclass
+class Cart:
+    items: list = []            # ValueError at class creation time
+
+@dataclass
+class Cart:
+    items: list = field(default_factory=list)   # correct: fresh list per instance
+\`\`\`
+
+Use \`field(default_factory=list)\` (or \`dict\`, \`set\`) so each instance gets its own container.
+
+**Interview nuance:** the generated \`__eq__\` compares field values only when the other object is the *same* dataclass type; against anything else it returns \`NotImplemented\`, so \`Point(1, 2) == (1, 2)\` is \`False\`, not \`True\`. Equality here means "same type and same fields," which is why dataclasses are safe to put in a \`set\` or use as dict keys once you add \`frozen=True\` (that also generates \`__hash__\`).`,
     demoCode: `from dataclasses import dataclass
 
 @dataclass
@@ -1240,49 +1326,59 @@ const exceptionsLesson: PythonLesson = {
   skills: ["exceptions", "try-except", "raise", "custom-exceptions"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Handling things that go wrong
+    markdown: `## Why catching errors matters
 
-Some operations can fail at runtime: dividing by zero, converting bad text, a missing key. A
-\`try\`/\`except\` lets you **catch** the failure instead of crashing:
+In real services the input is never clean: a user posts \`b=0\`, a config file is missing, an upstream API returns text where you expected a number. When one of those operations raises and nothing catches it, the exception unwinds up the call stack and the whole request (or batch job) dies. Exception handling is how you draw a boundary around risky code: this line might fail, and here is exactly what I do when it does. A pipeline that skips one malformed row is useful. One that crashes on row 3 of 10 million rows is not.
+
+## The mental model
+
+When a statement raises, Python stops the current block immediately and unwinds outward looking for a matching handler. A \`try\`/\`except\` installs that handler for a specific region:
 
 \`\`\`python
 try:
-    result = a / b
+    result = a / b        # if this raises...
 except ZeroDivisionError:
-    result = None        # runs only if that error happened
+    result = None         # ...jump here, but only for this error type
 \`\`\`
 
-Catch the **specific** exception you expect (\`ZeroDivisionError\`, \`ValueError\`, \`KeyError\`),
-not a bare \`except\`. You don't want to hide unrelated bugs.
+\`except ZeroDivisionError\` matches that class and its subclasses. Any other error (a \`TypeError\`, say) is not caught here and keeps propagating. Catch the specific exception you expect, not everything. That is exactly what \`safe_divide\` in the demo below does: it returns \`5.0\` for \`safe_divide(10, 2)\` and \`None\` for \`safe_divide(5, 0)\`, and it never hides an unrelated bug.
 
-### finally
+### \`finally\` always runs
 
-A \`finally\` block runs no matter what (success or failure) for cleanup:
+A \`finally\` block runs whether the \`try\` succeeded, raised, or returned early. Use it for cleanup that must happen no matter what, like closing a file or releasing a lock:
 
 \`\`\`python
 try:
     risky()
 finally:
-    cleanup()            # always runs
+    cleanup()             # runs on success and on failure
 \`\`\`
 
-### Raising and custom exceptions
+### Raising your own
 
-Use \`raise\` to signal an error yourself, and subclass \`Exception\` to name your own:
+Use \`raise\` to signal a failure yourself, and subclass \`Exception\` to give that failure a name so callers can catch exactly your error and nothing else:
 
 \`\`\`python
 class TooSmallError(Exception):
     pass
 
-if n < 10:
-    raise TooSmallError()
+def validate(n):
+    try:
+        if n < 10:
+            raise TooSmallError()
+        return "ok"
+    except TooSmallError:
+        return "too small"
+
+print(validate(5))    # too small
+print(validate(10))   # ok
 \`\`\`
 
-### Recap
+## Pitfalls
 
-\`try\`/\`except\` catches a specific error, \`finally\` always runs, \`raise\` signals an error, and
-subclassing \`Exception\` defines your own. Next you'll guard a division, then raise and catch a
-custom exception.`,
+A bare \`except:\` (or \`except Exception:\`) catches too much. If you wrap \`a / b\` in \`except:\` and later mistype a variable name, the resulting \`NameError\` gets swallowed and you silently return \`None\`, hiding a real bug. Catch the narrow type instead. A second trap: a \`return\` inside \`finally\` overrides any return value or exception from the \`try\` and discards it silently, so do not \`return\` from \`finally\`.
+
+**Interview nuance:** Python idiom favors EAFP ("easier to ask forgiveness than permission") over LBYL ("look before you leap"). Rather than checking \`if b != 0:\` before dividing, you try the division and catch \`ZeroDivisionError\`. This is not just style. The check-first approach has a race window in concurrent code (a shared value can change between the check and the use), and in CPython entering a \`try\` block costs nothing on the non-error path, so exception handling is effectively free when no error is raised. Interviewers watch for whether you catch a specific exception type or reach for a bare \`except\`.`,
     demoCode: `def safe_divide(a, b):
     try:
         return a / b
@@ -1364,48 +1460,56 @@ const filesJsonCsvLesson: PythonLesson = {
   skills: ["context-managers", "json", "csv", "parsing"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Working with structured data
+    markdown: `## Reading structured data safely
 
-### The with-statement (context managers)
+Almost every backend or pipeline job starts the same way: pull in text from a file or an API, turn it into Python objects, and do work. Two things go wrong constantly. First, a file handle gets leaked because someone forgot to close it, and under load the process runs out of descriptors and crashes. Second, the parse is naive, so a comma inside a quoted field or a number that arrives as text silently corrupts every downstream row. The standard library fixes both, and interviewers expect you to reach for it instead of hand-rolling.
 
-Opening a file with \`with\` guarantees it's closed again, even if an error happens:
+### Context managers guarantee cleanup
+
+\`with\` opens a resource and closes it when the block exits, even if an exception is raised partway through:
 
 \`\`\`python
 with open("data.txt") as fh:
     text = fh.read()
-# the file is automatically closed here
+# fh is closed here, exception or not
 \`\`\`
 
-\`with\` is the idiom for any resource that needs cleanup. (In this lesson the data is already a
-string, so you'll skip straight to parsing it.)
+\`open\` returns a context manager: the \`with\` statement calls its setup on entry and its cleanup (\`fh.close()\`) on exit. This is the idiom for anything that needs releasing (files, sockets, locks, DB connections). The raw data in these exercises is already handed to you as a string, so you go straight to parsing.
 
-### JSON
+### JSON: text to Python objects and back
 
-\`json.loads\` turns a JSON **string** into Python lists/dicts; \`json.dumps\` goes the other way:
+\`json.loads\` parses a JSON **string** into Python values; \`json.dumps\` serializes back to a string. The type mapping is fixed: JSON object to \`dict\`, array to \`list\`, string to \`str\`, number to \`int\` or \`float\`, \`true\`/\`false\` to \`bool\`, \`null\` to \`None\`.
 
 \`\`\`python
 import json
+
 data = json.loads('{"name": "Ada", "age": 30}')
-data["name"]    # "Ada"
+data["name"]   # "Ada" (a str)
+data["age"]    # 30    (an int, not "30")
 \`\`\`
 
-### CSV
+Note \`data["age"]\` is a real integer, so you can do arithmetic on it directly. Use \`json.load\`/\`json.dump\` (no \`s\`) when the source or target is a file object rather than a string.
 
-\`csv.reader\` reads comma-separated rows. To read from a string (instead of a file), wrap it in
-\`io.StringIO\`:
+### CSV: rows of strings
+
+\`csv.reader\` yields one list per row and handles quoted fields and embedded commas correctly. It reads from any line-yielding iterable, so wrap a string in \`io.StringIO\` to treat it like a file:
 
 \`\`\`python
 import csv, io
-rows = list(csv.reader(io.StringIO("a,b\\nc,d")))   # [["a", "b"], ["c", "d"]]
+
+rows = list(csv.reader(io.StringIO("a,b\\nc,d")))
+# [["a", "b"], ["c", "d"]]
 \`\`\`
 
-Every CSV value comes back as a **string**.
+Every CSV value comes back as a \`str\`. There is no type inference: the number \`30\` in a CSV cell arrives as \`"30"\`, and you must call \`int()\` yourself.
 
-### Recap
+### Pitfalls
 
-\`with\` safely manages resources, \`json.loads\`/\`dumps\` convert between JSON text and Python
-objects, and \`csv.reader\` parses comma-separated rows. Next you'll pull a field out of JSON, then
-parse CSV into rows.`,
+- **Do not \`split(",")\` a CSV line.** For \`'"a,b",c'\`, \`str.split(",")\` returns three broken pieces, while \`csv.reader\` correctly returns \`["a,b", "c"]\` because it respects the quotes.
+- **\`loads\` vs \`load\`.** Pass a string to \`json.loads\` and a file object to \`json.load\`. Mixing them raises \`TypeError\` or \`AttributeError\`.
+- **When reading a real CSV file, open it with \`newline=""\`** so \`csv\` handles line endings itself: \`open(path, newline="")\`.
+
+**Interview nuance:** JSON round-tripping is lossy for Python types. \`json.dumps((1, 2))\` produces the array \`"[1, 2]"\`, and \`json.loads\` of that gives back the list \`[1, 2]\`, not the original tuple. JSON has no concept of tuples, sets, or non-string dict keys, so tuples become lists, sets are unserializable, and integer keys are coerced to strings. If your code depends on getting the exact Python type back after a serialize-then-parse cycle, it will break.`,
     demoCode: `import json
 
 data = json.loads('{"name": "Ada", "age": 30}')
@@ -1509,40 +1613,45 @@ const modulesLesson: PythonLesson = {
   skills: ["modules", "imports", "standard-library", "collections"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Code lives in modules
+    markdown: `## Why code lives in modules
 
-A **module** is just a \`.py\` file. You pull names in from one with \`import\`:
+A 2000-line file is where bugs hide. Real projects split logic across many \`.py\` files so each one has a single job, and any file that has been imported once is cached in \`sys.modules\` so the second \`import\` is nearly free. Just as important: Python ships a huge **standard library**, so before you write a character counter or a GCD loop by hand, check whether someone already wrote, tested, and optimized it in C for you. Interviewers notice when you reach for \`collections\` instead of reinventing it.
 
-\`\`\`python
-import math                 # use as math.sqrt(...)
-from math import sqrt       # use as sqrt(...)
-from collections import Counter
-\`\`\`
+### A module is just a \`.py\` file
 
-Splitting code into modules keeps each file focused; \`import\` wires them together.
-
-### Batteries included
-
-Python's **standard library** ships hundreds of ready-made modules. Reach for them before writing
-your own:
+Every \`.py\` file is a module, and \`import\` runs it once and binds its names so you can use them:
 
 \`\`\`python
-import math
-math.gcd(12, 8)             # 4   greatest common divisor
+import math                     # names live under math.*
+math.gcd(12, 8)                 # 4
 
-from collections import Counter
-Counter("aabbbc")           # Counter({'b': 3, 'a': 2, 'c': 1})
-Counter("aabbbc").most_common(1)   # [('b', 3)]
+from math import sqrt           # pull one name into your file
+sqrt(9)                         # 3.0
+
+from collections import Counter # a name from the stdlib collections module
 \`\`\`
 
-\`Counter\` tallies how often each item appears; \`.most_common(k)\` returns the top \`k\` as
-\`(item, count)\` pairs.
+\`import math\` keeps names namespaced (\`math.gcd\`), which is safest. \`from math import sqrt\` copies just \`sqrt\` into your file, which is shorter but risks a name clash. Avoid \`from math import *\`: it dumps every name in and makes it impossible to tell where a function came from.
 
-### Recap
+### Batteries included: \`Counter\` and \`math\`
 
-\`import module\` / \`from module import name\` brings code in, and the standard library (\`math\`,
-\`collections\`, \`datetime\`, …) saves you from reinventing common tools. Next you'll find the most
-common character with \`Counter\`, then a GCD with \`math\`.`,
+\`Counter\` is a \`dict\` subclass that tallies how often each item appears. The demo below builds one from a string:
+
+\`\`\`python
+from collections import Counter
+
+tally = Counter("aabbbc")
+print(tally)                  # Counter({'b': 3, 'a': 2, 'c': 1})
+print(tally.most_common(1))   # [('b', 3)]
+\`\`\`
+
+\`most_common(k)\` returns the top \`k\` items as \`(item, count)\` pairs, already sorted from most to least frequent. That is exactly what the Apply exercise needs: \`Counter(text).most_common(1)[0][0]\` is the single most frequent character. For the Practice exercise, \`math.gcd(a, b)\` returns the greatest common divisor with no loop of your own: \`math.gcd(12, 8)\` is \`4\`.
+
+### Pitfall: do not name your file after a stdlib module
+
+If you save your own file as \`collections.py\`, your file shadows the real one, and \`import collections\` imports *your* file. You get a confusing \`ImportError\` or \`AttributeError\` on names that clearly exist. The fix: never name a script after a stdlib module you import, and delete any stray \`.pyc\` files or \`__pycache__\` folders left behind. A related trap is mixing import styles: after \`import math\` alone, writing \`gcd(12, 8)\` raises \`NameError\`, because the name lives at \`math.gcd\`, not in your file.
+
+**Interview nuance:** \`most_common\` is deterministic even on ties. When two items share the same count, they come back in the order first encountered while building the \`Counter\` (guaranteed since Python 3.7). So \`Counter("abcabx").most_common(1)\` returns \`[('a', 2)]\`, not \`[('b', 2)]\`, because \`a\` was seen first. If an interviewer asks "what if two characters tie for most frequent?", the honest answer is that your code returns the first one to reach that count, and if the spec needs a different tiebreak (say, alphabetical) you must sort explicitly rather than trust \`most_common\`.`,
     demoCode: `from collections import Counter
 
 tally = Counter("aabbbc")
@@ -1619,18 +1728,21 @@ const regexLesson: PythonLesson = {
   skills: ["regex", "re", "findall", "sub"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Regular expressions describe text patterns
+    markdown: `## Text patterns with \`re\`
 
-A **regular expression** (regex) is a mini-language for "text that looks like this". Python's \`re\`
-module runs them. Write patterns as **raw strings** (\`r"..."\`) so backslashes mean what you expect.
+Raw text arrives messy: log lines like \`"order 12, item 345"\`, user-typed phone numbers, IDs buried in free-form comments. A **regular expression** (regex) is a compact pattern language for "text that looks like this," and Python's \`re\` module runs those patterns. When a data engineer needs to pull every order ID out of a million log lines, or reject rows whose \`zip_code\` field is not five digits, regex does it in one pass instead of a hand-written character loop.
 
-### The building blocks you'll use most
+### Write patterns as raw strings
+
+Always write patterns as raw strings (\`r"..."\`). Regex leans on the backslash (\`\\d\`, \`\\w\`, \`\\s\`), and in a normal Python string the backslash is an escape character. \`r"\\d"\` is the two characters backslash-\`d\`, exactly what the regex engine wants; a plain \`"\\d"\` is fragile because \`\\d\` is not a valid string escape, and in Python 3.12 and later it triggers a \`SyntaxWarning\`.
+
+### The pieces you will use most
 
 \`\`\`text
-\\d   a digit            \\w   a word char (letter/digit/_)
-\\s   whitespace         .    any character
-+    one or more         *    zero or more
-[abc] any of a, b, c     ()   a capture group
+\\d  a digit 0-9        \\w  letter, digit, or _
+\\s  whitespace          .  any character
++   one or more         *  zero or more
+[abc] any of a,b,c     () a capture group
 \`\`\`
 
 ### The three workhorse functions
@@ -1638,26 +1750,27 @@ module runs them. Write patterns as **raw strings** (\`r"..."\`) so backslashes 
 \`\`\`python
 import re
 
-re.findall(r"\\d+", "a1 b22")     # ['1', '22']   every match
-re.search(r"\\d+", "abc7")         # a Match at '7' (or None)  first match anywhere
-re.sub(r"\\d", "#", "a1b2")        # 'a#b#'        replace matches
+re.findall(r"\\d+", "a1 b22")   # ['1', '22']  every match, as a list
+re.search(r"\\d+", "abc7")       # a Match at '7', or None if nothing matches
+re.sub(r"\\d", "#", "a1b2")      # 'a#b#'  replace every match
 \`\`\`
 
-\`re.findall\` returns a **list** of every match, perfect for pulling all the numbers, words, or
-codes out of a blob of text.
+\`re.findall\` returns a **list** of every non-overlapping match, left to right. That is exactly the Apply task: \`re.findall(r"\\d+", "a1b22")\` gives \`["1", "22"]\`, and \`[]\` when there are no digits. \`re.sub(pattern, replacement, text)\` swaps every match for the replacement string, which is the Practice task: \`re.sub(r"\\d", "#", "a1b2")\` gives \`"a#b#"\`.
 
-### Groups
+### Pitfalls
 
-Parentheses capture part of a match:
+**\`\\d\` matches one digit; \`\\d+\` matches a whole run.** \`re.findall(r"\\d", "a1b22")\` returns \`['1', '2', '2']\` (three separate digits), while \`re.findall(r"\\d+", "a1b22")\` returns \`['1', '22']\`. Reach for \`+\` when you want whole numbers, and drop it when you want single characters (as in redaction, where replacing each digit one at a time is fine).
+
+**A capture group changes what \`findall\` returns.** With no group it returns the full match; with one group it returns only that group; with several it returns tuples:
 
 \`\`\`python
-re.findall(r"(\\w+)@(\\w+)", "a@x b@y")   # [('a', 'x'), ('b', 'y')]
+re.findall(r"\\w+@\\w+", "a@x b@y")     # ['a@x', 'b@y']
+re.findall(r"(\\w+)@(\\w+)", "a@x b@y") # [('a', 'x'), ('b', 'y')]
 \`\`\`
 
-### Recap
+So do not wrap your whole pattern in \`()\` out of habit; it silently reshapes the result.
 
-\`re.findall\` pulls out every match, \`re.search\` finds the first, \`re.sub\` replaces. Raw
-strings (\`r"..."\`) keep your patterns readable. Next you'll extract numbers, then redact them.`,
+**Interview nuance:** quantifiers are **greedy** by default. \`.*\` matches as much as it can, then backtracks. \`re.findall(r"<.*>", "<a><b>")\` returns \`['<a><b>']\`, not the two tags you probably wanted. Add \`?\` to make it lazy: \`re.findall(r"<.*?>", "<a><b>")\` returns \`['<a>', '<b>']\`. Interviewers use this to check whether you understand that the engine explores text by backtracking, which is also why a careless pattern over adversarial input can blow up to quadratic time.`,
     demoCode: `import re
 print(re.findall(r"\\d+", "order 12, item 345"))   # ['12', '345']
 print(re.sub(r"\\d", "#", "PIN 4021"))             # 'PIN ####'`,
@@ -1729,52 +1842,59 @@ const collectionsToolkitLesson: PythonLesson = {
   skills: ["collections", "counter", "defaultdict", "deque"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## The collections module: sharper tools for common jobs
+    markdown: `## Reach for the right container, not a hand-rolled dict
 
-The standard library's \`collections\` module has drop-in upgrades over plain dicts and lists.
+When you tally, group, or queue, a plain \`dict\` or \`list\` works, but it forces you to write boilerplate that hides bugs. The \`collections\` module ships three focused upgrades that name your intent and delete that boilerplate: \`Counter\` for frequencies, \`defaultdict\` for grouping, and \`deque\` for queues. In interviews and in real data pipelines, reaching for the right one signals you know the standard library, and it usually cuts genuine complexity, not just line count.
 
-### Counter: tally things in one line
+### \`Counter\`: frequencies in one call
+
+\`Counter\` is a \`dict\` subclass whose values are counts. Feed it any iterable and it tallies:
 
 \`\`\`python
 from collections import Counter
 
-Counter(["a", "b", "a"])          # Counter({'a': 2, 'b': 1})
-Counter("mississippi")["s"]        # 4
-Counter(words).most_common(2)      # the two most frequent (word, count) pairs
+c = Counter(["a", "b", "a", "c", "a"])   # Counter({'a': 3, 'b': 1, 'c': 1})
+c["a"]                                    # 3
+c["z"]                                    # 0, not a KeyError
+c.most_common(2)                          # [('a', 3), ('b', 1)]
 \`\`\`
 
-What would be a 6-line manual counting loop is now one call.
+Two behaviors matter. A missing key returns \`0\` instead of raising, so you never guard a read. And both the \`repr\` and \`most_common()\` are ordered by count descending, with ties broken by first-seen order (\`b\` before \`c\` above). Because it is a \`dict\` subclass, \`Counter(words) == {"a": 2, "b": 1}\` is \`True\`, so for the Apply exercise you can return the \`Counter\` directly, or wrap it in \`dict(...)\` if a caller insists on a plain \`dict\`.
 
-### defaultdict: grouping without "does the key exist yet?"
+### \`defaultdict\`: group without the missing-key dance
 
-A plain dict raises \`KeyError\` on a missing key. A \`defaultdict(list)\` auto-creates an empty list
-the first time you touch a key, so grouping is clean:
+A plain \`dict\` raises \`KeyError\` on a missing key, so grouping needs an \`if key not in d: d[key] = []\` guard. \`defaultdict(list)\` calls the factory you pass (the callable \`list\`, not \`list()\`) the first time a key is touched:
 
 \`\`\`python
 from collections import defaultdict
 
 groups = defaultdict(list)
-for word in ["ant", "apple", "bee"]:
-    groups[word[0]].append(word)   # no "if key not in groups" needed
-# {'a': ['ant', 'apple'], 'b': ['bee']}
+for w in ["apple", "ant", "bee"]:
+    groups[w[0]].append(w)
+dict(groups)   # {'a': ['apple', 'ant'], 'b': ['bee']}
 \`\`\`
 
-### deque: a fast queue
+Keys keep insertion order and each list keeps append order, which is exactly what the Practice exercise checks.
 
-A \`deque\` ("deck") adds/removes from **both ends** in \`O(1)\` (a list's \`pop(0)\` is \`O(n)\`):
+### \`deque\`: a real queue
+
+A \`deque\` (double-ended queue) adds and removes at both ends in \`O(1)\`:
 
 \`\`\`python
 from collections import deque
+
 q = deque([1, 2, 3])
 q.appendleft(0)   # deque([0, 1, 2, 3])
 q.popleft()       # 0
 \`\`\`
 
-### Recap
+### Pitfalls
 
-\`Counter\` tallies frequencies, \`defaultdict\` removes missing-key boilerplate when grouping, and
-\`deque\` is the right structure for a queue. Next you'll count words, then group them by first
-letter.`,
+- Merely reading a missing \`defaultdict\` key inserts it: touching \`d["x"]\` when \`x\` is absent leaves \`d["x"] == []\` behind. Use \`d.get("x")\` when you only want to peek without mutating.
+- \`defaultdict([])\` raises \`TypeError\`. The factory must be callable, so pass \`list\`, \`set\`, or \`int\`, never an instance.
+- \`Counter\` never raises on a missing key, which is handy but hides typos: \`c["speling"]\` quietly returns \`0\`.
+
+**Interview nuance:** using a \`list\` as a queue is a classic trap. \`list.pop(0)\` and \`list.insert(0, x)\` are \`O(n)\` because every remaining element shifts one slot, so a BFS built on \`list.pop(0)\` is secretly \`O(n^2)\`. \`deque.popleft()\` and \`deque.appendleft()\` are \`O(1)\`, which is why a \`deque\` is the standard queue for BFS and sliding-window problems. The tradeoff is that a \`deque\` has no \`O(1)\` random indexing into its middle, unlike a \`list\`.`,
     demoCode: `from collections import Counter, defaultdict
 print(Counter(["a", "b", "a", "c", "a"]))   # Counter({'a': 3, 'b': 1, 'c': 1})
 

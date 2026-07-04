@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,8 @@ import { TeachPanel } from "./TeachPanel"
 import { SqlExerciseRunner } from "./SqlExerciseRunner"
 import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
-import { LessonOutline, type UpNextLesson } from "./LessonOutline"
+import { LessonRail } from "./LessonRail"
+import { type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
 import type { ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExtraPracticeSection } from "./ExtraPracticeSection"
@@ -77,6 +78,11 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
   })
 
   const [tutorOpen, setTutorOpen] = usePersistentState("cs_sql_tutor_open", "1")
+
+  // The left outline defaults to its slim strip: a three-step tracker doesn't earn 248px of permanent
+  // width, and the reclaimed space goes to the editor. The choice persists across reloads.
+  const [rail, setRail] = usePersistentState("cs_sql_rail", "0")
+  const railExpanded = rail === "1"
 
   // Which exercises passed this session — gates the "Mark as done" control (grading stays the bar to
   // complete; the learner saves the section when they choose to).
@@ -251,22 +257,23 @@ export function SqlLessonPlayer({ lesson, level, onSectionComplete }: SqlLessonP
 
       <div className="flex-1 overflow-x-auto">
         <div
-          className={[
-            "grid h-full min-w-[1080px]",
-            tutorOpen === "1"
-              ? "grid-cols-[248px_minmax(400px,1fr)_300px]"
-              : "grid-cols-[248px_minmax(400px,1fr)_2.5rem]",
-          ].join(" ")}
+          className="grid h-full min-w-[1080px] transition-[grid-template-columns] duration-200 ease-out"
+          style={
+            {
+              gridTemplateColumns: `var(--railw, 58px) minmax(400px,1fr) ${tutorOpen === "1" ? "300px" : "2.5rem"}`,
+              "--railw": railExpanded ? "248px" : "58px",
+            } as CSSProperties
+          }
         >
-          <div className="border-border overflow-y-auto border-r px-4 py-6">
-            <LessonOutline
-              sections={sections}
-              active={active}
-              onSelect={goToSection}
-              upNext={upNext}
-              basePath="/learn/sql"
-            />
-          </div>
+          <LessonRail
+            collapsed={!railExpanded}
+            onToggle={() => setRail(railExpanded ? "0" : "1")}
+            sections={sections}
+            active={active}
+            onSelect={goToSection}
+            upNext={upNext}
+            basePath="/learn/sql"
+          />
 
           <main
             id="lesson-main"

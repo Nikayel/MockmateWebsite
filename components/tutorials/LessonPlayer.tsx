@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,8 @@ import { TeachPanel } from "./TeachPanel"
 import { ExerciseRunner } from "./ExerciseRunner"
 import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
-import { LessonOutline, type UpNextLesson } from "./LessonOutline"
+import { LessonRail } from "./LessonRail"
+import { type UpNextLesson } from "./LessonOutline"
 import { LessonHeader } from "./LessonHeader"
 import type { ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExtraPracticeSection } from "./ExtraPracticeSection"
@@ -89,6 +90,11 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   // The AI tutor (Sable) is locked / "coming soon"; its column is collapsible and the state persists.
   const [tutorOpen, setTutorOpen] = usePersistentState("cs_py_tutor_open", "1")
+
+  // The left outline defaults to its slim strip: a three-step tracker doesn't earn 248px of permanent
+  // width, and the reclaimed space goes to the editor. The choice persists across reloads.
+  const [rail, setRail] = usePersistentState("cs_py_rail", "0")
+  const railExpanded = rail === "1"
 
   // Remember this level for the Path's "continue" behavior whenever a lesson is open.
   useEffect(() => {
@@ -253,26 +259,28 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
         </div>
       </header>
 
-      {/* Below 1080px the whole workspace scrolls horizontally as one unit. The tutor column
-          collapses to a slim rail, giving the lesson more room. */}
+      {/* Below 1080px the whole workspace scrolls horizontally as one unit. Both side columns
+          collapse to slim rails, giving the lesson more room. The outline (--railw) and tutor track
+          widths are inline so the grid can animate between the collapsed and expanded states. */}
       <div className="flex-1 overflow-x-auto">
         <div
-          className={[
-            "grid h-full min-w-[1080px]",
-            tutorOpen === "1"
-              ? "grid-cols-[248px_minmax(400px,1fr)_300px]"
-              : "grid-cols-[248px_minmax(400px,1fr)_2.5rem]",
-          ].join(" ")}
+          className="grid h-full min-w-[1080px] transition-[grid-template-columns] duration-200 ease-out"
+          style={
+            {
+              gridTemplateColumns: `var(--railw, 58px) minmax(400px,1fr) ${tutorOpen === "1" ? "300px" : "2.5rem"}`,
+              "--railw": railExpanded ? "248px" : "58px",
+            } as CSSProperties
+          }
         >
-          <div className="border-border overflow-y-auto border-r px-4 py-6">
-            <LessonOutline
-              sections={sections}
-              active={active}
-              onSelect={goToSection}
-              upNext={upNext}
-              basePath="/learn/python"
-            />
-          </div>
+          <LessonRail
+            collapsed={!railExpanded}
+            onToggle={() => setRail(railExpanded ? "0" : "1")}
+            sections={sections}
+            active={active}
+            onSelect={goToSection}
+            upNext={upNext}
+            basePath="/learn/python"
+          />
 
           <main
             id="lesson-main"

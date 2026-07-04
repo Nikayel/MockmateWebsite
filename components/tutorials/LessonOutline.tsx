@@ -1,27 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { Check } from "lucide-react"
+import { Check, PanelLeftClose } from "lucide-react"
 import { LESSON_SECTION_ORDER } from "@/lib/stores/tutorial-store"
+import { PHASE_ICON, SECTION_HINT, SECTION_LABEL } from "./lessonPhases"
 import type { LessonSection, SectionStatus } from "@/lib/tutorials/types"
 
 /**
- * The lesson workspace's left outline (HANDOFF §C): the Read → Apply → Practice stepper (numbered,
- * with a clay spine-fill and a check on completed steps; every step is clickable to revisit) plus an
- * "Up next" list of the lessons that follow. Purely presentational — the player owns section state.
+ * The lesson workspace's left outline (HANDOFF §C), shown when the rail is expanded: the Read →
+ * Apply → Practice stepper (each step iconned, with a clay spine-fill and a check on completed
+ * steps; every step is clickable to revisit) plus an "Up next" list of the lessons that follow. When
+ * `onCollapse` is provided a collapse control sits by the heading, folding the rail to its slim
+ * strip. Purely presentational — the player owns section state and the collapsed/expanded choice.
  */
-const SECTION_LABEL: Record<LessonSection, string> = {
-  teach: "Read",
-  apply: "Apply",
-  practice: "Practice",
-}
-
-const SECTION_HINT: Record<LessonSection, string> = {
-  teach: "Understand it",
-  apply: "Write it yourself",
-  practice: "A real-world variant",
-}
-
 export interface UpNextLesson {
   id: string
   title: string
@@ -35,6 +26,7 @@ export function LessonOutline({
   onSelect,
   upNext,
   basePath,
+  onCollapse,
 }: {
   sections: Record<LessonSection, SectionStatus>
   active: LessonSection
@@ -42,18 +34,35 @@ export function LessonOutline({
   upNext: UpNextLesson[]
   /** Route prefix for "Up next" links, e.g. "/learn/python" or "/learn/sql". */
   basePath: string
+  /** When set, renders a control by the heading that folds the rail to its slim strip. */
+  onCollapse?: () => void
 }) {
   return (
     <div className="flex flex-col gap-8">
       <nav aria-label="Lesson sections">
-        <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
-          This lesson
-        </p>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+            This lesson
+          </p>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              aria-label="Collapse lesson outline"
+              aria-expanded={true}
+              title="Collapse outline"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:ring-accent/50 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
         <ol className="relative">
           {LESSON_SECTION_ORDER.map((section, i) => {
             const isActive = active === section
             const isDone = sections[section] === "completed"
             const isLast = i === LESSON_SECTION_ORDER.length - 1
+            const Icon = PHASE_ICON[section]
             return (
               <li key={section} className="relative flex gap-3">
                 <div className="flex flex-col items-center">
@@ -68,7 +77,11 @@ export function LessonOutline({
                     ].join(" ")}
                     aria-hidden="true"
                   >
-                    {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                    {isDone ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
                   </span>
                   {!isLast && (
                     <span
