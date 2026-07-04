@@ -128,7 +128,9 @@ export function WorkspaceExerciseRunner({
               }
               language={activeFile.language}
               readOnly={!isEditable(activeFile)}
-              height={340}
+              autoHeight
+              minHeight={340}
+              maxHeight={600}
             />
           </CodeMirrorErrorBoundary>
         )}
