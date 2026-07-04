@@ -945,6 +945,11 @@ class Point:
 
 Now \`Point(1, 2) == Point(1, 2)\` is \`True\`, and printing a point shows \`Point(1, 2)\`.
 
+> **Interview gotcha:** defining \`__eq__\` sets \`__hash__\` to \`None\`, so your objects become
+> **unhashable**, they can no longer be dict keys or set members. If you need that, either add a
+> matching \`__hash__\` (equal objects must hash equal) or make the type immutable. \`@dataclass\` has
+> the same rule: use \`@dataclass(frozen=True)\` to keep it hashable.
+
 ## Computed attributes with @property
 
 A \`@property\` turns a method into a read-only attribute, accessed **without** parentheses:
