@@ -1770,15 +1770,15 @@ INSERT INTO books VALUES (1, 'Notes', 1), (2, 'Engine', 1);`,
   }),
   practice: scriptExercise({
     id: "sql-l3-cardinality-practice",
-    prompt: `Model a *playlists ↔ songs* feature with three relationships, encoded purely in DDL:
+    prompt: `Create four tables (\`users\`, \`playlists\`, \`cover_images\`, \`songs\`) plus a one-row
+\`model_notes\` table, encoding a *playlists and songs* feature's three relationships purely in DDL:
 
-1. **user 1:N playlists**: a user owns many playlists. Put the FK on the many side.
-2. **playlist 1:1 cover_image**: each playlist has at most one cover. Model it as a table split with a \`UNIQUE\` FK.
-3. **playlists M:N songs**: a playlist has many songs and a song appears on many playlists. A single FK **cannot** express this, so leave \`songs\` standalone (the junction table comes next lesson).
+1. **user 1:N playlists**: a user owns many playlists. Put the FK on \`playlists\` (the many side).
+2. **playlist 1:1 cover_image**: each playlist has at most one cover. Model \`cover_images\` as a table split with a \`UNIQUE\` FK on \`playlist_id\` referencing \`playlists\`.
+3. **playlists M:N songs**: a playlist has many songs and a song appears on many playlists. A single FK **cannot** express this many-to-many, so leave \`songs\` standalone (the junction table comes next lesson).
 
-Create \`users\`, \`playlists\`, \`cover_images\`, and \`songs\`, wire the 1:N and 1:1 FKs, and add a one-row
-\`model_notes\` table stating \`mn_needs_junction = 1\` to record that the playlist↔song link still needs a
-junction.`,
+In \`model_notes\`, store \`mn_needs_junction = 1\` to record that the playlists-to-songs link still
+needs a junction.`,
     starterCode: `PRAGMA foreign_keys = ON;
 DROP TABLE IF EXISTS cover_images;
 DROP TABLE IF EXISTS playlists;

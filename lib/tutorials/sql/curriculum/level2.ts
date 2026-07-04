@@ -683,7 +683,7 @@ INSERT INTO orders VALUES
   practice: {
     id: "sql-l2-inner-join-practice",
     executionMode: "single-file",
-    prompt: `Assemble a line-item fact by joining three tables: \`order_items\` → \`orders\` (on \`order_id\`) → \`products\` (on \`product_id\`). Return one row **per order item** with columns \`order_item_id\`, \`order_id\`, \`product_name\`, \`category\`, \`order_status\`, and \`line_revenue\` (that item's \`quantity * unit_price_cents\`), sorted by \`order_item_id\`.
+    prompt: `Write a query that returns one row **per order item** with columns \`order_item_id\`, \`order_id\`, \`product_name\`, \`category\`, \`order_status\`, and \`line_revenue\` (that item's \`quantity * unit_price_cents\`), sorted by \`order_item_id\`. Build it by inner-joining \`order_items\` to \`orders\` on \`order_id\` and then to \`products\` on \`product_id\`, so an item with no matching order or no matching product drops out.
 
 Because this is a 1:N chain, prove to yourself the grain stays at the line-item level: the output row count must equal the number of \`order_items\` rows that have a matching order **and** a matching product (inner joins on both). Do **not** sum anything; this is a preview at line grain.`,
     starterCode: `-- Line-item fact: order_items -> orders -> products (inner joins on both keys).
@@ -1047,7 +1047,7 @@ INSERT INTO orders VALUES
   practice: {
     id: "sql-l2-anti-join-practice",
     executionMode: "single-file",
-    prompt: `Referential audit (union of two anti-joins): produce a single problem report of two kinds of integrity break, tagged by type. Return columns \`issue_type\` and \`bad_id\`, where each row is either:
+    prompt: `Write a query that returns two columns, \`issue_type\` and \`bad_id\`, where each row flags one referential-integrity break of one of these two kinds:
 - \`'orphan_order_item'\`: an \`order_items\` row whose \`product_id\` has no matching product; \`bad_id\` is the \`order_item_id\`.
 - \`'customer_no_orders'\`: a \`customers\` row that has never appeared in \`orders\`; \`bad_id\` is the \`customer_id\`.
 
@@ -1234,16 +1234,16 @@ INSERT INTO employees VALUES
   practice: {
     id: "sql-l2-self-join-practice",
     executionMode: "single-file",
-    prompt: `Reconcile two daily snapshots. You have yesterday's and today's customer dimension
-snapshots. Use a \`FULL OUTER JOIN\` on \`customer_id\` to surface every change. Return \`customer_id\`
-(the non-NULL id from whichever side has it), and \`change_type\`, one of:
+    prompt: `Write a query that returns one row per customer with \`customer_id\` (the non-NULL id from
+whichever snapshot has it) and \`change_type\`, comparing yesterday's and today's customer dimension
+snapshots. Sort by \`customer_id\`. \`change_type\` is one of:
 
 - \`'added'\`: in today but not yesterday,
 - \`'dropped'\`: in yesterday but not today,
 - \`'changed'\`: in both, but \`tier\` differs,
 - \`'unchanged'\`: in both with the same \`tier\`.
 
-Sort by \`customer_id\`.`,
+Use a \`FULL OUTER JOIN\` on \`customer_id\` so rows present on only one side are still surfaced.`,
     starterCode: `-- FULL OUTER JOIN the two snapshots on customer_id.
 -- Return a non-NULL customer_id and a change_type; sort by customer_id.
 SELECT
@@ -1735,14 +1735,13 @@ INSERT INTO orders VALUES
   practice: {
     id: "sql-l2-ctes-practice",
     executionMode: "single-file",
-    prompt: `Author a three-stage transform with CTEs: the staging → intermediate → mart structure of
-production SQL.
-
-- **Stage 1** \`paid_orders\`: paid orders only, joined to their line items, computing each line's
-  revenue (\`quantity * unit_price_cents\`).
-- **Stage 2** \`per_customer\`: revenue and order count per customer.
-- **Final:** customers with **more than 1 order** AND **revenue over 10000**, returning
-  \`customer_id\`, \`order_count\`, \`revenue\`, sorted by \`revenue\` descending.`,
+    prompt: `Write a query that returns one row per customer with \`customer_id\`, \`order_count\`, and
+\`revenue\`, keeping only customers who have **more than 1** paid order and **more than 10000** in total
+revenue, sorted by \`revenue\` descending. Revenue is the sum of each paid order line's
+\`quantity * unit_price_cents\`, and \`order_count\` is the count of distinct paid orders. Build it as
+three CTE stages like a production pipeline: \`paid_orders\` (paid orders joined to their line items,
+each line's revenue), \`per_customer\` (revenue and distinct order count per customer), then a final
+\`SELECT\` that applies the filter and sort.`,
     starterCode: `-- Three stages: paid_orders (join), per_customer (aggregate), then the mart filter.
 WITH paid_orders AS (
 

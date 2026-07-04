@@ -128,11 +128,12 @@ INSERT INTO product_revenue VALUES
   },
   apply: scriptExercise({
     id: "sql-l4-window-ranking-apply",
-    prompt: `Build a **top-3-products-per-category** mart. From \`fact_sales\`, aggregate revenue per
-\`(category, product)\`, then keep only the three highest-revenue products *within each category*. Use
-the ranking function that assigns **unique slot numbers** (so exactly three rows survive per category)
-and keep rows whose slot is \`<= 3\`. Write the result into the pre-created \`top_products(category,
-product, revenue, rank_in_category)\` table.
+    prompt: `Write a script that populates the pre-created \`top_products(category, product, revenue,
+rank_in_category)\` table with the **three highest-revenue products in each category**, one row per
+product. \`revenue\` is that product's total revenue (sum its \`fact_sales\` rows per
+\`(category, product)\`) and \`rank_in_category\` is its 1-based slot within the category ordered by
+revenue descending. Rank with the function that assigns **unique slot numbers** (so exactly three rows
+survive per category) and keep the rows whose slot is \`<= 3\`.
 
 The target table is seeded **empty**. Lead your load with \`DELETE FROM top_products;\` so the script
 is safe to re-run.`,
@@ -3004,8 +3005,9 @@ grader re-runs your whole script to prove it changes nothing the second time.`,
   },
   apply: scriptExercise({
     id: "sql-l4-capstone-apply",
-    prompt: `Wire the **dedup step to the SCD2 apply step** for a single-day load. Given a raw dump
-\`raw_dump\` (with duplicate \`customer_code\`s) and a Type-2 \`dim_customer\`:
+    prompt: `Update the Type-2 \`dim_customer\` for a single-day load by deduplicating the raw dump and
+then versioning every customer whose city changed. Given a raw dump \`raw_dump\` (with duplicate
+\`customer_code\`s) and a Type-2 \`dim_customer\`:
 
 1. **Dedup** \`raw_dump\` to one row per \`customer_code\`, keeping the latest \`updated_at\` (this picks
    the Berlin row for \`C1\`).

@@ -58,8 +58,9 @@ export const sqlCtesDrills: SqlExercise[] = [
   {
     id: "sql-l2-ctes-drill1",
     executionMode: "single-file",
-    prompt: `**Easy.** Using a CTE named \`big_orders\` that selects the \`order_id\` and \`total_cents\` of orders
-with \`total_cents >= 5000\`, return those two columns ordered by \`order_id\`.`,
+    prompt: `**Easy.** Write a query that returns \`order_id\` and \`total_cents\` for orders with
+\`total_cents >= 5000\`, ordered by \`order_id\`. Build it with a CTE named \`big_orders\` that selects those two
+columns and applies the filter, then select from it.`,
     starterCode: `WITH big_orders AS (
   -- select order_id, total_cents for orders of 5000 cents or more
 )
@@ -81,15 +82,23 @@ ORDER BY order_id;`,
     singleFile: {
       seedSql: CTE_SEED,
       orderMatters: true,
-      expected: { columns: ["order_id", "total_cents"], rows: [[2, 6000], [3, 9000], [4, 5000]] },
+      expected: {
+        columns: ["order_id", "total_cents"],
+        rows: [
+          [2, 6000],
+          [3, 9000],
+          [4, 5000],
+        ],
+      },
     },
   },
   {
     id: "sql-l2-ctes-drill2",
     executionMode: "single-file",
-    prompt: `**Medium.** Chain two CTEs. First \`paid\` selects paid orders; then \`per_customer\` sums
-\`total_cents\` per customer. Return \`customer_id\` and \`revenue\` for customers whose revenue is at least
-\`8000\`, ordered by \`customer_id\`.`,
+    prompt: `**Medium.** Write a query that returns \`customer_id\` and \`revenue\` for customers whose paid
+revenue is at least \`8000\`, ordered by \`customer_id\`. Revenue is the sum of \`total_cents\` across a
+customer's paid orders. Build it as two chained CTEs: \`paid\` (paid orders only), then \`per_customer\`
+(sum \`total_cents\` per customer, reading from \`paid\`), and apply the \`8000\` cutoff in the final SELECT.`,
     starterCode: `WITH paid AS (
   -- paid orders only
 ),
@@ -117,14 +126,22 @@ ORDER BY customer_id;`,
     singleFile: {
       seedSql: CTE_SEED,
       orderMatters: true,
-      expected: { columns: ["customer_id", "revenue"], rows: [[1, 9000], [2, 9000]] },
+      expected: {
+        columns: ["customer_id", "revenue"],
+        rows: [
+          [1, 9000],
+          [2, 9000],
+        ],
+      },
     },
   },
   {
     id: "sql-l2-ctes-drill3",
     executionMode: "single-file",
-    prompt: `**Hard.** A CTE \`customer_totals\` sums paid revenue per customer; join it back to \`customers\` to
-return \`customer_name\` and \`revenue\`, ordered by \`revenue\` descending, then \`customer_name\`.`,
+    prompt: `**Hard.** Write a query that returns \`customer_name\` and \`revenue\` for each customer, where
+revenue is the sum of \`total_cents\` across that customer's paid orders, ordered by \`revenue\` descending,
+then \`customer_name\`. Build a CTE \`customer_totals\` that sums paid revenue per \`customer_id\`, then join it
+back to \`customers\` to get the name.`,
     starterCode: `WITH customer_totals AS (
   -- SUM(total_cents) AS revenue per customer, paid orders only
 )
@@ -150,7 +167,11 @@ ORDER BY t.revenue DESC, c.customer_name;`,
       orderMatters: true,
       expected: {
         columns: ["customer_name", "revenue"],
-        rows: [["Ava", 9000], ["Ben", 9000], ["Cara", 6000]],
+        rows: [
+          ["Ava", 9000],
+          ["Ben", 9000],
+          ["Cara", 6000],
+        ],
       },
     },
   },
@@ -229,7 +250,13 @@ ORDER BY order_id;`,
     singleFile: {
       seedSql: SUBQ_ORDERS_SEED,
       orderMatters: true,
-      expected: { columns: ["order_id", "total_cents"], rows: [[2, 4000], [5, 9000]] },
+      expected: {
+        columns: ["order_id", "total_cents"],
+        rows: [
+          [2, 4000],
+          [5, 9000],
+        ],
+      },
     },
   },
 ]
@@ -245,7 +272,10 @@ the total revenue as \`total_cents\`.`,
   -- COUNT of all rows AS order_count,
   -- SUM of total_cents AS total_cents
 FROM orders;`,
-    hints: ["`COUNT(*)` counts rows; `SUM(total_cents)` adds the column.", "No GROUP BY: one row for the whole table."],
+    hints: [
+      "`COUNT(*)` counts rows; `SUM(total_cents)` adds the column.",
+      "No GROUP BY: one row for the whole table.",
+    ],
     referenceSolution: `SELECT COUNT(*) AS order_count, SUM(total_cents) AS total_cents
 FROM orders;`,
     singleFile: {
@@ -262,7 +292,10 @@ FROM orders;`,
 FROM orders
 GROUP BY status
 ORDER BY status;`,
-    hints: ["Group by the column you want one row per: `GROUP BY status`.", "Aggregates (`COUNT(*)`, `SUM(...)`) collapse each group to one row."],
+    hints: [
+      "Group by the column you want one row per: `GROUP BY status`.",
+      "Aggregates (`COUNT(*)`, `SUM(...)`) collapse each group to one row.",
+    ],
     referenceSolution: `SELECT status, COUNT(*) AS order_count, SUM(total_cents) AS total_cents
 FROM orders
 GROUP BY status
@@ -272,7 +305,11 @@ ORDER BY status;`,
       orderMatters: true,
       expected: {
         columns: ["status", "order_count", "total_cents"],
-        rows: [["cancelled", 1, 5000], ["paid", 4, 20000], ["refunded", 1, 4000]],
+        rows: [
+          ["cancelled", 1, 5000],
+          ["paid", 4, 20000],
+          ["refunded", 1, 4000],
+        ],
       },
     },
   },
@@ -298,7 +335,14 @@ ORDER BY customer_id;`,
     singleFile: {
       seedSql: AGG_SEED,
       orderMatters: true,
-      expected: { columns: ["customer_id", "paid_revenue"], rows: [[1, 9000], [2, 9000], [3, 2000]] },
+      expected: {
+        columns: ["customer_id", "paid_revenue"],
+        rows: [
+          [1, 9000],
+          [2, 9000],
+          [3, 2000],
+        ],
+      },
     },
   },
 ]
@@ -315,7 +359,10 @@ FROM orders
 GROUP BY customer_id
 -- keep only groups with more than 2 orders
 ORDER BY customer_id;`,
-    hints: ["Filter groups with `HAVING`, not `WHERE` (WHERE can't see `COUNT(*)`).", "`HAVING COUNT(*) > 2`."],
+    hints: [
+      "Filter groups with `HAVING`, not `WHERE` (WHERE can't see `COUNT(*)`).",
+      "`HAVING COUNT(*) > 2`.",
+    ],
     referenceSolution: `SELECT customer_id, COUNT(*) AS order_count
 FROM orders
 GROUP BY customer_id
@@ -351,7 +398,13 @@ ORDER BY customer_id;`,
     singleFile: {
       seedSql: HAVING_SEED,
       orderMatters: true,
-      expected: { columns: ["customer_id", "paid_revenue"], rows: [[1, 10000], [2, 9000]] },
+      expected: {
+        columns: ["customer_id", "paid_revenue"],
+        rows: [
+          [1, 10000],
+          [2, 9000],
+        ],
+      },
     },
   },
   {
@@ -394,7 +447,10 @@ Order by \`order_id\`.`,
 FROM orders o
 JOIN customers c ON /* match customer_id */
 ORDER BY o.order_id;`,
-    hints: ["Join on the shared key: `ON c.customer_id = o.customer_id`.", "An inner join keeps only orders that have a matching customer."],
+    hints: [
+      "Join on the shared key: `ON c.customer_id = o.customer_id`.",
+      "An inner join keeps only orders that have a matching customer.",
+    ],
     referenceSolution: `SELECT o.order_id, c.customer_name
 FROM orders o
 JOIN customers c ON c.customer_id = o.customer_id
@@ -404,7 +460,12 @@ ORDER BY o.order_id;`,
       orderMatters: true,
       expected: {
         columns: ["order_id", "customer_name"],
-        rows: [[1, "Ava"], [2, "Ava"], [3, "Ben"], [4, "Cara"]],
+        rows: [
+          [1, "Ava"],
+          [2, "Ava"],
+          [3, "Ben"],
+          [4, "Cara"],
+        ],
       },
     },
   },
@@ -432,7 +493,12 @@ ORDER BY oi.item_id;`,
       orderMatters: true,
       expected: {
         columns: ["customer_name", "product"],
-        rows: [["Ava", "Pen"], ["Ava", "Mug"], ["Ben", "Bag"], ["Cara", "Pen"]],
+        rows: [
+          ["Ava", "Pen"],
+          ["Ava", "Mug"],
+          ["Ben", "Bag"],
+          ["Cara", "Pen"],
+        ],
       },
     },
   },
@@ -460,7 +526,11 @@ ORDER BY revenue DESC, c.customer_name;`,
       orderMatters: true,
       expected: {
         columns: ["customer_name", "revenue"],
-        rows: [["Ava", 9000], ["Ben", 9000], ["Cara", 2000]],
+        rows: [
+          ["Ava", 9000],
+          ["Ben", 9000],
+          ["Cara", 2000],
+        ],
       },
     },
   },
@@ -491,7 +561,13 @@ ORDER BY c.customer_name, o.order_id;`,
       orderMatters: true,
       expected: {
         columns: ["customer_name", "order_id"],
-        rows: [["Ava", 1], ["Ava", 2], ["Ben", null], ["Cara", 3], ["Dan", null]],
+        rows: [
+          ["Ava", 1],
+          ["Ava", 2],
+          ["Ben", null],
+          ["Cara", 3],
+          ["Dan", null],
+        ],
       },
     },
   },
@@ -544,7 +620,12 @@ ORDER BY c.customer_name;`,
       orderMatters: true,
       expected: {
         columns: ["customer_name", "order_count"],
-        rows: [["Ava", 2], ["Ben", 0], ["Cara", 1], ["Dan", 0]],
+        rows: [
+          ["Ava", 2],
+          ["Ben", 0],
+          ["Cara", 1],
+          ["Dan", 0],
+        ],
       },
     },
   },
@@ -747,7 +828,12 @@ ORDER BY month;`,
       orderMatters: true,
       expected: {
         columns: ["month", "delta"],
-        rows: [["2024-01", null], ["2024-02", 500], ["2024-03", -300], ["2024-04", 800]],
+        rows: [
+          ["2024-01", null],
+          ["2024-02", 500],
+          ["2024-03", -300],
+          ["2024-04", 800],
+        ],
       },
     },
   },
