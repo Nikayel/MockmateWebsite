@@ -3231,6 +3231,763 @@ CREATE TABLE dq_results (test_name TEXT, violations INTEGER);`,
   }),
 }
 
+const snowflake: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-snowflake",
+  title: "Star vs Snowflake Schemas",
+  summary:
+    "Denormalize a wide star dimension into a snowflake sub-dimension, then pay the extra join to query it.",
+  estimatedMinutes: 22,
+  difficulty: "medium",
+  skills: [
+    "star schema",
+    "snowflake schema",
+    "normalization",
+    "denormalization",
+    "dimension modeling",
+    "surrogate keys",
+    "multi-join aggregation",
+  ],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Why warehouses argue about this on day one
+
+You loaded a \`dim_product\` table last sprint, and it carries \`category_name\` and \`category_manager\` right on the product row. "Revenue by manager" is then a single join from \`fact_sales\` to \`dim_product\`. Now a teammate asks you to store each manager once instead of repeating it across 40,000 product rows. That one request is the entire star vs snowflake debate, and interviewers open with it because it reveals whether you understand the read-versus-normalize trade-off that shapes every warehouse.
+
+## The mental model
+
+A **star schema** keeps each dimension wide and **denormalized**: one \`dim_product\` row holds every descriptive attribute, including \`category_name\` and \`category_manager\`, even though thousands of products repeat the same category. A **snowflake schema** **normalizes** that dimension into sub-dimensions: \`dim_product\` drops the repeated category columns and instead stores a \`category_key\` pointing at a separate \`dim_category(category_key, category_name, category_manager)\`. The category attributes now live in exactly one place.
+
+The trade is precise. Snowflaking removes redundancy and gives you **one source of truth** for the shared sub-attribute, so renaming a manager updates one row instead of thousands. The cost is that **every query pays an extra join**. Star is the BI default: fewer joins, simpler SQL, and columnar engines make the wide dimension cheap to scan, so the redundancy barely hurts. Snowflaking earns its keep only when a sub-hierarchy is **large and shared** across several dimensions or facts, so normalizing it once beats copying it everywhere.
+
+## A worked example
+
+Given a snowflake (\`fact_sales\` to \`dim_product\` to \`dim_category\`), revenue by manager needs both joins:
+
+\`\`\`sql
+SELECT c.category_manager, SUM(f.revenue) AS revenue
+FROM fact_sales f
+JOIN dim_product  p ON p.product_key  = f.product_key
+JOIN dim_category c ON c.category_key = p.category_key
+GROUP BY c.category_manager;
+\`\`\`
+
+With Priya managing Audio and Marco managing Video, this returns Marco \`600\` and Priya \`300\`. In a star, \`category_manager\` already sits on \`dim_product\`, so you drop the second join entirely and get the same answer with one fewer hop. The seeded tables, this query, and its live result render below.
+
+## A pitfall interns hit
+
+Forgetting the second join returns wrong groupings. Group by \`category_key\` instead of \`category_manager\` and a manager who owns two categories splits into two rows that no longer reconcile to a single total. The opposite failure is over-snowflaking: a sub-dimension for every attribute turns routine reports into join marathons that are slower to write and slower to run.
+
+**Interview nuance:** star vs snowflake is a read-simplicity and performance trade-off against normalization, and most warehouses ship star or "starflake" because BI tools slice a denormalized dimension with a single join.`,
+    demoCode: `SELECT
+  c.category_manager,
+  SUM(f.revenue) AS revenue
+FROM fact_sales f
+JOIN dim_product  p ON p.product_key  = f.product_key
+JOIN dim_category c ON c.category_key = p.category_key
+GROUP BY c.category_manager
+ORDER BY revenue DESC;`,
+    demoSeedSql: `CREATE TABLE dim_category (
+  category_key     INTEGER PRIMARY KEY,
+  category_name    TEXT,
+  category_manager TEXT
+);
+INSERT INTO dim_category VALUES
+  (1, 'Audio', 'Priya'),
+  (2, 'Video', 'Marco');
+
+CREATE TABLE dim_product (
+  product_key  INTEGER PRIMARY KEY,
+  sku          TEXT,
+  product_name TEXT,
+  category_key INTEGER
+);
+INSERT INTO dim_product VALUES
+  (1, 'SKU-EAR', 'Earbuds',    1),
+  (2, 'SKU-HDP', 'Headphones', 1),
+  (3, 'SKU-MON', 'Monitor',    2),
+  (4, 'SKU-CAM', 'Webcam',     2);
+
+CREATE TABLE fact_sales (
+  sale_id     INTEGER PRIMARY KEY,
+  product_key INTEGER,
+  revenue     INTEGER
+);
+INSERT INTO fact_sales VALUES
+  (1, 1, 100),
+  (2, 2, 150),
+  (3, 1, 50),
+  (4, 3, 400),
+  (5, 4, 200);`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-snowflake-apply",
+    prompt: `Snowflake a denormalized product dimension. \`dim_product_wide(product_key, sku, product_name, category_name, category_manager)\` is seeded and repeats the category columns across products. Build \`dim_category(category_key, category_name, category_manager)\` from the DISTINCT categories (let \`category_key\` auto-assign), then rebuild \`dim_product(product_key, sku, product_name, category_key)\` so each product references its category by \`category_key\` instead of carrying the repeated columns. Preserve all six products and keep each \`product_key\` from the source. Expected: \`dim_category\` = 3 rows (one per distinct category), \`dim_product\` = 6 rows with zero orphan \`category_key\` values. Lead with \`DELETE FROM\` both targets (product before category) so the load re-runs cleanly.`,
+    starterCode: `-- dim_product_wide (the denormalized "star" product dim) is seeded and holds the
+-- repeated category_name + category_manager columns. dim_category and dim_product
+-- (the snowflaked target: product_key, sku, product_name, category_key) exist but are empty.
+
+-- Make the load re-runnable: clear the targets first (product references category, so delete it first).
+DELETE FROM dim_product;
+DELETE FROM dim_category;
+
+-- 1. Build dim_category from the DISTINCT categories; let category_key auto-assign.
+-- INSERT INTO dim_category (category_name, category_manager)
+-- SELECT DISTINCT ... FROM dim_product_wide;
+
+-- 2. Rebuild dim_product to reference category_key instead of the repeated columns.
+--    Join dim_product_wide to dim_category on category_name to fetch each category_key.
+-- INSERT INTO dim_product (product_key, sku, product_name, category_key)
+-- SELECT w.product_key, w.sku, w.product_name, c.category_key
+-- FROM dim_product_wide w JOIN dim_category c ON ...;`,
+    hints: [
+      `Clear the targets first: \`DELETE FROM dim_product;\` then \`DELETE FROM dim_category;\`. Product references category, so delete the product rows first; a second run then reproduces the same rows.`,
+      `Build the sub-dimension with \`INSERT INTO dim_category (category_name, category_manager) SELECT DISTINCT category_name, category_manager FROM dim_product_wide;\`. \`DISTINCT\` collapses the repeated categories to one row each, and \`category_key\` auto-assigns.`,
+      `Rebuild the product dim by joining back on the shared attribute: \`SELECT w.product_key, w.sku, w.product_name, c.category_key FROM dim_product_wide w JOIN dim_category c ON c.category_name = w.category_name;\`. That swaps the repeated columns for a single \`category_key\`.`,
+      `Do not forget \`DISTINCT\` on the category load. Without it \`dim_category\` gets one row per product, the join fans out, and your product grain doubles.`,
+    ],
+    referenceSolution: `DELETE FROM dim_product;
+DELETE FROM dim_category;
+
+INSERT INTO dim_category (category_name, category_manager)
+SELECT DISTINCT category_name, category_manager
+FROM dim_product_wide;
+
+INSERT INTO dim_product (product_key, sku, product_name, category_key)
+SELECT w.product_key, w.sku, w.product_name, c.category_key
+FROM dim_product_wide w
+JOIN dim_category c ON c.category_name = w.category_name;`,
+    seedSql: `CREATE TABLE dim_product_wide (
+  product_key      INTEGER PRIMARY KEY,
+  sku              TEXT,
+  product_name     TEXT,
+  category_name    TEXT,
+  category_manager TEXT
+);
+INSERT INTO dim_product_wide VALUES
+  (1, 'SKU-EAR', 'Earbuds',    'Audio',   'Priya'),
+  (2, 'SKU-HDP', 'Headphones', 'Audio',   'Priya'),
+  (3, 'SKU-MON', 'Monitor',    'Video',   'Marco'),
+  (4, 'SKU-CAM', 'Webcam',     'Video',   'Marco'),
+  (5, 'SKU-SSD', 'SSD',        'Storage', 'Dana'),
+  (6, 'SKU-HDD', 'HDD',        'Storage', 'Dana');
+
+CREATE TABLE dim_category (
+  category_key     INTEGER PRIMARY KEY,
+  category_name    TEXT,
+  category_manager TEXT
+);
+CREATE TABLE dim_product (
+  product_key  INTEGER PRIMARY KEY,
+  sku          TEXT,
+  product_name TEXT,
+  category_key INTEGER NOT NULL REFERENCES dim_category(category_key)
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "sub-dimension",
+        name: "dim_category holds one row per distinct source category",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_category) <> (SELECT COUNT(DISTINCT category_name) FROM dim_product_wide) OR (SELECT COUNT(DISTINCT category_key) FROM dim_category) <> (SELECT COUNT(DISTINCT category_name) FROM dim_product_wide)`,
+      },
+      {
+        suite: "sub-dimension",
+        name: "one source of truth: no category_name appears twice in dim_category",
+        isHidden: true,
+        sql: `SELECT category_name FROM dim_category GROUP BY category_name HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "grain",
+        name: "every source product survived (product count preserved)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_product) <> (SELECT COUNT(*) FROM dim_product_wide)`,
+      },
+      {
+        suite: "integrity",
+        name: "zero orphan products: every category_key resolves to a dim_category row",
+        isHidden: true,
+        sql: `SELECT p.product_key FROM dim_product p LEFT JOIN dim_category c ON c.category_key = p.category_key WHERE c.category_key IS NULL`,
+      },
+      {
+        suite: "integrity",
+        name: "each product resolves to its original category and manager",
+        isHidden: true,
+        sql: `SELECT p.product_key FROM dim_product p JOIN dim_category c ON c.category_key = p.category_key JOIN dim_product_wide w ON w.product_key = p.product_key WHERE c.category_name <> w.category_name OR c.category_manager <> w.category_manager`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-snowflake-practice",
+    prompt: `Write a load that fills \`revenue_by_manager(category_manager, total_revenue)\` with total revenue per \`category_manager\`. The snowflake \`fact_sales\` to \`dim_product\` to \`dim_category\` is seeded, and \`category_manager\` lives only on \`dim_category\`, so you must join \`fact_sales\` to \`dim_product\` (on \`product_key\`) to \`dim_category\` (on \`category_key\`) and \`GROUP BY c.category_manager\`. Expected output: two rows, \`Priya\` = 720 (she manages two categories) and \`Marco\` = 680. Lead with \`DELETE FROM revenue_by_manager;\` so the load re-runs cleanly.`,
+    starterCode: `-- A snowflake is seeded: fact_sales -> dim_product -> dim_category.
+-- The empty report table revenue_by_manager(category_manager, total_revenue) is waiting.
+
+-- Make the load re-runnable: clear the report first.
+DELETE FROM revenue_by_manager;
+
+-- Revenue by category_manager needs BOTH joins: fact -> dim_product -> dim_category.
+-- INSERT INTO revenue_by_manager (category_manager, total_revenue)
+-- SELECT c.category_manager, SUM(f.revenue)
+-- FROM fact_sales f
+-- JOIN dim_product  p ON ...
+-- JOIN dim_category c ON ...
+-- GROUP BY c.category_manager;`,
+    hints: [
+      `\`category_manager\` is not on \`dim_product\`; it lives on \`dim_category\`. You need two joins: \`fact_sales\` to \`dim_product\` on \`product_key\`, then \`dim_product\` to \`dim_category\` on \`category_key\`.`,
+      `Aggregate at the manager grain: \`GROUP BY c.category_manager\`, not \`GROUP BY p.category_key\`. Priya manages two categories, so grouping by category would split her into two rows that never combine.`,
+      `Insert the result: \`INSERT INTO revenue_by_manager (category_manager, total_revenue) SELECT c.category_manager, SUM(f.revenue) FROM fact_sales f JOIN dim_product p ON p.product_key = f.product_key JOIN dim_category c ON c.category_key = p.category_key GROUP BY c.category_manager;\`.`,
+    ],
+    seedSql: `CREATE TABLE dim_category (
+  category_key     INTEGER PRIMARY KEY,
+  category_name    TEXT,
+  category_manager TEXT
+);
+INSERT INTO dim_category VALUES
+  (1, 'Audio',       'Priya'),
+  (2, 'Accessories', 'Priya'),
+  (3, 'Video',       'Marco');
+
+CREATE TABLE dim_product (
+  product_key  INTEGER PRIMARY KEY,
+  sku          TEXT,
+  product_name TEXT,
+  category_key INTEGER NOT NULL REFERENCES dim_category(category_key)
+);
+INSERT INTO dim_product VALUES
+  (1, 'SKU-EAR', 'Earbuds',    1),
+  (2, 'SKU-HDP', 'Headphones', 1),
+  (3, 'SKU-CAB', 'HDMI Cable', 2),
+  (4, 'SKU-MON', 'Monitor',    3),
+  (5, 'SKU-CAM', 'Webcam',     3);
+
+CREATE TABLE fact_sales (
+  sale_id     INTEGER PRIMARY KEY,
+  product_key INTEGER NOT NULL REFERENCES dim_product(product_key),
+  revenue     INTEGER
+);
+INSERT INTO fact_sales VALUES
+  (1, 1, 100),
+  (2, 1, 100),
+  (3, 2, 300),
+  (4, 3, 220),
+  (5, 4, 400),
+  (6, 5, 280);
+
+CREATE TABLE revenue_by_manager (
+  category_manager TEXT,
+  total_revenue    INTEGER
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "grain",
+        name: "revenue_by_manager holds exactly one row per manager (two total)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM revenue_by_manager) <> 2`,
+      },
+      {
+        suite: "grain",
+        name: "no category_manager appears more than once",
+        isHidden: true,
+        sql: `SELECT category_manager FROM revenue_by_manager GROUP BY category_manager HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "totals",
+        name: "Priya rolls up both her categories to 720",
+        sql: `SELECT 1 WHERE (SELECT total_revenue FROM revenue_by_manager WHERE category_manager = 'Priya') <> 720`,
+      },
+      {
+        suite: "totals",
+        name: "Marco totals 680",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT total_revenue FROM revenue_by_manager WHERE category_manager = 'Marco') <> 680`,
+      },
+      {
+        suite: "totals",
+        name: "report reconciles to total fact_sales revenue",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT COALESCE(SUM(total_revenue),0) FROM revenue_by_manager) <> (SELECT SUM(revenue) FROM fact_sales)`,
+      },
+    ],
+  }),
+}
+
+const factTypes: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-fact-types",
+  title: "Fact Table Types and Measure Additivity",
+  summary:
+    "Classify fact tables by grain and use measure additivity to decide which sums are valid: correctly roll up a semi-additive balance and recompute a non-additive ratio from additive parts.",
+  estimatedMinutes: 20,
+  difficulty: "medium",
+  skills: [
+    "fact table grain",
+    "transaction fact",
+    "periodic snapshot",
+    "accumulating snapshot",
+    "additive measures",
+    "semi-additive measures",
+    "non-additive measures",
+    "ROW_NUMBER",
+  ],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Why "can I sum this column?" is a real question
+
+Every warehouse metric is a \`SUM\`, \`AVG\`, or \`COUNT\` rolled up over some dimensions. The dangerous assumption is that any numeric column can be summed over any dimension. It cannot. Roll a bank balance up over time and you invent money that never existed. Additivity is the rule that tells you which aggregations are valid, and interviewers probe it because getting it wrong ships a dashboard that looks perfectly reasonable and is quietly wrong.
+
+## Three fact tables, told apart by grain
+
+A fact table's grain is what one row means. Three shapes cover almost everything:
+
+- **Transaction fact**: one row per event (\`fact_sales\`, one row per line item). Its measures are fully additive: sum revenue across any dimension you like.
+- **Periodic snapshot**: one row per entity per period (\`fact_daily_balance\`, one row per account per day). You capture a level at a point in time, not an event.
+- **Accumulating snapshot**: one row per process instance, updated in place as it clears milestones. An order row carries \`order_date\`, \`ship_date\`, and \`deliver_date\`, and each column fills in as the order moves. You measure the lag between milestones.
+
+## Three kinds of measure
+
+- **Additive**: sum across all dimensions (revenue, quantity, order count).
+- **Semi-additive**: sum across some dimensions but not time (account balance, inventory on hand, headcount). To collapse time, take the period-end value or an average, never a sum.
+- **Non-additive**: never sum, not even across entities (ratios, percentages, unit prices). Recompute them from their additive parts.
+
+## Worked example: a daily balance snapshot
+
+\`fact_daily_balance\` holds two accounts over three days. The input table, the query, and its live result render below.
+
+Balance is semi-additive. Summing across accounts on the latest day gives today's total assets, \`1200 + 900 = 2100\`, a real number. Summing the same column across all rows gives \`5900\`, which means nothing: it folds Monday's and Tuesday's money into Wednesday's total. Same column, one legal roll-up and one meaningless one, decided entirely by whether you crossed the time dimension.
+
+## The trap interns hit
+
+The classic warehouse bug is \`SUM(balance)\` over a date range on a periodic snapshot. It runs, returns a big confident number, and is wrong. The fix is to pick one row per entity first (each account's latest date via \`ROW_NUMBER\`), then sum those. For a non-additive measure the parallel trap is \`AVG\` of a per-row ratio: overall average order value is \`SUM(revenue) / SUM(order_count)\`, never \`AVG(revenue / order_count)\`, because averaging ratios weights a four-order day the same as a four-hundred-order day.
+
+**Interview nuance:** when an interviewer hands you a \`daily_balance\` or \`inventory\` table and asks for a total, the answer they are listening for is "balances are semi-additive, so I take each entity's latest-period value and sum those, I never sum a balance across time."
+
+**Recap:** transaction facts are fully additive; periodic snapshots are semi-additive (sum across entities, take period-end over time); accumulating snapshots track milestone lags; non-additive ratios get recomputed from additive parts. Additivity decides which aggregation is legal.`,
+    demoCode: `SELECT
+  'sum across accounts on the latest day (VALID)' AS calculation,
+  SUM(balance)                                    AS result
+FROM fact_daily_balance
+WHERE date_key = (SELECT MAX(date_key) FROM fact_daily_balance)
+UNION ALL
+SELECT
+  'sum across ALL days (MEANINGLESS)',
+  SUM(balance)
+FROM fact_daily_balance;`,
+    demoSeedSql: `CREATE TABLE fact_daily_balance (
+  account_key INTEGER,
+  date_key    TEXT,
+  balance     INTEGER
+);
+INSERT INTO fact_daily_balance VALUES
+  (1, '2026-03-01', 1000),
+  (1, '2026-03-02', 1500),
+  (1, '2026-03-03', 1200),
+  (2, '2026-03-01',  500),
+  (2, '2026-03-02',  800),
+  (2, '2026-03-03',  900);`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-fact-types-apply",
+    prompt: `Write a script that fills the pre-created \`current_balance(account_key, balance)\` table with the CURRENT balance of every account: one row per account, holding that account's balance on its own LATEST \`date_key\`. \`balance\` is a semi-additive measure, so the current total is each account's most recent balance summed, not \`SUM(balance)\` over every row. Watch out: some accounts stop reporting before the newest date in the table, so you must use each account's own latest date, not the global maximum date. Expected result: three rows (accounts 1, 2, and 3) whose balances sum to a current total of 2800. The target is seeded empty; lead your load with \`DELETE FROM current_balance;\` so the script is safe to re-run.`,
+    starterCode: `-- fact_daily_balance (account_key, date_key, balance) and the empty
+-- current_balance (account_key, balance) table are already seeded.
+DELETE FROM current_balance;   -- re-runnable: clear before you repopulate
+
+-- Goal: one row per account = its balance on its LATEST date_key.
+-- balance is SEMI-ADDITIVE, so never SUM it across time; pick the latest row per account.
+-- INSERT INTO current_balance (account_key, balance)
+-- SELECT account_key, balance FROM (
+--   SELECT account_key, balance,
+--          ROW_NUMBER() OVER (PARTITION BY account_key ORDER BY ____ ) AS rn
+--   FROM fact_daily_balance
+-- ) ranked
+-- WHERE rn = 1;`,
+    hints: [
+      `The current total is each account's latest balance summed. First find each account's most recent \`date_key\`, which can differ from account to account, then read that day's balance.`,
+      `\`ROW_NUMBER() OVER (PARTITION BY account_key ORDER BY date_key DESC)\` numbers each account's rows newest-first. Wrap that in a subquery and keep \`WHERE rn = 1\` to grab the latest row per account.`,
+      `Do not \`SUM(balance)\` over the whole table or per account: that sums across time and inflates the total. The only sum that is valid happens when the grader adds up your one-row-per-account values.`,
+      `Account 3 has no row on the newest date in the table, so a \`WHERE date_key = (SELECT MAX(date_key) ...)\` filter would silently drop it. Rank per account instead so each account keeps its own latest date.`,
+    ],
+    referenceSolution: `DELETE FROM current_balance;
+
+INSERT INTO current_balance (account_key, balance)
+SELECT account_key, balance
+FROM (
+  SELECT account_key, balance,
+         ROW_NUMBER() OVER (PARTITION BY account_key ORDER BY date_key DESC) AS rn
+  FROM fact_daily_balance
+) ranked
+WHERE rn = 1;`,
+    seedSql: `DROP TABLE IF EXISTS fact_daily_balance;
+CREATE TABLE fact_daily_balance (
+  account_key INTEGER NOT NULL,
+  date_key    TEXT NOT NULL,        -- ISO date 'YYYY-MM-DD'
+  balance     INTEGER NOT NULL      -- end-of-day balance (semi-additive)
+);
+INSERT INTO fact_daily_balance (account_key, date_key, balance) VALUES
+  (1, '2026-03-01', 1000), (1, '2026-03-02', 1500), (1, '2026-03-03', 1200),
+  (2, '2026-03-01',  500), (2, '2026-03-02',  800), (2, '2026-03-03',  900),
+  (3, '2026-03-01',  300), (3, '2026-03-02',  700);
+
+DROP TABLE IF EXISTS current_balance;
+CREATE TABLE current_balance (
+  account_key INTEGER,
+  balance     INTEGER
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "current_balance holds exactly three rows (one per account)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM current_balance) <> 3`,
+      },
+      {
+        suite: "grain",
+        name: "each account appears at most once",
+        sql: `SELECT account_key FROM current_balance GROUP BY account_key HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "additivity",
+        name: "current total balance is 2800 (each account's latest balance, summed)",
+        sql: `SELECT 1 WHERE (SELECT SUM(balance) FROM current_balance) <> 2800`,
+      },
+      {
+        suite: "additivity",
+        name: "account 3, which stopped reporting before the newest date, is included at its latest balance 700",
+        sql: `SELECT 1 WHERE COALESCE((SELECT balance FROM current_balance WHERE account_key = 3), -1) <> 700`,
+      },
+      {
+        suite: "additivity",
+        name: "account 1's current balance is its latest day (1200), not a sum across days",
+        sql: `SELECT 1 WHERE COALESCE((SELECT balance FROM current_balance WHERE account_key = 1), -1) <> 1200`,
+      },
+      {
+        suite: "additivity",
+        name: "no account's balance equals its sum across all days (the semi-additive trap)",
+        isHidden: true,
+        sql: `SELECT cb.account_key FROM current_balance cb WHERE cb.balance = (SELECT SUM(f.balance) FROM fact_daily_balance f WHERE f.account_key = cb.account_key)`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-fact-types-practice",
+    prompt: `Write a script that inserts exactly one row into the pre-created \`sales_report(metric, value)\` table: \`metric = 'overall_aov'\` and \`value\` = the overall average order value across all days in \`fact_daily_sales\`. Average order value is a NON-ADDITIVE measure, so recompute it from its additive parts: \`value = SUM(revenue) / SUM(order_count)\`, not \`AVG(revenue / order_count)\`. Force decimal division with \`* 1.0\` so integer truncation does not round the answer down. Expected result: one row whose \`value\` is about 111.76. The target is seeded empty; lead your load with \`DELETE FROM sales_report;\` so the script is safe to re-run.`,
+    starterCode: `-- fact_daily_sales (day, revenue, order_count) and the empty
+-- sales_report (metric, value) table are already seeded.
+DELETE FROM sales_report;   -- re-runnable: clear before you repopulate
+
+-- overall AOV is NON-ADDITIVE: recompute from additive parts, never AVG the per-day ratios.
+-- Force decimal division with * 1.0 so integer division does not truncate.
+-- INSERT INTO sales_report (metric, value)
+-- SELECT 'overall_aov', SUM(______) * 1.0 / SUM(______)
+-- FROM fact_daily_sales;`,
+    hints: [
+      `Average order value is total revenue divided by total orders. Sum the two additive columns first, then divide the sums; do not average a per-row ratio.`,
+      `\`AVG(revenue / order_count)\` is the trap: it weights every day equally and ignores how many orders each day had. Use \`SUM(revenue) * 1.0 / SUM(order_count)\` instead.`,
+      `Both \`revenue\` and \`order_count\` are integers, so \`SUM(revenue) / SUM(order_count)\` does integer division and truncates 111.76 down to 111. Multiply by \`1.0\` (or \`CAST(... AS REAL)\`) before dividing.`,
+      `The finished row is \`metric = 'overall_aov'\` with \`value\` about 111.76. Lead with \`DELETE FROM sales_report;\` so re-running the script is stable.`,
+    ],
+    seedSql: `DROP TABLE IF EXISTS fact_daily_sales;
+CREATE TABLE fact_daily_sales (
+  day         TEXT NOT NULL,       -- ISO date 'YYYY-MM-DD'
+  revenue     INTEGER NOT NULL,    -- total revenue for the day (additive)
+  order_count INTEGER NOT NULL     -- number of orders that day (additive)
+);
+INSERT INTO fact_daily_sales (day, revenue, order_count) VALUES
+  ('2026-03-01', 1000, 8),
+  ('2026-03-02',  600, 5),
+  ('2026-03-03',  300, 4);
+
+DROP TABLE IF EXISTS sales_report;
+CREATE TABLE sales_report (
+  metric TEXT,
+  value  REAL                      -- store the ratio as a decimal, not an integer
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "sales_report holds exactly one row",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM sales_report) <> 1`,
+      },
+      {
+        suite: "grain",
+        name: "the single row is the overall_aov metric",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM sales_report WHERE metric = 'overall_aov') <> 1`,
+      },
+      {
+        suite: "additivity",
+        name: "overall AOV is about 111.76, recomputed as SUM(revenue)/SUM(order_count) from additive parts",
+        sql: `SELECT 1 WHERE (SELECT ABS(value - (SELECT SUM(revenue) * 1.0 / SUM(order_count) FROM fact_daily_sales)) FROM sales_report WHERE metric = 'overall_aov') > 0.01`,
+      },
+      {
+        suite: "additivity",
+        name: "value keeps its decimals and is not integer-truncated to 111",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT value FROM sales_report WHERE metric = 'overall_aov') <= 111.5`,
+      },
+    ],
+  }),
+}
+
+const dimensionPatterns: SqlLevel["modules"][number]["lessons"][number] = {
+  id: "sql-l4-dimension-patterns",
+  title: "Dimension Patterns: Conformed, Role-Playing, Degenerate, Junk",
+  summary:
+    "Model conformed, role-playing, degenerate, and junk dimensions, plus factless facts, the way data-engineering interviewers ask about them.",
+  estimatedMinutes: 22,
+  difficulty: "medium",
+  skills: [
+    "conformed dimension",
+    "role-playing dimension",
+    "junk dimension",
+    "degenerate dimension",
+    "factless fact table",
+  ],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Why conformed dimensions hold a warehouse together
+
+An enterprise warehouse is many fact tables at once: \`fact_orders\`, \`fact_returns\`, \`fact_web_sessions\`. If each one invents its own idea of "customer" or "date", no two marts slice the same way and cross-mart numbers never reconcile. A **conformed dimension** fixes this: it is one shared table, like a single \`dim_date\` or \`dim_customer\`, that every fact joins to. Because they all reference the same rows, "revenue by month" from orders and "returns by month" from returns line up exactly. Kimball calls the grid of which facts share which conformed dimensions the **bus matrix**, and it is the backbone of a coherent warehouse.
+
+Four more patterns show up on that same schema, and interviewers name them directly.
+
+## Four patterns on one schema
+
+**Role-playing dimension.** One physical dimension joined more than once under different meanings. An order has an order date and a ship date. You do not build two date tables. You join the single \`dim_date\` twice, once for the order role and once for the ship role, and each alias contributes its own columns.
+
+**Degenerate dimension.** A dimension attribute with no dimension table. An \`order_number\` or \`invoice_number\` is a genuine attribute of a sale, but it has nothing to describe (no name, no category), so you store it directly on the fact and skip the \`dim\` table. The dimension has degenerated to a bare key sitting on the fact.
+
+**Junk dimension.** Several low-cardinality flags, like \`is_gift\`, \`is_expedited\`, and \`is_first_order\`, folded into one small table of the **distinct combinations** that actually occur. The fact then carries a single \`flag_key\` instead of three separate boolean columns or three tiny foreign keys.
+
+**Factless fact table.** A fact with no measures. It records that an event or relationship happened, like "student attended class" or "promotion covered product". There is nothing to sum, so you answer questions with \`COUNT(*)\` over the rows.
+
+## Worked example: role-playing dim_date
+
+\`\`\`sql
+SELECT
+  f.order_key,
+  order_d.month AS order_month,
+  ship_d.month  AS ship_month
+FROM fact_orders f
+JOIN dim_date order_d ON order_d.date_key = f.order_date_key
+JOIN dim_date ship_d  ON ship_d.date_key  = f.ship_date_key;
+\`\`\`
+
+Order \`500\` was placed in month \`1\` and shipped in month \`2\`. The same \`dim_date\` supplies both months; the aliases \`order_d\` and \`ship_d\` are what give the two roles distinct meaning.
+
+## Pitfalls
+
+- **Duplicating a shared dimension.** Building a separate \`dim_ship_date\` next to \`dim_order_date\` forks one conformed dimension into two. Now a fiscal-calendar fix has to be applied twice and the copies drift apart. Join the single \`dim_date\` twice instead.
+- **A tiny dimension per flag.** Giving \`is_gift\`, \`is_expedited\`, and \`is_first_order\` each its own dimension table (dimension explosion) bloats the schema with three one-column joins. Fold them into one junk dimension of the combinations that occur.
+
+**Interview nuance:** conformed dimensions are what let two independently built marts be compared at all, so when asked "how do you make revenue and returns slice consistently by month", the answer is a single conformed \`dim_date\` that both facts join, not two lookalike date tables.`,
+    demoCode: `SELECT
+  f.order_key,
+  order_d.month AS order_month,   -- dim_date in its "order date" role
+  ship_d.month  AS ship_month,    -- SAME table, joined again in its "ship date" role
+  f.revenue
+FROM fact_orders f
+JOIN dim_date order_d ON order_d.date_key = f.order_date_key
+JOIN dim_date ship_d  ON ship_d.date_key  = f.ship_date_key
+ORDER BY f.order_key;`,
+    demoSeedSql: `CREATE TABLE dim_date (
+  date_key  INTEGER PRIMARY KEY,
+  full_date TEXT,
+  year      INTEGER,
+  month     INTEGER
+);
+INSERT INTO dim_date (date_key, full_date, year, month) VALUES
+  (1, '2026-01-05', 2026, 1),
+  (2, '2026-02-11', 2026, 2),
+  (3, '2026-03-20', 2026, 3);
+
+CREATE TABLE fact_orders (
+  order_key      INTEGER PRIMARY KEY,
+  order_date_key INTEGER,
+  ship_date_key  INTEGER,
+  revenue        INTEGER
+);
+INSERT INTO fact_orders (order_key, order_date_key, ship_date_key, revenue) VALUES
+  (500, 1, 2, 250),
+  (501, 1, 3, 400),
+  (502, 2, 2, 150);`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l4-dimension-patterns-apply",
+    prompt: `Write a load that fills \`order_month_report(order_key, order_month, ship_month)\` with one row per order, where \`order_month\` is the calendar month the order was placed and \`ship_month\` is the month it shipped. \`fact_orders(order_key, order_date_key, ship_date_key, revenue)\` carries two date keys, and both reference the single conformed \`dim_date(date_key, full_date, year, month)\`.
+
+Fetch both months by joining \`dim_date\` **twice under different aliases** (an order role and a ship role), because one physical date table plays both roles. Lead with \`DELETE FROM order_month_report;\` so the load survives a re-run.
+
+Expected rows: order \`101\` (placed in month \`1\`, shipped in month \`2\`) yields \`order_month = 1, ship_month = 2\`; order \`102\` yields \`1, 1\`; order \`103\` yields \`2, 3\`; order \`104\` yields \`2, 2\`.`,
+    starterCode: `-- dim_date, fact_orders, and the empty order_month_report are seeded for you.
+-- Make the load re-runnable: clear the target first.
+DELETE FROM order_month_report;
+
+-- Join dim_date TWICE (aliased order_d and ship_d) to fetch both months.
+-- INSERT INTO order_month_report (order_key, order_month, ship_month)
+-- SELECT f.order_key, order_d.month, ship_d.month
+-- FROM fact_orders f
+-- JOIN dim_date order_d ON ...
+-- JOIN dim_date ship_d  ON ...;`,
+    hints: [
+      `Lead with \`DELETE FROM order_month_report;\` so a second run doesn't double the rows.`,
+      `The whole trick is joining the single \`dim_date\` twice under two aliases: \`JOIN dim_date order_d ON order_d.date_key = f.order_date_key\` and \`JOIN dim_date ship_d ON ship_d.date_key = f.ship_date_key\`.`,
+      `Select \`order_d.month\` for \`order_month\` and \`ship_d.month\` for \`ship_month\`. Each alias contributes its own role's column.`,
+      `Do not join \`dim_date\` only once. One join can only give you one date, so the ship month would just repeat the order month.`,
+    ],
+    referenceSolution: `DELETE FROM order_month_report;
+
+INSERT INTO order_month_report (order_key, order_month, ship_month)
+SELECT f.order_key, order_d.month, ship_d.month
+FROM fact_orders f
+JOIN dim_date order_d ON order_d.date_key = f.order_date_key
+JOIN dim_date ship_d  ON ship_d.date_key  = f.ship_date_key;`,
+    seedSql: `CREATE TABLE dim_date (
+  date_key  INTEGER PRIMARY KEY,
+  full_date TEXT,
+  year      INTEGER,
+  month     INTEGER
+);
+INSERT INTO dim_date (date_key, full_date, year, month) VALUES
+  (1, '2026-01-05', 2026, 1),
+  (2, '2026-01-20', 2026, 1),
+  (3, '2026-02-02', 2026, 2),
+  (4, '2026-02-15', 2026, 2),
+  (5, '2026-03-10', 2026, 3);
+
+CREATE TABLE fact_orders (
+  order_key      INTEGER PRIMARY KEY,
+  order_date_key INTEGER NOT NULL REFERENCES dim_date(date_key),
+  ship_date_key  INTEGER NOT NULL REFERENCES dim_date(date_key),
+  revenue        INTEGER
+);
+INSERT INTO fact_orders (order_key, order_date_key, ship_date_key, revenue) VALUES
+  (101, 1, 3, 200),
+  (102, 2, 2, 150),
+  (103, 3, 5, 300),
+  (104, 4, 4, 120);
+
+CREATE TABLE order_month_report (
+  order_key   INTEGER PRIMARY KEY,
+  order_month INTEGER,
+  ship_month  INTEGER
+);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "order_month_report has one row per order (four rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM order_month_report) <> 4`,
+      },
+      {
+        suite: "order_role",
+        name: "order_month matches the month of each order's order_date_key",
+        sql: `SELECT r.order_key
+        FROM order_month_report r
+        JOIN fact_orders f ON f.order_key = r.order_key
+        JOIN dim_date d ON d.date_key = f.order_date_key
+        WHERE r.order_month <> d.month`,
+      },
+      {
+        suite: "ship_role",
+        name: "ship_month matches the month of each order's ship_date_key (needs the second join)",
+        isHidden: true,
+        sql: `SELECT r.order_key
+        FROM order_month_report r
+        JOIN fact_orders f ON f.order_key = r.order_key
+        JOIN dim_date d ON d.date_key = f.ship_date_key
+        WHERE r.ship_month <> d.month`,
+      },
+      {
+        suite: "roles",
+        name: "order 101 keeps its two roles distinct (order month 1, ship month 2)",
+        isHidden: true,
+        sql: `SELECT 1 WHERE (SELECT ship_month FROM order_month_report WHERE order_key = 101) <> 2
+                 OR (SELECT order_month FROM order_month_report WHERE order_key = 101) <> 1`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l4-dimension-patterns-practice",
+    prompt: `Write a load that builds the junk dimension \`dim_order_flags(flag_key, is_gift, is_expedited, is_first_order)\` from \`fact_order\`, then backfills \`fact_order.flag_key\` to point at it. \`dim_order_flags\` must hold exactly one row per **distinct combination of the three flags that occurs** in \`fact_order\`, with \`flag_key\` auto-assigned. Then set each \`fact_order.flag_key\` to that order's matching combination.
+
+The six seeded orders use four distinct flag combinations, so \`dim_order_flags\` ends with **4 rows**, every combination appears exactly once, and every \`fact_order.flag_key\` resolves to one of them (zero orphans). Lead with \`DELETE FROM dim_order_flags;\` and \`UPDATE fact_order SET flag_key = NULL;\` so the load re-runs cleanly.`,
+    starterCode: `-- fact_order (with an empty flag_key column) and the empty dim_order_flags are seeded.
+-- Make the load re-runnable: clear the dim and reset the backfilled key first.
+DELETE FROM dim_order_flags;
+UPDATE fact_order SET flag_key = NULL;
+
+-- 1. Build the junk dim from the DISTINCT flag combinations; let flag_key auto-assign.
+-- INSERT INTO dim_order_flags (is_gift, is_expedited, is_first_order)
+-- SELECT DISTINCT ... FROM fact_order;
+
+-- 2. Backfill fact_order.flag_key by matching all three flags to the dim.
+-- UPDATE fact_order SET flag_key = (SELECT d.flag_key FROM dim_order_flags d WHERE ...);`,
+    hints: [
+      `Clear the targets first: \`DELETE FROM dim_order_flags;\` then \`UPDATE fact_order SET flag_key = NULL;\` so the load re-runs cleanly.`,
+      `Build the dim with \`INSERT INTO dim_order_flags (is_gift, is_expedited, is_first_order) SELECT DISTINCT is_gift, is_expedited, is_first_order FROM fact_order;\`. \`DISTINCT\` keeps only the combinations that occur, and \`flag_key\` auto-assigns.`,
+      `Do not omit \`DISTINCT\`. Without it every order gets its own row and the point of a junk dimension (one row per combination) is lost.`,
+      `Backfill with a correlated \`UPDATE\`: set \`flag_key\` to the \`dim_order_flags.flag_key\` whose three flags all equal the order's \`is_gift\`, \`is_expedited\`, and \`is_first_order\`.`,
+    ],
+    seedSql: `CREATE TABLE dim_order_flags (
+  flag_key       INTEGER PRIMARY KEY,
+  is_gift        INTEGER,
+  is_expedited   INTEGER,
+  is_first_order INTEGER
+);
+
+CREATE TABLE fact_order (
+  order_key      INTEGER PRIMARY KEY,
+  is_gift        INTEGER NOT NULL,
+  is_expedited   INTEGER NOT NULL,
+  is_first_order INTEGER NOT NULL,
+  flag_key       INTEGER
+);
+INSERT INTO fact_order (order_key, is_gift, is_expedited, is_first_order, flag_key) VALUES
+  (1, 0, 0, 0, NULL),
+  (2, 1, 0, 0, NULL),
+  (3, 0, 1, 1, NULL),
+  (4, 1, 1, 0, NULL),
+  (5, 0, 0, 0, NULL),
+  (6, 1, 0, 0, NULL);`,
+    checkIdempotency: true,
+    assertions: [
+      {
+        suite: "rows",
+        name: "dim_order_flags has exactly one row per distinct flag combination (four rows)",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM dim_order_flags) <> 4`,
+      },
+      {
+        suite: "distinct",
+        name: "no flag combination appears more than once in the junk dimension",
+        sql: `SELECT is_gift, is_expedited, is_first_order
+        FROM dim_order_flags
+        GROUP BY is_gift, is_expedited, is_first_order
+        HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "backfill",
+        name: "every fact_order.flag_key resolves to a dim_order_flags row (zero orphans)",
+        sql: `SELECT f.order_key
+        FROM fact_order f
+        LEFT JOIN dim_order_flags d ON d.flag_key = f.flag_key
+        WHERE f.flag_key IS NULL OR d.flag_key IS NULL`,
+      },
+      {
+        suite: "backfill",
+        name: "each fact_order.flag_key points at the row whose three flags match the order",
+        isHidden: true,
+        sql: `SELECT f.order_key
+        FROM fact_order f
+        JOIN dim_order_flags d ON d.flag_key = f.flag_key
+        WHERE d.is_gift <> f.is_gift
+           OR d.is_expedited <> f.is_expedited
+           OR d.is_first_order <> f.is_first_order`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel4: SqlLevel = {
   id: 4,
   slug: "engineering",
@@ -3260,6 +4017,13 @@ export const sqlLevel4: SqlLevel = {
       description:
         "Load a star schema and track change over time: surrogate keys, then SCD Type 1 overwrite and Type 2 history.",
       lessons: [starBuild, scdType1, scdType2],
+    },
+    {
+      id: "sql-l4-dimensional-depth",
+      title: "Module 4.3b: Dimensional Modeling in Depth",
+      description:
+        "Beyond the basic star: snowflake trade-offs, fact-table types and measure additivity, and the standard dimension patterns (conformed, role-playing, degenerate, junk).",
+      lessons: [snowflake, factTypes, dimensionPatterns],
     },
     {
       id: "sql-l4-correctness",
