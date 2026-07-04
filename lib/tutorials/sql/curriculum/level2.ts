@@ -1027,46 +1027,28 @@ INSERT INTO orders VALUES
   practice: {
     id: "sql-l2-anti-join-practice",
     executionMode: "single-file",
-    prompt: `Write a query that returns two columns, \`issue_type\` and \`bad_id\`, where each row flags one referential-integrity break of one of these two kinds:
-- \`'orphan_order_item'\`: an \`order_items\` row whose \`product_id\` has no matching product; \`bad_id\` is the \`order_item_id\`.
-- \`'customer_no_orders'\`: a \`customers\` row that has never appeared in \`orders\`; \`bad_id\` is the \`customer_id\`.
-
-Stack both anti-joins with \`UNION ALL\` and sort by \`issue_type\`, then \`bad_id\`.`,
-    starterCode: `-- Two anti-joins, each tagged with a literal issue_type, stacked with UNION ALL.
-SELECT 'orphan_order_item' AS issue_type, oi.order_item_id AS bad_id
+    prompt: `Write a query that returns the \`order_item_id\` and \`product_id\` of every **orphaned line item**: an \`order_items\` row whose \`product_id\` has no matching row in \`products\`. Sort by \`order_item_id\`.`,
+    starterCode: `-- Anti-join: keep only order_items with no matching product.
+SELECT
 FROM order_items AS oi
-LEFT JOIN products AS p ON oi.product_id = p.product_id
-WHERE
-UNION ALL
--- second anti-join here
+LEFT JOIN products AS p
+  ON oi.product_id = p.product_id
 `,
     hints: [
-      "Write each anti-join separately first. Orphan items: `order_items LEFT JOIN products … WHERE products.product_id IS NULL`. Customers with no orders: `customers LEFT JOIN orders … WHERE orders.order_id IS NULL`.",
-      "In each `SELECT`, hard-code the tag as a literal column: `SELECT 'orphan_order_item' AS issue_type, oi.order_item_id AS bad_id …`.",
-      "Both `SELECT`s must expose the same two column names in the same order to be `UNION ALL`-compatible.",
-      "Combine with `UNION ALL` (no dedup needed here) and add a final `ORDER BY issue_type, bad_id` after the union.",
+      "`LEFT JOIN products p ON oi.product_id = p.product_id` keeps every line item.",
+      "Filter to the unmatched ones with `WHERE p.product_id IS NULL`.",
+      "Select from the `order_items` side (`oi.order_item_id`, `oi.product_id`); the `products` columns are NULL for orphans. Finish with `ORDER BY oi.order_item_id`.",
     ],
     singleFile: {
-      seedSql: `CREATE TABLE customers (
-  customer_id INTEGER PRIMARY KEY
-);
-CREATE TABLE products (
+      seedSql: `CREATE TABLE products (
   product_id INTEGER PRIMARY KEY
-);
-CREATE TABLE orders (
-  order_id    INTEGER PRIMARY KEY,
-  customer_id INTEGER
 );
 CREATE TABLE order_items (
   order_item_id INTEGER PRIMARY KEY,
   order_id      INTEGER,
   product_id    INTEGER
 );
-INSERT INTO customers VALUES (1),(2),(3),(4);
-INSERT INTO products  VALUES (10),(11),(12);
-INSERT INTO orders VALUES
-  (100, 1),
-  (101, 2);          -- customers 3 and 4 never order
+INSERT INTO products VALUES (10),(11),(12);
 INSERT INTO order_items VALUES
   (1, 100, 10),
   (2, 100, 99),      -- product 99 doesn't exist → orphan item
@@ -1074,12 +1056,10 @@ INSERT INTO order_items VALUES
   (4, 101, 88);      -- product 88 doesn't exist → orphan item`,
       orderMatters: true,
       expected: {
-        columns: ["issue_type", "bad_id"],
+        columns: ["order_item_id", "product_id"],
         rows: [
-          ["customer_no_orders", 3],
-          ["customer_no_orders", 4],
-          ["orphan_order_item", 2],
-          ["orphan_order_item", 4],
+          [2, 99],
+          [4, 88],
         ],
       },
     },
