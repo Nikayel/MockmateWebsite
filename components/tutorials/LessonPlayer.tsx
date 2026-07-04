@@ -172,7 +172,6 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
   const renderExercise = (
     exercise: PythonExercise,
-    _section: LessonSection,
     opts: { canRevealReference?: boolean; onPass: () => void }
   ) => {
     if (exercise.executionMode === "workspace" && exercise.workspace) {
@@ -297,7 +296,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
               {!isLoading && active === "apply" && (
                 <div className="flex flex-col gap-4">
-                  {renderExercise(lesson.apply, "apply", {
+                  {renderExercise(lesson.apply, {
                     canRevealReference: true,
                     onPass: () => markPassed("apply"),
                   })}
@@ -319,7 +318,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
 
               {!isLoading && active === "practice" && (
                 <div className="flex flex-col gap-4">
-                  {renderExercise(lesson.practice, "practice", {
+                  {renderExercise(lesson.practice, {
                     onPass: () => markPassed("practice"),
                   })}
                   <SectionDoneButton
