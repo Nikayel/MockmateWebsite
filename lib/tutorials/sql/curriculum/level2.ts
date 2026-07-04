@@ -17,57 +17,37 @@ const aggregates: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["COUNT", "SUM", "AVG", "MIN", "MAX", "COUNT(DISTINCT)", "NULL handling in aggregates"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## The atom of every metric
+    markdown: `## Why aggregates are the first thing you run
 
-Every dashboard number you've ever seen (total revenue, active users, average order value) is
-an **aggregate**: a function that eats many rows and emits one value. As a DE, the first thing you
-do after a table lands is run a handful of aggregates to sanity-check the load. Row count looks
-right? Revenue in the expected ballpark? No absurd max? These are your smoke tests.
+Every dashboard number you have ever seen (total revenue, active users, average order value) is an **aggregate**: a function that eats many rows and emits one value. The moment a table lands in your warehouse, before you build anything on top of it, you run a handful of aggregates as smoke tests. Is \`COUNT(*)\` the row count you expected? Is \`SUM(total_cents)\` in the right ballpark? Is \`MAX(total_cents)\` impossibly large (a data-entry typo with extra zeros, or a test row that leaked into prod)? Aggregates are how you catch a broken load in ten seconds instead of after it has corrupted a report.
 
-## The five workhorses
+## The mental model: many rows collapse to one
+
+An aggregate takes a set of rows and returns a single scalar. With no \`GROUP BY\`, the entire table is one group, so a \`SELECT\` of only aggregates always returns **exactly one row**, no matter how many rows went in. (Next module: \`GROUP BY\` splits the table into groups and returns one row per group. Same functions, finer grain.)
+
+The five workhorses:
 
 | Function | Returns |
 |---|---|
-| \`COUNT(*)\` | number of rows |
+| \`COUNT(*)\` | number of rows, including all-\`NULL\` rows |
 | \`COUNT(col)\` | number of **non-NULL** values in \`col\` |
-| \`COUNT(DISTINCT col)\` | number of distinct non-NULL values |
-| \`SUM(col)\` / \`AVG(col)\` | total / mean of non-NULL values |
+| \`COUNT(DISTINCT col)\` | number of distinct non-\`NULL\` values |
+| \`SUM(expr)\` / \`AVG(expr)\` | total / mean of non-\`NULL\` values |
 | \`MIN(col)\` / \`MAX(col)\` | smallest / largest value |
 
-A worked example, the "health check" of an orders table:
+\`SUM\` and \`AVG\` accept any expression, not just a bare column, so \`SUM(quantity * unit_price_cents)\` totals a per-row calculation in one pass.
 
-\`\`\`sql
-SELECT
-  COUNT(*)                    AS row_count,
-  COUNT(DISTINCT customer_id) AS distinct_customers,
-  SUM(total_cents)            AS total_revenue_cents,
-  AVG(total_cents)            AS avg_order_cents,
-  MAX(total_cents)            AS largest_order_cents
-FROM orders;
-\`\`\`
+## Worked example
 
-One row out. Five numbers that tell you whether the load is sane.
+The demo below runs this health check against six seed orders. It returns one row: \`row_count = 6\`, \`distinct_customers = 3\` (customers 1, 2, and 3, with the two guest \`NULL\`s skipped), \`total_revenue_cents = 18900\`, \`avg_order_cents = 4725.0\`, and \`largest_order_cents = 9900\`.
 
 ## The NULL rule that trips everyone
 
-\`\`\`
-COUNT(*)            -> counts rows, even all-NULL rows
-COUNT(email)        -> skips rows where email IS NULL
-AVG(total_cents)    -> divides SUM by the COUNT of NON-NULL values, not by COUNT(*)
-\`\`\`
+\`AVG\` **ignores NULLs entirely**. It does not treat them as zero. Two of the six orders have a \`NULL\` total, so \`AVG(total_cents)\` divides by 4 (the non-\`NULL\` count), not 6: \`18900 / 4 = 4725\`, never \`18900 / 6 = 3150\`. Put precisely, \`AVG(col)\` equals \`SUM(col) / COUNT(col)\`, never \`SUM(col) / COUNT(*)\`.
 
-That last one is the classic interview trap. \`AVG\` **ignores NULLs entirely**. It does not treat
-them as zero. If half your \`total_cents\` are NULL, \`AVG(total_cents)\` averages only the other half.
-If you *want* NULLs to count as zero, wrap first: \`AVG(COALESCE(total_cents, 0))\`. Those two queries
-give different answers, and knowing which one the business meant is your job.
+If the business wants NULLs counted as zero, push the default inside the function: \`AVG(COALESCE(total_cents, 0))\` returns \`3150.0\`. The two queries give different answers, and knowing which one the business meant is your job. Likewise, \`COUNT(*)\` and \`COUNT(col)\` diverge the instant \`col\` has a \`NULL\`, so when someone asks "how many orders have a customer?", answer with \`COUNT(customer_id)\`, not \`COUNT(*)\`. Say what you count.
 
-**Keep it readable / common pitfall.** \`COUNT(*)\` vs \`COUNT(col)\` diverge the moment \`col\` has a
-NULL. When someone asks "how many orders have a customer?", they mean \`COUNT(customer_id)\`, not
-\`COUNT(*)\`. Say what you count.
-
-**Recap.** Aggregates collapse many rows to one number and silently skip NULLs: \`COUNT(*)\` counts
-rows, \`COUNT(col)\`/\`SUM\`/\`AVG\` count only non-NULL values, and \`COUNT(DISTINCT col)\` counts unique
-ones.`,
+**Interview nuance:** on an empty set (or a column that is entirely \`NULL\`), \`SUM\`, \`AVG\`, \`MIN\`, and \`MAX\` return \`NULL\`, but \`COUNT\` returns \`0\`. This is why production pipelines wrap totals as \`COALESCE(SUM(amount), 0)\`: an all-refunded day should report \`0\` revenue, not a \`NULL\` that silently poisons the next join or arithmetic step downstream.`,
     demoCode: `SELECT
   COUNT(*)                    AS row_count,
   COUNT(DISTINCT customer_id) AS distinct_customers,
@@ -1115,57 +1095,63 @@ const selfJoin: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["self-join", "RIGHT JOIN", "FULL OUTER JOIN", "aliasing one table twice"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Joining a table to itself
+    markdown: `## Why relate a table to itself
 
-Sometimes the two things you're relating live in the **same** table. An \`employees\` table where each
-row has a \`manager_id\` pointing at another row *in that same table* is the classic case. To show each
-employee next to their manager's name, you join \`employees\` to \`employees\`. This is a **self-join**,
-and the only trick is that you must alias the table twice so the two "copies" are distinguishable.
+Org charts, threaded comments, category trees, "customers referred by other customers": all of these store a relationship between two rows of the *same* table. The table has a column that points back at its own primary key (\`manager_id\` referencing \`employee_id\`). To read the pair as one row ("Grace reports to Ada"), you join the table to itself. Interviewers love this because it proves you understand that a join operates on *aliases*, not table names.
+
+## A self-join is an ordinary join with two aliases
+
+There is no special \`SELF JOIN\` keyword. You list the same table twice, give each appearance a different alias, and join them like any two tables. Picture two independent copies of the rows: \`e\` is "the employee I am describing" and \`m\` is "the row that happens to be that employee's manager."
 
 \`\`\`sql
 SELECT
-  e.employee_name          AS employee,
-  m.employee_name          AS manager
+  e.employee_name AS employee,
+  m.employee_name AS manager
 FROM employees AS e
 LEFT JOIN employees AS m
   ON e.manager_id = m.employee_id;
 \`\`\`
 
-\`e\` is the employee copy, \`m\` is the manager copy. The \`ON\` says "match this row's \`manager_id\` to
-some other row's \`employee_id\`." Using \`LEFT JOIN\` keeps top-level employees (whose \`manager_id\` is
-NULL) with a NULL manager, rather than dropping them.
+The \`ON\` clause matches each employee's \`manager_id\` to some row's \`employee_id\`. Using \`LEFT JOIN\` (not \`INNER\`) keeps top-level people whose \`manager_id\` is \`NULL\`; they survive with a \`NULL\` manager instead of vanishing. Against the seed data you get:
 
-**Anatomy:**
-
+\`\`\`text
+employee   | manager
+-----------+--------
+Ada        | NULL
+Grace      | Ada
+Alan       | Ada
+Katherine  | Grace
 \`\`\`
-FROM employees AS e            <- "the employee" copy
-LEFT JOIN employees AS m       <- "the manager" copy (same table, second alias)
-  ON e.manager_id = m.employee_id
+
+Add \`ORDER BY e.employee_name\` when output order matters. Row order is not guaranteed otherwise.
+
+## Outer joins for reconciling two sources
+
+Now the two inputs are different tables: yesterday's snapshot and today's. To see what was *added*, *dropped*, or *changed*, you need every key from *both* sides. That is a \`FULL OUTER JOIN\`: keep all left rows, all right rows, and \`NULL\`-pad wherever a match is missing. A \`RIGHT JOIN\` is simply a \`LEFT JOIN\` with the operands swapped (keep every right-side row).
+
+Because an unmatched key is \`NULL\` on the missing side, recover one clean key with \`COALESCE(y.customer_id, t.customer_id)\`, and classify each row by testing which side is \`NULL\`:
+
+\`\`\`sql
+SELECT
+  COALESCE(y.customer_id, t.customer_id) AS customer_id,
+  CASE
+    WHEN y.customer_id IS NULL THEN 'added'
+    WHEN t.customer_id IS NULL THEN 'dropped'
+    WHEN y.tier <> t.tier      THEN 'changed'
+    ELSE 'unchanged'
+  END AS change_type
+FROM yesterday AS y
+FULL OUTER JOIN today AS t
+  ON y.customer_id = t.customer_id;
 \`\`\`
 
-## Outer joins for reconciliation
+\`RIGHT\` and \`FULL OUTER JOIN\` only arrived in SQLite 3.39 (2022); Postgres, Snowflake, BigQuery, and SQL Server have had them for years. Older engines emulate \`FULL OUTER\` as a \`LEFT JOIN\` unioned with the reversed \`LEFT JOIN\`.
 
-When you compare two *different* sources (yesterday's snapshot vs today's), you often need every key
-from **both** sides so you can see what was added, dropped, or changed. That's a \`FULL OUTER JOIN\`:
-keep all left rows, all right rows, NULL-pad wherever one side is missing. A \`RIGHT JOIN\` is just a
-\`LEFT JOIN\` with the tables swapped (keep all right-side rows).
+## Pitfall: order the \`CASE\` so \`NULL\` checks come first
 
-> **In the warehouse this differs.** \`RIGHT JOIN\` and \`FULL OUTER JOIN\` only arrived in SQLite 3.39
-> (2022). Older embedded builds reject them, and you'll sometimes see them emulated as \`LEFT JOIN\` +
-> a \`UNION\` of the reverse \`LEFT JOIN\`. Postgres, Snowflake, BigQuery, and SQL Server have supported
-> both for years. The self-join is universal: it's just an ordinary join whose two operands happen to
-> be the same table.
+If you test \`y.tier <> t.tier\` before the \`IS NULL\` branches, added and dropped rows classify wrong. For an added customer the whole \`y\` row is \`NULL\`-padded, so \`y.tier <> t.tier\` is \`NULL <> 'gold'\`, which evaluates to *unknown*, not \`true\`. That branch is skipped and the row silently falls into \`ELSE 'unchanged'\`. Put both \`IS NULL\` tests ahead of any payload comparison.
 
-**Keep it readable / common pitfall.** In a \`FULL OUTER JOIN\`, a key present on only one side has NULL
-for *that side's* key column, so to get a single non-NULL key for the output, use
-\`COALESCE(a.id, b.id)\`. And to classify each row (added / dropped / changed), test which side's key is
-NULL. Order those \`CASE\` branches so the NULL-side checks come *before* any comparison of the payload
-columns: comparing a NULL \`tier\` with \`<>\` yields \`unknown\`, so a dropped/added row would otherwise
-fall through to the wrong branch.
-
-**Recap.** A self-join is an ordinary join with the table aliased twice (e.g. employee to manager);
-\`FULL OUTER JOIN\` keeps unmatched rows from both sides for reconciliation, available in SQLite 3.39+
-and every major warehouse.`,
+**Interview nuance:** SQL uses three-valued logic. Any comparison involving \`NULL\`, including \`NULL = NULL\` and \`NULL <> NULL\`, returns \`unknown\` rather than \`true\` or \`false\`, and only \`true\` passes a \`WHERE\`, \`ON\`, or \`CASE WHEN\`. This one rule explains the reconciliation ordering above, why \`col NOT IN (subquery_with_a_null)\` returns zero rows, and why you match missing keys with \`IS NULL\` instead of \`= NULL\`.`,
     demoCode: `SELECT
   e.employee_name AS employee,
   m.employee_name AS manager
@@ -1594,15 +1580,13 @@ const ctes: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["WITH", "single and chained CTEs", "refactoring nested subqueries"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Nested subqueries read inside-out; CTEs read top-to-bottom
+    markdown: `## Why nested subqueries get unreadable
 
-Nested subqueries read inside-out. You parse the innermost first and work outward, which is
-exhausting once there are two levels. A **Common Table Expression (CTE)**, introduced with \`WITH\`,
-lets you name each step and read the query **top-to-bottom** like a pipeline. This is not cosmetic:
-production SQL (every dbt model) is built as a chain of named CTEs precisely because named stages are
-reviewable, testable, and self-documenting.
+A nested subquery forces you to read inside-out: find the innermost \`SELECT\`, understand it, then peel outward one layer at a time. Two levels deep and code review slows to a crawl. A Common Table Expression (CTE), written with \`WITH\`, names each step so the query reads top-to-bottom like a pipeline. This is not cosmetic. Production SQL, including every dbt model, is built as a chain of named CTEs precisely because named stages are reviewable, testable, and self-documenting.
 
-## Syntax: name a subquery, then use it like a table
+## A CTE is a named subquery, scoped to one statement
+
+\`WITH name AS ( ... )\` defines a temporary named result you can then query like a table. The demo below filters \`orders\` down to paid rows in a CTE called \`paid_orders\`, then aggregates revenue per customer from that CTE:
 
 \`\`\`sql
 WITH paid_orders AS (
@@ -1613,11 +1597,17 @@ WITH paid_orders AS (
 SELECT customer_id, SUM(total_cents) AS revenue
 FROM paid_orders
 GROUP BY customer_id;
+-- customer_id | revenue
+-- 1           | 7000
+-- 2           | 1000
+-- 3           | 6000
 \`\`\`
 
-## Chaining: the staging → intermediate → mart pattern
+Customer \`2\`'s \`cancelled\` order for \`9000\` never reaches the aggregate, because the \`WHERE status = 'paid'\` filter lives inside the CTE. Without an \`ORDER BY\` the row order is not guaranteed, so add one when order matters.
 
-Each CTE can reference the ones above it, forming the staging → intermediate → mart pattern:
+## Chaining stages: aggregate first, filter second
+
+Each CTE can reference the ones defined above it, giving the staging, intermediate, mart shape:
 
 \`\`\`sql
 WITH paid_orders AS (
@@ -1628,30 +1618,21 @@ per_customer AS (
   FROM paid_orders
   GROUP BY customer_id
 )
-SELECT * FROM per_customer WHERE revenue > 10000;
+SELECT customer_id, revenue
+FROM per_customer
+WHERE revenue > 5000
+ORDER BY customer_id;
 \`\`\`
 
-## Anatomy
+The payoff is that final \`WHERE revenue > 5000\`. You cannot filter on an aggregate in the same \`SELECT\` that computes it: \`WHERE SUM(total_cents) > 5000\` fails with \`misuse of aggregate\`, because \`WHERE\` is evaluated before rows are grouped. The one-statement fix is \`HAVING\`, but splitting the aggregate into its own CTE lets the next stage treat \`revenue\` as an ordinary column and filter it with a plain \`WHERE\`. As stages pile up, that reads far better, and it is exactly the structure the Apply and Practice ask for.
 
-\`\`\`
-WITH name1 AS ( … ),        ← first stage
-     name2 AS ( … name1 … ) ← second stage, may read name1
-SELECT … FROM name2         ← final query reads the last stage
-       └─ commas separate CTEs; the final SELECT has NO leading comma ─┘
-\`\`\`
+## Pitfalls
 
-## Keep it readable / common pitfall
+- Commas separate CTE definitions, but there is no comma before the final \`SELECT\`: \`... ), per_customer AS ( ... ) SELECT ...\`.
+- A CTE is scoped to the single statement that begins with its \`WITH\`. A later, separate query cannot see it.
+- Put each filter at the right stage. Row filters like \`status = 'paid'\` belong in the first CTE; aggregate filters (\`revenue\`, \`order_count\`) belong in a stage that reads the already-aggregated CTE.
 
-Each CTE definition is comma-separated, but there is **no comma** before the final \`SELECT\`. A CTE is
-scoped to the single statement it prefixes. You can't reference it from a later, separate query.
-
-> **In the warehouse this differs.** In most engines a non-recursive CTE is just a named inline view;
-> SQLite may materialize or inline it, but correctness is identical.
-
-## Recap
-
-\`WITH\` names a subquery so a transform reads top-to-bottom; chain CTEs (each reading the previous) to
-express the staging → intermediate → mart pipeline that production SQL is built from.`,
+**Interview nuance:** a CTE does not make a query faster on its own. Logically it is just a named subquery. Postgres 12 and later inline a non-recursive CTE that is referenced once, so it plans identically to the equivalent subquery, while Postgres 11 and earlier always materialized every CTE, which could actually be slower. Reach for CTEs to make a transform readable and reusable, not to optimize it.`,
     demoCode: `WITH paid_orders AS (
   SELECT customer_id, total_cents
   FROM orders
