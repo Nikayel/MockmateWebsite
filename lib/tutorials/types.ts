@@ -38,6 +38,14 @@ export interface TeachSection {
   markdown: string
   /** Optional snippet the learner can Run to "see it work" (no grading). */
   demoCode?: string
+  /**
+   * SQL lessons only: a seed DB so `demoCode` can be executed LIVE to show its output table, rather
+   * than hand-authoring a result that would silently drift. When present alongside a SELECT
+   * `demoCode`, the Read phase runs it and renders the returned rows. (Python teach omits this.)
+   */
+  demoSeedSql?: string
+  /** SQL lessons only: also render the seeded input tables above the demo output. */
+  showDemoInput?: boolean
   estimatedMinutes: number
 }
 

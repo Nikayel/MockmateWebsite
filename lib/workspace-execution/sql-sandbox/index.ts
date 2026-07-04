@@ -2,6 +2,8 @@ export { executeSqlClientSide } from "./single-file-runner"
 export type { SqlSingleFileScenario } from "./single-file-runner"
 export { executeWorkspaceScenarioSqlClientSide } from "./workspace-runner"
 export { runSqlInWorker } from "./worker-runner"
+export { introspectSqlSeed, DEFAULT_PREVIEW_LIMIT } from "./introspect-runner"
+export type { SqlTablePreview, SqlIntrospectResult } from "./introspect-runner"
 export { compareResultSets } from "./comparator"
 export type { SqlResultSet, CompareOptions, CompareResult } from "./comparator"
 export {

@@ -7,6 +7,7 @@ import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
+import { SqlDataPreview } from "./SqlDataPreview"
 import { useExerciseRun } from "./useExerciseRun"
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 import type { PythonExercise } from "@/lib/tutorials/types"
@@ -26,6 +27,12 @@ export interface WorkspaceExerciseRunnerProps {
   onRunResult?: (passed: boolean) => void
   /** Which browser engine warms — drives the cold-start copy. Defaults to "python" (call sites unchanged). */
   engine?: "python" | "sql"
+  /**
+   * SQL workspaces only: the seed DB, shown as an input-table preview above the editor. Sourced from
+   * `SqlWorkspaceGrading.seedSql` at the call site (the `workspace` prop is Python-typed and lacks
+   * it). Omitted for Python workspaces, where the preview renders nothing.
+   */
+  seedSql?: string
 }
 
 export function WorkspaceExerciseRunner({
@@ -34,6 +41,7 @@ export function WorkspaceExerciseRunner({
   onPass,
   onRunResult,
   engine = "python",
+  seedSql,
 }: WorkspaceExerciseRunnerProps) {
   const editablePaths = useMemo(() => new Set(workspace.editableFilePaths), [workspace])
   const isEditable = (file: WorkspaceScenarioFile) =>
@@ -72,6 +80,9 @@ export function WorkspaceExerciseRunner({
       <div className="prose prose-sm dark:prose-invert max-w-none">
         <MarkdownRenderer content={exercise.prompt} />
       </div>
+
+      {/* SQL workspaces: preview the seeded input tables. No-op (renders nothing) for Python. */}
+      <SqlDataPreview seedSql={seedSql} />
 
       <div className="border-border overflow-hidden rounded-lg border">
         <div

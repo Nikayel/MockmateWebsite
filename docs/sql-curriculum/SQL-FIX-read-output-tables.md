@@ -6,6 +6,19 @@ the query runs against and (b) for worked examples in Read, the **output table**
 so a learner can always see the data in action before writing SQL. Scope is SQL only; no Python
 changes; execution stays 100% client-side (no backend, no quota).
 
+> **Status (2026-07-03): shipped** on branch `claude/sql-curriculum-and-python-gaps`. All slices
+> landed; `pnpm typecheck` / `pnpm test` / `pnpm build` green. A sql.js integration guard
+> (`lib/tutorials/sql/__tests__/teach-demos.test.ts`) executes every populated demo. Every exercise in
+> all 46 lessons shows its input table(s); every **single-statement** result-returning teach demo
+> (L1 ×11, L2 ×11, and the L4 window-ranking lesson — the one hand-authored table, now live) renders a
+> live output table. Two documented exceptions: **(1)** L3's single teach demo is a multi-statement
+> `EXPLAIN QUERY PLAN` before/after-index comparison — it stays a read-only "run me" block because one
+> live output grid can't show its two plans; **(2)** the remaining L4 teach examples are embedded
+> mid-prose, and `TeachPanel` renders a live demo at the *end* of the Read phase, so migrating them
+> would separate output from explanation (their exercises still show input tables via Slice 3). One
+> implementation note beyond the plan: the sql.js worker was made to **serialize** runs so the input
+> preview, the demo auto-run, and the prewarm ping never collide.
+
 ---
 
 ## How to run it

@@ -58,6 +58,42 @@ export function getNextSqlLesson(lessonId: string): SqlLesson | undefined {
   return lessons[index + 1]
 }
 
+/**
+ * The next SQL lesson *within the same level*, or `undefined` at the level's last lesson.
+ * "Up next" and the in-lesson "Next lesson" button use this so navigation never silently bleeds
+ * into another level — crossing a level boundary is a deliberate step (see
+ * {@link getFirstLessonOfNextSqlLevel}), not a linear continuation.
+ */
+export function getNextSqlLessonInLevel(lessonId: string): SqlLesson | undefined {
+  const location = getSqlLessonLocation(lessonId)
+  if (!location) return undefined
+  const lessonsInLevel = location.level.modules.flatMap((mod) => mod.lessons)
+  const index = lessonsInLevel.findIndex((lesson) => lesson.id === lessonId)
+  if (index === -1) return undefined
+  return lessonsInLevel[index + 1]
+}
+
+/** Every SQL lesson in a level, in curriculum order (module → lesson). */
+export function listSqlLessonsInLevel(level: SqlLevel): SqlLesson[] {
+  return level.modules.flatMap((mod) => mod.lessons)
+}
+
+/**
+ * The first lesson of the level immediately after `lessonId`'s level, or `undefined` when the lesson
+ * is already in the last level. Powers the deliberate "level complete → start next level" hand-off.
+ */
+export function getFirstLessonOfNextSqlLevel(
+  lessonId: string
+): { level: SqlLevel; lesson: SqlLesson } | undefined {
+  const location = getSqlLessonLocation(lessonId)
+  if (!location) return undefined
+  const levelIndex = SQL_LEVELS.findIndex((level) => level.id === location.level.id)
+  const nextLevel = levelIndex === -1 ? undefined : SQL_LEVELS[levelIndex + 1]
+  const firstLesson = nextLevel && listSqlLessonsInLevel(nextLevel)[0]
+  if (!nextLevel || !firstLesson) return undefined
+  return { level: nextLevel, lesson: firstLesson }
+}
+
 /** Find a SQL exercise by id across every lesson's `apply` and `practice`. */
 export function getSqlExerciseById(exerciseId: string): SqlExercise | undefined {
   for (const lesson of listAllSqlLessons()) {

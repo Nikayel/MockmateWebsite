@@ -9,13 +9,15 @@ export interface SqlWorkerRunResult {
 }
 
 export interface SqlWorkerData {
-  mode: "single-file" | "workspace" | "warm"
+  mode: "single-file" | "workspace" | "warm" | "introspect"
   seedSql?: string
   code?: string
   assertions?: Array<{ suite: string; name: string; sql: string; isHidden?: boolean }>
   checkIdempotency?: boolean
   /** Graded tables whose content the idempotency double-run compares (see SqlWorkspaceGrading). */
   idempotencyTables?: string[]
+  /** introspect mode: max sample rows returned per table (default 8). */
+  previewLimit?: number
 }
 
 interface PendingSqlRun {
@@ -23,8 +25,6 @@ interface PendingSqlRun {
   timeoutId: ReturnType<typeof setTimeout>
   execTimeoutMs: number
   logs: DsaExecutionResult["consoleLogs"]
-  /** true for a background prewarm (mode "warm") — a real Run is allowed to wait for it, not be rejected. */
-  isWarm: boolean
 }
 
 // Compiling the SQLite WASM module on a first run is a ~1 MB same-origin fetch + compile. Keep the
@@ -39,8 +39,9 @@ const EXEC_TIMEOUT_MESSAGE = "Query timed out. Check for an accidental cross joi
 
 let sqlWorker: Worker | null = null
 let pendingRun: PendingSqlRun | null = null
-// The in-flight background prewarm (if any), so a real Run can await it instead of being rejected.
-let warmPromise: Promise<SqlWorkerRunResult> | null = null
+// The single worker does one job at a time, so runs queue behind each other on this chain (see
+// runSqlInWorker). Concurrent callers WAIT their turn instead of failing with "already running".
+let runQueue: Promise<unknown> = Promise.resolve()
 
 function resetSqlWorker(): void {
   if (sqlWorker) {
@@ -140,18 +141,16 @@ export function runSqlInWorker(
     })
   }
 
-  // A background prewarm (mode "warm") holds the single run slot only until the ~1 MB WASM module
-  // compiles. If a real Run lands in that window, WAIT for the prewarm to finish (the worker stays
-  // warm) and then run — instead of rejecting the learner's click with "A SQL query is already running".
-  if (pendingRun && pendingRun.isWarm && workerData.mode !== "warm" && warmPromise) {
-    return warmPromise.then(() => runSqlInWorker(workerData, execTimeoutMs, bootTimeoutMs))
-  }
-
-  if (pendingRun) {
-    return Promise.resolve({ success: false, logs: [], error: "A SQL query is already running" })
-  }
-
-  return startSqlRun(workerData, execTimeoutMs, bootTimeoutMs)
+  // One worker, one job at a time: queue each run behind the previous so concurrent callers — the
+  // prewarm ping, an input-table preview, a demo auto-run, a graded Run — WAIT their turn instead of
+  // failing with "already running". A learner's first Run naturally waits for the WASM compile.
+  const task = runQueue.then(() => startSqlRun(workerData, execTimeoutMs, bootTimeoutMs))
+  // Keep the chain alive regardless of any individual run's outcome (startSqlRun never rejects).
+  runQueue = task.then(
+    () => undefined,
+    () => undefined
+  )
+  return task
 }
 
 function startSqlRun(
@@ -180,17 +179,9 @@ function startSqlRun(
       resetSqlWorker()
     }, bootTimeoutMs)
 
-    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [], isWarm: workerData.mode === "warm" }
+    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [] }
     worker.postMessage(workerData)
   })
-
-  // Track the prewarm so a concurrent real Run can await it (see runSqlInWorker), and clear it when done.
-  if (workerData.mode === "warm") {
-    warmPromise = promise
-    void promise.finally(() => {
-      if (warmPromise === promise) warmPromise = null
-    })
-  }
 
   return promise
 }
