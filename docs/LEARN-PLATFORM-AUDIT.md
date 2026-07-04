@@ -1,8 +1,9 @@
 # /learn Platform Audit — Python + SQL
 
-> **RESOLUTION (2026-07-03):** All findings below have been fixed on branch
-> `claude/sql-curriculum-and-python-gaps`. The fixes were built systematically (root-cause, not
-> patch) and centralized where it reduced real duplication. Summary:
+> **RESOLUTION (2026-07-03):** Every finding below has been fixed on branch
+> `claude/sql-curriculum-and-python-gaps` **except U3**, which is a deliberate deferral (see note at
+> the end of this box). The fixes were built systematically (root-cause, not patch) and centralized
+> where it reduced real duplication. Summary:
 >
 > - **Clipping (U1/U2/S3/P3, the reported bug):** fixed at the root. `CodeMirrorEditor` gained an
 >   `autoHeight` mode (grow to content, scroll only past `maxHeight`). A new `ReadOnlyCodeBlock`
