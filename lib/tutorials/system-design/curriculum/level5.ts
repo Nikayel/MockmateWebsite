@@ -243,6 +243,54 @@ cost, remember causal is the strongest model available under partition, keep rep
 separate from ACID isolation, and always reach for the weakest model that is still correct.
 `.trim()
 
+const sessionGuaranteesTeach = `
+## Most "the app feels broken" bugs are not deep
+
+A user updates their profile photo, the page reloads, and the old photo is back. They post a comment,
+refresh, and it is gone. Nothing is corrupted; a read hit a replica that had not caught up. The fix
+is not global linearizability. It is the four **client-centric session guarantees** (from the Bayou
+system), which promise consistency *relative to one client's own view* rather than globally. That is
+usually exactly what the product needs, and it is far cheaper.
+
+The setup that causes the pain: writes go to a **primary**, reads are served from **asynchronous read
+replicas** that lag by anywhere from a few milliseconds to seconds. Each guarantee patches one
+symptom of that lag.
+
+- **Read-your-writes (read-after-write):** once you have written a value, your later reads never
+  return an *older* value. Symptom without it: you edit your bio, reload, and see the old bio.
+- **Monotonic reads:** if you read a value, later reads never show you an *earlier* state. Symptom
+  without it: you refresh a thread, see 10 comments, refresh again and see 8. Time goes backward.
+- **Monotonic writes:** your writes are applied in the order you issued them. Symptom without it: you
+  set status to "away" then "online," but a replica applies them out of order.
+- **Writes-follow-reads (causal on your session):** if you read X and then write Y in response,
+  everyone sees X before Y. Symptom without it: your reply shows up on a replica that has not yet
+  received the comment it answers.
+
+### How you actually implement them
+
+1. **Sticky routing.** After a user writes, pin their reads to the primary (or to the specific
+   replica that has the write) for a short window, via a cookie or a "read from primary for N
+   seconds" flag. Simple; delivers read-your-writes and monotonic reads for a single session on a
+   single device.
+2. **Version tokens.** On each write, return a **logical version** (a WAL position / LSN, a commit
+   timestamp, an opaque "consistency token"). The client sends it back on reads, and the read path
+   either routes to a replica that has caught up to that version or waits until it has.
+
+**Interview nuance:** the sharp follow-up is the **cross-device** case. Sticky sessions live in one
+client's cookie, so they do nothing when you write on your phone and read on your laptop. Only a
+**shared version token** carried per user (or a read-from-primary window keyed on the user, not the
+connection) fixes cross-device read-your-writes. If you only mention stickiness, expect "what about
+my other device?"
+
+These guarantees are strictly weaker than linearizability (they say nothing about what *other* users
+see relative to each other), which is the whole point: user-visible correctness for a fraction of the
+coordination cost.
+
+Recap: the four session guarantees fix the common lag symptoms per client, implement them with sticky
+routing or version/LSN tokens, remember tokens are required for cross-device, and never promise
+read-your-writes off async replicas with neither routing nor a token.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -457,6 +505,54 @@ export const systemDesignLevel5: DesignLevel = {
               "**Place-order decrement: linearizable, single-key.** The actual 'reserve one unit' must be a linearizable conditional decrement on the item's stock key (compare-and-set: decrement only if remaining > 0), so the (N+1)th sale of an N-stock item is never authorized. Scope the coordination to the single hot key (a per-item leader/partition or an atomic counter in a strongly consistent store): per-SKU coordination, not global.",
               "**The hot-SKU mitigation:** a doorbuster becomes a serialization point, so pre-allocate stock into per-shard buckets (sell 1000 units as 10 buckets of 100) to spread contention.",
               "**The through-line:** each surface gets the weakest model that keeps *its* invariant, with the anomaly named (stale badge, resurrected cart item) and real coordination spent only where overselling is unacceptable.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-session-guarantees",
+          title: "Client-Centric Session Guarantees",
+          summary:
+            "Fix per-client staleness bugs with the four Bayou session guarantees, implemented via sticky routing or version tokens, with tokens required for cross-device correctness.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["session-guarantees", "consistency"],
+          teach: {
+            markdown: sessionGuaranteesTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-session-guarantees-apply",
+            prompt:
+              "Add read-your-writes and monotonic-reads guarantees to a read-replica architecture where a user writes to the primary and reads from lagging replicas.",
+            thinkAbout: [
+              "Which guarantee does each user-visible symptom violate?",
+              "How do sticky routing and version tokens implement them?",
+              "Where do cross-device cases break sticky sessions?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a single primary handling writes, async read replicas lagging tens of ms normally and seconds under load, reads load-balanced across the pool. Bug reports: 'I saved it but it shows the old value' (read-your-writes violation) and 'I refreshed and my item count went down' (monotonic-reads violation).",
+              "**Design with version tokens:** on every write, the primary returns the commit position (replication log LSN / commit timestamp). The client stores this token per user and sends it on every read; the read router picks a replica whose applied-LSN is at least the token's, waiting briefly or falling back to the primary if none has caught up. This gives read-your-writes, and because the token only moves forward, monotonic reads too. Advance the client's stored token to the max LSN seen on reads, not just writes, so monotonic-reads holds even for read-only sessions.",
+              "**The cheaper, coarser alternative: sticky routing.** For N seconds after a write, route that user's reads to the primary via a signed cookie. One flag, no per-request LSN bookkeeping, covers most single-device cases. Ship stickiness first; add tokens where the guarantee must survive replica changes or long sessions.",
+              "**Cross-device:** sticky-session state lives in one browser's cookie, so a write on the phone does nothing for a read on the laptop. Fix: carry the version token server-side, keyed on the user ('user U has committed up to LSN L' in Redis, checked on every read for U), converting a per-connection guarantee into a per-user one.",
+              "Common wrong turn: promising read-your-writes while reading off async replicas with neither sticky routing nor a token. Replica lag guarantees a stale read some fraction of the time; 'we have replicas' does not fix it.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-session-guarantees-practice",
+            prompt:
+              "Design session-guarantee handling for Twitter/X's 'compose tweet then land on your profile timeline' flow at read-replica scale (a fan-out timeline served from many geo-distributed cache and DB replicas), where a user commonly composes on mobile and immediately opens the web app, and must see their own new tweet at the top.",
+            thinkAbout: [
+              "Where must the 'user U wrote up to T' fact live for the phone-then-web case to work?",
+              "How do you avoid making the whole timeline linearizable for one UX requirement?",
+              "What keeps refresh and paging from revealing an earlier state?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: writes go to a primary and fan out to timeline caches and geo replicas lagging ms to seconds; the user's own new tweet appearing instantly on their profile is a hard product requirement, cross-device.",
+              "**Design:** the moment the tweet commits, the write path returns a commit token (tweet id plus commit timestamp/LSN) and, critically, records 'user U wrote up to token T' in a shared per-user marker in a fast global store (Redis / edge KV replicated to regions), not just the client. Any device opening U's profile reads the marker and requires its timeline read to reflect at least T; if the local replica or cache has not caught up, the read waits a bounded few hundred ms or falls back to the authoritative store for U's own tweets. Because the marker is per-user and server-side, the phone-then-web case works.",
+              "**Monotonic reads across scrolling:** carry the highest observed token so paging and refresh never reveal an earlier state (no tweets vanishing on refresh).",
+              "**Deliberately stay eventual for everyone else:** other users seeing the tweet a second or two later is fine and buys full availability and cheap fan-out.",
+              "**The scale trick:** do not make the whole timeline linearizable. Special-case the author's own recent writes: prepend the just-written tweet from a small 'my recent tweets' authoritative read merged over the eventually-consistent fanned-out timeline. Read-your-writes only for your own content gives the instant-feedback UX while keeping the hot fan-out path eventually consistent.",
+              "Common wrong turn: relying on client-side stickiness, which cannot survive the mobile-to-web device switch and leaves the user staring at a timeline missing the tweet they just posted.",
             ],
           },
         },
