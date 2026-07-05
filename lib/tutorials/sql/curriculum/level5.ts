@@ -1178,6 +1178,173 @@ INSERT INTO late_deliveries VALUES (2, '2026-03-08');`,
   }),
 }
 
+const asOfScd2Join: SqlLesson = {
+  id: "sql-l5-as-of-scd2-join",
+  title: "Point-in-Time (As-Of) Joins Against an SCD2 Dimension",
+  summary:
+    "Join a fact to the dimension version that was valid at event time using a half-open effective range, not the is_current row.",
+  estimatedMinutes: 28,
+  difficulty: "medium",
+  skills: [
+    "snowflake-warehouse",
+    "point-in-time join",
+    "as-of join",
+    "SCD2 history",
+    "effective_from/effective_to range predicate",
+    "late-arriving fact",
+  ],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## History is worthless if you only ever read the current row
+
+L4 built a Type-2 (SCD2) dimension: every time a customer attribute changes, you close the old row by setting its \`effective_to\` and open a new one, so the table keeps the full history with \`effective_from\` and \`effective_to\` ranges and an \`is_current\` flag. The point of keeping that history is to answer "what was true then", and that is exactly what most people get wrong. They join on \`is_current = 1\`, which staples today's attribute onto every historical fact. An order placed while the customer was in the east region gets mislabeled west because that is where they live now.
+
+## The as-of (point-in-time) join
+
+Join the fact to the dimension version whose validity window contains the event date:
+
+\`\`\`sql
+JOIN dim_customer d
+  ON d.customer_id = o.customer_id
+ AND o.event_date >= d.effective_from
+ AND o.event_date <  d.effective_to
+\`\`\`
+
+The half-open range (\`>=\` on the low end, \`<\` on the high end) is deliberate: a change that takes effect on a date belongs to the new version, and no event ever matches two versions. The same predicate handles a late-arriving fact: an order that lands after its dimension already changed still joins to the version that was valid on its event date, not the newest one.
+
+**Interview nuance:** get the boundary right or you double-count. If both ends were inclusive, an event on a change date would match the old and the new version at once, and the fact would fan out to two rows. Half-open ranges are how point-in-time joins stay one-to-one.
+
+> **In the warehouse this differs.** Snowflake, BigQuery, and DuckDB offer an \`ASOF JOIN\` keyword that finds the most recent dimension row at or before the event, so you do not write the range by hand. SQLite has no \`ASOF JOIN\`, so you express the same result with the half-open range predicate. The correctness idea, attach the version that was valid then and not the current one, is dialect-independent.`,
+    demoSeedSql: `CREATE TABLE dim_customer (customer_id INTEGER, region TEXT, effective_from TEXT, effective_to TEXT, is_current INTEGER);
+INSERT INTO dim_customer VALUES
+  (1, 'east', '2026-01-01', '2026-03-01', 0),
+  (1, 'west', '2026-03-01', '9999-12-31', 1),
+  (2, 'north', '2026-01-01', '9999-12-31', 1);
+CREATE TABLE fact_orders (order_id INTEGER, customer_id INTEGER, event_date TEXT, amount INTEGER);
+INSERT INTO fact_orders VALUES
+  (100, 1, '2026-02-15', 50), (101, 1, '2026-03-10', 80), (102, 2, '2026-02-20', 30), (103, 1, '2026-03-01', 40);`,
+    demoCode: `-- region_as_of is what was true then; region_current is is_current. Order 100 shows the gap.
+SELECT o.order_id, o.event_date,
+  asof.region AS region_as_of,
+  cur.region  AS region_current
+FROM fact_orders o
+JOIN dim_customer asof
+  ON asof.customer_id = o.customer_id AND o.event_date >= asof.effective_from AND o.event_date < asof.effective_to
+JOIN dim_customer cur
+  ON cur.customer_id = o.customer_id AND cur.is_current = 1
+ORDER BY o.order_id;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-as-of-scd2-join-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that attaches to each order the customer region that was current on the order's \`event_date\`, as \`(order_id, region)\`, over \`fact_orders(order_id, customer_id, event_date, amount)\` and the Type-2 \`dim_customer(customer_id, region, effective_from, effective_to, is_current)\`.
+
+Join to the dimension version whose validity window contains \`event_date\` using a half-open range (\`>= effective_from AND < effective_to\`), not the \`is_current\` row. Alias the columns exactly as named.`,
+    starterCode: `-- Attach the region that was valid on each order's event_date (as-of join).
+SELECT o.order_id, d.region
+FROM fact_orders o
+JOIN dim_customer d
+  ON d.customer_id = o.customer_id
+  -- add the half-open effective-range predicate here
+;`,
+    hints: [
+      "The as-of predicate is `o.event_date >= d.effective_from AND o.event_date < d.effective_to`.",
+      "Do NOT filter on `d.is_current = 1`; that attaches today's region to old orders.",
+      "The half-open range means an event exactly on a change date joins to the new version only.",
+    ],
+    referenceSolution: `SELECT o.order_id, d.region
+FROM fact_orders o
+JOIN dim_customer d
+  ON d.customer_id = o.customer_id
+ AND o.event_date >= d.effective_from
+ AND o.event_date <  d.effective_to;`,
+    singleFile: {
+      seedSql: `CREATE TABLE dim_customer (
+  customer_id    INTEGER,
+  region         TEXT,
+  effective_from TEXT,
+  effective_to   TEXT,
+  is_current     INTEGER
+);
+INSERT INTO dim_customer VALUES
+  (1, 'east',  '2026-01-01', '2026-03-01', 0),
+  (1, 'west',  '2026-03-01', '9999-12-31', 1),
+  (2, 'north', '2026-01-01', '9999-12-31', 1);
+
+CREATE TABLE fact_orders (order_id INTEGER, customer_id INTEGER, event_date TEXT, amount INTEGER);
+INSERT INTO fact_orders VALUES
+  (100, 1, '2026-02-15', 50),
+  (101, 1, '2026-03-10', 80),
+  (102, 2, '2026-02-20', 30),
+  (103, 1, '2026-03-01', 40);`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["order_id", "region"],
+        rows: [
+          [100, "east"],
+          [101, "west"],
+          [102, "north"],
+          [103, "west"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-as-of-scd2-join-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns total revenue bucketed by the region effective at event time versus by the customer's current region, as \`(region, revenue_as_was, revenue_current)\`, over the same \`fact_orders\` and \`dim_customer\` tables.
+
+\`revenue_as_was\` sums \`amount\` grouped by the as-of region (the half-open range join); \`revenue_current\` sums \`amount\` grouped by the customer's \`is_current\` region. A region with no revenue under one attribution shows \`0\`. Alias the columns exactly as named.`,
+    starterCode: `-- Revenue by as-was region vs by current region, side by side.
+WITH as_was AS (
+  -- SUM(amount) grouped by the as-of region (half-open range join)
+),
+current AS (
+  -- SUM(amount) grouped by the is_current region
+)
+SELECT
+  -- one row per region with both revenue columns (0 where a region is missing on one side)
+;`,
+    hints: [
+      "`as_was` joins with the half-open range; `current` joins with `d.is_current = 1`. Group each by region.",
+      "Build the region key set with `SELECT region FROM as_was UNION SELECT region FROM current`.",
+      "LEFT JOIN both aggregates to that key set and `COALESCE(rev, 0)` so a missing side reads 0.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE dim_customer (
+  customer_id    INTEGER,
+  region         TEXT,
+  effective_from TEXT,
+  effective_to   TEXT,
+  is_current     INTEGER
+);
+INSERT INTO dim_customer VALUES
+  (1, 'east',  '2026-01-01', '2026-03-01', 0),
+  (1, 'west',  '2026-03-01', '9999-12-31', 1),
+  (2, 'north', '2026-01-01', '9999-12-31', 1);
+
+CREATE TABLE fact_orders (order_id INTEGER, customer_id INTEGER, event_date TEXT, amount INTEGER);
+INSERT INTO fact_orders VALUES
+  (100, 1, '2026-02-15', 50),
+  (101, 1, '2026-03-10', 80),
+  (102, 2, '2026-02-20', 30),
+  (103, 1, '2026-03-01', 40);`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["region", "revenue_as_was", "revenue_current"],
+        rows: [
+          ["east", 50, 0],
+          ["north", 30, 30],
+          ["west", 120, 170],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -1205,7 +1372,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.2: The Warehouse and Modeling Round",
       description:
         "Modeling-round asks on a Snowflake, BigQuery, or Databricks-shaped stack: semi-structured JSON extraction, advanced fact grains, as-of joins, and join fan-out.",
-      lessons: [jsonVariantFlatten, factGrainsAccumulatingSnapshot],
+      lessons: [jsonVariantFlatten, factGrainsAccumulatingSnapshot, asOfScd2Join],
     },
   ],
 }
