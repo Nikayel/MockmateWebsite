@@ -869,6 +869,130 @@ INSERT INTO customers (customer_id, total_spend) VALUES
   },
 }
 
+// ---------------------------------------------------------------------------
+// Module 5.2 — Round 2: The Warehouse and Modeling Round
+// ---------------------------------------------------------------------------
+
+const jsonVariantFlatten: SqlLesson = {
+  id: "sql-l5-json-variant-flatten",
+  title: "Semi-Structured Data: JSON/VARIANT Extraction and Array Flattening",
+  summary:
+    "Shred JSON into typed columns with the path operator, explode nested arrays with json_each, and avoid the double-count trap.",
+  estimatedMinutes: 36,
+  difficulty: "hard",
+  skills: [
+    "snowflake-warehouse",
+    "json_extract",
+    "->> operator",
+    "json_each",
+    "array fan-out",
+    "double-count trap",
+  ],
+  teach: {
+    estimatedMinutes: 12,
+    markdown: `## Semi-structured data lands as JSON, and you shred it in SQL
+
+Modern pipelines ingest a lot of JSON: event payloads, API responses, webhook bodies. It arrives in one text (or VARIANT) column, and your job is to shred it into typed columns and to explode its nested arrays into rows. Two operations cover almost every question: scalar extraction and array fan-out.
+
+## Scalar extraction
+
+On \`raw_events(id, payload)\`, pull a scalar with the path operator. \`payload ->> '$.user.country'\` returns the value at that path as text, and \`NULL\` when the key is absent, so a missing field never errors, it simply goes null. Because SQLite is loosely typed, wrap numeric fields in \`CAST(... AS REAL)\` or \`CAST(... AS INTEGER)\` so downstream math behaves. (\`json_extract(payload, '$.user.country')\` is the function form of the same thing; \`->>\` is the operator sugar for it.)
+
+## Array fan-out
+
+A nested array becomes one row per element with \`json_each\`. Writing \`FROM raw_events r, json_each(r.payload, '$.items') je\` joins each parent row to its array elements, which is a LATERAL join, and \`je.value ->> '$.sku'\` reads a field out of each element. Now you can group and aggregate the exploded rows.
+
+## The double-count trap
+
+The moment you explode an array, the parent's scalar columns repeat once per element. If \`order_total\` is a parent field and you write \`SUM(order_total)\` in the same query that fans out a two-item array, you count the total twice. The demo shows \`naive_sum_doubles\` reporting 200 for a true total of 100. Fix it by exploding in an isolated CTE or subquery, or by aggregating the parent before you fan out. Keep the two grains apart.
+
+**Interview nuance:** always ask what grain the answer should be at. "Revenue per order" stays at the order grain, so you never explode line items to get it; "units per sku" needs the item grain, so you must explode. Mixing the two grains is the classic semi-structured bug.
+
+> **In the warehouse this differs.** Snowflake stores this as a \`VARIANT\` column and writes \`LATERAL FLATTEN(input => payload:items)\`, reading \`value:sku::string\`. BigQuery uses \`UNNEST\` over a \`REPEATED\` field with \`JSON_VALUE\`. Databricks and Spark use \`explode()\` and \`from_json\`. \`json_each\` is the same lateral fan-out, and the double-count trap is identical in all four.`,
+    demoSeedSql: `CREATE TABLE raw_events (id INTEGER PRIMARY KEY, payload TEXT);
+INSERT INTO raw_events (id, payload) VALUES
+  (1, '{"order_total":100,"items":[{"sku":"A","qty":2},{"sku":"B","qty":1}]}');`,
+    demoCode: `-- order_total is a parent scalar. Summing it across exploded item rows doubles it.
+SELECT
+  (SELECT payload ->> '$.order_total' FROM raw_events) AS true_order_total,
+  SUM(CAST(r.payload ->> '$.order_total' AS INTEGER))  AS naive_sum_doubles,
+  SUM(CAST(je.value ->> '$.qty' AS INTEGER))           AS total_qty
+FROM raw_events r, json_each(r.payload, '$.items') je;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-json-variant-flatten-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns, for each event, its \`id\`, the user's country, and the amount, as \`(id, country, amount)\`, over \`raw_events(id, payload)\` where \`payload\` is JSON.
+
+Read \`country\` from the path \`$.user.country\` as text, and \`amount\` from \`$.amount\` cast to \`REAL\`. Rows whose payload is missing a key must return \`NULL\` for that column, not error. Alias the columns exactly as named.`,
+    starterCode: `-- Shred scalar fields out of each JSON payload; missing keys become NULL.
+SELECT id,
+  -- country from $.user.country, amount from $.amount cast to REAL
+FROM raw_events;`,
+    hints: [
+      "The path operator `payload ->> '$.user.country'` returns text and yields NULL for a missing key.",
+      "Wrap the amount in `CAST(payload ->> '$.amount' AS REAL)` so it is numeric.",
+      "No CASE or COALESCE is needed; a missing key already returns NULL.",
+    ],
+    referenceSolution: `SELECT id,
+       payload ->> '$.user.country' AS country,
+       CAST(payload ->> '$.amount' AS REAL) AS amount
+FROM raw_events;`,
+    singleFile: {
+      seedSql: `CREATE TABLE raw_events (id INTEGER PRIMARY KEY, payload TEXT);
+INSERT INTO raw_events (id, payload) VALUES
+  (1, '{"user":{"id":7,"country":"US"},"amount":"120.50","items":[{"sku":"A","qty":2},{"sku":"B","qty":1}]}'),
+  (2, '{"user":{"id":8},"amount":"50","items":[{"sku":"A","qty":3}]}'),
+  (3, '{"user":{"id":9,"country":"CA"},"items":[{"sku":"C","qty":5}]}');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["id", "country", "amount"],
+        rows: [
+          [1, "US", 120.5],
+          [2, null, 50],
+          [3, "CA", null],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-json-variant-flatten-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the total quantity sold per sku from the nested \`items\` array, as \`(sku, total_qty)\`, over the same \`raw_events(id, payload)\` table.
+
+Explode the \`$.items\` array so each item becomes a row, read \`sku\` and \`qty\` from each element, and sum \`qty\` per \`sku\`. Explode in isolation so no parent scalar is double-counted. Alias the columns exactly as named.`,
+    starterCode: `-- Total quantity per sku, exploding the items array with json_each.
+SELECT
+  -- sku and SUM(qty) from the exploded $.items elements
+FROM raw_events r, json_each(r.payload, '$.items') je
+GROUP BY sku;`,
+    hints: [
+      "`json_each(r.payload, '$.items')` yields one row per array element; each element is in `je.value`.",
+      "Read fields from an element with `je.value ->> '$.sku'` and `je.value ->> '$.qty'`.",
+      "`SUM(CAST(je.value ->> '$.qty' AS INTEGER))` grouped by the sku.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE raw_events (id INTEGER PRIMARY KEY, payload TEXT);
+INSERT INTO raw_events (id, payload) VALUES
+  (1, '{"user":{"id":7,"country":"US"},"amount":"120.50","items":[{"sku":"A","qty":2},{"sku":"B","qty":1}]}'),
+  (2, '{"user":{"id":8},"amount":"50","items":[{"sku":"A","qty":3}]}'),
+  (3, '{"user":{"id":9,"country":"CA"},"items":[{"sku":"C","qty":5}]}');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["sku", "total_qty"],
+        rows: [
+          ["A", 5],
+          ["B", 1],
+          ["C", 5],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -890,6 +1014,13 @@ export const sqlLevel5: SqlLevel = {
         funnelConversion,
         windowFramesAndQualify,
       ],
+    },
+    {
+      id: "sql-l5-modeling-round",
+      title: "Module 5.2: The Warehouse and Modeling Round",
+      description:
+        "Modeling-round asks on a Snowflake, BigQuery, or Databricks-shaped stack: semi-structured JSON extraction, advanced fact grains, as-of joins, and join fan-out.",
+      lessons: [jsonVariantFlatten],
     },
   ],
 }
