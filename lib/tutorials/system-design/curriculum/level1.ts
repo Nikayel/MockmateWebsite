@@ -226,6 +226,59 @@ replay), you cut cost with session resumption and connection reuse, you choose t
 internal visibility for edge features, and mTLS gives services cryptographic identity for zero-trust.
 `.trim()
 
+const httpVersionsTeach = `
+## The recurring villain: head-of-line blocking
+
+Each HTTP version exists to fix a specific bottleneck of the previous one, and the recurring villain
+is **head-of-line (HOL) blocking**: a stuck item stalls everything behind it. Knowing where HOL
+blocking bites in each version is the whole lesson.
+
+### HTTP/1.1
+
+One request in flight per connection. You send a request, you wait for its full response, then you
+send the next. Keep-alive lets you reuse the connection but not overlap requests (pipelining exists
+on paper but is broken in practice). To get parallelism, browsers open about 6 connections per host,
+which means 6 handshakes and 6 slow-start ramps, and everything past 6 queues. HOL blocking here is
+at the request level: a slow response blocks its whole connection.
+
+### HTTP/2
+
+Multiplexing. Many requests become independent **streams** over a single TCP connection, interleaved
+as frames, so you send all your requests at once and responses come back concurrently over one warm
+connection. Add header compression (HPACK), since HTTP headers are hugely repetitive. This kills
+application-level HOL blocking and the 6-connection tax. But there is a catch that interviewers love:
+**TCP-level HOL blocking remains**. Because all streams ride one TCP connection, a single lost TCP
+packet stalls TCP's ordered delivery, and every multiplexed stream waits for that retransmission,
+even streams whose data already arrived. On a clean network you never notice; on a lossy one, H2 can
+be worse than H1's separate connections.
+
+### HTTP/3 over QUIC
+
+QUIC is a new transport built on **UDP** that reimplements reliability, ordering, and congestion
+control per stream. Because each stream is independently reliable, a lost packet only stalls its own
+stream, not the others: **QUIC removes TCP-level HOL blocking**. It also folds the transport and TLS
+handshake together for a faster (often 1-RTT, 0-RTT on resumption) setup, and supports **connection
+migration**: the connection is identified by a connection ID, not the 4-tuple, so a phone switching
+from Wi-Fi to cellular (new IP) keeps the same connection instead of re-handshaking.
+
+When does H3 actually win? On **lossy and mobile networks** and paths with **many short
+connections**, where per-stream independence and connection migration matter most. On a stable,
+low-loss, high-bandwidth link (two datacenters), H3's advantage over H2 is marginal, and UDP can even
+be throttled or blocked by some middleboxes, and its user-space congestion control can burn more CPU
+than kernel TCP. So H3 is a clear win at the mobile-facing edge, a weak case for stable internal
+links.
+
+**Interview nuance:** **gRPC runs on HTTP/2 today**. So internal service-to-service RPC is naturally
+H2 (multiplexed streams, which gRPC needs for streaming). The common real topology: public edge on H2
+and H3 (serve mobile users the H3 benefit, fall back to H2), internal RPC on H2/gRPC where the
+network is stable and H3 adds little.
+
+Recap: HOL blocking is the theme, H1 blocks per request and needs ~6 connections, H2 multiplexes over
+one TCP connection but still suffers TCP-level HOL blocking on loss, H3/QUIC removes it with
+per-stream reliability over UDP plus connection migration, so use H3 at the lossy/mobile edge and
+keep stable internal RPC on H2/gRPC.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -435,6 +488,57 @@ export const systemDesignLevel1: DesignLevel = {
               "**Keeping latency in budget:** (1) TLS 1.3 for 1-RTT handshakes; (2) aggressive connection reuse/pooling between sidecars so the handshake amortizes over thousands of requests (steady state is symmetric-key encryption, cheap and often hardware-accelerated AES-NI); (3) session resumption for reconnects; (4) shallow call graphs so handshake RTTs do not stack. Do not enable 0-RTT: these are payment mutations, and 0-RTT's replay risk is unacceptable for a charge.",
               "**Tradeoff:** full mesh mTLS is operationally heavy (CA, sidecars, rotation infra) and adds a small per-connection cost, but it is the only way to satisfy 'encrypted everywhere, attributable everywhere.' The latency hit is contained because reuse makes handshakes rare and symmetric crypto is cheap.",
               "Common wrong turn: edge-terminating to plaintext internally 'because the VPC is private,' which violates the compliance rule, or using long-lived certs that become a rotation-outage and leak-blast-radius problem.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-http-versions",
+          title: "HTTP/1.1 vs 2 vs 3 (QUIC)",
+          summary:
+            "Locate head-of-line blocking in each version: H1 blocks per request, H2 still stalls on TCP loss, H3/QUIC removes it, so H3 belongs at the mobile edge and H2/gRPC internally.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["http", "quic", "protocols"],
+          teach: {
+            markdown: httpVersionsTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-http-versions-apply",
+            prompt:
+              "Choose the HTTP version(s) for a public API plus its internal microservices and justify each with its failure and latency profile.",
+            thinkAbout: [
+              "Where does head-of-line blocking bite in H1, H2, and H3?",
+              "When does HTTP/3 over QUIC actually win?",
+              "What protocol does gRPC use today?",
+            ],
+            modelAnswerOutline: [
+              "Assume a public API serving mostly mobile and browser clients over the open internet, and a fleet of internal microservices on a low-loss datacenter network.",
+              "**Public edge: HTTP/3 (QUIC) with HTTP/2 fallback.** Public clients are on mobile and lossy links, exactly where H3 wins. Per-stream reliability means one lost packet stalls only its own stream, avoiding the TCP-level HOL blocking that hurts H2 on lossy networks. QUIC's connection migration keeps a user's connection alive across a Wi-Fi-to-cellular switch instead of forcing a fresh handshake, and its combined transport+TLS handshake shaves a round trip. Keep H2 as a fallback because some networks and middleboxes block or throttle UDP, and older clients need it.",
+              "**Latency and failure profile of the edge choice:** faster handshake, no cross-stream stalls on loss; if UDP is blocked, fall back cleanly to H2 over TCP.",
+              "**Internal microservices: HTTP/2, via gRPC.** gRPC runs on H2 today, and internal RPC benefits from H2's multiplexed streams and streaming support with contract-first Protobuf. The internal network is stable and low-loss, so H2's one weakness, TCP-level HOL blocking under packet loss, rarely triggers; H3 would add operational complexity and user-space congestion-control CPU cost for little benefit.",
+              "**Why not H1 anywhere new:** one request per connection forces ~6 connections per host (6 handshakes, 6 slow starts) and blocks per request; H2 multiplexing strictly dominates it on the same TCP transport.",
+              "**The committed tradeoff:** H3 at the edge buys mobile/lossy-network resilience and connection migration at the cost of UDP-middlebox risk (mitigated by H2 fallback); H2/gRPC internally buys mature multiplexed RPC on a network where H3's loss-resilience advantage does not pay for itself.",
+              "Common wrong turn: rolling H3 everywhere including stable internal links, where it adds CPU and operational cost for a benefit (loss resilience, migration) that a low-loss datacenter never needs.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-http-versions-practice",
+            prompt:
+              "Choose and justify the HTTP protocol strategy for a mobile game backend where players on flaky 4G in moving vehicles need low-latency state sync, plus a companion web dashboard and internal matchmaking services. Explain the failure mode you are optimizing against on the mobile path and where you would not use HTTP/3.",
+            thinkAbout: [
+              "What happens to a TCP connection when a moving vehicle's IP changes between towers?",
+              "Which state updates tolerate loss, and is even QUIC's reliability unwanted for them?",
+              "Where does H3 earn nothing, and what should those links use instead?",
+            ],
+            modelAnswerOutline: [
+              "The dominant constraint is players on flaky, mobile 4G in moving vehicles, the textbook case for HTTP/3, so the mobile path drives the decision.",
+              "**Mobile game clients: HTTP/3 over QUIC**, optimizing against two failure modes. First, packet loss: on 4G, loss is frequent, and under H2 a single lost TCP packet head-of-line-blocks every multiplexed stream until retransmission, so one dropped packet stalls unrelated state updates. QUIC's per-stream reliability confines the stall to the affected stream. Second, network changes: a moving vehicle hands off between cell towers and Wi-Fi, changing IP; under TCP that breaks the 4-tuple and forces a full reconnect and re-handshake mid-game. QUIC's connection migration keeps the same connection ID across the IP change, so the session survives. The faster QUIC handshake also helps on reconnects. Keep H2 fallback for networks that block UDP.",
+              "**For the truly latency-critical, loss-tolerant real-time state** (position updates), additionally consider a raw UDP or WebRTC data channel, since even QUIC's reliability is unwanted for data that is stale on arrival; for reliable game events QUIC is the sweet spot.",
+              "**Companion web dashboard: H2 with H3 where available.** Not latency-critical or mobile-hostile, so H2 multiplexing over one connection is plenty; H3 is a nice-to-have.",
+              "**Internal matchmaking and game services: H2/gRPC.** Contract-first Protobuf RPC on a stable, low-loss datacenter network. Exactly where NOT to use H3: the loss-resilience and migration benefits do not apply on a clean internal link, and H3's user-space congestion control just adds CPU and operational complexity.",
+              "**Tradeoff:** H3 on mobile buys survival of loss and network handoffs at the cost of UDP-middlebox risk (mitigated by fallback); H2/gRPC internally is the boring correct choice where H3 earns nothing.",
+              "Common wrong turn: forcing H3 on internal services for consistency, paying its cost with none of its mobile-network benefit, or running reliable game events over plain UDP and then reinventing retransmission badly.",
             ],
           },
         },
