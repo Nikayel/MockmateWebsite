@@ -116,6 +116,61 @@ edge in front of an L7 fleet, and the LB tier itself must be made HA (active-act
 anycast) so it is never a SPOF.
 `.trim()
 
+const lbAlgorithmsTeach = `
+## The rule for who gets the next request
+
+Once a load balancer has a pool of healthy backends, it needs a rule for **which one gets the next
+request**. The rule matters because the wrong one creates hotspots: some nodes melt while others sit
+idle.
+
+- **Round robin (RR):** hand requests out in rotation. **Weighted RR** biases toward bigger nodes. RR
+  is perfect when every node is identical and every request costs about the same. It is blind to how
+  busy a node actually is.
+- **Least-connections (least-outstanding-requests):** send the next request to the node with the
+  fewest in-flight requests. The right default when **request durations vary widely.** In a fleet
+  where most requests take 5ms but some take 2s, a node that caught several 2s requests keeps getting
+  new work on its RR turn even though it is buried; least-connections routes around it automatically
+  because its in-flight count is high. This is the single most important algorithm intuition.
+- **Power-of-two-choices (P2C):** for a **large** pool, tracking exact least-connections means an
+  O(N) scan or a globally synchronized structure, and when many LB nodes independently pick "the
+  least-loaded node," they **herd** onto whatever looked idle a moment ago. P2C fixes both: pick
+  **two backends at random**, send to the less-loaded of the two. Nearly as good as true
+  least-connections, O(1), no global state, provably avoids herding. The practical default for big
+  fleets (Envoy, Nginx).
+- **Consistent / rendezvous hashing:** hash a request key (user ID, session ID, cache key) to a
+  backend so the **same key always lands on the same node**, and when a node joins or leaves only
+  ~1/N of keys move. This is **sticky routing** without a lookup table: essential for cache-warm
+  nodes and sharded in-memory state.
+
+### Session affinity: a targeted tool, not a default
+
+**Sticky sessions** deliberately pin a client to one backend, usually via a **cookie** the LB sets or
+a **hash of the client IP / session ID**. You want it when a node holds warm per-user state and
+re-hitting the same node avoids a cold miss. But affinity has two real costs. First, **uneven load**:
+pinning means the balancer can no longer freely spread traffic, so a few heavy users skew load onto
+their pinned nodes. Second, **lost state on node death**: when the pinned node dies, everything it
+held is gone, and those users reconnect cold.
+
+**Interview nuance:** the crisp story: "round robin for homogeneous stateless nodes; least-connections
+when request durations vary; power-of-two-choices when the pool is large; consistent hashing when I
+need stickiness or sharded state, accepting that stickiness costs even load and loses state on node
+death." If you reach for sticky sessions to compensate for not externalizing state, that is a design
+smell; if you reach for consistent hashing to keep a cache warm, that is sound engineering. Same
+mechanism, different justification.
+
+\`\`\`
+   variable durations:
+   RR  -> buried node still gets its turn   (bad: hotspot)
+   LC  -> skip the buried node              (good)
+   P2C -> pick 2 random, send to lighter    (good + O(1), no herd, no global state)
+\`\`\`
+
+Recap: round robin for identical stateless nodes, least-connections for variable durations,
+power-of-two-choices as the O(1) no-herd default for large pools, and consistent/rendezvous hashing
+for sticky routing or sharded state; session affinity keeps a user on a cache-warm node but costs
+even load and loses that node's state when it dies, so use it deliberately.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -224,6 +279,55 @@ export const systemDesignLevel4: DesignLevel = {
               "**Why TLS terminates at the edge:** the expensive handshake happens close to the user (low RTT, fast setup), the edge can cache and inspect requests, and origin connection count collapses because thousands of client connections multiplex onto a few pooled origin connections. The cost: edge-to-origin traffic must be independently secured (re-encrypted or over a private backbone).",
               "**Failure handling:** L4 nodes are active-active and ECMP-balanced (one dying just removes a hash bucket); L7 nodes are health-checked and drained; a whole PoP failing withdraws its anycast route and the next PoP absorbs the load. No SPOF at any layer.",
               "Common wrong turn: plain (non-consistent) hashing or round robin at L4, so scaling the L7 fleet mid-day resets a large share of live TLS connections and causes a reconnect storm.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-lb-algorithms",
+          title: "Load-Balancing Algorithms & Session Affinity",
+          summary:
+            "Least-connections for variable durations, power-of-two-choices for large pools, consistent hashing for cache-warm stickiness, and affinity used deliberately, not by default.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["lb-algorithms", "affinity"],
+          teach: {
+            markdown: lbAlgorithmsTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l4-lb-algorithms-apply",
+            prompt:
+              "Pick a balancing algorithm for a fleet with highly variable request durations and explain how you keep a user pinned to a cache-warm node.",
+            thinkAbout: [
+              "Why does least-connections beat round robin for variable durations?",
+              "When is power-of-two-choices the practical large-pool default?",
+              "What is the downside of sticky sessions?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a stateless-ish app fleet where most requests take a few milliseconds but a meaningful tail runs hundreds of milliseconds to seconds (report generation, fan-out queries), and each node keeps a warm local cache for recently served users.",
+              "**Not round robin:** with variable durations, RR keeps handing new work to a node on its turn regardless of how buried it is, so a node that caught a few slow requests piles up while RR stays blind. Choose a load-aware rule: **least-connections** (route to the fewest in-flight requests), which naturally steers away from a node stuck on slow work.",
+              "**Once the fleet is large** (hundreds of nodes across many LB instances), use **power-of-two-choices**: pick two backends at random, send to the less loaded. Nearly the same smoothing as true least-connections, O(1), no global load table, and no herd effect where every LB piles onto the one node that momentarily looked idle.",
+              "**Cache-warm pinning: layer consistent hashing on top.** Hash the user (or session) ID to a backend so a returning user deterministically lands on the node with their data hot; because it is consistent hashing, adding or removing a node remaps only ~1/N of users rather than cold-flushing the fleet. Practically: affinity within a load-aware policy, with a fallback to a least-loaded node if the hashed target is overloaded or unhealthy (bounded-load consistent hashing).",
+              "**The downside called out:** affinity costs even load (heavy or long-lived users concentrate on their pinned nodes) and loses state on node death (those users reconnect cold and rebuild). Acceptable here because the cache is a performance optimization, not a source of truth; if the warm state were authoritative, externalize it rather than rely on stickiness.",
+              "Common wrong turn: round robin here (hotspots on slow requests) or rigid stickiness with no load-aware fallback, so one hot user melts their pinned node.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-lb-algorithms-practice",
+            prompt:
+              "Design the balancing and affinity strategy for Discord-style stateful gateway nodes where each node holds thousands of live connections plus per-guild in-memory fan-out state, request/message durations are highly variable, and a redeploy reshuffles the fleet several times a day.",
+            thinkAbout: [
+              "What does hash % N do to guild state on every deploy, and what fixes it?",
+              "How do you stop a viral guild from overloading its assigned node?",
+              "Which state must be rebuildable rather than durable for this to work?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a gateway fleet where each node holds many long-lived connections and per-guild fan-out state in memory; message-handling cost varies widely (a quiet DM vs a 100k-member guild broadcast); deploys rotate the fleet multiple times daily.",
+              "**Two interacting problems: balancing variable work, and keeping guild state coherent across a churning fleet.** For spreading connections and per-message work: least-connections / least-outstanding-requests so a node stuck fanning out to a huge guild stops receiving new connections. Because the fleet is large, implement it as power-of-two-choices: O(1), no global load table, no herd.",
+              "**Guild stickiness under churn:** naive `hash(guild) % N` is unusable because changing N (every deploy) remaps almost every guild and cold-flushes all state. Use consistent hashing (or rendezvous hashing) on guild ID, so a guild deterministically maps to a node and its warm fan-out state, and a deploy migrates only ~1/N of guilds.",
+              "**The viral-guild escape valve:** pair with bounded-load consistent hashing so a hot guild does not overload its assigned node: past a load threshold, overflow spills to the next node in the ring.",
+              "**Deploy handling:** affinity loses in-memory state on node death, so drain connections gracefully, let clients reconnect, and treat per-guild fan-out state as rebuildable (reload from the authoritative store on reconnect) rather than durable.",
+              "Common wrong turn: `hash % N` stickiness, which turns every deploy into a fleet-wide cache stampede as nearly every guild remaps at once; consistent hashing bounds that churn to a small fraction.",
             ],
           },
         },
