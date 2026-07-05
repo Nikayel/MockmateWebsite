@@ -1034,6 +1034,67 @@ Law (L = arrival_rate x latency) sizes your concurrency and exposes when latency
 throughput.
 `.trim()
 
+const resiliencePrimitivesTeach = `
+## How one slow dependency becomes an outage
+
+A distributed system fails one dependency at a time, and the way one failure becomes an outage is
+almost always the caller mishandling a slow or broken downstream. The client-side call policy is your
+primary defense, and it has four moving parts: timeouts, retries, circuit breakers, and isolation.
+
+### Timeouts
+
+Every network call must have one. The default in most HTTP clients is infinite or 30+ seconds, which
+is a trap: when a downstream stalls, your threads (or async slots) block waiting, the pool drains,
+and you stop serving healthy requests too. This is the classic cascading failure. Set the timeout
+from the downstream's SLO (for example, if it promises p99 of 50ms, time out at maybe 150ms), and
+**propagate a deadline** down the call chain. If the top-level request has a 300ms budget and 200ms
+is already spent, the next hop should be told it has 100ms left, not handed a fresh 150ms. gRPC
+deadlines and context propagation do this for you; without it, downstreams do work for a client that
+already gave up.
+
+### Retries
+
+A retry can turn a transient blip into a success, but only under two conditions. First, the operation
+must be **idempotent or the error safely retryable** (a timeout on a non-idempotent POST might have
+already charged the card). Use idempotency keys so a retried write dedupes. Second, retries must have
+**exponential backoff with jitter**. Without backoff, thousands of clients retry in lockstep the
+instant a service hiccups, creating a synchronized thundering herd that keeps the service down (a
+"retry storm"). Backoff spreads them out; jitter (randomizing the delay) breaks the synchronization.
+Cap the total with a **retry budget**: allow retries only up to, say, 10% of request volume, so a
+widespread failure cannot multiply your load 3x and turn a partial outage into a total one.
+
+**Interview nuance:** "Retries make it more reliable" is only half true. The senior answer names the
+failure mode retries cause (retry amplification) and the three guards: idempotency,
+backoff-with-jitter, and a retry budget.
+
+### Circuit breaker
+
+When a downstream is genuinely down, retrying at all is waste that adds load. A circuit breaker
+tracks the recent failure rate and has three states. **Closed:** calls flow normally. When failures
+cross a threshold (for example 50% of the last 20 calls), it trips to **Open:** calls fail fast
+immediately without touching the network, giving the downstream room to recover and freeing your
+threads. After a cool-down it goes **Half-open:** it lets a trickle of trial calls through, and if
+they succeed it closes, if they fail it re-opens. This converts a slow, thread-eating failure into a
+fast, cheap one.
+
+### Isolation and fallback
+
+**Bulkheads** give each dependency its own bounded connection pool or thread pool, so one slow
+dependency drowns only its own bulkhead instead of every thread in the process (the pattern that
+named the Hystrix library). When a call fails fast, **degrade gracefully**: serve a cached value, a
+default, or a partial response rather than an error.
+
+\`\`\`
+Closed --failures over threshold--> Open --cool-down--> Half-open --trial ok--> Closed
+   ^                                                         |
+   +---------------- trial fails ----------------------------+
+\`\`\`
+
+Recap: Give every call a propagated deadline, retry only idempotent errors with backoff, jitter, and
+a budget, trip a circuit breaker to fail fast when a dependency is down, and isolate with bulkheads
+so one slow dependency cannot drain the whole caller.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1978,6 +2039,56 @@ export const systemDesignLevel1: DesignLevel = {
               "**Capacity by Little's Law:** at 500k pages/sec and a 300ms budget, in-flight pages average 500000 x 0.3 = 150000, and each page holds up to 100 downstream calls, so downstream connection pools and thread/async budgets must be sized against the fan-out, not the page count.",
               "**Headroom:** provision to keep every tier well under ~70% utilization at peak, because latency explodes as utilization approaches 100%.",
               "Common wrong turn: setting a single p99 SLO on the page and assuming healthy per-backend p99s will deliver it, when fan-out math says they will not.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-resilience-primitives",
+          title: "Timeouts, Retries, Backoff & Circuit Breakers",
+          summary:
+            "Propagated deadlines on every call, retries gated by idempotency with backoff-jitter-budget, circuit breakers to fail fast, and bulkheads to contain the blast.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["resilience", "retries", "circuit-breaker"],
+          teach: {
+            markdown: resiliencePrimitivesTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-resilience-primitives-apply",
+            prompt:
+              "Design the client-side call policy for a flaky downstream dependency so a slow dependency cannot take down the caller.",
+            thinkAbout: [
+              "Why does every network call need a timeout and a propagated deadline?",
+              "When is a retry safe, and why do you need jitter and a retry budget?",
+              "What do the circuit-breaker states do?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a service calling a downstream pricing API that promises p99 of 40ms but occasionally stalls or returns 503s during deploys; a 250ms end-to-end budget and a bounded thread pool.",
+              "**Timeouts and deadlines:** per-call timeout derived from the downstream SLO, roughly 120ms (a few multiples of its p99, not its worst case). Critically, propagate a deadline (gRPC deadline or context header): if 200ms of the 250ms budget is already gone, the pricing call gets 50ms and fails fast instead of doing work that will be discarded. This keeps the thread pool from filling with requests waiting on a downstream that already blew the budget, which is how a slow dependency cascades into your own outage.",
+              "**Retries:** only on idempotent, retryable errors: connection failures, 503s, timeouts on safe reads. Writes carry an idempotency key so a retry dedupes rather than double-charges. Exponential backoff with full jitter (base 20ms, doubling, randomized) so clients do not resynchronize into a thundering herd on recovery. Cap at a retry budget of ~10% of traffic, so a broad failure cannot triple outbound load: at most 1 to 2 retries per request, never unbounded.",
+              "**Circuit breaker:** closed normally; if failures exceed ~50% over a rolling window of 20 calls it opens and fails fast (serving a fallback) for a cool-down of a few seconds, then half-open to test with a few trial calls before closing. This stops hammering a downed dependency and frees threads instantly.",
+              "**Isolation and fallback:** the pricing dependency gets its own bulkhead (a bounded pool), so a stall exhausts only its pool, not the whole process. On failure, degrade: serve a slightly stale cached price or a default rather than failing the user's request.",
+              "Common wrong turn: adding retries with no backoff, no jitter, no idempotency, and no budget, which turns a brief downstream hiccup into a self-inflicted retry storm that keeps the dependency down.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-resilience-primitives-practice",
+            prompt:
+              "Design the resilience policy for Stripe's payment-charge path when its downstream fraud-scoring service degrades under a traffic spike, where charges must not be double-executed and the fraud check is on the critical path. Specify exactly how retries, deadlines, and the breaker behave for a money-moving, non-idempotent operation.",
+            thinkAbout: [
+              "What must be in place before any retry of a money-moving operation is safe?",
+              "On a fraud-check timeout, is failing open or failing closed the expensive error?",
+              "When the breaker opens, who decides the fallback: the code or the business?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the charge operation moves money and is not naturally idempotent, fraud scoring is on the critical path, and correctness (never double-charge, never approve fraud incorrectly) outranks latency.",
+              "**Idempotency first, non-negotiable:** every charge carries a client-supplied idempotency key, and the charge service dedupes on it, so a retry arriving after a first attempt already succeeded returns the original result instead of charging twice. This is what makes retrying safe at all here.",
+              "**Deadlines with fail-closed:** the fraud call gets a tight, propagated deadline (say 200ms of the charge's budget). On timeout, do NOT silently approve; for a money path the fraud check fails closed (decline or queue for manual review), because approving an unscored charge is the expensive error.",
+              "**Retries, tightly bounded:** the fraud call is retried at most once, with jittered backoff, only on clearly transient errors, under a retry budget so a spike cannot amplify load into the already-struggling fraud service.",
+              "**Circuit breaker with a business-decision fallback:** when the breaker opens because fraud scoring is broadly down, failing fast is correct, but the fallback is a policy choice: decline (safest, hurts conversion), route to a cheaper cached/heuristic model, or approve-and-async-review small low-risk charges under a strict cap. Degrade to the heuristic model for low-risk charges and fail closed above a risk/amount threshold.",
+              "**Bulkhead:** fraud scoring gets its own bounded pool so its stall never drains the charge service's threads.",
+              "Common wrong turn: retrying the non-idempotent charge itself (not just the fraud read) without an idempotency key, or failing OPEN on a fraud timeout and letting unscored charges through under load.",
             ],
           },
         },
