@@ -307,6 +307,62 @@ between neighbors; virtual nodes smooth load, spread rebalancing, and enable wei
 caps hotspots; and rendezvous hashing is a ring-free alternative for small replica-selection cases.
 `.trim()
 
+const shardKeyHotspotsTeach = `
+## The decision you cannot cheaply undo
+
+Consistent hashing spreads keys evenly *given* good keys. The shard key itself is the higher-leverage
+decision, and it is the one you cannot cheaply undo. A bad shard key silently rebuilds a single-node
+bottleneck inside your distributed system, and changing it later means migrating the whole dataset.
+
+A good shard key has three properties. **High cardinality:** many distinct values, so load can
+actually spread. Sharding by \`country\` or \`status\` (a handful of values) means a handful of
+partitions, and one value dominates. **Even access distribution:** not just many values, but roughly
+uniform *traffic* per value. A high-cardinality key where 1% of values get 99% of reads is still a
+hotspot. **Alignment to the dominant query:** the key the most frequent/critical query filters on, so
+that query hits one partition instead of scatter-gathering across all of them.
+
+These pull against each other, which is the whole difficulty. \`user_id\` gives high cardinality and
+even spread but forces "all posts in this group" to scatter-gather. \`group_id\` co-locates a group's
+posts for cheap reads but hotspots a giant group. Naming the tension and committing to a side
+(usually: align to the dominant query, then mitigate the resulting hotspot) is the senior move.
+
+### The celebrity / hot-key problem
+
+Shard a social graph by \`user_id\` and one celebrity with 100M followers and 1000x normal traffic
+maps to **one** partition, which then owns 1000x the load of its peers. No amount of consistent
+hashing helps: it is one key, so it is one node. Mitigations, roughly in order of reach:
+
+- **Salting / key-splitting:** append a bucket suffix to spread one logical key across K physical
+  partitions (\`celebrity_id:0..K-1\`). Writes pick a random bucket; reads fan out to all K and
+  merge. Use it for the few known whales, not everyone.
+- **Sub-partitioning:** split a hot partition's range into finer ranges dynamically when it exceeds a
+  load threshold (DynamoDB adaptive capacity and split-for-heat do this for you).
+- **Dedicated shards for whales:** route known celebrities/mega-tenants to their own isolated nodes
+  so their traffic cannot starve normal users. Common in multi-tenant SaaS.
+- **Caching + fan-out-on-read:** for a celebrity's timeline, cache aggressively and read the
+  celebrity's posts at read time rather than fanning out writes to 100M follower inboxes (the classic
+  Twitter hybrid).
+
+**Entity groups / co-location:** deliberately put data that is transacted together on the same
+partition so common operations stay single-shard (Google Megastore's entity groups, and the reason
+you shard an e-commerce order and its line items together by \`order_id\`).
+
+**Compound keys** serve multi-tenancy: \`(tenant_id, entity_id)\` isolates tenants (a tenant's data
+is co-located) while entity_id preserves cardinality within a tenant. Combine with dedicated shards
+for the biggest tenants.
+
+**Interview nuance:** always say resharding is expensive and must be planned *before* you need it.
+Pre-split into more logical partitions than nodes (e.g. 1024 logical shards on 16 physical nodes) so
+growth is a cheap remap of logical-to-physical, not a re-key. And design **online migration**:
+double-write to old and new, backfill, verify, then cut over reads, so you never take downtime to
+reshard.
+
+Recap: a good shard key is high-cardinality, evenly accessed, and aligned to the dominant query; the
+celebrity problem defeats plain hashing because one key is one node, so mitigate with salting,
+sub-partitioning, or dedicated shards; use entity groups and compound keys to keep transactions
+single-shard; and plan resharding and online migration early.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -569,6 +625,56 @@ export const systemDesignLevel3: DesignLevel = {
               "**Throttling the rebalance (the crux):** rate-limit streaming (a bytes/sec cap per node pair), bootstrap new nodes in batches rather than all at once, and prioritize live read/write traffic over background streaming so p99 holds. New nodes serve reads only after their range is fully streamed and verified (Merkle-tree anti-entropy), so reads never route to a partially-filled replica. During the ramp, reads still have 3 replicas on the old owners until handoff completes: no availability dip.",
               "**Shrinking after the peak** reverses the process gradually with the same throttle.",
               "**The committed tradeoff:** a slower, throttled rebalance (hours, not minutes) protects live-traffic latency and correctness, rather than a fast reshuffle that would spike p99 and risk serving stale or missing replicas.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-shard-key-hotspots",
+          title: "Shard-Key Selection, Hotspots & the Celebrity Problem",
+          summary:
+            "A good shard key is high-cardinality, evenly accessed, and query-aligned; a celebrity is one key on one node, so split the key, dedicate shards, or change the read pattern.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["shard-key", "hot-key", "celebrity"],
+          teach: {
+            markdown: shardKeyHotspotsTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l3-shard-key-hotspots-apply",
+            prompt:
+              "Choose the shard key for a social feed where one celebrity account has 100M followers and 1000x normal traffic; prevent a single hot shard.",
+            thinkAbout: [
+              "What makes a good shard key (cardinality, even access, aligned to query)?",
+              "How do you mitigate a hot key (salting, dedicated shards, sub-partitioning)?",
+              "Why plan resharding and online migration early?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the store holds posts and the follow graph; dominant reads are 'load user U's home feed' and 'load account A's posts'; writes are 'A posts' and 'U follows A.' The stated pathology is one celebrity at 1000x traffic.",
+              "**Base shard key: hash of user_id (the author) for posts.** High-cardinality, evenly accessed for the 99.9% of normal accounts, and it co-locates an account's own posts so 'load A's posts' is a single-partition scan. Shard 'followers of A' edges by A and 'who U follows' edges by U, so both directions of the graph have single-partition lookups.",
+              "**The celebrity hotspot is unavoidable under plain hash(user_id):** one key, one node, 1000x load. Mitigation 1, salting/key-splitting for detected whales: store the celebrity's posts under celebrity_id:bucket for K=32 buckets, writes round-robin, reads fan out to 32 and merge. Converts a 1000x single-node hotspot into ~30x spread across 32 partitions with a bounded 32-way read.",
+              "**Mitigation 2, the one that actually tames 100M followers: change the read pattern.** Normal accounts use fan-out-on-write (push a new post into each follower's inbox); celebrities use fan-out-on-read. Never write 100M inbox rows per celebrity post; a follower's feed merges their fan-out-on-write inbox with a read-time pull of the (heavily cached) celebrity posts they follow. The Twitter hybrid.",
+              "**Mitigation 3:** dedicate shards to the top handful of celebrities so their traffic is physically isolated and cannot starve normal users.",
+              "**Planning:** pre-split into ~1024 logical shards mapped onto far fewer physical nodes so growth is a logical-to-physical remap, not a re-key, and design online resharding (double-write, backfill, verify, cutover) up front.",
+              "Common wrong turn: sharding by a low-cardinality key like country or account_status, or assuming hash(user_id) alone handles the celebrity. Hashing spreads *keys*; a celebrity is a single key, so it stays a single hot node until you split the key or change the read pattern.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-shard-key-hotspots-practice",
+            prompt:
+              "Choose the shard key for a multi-tenant B2B SaaS analytics platform (think Datadog or a Segment-style event store) where 10,000 tenants share the cluster, the largest tenant generates 40% of all events, and every query is scoped to a single tenant. Prevent both the whale-tenant hotspot and the noisy-neighbor problem.",
+            thinkAbout: [
+              "Why must a 40%-of-volume tenant and a 3-event/day tenant not share one placement regime?",
+              "What does the compound (tenant_id, entity_id) key preserve on both sides?",
+              "How does a growing tenant move tiers without downtime?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: every query filters by tenant, so tenant isolation is both a performance and a correctness/security concern; event volume per tenant spans many orders of magnitude; one whale is 40% of the load.",
+              "**Shard key: compound (tenant_id, entity_id), hashed.** Scoping placement by tenant co-locates a tenant's data so every tenant-scoped query hits a bounded set of partitions, and it enforces isolation. The entity_id component preserves cardinality *within* a tenant so a single large tenant still spreads across partitions instead of one row-key.",
+              "**Tier the tenants because the whale cannot share a regime with the tail.** Whales get dedicated shards (own physical nodes or a dedicated cluster): isolates their load (the noisy-neighbor fix) and lets their capacity scale independently. Within a whale, sub-partition by (tenant_id:bucket, entity) to spread the 40% across many partitions.",
+              "**The long tail** of small tenants is packed many-to-a-partition by hash(tenant_id), efficient because none is individually hot.",
+              "**A directory/routing table** (tenant to shard-tier mapping) allows promoting a growing tenant from the shared pool to a dedicated shard online, via double-write and backfill, when it crosses a load threshold.",
+              "**The committed tradeoff:** two placement regimes plus a routing directory and tenant-promotion migrations, in exchange for hard noisy-neighbor isolation and independent scaling of the tenants that drive cost. A single uniform hash(tenant_id) would either waste a whole node on tiny tenants or let the whale dominate whatever partition it lands on.",
             ],
           },
         },
