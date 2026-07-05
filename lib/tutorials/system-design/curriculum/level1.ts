@@ -901,6 +901,86 @@ service-to-service mTLS and retries in a mesh (east-west), use BFFs to shape per
 front it all with a WAF, and never let the gateway swell into a business-logic monolith.
 `.trim()
 
+const cdnCachingFoundationsTeach = `
+## The highest-leverage tool, and the nastiest bugs
+
+Caching is the highest-leverage performance tool you have: it turns a 50 ms database query into a
+sub-millisecond memory hit and takes load off the systems that are hardest to scale. It is also the
+source of the nastiest correctness bugs, because a cache is a copy of the truth that can silently go
+stale. Phil Karlton's line ("there are only two hard things in computer science: cache invalidation
+and naming things") is a joke that ships incidents.
+
+Think of caching as a **stack of layers**, each catching what the layer above missed:
+
+\`\`\`
+Browser cache (private, per user)
+   |
+CDN / edge POP (shared, geographic)
+   |
+Reverse proxy / gateway cache
+   |
+App in-memory cache (local, per instance)
+   |
+Distributed cache (Redis / Memcached, shared)
+   |
+Database buffer pool (pages in RAM)
+\`\`\`
+
+The closer to the user a request is served, the cheaper and faster it is, so you try to satisfy reads
+as high up as possible. A product page image should be served from the browser or CDN, never from
+your database.
+
+### Write/read policies
+
+- **Cache-aside (lazy loading)** is the default. The app checks the cache; on a miss it reads the DB,
+  writes the value into the cache, and returns it. Simple and resilient (a cache outage just means
+  slower reads), but the first read after a write is a miss, and you must invalidate on writes or
+  serve stale data.
+- **Read-through** is cache-aside where the cache library, not your code, loads from the DB on a
+  miss. Same semantics, less boilerplate.
+- **Write-through** writes to the cache and the DB together on every write, so the cache is always
+  fresh, at the cost of write latency and caching data that may never be read.
+- **Write-behind (write-back)** writes to the cache immediately and flushes to the DB asynchronously.
+  Fast writes, but you risk data loss if the cache dies before the flush.
+
+### Invalidation, the hard part
+
+Three strategies, usually combined. **TTL** expires entries after N seconds; simple and self-healing,
+but you serve stale data for up to the TTL, so you tune TTL against how stale you can tolerate.
+**Explicit purge** deletes or updates the entry when the underlying data changes; precise but
+requires the write path to know every cache key it affects. **Event-driven** invalidation publishes a
+change event (via Kafka or a CDC stream) that fan-out invalidates caches; this scales to many caches
+but is more machinery. A powerful pattern is **stale-while-revalidate**: serve the stale value
+immediately while asynchronously refreshing it, which hides refresh latency and keeps you serving
+during a backend blip. Guard hot keys against a **cache stampede** (thundering herd): when a popular
+key expires and a thousand requests all miss and hit the DB at once, use request coalescing
+(single-flight), a short lock, or jittered TTLs so they do not all expire together.
+
+### The CDN
+
+The CDN is the caching layer nearest the user: a network of **anycast POPs** worldwide that cache
+your static (and cacheable dynamic) content near users, cutting latency and offloading your origin.
+Key knobs: the **cache key** (usually URL plus a chosen subset of headers/query params; include too
+much and hit rate collapses, include user-specific fields and you leak data), **Cache-Control**
+headers (\`max-age\`, \`s-maxage\` for shared caches, \`immutable\` for content that never changes),
+and **cache busting**. The clean way to invalidate a CDN asset is not to purge, it is to **version
+the URL**: ship \`app.9f3a1c.js\` (a content fingerprint) with a one-year \`immutable\` TTL, and when
+the file changes the filename changes, so clients fetch the new URL and the old one just ages out.
+Purge APIs exist for emergencies, but fingerprinting avoids the need.
+
+**Interview nuance:** The correctness landmine is caching **personalized or authenticated**
+responses. Never let a shared cache (CDN or proxy) store a response that contains one user's data, or
+you will serve Alice's account page to Bob. Mark those \`Cache-Control: private, no-store\`, and be
+careful with the \`Vary\` header: \`Vary: Cookie\` technically keys per user but destroys hit rate,
+so the right move is usually to not cache authenticated responses at the shared layer at all and
+cache only truly public assets.
+
+Recap: Cache as high up the browser-CDN-proxy-app-Redis-DB stack as you can, default to cache-aside,
+invalidate with a mix of TTL, explicit purge, and events plus stale-while-revalidate, version CDN
+URLs instead of purging, defend hot keys against stampedes, and never let a shared cache store
+authenticated responses.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1736,6 +1816,58 @@ export const systemDesignLevel1: DesignLevel = {
               "**Safe deploys:** roll gateway and BFF changes as canaries: shift a small weighted slice of traffic, watch error and latency SLOs, widen only if healthy, roll back by dropping the weight to zero. Because BFFs are separate pools, a bad canary is contained to one client type and one region, never a global blackout.",
               "**East-west** (BFF to domain services) goes through a service mesh for mTLS, retries, and circuit breaking, keeping resilience policy out of BFF code.",
               "Common wrong turn: a single monolithic gateway serving all clients and holding client-specific logic: it becomes both a global SPOF and a coordination bottleneck, and one bad deploy blacks out every device at once.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-cdn-caching-foundations",
+          title: "CDN & Caching Across Layers",
+          summary:
+            "Cache as high up the browser-CDN-app-Redis stack as possible, default to cache-aside, mix TTL/purge/event invalidation, and never let a shared cache hold user data.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["cdn", "caching", "invalidation"],
+          teach: {
+            markdown: cdnCachingFoundationsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-cdn-caching-foundations-apply",
+            prompt:
+              "Design the caching layers for a read-heavy product page and state your invalidation strategy at each layer, including the CDN.",
+            thinkAbout: [
+              "What are the cache layers from browser to DB buffer?",
+              "Which write policy (cache-aside, write-through, write-back) fits, and how do you invalidate?",
+              "How do you invalidate a stale CDN asset?",
+            ],
+            modelAnswerOutline: [
+              "Assume an e-commerce product page: mostly public content, read-to-write ratio around 1000:1, prices and stock change occasionally, and the page must never show one user's data to another.",
+              "**Split public from personalized.** Public parts (product details, images, marketing copy) render as a cacheable shell; personalized bits (cart badge, recommendations, 'your price') load client-side or via a non-cached fragment, so shared caches only ever hold public data.",
+              "**Browser cache:** static assets served with `Cache-Control: max-age=31536000, immutable` and fingerprinted filenames; the HTML shell gets a short TTL (60s) or is revalidated. **CDN:** caches images and the public product HTML with `s-maxage`; the cache key is URL plus product id, explicitly excluding cookies and user query params so no personalized variant is ever cached. Hit rate here should be very high at 1000:1.",
+              "**App in-memory cache:** hot product objects per instance for a few seconds to absorb bursts with zero network hop. **Redis (distributed):** the shared product-object cache using cache-aside: on miss, read the DB, populate Redis, return. **DB buffer pool:** PostgreSQL keeps hot pages in RAM as the last line.",
+              "**Write policy: cache-aside**, because it is simple, survives a Redis outage (degrades to slower DB reads), and fits a read-heavy workload where write-through would waste effort caching rarely-read writes.",
+              "**Invalidation:** Redis and app cache use a short TTL plus explicit purge on price/stock change: the write path publishes a product-updated event (Kafka) that deletes the affected keys, so a price change propagates in seconds rather than waiting out the TTL. Add stale-while-revalidate on the product object and jittered TTLs to prevent a stampede when a hot product expires.",
+              "**CDN invalidation:** images and versioned assets by URL fingerprinting (`hero.9f3a.jpg`, a new image is a new URL); for the public HTML, a short `s-maxage` and, on a price change, a targeted purge API call for that product's URL as a backstop.",
+              "Common wrong turn: caching the whole page including the personalized cart/price at the CDN, which leaks one user's data to another, or a long TTL with no purge path so a price change is invisible for an hour.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-cdn-caching-foundations-practice",
+            prompt:
+              "Design the caching and invalidation strategy for a news homepage like the BBC during a breaking-news event, where a single URL gets 500k requests per second globally and an editor's correction to the headline must reach every reader within about 10 seconds without melting the origin. Explain your CDN strategy, invalidation, and stampede protection.",
+            thinkAbout: [
+              "What fraction of 500k RPS can the origin afford to see, and what keeps the rest at the edge?",
+              "Why is TTL expiry alone not enough for a 10-second correction target?",
+              "What stops thousands of edge misses from stampeding the origin when the entry expires?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: one extremely hot public URL, global readership, 500k RPS, editor-updated content, a hard freshness target of ~10 seconds for corrections. The content is public, which is what makes aggressive edge caching possible.",
+              "**Serve almost everything from the CDN edge.** Cache the homepage HTML at the CDN with a short `s-maxage` (5 to 10s) so the edge answers the vast majority of requests and the origin sees at most a trickle. Static assets are fingerprinted and immutable with a one-year TTL.",
+              "**Stale-while-revalidate is the core trick:** the edge keeps serving the slightly old page instantly while refetching in the background. Readers never wait on the origin, and the origin is hit only for occasional revalidation, not per request. This is what keeps a 500k RPS spike from melting the origin.",
+              "**Fast corrections via targeted purge:** when an editor fixes the headline, the CMS fires a purge/invalidate for that one URL to the CDN. Combined with the short TTL, the correction reaches all POPs within the freshness window. Do not rely on TTL expiry alone; 10 seconds is tight, and the explicit purge guarantees it.",
+              "**Stampede protection at the edge:** rely on the CDN's origin shielding / request coalescing: a designated shield POP talks to the origin, and concurrent misses for the same key collapse into one origin fetch (single-flight) while the rest wait or serve stale. Add small TTL jitter so POPs do not expire in lockstep.",
+              "**Origin resilience:** the origin sits behind its own cache (Redis/Varnish) so even revalidation requests rarely hit the database, and the CDN TTL can be raised during an incident to shed origin load.",
+              "Common wrong turn: a long TTL with no purge (corrections invisible for minutes) or a very short TTL with no request coalescing (every expiry stampedes the origin at 500k RPS and takes it down).",
             ],
           },
         },
