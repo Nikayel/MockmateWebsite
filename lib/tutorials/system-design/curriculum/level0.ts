@@ -305,6 +305,67 @@ Recap: decompose into stated assumptions, label units, round to powers of ten, c
 with a 2 to 3x multiplier, and compute only the numbers that change the architecture.
 `.trim()
 
+const qpsReadWriteTeach = `
+## The most decision-shaping number: the read:write ratio
+
+The single most decision-shaping number in an estimate is the read:write ratio. It tells you which
+path to optimize, and optimizing the wrong path is one of the most common ways to lose a design round.
+A 100:1 read-heavy system (a social feed, a product catalog) wants caches, read replicas, and
+denormalized read models. A write-heavy or balanced system (an analytics ingest pipeline, a metrics
+store) wants write batching, append-only logs, and horizontally sharded write paths.
+
+Start by converting DAU to QPS with explicit arithmetic, exactly as in Fermi estimation. Then compute
+reads and writes separately and take the ratio.
+
+### Fan-out: where one write becomes many
+
+The subtlety in feed-like systems is fan-out: one write can generate many logical reads, or one read
+can require merging many sources. This is the fan-out-on-write versus fan-out-on-read decision.
+
+\`\`\`
+Fan-out on WRITE (precompute):        Fan-out on READ (merge at query time):
+user posts -> push into each              user opens feed -> pull recent posts
+follower's feed cache                     from each followee -> merge/sort
+- read is cheap (one cache GET)           - write is cheap (one append)
+- write is expensive (N inserts)          - read is expensive (N fetches + merge)
+- great when reads >> writes              - great for celebrities / huge fan-out
+\`\`\`
+
+Worked example: a feed with 50M DAU, each user reads their feed 20 times/day and posts 0.5 times/day,
+average 200 followers.
+
+\`\`\`
+reads/day  = 50M x 20  = 10^9       -> avg  ~10k QPS,  peak ~30k QPS
+writes/day = 50M x 0.5 = 2.5 x 10^7 -> avg ~250 QPS,  peak ~750 QPS
+read:write ratio ~= 40:1  (read-heavy)
+\`\`\`
+
+But if you fan out on write, each post writes into ~200 follower feeds. Effective feed-insert QPS =
+250 x 200 = 50k QPS of cache writes. So the naive write QPS (250) understates the real write cost by
+the fan-out factor. This is why the ratio alone is not enough; you must model where the fan-out
+happens.
+
+**Interview nuance:** the strong answer usually picks a hybrid. Fan out on write for normal users
+(cheap reads), but for celebrities with millions of followers, fan out on read (pull their posts at
+query time) so a single tweet does not trigger tens of millions of feed inserts. Naming this hybrid is
+a senior signal.
+
+### Averages lie: design for the hot key
+
+Access is Zipfian: a small number of hot keys (viral posts, celebrity accounts, trending products)
+take a hugely disproportionate share of traffic. Your design must survive the hot key, not just the
+average. A hot key can saturate a single cache node or shard even when the fleet-wide average looks
+fine, so you plan for replication of hot keys or request coalescing.
+
+Finally, translate QPS into a first-order server count. If a tuned application server handles ~10k
+QPS, then 30k peak read QPS needs at least 3 to 4 app servers behind the load balancer plus headroom,
+and a cache handling 100k+ ops/sec covers the feed reads.
+
+Recap: derive read and write QPS separately, take the ratio to decide read-optimized versus
+write-optimized, model where fan-out happens (write vs read, and a celebrity hybrid), and design for
+the hot key rather than the average.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -576,6 +637,56 @@ export const systemDesignLevel0: DesignLevel = {
               "That single number forces the storage choice: photos must live in an object store (S3-class) fronted by a CDN, with only compact metadata (photo id, owner, S3 key, timestamps, ~1 KB/photo, so ~1 TB/day) in a sharded database. You cannot put multi-petabyte-per-day blobs in Postgres.",
               "**Serving implications:** 750k peak view QPS is served almost entirely from the CDN edge, so origin QPS is a small fraction. 30k peak upload QPS goes through an ingest tier that writes blobs to the object store and enqueues thumbnail generation (Kafka or SQS plus workers). Metadata writes at 30k QPS need sharding by photo id or user id.",
               "Common wrong turn: sizing a database to hold the images themselves, or forgetting that egress at this view volume is a CDN and bandwidth-cost problem, not a database problem.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-qps-read-write",
+          title: "QPS and Read-vs-Write Modeling",
+          summary:
+            "Derive read and write QPS separately, use the ratio to pick which path to optimize, and model where fan-out multiplies the real load.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["estimation", "read-write-ratio"],
+          teach: {
+            markdown: qpsReadWriteTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l0-qps-read-write-apply",
+            prompt:
+              "Derive read QPS vs write QPS for a social feed from DAU and a fan-out assumption, then state whether you would optimize the read or write path.",
+            thinkAbout: [
+              "What is the read:write ratio, and does it point you to cache-heavy or write-optimized design?",
+              "Is fan-out done on read or on write, and how does that change QPS?",
+              "How do hotspots and Zipfian access change the averages?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 50M DAU, each opens the feed 20 times/day (reads) and posts 0.5 times/day (writes), average 200 followers, 3x peak multiplier.",
+              "**Base QPS.** Reads/day = 50M x 20 = 10^9, so avg ~10k and peak ~30k read QPS. Writes/day = 50M x 0.5 = 2.5 x 10^7, so avg ~250 and peak ~750 post QPS. The base read:write ratio is about 40:1, firmly read-heavy.",
+              "**The ratio says optimize the read path.** Reads must be a cheap cache lookup, not a live merge across hundreds of followees. So fan out on write: when a user posts, push the post id into each follower's precomputed feed (a per-user list in Redis). A feed read becomes a single cache range-read.",
+              "**But fan-out changes the real write cost.** Each post touches ~200 follower feeds, so effective feed-insert QPS = 250 x 200 = 50k avg (150k peak) cache writes. The dominant write load now lives in the cache/feed-store tier, not the source-of-truth posts table (still only ~750 peak QPS). Size the fan-out workers and cache write throughput for 150k peak inserts.",
+              "**Hotspots force a hybrid.** A celebrity with 10M followers would trigger 10M feed inserts per post, a write storm fan-out-on-write cannot absorb. Users above a follower threshold (say 100k) are fan-out-on-read: their posts are pulled and merged at read time. Zipfian access also makes viral posts hot keys, so replicate hot feed entries across cache nodes and coalesce duplicate reads.",
+              "**Server count:** 30k peak read QPS at ~10k QPS/server is ~4 app servers plus headroom; a Redis cluster sized for 150k+ writes/sec handles fan-out.",
+              "Common wrong turn: reporting the 40:1 ratio, declaring 'read-heavy, add a cache,' and never noticing that fan-out-on-write made the system write-bound in the cache tier.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-qps-read-write-practice",
+            prompt:
+              "Model send QPS vs delivery QPS for WhatsApp-scale group messaging assuming 2B users, 40 messages sent per user per day, and an average group size of 8. Decide whether the delivery path or the send path is the scaling bottleneck and justify the fan-out strategy.",
+            thinkAbout: [
+              "How does group size turn one send into many deliveries, and what multiplier does that put on QPS?",
+              "Is messaging read-heavy like a feed, or delivery/write-heavy, and what does that flip in your design?",
+              "How does the online-vs-offline split of recipients change the delivery mechanism?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 2B users, 40 sends/user/day, average group size 8 (each sent message fans out to ~7 other recipients), 3x peak multiplier.",
+              "**Send QPS.** Messages sent/day = 2B x 40 = 8 x 10^10. Divided by ~10^5 s/day: avg ~800k send QPS, peak ~2.4M send QPS.",
+              "**Delivery QPS.** Each send delivers to ~7 recipients, so deliveries/day = 5.6 x 10^11: avg ~5.6M and peak ~17M delivery QPS. The delivery path is roughly 7x the send path and is clearly the bottleneck. Messaging is write/delivery-heavy, the opposite of a read-heavy feed.",
+              "**Fan-out strategy.** On send, write the message once to a durable per-conversation log (Cassandra-class store), then fan out delivery per recipient: push over an existing persistent connection (WebSocket) if the device is online, or write to a per-user pending queue and trigger a push notification (APNs/FCM) if offline. Delivery is fan-out-on-write into per-recipient inboxes.",
+              "**Bottleneck handling.** 17M peak delivery QPS demands a large fleet of connection servers, each holding hundreds of thousands of live WebSockets, sharded by user id, with a pub/sub or routing layer to find which connection server holds a given recipient. Large groups are the hot spots: a 1,000-member group turns one send into 1,000 deliveries, so cap group size and treat very large groups closer to a broadcast/read model.",
+              "Common wrong turn: optimizing the send write (only 2.4M QPS) and under-provisioning the delivery fan-out (the 17M-QPS reality), or forgetting the online-vs-offline split that decides push-vs-queue.",
             ],
           },
         },
