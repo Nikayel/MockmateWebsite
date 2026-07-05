@@ -663,6 +663,72 @@ compression, time-partitioning, retention tiers, and downsampling to make metric
 failure mode you must design against is cardinality explosion from unbounded tags.
 `.trim()
 
+const vectorEmbeddingsTeach = `
+## Similarity search is the whole product
+
+A vector database stores **embeddings**, high-dimensional numeric vectors (typically 384 to 3072
+dimensions) produced by an embedding model, and answers **similarity search**: "give me the K stored
+vectors closest to this query vector." This is the retrieval backbone of semantic search,
+recommendations, deduplication, and RAG (retrieval-augmented generation), where you embed a user's
+question, find the most similar document chunks, and feed them to an LLM as context. The whole value
+is that "closeness" in embedding space approximates semantic meaning, so a query for "how do I reset
+my password" retrieves a chunk about "recovering account access" even with zero shared keywords.
+
+**Why not exact search.** Finding the true nearest neighbors means comparing the query against every
+stored vector, O(N x d). At a few thousand vectors that is fine; at millions or billions it is far
+too slow for an interactive query. So vector databases use **ANN (approximate nearest neighbor)**
+search: give up a small amount of **recall** (you might miss a few of the true top-K) in exchange for
+orders-of-magnitude faster queries. The central tradeoff of the whole family is **recall vs latency
+vs memory**, and picking an index is picking a point on that surface.
+
+### The index families you must know
+
+**HNSW (Hierarchical Navigable Small World)** builds a layered graph where each vector links to
+nearby vectors; search greedily hops through the graph from a coarse top layer down to a fine bottom
+layer. It gives **high recall at low latency** and is the default for most workloads. The cost is
+**memory**: the graph and vectors live in RAM, so it is expensive at billion scale. Tunable knobs:
+\`M\` (links per node) and \`efSearch\` (candidates explored, higher = better recall, slower).
+
+**IVF (Inverted File)** clusters vectors into \`nlist\` partitions (via k-means) and, at query time,
+only searches the few nearest partitions (\`nprobe\`). More memory-efficient and faster to build than
+HNSW but lower recall unless you probe more partitions. **PQ (Product Quantization)** compresses each
+vector into a short code (e.g. 1536 floats to 64 bytes), slashing memory 10 to 50x at the cost of
+some recall. **IVF-PQ** combines them and is the go-to for **billion-scale, memory-constrained**
+deployments (what FAISS is known for). Rule of thumb: HNSW when recall and latency matter and you can
+afford RAM; IVF-PQ when scale and memory dominate.
+
+### Two essentials beyond raw similarity
+
+**Metadata filtering.** Real queries are "similar chunks **from this user's documents, in English,
+updated this year**." You store metadata alongside each vector and filter on it. The subtlety is
+**pre-filter vs post-filter**: post-filtering (find top-K by vector, then drop non-matching) can
+return too few results if the filter is selective; good systems do **filtered ANN** that respects the
+filter during traversal. Ask about this; it is a common gotcha.
+
+**Hybrid search.** Pure vector search misses exact keyword matches (product codes, names, rare
+terms). **Hybrid search** combines vector similarity with a keyword/**BM25** lexical score, fused
+(often via **reciprocal rank fusion**), giving both semantic recall and lexical precision. Production
+RAG almost always uses hybrid.
+
+**Interview nuance:** "pgvector or a dedicated vector store?" **pgvector** (Postgres extension) is
+the right call when your corpus is modest (up to low millions), you already run Postgres, and you
+want vectors next to relational data and transactions with no new system. Reach for a **dedicated
+store** (Pinecone, Weaviate, Qdrant, Milvus) at tens of millions to billions of vectors, when you
+need advanced filtered ANN, horizontal scaling, or managed operations. Do not add a specialized
+vector database for 50k chunks; pgvector is plenty.
+
+**Design choices that bite later:** the **embedding model** fixes your **dimensionality** and
+**distance metric** (cosine for normalized text embeddings, dot product, or L2). **Chunking**
+strategy (size and overlap) hugely affects retrieval quality. And critically, **re-embedding
+migrations**: if you switch embedding models, every stored vector is now in a different space and
+must be **re-embedded**, an expensive backfill you must plan for, so version your embeddings.
+
+Recap: Vector databases do approximate nearest-neighbor search over embeddings, trading recall for
+latency and memory; choose HNSW for recall at cost of RAM or IVF-PQ for billion-scale memory
+efficiency, always add metadata filtering and hybrid (vector + BM25) search, use pgvector until scale
+forces a dedicated store, and plan for re-embedding when the model changes.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1235,6 +1301,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Tenant isolation:** every write and query carries tenant_id; storage blocks and index are partitioned per tenant so one tenant's cardinality never shares an index with another's. Per-tenant quotas cover ingest rate, active series, and query concurrency/cost, so a noisy tenant hits their own limit first; an expensive year-long high-resolution query is throttled, not allowed to starve others.",
               "**Downsampling/retention** is per-tenant policy: raw for days, rollups for months to years, all in S3 tiers.",
               "Common wrong turn: a shared global index with no per-tenant cardinality caps: the first customer to tag by pod_uid takes down everyone. The senior insight: in a multi-tenant TSDB, cardinality is a security/isolation boundary, not just a performance concern, so it must be quota-enforced per tenant at the ingest gate.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-vector-embeddings",
+          title: "Vector Databases & Embeddings",
+          summary:
+            "ANN search trades recall for latency and memory: HNSW for recall in RAM, IVF-PQ at billion scale, plus filtered ANN, hybrid BM25 fusion, and re-embedding plans.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["vector-db", "embeddings", "ann"],
+          teach: {
+            markdown: vectorEmbeddingsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-vector-embeddings-apply",
+            prompt:
+              "Design the storage and retrieval layer for a RAG system that does semantic search over millions of document chunks.",
+            thinkAbout: [
+              "Which ANN index (HNSW, IVF, PQ) fits your recall/latency/memory budget?",
+              "How do metadata filtering and hybrid (vector + BM25) search combine?",
+              "When is pgvector enough vs a dedicated vector store?",
+            ],
+            modelAnswerOutline: [
+              "Assume an enterprise RAG system over ~10M document chunks, multi-tenant (each query scoped to one org's documents), interactive retrieval budget under ~200ms, and a requirement to catch both semantic matches and exact terms (product codes, names).",
+              "**Pipeline:** ingest documents, chunk them (~500 tokens with ~50-token overlap so context is not sliced mid-idea), embed each chunk with a fixed model (say 1024-dim), store `{vector, chunk_text, metadata: {org_id, doc_id, lang, updated_at, source}}`. Normalize vectors and use cosine distance.",
+              "**Store choice:** at 10M chunks with multi-tenant filtering and sub-200ms needs, a dedicated vector store (Qdrant, Weaviate, or Milvus) rather than pgvector. pgvector wins under a couple million chunks with existing Postgres, but 10M plus heavy filtered ANN and horizontal scaling pushes to a purpose-built system.",
+              "**Index: HNSW** as the primary: high recall at low latency, which matters because RAG answer quality depends on retrieving the right chunks. 10M x 1024-dim vectors fit in RAM on a reasonably sized cluster, so pay the memory cost for recall; tune efSearch to hit the recall target and measure. If the corpus grew to billions or memory got tight, switch to IVF-PQ to trade some recall for a large memory reduction.",
+              "**Filtering:** every query is scoped by org_id (a hard multi-tenant boundary) plus optional lang/recency filters, using the store's filtered ANN (filter applied during graph traversal) rather than naive post-filtering, because post-filtering a selective org_id after top-K could return too few chunks.",
+              "**Hybrid search:** run vector search + BM25 keyword search in parallel and fuse with reciprocal rank fusion, so a query mentioning an exact SKU or name still retrieves the lexically matching chunk that pure embeddings might rank low.",
+              "**Retrieval:** return top ~20 by fused score, optionally rerank with a cross-encoder to top ~5, then pass to the LLM. **Migrations:** version embeddings; upgrading the embedding model means re-embedding all 10M chunks as a planned backfill, since old and new vectors are not comparable.",
+              "Common wrong turn: assuming brute-force vector search scales (it does not past a few thousand), 'using HNSW' without measuring recall, or forgetting metadata filtering and leaking one tenant's chunks into another's answers.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-vector-embeddings-practice",
+            prompt:
+              "Design the retrieval layer for Spotify-style podcast/music semantic search and recommendations over 5 billion embeddings (tracks, episodes, user taste vectors), where queries must return in under 50ms and the index must fit a realistic memory budget. Explain your index choice, how you shard, and how you keep recommendations fresh as new content arrives every minute.",
+            thinkAbout: [
+              "What does full in-RAM HNSW cost at 5 billion vectors, and what does IVF-PQ change?",
+              "How does a query find its way across many shards and merge results?",
+              "How does brand-new content become retrievable without retraining the base index?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 5 billion vectors, p99 under 50ms, a memory budget that makes full in-RAM HNSW over 5B vectors economically impossible, continuous ingestion of new tracks/episodes, and both search (query to items) and recommendation (taste vector to items) use cases.",
+              "**Index: IVF-PQ, not pure HNSW.** At 5B vectors, full-precision vectors plus an HNSW graph in RAM cost an absurd amount of memory. IVF partitions the space so a query only scans a few (nprobe) partitions, and PQ compresses each vector to a short code (e.g. 64 bytes), cutting memory by an order of magnitude. This fits the budget and hits sub-50ms by probing a bounded number of partitions, accepting slightly lower recall, fine for recommendations where 'good' beats 'provably nearest.' Add a re-ranking pass on full-precision vectors for the top candidates to recover precision.",
+              "**Sharding:** partition the 5B vectors across many shards (by IVF cluster or hash), each shard an IVF-PQ index on its own nodes; a query fans out to relevant shards and merges top-K (scatter-gather). Horizontal scale with bounded per-shard memory; replicas per shard give read throughput and availability.",
+              "**Freshness: a two-tier index.** IVF training is expensive, so new content cannot wait for a full rebuild. Run a large, periodically rebuilt base IVF-PQ index for the bulk, plus a small, fast, freshly-updated HNSW (or flat) index for recent items that is cheap to insert into. Queries search both and merge, so a track uploaded a minute ago is retrievable immediately and folds into the base index at the next scheduled rebuild. User taste vectors update as people listen and are just another query vector against the item index.",
+              "Common wrong turn: insisting on exact search or full in-memory HNSW at 5B scale (memory-infeasible, too slow to rebuild), or a single monolithic index that cannot ingest fresh content without a full retrain. The senior moves: IVF-PQ for the memory/latency budget, sharded scatter-gather for scale, and a hot fresh-item index layered over a periodically rebuilt base.",
             ],
           },
         },
