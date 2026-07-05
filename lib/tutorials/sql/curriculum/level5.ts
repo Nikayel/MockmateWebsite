@@ -1345,6 +1345,141 @@ INSERT INTO fact_orders VALUES
   },
 }
 
+const joinFanOutAndSkew: SqlLesson = {
+  id: "sql-l5-join-fan-out-and-skew",
+  title: "Join Fan-Out and Data Skew: Diagnose, Fix, and Keep Metrics Consistent",
+  summary:
+    "A join to the many side inflates a SUM; fix it by aggregating to the fact grain first, define the metric once, and surface hot keys.",
+  estimatedMinutes: 28,
+  difficulty: "hard",
+  skills: [
+    "lakehouse",
+    "join fan-out",
+    "grain-first pre-aggregation",
+    "COUNT(DISTINCT)",
+    "define-metric-once CTE",
+    "hot-key detection",
+    "skew reasoning",
+  ],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## A join to the many side silently inflates your metric
+
+Revenue per region should be a fixed number. But the moment you join \`orders\` to \`order_items\` and then \`SUM(orders.amount)\`, every order's amount is counted once per line item. A three-item order contributes its amount three times. The join fanned the fact out to the item grain, and your total is now wrong by a factor that varies per order. This is the most common silent bug in analytics SQL, and interviewers plant it on purpose.
+
+## Fix: aggregate to the fact's own grain first
+
+The rule is simple: know the grain of every table in your join, and never sum a measure at a finer grain than the one it lives on. \`amount\` lives at the order grain, so compute revenue at the order grain, in a CTE (or with \`COUNT(DISTINCT order_id)\`), BEFORE joining anything that multiplies rows. Then join the dimension you actually need (region, category) to the pre-aggregated fact, not to the raw fan-out.
+
+## Define the metric once
+
+A related discipline: define revenue in exactly one CTE and reuse it for every cut. When "revenue by region" and "revenue by category" both read from the same order-grain CTE, they roll up to the same grand total by construction. When each cut re-derives revenue with its own join, they drift, and now two dashboards disagree and nobody can say which is right. The demo shows both cuts summing to the same total precisely because they share one metric definition.
+
+**Interview nuance:** the same \`GROUP BY key COUNT(*)\` that finds a fan-out key is how you find a skewed key in a distributed engine. One \`order_id\` or \`customer_id\` with far more rows than the rest is the straggler that makes one Spark task run long after the others finish. Surfacing the hot key with a count is the first diagnostic, before you fix it by salting the key, broadcasting the small table, or letting Adaptive Query Execution split the skew.
+
+> **In the warehouse this differs.** The SQL is identical everywhere. A semantic layer (Airbnb Minerva, dbt MetricFlow, LookML) declares the measure and its grain once, which is what guarantees the aggregate-before-join you wrote by hand. In Spark, the hot key you surface with a \`GROUP BY\` count is the straggler you fix with salting, a broadcast join, or Adaptive Query Execution skew splitting.`,
+    demoSeedSql: `CREATE TABLE orders (order_id INTEGER, customer_id INTEGER, amount INTEGER);
+INSERT INTO orders VALUES (1, 10, 100), (2, 10, 200), (3, 20, 50);
+CREATE TABLE order_items (order_id INTEGER, sku TEXT);
+INSERT INTO order_items VALUES (1, 'A'), (1, 'B'), (2, 'A'), (3, 'C'), (3, 'A'), (3, 'B');`,
+    demoCode: `-- Joining order_items multiplies each order's amount by its item count: 550 instead of 350.
+SELECT 'naive (join items)' AS method, SUM(o.amount) AS total
+FROM orders o JOIN order_items i ON i.order_id = o.order_id
+UNION ALL
+SELECT 'correct (order grain)', SUM(amount) FROM orders;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-join-fan-out-and-skew-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns correct total revenue per region as \`(region, revenue)\`, over \`orders(order_id, customer_id, amount)\`, \`customers(customer_id, region, category)\`, and \`order_items(order_id, sku)\`, without fan-out double-counting.
+
+Define the revenue metric once at the order grain, then join the \`customers\` dimension for region. Do not let the \`order_items\` rows multiply the amount. Alias the columns exactly as named.`,
+    starterCode: `-- Correct revenue per region: aggregate at the order grain, then join the dimension.
+WITH order_revenue AS (
+  SELECT order_id, customer_id, amount FROM orders
+)
+SELECT
+  -- join customers for region and SUM the order-grain amount
+FROM order_revenue r
+JOIN customers c ON c.customer_id = r.customer_id
+GROUP BY c.region;`,
+    hints: [
+      "The fact `amount` is already at the order grain; keep it there. Do not join `order_items` for a revenue number.",
+      "Join only the `customers` dimension to the order-grain revenue, then `GROUP BY region`.",
+      "If you join `order_items`, each order's amount repeats per line item and the total inflates.",
+    ],
+    referenceSolution: `WITH order_revenue AS (
+  SELECT order_id, customer_id, amount FROM orders
+)
+SELECT c.region, SUM(r.amount) AS revenue
+FROM order_revenue r
+JOIN customers c ON c.customer_id = r.customer_id
+GROUP BY c.region
+ORDER BY c.region;`,
+    singleFile: {
+      seedSql: `CREATE TABLE orders (order_id INTEGER, customer_id INTEGER, amount INTEGER);
+INSERT INTO orders VALUES (1, 10, 100), (2, 10, 200), (3, 20, 50);
+
+CREATE TABLE customers (customer_id INTEGER, region TEXT, category TEXT);
+INSERT INTO customers VALUES (10, 'east', 'retail'), (20, 'west', 'wholesale');
+
+CREATE TABLE order_items (order_id INTEGER, sku TEXT);
+INSERT INTO order_items VALUES
+  (1, 'A'), (1, 'B'),
+  (2, 'A'),
+  (3, 'C'), (3, 'A'), (3, 'B');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["region", "revenue"],
+        rows: [
+          ["east", 300],
+          ["west", 50],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-join-fan-out-and-skew-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the join keys that fan out, meaning the \`order_id\` values that appear more than once on the many side (\`order_items\`), as \`(order_id, item_count)\`, ordered by count descending.
+
+This is the hot-key diagnostic that also flags the straggler key in a distributed shuffle. Alias the columns exactly as named.`,
+    starterCode: `-- Hot keys: order_ids that appear more than once in order_items, by count descending.
+SELECT
+  -- order_id and COUNT(*), keeping only counts > 1, ordered by the count desc
+FROM order_items;`,
+    hints: [
+      "`GROUP BY order_id` and `COUNT(*) AS item_count`.",
+      "Keep only fan-out keys with `HAVING COUNT(*) > 1`.",
+      "`ORDER BY item_count DESC` so the hottest key is first.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE orders (order_id INTEGER, customer_id INTEGER, amount INTEGER);
+INSERT INTO orders VALUES (1, 10, 100), (2, 10, 200), (3, 20, 50);
+
+CREATE TABLE customers (customer_id INTEGER, region TEXT, category TEXT);
+INSERT INTO customers VALUES (10, 'east', 'retail'), (20, 'west', 'wholesale');
+
+CREATE TABLE order_items (order_id INTEGER, sku TEXT);
+INSERT INTO order_items VALUES
+  (1, 'A'), (1, 'B'),
+  (2, 'A'),
+  (3, 'C'), (3, 'A'), (3, 'B');`,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["order_id", "item_count"],
+        rows: [
+          [3, 3],
+          [1, 2],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -1372,7 +1507,12 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.2: The Warehouse and Modeling Round",
       description:
         "Modeling-round asks on a Snowflake, BigQuery, or Databricks-shaped stack: semi-structured JSON extraction, advanced fact grains, as-of joins, and join fan-out.",
-      lessons: [jsonVariantFlatten, factGrainsAccumulatingSnapshot, asOfScd2Join],
+      lessons: [
+        jsonVariantFlatten,
+        factGrainsAccumulatingSnapshot,
+        asOfScd2Join,
+        joinFanOutAndSkew,
+      ],
     },
   ],
 }
