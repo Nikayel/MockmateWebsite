@@ -435,6 +435,79 @@ replication factor and add index overhead, compute ingress and egress bandwidth 
 drives CDN), and size the cache from the hot ~20% against a target hit rate.
 `.trim()
 
+const latencyNumbersTeach = `
+## The constants that make your math credible
+
+Fast, credible estimation rests on a small set of memorized constants. If you quote a same-datacenter
+round trip as 50 ms or a memory read as 1 ms, every downstream number is wrong by orders of magnitude
+and the interviewer stops trusting your math. This lesson is the cheat-sheet.
+
+### The latency ladder
+
+Rounded, order-of-magnitude, the numbers that matter:
+
+\`\`\`
+L1 cache reference            ~1 ns
+Main memory (RAM) read        ~100 ns        (0.1 us)
+Read 1 MB sequentially/RAM    ~10 us
+SSD random read              ~100 us        (0.1 ms)
+Round trip within same DC     ~0.5 ms
+Read 1 MB from SSD            ~1 ms
+Disk (HDD) seek               ~10 ms
+Round trip cross-region       ~50-150 ms     (e.g. US-EU)
+\`\`\`
+
+The key ratios to internalize: memory is roughly 1,000x faster than an SSD random read, an SSD is
+roughly 100x faster than an HDD seek, a same-datacenter round trip (~0.5 ms) is roughly 100x to 300x
+faster than a cross-region round trip. These ratios are why you cache in memory, why you avoid random
+disk seeks, and why you keep chatty request sequences within one region.
+
+**Interview nuance:** the practical takeaway interviewers want is not the exact nanoseconds but the
+design consequence. "Cross-region is ~100 ms, so a synchronous read-your-writes across regions will
+feel slow; I will serve reads from a regional replica and replicate asynchronously" is the sentence
+that earns the point.
+
+### Units, time, and object sizes
+
+\`\`\`
+1 KB ~= 10^3 bytes      1 MB ~= 10^6      1 GB ~= 10^9      1 TB ~= 10^12
+
+1 day   ~= 86,400 s      ~= ~10^5 s
+1 month ~= 2.5M s        ~= 2.5 x 10^6 s
+1 year  ~= 31.5M s       ~= ~3 x 10^7 s
+
+a text message / tweet      ~ 100s of bytes to ~1 KB
+a database row (metadata)   ~ 1 KB
+a compressed web page       ~ 100s of KB
+a photo (post-compression)  ~ 1-2 MB
+a minute of video (SD/HD)   ~ 5-15 MB
+\`\`\`
+
+### Single-machine ceilings
+
+The rough capacities you assume before proving otherwise:
+
+\`\`\`
+Tuned app server (stateless)   ~ 10k-50k QPS
+Redis / in-memory cache node   ~ 100k+ ops/sec
+Single relational DB primary   ~ few k writes/sec, tens of k reads/sec
+One server's live connections  ~ 100k+ WebSockets (tuned)
+\`\`\`
+
+These ceilings turn a QPS number into a server count in one step: 30k peak read QPS at ~10k QPS/server
+means 3 to 4 servers plus headroom; 1M write QPS against a ~5k-writes/sec DB node means you need ~200
+shards, which immediately justifies a horizontally sharded datastore.
+
+**Interview nuance:** you will not be graded on decimal precision. You will be graded on whether your
+quoted numbers are within an order of magnitude and whether you convert them into a decision (cache
+here, shard there, replicate this way). Being off by 1000x on a single constant can invalidate an
+otherwise good design.
+
+Recap: memorize the latency ladder (memory ~100 ns, SSD ~100 us, same-DC ~0.5 ms, cross-region ~50 to
+150 ms), the day/month-to-seconds conversions, typical object sizes, and single-machine ceilings, then
+always translate a number into a design decision.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -805,6 +878,55 @@ export const systemDesignLevel0: DesignLevel = {
               "**Cache/CDN tier.** Apply the 80/20 rule hard: a small fraction of titles (new releases, trending shows) drives the overwhelming majority of streams. Each edge appliance caches the hot terabytes (a few thousand popular titles) and serves them locally; misses fall back to regional caches then origin. Because the catalog is only ~1.5 PB, a full copy fits in a regional cache. Fill happens off-peak overnight.",
               "**Verdict:** not storage (1.5 PB is small), not control-plane QPS (playback starts are modest), but sustained peak egress at 125 Tbps, which forces a purpose-built edge CDN rather than a centralized serving tier.",
               "Common wrong turn: sizing central data-center bandwidth for 125 Tbps, or fixating on catalog storage when the binding constraint is peak concurrent egress served from the edge.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-latency-numbers",
+          title: "Latency Numbers Every Engineer Should Know",
+          summary:
+            "Memorize the latency ladder, unit conversions, object sizes, and single-machine ceilings, and turn each constant into a design decision.",
+          estimatedMinutes: 20,
+          difficulty: "easy",
+          skills: ["estimation", "latency"],
+          teach: {
+            markdown: latencyNumbersTeach,
+            estimatedMinutes: 8,
+          },
+          apply: {
+            id: "sd-l0-latency-numbers-apply",
+            prompt:
+              "Order these by latency from memory and give rough magnitudes: L1/RAM read, SSD read, same-datacenter round trip, cross-region round trip, disk seek.",
+            thinkAbout: [
+              "What is the rough order of magnitude at each rung of the latency ladder?",
+              "How do you convert one day and one month into seconds for QPS math?",
+              "What single-machine ceilings (QPS, connections) do you assume?",
+            ],
+            modelAnswerOutline: [
+              "Ordered fastest to slowest: RAM read ~100 ns (L1 cache even faster at ~1 ns); SSD random read ~100 us, roughly 1,000x slower than RAM; same-datacenter round trip ~0.5 ms, in the same ballpark as an SSD read; disk (HDD) seek ~10 ms, about 100x slower than SSD; cross-region round trip ~50 to 150 ms, roughly 100x to 300x a same-DC round trip.",
+              "The full order: RAM (100 ns) < SSD (100 us) < same-DC RTT (0.5 ms) < HDD seek (10 ms) < cross-region RTT (50 to 150 ms). The big cliffs are RAM-to-SSD (1,000x) and same-DC-to-cross-region (100x+).",
+              "**Design consequences:** memory is ~1,000x faster than SSD, so hot data belongs in an in-memory cache. A disk seek is ~10 ms, so avoid random access on spinning disk and prefer sequential I/O or SSDs. Cross-region is ~100 ms, so never make synchronous cross-region calls on the request path; serve from a regional replica and replicate asynchronously, accepting eventual consistency.",
+              "**Time and unit conversions:** 1 day ~= 86,400 s ~= 10^5 s; 1 month ~= 2.5M s; 1 year ~= 3 x 10^7 s. Data units: 1 KB ~= 10^3, 1 MB ~= 10^6, 1 GB ~= 10^9, 1 TB ~= 10^12 bytes.",
+              "**Single-machine ceilings:** a tuned stateless app server ~10k to 50k QPS; a Redis node ~100k+ ops/sec; a single relational primary a few thousand writes/sec and tens of thousands of reads/sec; one tuned server ~100k+ live WebSocket connections. These turn any QPS number into a server or shard count in one step.",
+              "Common wrong turn: quoting a same-DC round trip as tens of milliseconds or a memory read as microseconds, which throws every downstream latency budget off by orders of magnitude.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-latency-numbers-practice",
+            prompt:
+              "Explain how you would use the latency ladder to justify a design decision in a global e-commerce checkout with users in the US, EU, and Asia, where inventory is the source of truth in a single US region. Give a concrete latency budget and the tradeoff you accept.",
+            thinkAbout: [
+              "How many cross-region round trips can a sub-second checkout afford, and what does each one cost from Asia?",
+              "Which reads can move to regional replicas and caches, and which single write must stay authoritative?",
+              "What consistency tradeoff do you accept on inventory, and what compensating action covers the edge case?",
+            ],
+            modelAnswerOutline: [
+              "The binding constant is the cross-region round trip: US to EU is ~80 to 100 ms and US to Asia ~150 to 200 ms. A checkout making 4 sequential cross-region calls from Asia at ~150 ms each stacks ~600 ms of pure network latency before any processing, blowing a sub-200 ms p99 budget.",
+              "**Latency budget for a 200 ms checkout:** DNS/TLS amortized by connection reuse, edge/CDN termination ~10 ms, regional app processing ~20 ms, in-region cache reads (~100 us each) negligible, and at most ONE cross-region call to the authoritative inventory. Spend the budget on making it exactly one, issued asynchronously or optimistically where possible.",
+              "**The ladder justifies:** serve product browsing and cart from regional read replicas and in-region caches (memory reads at ~100 ns and same-DC round trips at ~0.5 ms are effectively free against the budget). Keep the single US region as the source of truth for the final inventory decrement, done as an optimistic reservation: the regional service tentatively reserves stock and confirms with one asynchronous cross-region write, reconciling on conflict.",
+              "**Tradeoff accepted:** eventual consistency on inventory. Two shoppers in different regions might both reserve the last unit within the replication window, so accept a small oversell risk resolved by a compensating action (cancel and refund, or backorder) rather than paying a ~150 ms synchronous cross-region lock on every checkout.",
+              "For extremely scarce, high-value inventory, invert the trade: route those SKUs' checkout to the US region and accept the higher latency for correctness.",
+              "Common wrong turn: making checkout synchronously consistent across regions (correct but 600 ms+ from Asia), or ignoring the cross-region constant entirely and being surprised by tail latency.",
             ],
           },
         },
