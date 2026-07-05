@@ -686,6 +686,55 @@ autoscaler + VPA, and because reactive scaling always trails a fast burst by 2 t
 hide that lag with warm pools, scheduled pre-scaling, and standing headroom.
 `.trim()
 
+const capacityPlanningTeach = `
+## From "how much traffic" to "how many machines"
+
+Capacity planning is turning traffic numbers into machine counts you can defend on a whiteboard. The
+core engine is **Little's Law**: in a stable system, the average number of requests *in flight*
+equals arrival rate times average time-in-system.
+
+\`\`\`
+  L (concurrency) = lambda (RPS) x W (latency in seconds)
+\`\`\`
+
+If you serve 50,000 RPS and each request spends 100ms (0.1s) being processed, average concurrency is
+\`50000 x 0.1 = 5000\` requests in flight simultaneously. That is the real sizing number: not RPS,
+but *concurrent work*. If one instance can hold ~250 concurrent requests before its own latency
+degrades, you need \`5000 / 250 = 20\` instances just to hold steady-state concurrency.
+
+### Never size to 100%
+
+You never size to 100% of steady state, for two reasons rooted in queueing theory. First,
+**utilization and latency are not linear**. As utilization approaches 100%, queue length and wait
+time explode toward infinity (the \`1/(1-rho)\` term): going from 70% to 90% utilization can double
+or triple your p99. Second, you need slack to absorb bursts and GC/pause jitter. So you target **50
+to 70% utilization**: 20 instances at a 70% target becomes \`20 / 0.7 = ~29\` instances.
+
+### Redundancy math
+
+You must survive failure of a whole **availability zone**, so you spread instances across (typically)
+3 AZs and size so that *losing one AZ still leaves enough capacity*. This is **N+1** thinking at the
+AZ level. If 29 instances serve peak at target utilization across 3 AZs, losing one removes a third
+of the fleet; to keep the surviving two AZs at or below target after a zone loss, provision ~50%
+more, so \`2/3\` of the fleet still covers 100% of peak. So ~29 becomes ~44 instances (roughly 15 per
+AZ).
+
+Finally, **peak-to-average ratio** sets autoscaling bounds and the reserved-vs-on-demand mix. Buy
+**reserved/savings-plan** capacity for the always-on baseline (cheapest per hour), **on-demand** for
+the predictable daily peak, and **spot** for burst or batch (cheapest but pre-emptible). You do not
+reserve for peak, because peak is a small fraction of the day.
+
+**Interview nuance:** the fastest way to sound junior is to divide RPS by "requests per second per
+server" and stop. The fastest way to sound senior is to (1) convert to concurrency with Little's Law,
+(2) apply a utilization target and say *why* (queues explode near 100%), and (3) add explicit N+1 AZ
+redundancy. State the estimation chain out loud: DAU x actions/user/day / 86,400s x peak multiplier =
+peak RPS. Interviewers grade the *method*, not the exact number.
+
+Recap: size with Little's Law (concurrency = RPS x latency), divide by a 50 to 70% utilization target
+because queues blow up near 100%, add N+1 AZ redundancy so losing a zone stays above peak, and split
+the resulting capacity across reserved/on-demand/spot by peak-to-average ratio.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -1300,6 +1349,56 @@ export const systemDesignLevel4: DesignLevel = {
               "**Cold-start lag:** a warm pool of pre-provisioned nodes (or Karpenter with a small standing buffer) so the first burst of uploads does not wait 2 minutes for VMs. Scale the target ratio by desired backlog: one worker per ~5 queued jobs, so a 500-job wave provisions ~100 workers.",
               "**Cost mix:** baseline on spot instances (transcoding is retryable and interruption-tolerant: a lost spot node just re-queues its job), with a small on-demand floor for latency-sensitive live jobs. The tradeoff: scale-to-zero adds cold-start latency on the first job after idle, acceptable for async transcoding.",
               "Common wrong turn: autoscaling on CPU and paying for idle transcode nodes between upload waves.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-capacity-planning",
+          title: "Capacity Planning & Back-of-Envelope Sizing",
+          summary:
+            "Size with Little's Law, divide by a 50-70% utilization target because queues explode near 100%, add N+1 AZ redundancy, and split capacity across reserved/on-demand/spot.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["capacity", "sizing", "littles-law"],
+          teach: {
+            markdown: capacityPlanningTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-capacity-planning-apply",
+            prompt:
+              "Size the fleet for a service that must serve 50k RPS at p99 < 200ms and survive one AZ failure.",
+            thinkAbout: [
+              "How does Little's Law convert RPS and latency into instance count?",
+              "What utilization target leaves headroom for spikes and failover?",
+              "How does N+1/N+2 AZ math change the count?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 50k RPS is peak, p99 < 200ms so budget average processing time W ~90ms (headroom under the tail), 3 AZs, and each instance sustains ~200 concurrent in-flight requests before tail degradation (validated by load test, stated and carried).",
+              "**Step 1, Little's Law:** concurrency L = 50000 x 0.09s = 4500 requests in flight at peak. That is the quantity actually being sized for.",
+              "**Step 2, instances at full utilization:** 4500 / 200 = ~23 instances to just hold peak concurrency with zero slack.",
+              "**Step 3, utilization target:** never run at 100%, because queueing delay explodes as utilization approaches 1 (the 1/(1-rho) blow-up), wrecking p99. Target 65%: 23 / 0.65 = ~35 instances to serve peak with healthy tails.",
+              "**Step 4, AZ redundancy (N+1):** across 3 AZs, losing one removes a third of capacity. Size so the surviving 2 AZs still carry 100% of peak at target: multiply by 3/2. 35 x 1.5 = ~53 instances, roughly 18 per AZ. An AZ failure drops to 36 instances, still above the 35 needed.",
+              "**Step 5, cost and bounds:** with peak ~2.5x daily average, the always-on baseline (~21 instances) goes on reserved/savings plans, the daily peak delta on on-demand, spillover burst on spot. Autoscaling min/max come from the peak-to-average ratio so 53 instances are not running at 3am.",
+              "**Tradeoffs:** the utilization target plus the 1.5x AZ factor mean running roughly 2.3x the naive count: the cost of a healthy p99 plus surviving a zone outage. Common wrong turn: sizing to raw peak at high utilization with no failover margin: cheap on the slide, pages you the first time an AZ blips.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-capacity-planning-practice",
+            prompt:
+              "Size the read fleet for a service like Twitter's home-timeline API that must serve 300k RPS at p99 < 150ms across 3 regions, where each request fans out to a Redis timeline cache plus 2 downstream calls, and you must survive losing an entire region. Lead with your estimation chain.",
+            thinkAbout: [
+              "What must each region carry when a peer region dies?",
+              "Why must the downstreams be sized for the failover surge too?",
+              "Can the failover headroom be warm-but-light rather than fully provisioned?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 300k RPS global peak split evenly (~100k RPS/region), p99 < 150ms, each request does a Redis read plus 2 downstream RPCs with average server-side W ~60ms, and each instance sustains ~250 concurrent requests. Size per region, then apply region-level redundancy.",
+              "**Estimation chain per region:** L = 100000 x 0.06 = 6000 in-flight requests. At 250 concurrent/instance: 6000 / 250 = 24 instances at full load. Apply a 60% utilization target (tight p99 budget): 24 / 0.6 = 40 instances per region for regional peak.",
+              "**Region-level redundancy (the hard constraint):** surviving a full region loss means the other 2 regions absorb all 300k RPS, so each region must carry 300k / 2 = 150k RPS at target when a peer dies: 1.5x its steady load. 40 x 1.5 = 60 instances per region, ~180 globally. On region failure, GeoDNS/global LB shifts traffic to the survivors, which then run at ~90% of provisioned capacity: within budget.",
+              "**Downstream check:** the Redis timeline cache and the 2 downstreams must also be sized for the failover surge, or the compute fleet just moves the bottleneck. Verify Redis has connection and throughput headroom for 1.5x regional load.",
+              "**Cost mix:** baseline reserved, failover margin on-demand, and consider running the failover headroom warm-but-light rather than fully provisioned 24/7 if RTO tolerance allows a brief autoscale ramp.",
+              "Common wrong turn: sizing each region only for its own 100k RPS, so the day a region dies the survivors instantly saturate and cascade.",
             ],
           },
         },
