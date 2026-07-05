@@ -778,6 +778,61 @@ wants unaided bottleneck-finding and quantified tradeoffs, staff wants ambiguity
 org/cost/reliability and evolution thinking.
 `.trim()
 
+const templatePitfallsTeach = `
+## A backbone you can reproduce in 60 seconds
+
+Under interview pressure, working memory shrinks. The fix is a one-page template you have internalized
+so well you can reproduce it in the first 60 seconds of any round, without it sounding like a recited
+script. The template is a backbone you hang the specific prompt on, not a monologue you deliver.
+
+### The phase backbone (45-minute budget)
+
+\`\`\`
+1. Scope & requirements      ~5 min   functional + non-functional, clarify
+2. Estimation (back-of-env)  ~5 min   QPS, storage, bandwidth
+3. API + data model          ~5 min   the contract and the schema
+4. High-level design         ~10 min  box-and-arrow, request path
+5. Deep dive(s)              ~10 min  the 1-2 hard parts
+6. Bottlenecks & wrap-up     ~5 min   scale, failure, tradeoffs, what next
+\`\`\`
+
+**Stock clarifying and NFR prompts** to open with: who are the users and how many, read-heavy or
+write-heavy, what is the consistency requirement, what latency is acceptable, what is the scale (DAU,
+QPS), and what is explicitly out of scope. Asking these is problem navigation points on the rubric.
+
+**An estimation checklist** so you never freeze on numbers: DAU to QPS (DAU x actions/day / 86,400,
+then x2 or x3 for peak), storage (records/day x bytes/record x retention), bandwidth (QPS x payload
+size), cache size (hot set, often the 20% that serves 80%), and server count (QPS / per-box
+throughput).
+
+**A component palette** you can pull from without inventing: load balancer, API gateway, app/service
+tier, cache (Redis), message queue (Kafka), CDN, object store (S3), search index (Elasticsearch), and
+database with replicas and shards. When you need a box, it is almost always one of these.
+
+**Trade-off lenses** to reach for: CAP/PACELC, push vs pull, sync vs async, SQL vs NoSQL, normalize vs
+denormalize.
+
+### The top pitfalls, each with its counter
+
+- **Solutioning before scoping**: naming Kafka before you know the requirements. Counter: spend the
+  first 5 minutes on requirements, always.
+- **Unbounded feature list**: trying to design everything. Counter: pick the core 2 to 3 features and
+  defer the rest out loud.
+- **Generic NFRs**: "it should be scalable and fast." Counter: attach numbers (100K QPS, p99 under
+  200ms).
+- **Designing in silence**: thinking without narrating. Counter: talk continuously.
+- **No wrap-up**: running out of time with no summary. Counter: reserve 5 minutes to name bottlenecks
+  and next steps.
+
+**Interview nuance:** The template must bend to the prompt. If the interviewer says "assume you know
+the requirements, go straight to the storage design," skip phases 1 and 2 and say so. Rigidly marching
+through a memorized order when the prompt does not want it is itself a red flag.
+
+Recap: Carry a phase-and-time backbone, stock clarifying/NFR prompts, an estimation checklist, a
+component palette, and trade-off lenses, and actively counter the five classic pitfalls, adapting the
+template to the actual prompt.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -1468,6 +1523,59 @@ export const systemDesignLevel0: DesignLevel = {
               "**Also flag the money-path dependency:** a synchronous Redis call on every payment adds latency to the money path and a dependency to on-call, which argues for a local token cache synced asynchronously, trading a little accuracy for a smaller failure surface on the critical path.",
               "**Third, evolution and what not to build:** start with centralized counters, plan the migration to a cell-based or sidecar limiter as QPS grows, and explicitly defer ML-based anomaly limiting as out of scope for v1. Naming the two-year path and the deliberate cut is what a staff interviewer listens for.",
               "Common wrong turn: adding more algorithms and more Redis tuning (deeper senior) instead of reframing the problem in business terms (staff): isolation, revenue risk, failure surface, and evolution.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-template-pitfalls",
+          title: "A Reusable Template & the Top Pitfalls",
+          summary:
+            "Carry a phase backbone, stock questions, an estimation checklist, a component palette, and tradeoff lenses, and actively counter the five classic pitfalls.",
+          estimatedMinutes: 25,
+          difficulty: "easy",
+          skills: ["template", "pitfalls"],
+          teach: {
+            markdown: templatePitfallsTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-template-pitfalls-apply",
+            prompt:
+              "Write a one-page personal cheat template (phases, clarifying questions, estimation checklist, component palette, trade-off lenses) you could reproduce in the first minute of any round, and list the 5 pitfalls you will actively avoid.",
+            thinkAbout: [
+              "What is the minimal template that starts any round without sounding scripted?",
+              "Which pitfalls most commonly cause failure, and how do you counter each?",
+              "How do you adapt the template to the actual prompt's constraints?",
+            ],
+            modelAnswerOutline: [
+              "**Phase backbone (45-min budget):** (1) Scope and requirements, 5 min: functional plus non-functional, clarify before designing. (2) Estimation, 5 min: QPS, storage, bandwidth. (3) API and data model, 5 min. (4) High-level design, 10 min: box-and-arrow request path. (5) Deep dive on the 1 to 2 hard parts, 10 min. (6) Bottlenecks and wrap-up, 5 min.",
+              "**Clarifying and NFR questions to open with:** How many users (DAU) and what QPS? Read-heavy or write-heavy? Consistency requirement (strong or eventual)? Latency target (p99)? What is explicitly out of scope? Any hard constraints (regions, compliance, budget)?",
+              "**Estimation checklist:** DAU x actions/day / 86,400 = average QPS, then x2 to x3 for peak. Storage = writes/day x bytes/record x retention. Bandwidth = QPS x payload. Cache = hot 20% of the data. Servers = peak QPS / per-box throughput.",
+              "**Component palette:** load balancer, API gateway, stateless app tier, Redis cache, Kafka queue, CDN, S3 object store, Elasticsearch, primary DB with read replicas and shards.",
+              "**Trade-off lenses:** CAP/PACELC, push vs pull, sync vs async, SQL vs NoSQL, normalize vs denormalize.",
+              "**The 5 pitfalls and counters:** (1) Solutioning before scoping: force the first 5 minutes onto requirements. (2) Unbounded feature list: pick 2 to 3 core features and defer the rest out loud. (3) Generic NFRs: attach real numbers to every 'scalable/fast.' (4) Designing in silence: narrate every assumption and choice continuously. (5) No wrap-up: reserve the last 5 minutes for bottlenecks, failure modes, and next steps.",
+              "**Adapting it:** the template is a backbone, not a script. If the interviewer hands over the requirements and says 'go to storage,' skip phases 1 and 2, say so, and jump in.",
+              "Common wrong turn: memorizing this as a monologue and delivering it verbatim regardless of the actual prompt, which reads as not listening.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-template-pitfalls-practice",
+            prompt:
+              "Adapt your one-page template to a 35-minute clock (a compressed onsite slot, not 45) for the prompt 'Design a URL shortener like Bitly,' and show the running order and time budget you would actually use, including where you cut.",
+            thinkAbout: [
+              "Which phases are cheap to lose but expensive to miss, and which can safely compress?",
+              "Which two estimation numbers actually drive a design decision for a URL shortener?",
+              "Where does the single deep dive belong for this specific system?",
+            ],
+            modelAnswerOutline: [
+              "With 35 minutes, compress rather than skip. The rubric axes are the same, so protect scoping and wrap-up (cheap to lose, expensive to miss) and compress the middle.",
+              "**(1) Scope, 4 min:** core features are create-short-URL and redirect; name and defer analytics and custom aliases. NFRs: read-heavy (redirects outnumber creations roughly 100:1), redirect p99 under 100ms, high availability (a dead link is a broken product).",
+              "**(2) Estimation, 3 min:** assume 100M new URLs/month, about 40 writes/sec, and at 100:1 about 4K redirects/sec peak; 100M/month x 500 bytes x 5 years is low terabytes, small enough that the interesting problem is read latency, not storage.",
+              "**(3) API and key generation, 5 min:** `POST /shorten`, `GET /{code}` redirecting with 301/302; the code is base62 of a counter or a hash. Commit to a distributed counter (or pre-generated key ranges per host) to avoid collision-checking on the write path.",
+              "**(4) High-level design, 9 min:** LB, stateless app tier, a KV store (DynamoDB or Cassandra) keyed by short code, and an aggressive cache (Redis plus CDN) in front because reads dominate and the hot set is small.",
+              "**(5) One deep dive, 8 min:** read scaling and cache strategy, since that is where this design lives, not the write path.",
+              "**(6) Wrap-up, 6 min:** the bottleneck is the redirect read path, so cache heavily and consider read replicas; call out the counter as a single point of contention and how key-range pre-allocation fixes it.",
+              "**Where the cut lands:** a single deep dive instead of two, and estimation kept to the two numbers that drive a decision (read:write ratio and total storage class). Refuse to cut scoping or wrap-up, the phases whose absence a grader notices most.",
             ],
           },
         },
