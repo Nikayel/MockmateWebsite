@@ -229,6 +229,67 @@ deploy drops nothing; and make checks deep enough to catch a broken downstream w
 shared-dependency blip fail the whole fleet at once.
 `.trim()
 
+const serviceDiscoveryTeach = `
+## Callers must learn addresses that change every minute
+
+In a fleet that autoscales and redeploys constantly, a service's instances come and go every minute:
+IPs and ports change, instances are added under load and terminated on scale-in. So a caller cannot
+hardcode addresses, and it cannot rely on long-TTL DNS, because the moment an instance is terminated
+a stale address keeps receiving traffic and callers get connection errors. **Service discovery** lets
+a caller learn the **current set of healthy addresses**, and the second question is **who makes the
+balancing decision**: a central load balancer, or each client.
+
+### The service registry
+
+- **Self-registration:** each instance **registers** itself on startup and sends periodic
+  **heartbeats** (Consul, etcd, Netflix Eureka). If heartbeats stop, the registry marks it gone. On
+  graceful shutdown it deregisters.
+- **Platform-managed:** the orchestrator maintains it for you. In **Kubernetes**, a **Service** is a
+  stable name/VIP, and the control plane keeps its **Endpoints / EndpointSlices** in sync with the
+  pods that pass their **readiness** probe.
+
+**Health-based removal** keeps discovery honest. The registry advertises only instances that pass
+**active health checks** or are heartbeating, combined with **readiness** so a new instance receives
+traffic only once warm. The number that matters is **propagation speed**: how fast a terminated or
+failing instance actually leaves every caller's view. With short check intervals plus fast registry
+watch/push, a bad instance is out of rotation within **seconds**; with long DNS TTLs it can be
+minutes, which is the failure mode to avoid.
+
+### Where the balancing decision happens
+
+- **Server-side load balancing:** clients hit one stable VIP or DNS name and a dedicated load
+  balancer (ALB/NLB, Envoy, Nginx) picks a backend. Clients stay dumb and simple, and control is
+  central. The cost is an extra network hop and a component you must scale and keep HA.
+- **Client-side load balancing:** the client fetches the healthy instance list from the registry (or
+  a mesh sidecar) and picks a backend itself (gRPC client-side LB, a sidecar Envoy). This removes the
+  extra hop and enables smart, locality-aware policies (prefer same-zone, least-request with local
+  load view). The cost is complexity pushed into every client and a hard dependency on fast registry
+  propagation.
+
+A **service mesh** (Istio or Linkerd, Envoy sidecars) is the popular middle ground: client-side
+benefits (no central-LB hop, locality, per-request balancing, retries, mTLS) with **central
+configuration**. The price is real operational complexity (a control plane and a sidecar per pod).
+
+**Interview nuance:** the discriminator is where you want complexity to live. Central LB = simple
+clients, extra hop, one scaling choke point. Client-side/mesh = no hop and smart routing, but
+complexity and propagation risk in every caller. A strong concrete answer: Kubernetes with a mesh for
+a polyglot fleet, or gRPC client-side LB backed by etcd for a gRPC-heavy one, with short health-check
+intervals so bad instances leave rotation within seconds.
+
+\`\`\`
+  registry (Consul/etcd/Eureka  |  k8s Endpoints via readiness)
+       ^ register/heartbeat            ^ controller keeps in sync
+  server-side:  client -> [ VIP/LB ] -> backend        (1 extra hop, central control)
+  client-side:  client (has list) ---> backend         (no hop, smart local policy)
+\`\`\`
+
+Recap: callers learn healthy addresses from a service registry (self-registration with heartbeats, or
+Kubernetes Endpoints tied to readiness), unhealthy instances leave rotation in seconds; server-side
+LB keeps clients simple at the cost of a hop and a central component, client-side/mesh removes the
+hop and adds locality at the cost of per-client complexity, and the classic wrong turn is hardcoded
+IPs or long-TTL DNS that keeps sending traffic to terminated instances.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -434,6 +495,55 @@ export const systemDesignLevel4: DesignLevel = {
               "**Handle the dependency itself at the sidecar:** circuit breaking plus caching of recent auth decisions/keys so a 10s auth blip is served from cache rather than failing requests, and fail degraded where policy permits rather than fail-closed for the whole fleet.",
               "**Rollouts:** small maxUnavailable/maxSurge with health gates between batches.",
               "Common wrong turn: a deep readiness check that hard-depends on a shared service with no ejection cap and no hysteresis, so the shared blip synchronously fails every pod and takes the service fully down: exactly the correlated-failure amplification a good design prevents.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-service-discovery",
+          title: "Service Discovery & Client vs Server-Side Load Balancing",
+          summary:
+            "A registry (heartbeats or k8s readiness-driven Endpoints) keeps healthy addresses current within seconds; choose server-side simplicity or client-side/mesh locality deliberately.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["service-discovery", "load-balancing", "microservices"],
+          teach: {
+            markdown: serviceDiscoveryTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-service-discovery-apply",
+            prompt:
+              "Design service discovery for a microservice fleet that autoscales and redeploys constantly, and choose between client-side and server-side load balancing, justifying how unhealthy instances get removed.",
+            thinkAbout: [
+              "When instances come and go every minute, how does a caller learn the current set of healthy addresses?",
+              "Who makes the load-balancing decision: a central load balancer, or each client with a local view?",
+              "How fast does an unhealthy or terminated instance get pulled out of rotation?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a polyglot microservice fleet behind autoscaling, where instance IP and port change constantly and stale routing causes user-visible errors.",
+              "**Discovery:** a service registry as the source of truth. On Kubernetes, lean on the platform-managed path: a Service gives a stable name and the control plane keeps EndpointSlices in sync with pods that pass readiness, so instances appear only when warm and disappear on termination. Off Kubernetes, use Consul or etcd with self-registration: instances register on startup and heartbeat, and stop being advertised when heartbeats lapse. Explicitly avoid hardcoded IPs and long-TTL DNS: the classic sources of 'traffic to a terminated instance.'",
+              "**Health-based removal:** active health checks (short interval, unhealthy after 2-3 consecutive failures) plus readiness gating for new instances plus passive outlier ejection for instances that fail real requests but probe green. With second-scale intervals and registry watch/push, a terminated or failing instance is out of every caller's view within seconds: the metric that actually matters.",
+              "**LB decision: client-side via a service mesh** (Istio or Linkerd with Envoy sidecars). It removes the central-LB hop, enables locality-aware and least-request routing (same-zone traffic cuts latency and cross-AZ cost), gives retries, circuit breaking, and mTLS uniformly, and keeps balancing logic out of each service's code (the sidecar handles it) while configuration stays central. The accepted tradeoff: running the mesh control plane and a sidecar per pod, and a dependence on fast endpoint propagation.",
+              "**Fallbacks:** gRPC client-side LB backed by etcd for a gRPC-heavy fleet, or server-side LB (ALB/Envoy behind a stable VIP) when dumb clients and central control are worth the extra hop.",
+              "Common wrong turn: hardcoding instance addresses or relying on long-TTL DNS, so terminated instances keep getting traffic and callers see connection errors during every scale-in and deploy.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-service-discovery-practice",
+            prompt:
+              "Design service discovery and load balancing for a Netflix-scale fleet of thousands of instances across three AWS regions and multiple availability zones, where deploys and autoscaling churn instances continuously, cross-AZ traffic is a real cost line, and a single instance failure must be invisible within seconds. Justify client-side vs server-side.",
+            thinkAbout: [
+              "What can a zone-aware client do that a central LB cannot express as cheaply?",
+              "Why does client-side passive detection beat waiting for a registry update?",
+              "Why per-region registries rather than one global one?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: thousands of instances, three regions, several AZs per region, continuous churn from deploys and autoscaling, meaningful cross-AZ data-transfer cost, and one instance dying must be invisible within seconds.",
+              "**Choose client-side load balancing** (the Netflix Eureka + Ribbon lineage; the modern equivalent is a mesh with Envoy sidecars or gRPC client-side LB). Deciding factors: (1) cost: a client that knows instance zones can prefer same-AZ backends and only spill cross-AZ on failure, directly cutting the cross-AZ cost line, which a central LB cannot express as cheaply; (2) no central choke point: routing thousands of instances through a central LB tier means scaling and paying for that tier plus a hop on every call; (3) latency: local, least-request, locality-aware picks beat a blind central hop.",
+              "**Discovery:** instances self-register and heartbeat into a highly available, regionally replicated registry (Eureka-style, or etcd/Consul per region); clients poll/watch with a short refresh. Registration is per-region so a region is self-contained; cross-region routing is handled above this layer (GSLB), not by one global registry.",
+              "**Invisible-within-seconds:** short heartbeat and check intervals plus client-side passive detection: the client ejects an instance that errors or times out on real requests immediately, without waiting for the registry to catch up, then rechecks the registry. Retries with budgets and circuit breaking cover an ejected instance's in-flight requests on a healthy peer. This is why client-side wins the requirement: the caller reacts to its own observed failures instantly.",
+              "**Tradeoff:** client-side/mesh pushes complexity into every caller and depends on fast registry propagation: accepted for the cost and latency wins at this scale.",
+              "Common wrong turn: a single central LB tier for all east-west traffic (extra hop, scaling choke point, blind to AZ locality so it burns cross-AZ cost), or a single global registry whose propagation lag makes 'invisible within seconds' impossible across regions.",
             ],
           },
         },
