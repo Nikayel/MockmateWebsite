@@ -402,6 +402,70 @@ north-south traffic, use a BFF per client type to avoid over/under-fetching, lea
 concerns to the mesh, and hold the line against business logic creeping into the edge.
 `.trim()
 
+const tlsConnectionMgmtTeach = `
+## Where do you decrypt, and how many connections do you hold?
+
+Two questions decide the health of a system's front door under real load: where do you decrypt, and
+how many TCP connections does your backend actually have to hold open? Getting either wrong shows up
+as CPU burn, port exhaustion, or a load balancer that silently stops balancing.
+
+### Where you terminate TLS
+
+The TLS handshake is expensive, and it happens per new connection. **Edge/LB termination** decrypts
+at the load balancer or edge PoP, so the backend fleet never pays the handshake cost and certificates
+are managed in one place. The gap: traffic from the LB to the backend is now plaintext internally.
+**End-to-end TLS** (or re-encryption at the LB) keeps it encrypted all the way, and **mTLS**
+additionally has both sides present certificates so services mutually authenticate: the zero-trust
+default inside a service mesh (Istio/Linkerd issue and rotate certs via sidecars). A common
+production shape: TLS terminated at the edge for the public handshake, then re-encrypted with mTLS
+for the internal hop, giving both cheap edge offload and a zero-trust interior.
+
+**SNI and certificates at scale.** One IP/LB often fronts many hostnames. **SNI** (the client sends
+the target hostname in the ClientHello) lets the LB pick the right certificate per connection.
+Certificate **rotation** must be automated (ACME/Let's Encrypt, an internal CA); manual cert
+management does not survive thousands of short-lived certs.
+
+### Connection management: where the sharp edges live
+
+Every new backend connection means a handshake and consumes an **ephemeral port**. A proxy opening a
+fresh connection per request will exhaust its ~64K ephemeral ports and burn CPU on handshakes. The
+fixes are **keep-alive** (reuse a connection for many requests) and **connection pooling** (a warm
+pool per backend, multiplexing requests over it), making backend connection counts a function of
+concurrency and pool size, not raw request rate.
+
+### The trap: multiplexed connections pin to one backend
+
+**HTTP/2 and gRPC multiplex many streams over one long-lived connection.** A layer-7 load balancer
+balances at *connection* establishment. But a gRPC client opens one connection and keeps it, sending
+thousands of RPCs as streams over that single connection, all **pinned to whatever backend the LB
+picked at connect time**. Add ten new backend pods and existing clients keep hammering the old ones;
+the new pods sit idle.
+
+\`\`\`
+gRPC client --- one long-lived H2 connection ---> backend A  (all streams pinned)
+new backends B,C come up  ->  get zero traffic until clients reconnect
+\`\`\`
+
+The fixes: **client-side load balancing** (the client spreads RPCs itself, via gRPC's round_robin
+resolver or an xDS/mesh control plane), balance at **L7 per-request** with a proxy that understands
+H2 streams (Envoy balances individual streams, not just connections), or periodically **cycle
+connections** (max-connection-age) so clients re-resolve and rebalance. WebSockets have the same
+pinning problem, so plan for connection draining and rebalancing on scale events.
+
+**C10k / C10M.** Holding 100K-plus concurrent connections needs **event-driven** proxies
+(epoll/kqueue, nginx/Envoy) rather than thread-per-connection, plus OS tuning (file-descriptor
+limits, ephemeral port range, TCP buffers, SO_REUSEPORT).
+
+**Interview nuance:** if you say "terminate gRPC at our L7 load balancer" without mentioning stream
+pinning, expect "then why did your new pods get no traffic after a scale-up?" Naming client-side LB
+or Envoy per-request balancing is what proves you have run this in production.
+
+Recap: terminate TLS at the edge and re-encrypt with mTLS for a zero-trust interior, pool and
+keep-alive connections to avoid handshake cost and port exhaustion, and remember that long-lived
+multiplexed H2/gRPC/WebSocket connections pin to one backend so you need client-side or per-request
+balancing to actually spread load.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -758,6 +822,53 @@ export const systemDesignLevel4: DesignLevel = {
               "**Device diversity is why one generic API fails:** a 4K TV, a low-end Android phone, and a console differ in screen size, codec support, memory, and network. The aggregation layer is device-aware: it shapes payloads (image resolutions, row counts, field sets) per device class, ideally driven by device capability metadata. Netflix's real answer let device teams run their own adapter logic at the edge so each client controls its own shaping: the BFF idea taken to its scaled conclusion.",
               "**Resilience dominates at this fan-out:** because one screen depends on dozens of services, the aggregator must degrade gracefully. Wrap each downstream in a circuit breaker and timeout (Hystrix-style); when a non-critical service (a single recommendation row) is slow or down, return the screen without that row rather than failing the whole load. Critical fields (is the account active, is playback allowed) fail differently from cosmetic ones.",
               "**Caching and thinness:** hot shared responses (artwork, common rows) cache at the edge to cut fan-out volume. The gateway stays thin and stateless; per-device shaping and partial-failure composition live in the aggregation/BFF layer; domain logic stays in the individual services.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-tls-connection-mgmt",
+          title: "TLS Termination & Connection Management",
+          summary:
+            "Terminate TLS at the edge and re-encrypt with mTLS inside, pool and keep-alive connections, and fix H2/gRPC/WebSocket pinning with client-side or per-stream balancing.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["tls", "connection-management"],
+          teach: {
+            markdown: tlsConnectionMgmtTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-tls-connection-mgmt-apply",
+            prompt:
+              "Decide where to terminate TLS for an API platform and how to keep backend connection counts sane at 100k concurrent clients.",
+            thinkAbout: [
+              "What is the tradeoff of edge TLS termination vs end-to-end/mTLS?",
+              "Why do long-lived multiplexed gRPC/WebSocket connections defeat L7 balancing?",
+              "How do pooling and keep-alive avoid port exhaustion?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an API platform with 100K concurrent clients, a mix of HTTP/1.1, HTTP/2, and gRPC, running on an internal network that is not fully trusted, with a low-p99 SLO.",
+              "**TLS termination:** terminate public TLS at the edge / L7 load balancer (Envoy or ALB) so the crypto-heavy handshake is offloaded from backends and certificates are managed centrally, with SNI for multi-hostname routing and automated rotation (ACME/internal CA). Because the internal network is untrusted, do not leave the internal hop plaintext: re-encrypt with mTLS from edge to services via a mesh that issues and rotates sidecar certs. Cheap edge offload plus a zero-trust interior. If the threat model forbids plaintext anywhere including inside the LB, push toward full end-to-end TLS and accept the CPU.",
+              "**Connection counts:** naively, 100K clients opening fresh connections per request burns CPU on handshakes and exhausts ephemeral ports on the proxy-to-backend hop. Use keep-alive to reuse connections and connection pooling so the edge holds a bounded warm pool per backend, making backend connection count a function of concurrency and pool size rather than request rate. Run event-driven proxies (epoll-based nginx/Envoy) and tune the OS (fd limits, ephemeral port range, TCP buffers, SO_REUSEPORT).",
+              "**The gRPC/H2 trap:** gRPC clients open one long-lived H2 connection and stream thousands of RPCs over it, all pinned to the backend chosen at connect time. Terminating gRPC at a naive L7 LB means a scale-up adds pods that get zero traffic. Fix by balancing per request/stream at an Envoy-style proxy that understands H2 streams, or client-side load balancing where clients resolve all backends and spread RPCs, plus max-connection-age so connections cycle and clients re-resolve after scaling events. WebSockets get the same treatment: plan for draining and rebalancing on scale-up.",
+              "Common wrong turn: terminating H2/gRPC at an L7 LB and discovering streams pinned to one backend, so new capacity sits idle and one pod is hot while others are cold.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-tls-connection-mgmt-practice",
+            prompt:
+              "Design connection and TLS management for a real-time trading or chat platform holding 5 million concurrent WebSocket connections across a fleet, where backends scale up and down through the day and a dropped connection is a user-visible event. Lead with how you spread and rebalance those long-lived connections.",
+            thinkAbout: [
+              "Why does L7 rebalancing not help an already-open WebSocket?",
+              "How do new nodes ever acquire connections after a scale-up?",
+              "What makes a scale-down drain invisible instead of dropping 300K users at once?",
+            ],
+            modelAnswerOutline: [
+              "**Spreading them:** 5M concurrent long-lived WebSockets cannot land on one tier, so front them with a fleet of event-driven edge/gateway nodes (Envoy or a custom epoll-based server), each holding a few hundred thousand sockets, behind an L4 anycast/NLB layer. Balance at L4 on connect and spread with consistent hashing so adding or removing an edge node remaps only a small fraction of new connections. TLS terminates at these edge nodes: the handshake happens once per connection, so with millions of persistent sockets it amortizes to near zero and the real cost is memory per connection, which is why event-driven (not thread-per-connection) is mandatory. Re-encrypt internally with mTLS to the message-routing services.",
+              "**The hard part is pinning:** a WebSocket is bound to the edge node it connected to for its lifetime, so L7 rebalancing does not help an open socket. On scale-up, new nodes get zero existing connections and only pick up new ones, so add connection-age limits / graceful cycling to bleed some connections onto new capacity over time, and bias new client connects toward the least-loaded nodes via the resolver.",
+              "**Scale-down: drain.** Stop routing new connects to the node, then let client reconnect logic move sockets off it gradually rather than dropping 300K users at once.",
+              "**Because a drop is user-visible:** clients have automatic reconnect with jittered backoff (avoiding a thundering herd all reconnecting at once), and the server supports fast session resume so a reconnect restores subscriptions without a full re-auth round trip.",
+              "**OS and safety:** file descriptors in the millions across the fleet, ephemeral port tuning, TCP keepalive for dead-peer detection, and per-node connection caps so no single node tips over.",
             ],
           },
         },
