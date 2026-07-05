@@ -852,6 +852,77 @@ the partition key to avoid hot partitions, and add secondary indexes only to ser
 access pattern.
 `.trim()
 
+const keysIdsConstraintsTeach = `
+## The most trivial-looking column is the highest-leverage one
+
+An ID looks like the most trivial column in the table. It is actually one of the highest-leverage
+decisions you make, because the primary key drives physical storage layout, index locality, and how
+the data shards, and all three are painful to change once the table is large.
+
+### The monotonic-key hotspot
+
+Auto-increment integer keys are compact, sort naturally, and give great index locality: new rows
+cluster at the right edge of the B-tree. That same property is a curse at write scale. In an
+InnoDB-style **clustered index**, rows are physically stored in primary-key order, so if the key is
+monotonic, every insert lands on the same rightmost page and, worse, the same shard. You get a
+**write hotspot**: one page or one node absorbs all the insert traffic while the rest sit idle.
+Auto-increment also leaks information (competitors count your order volume) and does not work cleanly
+across multiple write nodes that would collide on the next value.
+
+### The random-UUID cure that causes a new disease
+
+The obvious fix is a random **UUIDv4**: 128 bits of randomness, generated anywhere with no
+coordination, no information leak, no collision. But UUIDv4 destroys index locality. Because values
+are random, every insert lands on a random B-tree page, so the working set of pages you must keep in
+memory balloons, pages split constantly, and the index **fragments**. On a large table this can
+multiply write cost and index size several-fold. Using a random UUIDv4 as a clustered primary key is
+one of the most common and expensive modeling mistakes.
+
+### Time-ordered IDs, the actual answer
+
+You want the coordination-free, information-hiding property of a UUID with the locality of a
+sequential key. That is exactly what **ULID** and **UUIDv7** provide: a high-order timestamp prefix
+(millisecond) followed by random bits. Because the prefix increases with time, new IDs are roughly
+ordered, so they cluster like an auto-increment for locality, while the random suffix keeps them
+collision-free and generatable anywhere. **Snowflake** IDs (Twitter's scheme: timestamp + machine id
++ per-ms sequence, packed into 64 bits) give the same time-ordering plus an embedded shard/worker id,
+at the cost of needing worker-id coordination. Rule of thumb: default to ULID/UUIDv7 for distributed
+primary keys; use Snowflake when you want a compact 64-bit id and already have worker-id assignment.
+
+**Interview nuance:** if you propose random UUIDs, expect "what does that do to your clustered
+index," and if you propose auto-increment, expect "how does that shard." The answer that ends the
+line of questioning is "ULID/UUIDv7: time-ordered for locality, random-tailed for distribution,
+coordination-free."
+
+### Keys, constraints, and types
+
+**Natural vs surrogate keys.** A natural key is a real-world attribute (email, ISBN, SKU). A
+surrogate key is a synthetic id with no business meaning. Prefer surrogate keys for entity primary
+keys, because natural attributes change (people change emails) and a primary key should be immutable
+and stable as a foreign-key target. Keep the natural attribute as a \`UNIQUE\` constraint, not the
+PK. Composite keys are right when the identity truly is the combination, for example a junction table
+keyed by \`(order_id, product_id)\`.
+
+**Constraints are guardrails, not decoration.** They enforce invariants at the one place nothing can
+bypass: the database. \`NOT NULL\` stops missing data, \`UNIQUE\` stops duplicate emails, a
+\`FOREIGN KEY\` stops orphaned rows, and a \`CHECK\` (\`quantity > 0\`, \`status IN (...)\`) stops
+invalid values regardless of which service wrote them. Application-level validation is not a
+substitute, because a second service or a manual fix can write around it.
+
+**Data types encode correctness.** Store **money as decimal/integer cents, never float**, because
+binary floating point cannot represent 0.10 exactly and will drift by cents over millions of rows.
+Use **timezone-aware timestamps** (\`timestamptz\`, stored UTC) so events order correctly across
+regions. Size integers to the domain. Finally, decide **soft vs hard delete**: a \`deleted_at\`
+timestamp preserves history and audit trails and lets you undo, at the cost of every query filtering
+\`WHERE deleted_at IS NULL\`; a hard delete reclaims space and simplifies queries but loses the
+record. Pick soft delete when history or recovery matters, hard delete for high-churn or
+privacy-mandated erasure.
+
+Recap: avoid monotonic keys for hotspots and random UUIDv4 for fragmentation, default to ULID/UUIDv7
+(or Snowflake) for time-ordered distributed IDs, use surrogate keys with natural attributes as unique
+constraints, enforce invariants with DB constraints, and pick types that encode correctness.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1582,6 +1653,58 @@ export const systemDesignLevel2: DesignLevel = {
               "**Unread badge without 500k writes:** no per-member counter fan-out. Each channel stores a monotonic `lastMessageSeq`; each membership item stores the user's `lastReadSeq`. Unread = lastMessageSeq - lastReadSeq, computed at read time, returned with the channel-list query. One message is a single write (bump the channel's seq) instead of 500k; reading a channel updates only that user's lastReadSeq. O(members) write becomes O(1).",
               "**The trade:** a per-message mention badge (distinct from unread) still needs targeted fan-out, but only to the people actually @-mentioned: a small, bounded set, which is exactly the fan-out that is fine.",
               "Common wrong turn: treating a 500k-member channel like a 5-member DM and fanning out counters, or keeping channel history on one partition key and throttling the moment a channel goes viral.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-keys-ids-constraints",
+          title: "Keys, IDs & Constraints",
+          summary:
+            "Avoid monotonic-key hotspots and UUIDv4 fragmentation with ULID/UUIDv7, use surrogate keys with unique natural attributes, and let DB constraints and types carry correctness.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["ids", "keys", "sharding"],
+          teach: {
+            markdown: keysIdsConstraintsTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l2-keys-ids-constraints-apply",
+            prompt:
+              "Choose a primary-key/ID strategy for a distributed order service and explain its impact on index locality and sharding.",
+            thinkAbout: [
+              "Why do monotonic keys cause write hotspots on B-trees?",
+              "How do ULID/UUIDv7 restore time-ordering without random-UUID fragmentation?",
+              "Which constraints and data types protect integrity (money, timestamps)?",
+            ],
+            modelAnswerOutline: [
+              "Assume an order service that must scale writes across multiple nodes/shards, generate ids without a central sequence, and support 'list a customer's recent orders' efficiently.",
+              "**Reject auto-increment:** in a clustered index every insert lands on the same rightmost page and, once sharded by id, the same node: a write hotspot. It also needs central coordination across nodes and leaks order volume. **Reject random UUIDv4:** coordination-free, but random values scatter inserts across the whole B-tree, fragmenting the index, causing constant page splits, and inflating the in-memory working set, multiplying write cost on a large table.",
+              "**Choose ULID (or UUIDv7):** a millisecond timestamp prefix makes ids time-ordered (new orders cluster like an auto-increment: good locality, cheap 'recent orders' range scans) while the random suffix keeps them collision-free and generatable on any node with no coordination.",
+              "**Sharding impact:** because the id is time-ordered, sharding on the raw id would send all current writes to one shard (the newest time-prefix range), recreating the hotspot. Shard on hash(customer_id) instead, spreading writes evenly and co-locating a customer's orders for 'list my orders,' while ULID remains the primary key for locality within a shard. Separate the routing key (customer) from the storage-ordering key (ULID).",
+              "**Keys:** surrogate ULID PK for orders; order_number (human-facing natural value) as a separate UNIQUE column, not the PK. Line items use a composite identity (order_id, line_no).",
+              "**Constraints:** FOREIGN KEY(customer_id) against orphaned orders, CHECK(quantity > 0), CHECK(status IN (...)), NOT NULL on money and status, UNIQUE(order_number): in the DB so a second service cannot write around them.",
+              "**Types:** money as bigint cents (or numeric), never float; created_at timestamptz in UTC; soft delete via cancelled_at/deleted_at because order history is audit-relevant.",
+              "Common wrong turn: UUIDv4 as the clustered PK (write amplification and index bloat in production), or sharding on the time-ordered id and hotspotting the newest shard.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-keys-ids-constraints-practice",
+            prompt:
+              "Choose the ID and key strategy for a payments ledger at Stripe scale that must generate globally unique ids across dozens of regions with no coordination, guarantee no double-charge on retries, and keep money math exact. Show the ID scheme, the idempotency mechanism, and the constraints and types that make correctness enforceable in the database.",
+            thinkAbout: [
+              "Where does the double-charge risk actually come from: id generation or retries?",
+              "Why is 'check if exists then insert' not a safe idempotency mechanism?",
+              "What schema shape makes ledger corrections auditable instead of destructive?",
+            ],
+            modelAnswerOutline: [
+              "Assume a ledger writing across dozens of regions, clients that retry on timeout, and zero tolerance for a lost cent or a double charge.",
+              "**ID scheme:** UUIDv7/ULID for internal row ids: time-ordered for index locality on the append-heavy ledger, random-tailed for collision-free generation in every region with no central sequence. Snowflake would also be defensible if worker-id assignment infrastructure existed. Public-facing object ids get a prefixed opaque form (`ch_<base32>`) so the type is visible and the internal id is not leaked.",
+              "**No double-charge: idempotency keys, enforced by the database.** The double-charge risk comes from retries, not id generation. The client sends an idempotency key per logical charge attempt, stored in an `idempotency_keys` table with a UNIQUE constraint plus the stored response. The first request inserts the key inside the same transaction that writes the charge; a retry hits the unique-constraint violation and returns the stored original response. Two concurrent retries racing across regions cannot both succeed: the unique constraint is the atomic guard. 'Check if exists then insert' has a TOCTOU race and is not the mechanism.",
+              "**Money math:** amounts as integer minor units (bigint cents or numeric(20,0)), never floating point, because binary float cannot represent 0.10 and drifts over billions of rows. Currency as a separate char(3) column with a CHECK.",
+              "**Ledger shape:** every entry is immutable and append-only; corrections are new reversing entries, never updates. Enforce double-entry with a CHECK/trigger that debits and credits sum to zero per transaction. No soft delete on a ledger: reversals instead.",
+              "**Constraints and types carrying correctness:** UNIQUE(idempotency_key), FOREIGN KEY from entries to accounts, CHECK(amount_minor <> 0), NOT NULL on amount/currency/account, timestamptz UTC for global ordering. The invariants live in the database, where no service, retry, or manual fix can bypass them.",
+              "Common wrong turn: relying on application-code checks to prevent double charges (racy under retries), or storing money as float and reconciling penny drift later.",
             ],
           },
         },
