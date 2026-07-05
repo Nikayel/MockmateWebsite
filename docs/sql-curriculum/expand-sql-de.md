@@ -19,6 +19,48 @@ The level structure mirrors the four rounds of a real DE interview loop, so each
 
 ---
 
+## Interview-level triage: what an intern is actually expected to know
+
+The whole course is a trojan horse. It reads as "learn SQL," but every lesson is chosen to move a candidate through a Data Engineering **intern** loop. That framing forces one honest question about Level 5: an intern is not expected to know all of it. Some of this is true intern table-stakes; the rest is new-grad and full-time DE material that an intern who learns it uses to punch above their level. Both belong in the course, but the learner should know which is which so they spend nervous pre-interview hours on the right rows. **Nothing below is cut.** These are labels, not deletions.
+
+Three tiers, tagged on every lesson:
+
+- **Intern-core.** Table-stakes for a DE intern live SQL screen. If a candidate cannot do these, the intern loop fails them. Study these first and until they are automatic.
+- **Intern-stretch.** The hard end of an intern screen and the normal middle of a new-grad loop. An intern is rarely failed for missing these, but nailing them is the difference between "fine" and "obvious hire." Reach for them once Intern-core is solid.
+- **Junior-to-Senior.** Genuinely above the intern bar: the modeling round, the pipeline round, and the system-design round that full-time DE candidates (new-grad through senior) sit. Included on purpose as the trojan horse's upside, not because an intern must have it. High leverage for converting an internship into a return offer, and for the new-grad loop a year later.
+
+Read by module, the level climbs exactly as the interview loop does:
+
+- **Module 5.1 (the live SQL power screen) is all Intern-core.** This is the round an intern actually sits, and gaps-and-islands / sessionization / cohort / funnel / window-frames are the exact patterns that filter that screen. Every row earns its place at the intern bar.
+- **Module 5.2 (modeling round) is mixed.** JSON scalar extraction and join fan-out double-counting are intern-reachable; the accumulating-snapshot fact and the as-of SCD2 join are junior-and-up modeling asks that interns almost never get.
+- **Module 5.3 (pipeline round) is Junior-to-Senior.** CDC apply, watermark incremental plus backfill, and write-audit-publish gates are real pipeline-engineering work. Interns are seldom asked to implement them; new-grad and full-time DE candidates are.
+- **Module 5.4 (system-design round) is Junior-to-Senior.** Interns are rarely given a full system-design round at all. This module exists to build the vocabulary early and to carry the medallion capstone that ties the level together.
+
+Practical order for someone with an intern loop next week: finish Module 5.1 cold, then do the Intern-stretch rows of 5.2 (JSON, join fan-out), and treat 5.3, 5.4, and the accumulating-snapshot / as-of lessons as return-offer and new-grad preparation to reach for once the intern-core screen is safe.
+
+### Per-lesson level tags
+
+| Lesson | Module | Difficulty (as authored) | Interview level | Why this tier |
+|---|---|---|---|---|
+| `gaps-and-islands` | 5.1 | hard | **Intern-core** | The single most-failed screen pattern; the highest-ROI row in the level. |
+| `sessionization` | 5.1 | hard | **Intern-core** | Standard analytics-SQL screen question (LAG gap plus cumulative flag). |
+| `cohort-retention` | 5.1 | hard | **Intern-core** | Product-analytics screen staple; the denominator trap is the filter. |
+| `funnel-conversion` | 5.1 | medium | **Intern-core** | Conditional-aggregation screen staple. |
+| `window-frames-and-qualify` | 5.1 | hard | **Intern-core** | Upper-intern depth; ROWS vs RANGE and the LAST_VALUE trap are fair game on the screen. |
+| `json-variant-flatten` | 5.2 | hard | **Intern-stretch** | Scalar extraction is intern-core; the array fan-out and double-count trap lean new-grad. |
+| `join-fan-out-and-skew` | 5.2 | hard | **Intern-stretch** | Fan-out double-counting is intern-reachable; the skew / salting / broadcast note is senior distributed-systems flavor. |
+| `as-of-scd2-join` | 5.2 | medium | **Intern-stretch / Junior** | Builds on L4 SCD2; a junior modeling-round ask, reachable for a strong intern. |
+| `fact-grains-accumulating-snapshot` | 5.2 | hard | **Junior-to-Senior** | The most-asked *advanced* fact question, but advanced-fact modeling sits above the intern bar. |
+| `cdc-changelog-apply` | 5.3 | hard | **Junior-to-Senior** | Pipeline-round CDC implementation; interns rarely build this. |
+| `incremental-watermark-backfill` | 5.3 | hard | **Junior-to-Senior** | Pipeline-engineering incremental and backfill design; new-grad and up. |
+| `data-quality-gates` | 5.3 | medium | **Junior** | Write-audit-publish is a junior/mid operational responsibility beyond intern scope. |
+| `system-design-round-reasoning` | 5.4 | hard | **Junior-to-Senior** | System-design rounds are seldom given to interns. |
+| `medallion-streaming-capstone` | 5.4 | hard | **Junior-to-Senior** | Integrative take-home-style build; inherits the pipeline and system-design level. |
+
+Verdict: **5 of 14 are true intern table-stakes** (all of Module 5.1), **3 are intern-stretch** (JSON, join fan-out, as-of), and **6 are junior-to-senior** (accumulating snapshot, the whole pipeline round, and the whole system-design round). The trojan horse still works: an intern grinds Module 5.1 to pass the screen, then keeps the rest loaded as the return-offer and new-grad track.
+
+---
+
 ## What L1-L4 already cover, and what Level 5 adds
 
 **Do not re-teach these (already shipped in L1-L4).** SELECT / WHERE / NULL logic / CAST / strings / dates (L1). COUNT/SUM/AVG, GROUP BY, HAVING, INNER/LEFT/RIGHT/FULL joins, anti-joins, self-joins, UNION/INTERSECT/EXCEPT, subqueries, CTEs, CASE + basic conditional aggregation (L2). CREATE TABLE, INSERT ... SELECT, primary/foreign keys, UNIQUE/NOT NULL/CHECK, 1NF/2NF/3NF, denormalization, ER modeling, junction tables, B-tree indexes, the first star schema (L3). Window ranking (ROW_NUMBER/RANK/DENSE_RANK), LAG/LEAD, basic ROWS frames (running totals, moving averages, percent-of-total), recursive CTEs, star-schema load, SCD Type 1, SCD Type 2, deduplication (ROW_NUMBER keep-latest), idempotent upsert (ON CONFLICT, run-twice-same-count), the dbt four data-quality tests, EXPLAIN QUERY PLAN seek-vs-scan and sargable predicates (L4).
