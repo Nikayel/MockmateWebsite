@@ -1,9 +1,9 @@
 /**
  * System Design — Level 0: Interview & Communication Method.
  *
- * Skeleton level for the vertical slice: it holds the ONE proof lesson (`sd-l0-clarify-scope`,
- * Module sd-l0-m1) authored verbatim from `docs/system-design-curriculum/CURRICULUM-MAP.md` §L0.
- * AGENT-2 authors the remaining lessons/modules/levels from the same map.
+ * Fully authored: 15 lessons across 4 modules (sd-l0-m1..m4), compiled from
+ * `docs/system-design-curriculum/content/sd-l0-m*.md` with ids verbatim from
+ * `docs/system-design-curriculum/curriculum-map.json`.
  *
  * Each lesson carries both `apply` and `practice` because `TutorialLesson<E>` requires both. The
  * System-Design player renders the Read + Design (apply) spine and completes `apply` and `practice`
