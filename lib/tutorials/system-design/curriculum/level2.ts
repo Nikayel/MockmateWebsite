@@ -122,6 +122,71 @@ stops dirty, non-repeatable, and phantom reads but still allows write skew, whic
 Serializable or targeted locking prevents.
 `.trim()
 
+const mvccLockingTeach = `
+## The contract vs the machinery
+
+Isolation levels are the contract; concurrency control is how the database actually delivers them.
+There are two big families, and modern databases lean on the first.
+
+### MVCC: readers don't block writers
+
+**Multi-Version Concurrency Control (MVCC)** is the reason "readers don't block writers and writers
+don't block readers" in Postgres, MySQL InnoDB, Oracle, and most serious OLTP engines. The idea: a
+write does not overwrite a row in place; it creates a new version of the row, tagged with the
+transaction that created it. Every transaction runs against a consistent snapshot defined by which
+versions were committed as of its start. So a long analytical read sees a frozen, coherent view while
+writers keep creating new versions alongside it, and neither waits on the other. This is what makes
+snapshot isolation cheap and is why read-heavy systems love it.
+
+The cost of MVCC is that old row versions pile up and must be reclaimed. In Postgres this is
+**VACUUM** (and autovacuum); in InnoDB it is the purge thread cleaning the undo log. The dangerous
+failure mode is a **long-running transaction**: it holds an old snapshot, so the database cannot
+reclaim any version newer than that snapshot's start, and dead tuples accumulate as **bloat**. A
+single forgotten transaction (an idle-in-transaction connection, a stuck analytics query) can bloat a
+table many times its live size and tank performance. This is the operational tax of MVCC, and
+interviewers love it.
+
+**Interview nuance:** "What breaks if a transaction stays open for an hour?" The strong answer: it
+pins the vacuum horizon, so dead tuples cannot be reclaimed, the table and its indexes bloat, and
+sequential scans slow down. Mitigation: \`idle_in_transaction_session_timeout\`, keep transactions
+short, and monitor the oldest transaction age.
+
+### Locking and optimistic control
+
+The second family is **locking-based / pessimistic concurrency**, classically **two-phase locking
+(2PL)**: acquire shared (read) or exclusive (write) locks, hold them, and release only at commit. It
+is correct but writers block conflicting readers and each other, so throughput drops under
+contention, and it introduces **deadlocks**: transaction 1 holds lock A and wants B, transaction 2
+holds B and wants A. Databases handle this by detecting the cycle and aborting one victim, so your
+app must catch the deadlock error and retry. You reduce deadlocks by acquiring locks in a consistent
+order (always lock the lower account id first) and keeping transactions short.
+
+**Optimistic concurrency control (OCC)** assumes conflicts are rare: do not lock, just read a
+\`version\`, and at commit check \`WHERE version = :read_version\`; if it changed, abort and retry.
+OCC wins when contention is genuinely low, because it skips all lock overhead. It loses badly under
+high contention, because the abort-and-retry rate explodes and you burn CPU redoing work. So the
+rule is: **optimistic under low contention, pessimistic under high contention.**
+
+### The hot key
+
+For a hot key specifically (a viral post's like counter taking thousands of increments per second on
+one row), the wrong move is heavy pessimistic locking, which serializes every writer behind one lock
+and caps throughput at one-at-a-time. The right moves: **shard the counter** into N sub-rows
+(\`like_count_shard_0..N\`), increment a random shard, and sum on read, which spreads contention
+N-fold; or aggregate increments in memory/Redis and flush periodically; or use an atomic in-database
+increment so each write is a single short operation rather than a read-modify-write holding a lock.
+
+\`\`\`
+MVCC read:  txn snapshot --> sees v2 (committed), ignores v3 (in-flight) -- no wait
+Hot counter: 1 row, all writers -- LOCK --> serialized (bad)
+             N shards, random pick ------> ~N-way parallel, sum on read (good)
+\`\`\`
+
+Recap: MVCC makes readers and writers not block each other by versioning rows, at the cost of vacuum
+and bloat from long transactions; choose optimistic control under low contention and pessimistic
+under high, and for a hot key shard the counter instead of serializing writers behind one lock.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -232,6 +297,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Load-shed with Redis in front:** a short-lived `SETNX seat:{id}` lock with a TTL matching the hold window sheds the majority of duplicate attempts before they hit Postgres, then the durable reservation is confirmed in Postgres where the unique constraint is the final authority. Redis is an optimization, not the source of truth; a Redis failure must never allow a double-sell, so the DB constraint remains the backstop.",
               "**Expiry:** a background job (or a `held_until` timestamp checked at insert time) frees seats whose hold lapsed; because release plus re-reservation both go through the same unique constraint, there is no window for a double-book.",
               "Common wrong turn: treating seats as a fungible counter and decrementing stock (loses which seat), or relying on application-level 'check then insert,' which write skew and raced retries slip through. Correctness must come from the unique index.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-mvcc-locking",
+          title: "Concurrency Control: MVCC, Locking, OCC",
+          summary:
+            "MVCC versions rows so readers and writers never block each other (at vacuum/bloat cost); go optimistic under low contention, pessimistic under high, and shard hot counters.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["mvcc", "locking", "concurrency"],
+          teach: {
+            markdown: mvccLockingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-mvcc-locking-apply",
+            prompt:
+              "Design the concurrency-control strategy for a high-contention counter/like feature so reads stay fast under heavy writes.",
+            thinkAbout: [
+              "How does MVCC let readers see a snapshot without blocking writers?",
+              "When do you choose optimistic (version/CAS) over pessimistic locking?",
+              "What is the operational cost of MVCC (bloat, vacuum, long transactions)?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a social product where a viral post can take 5,000 likes per second concentrated on one row; reads of the count far exceed writes and can tolerate a second or two of staleness; exact-to-the-like precision is not required.",
+              "**Why the naive design fails:** `UPDATE posts SET likes = likes + 1` on a hot row means every increment creates a new row version, and although MVCC keeps readers non-blocking, the writers all contend on the same row's write lock and serialize, capping throughput at how fast one transaction commits, while the row bloats with dead versions vacuum must chase.",
+              "**Design: shard the counter.** Store the count as N rows (say 50), `post_like_shards(post_id, shard_id, count)`. Each like increments a randomly chosen shard: 5,000 writes/sec spread across 50 rows is ~100/sec each, trivial, and cuts contention 50-fold. Reads compute `SELECT SUM(count)`; because reads are hot, cache that sum in Redis with a 1-2s TTL or maintain a materialized total so the common read is a single key lookup.",
+              "**The increment itself is the atomic in-database form** (single-statement `count = count + 1`), not app-side read-modify-write, so there is no lost update and no held lock. Reject pessimistic `SELECT ... FOR UPDATE` on the counter (serializes writers, exactly the failure being avoided) and reject optimistic CAS (under heavy contention its retry-abort rate explodes; OCC is for low contention).",
+              "**MVCC operational care:** sharding also relieves bloat because updates spread across rows, but keep autovacuum aggressive on these tables and monitor for long-running transactions that pin the vacuum horizon.",
+              "**At even higher scale,** move the write path off the transactional store: buffer increments in Redis (`INCR post:likes:{id}`) and flush aggregated deltas to Postgres every few seconds, trading a small staleness and durability window for near-unlimited write throughput.",
+              "Common wrong turn: reaching for pessimistic locking on the hot key to be safe, which serializes all writers behind one lock and is the worst possible choice for a contended counter.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-mvcc-locking-practice",
+            prompt:
+              "Design the concurrency control for a YouTube-scale view counter where a trending video takes 100,000 view events per second globally across many regions, the displayed count can lag real time by seconds, but the eventual total must be accurate and durable enough to drive creator payouts.",
+            thinkAbout: [
+              "Can any single-primary relational row absorb 100,000 writes per second, even sharded?",
+              "How do you serve a fast approximate count and a billing-grade exact total from the same events?",
+              "Where does deduplication (bots, replays) belong in the pipeline?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: writes vastly exceed reads for a given video, a globally distributed audience, the shown count may lag by seconds, but the settled total feeds monetization so it must eventually be exact and durable. A single relational row cannot absorb 100,000 writes/sec; even a sharded single-database counter strains.",
+              "**Design as a streaming pipeline, not a transactional counter.** View events are produced to Kafka (or Kinesis), partitioned by video id so all events for one video land in ordered partitions. Because payouts need accuracy, treat the Kafka log as the durable source of truth and process it exactly-once (idempotent consumers keyed by event id, or Kafka transactions) so a consumer crash does not double-count or drop views.",
+              "**Two read paths, two consistency tiers.** Live displayed count: a stream processor (Kafka Streams or Flink) maintains a running per-video tally and pushes it to a fast store (Redis `INCRBY` on aggregated windows) the UI reads with single-digit-ms latency; allowed to be seconds stale and slightly approximate. Billing-grade total: a batch or exactly-once streaming job periodically aggregates the raw event log into a durable warehouse table (per video, per time window) that is the number of record for payouts. Reconciliation compares the two and heals the fast tier from the authoritative one.",
+              "**Regional layout:** each region writes to its local Kafka cluster to keep write latency low; cross-region aggregation rolls regional partials into the global total, avoiding a single global write bottleneck. A deliberate move from strong single-row consistency to eventual consistency, justified because the invariant (exact eventual total) is preserved by the durable log while the real-time display trades precision for throughput.",
+              "**Anti-fraud dedup** (bot views, replays) lives in the stream layer, keyed by viewer/session, before events count toward payout.",
+              "Common wrong turn: trying to keep an ACID row counter authoritative at 100,000 writes/sec, which no single-primary relational row survives; the scale forces the counter out of the transactional database into a durable event log with tiered consistency, while still preserving eventual accuracy for money.",
             ],
           },
         },
