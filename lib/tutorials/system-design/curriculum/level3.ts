@@ -723,6 +723,64 @@ replicas, stays in sync as an eventually-consistent derived store fed by CDC, an
 with search_after, never large from offsets.
 `.trim()
 
+const vectorHybridSearchTeach = `
+## When tokens do not overlap
+
+Keyword (BM25) search matches tokens. Ask it "my card was declined" and it will not find a document
+titled "payment authorization failed" because the words do not overlap. **Vector search** fixes this.
+An **embedding model** maps text into a dense vector (say 768 or 1536 dimensions) where semantically
+similar text lands close together. Now "declined card" and "payment authorization failed" are near
+neighbors even with zero shared words. Retrieval becomes: embed the query, find the nearest document
+vectors by cosine similarity.
+
+Exhaustively comparing the query to every vector is O(N) and too slow at millions of docs, so you use
+an **approximate nearest neighbor (ANN)** index. The two workhorses are **HNSW** (a navigable
+small-world graph, excellent recall and latency, high memory) and **IVF** (cluster the space and
+search a few clusters, lower memory, tunable recall). ANN trades a little **recall** for a massive
+latency win; you tune parameters (\`efSearch\`, \`nprobe\`) to sit where you want on the
+recall/latency/memory curve.
+
+### Hybrid search: because vectors are bad at exact tokens
+
+Error code \`E-4021\`, SKU \`SKU-99183\`, version \`v2.14.0\`, a person's exact name: these are
+precisely where semantic similarity fails, because the embedding blurs the exact string. That is why
+production systems use **hybrid search**: run **BM25 for exact/lexical matching** and **dense vectors
+for semantic recall** in parallel, then combine.
+
+You cannot just add the scores: BM25 scores are unbounded and dataset-dependent, cosine similarity is
+bounded 0 to 1, so summing them is meaningless. The clean fix is **Reciprocal Rank Fusion (RRF)**,
+which ignores raw scores and fuses by **rank**: each result gets \`1 / (k + rank)\` from each list
+(k ~ 60) and the sums are combined. A document ranked high by either method surfaces, and the
+incompatible score scales never touch.
+
+\`\`\`
+  query --> [ BM25 exact match ]     --> ranked list A
+        \\-> [ embed -> ANN vectors ] --> ranked list B
+                          \\-> RRF fuse by rank -> top-k
+                                        \\-> cross-encoder rerank -> top-n
+\`\`\`
+
+### Retrieve, then rerank
+
+First-stage retrieval (BM25 + ANN) is cheap and optimized for **recall**: cast a wide net, fetch the
+top ~100 candidates. Then a **cross-encoder reranker** (a model that reads the query and each
+candidate together, far more accurate but far more expensive) reorders just those 100 to produce a
+precise top 5 to 10. You get the recall of cheap retrieval and the precision of an expensive model,
+without running the expensive model over the whole corpus.
+
+**Interview nuance:** two operational realities interviewers probe. **Freshness and metadata
+filtering**: you often must restrict to \`product_id = X\` or \`updated_at > T\`. Prefer
+**pre-filtering** (filter the candidate set, then ANN) when the filter is selective, and be aware
+naive **post-filtering** can return too few results after ANN. **Re-embedding cost**: if you change
+the embedding model, every vector must be recomputed and reindexed, which for hundreds of millions of
+docs is a real migration, so you version embeddings and roll over like a search alias.
+
+Recap: use embeddings + an ANN index (HNSW/IVF) for semantic recall, run it alongside BM25 for exact
+tokens like codes and IDs, fuse the two by rank with RRF (never by raw score), add a cross-encoder
+reranker over the top-k for precision, and plan for metadata filtering and the migration cost of
+re-embedding.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1349,6 +1407,56 @@ export const systemDesignLevel3: DesignLevel = {
               "**Ingest and sharding:** buffer through Kafka to absorb spikes and decouple producers from indexing; route by tenant + time so one noisy customer does not hotspot a shard, cap shard size, and force-merge plus reduce replicas on rolled-over indices to shrink footprint.",
               "**Query:** mostly filters (service, host, level, time range) plus keyword match, so lean on cached filter bitsets and time pruning.",
               "**The tradeoff:** cheaper cold storage means slow historical queries, which is right because engineers tolerate seconds for a 30-day search but never during a live incident. Common wrong turn: one giant append-only index (retention and deletes become impossible, every query scans everything) or keeping all data on hot nodes (cost explodes at petabyte scale).",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-vector-hybrid-search",
+          title: "Vector, Semantic & Hybrid Search",
+          summary:
+            "Embeddings plus ANN give semantic recall, BM25 catches exact tokens; fuse by rank with RRF, rerank the top-k with a cross-encoder, and plan re-embedding migrations.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["vector-search", "hybrid-search", "rag"],
+          teach: {
+            markdown: vectorHybridSearchTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-vector-hybrid-search-apply",
+            prompt:
+              "Design retrieval for a support and knowledge base that must match paraphrased questions plus exact error codes and version numbers, and return the most relevant articles.",
+            thinkAbout: [
+              "Why combine dense vectors with BM25, and how are the scores fused?",
+              "What does a retrieve-then-rerank pipeline add?",
+              "How do you handle freshness and metadata filtering?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a KB of tens to hundreds of thousands of articles; queries mix natural-language paraphrases ('my payment won't go through') and exact tokens (`E-4021`, `v2.14.0`); latency budget in the low hundreds of ms; articles updated continuously.",
+              "**Hybrid retrieval:** chunk articles into passages and index them two ways. (1) BM25 / inverted index for exact lexical matching, which catches error codes, SKUs, and version numbers that embeddings blur. (2) Dense embeddings + ANN (HNSW in pgvector, Weaviate, or Elasticsearch dense_vector) for semantic recall so paraphrases match with no shared words.",
+              "**Fusion: Reciprocal Rank Fusion,** which fuses by rank (`1/(k+rank)`, k ~ 60) rather than raw score, because BM25 scores are unbounded and cosine is 0-1, so summing them directly is meaningless.",
+              "**Two-stage precision:** first stage retrieves ~100 candidates optimized for recall; a cross-encoder reranker reads the query with each candidate and reorders into a precise top 5-10. The recall of cheap retrieval plus the precision of an expensive model, run over 100 items, not the corpus.",
+              "**Freshness and filtering:** index updates flow through the same CDC/event pipeline as the article store (seconds of lag). Apply metadata filters (product, version, locale, is_published) as pre-filters when selective so ANN searches only the valid subset; avoid naive post-filtering that can starve results.",
+              "**The tradeoff:** reranking adds tens of ms and model cost per query, worth it where a wrong top result means a filed ticket. Migration reality: changing the embedding model forces re-embedding and reindexing every passage, so version embeddings and roll over via an alias.",
+              "Common wrong turn: raw vector similarity alone with no exact-match path (so `E-4021` returns vaguely-related payment articles) and no reranker (so the top result is only approximately right).",
+            ],
+          },
+          practice: {
+            id: "sd-l3-vector-hybrid-search-practice",
+            prompt:
+              "Design the retrieval layer for a coding assistant's RAG over a company's 20M-file private codebase and docs, where a query might be 'how do we rotate service credentials' or an exact symbol like AuthTokenRefresher.refresh(), and answers must never leak one team's private repos to another. Lead with how you keep exact-symbol matching and per-repo access control correct.",
+            thinkAbout: [
+              "Why must exact-symbol matching be first-class rather than left to embeddings?",
+              "Where must ACL filtering happen so no unauthorized chunk ever reaches ranking or the LLM?",
+              "What keeps the index fresh as code changes on every commit?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 20M files, mixed natural-language and exact-symbol queries, strict per-user/per-repo authorization, low-latency IDE completions, code and docs updated on every commit.",
+              "**Exact-symbol correctness:** code retrieval lives or dies on exact tokens, so BM25 (or a symbol index) is first-class, not an afterthought. `AuthTokenRefresher.refresh()` must match exactly, which embeddings blur badly. Index code with a code-aware analyzer (split camelCase and snake_case, keep the raw symbol) and build a dedicated symbol/definition index from the parser (ctags/LSP/tree-sitter) so definitions and references are exact lookups. Run dense embeddings in parallel for conceptual queries, fuse with RRF, and rerank the top ~100 with a cross-encoder.",
+              "**Access control, the load-bearing part: retrieval must be security-trimmed.** Attach repo_id and ACL/visibility metadata to every chunk and apply it as a pre-filter so the ANN and BM25 candidate sets only ever contain repos the user can read. Never post-filter after ranking (timing leaks and starved results), and never let the reranker or the LLM see a chunk the user cannot access. Enforce ACLs at query time from the authoritative permission service, not stale cached grants, because repo access changes.",
+              "**Freshness:** index on commit via CDC/webhooks, chunk by function/symbol, and re-embed only changed files.",
+              "**The tradeoff:** per-repo pre-filtering shrinks the candidate pool and can hurt recall for broad queries, which is correct because a leak is catastrophic and a slightly narrower result set is not.",
+              "Common wrong turn: a single shared index queried then filtered afterward (leaks via ranking side channels and counts), or leaning on vector similarity alone so exact symbol lookups fail.",
             ],
           },
         },
