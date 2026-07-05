@@ -1156,6 +1156,71 @@ critical traffic, and drop stale requests instead of letting an unbounded queue 
 until an OOM.
 `.trim()
 
+const concurrencyModelsTeach = `
+## One question decides it: CPU-bound or IO-bound?
+
+How a server maps incoming connections onto CPU work is one of the oldest and most consequential
+design choices, and it is entirely governed by one question: is the workload CPU-bound or IO-bound?
+
+### Thread-per-request
+
+Classic Apache prefork, Tomcat's default, most synchronous frameworks: a thread (or process) per
+in-flight request. Its great virtue is simplicity: you write straight-line blocking code
+(\`result = db.query(...)\`), the OS scheduler handles switching, and stack traces are clean. The
+cost is that each thread carries a real price. A default Linux thread reserves around 1MB of stack,
+so 10,000 threads is roughly 10GB of address space before doing any work, and the scheduler pays
+context-switch overhead that grows with thread count. The killer is **blocking IO**: when a thread
+waits on a slow database or a downstream API, it is parked doing nothing but still consuming a
+thread. If your workload is 90% waiting on IO, your threads sit idle while CPU is nearly free, and
+you exhaust the thread pool (and memory) long before the CPU saturates. That is why a
+thread-per-request box can fall over at a few thousand concurrent connections while showing 10% CPU.
+
+### Event loop
+
+Node.js, Nginx, Netty, Redis, Python asyncio (Go's runtime is a hybrid): one thread (or one per core)
+multiplexes thousands of sockets using an OS readiness API, **epoll** on Linux or **kqueue** on
+BSD/macOS, which lets the kernel say "these 50 of your 10,000 sockets have data ready" in one cheap
+call. Idle connections cost only a file descriptor and a little kernel memory, not a thread, so a
+single event-loop process holds hundreds of thousands of mostly-idle connections. This is precisely
+what IO-bound fan-out needs: an API gateway waiting on 20 backends per request spends almost all its
+time waiting, and the event loop turns that waiting into near-free multiplexing.
+
+But the event loop has one absolute rule: **never block the loop**. Because one thread drives
+everything, any single long operation (a synchronous CPU task, a blocking file read, a
+\`JSON.parse\` of a 50MB payload) freezes every other connection until it finishes. A CPU-heavy image
+transcode on the event loop serializes the whole server behind it. The fix is to offload CPU work to
+a **worker pool** sized to the number of cores, keeping the loop free to do IO.
+
+**Interview nuance:** The crisp rule is "event loops are for waiting, thread/worker pools are for
+computing." CPU-bound work does not benefit from an event loop because there is nothing to wait on;
+you are limited by cores, so you want exactly one busy worker per core, not async.
+
+### C10k and the OS limits
+
+The **C10k / C10M problem** names the challenge of holding 10,000 (or 10 million) concurrent
+connections. It is unsolvable with one blocking thread per connection and requires non-blocking IO
+plus tuned OS limits:
+
+- **File descriptors:** every socket is an fd, and the default \`ulimit -n\` is often 1024. Raise
+  \`nofile\` (and system-wide \`fs.file-max\`) to hundreds of thousands.
+- **Ephemeral ports:** a single source IP connecting to one destination IP:port is limited to roughly
+  28,000 outbound connections, so a proxy fanning out to one backend runs out of ports. Fix with
+  connection pooling and spreading across multiple destination IPs/ports.
+- **Memory per thread:** the ~1MB stack per thread that caps thread-per-request; event loops sidestep
+  it by not having a thread per connection.
+
+\`\`\`
+Thread-per-request:   [req]->thread->BLOCK on IO (idle, 1MB)   ... caps at ~thousands
+Event loop:           epoll -> 1 thread -> 100k idle sockets   ... never block it
+                                     \`-> CPU task? offload to worker pool (N=cores)
+\`\`\`
+
+Recap: CPU-bound work wants a worker pool sized to cores, IO-bound fan-out wants an event loop
+multiplexing many connections via epoll/kqueue, never block the loop with CPU or blocking IO, and
+past ~10k connections you must raise fd limits, pool connections around the ephemeral-port ceiling,
+and avoid the per-thread memory wall.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -2201,6 +2266,53 @@ export const systemDesignLevel1: DesignLevel = {
               "**Graceful behavior for shed traffic:** serve stale-but-cached content from the edge cache where possible (a slightly old product page beats an error), return 429 with Retry-After for the truly rejectable, queue nothing unboundedly. For write-ish analytics, accept-and-async or simply drop, since it is best-effort.",
               "**Origin protection:** run origins below saturation and let the edge soak the burst via caching, so the 1/(1-rho) latency cliff never hits the origin.",
               "Common wrong turn: a single global rate limit applied uniformly, which sheds checkout and analytics at the same rate and loses revenue to protect telemetry.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-concurrency-models",
+          title: "Server Concurrency Models: Thread-per-Request vs Event Loop & C10k",
+          summary:
+            "CPU-bound work wants a core-sized worker pool; IO-bound fan-out wants an event loop that you never block; past 10k connections, tune fds, ports, and memory.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["concurrency", "performance", "operating-systems"],
+          teach: {
+            markdown: concurrencyModelsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-concurrency-models-apply",
+            prompt:
+              "Explain how you would choose between a thread-per-request server and an event-loop server for two workloads (a CPU-heavy image transcoder and an IO-heavy API gateway fanning out to 20 backends), and describe the C10k limits each model runs into.",
+            thinkAbout: [
+              "Is the workload CPU-bound or IO-bound, and how does that change which model wins?",
+              "Why does blocking IO cap a thread-per-request server long before CPU saturates?",
+              "Which OS limits (file descriptors, ephemeral ports, memory per thread) surface at 10k or more connections?",
+            ],
+            modelAnswerOutline: [
+              "The deciding axis is CPU-bound vs IO-bound. Image transcoding is CPU-bound: each request pins a core for hundreds of milliseconds with nothing to wait on. The API gateway is IO-bound: each request fans out to 20 backends and spends almost all its wall-clock time waiting on the network, using near-zero CPU.",
+              "**Image transcoder -> thread/process worker pool sized to cores.** The work is compute, so the only thing that matters is keeping every core busy without oversubscription: roughly N workers for N cores plus a bounded queue in front. An event loop would be actively wrong: a single transcode blocks the loop and serializes every other request. If an event runtime handles the HTTP layer, offload the transcode itself to worker threads or a separate service.",
+              "**API gateway -> event-loop / async runtime with connection pooling.** Thread-per-request fails here specifically: with 20 blocking downstream calls per request, each request parks threads doing nothing but waiting. At a few thousand concurrent requests the thread pool and memory (~1MB stack each) are exhausted while CPU sits near idle: blocking IO caps the server long before compute does. An event loop multiplexes thousands of waiting connections on a few threads via epoll, so idle connections cost only an fd.",
+              "**C10k / OS limits to tune:** raise the file-descriptor limit (`ulimit -n`, `fs.file-max`) from the 1024 default to hundreds of thousands, since every connection is an fd. Watch ephemeral ports: the gateway opening connections to a single backend IP:port caps near 28,000, so pool and reuse connections and spread across multiple backend endpoints. The per-thread ~1MB stack is exactly the wall that makes thread-per-request infeasible at 10k+, which the event loop avoids.",
+              "Common wrong turn: putting a blocking DB call or a CPU-heavy transform directly on the event loop, which serializes every request behind it and destroys throughput: the mirror image of running CPU work on an async model that gives no benefit.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-concurrency-models-practice",
+            prompt:
+              "Explain the concurrency architecture you would choose for Discord's real-time gateway holding several million idle-but-connected WebSocket clients per cluster, where most connections sit silent and occasionally receive a pushed message, and contrast it with the model you would use for the media/voice transcoding tier. Name the OS-level limits and how you get past them.",
+            thinkAbout: [
+              "What does a million mostly-idle connections cost per connection under each model?",
+              "Why are the gateway and the voice tier deliberately separate services?",
+              "Which kernel knobs and sharding moves get you past single-box limits?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: millions of persistent WebSocket connections that are mostly idle (heartbeats plus occasional pushed events), and a separate voice/media tier doing CPU-heavy audio transcoding and mixing.",
+              "**Gateway (millions of idle sockets) -> event-loop / async, unambiguously.** This is the C10M problem: connections are almost entirely idle, so the cost that matters is per-connection memory and the ability to wait cheaply. Thread-per-connection is dead on arrival: a million threads at ~1MB each is a terabyte of stack. An event-driven runtime built on epoll (Discord famously uses Elixir/BEAM, whose lightweight processes are effectively userspace green threads over an async core; Go, Netty, or Node is analogous) holds each connection as a few KB of userspace state, and epoll surfaces only the handful of active sockets per tick. The workload is 99.9% waiting, exactly what async multiplexing is for.",
+              "**Media/voice tier -> worker pool sized to cores (or GPUs).** Transcoding and mixing are CPU-bound, so this tier wants one busy worker per core, a bounded intake queue, and horizontal scale-out, not async. These are deliberately separate services precisely because their concurrency models are opposite.",
+              "**OS limits and fixes:** raise `nofile` to millions and `fs.file-max` system-wide (every WebSocket is an fd); shard connections across many gateway nodes so no single box holds all millions; tune kernel socket buffers and `somaxconn` for accept bursts; on any node making outbound connections, pool them and spread across destination IPs to dodge the ~28k ephemeral-port ceiling per source/destination pair. Heartbeat/keepalive tuning matters too: at millions of connections even a cheap per-connection timer adds up.",
+              "Common wrong turn: trying to hold millions of WebSockets with a thread-per-connection server (instant memory death), or conversely running voice transcoding on the same event loop and freezing every connected client behind one CPU-bound mixing job.",
             ],
           },
         },
