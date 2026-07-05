@@ -415,6 +415,68 @@ key, guard against hot keys, always TTL cache data, and never treat a non-persis
 source of truth.
 `.trim()
 
+const documentTeach = `
+## Schema-on-read trees, and the embed-vs-reference call
+
+A document database stores semi-structured records, typically JSON or its binary form BSON, where
+each document is a self-contained tree: nested objects, arrays, and scalars. MongoDB, Couchbase, and
+Firestore are the common examples. Unlike a relational table, there is no fixed schema enforced by
+the engine. It is **schema-on-read**: two documents in the same collection can have different fields,
+and the application interprets shape at read time. That flexibility is the selling point (rapid
+iteration, heterogeneous data, natural fit for object graphs) and the trap (nothing stops you writing
+inconsistent shapes, so schema discipline moves into your application and validators).
+
+### Embed versus reference
+
+**Embedding** nests related data inside the parent document. A blog post document can carry its
+recent comments as an array right inside it. One read returns the whole thing, no join, and the data
+that is read together is stored together, which is exactly what you want on a hot read path.
+**Referencing** stores an id pointer and fetches the related entity separately, the way a foreign key
+works, requiring a second lookup (an application-side join, since most document stores do not join
+efficiently).
+
+The decision rule is driven by three questions. First, **is the data read together?** If you almost
+always render the post and its comments on the same page, embed the recent ones. Second, **is the
+related entity large or independently accessed?** An author appears on many posts; embedding a full
+copy into every post duplicates data and means updating the author's name touches thousands of
+documents. Reference the author. Third, **how big and how unbounded is it?** This is the killer.
+
+**Document size limits.** MongoDB caps a single document at **16MB**. A post with an unbounded,
+ever-growing comments array will eventually hit that ceiling and the write fails. So the real pattern
+is hybrid: **embed a bounded, frequently-read subset** (the latest 20 comments, denormalized author
+name and avatar for display) and **reference the unbounded remainder** (the full comment history
+lives in its own collection, keyed by post id). This gives you a fast first render and a scalable
+long tail.
+
+**Interview nuance:** The question that separates juniors from seniors is transactions. **Atomicity
+is guaranteed per document.** A single document update (including nested fields and arrays) is
+atomic, all-or-nothing. Multi-document transactions exist in modern MongoDB but are the exception,
+cost more, and were not available for years. So the idiomatic move is to model an operation that must
+be atomic as a single document. If updating a post and its comment count must happen together, put
+the count inside the post document and increment it in the same write. Reaching for multi-document
+transactions to patch a bad model is the wrong turn.
+
+**Indexing.** You can index nested fields (\`author.id\`) and array elements (multikey indexes on
+\`tags\`). Plan indexes to your queries just as in SQL; an unindexed query on millions of documents
+is a full collection scan. And because there is no engine-enforced schema, plan **schema
+versioning**: stamp documents with a \`schemaVersion\`, migrate lazily on read or with a background
+job, and let your app handle multiple shapes during the transition.
+
+\`\`\`
+posts (collection)
+  { _id, title, body,
+    author: { id, name, avatar },        <- referenced id + denormalized display fields
+    recentComments: [ {..}, {..} x20 ],  <- embedded bounded subset
+    commentCount: 1423 }                 <- embedded for atomic increment
+comments (collection)                    <- full unbounded history, referenced
+  { _id, postId, authorId, body, createdAt }
+\`\`\`
+
+Recap: Model to the access pattern, embed bounded read-together data and reference large or unbounded
+entities, respect the 16MB document cap, and treat per-document atomicity as a design constraint
+rather than assuming relational multi-row transactions.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -787,6 +849,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Chat rate-limiting, two scopes.** Per-user: `ratelimit:chat:{userId}:{secondBucket}` with INCR/EXPIRE 1, enforcing a few messages per second. Per-channel (slow mode): a channel-wide limit is itself a hot key, so push enforcement to the chat edge nodes with a local token bucket per node and only periodically sync aggregate state to Redis, accepting slight over-admission rather than a global lock on every message.",
               "**Consistency accepted:** deliberately eventual/approximate for counts (AP-style), because a viewer badge off by 0.1% for 2 seconds costs nothing, whereas exact synchronous counting at 5M concurrent would require coordination that blows the latency budget. Redis Cluster shards the keyspace; sharded-counter keys spread write load, replicas serve the aggregated-total read.",
               "Common wrong turn: a single `INCR viewers:{channelId}` for correctness: exact, but concentrates millions of writes on one node and falls over. The senior move is recognizing the count does not need to be exact and buying massive throughput with sharding plus periodic aggregation.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-document",
+          title: "Document Databases",
+          summary:
+            "Embed bounded read-together data, reference large or unbounded entities, respect the 16MB cap, and treat per-document atomicity as a design constraint.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["document-db", "mongodb", "modeling"],
+          teach: {
+            markdown: documentTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l2-document-apply",
+            prompt:
+              "Design the document model for a blog/CMS with posts, comments, and authors, deciding what to embed vs reference.",
+            thinkAbout: [
+              "What data is read together and should be embedded?",
+              "When does referencing win despite requiring lookups?",
+              "Why is atomicity per-document a constraint?",
+            ],
+            modelAnswerOutline: [
+              "Assume MongoDB, a blog with tens of thousands of posts, popular posts reaching thousands of comments, and the hot read path being 'render a post page with its author and recent comments.'",
+              "**Authors: reference.** An author is a large, independently accessed entity appearing across many posts, and their name or avatar can change. Embedding a full copy in every post duplicates data and turns a name change into a fan-out update across thousands of documents. The post holds `author.id` plus a small **denormalized display subset** (name, avatar) so the common render needs no join; the canonical author lives in an `authors` collection, with a background job updating denormalized copies on change (accepting brief staleness).",
+              "**Recent comments: embed a bounded subset.** The post page shows the latest ~20 comments, so embed them as an array in the post document with denormalized commenter names/avatars. One read renders the page. Keep the array **bounded**: on a new comment, push and trim to the newest 20, because an unbounded array eventually blows the **16MB document limit** and makes the post heavy to read.",
+              "**Full comment history: reference.** All comments live in a `comments` collection keyed by postId with an index on (postId, createdAt); 'load more comments' pages this collection. Post document stays small, comment count unbounded.",
+              "**Atomicity:** store `commentCount` inside the post document and increment it in the **same atomic write** that pushes the new comment into the embedded array, because per-document updates are atomic. The full comment also inserts into `comments`; prefer making the post-document update the display source of truth and treating the history insert as append-only, reaching for a multi-document transaction only if both writes must be all-or-nothing.",
+              "Common wrong turn: embedding all comments in the post (hits 16MB, bloats reads), embedding full author copies everywhere (fan-out updates), or assuming a document store gives free relational transactions across posts, authors, and comments.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-document-practice",
+            prompt:
+              "Design the Firestore/MongoDB document model for Notion-style nested pages where a page contains blocks (text, images, tables, sub-pages) that can nest arbitrarily deep and a busy workspace page can have thousands of blocks. Explain your embed/reference split, how you avoid the document-size cliff, and how you keep block reordering fast.",
+            thinkAbout: [
+              "What breaks, twice, if the entire block tree is embedded in one page document?",
+              "How does a fractional order key make reordering a single-block write?",
+              "What does per-document atomicity give two users editing different blocks?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a document store, arbitrarily deep block nesting, pages with up to thousands of blocks, frequent block edits and reordering, multiple users viewing a page.",
+              "**Do not embed the block tree.** The naive single-page-document model fails twice: a busy page exceeds the 16MB cap, and every keystroke rewrites a huge document, killing write throughput and concurrency. Instead, **each block is its own document** in a `blocks` collection: `{ _id, pageId, parentId, type, content, order }`. The page document holds only metadata (title, icon, permissions, rootBlockIds).",
+              "**Rendering:** fetch all blocks with `pageId == X` (indexed on pageId) and reassemble the tree client-side from parentId pointers. Reference-heavy on purpose: blocks are numerous, independently edited, and unbounded, exactly when referencing wins. Editing one block is a single small-document atomic write, so two users editing different blocks never contend.",
+              "**Ordering: fractional keys.** A reorder must not rewrite every sibling. Use a fractional `order` (a string or float between neighbors): moving a block computes a key between its new neighbors' values, so a reorder is a single-block update, not an O(n) renumber. Rebalance keys periodically if they get too dense.",
+              "**Nesting depth** is handled by parentId, not physical embedding, so arbitrary depth costs nothing in document size. Sub-pages are blocks of type `page` pointing at another page document.",
+              "**The accepted tradeoff:** rendering is now N block reads instead of one document read, mitigated by a single indexed query on pageId, client-side assembly, and caching the assembled tree.",
+              "Common wrong turn: embedding the tree for 'one fast read' and hitting the size cliff plus write contention the moment a page gets popular.",
             ],
           },
         },
