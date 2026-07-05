@@ -677,6 +677,58 @@ options and commit with a quantified reason, then close in 2 to 3 minutes on the
 bottleneck, failure mode, monitoring, and cost driver.
 `.trim()
 
+const tradeoffArticulationTeach = `
+## A fact is not a decision
+
+The single fastest way to sound junior is to name a technology without naming what you gave up to get
+it. "I'll use Cassandra" is a fact. "I'll use Cassandra because I need multi-region writes and can
+tolerate read-repair latency, which costs me easy cross-partition transactions" is a decision.
+Staff-level interviewers grade the second sentence, not the first.
+
+### Reach for the lens before the answer
+
+Every real choice in a design is a tradeoff, and there is almost always a principled lens that frames
+it:
+
+- **CAP / PACELC**: under a partition, do you keep serving (AP) or refuse to serve stale data (CP)?
+  PACELC adds the case with no partition: even then, do you favor latency or consistency? A payment
+  ledger is CP/consistency. A social feed is AP/latency.
+- **Push vs pull**: do you compute work at write time (fan-out on write, fast reads, expensive writes)
+  or read time (fan-out on read, cheap writes, slow reads)? Celebrity followers break naive push.
+- **Sync vs async**: does the caller block for the result, or do you accept the request, return a 202,
+  and finish on a queue? Async buys throughput and resilience at the cost of end-to-end visibility.
+- **SQL vs NoSQL, normalize vs denormalize, cache vs recompute**: each is a spend-here-to-save-there
+  trade.
+
+### Commit, with the assumption stated
+
+The move that separates strong candidates is committing. Weak candidates enumerate ("we could do A, or
+B, or C") and stall, waiting for the interviewer to choose. That reads as indecision. State the
+assumption the decision rests on, pick, and say what you are giving up: "Assuming reads dominate
+writes 100 to 1 and we can tolerate a few seconds of staleness, I'll denormalize the counter into the
+post row. This doubles write cost but turns a JOIN-and-aggregate read into a single-key lookup. If
+writes ever approach reads, I would revisit."
+
+Quantify whenever a number is available, even a rough one. "This doubles storage but halves p99 read
+latency" is a sentence an interviewer can push on, which is exactly what you want.
+
+**Interview nuance:** Interviewers often probe with "why not the other option?" They are not
+disagreeing; they are checking whether you understood the tradeoff or got lucky. Have the losing
+option's one real advantage ready, and re-state the assumption that made you overrule it.
+
+**Interview nuance:** Tie every decision to an assumption that can be revisited, so your design has a
+documented seam for scale. "At 10x traffic this assumption breaks, and then I'd shard by user" shows
+evolution-over-time thinking without you having to build the sharded version now.
+
+\`\`\`
+Choice --> pick the lens --> state the assumption --> commit --> name what you gave up
+ (SQL?)    (CAP / push-pull)   (reads >> writes)      (NoSQL)    (cross-entity txns)
+\`\`\`
+
+Recap: Frame every major choice through a principled lens, commit to one option on a stated
+assumption, quantify the trade, and name what you gave up.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -1260,6 +1312,64 @@ export const systemDesignLevel0: DesignLevel = {
               "**Blobs off the hot path:** photos live in S3 and are served via CloudFront CDN; the feed carries only IDs and CDN URLs, never blob bytes, so blob size never touches the 200ms path.",
               "**Wrap-up:** 10x break point is the fanout write pipeline backing up when many mid-size accounts post simultaneously (absorb with a Kafka fanout queue and autoscaled workers). Failure mode: Redis feed-store loss, rebuilt lazily from the post store on miss, accepting a slower first load. Monitoring: feed p99, fanout lag (post time to feed-visible time), CDN hit rate, Redis memory per shard. Cost driver: Redis memory for 500M precomputed feeds and CDN egress, which is exactly why celebrities are excluded from write fanout.",
               "Common wrong turn: serving photo bytes through the app tier, which couples blob bandwidth to the latency-critical feed path instead of offloading to S3 and a CDN.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l0-m4",
+      title: "Driving the Conversation & Tradeoffs",
+      description:
+        "Frame every major choice as an explicit committed tradeoff, calibrate depth to the level you are interviewing for, run the round from a reusable template, and narrate so the interviewer stays inside your head.",
+      lessons: [
+        {
+          id: "sd-l0-tradeoff-articulation",
+          title: "Trade-off Articulation & Decision Framing",
+          summary:
+            "Frame choices through a principled lens (CAP/PACELC, push/pull, sync/async), commit on a stated assumption, quantify, and name what you gave up.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["tradeoffs", "decision-framing"],
+          teach: {
+            markdown: tradeoffArticulationTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-tradeoff-articulation-apply",
+            prompt:
+              "Choose a datastore for a social feed system: compare SQL versus NoSQL against your specific consistency, scale, and query requirements, and commit to one with justification.",
+            thinkAbout: [
+              "Which principled lens (CAP/PACELC, push/pull, sync/async) frames this choice?",
+              "What assumptions does the decision depend on, so it can be revisited at scale?",
+              "What are you giving up, not just gaining?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: feed storage for a Twitter-scale product, reads dominate writes ~100:1, a post is immutable once created, users tolerate a feed a few seconds stale. Target scale: tens of millions of DAU, hundreds of thousands of feed reads/sec at peak.",
+              "**The lens: PACELC plus push versus pull.** The feed is an availability-and-latency problem, not a consistency problem: showing a post 3 seconds late is fine, a 500ms feed load is not. That pushes toward the AP/latency corner, where wide-column and key-value stores live.",
+              "**Decision:** store posts and the per-user materialized timeline in a NoSQL wide-column store (Cassandra or DynamoDB), keyed by user id with the timeline as a partition sorted by time. Reads become a single-partition range scan, exactly what these stores are built for: single-digit-millisecond reads at scale with tunable consistency (quorum settings favoring availability).",
+              "**What is given up by not choosing SQL:** easy multi-row ACID transactions and ad hoc JOINs. A social feed does not need them; the relational strengths are exactly the things a feed does not exercise, so paying their scaling cost (a single primary write node, harder horizontal sharding) buys nothing here.",
+              "**Where SQL would win, and the revisit seam:** the user graph and account/billing data are relational and need consistency, so they belong in Postgres. If this were an analytics feed needing arbitrary slice-and-dice, or if writes ever approached reads, revisit: the denormalized fan-out-on-write timeline is a write-amplification bet that only pays off while reads dominate.",
+              "Common wrong turn: listing 'SQL is consistent, NoSQL is scalable' and refusing to pick, or picking NoSQL for scale while ignoring that the social graph itself still wants a relational or graph store.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-tradeoff-articulation-practice",
+            prompt:
+              "Choose the primary datastore for Uber's real-time driver-location and trip-matching service (hundreds of thousands of location updates per second, sub-second match queries over 'drivers near this point'), and justify the pick against the tradeoff you are accepting.",
+            thinkAbout: [
+              "Does every location ping actually need durability, or does staleness make old pings worthless anyway?",
+              "What query shape (proximity search) must the store answer fast, and which stores are built for it?",
+              "Which data in this system must never be lost, and does it belong in the same store as live location?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 1 to 5 million active drivers, each pinging location every 4 seconds, so on the order of 250K to 1M writes/sec; matching queries are geospatial ('nearest available drivers to a rider') and must return well under a second; a driver's location is disposable (a 4-second-stale ping is worthless anyway).",
+              "**The lens:** PACELC latency-favoring with a heavy write and geospatial-query workload, plus a freshness-not-durability angle: no need to durably persist every ping, only the current location, queryable by proximity, fast.",
+              "**Decision:** keep live location in an in-memory geospatial store, Redis with geospatial commands (GEOADD/GEOSEARCH) sharded by geographic cell, as the hot serving layer. Redis absorbs the write rate in memory and answers radius queries in single-digit milliseconds. Partition the world into cells (an S2 or geohash grid) so each shard owns a region and matching is a bounded local search, not a global scan.",
+              "**What is given up:** durability and rich secondary querying. The correct trade, because a lost location ping self-heals in 4 seconds and location is only ever queried by proximity.",
+              "**The data that must never be lost goes elsewhere:** trip records (fares, receipts, dispute history) go to a separate durable store, sharded SQL or a durable document store, written asynchronously off the hot path.",
+              "**Revisit seam:** if match quality needs richer filters (driver rating, vehicle type) at query time, enrich from a cache alongside Redis rather than moving the hot geo query into a heavier store.",
+              "Common wrong turn: putting live location in Postgres with PostGIS 'because it does geo.' It does, but a single relational primary cannot absorb 1M writes/sec of ephemeral data, and you would pay for durability on exactly the data that does not need it.",
             ],
           },
         },
