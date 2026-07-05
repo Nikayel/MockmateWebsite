@@ -466,6 +466,59 @@ multiplexed H2/gRPC/WebSocket connections pin to one backend so you need client-
 balancing to actually spread load.
 `.trim()
 
+const rateLimitAlgorithmsTeach = `
+## The shape of what you allow
+
+Rate limiting answers one question: given a stream of requests keyed by some dimension (per-user,
+per-IP, per-API-key, per-endpoint, or global), do I allow or reject the next one? The interesting
+part is the shape of what you allow. Two systems can both permit "100 requests per minute" and behave
+completely differently at the second scale.
+
+**Token bucket** is the usual default because it is burst-friendly. A bucket holds up to \`B\` tokens
+and refills at \`R\` tokens per second. Each request removes one token; if the bucket is empty,
+reject. A client that has been idle accumulates up to \`B\` tokens, so it can fire a burst of \`B\`
+instantly, then settle to the steady rate \`R\`. You store just two numbers per key: the current
+token count and the last-refill timestamp, refilled lazily on each access
+(\`tokens = min(B, tokens + elapsed * R)\`). Capacity \`B\` sets the maximum burst; \`R\` sets the
+long-run rate. This is what most APIs want: allow natural bursts, cap sustained abuse.
+
+**Leaky bucket** is the opposite intent: it smooths output. Requests enter a queue and drain at a
+fixed rate, so downstream sees a perfectly steady stream. Use it when the thing you protect cannot
+absorb bursts at all (a payment processor with a hard TPS ceiling). The cost is added latency and a
+queue to manage.
+
+**Fixed window** counts requests per aligned interval and resets at the boundary. Trivially cheap
+(one integer per key per window), but it has the **boundary spike**: a client can send the full quota
+in the last second of one window and the full quota in the first second of the next, delivering 2x
+the intended rate across a two-second span.
+
+**Sliding-window log** stores a timestamp per request and counts those in the trailing window: exact
+but memory-heavy (1000 req/min = 1000 stored timestamps). The practical compromise is the
+**sliding-window counter**: keep the current and previous fixed-window counts and weight the previous
+one by how much still overlaps the trailing window
+(\`count = current + previous * overlap_fraction\`). It kills the boundary spike with roughly the
+memory of fixed window.
+
+**Interview nuance:** the response contract matters as much as the algorithm. On rejection return
+**HTTP 429 Too Many Requests** with a **Retry-After** header and the standard **RateLimit** headers
+(\`RateLimit-Limit\`, \`RateLimit-Remaining\`, \`RateLimit-Reset\`) so well-behaved clients back off.
+Decide **fail-open vs fail-closed**: if the limiter's state store is unavailable, do you allow
+traffic (protect availability, risk overload) or block it (protect the backend, risk an outage)?
+Most public APIs fail open on the limiter and rely on downstream load shedding as the real backstop.
+
+\`\`\`
+token bucket (burst-friendly)        fixed window (boundary spike)
+  cap B, refill R/sec                  [--59 reqs--|--59 reqs--]
+  idle -> save up to B tokens                    ^ 118 in ~1s
+  req  -> take 1 or 429                sliding-window counter fixes it
+\`\`\`
+
+Recap: default to token bucket for burst-friendly per-key limits, use sliding-window counter when you
+need window accuracy without the log's memory, avoid raw fixed window for anything abuse-sensitive,
+and always return 429 plus Retry-After and RateLimit headers with a stated fail-open or fail-closed
+policy.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -869,6 +922,62 @@ export const systemDesignLevel4: DesignLevel = {
               "**Scale-down: drain.** Stop routing new connects to the node, then let client reconnect logic move sockets off it gradually rather than dropping 300K users at once.",
               "**Because a drop is user-visible:** clients have automatic reconnect with jittered backoff (avoiding a thundering herd all reconnecting at once), and the server supports fast session resume so a reconnect restores subscriptions without a full re-auth round trip.",
               "**OS and safety:** file descriptors in the millions across the fleet, ephemeral port tuning, TCP keepalive for dead-peer detection, and per-node connection caps so no single node tips over.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l4-m3",
+      title: "Rate Limiting & Overload",
+      description:
+        "Keep a service alive when demand exceeds supply: pick a rate-limiting algorithm with an exact response contract, enforce one global limit across a fleet, and shed load by priority instead of collapsing.",
+      lessons: [
+        {
+          id: "sd-l4-rate-limit-algorithms",
+          title: "Rate Limiting Algorithms",
+          summary:
+            "Token bucket for burst-friendly limits, sliding-window counter for accuracy without the log's memory, never raw fixed window, and always a 429 + Retry-After contract.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["rate-limiting", "token-bucket"],
+          teach: {
+            markdown: rateLimitAlgorithmsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-rate-limit-algorithms-apply",
+            prompt:
+              "Write the algorithm for an API rate limiter that allows short bursts but enforces a steady long-run rate, and state the counters it stores per user.",
+            thinkAbout: [
+              "Which algorithm allows bursts vs smooths output?",
+              "What is the fixed-window boundary-spike bug?",
+              "What is the client-facing response contract?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a public REST API where each user (keyed by API key) gets 100 requests per minute steady state with a natural burst of up to 20 rapid requests after idle; O(1) memory per key; the decision runs inline on every request.",
+              "**Algorithm: token bucket** with capacity B = 20 (max burst) and refill rate R = 100/60 ~ 1.67 tokens/sec (steady rate). Per user, store exactly two fields: `tokens` (a float) and `last_refill_ts`.",
+              "**Per request:** compute elapsed = now - last_refill_ts; lazily refill `tokens = min(B, tokens + elapsed * R)`; update last_refill_ts; if tokens >= 1, decrement and allow; else reject with 429 and `Retry-After = ceil((1 - tokens) / R)`. An idle client accumulates up to 20 tokens and can fire a 20-request burst instantly, then throttles to 100/min as tokens refill. Two numbers per user, no queue.",
+              "**Why not the alternatives:** fixed window (one counter per minute) is cheaper but has the boundary-spike bug: 100 requests in the last second of minute N plus 100 in the first second of minute N+1 = 200 in ~2 seconds, double the intended rate. Leaky bucket smooths output but forbids the bursts the requirement wants and adds queueing latency. Sliding-window log is accurate but stores a timestamp per request: wasteful here.",
+              "**Response contract:** on allow, return RateLimit-Limit, RateLimit-Remaining (floor of current tokens), and RateLimit-Reset. On reject, 429 Too Many Requests with Retry-After set to when one token will be available. If the state store is unreachable, fail open (allow) and lean on downstream load shedding, because a limiter outage should not become a full API outage.",
+              "Common wrong turn: a plain fixed-window counter 'because it is simple,' shipping the 2x boundary-spike bug, or omitting the 429 / Retry-After contract so clients cannot tell they are throttled and retry-storm the API.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-rate-limit-algorithms-practice",
+            prompt:
+              "Design the rate-limiting tiers for Stripe-style payment APIs where a single merchant may legitimately batch thousands of charges at midnight but a compromised key must be contained fast. Choose the algorithms per tier and justify.",
+            thinkAbout: [
+              "Why can one flat limit not serve both the nightly batch and the fraud case?",
+              "What does an anomaly-triggered clamp add that static limits cannot?",
+              "Why does the payment tier invert the usual fail-open default?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: payments API keyed per API key, with two opposing concerns: a legitimate merchant running a nightly billing job wants a large controlled burst, while a leaked key doing fraud must be stopped within seconds. One flat limit cannot serve both, so use layered limits with different algorithms per layer.",
+              "**Layer 1, per-key steady rate: token bucket** with generous capacity (B = 500) and refill R = 100/sec, so the nightly batch drains its bucket in a burst then proceeds at the sustained rate. Token bucket is right because the merchant's burst is legitimate and expected. Publish the numbers so clients can pace their jobs.",
+              "**Layer 2, hard ceiling: sliding-window counter** at a coarser granularity (per-hour) to cap total volume even if the token bucket is continuously refilled: catches sustained abuse that stays just under the per-second bucket, without the fixed-window boundary spike.",
+              "**Layer 3, anomaly-triggered clamp:** payments are money, so add a fast reactive control: if a key's charge rate or failure/decline rate jumps far above its own trailing baseline (a fraud signal), automatically drop that key to a tiny emergency limit and alert. This is the 'contain a compromised key fast' requirement; no static limit provides it.",
+              "**Contract:** 429 with Retry-After, and critically the API requires idempotency keys so a client retrying after a 429 cannot double-charge. **Fail closed** at the payment tier when the limiter state store is unavailable for a suspicious key: unusual for public APIs but correct here, since wrongly allowing a fraud burst is worse than briefly rejecting legitimate traffic, and legitimate merchants retry safely via idempotency keys.",
             ],
           },
         },
