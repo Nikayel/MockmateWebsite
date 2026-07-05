@@ -1649,6 +1649,181 @@ SELECT * FROM (SELECT pk, version, payload FROM expected EXCEPT SELECT pk, versi
   }),
 }
 
+const incrementalWatermarkBackfill: SqlLesson = {
+  id: "sql-l5-incremental-watermark-backfill",
+  title: "High-Water-Mark Incremental Extraction and Safe Backfill",
+  summary:
+    "Load only rows newer than a stored watermark, catch late arrivals with a partition-overwrite backfill, and stay idempotent per partition.",
+  estimatedMinutes: 40,
+  difficulty: "hard",
+  skills: [
+    "dbt-orchestration",
+    "high-water-mark",
+    "incremental load",
+    "watermark state table",
+    "partition-overwrite backfill",
+    "late-arriving lookback",
+    "idempotency",
+  ],
+  teach: {
+    estimatedMinutes: 13,
+    markdown: `## Full refresh, watermark, or CDC: pick the loader
+
+Reloading a whole table every run is safe but slow and expensive. Three loaders trade freshness against cost:
+
+- **Full refresh.** Rebuild the target from all of source every run. Simple and always correct, but it does not scale.
+- **High-water-mark incremental.** Keep the last-processed value (a watermark) in a small state table, and each run pull only source rows newer than it. Cheap, and the subject of this lesson.
+- **CDC.** Consume a change stream of inserts, updates, and deletes (the previous lesson).
+
+## The incremental loop
+
+Store one watermark in a \`state\` table. Each run:
+
+1. Read the watermark: \`SELECT watermark FROM state\`.
+2. Pull the new slice: \`WHERE updated_at > watermark\`. Use strict \`>\`, not \`>=\`, or a row exactly on the boundary reloads every run and, without an upsert, duplicates.
+3. Upsert the slice into the target, keyed on the business key.
+4. Advance the watermark to the newest value you just loaded.
+
+## Late arrivals and the backfill
+
+Strict \`>\` has a cost: a row that arrives late with an \`updated_at\` below the current watermark is never picked up. The fix is a rolling lookback, reprocessing the last few partitions each run so late rows are caught. The mechanism is **partition-overwrite**: \`DELETE\` a bounded \`load_date\` range, then \`INSERT ... SELECT\` the same range from source. Because you delete before you insert, re-running does not duplicate, which is the whole point.
+
+When you need to correct history rather than catch late rows, the two production answers share that shape:
+
+- **Partition-overwrite**: delete and reinsert a bounded date range.
+- **Staging plus atomic swap**: build a corrected copy in a staging table, validate it, then swap it in inside a transaction so readers never see a half-built table.
+
+The invariant across all of it is **idempotency per partition**: running the same load twice leaves the same rows. That is what makes a retried or backfilled run safe.
+
+**Interview nuance:** the number one incremental bug is a non-idempotent append (an \`INSERT\` with no delete or upsert), which doubles rows on any retry. If your loader cannot survive being run twice, it is wrong. Lead with "delete-then-insert the partition, or upsert on the key".
+
+> **In the warehouse this differs.** This maps to dbt \`is_incremental()\` models, BigQuery and Hive \`INSERT OVERWRITE PARTITION\`, Delta \`replaceWhere\`, and Snowflake \`CREATE OR REPLACE TABLE ... SWAP WITH\` plus Streams offsets. Airflow passes the data interval as the partition to overwrite, and \`catchup=True\` triggers the backfill runs.`,
+    demoSeedSql: `CREATE TABLE source (id INTEGER, updated_at TEXT, amount INTEGER);
+INSERT INTO source VALUES
+  (2, '2026-03-02 10:00', 200), (3, '2026-03-03 10:00', 300), (4, '2026-03-02 09:00', 250);
+CREATE TABLE state (id INTEGER PRIMARY KEY, watermark TEXT);
+INSERT INTO state VALUES (1, '2026-03-02 10:00');`,
+    demoCode: `-- Strict > picks up only id 3. Id 4 arrived late (below the watermark) and needs the backfill.
+SELECT id, updated_at, amount,
+  CASE WHEN updated_at > (SELECT watermark FROM state WHERE id = 1)
+       THEN 'loaded (newer than watermark)'
+       ELSE 'skipped (needs backfill lookback)' END AS incremental_decision
+FROM source
+ORDER BY updated_at;`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l5-incremental-watermark-backfill-apply",
+    prompt: `Write a script that incrementally loads only source rows newer than the stored watermark, upserts them, advances the watermark, and then backfills the recent partition so a late-arriving row is not missed, over \`source(id, load_date, updated_at, amount)\`, \`target(id, load_date, updated_at, amount)\` keyed on \`id\`, and a one-row \`state(id, watermark)\`.
+
+Load rows whose \`updated_at\` is strictly greater than the watermark, upsert on \`id\`, set the watermark to the newest \`updated_at\` now in \`target\`, then partition-overwrite the \`'2026-03-02'\` \`load_date\` (delete that partition from target, reinsert it from source) to catch a late row that landed below the watermark.`,
+    starterCode: `-- Incremental load (strict > watermark), advance the watermark, then backfill the recent partition.
+INSERT INTO target (id, load_date, updated_at, amount)
+SELECT id, load_date, updated_at, amount FROM source
+WHERE updated_at > (SELECT watermark FROM state WHERE id = 1)
+ON CONFLICT(id) DO UPDATE SET load_date = excluded.load_date, updated_at = excluded.updated_at, amount = excluded.amount;
+
+-- advance the watermark to the newest updated_at in target, then
+-- partition-overwrite backfill of load_date '2026-03-02'
+`,
+    hints: [
+      "Advance the watermark: `UPDATE state SET watermark = (SELECT MAX(updated_at) FROM target) WHERE id = 1`.",
+      "Backfill is `DELETE FROM target WHERE load_date = '2026-03-02';` then `INSERT ... SELECT ... FROM source WHERE load_date = '2026-03-02'`.",
+      "The delete-before-insert is what recovers the late row and keeps the re-run idempotent.",
+    ],
+    referenceSolution: `INSERT INTO target (id, load_date, updated_at, amount)
+SELECT id, load_date, updated_at, amount FROM source
+WHERE updated_at > (SELECT watermark FROM state WHERE id = 1)
+ON CONFLICT(id) DO UPDATE SET load_date = excluded.load_date, updated_at = excluded.updated_at, amount = excluded.amount;
+
+UPDATE state SET watermark = (SELECT MAX(updated_at) FROM target) WHERE id = 1;
+
+DELETE FROM target WHERE load_date = '2026-03-02';
+INSERT INTO target (id, load_date, updated_at, amount)
+SELECT id, load_date, updated_at, amount FROM source WHERE load_date = '2026-03-02';`,
+    seedSql: `CREATE TABLE source (id INTEGER, load_date TEXT, updated_at TEXT, amount INTEGER);
+INSERT INTO source VALUES
+  (1, '2026-03-01', '2026-03-01 10:00', 100),
+  (2, '2026-03-02', '2026-03-02 10:00', 200),
+  (3, '2026-03-03', '2026-03-03 10:00', 300),
+  (4, '2026-03-02', '2026-03-02 09:00', 250);
+
+CREATE TABLE target (id INTEGER PRIMARY KEY, load_date TEXT, updated_at TEXT, amount INTEGER);
+INSERT INTO target VALUES
+  (1, '2026-03-01', '2026-03-01 10:00', 100),
+  (2, '2026-03-02', '2026-03-02 10:00', 200);
+
+CREATE TABLE state (id INTEGER PRIMARY KEY, watermark TEXT);
+INSERT INTO state VALUES (1, '2026-03-02 10:00');`,
+    assertions: [
+      {
+        suite: "grain",
+        name: "no_duplicate_business_keys",
+        sql: `SELECT id FROM target GROUP BY id HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "late",
+        name: "late_row_recovered",
+        sql: `SELECT id FROM source WHERE id = 4 AND id NOT IN (SELECT id FROM target)`,
+      },
+      {
+        suite: "watermark",
+        name: "watermark_advanced",
+        sql: `SELECT 1 WHERE (SELECT watermark FROM state WHERE id = 1) < '2026-03-03 10:00'`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["target", "state"],
+  }),
+  practice: scriptExercise({
+    id: "sql-l5-incremental-watermark-backfill-practice",
+    prompt: `Write a script that loads a corrected partition into target with partition-overwrite so that re-running it leaves the target unchanged, over \`source(id, load_date, amount)\` and a \`target(id, load_date, amount)\` pre-seeded with stale values for \`load_date\` \`'2026-03-05'\`.
+
+Delete the \`'2026-03-05'\` partition from target, then reinsert it from source for that same date. A naive append would violate the key or double rows on a retry; delete-then-insert stays idempotent.`,
+    starterCode: `-- Correct the 2026-03-05 partition with delete-then-insert (idempotent on re-run).
+DELETE FROM target WHERE load_date = '2026-03-05';
+-- reinsert that partition from source
+`,
+    hints: [
+      "First `DELETE FROM target WHERE load_date = '2026-03-05';`.",
+      "Then `INSERT INTO target (id, load_date, amount) SELECT id, load_date, amount FROM source WHERE load_date = '2026-03-05';`.",
+      "Skipping the delete makes an append that fails the run-twice check (duplicate key).",
+    ],
+    seedSql: `CREATE TABLE source (id INTEGER, load_date TEXT, amount INTEGER);
+INSERT INTO source VALUES (2, '2026-03-05', 200), (3, '2026-03-05', 300);
+
+CREATE TABLE target (id INTEGER PRIMARY KEY, load_date TEXT, amount INTEGER);
+INSERT INTO target VALUES
+  (1, '2026-03-04', 100),
+  (2, '2026-03-05', 999),
+  (3, '2026-03-05', 999);`,
+    assertions: [
+      {
+        suite: "grain",
+        name: "no_duplicate_business_keys",
+        sql: `SELECT id FROM target GROUP BY id HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "reconcile",
+        name: "partition_matches_source",
+        sql: `SELECT id FROM (
+  SELECT id, load_date, amount FROM target WHERE load_date = '2026-03-05'
+  EXCEPT
+  SELECT id, load_date, amount FROM source WHERE load_date = '2026-03-05'
+)
+UNION ALL
+SELECT id FROM (
+  SELECT id, load_date, amount FROM source WHERE load_date = '2026-03-05'
+  EXCEPT
+  SELECT id, load_date, amount FROM target WHERE load_date = '2026-03-05'
+)`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["target"],
+  }),
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -1688,7 +1863,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.3: The Streaming and Pipeline Round",
       description:
         "The operational reasoning the pipeline round scores: CDC changelog apply, high-water-mark incremental loads with safe backfill, and write-audit-publish quality gates.",
-      lessons: [cdcChangelogApply],
+      lessons: [cdcChangelogApply, incrementalWatermarkBackfill],
     },
   ],
 }
