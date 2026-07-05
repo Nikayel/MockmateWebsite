@@ -184,6 +184,191 @@ INSERT INTO price_history (product_id, price, effective_date) VALUES
   },
 }
 
+const sessionization: SqlLesson = {
+  id: "sql-l5-sessionization",
+  title: "Sessionization: Grouping Events with an Inactivity Timeout",
+  summary:
+    "Stamp each event with the session it belongs to: LAG the gap, flag a new session past the timeout, running-sum the flag into a session id.",
+  estimatedMinutes: 36,
+  difficulty: "hard",
+  skills: [
+    "streaming",
+    "LAG",
+    "cumulative-sum flag",
+    "event-time windowing",
+    "sessionization",
+    "session_id assignment",
+  ],
+  teach: {
+    estimatedMinutes: 11,
+    markdown: `## What a session is, and why you build one
+
+Raw event logs have no notion of a "visit". You get a stream of \`(user_id, event_ts)\` rows, and the analytics questions all assume sessions: how long is a typical visit, how many events happen per session, where inside a session do people drop off. A **session** is a run of one user's events with no gap longer than an inactivity timeout, and 30 minutes is the common default. Sessionization is the query that stamps each event with the session it belongs to, and it is one of the most common streaming-flavored questions on a DE screen.
+
+## The three-step build
+
+Work on \`events(user_id, event_ts)\`. The spirit is the same as gaps-and-islands: find where a run breaks, then number the runs.
+
+1. **Look back one event.** \`LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts)\` hands each event the previous event's timestamp for that user, and \`NULL\` for the user's first event.
+2. **Flag a new session on a long gap.** A user's first event and any event more than 30 minutes after the previous one open a fresh session: \`prev_ts IS NULL OR (julianday(event_ts) - julianday(prev_ts)) * 1440 > 30\`. \`julianday\` returns days, so multiplying the difference by 1440 converts it to minutes.
+3. **Running-sum the flag into a session number.** \`SUM(new_session) OVER (PARTITION BY user_id ORDER BY event_ts)\` counts how many sessions have started up to and including this event, so every event inside one session shares the same number. Concatenate it with the user id for a stable id: \`user_id || '-' || session_seq\`.
+
+The demo below shows every intermediate column (the previous timestamp, the gap in minutes, the new-session flag, and the running session number) so you can watch the 80-minute gap flip the flag and bump the number.
+
+## The ambiguity interviewers probe
+
+"Thirty minutes of inactivity" almost always means **since the previous event**, which is exactly what the LAG gap measures and what we use here. A few teams instead mean 30 minutes since the session **started**, a fixed-length window. The two disagree: a steady trickle every 20 minutes is one endless session under the first rule and a series of capped windows under the second. State which one you are implementing, because the interviewer is often checking that you noticed the fork.
+
+**Interview nuance:** this is the batch-SQL form of a streaming session window. It is exact over a bounded table, but a live stream needs a watermark to decide when a session is closed and safe to emit, since a late event could still extend it.
+
+> **In the warehouse this differs.** Flink and Spark Structured Streaming have a native session window (\`SESSION(event_time, INTERVAL '30' MINUTE)\`) where a watermark bounds late data, and Snowflake exposes \`CONDITIONAL_TRUE_EVENT\` and \`MATCH_RECOGNIZE\`. The gap math changes as well (\`TIMESTAMPDIFF\` or \`DATE_DIFF\` instead of \`julianday() * 1440\`). The LAG-plus-running-sum pattern is what you write over a bounded batch table, and it is the answer an interviewer wants.`,
+    demoSeedSql: `CREATE TABLE events (event_id INTEGER PRIMARY KEY, user_id INTEGER, event_ts TEXT);
+INSERT INTO events (event_id, user_id, event_ts) VALUES
+  (1, 1, '2026-03-01 09:00:00'),
+  (2, 1, '2026-03-01 09:10:00'),
+  (3, 1, '2026-03-01 10:30:00'),   -- 80 min gap starts a new session
+  (4, 1, '2026-03-01 10:45:00');`,
+    demoCode: `-- Every intermediate column: prev_ts gap, the new-session flag, the running session number.
+WITH with_prev AS (
+  SELECT event_id, event_ts,
+         LAG(event_ts) OVER (ORDER BY event_ts) AS prev_ts
+  FROM events
+),
+flagged AS (
+  SELECT event_id, event_ts, prev_ts,
+         ROUND((julianday(event_ts) - julianday(prev_ts)) * 1440) AS gap_minutes,
+         CASE WHEN prev_ts IS NULL OR (julianday(event_ts) - julianday(prev_ts)) * 1440 > 30
+              THEN 1 ELSE 0 END AS new_session
+  FROM with_prev
+)
+SELECT event_id, event_ts, gap_minutes, new_session,
+       SUM(new_session) OVER (ORDER BY event_ts) AS session_seq
+FROM flagged
+ORDER BY event_ts;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-sessionization-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that assigns a \`session_id\` to each event, starting a new session after **30 minutes** of user inactivity, and returns \`(event_id, user_id, event_ts, session_id)\` over \`events(event_id, user_id, event_ts)\`.
+
+Measure the gap to the previous event per user with \`LAG\`, flag a new session when that gap exceeds 30 minutes (or the event is the user's first), running-sum the flag per user into a session number, and build \`session_id\` as \`user_id || '-' || session_number\`. Alias the columns exactly \`event_id\`, \`user_id\`, \`event_ts\`, \`session_id\`.`,
+    starterCode: `-- Stamp each event with its session_id (new session after a 30-minute gap).
+WITH with_prev AS (
+  SELECT event_id, user_id, event_ts,
+         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts
+  FROM events
+)
+SELECT
+  -- flag a new session on a > 30 min gap, running-sum it, then build session_id
+FROM with_prev;`,
+    hints: [
+      "Minutes between two timestamps: `(julianday(event_ts) - julianday(prev_ts)) * 1440`.",
+      "New-session flag: `prev_ts IS NULL OR that_gap > 30` as a `CASE ... THEN 1 ELSE 0 END`.",
+      "Running-sum the flag with `SUM(new_session) OVER (PARTITION BY user_id ORDER BY event_ts)`, then `user_id || '-' || that_sum`.",
+    ],
+    referenceSolution: `WITH with_prev AS (
+  SELECT event_id, user_id, event_ts,
+         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts
+  FROM events
+),
+flagged AS (
+  SELECT event_id, user_id, event_ts,
+         CASE WHEN prev_ts IS NULL
+                   OR (julianday(event_ts) - julianday(prev_ts)) * 1440 > 30
+              THEN 1 ELSE 0 END AS new_session
+  FROM with_prev
+),
+sessioned AS (
+  SELECT event_id, user_id, event_ts,
+         SUM(new_session) OVER (PARTITION BY user_id ORDER BY event_ts) AS session_seq
+  FROM flagged
+)
+SELECT event_id, user_id, event_ts,
+       user_id || '-' || session_seq AS session_id
+FROM sessioned;`,
+    singleFile: {
+      seedSql: `CREATE TABLE events (
+  event_id INTEGER PRIMARY KEY,
+  user_id  INTEGER,
+  event_ts TEXT      -- 'YYYY-MM-DD HH:MM:SS'
+);
+INSERT INTO events (event_id, user_id, event_ts) VALUES
+  (1, 1, '2026-03-01 09:00:00'),
+  (2, 1, '2026-03-01 09:10:00'),
+  (3, 1, '2026-03-01 09:20:00'),
+  (4, 1, '2026-03-01 10:30:00'),
+  (5, 1, '2026-03-01 10:35:00'),
+  (6, 2, '2026-03-01 14:00:00'),
+  (7, 2, '2026-03-01 14:05:00'),
+  (8, 2, '2026-03-01 15:00:00');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["event_id", "user_id", "event_ts", "session_id"],
+        rows: [
+          [1, 1, "2026-03-01 09:00:00", "1-1"],
+          [2, 1, "2026-03-01 09:10:00", "1-1"],
+          [3, 1, "2026-03-01 09:20:00", "1-1"],
+          [4, 1, "2026-03-01 10:30:00", "1-2"],
+          [5, 1, "2026-03-01 10:35:00", "1-2"],
+          [6, 2, "2026-03-01 14:00:00", "2-1"],
+          [7, 2, "2026-03-01 14:05:00", "2-1"],
+          [8, 2, "2026-03-01 15:00:00", "2-2"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-sessionization-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns **one row per session** as \`(session_id, start_ts, end_ts, event_count, duration_minutes)\`, over the same \`events(event_id, user_id, event_ts)\` table with the 30-minute inactivity rule.
+
+Assign sessions as before, then aggregate per session: the earliest event timestamp as \`start_ts\`, the latest as \`end_ts\`, the number of events, and the whole-minute duration between the first and last event. Alias the columns exactly as named.`,
+    starterCode: `-- One row per session: session_id, start_ts, end_ts, event_count, duration_minutes.
+WITH with_prev AS (
+  SELECT event_id, user_id, event_ts,
+         LAG(event_ts) OVER (PARTITION BY user_id ORDER BY event_ts) AS prev_ts
+  FROM events
+)
+SELECT
+  -- assign sessions, then GROUP BY the session and aggregate
+FROM with_prev;`,
+    hints: [
+      "Reuse the apply pipeline (flag, running-sum) to get a session number per event, then `GROUP BY user_id, session_seq`.",
+      "`MIN(event_ts)` is `start_ts`, `MAX(event_ts)` is `end_ts`, `COUNT(*)` is `event_count`.",
+      "Whole-minute duration: `CAST(ROUND((julianday(MAX(event_ts)) - julianday(MIN(event_ts))) * 1440) AS INTEGER)`.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE events (
+  event_id INTEGER PRIMARY KEY,
+  user_id  INTEGER,
+  event_ts TEXT
+);
+INSERT INTO events (event_id, user_id, event_ts) VALUES
+  (1, 1, '2026-03-01 09:00:00'),
+  (2, 1, '2026-03-01 09:10:00'),
+  (3, 1, '2026-03-01 09:20:00'),
+  (4, 1, '2026-03-01 10:30:00'),
+  (5, 1, '2026-03-01 10:35:00'),
+  (6, 2, '2026-03-01 14:00:00'),
+  (7, 2, '2026-03-01 14:05:00'),
+  (8, 2, '2026-03-01 15:00:00');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["session_id", "start_ts", "end_ts", "event_count", "duration_minutes"],
+        rows: [
+          ["1-1", "2026-03-01 09:00:00", "2026-03-01 09:20:00", 3, 20],
+          ["1-2", "2026-03-01 10:30:00", "2026-03-01 10:35:00", 2, 5],
+          ["2-1", "2026-03-01 14:00:00", "2026-03-01 14:05:00", 2, 5],
+          ["2-2", "2026-03-01 15:00:00", "2026-03-01 15:00:00", 1, 0],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -198,7 +383,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.1: The Advanced SQL Power Round",
       description:
         "The live SQL screen an intern actually sits: gaps-and-islands, sessionization, cohort retention, funnels, and advanced window frames.",
-      lessons: [gapsAndIslands],
+      lessons: [gapsAndIslands, sessionization],
     },
   ],
 }
