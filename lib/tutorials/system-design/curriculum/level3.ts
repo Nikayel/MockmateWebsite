@@ -184,6 +184,65 @@ reads wait for a replica to catch up (works cross-device), and remember these ar
 linearizability but usually exactly what the product needs.
 `.trim()
 
+const partitioningStrategiesTeach = `
+## Splitting past one machine
+
+When one machine can no longer hold the dataset or absorb the write rate, the only real fix is
+**horizontal partitioning** (sharding): split the rows across many nodes so each node owns a slice.
+Contrast this with **vertical partitioning** (splitting a wide table into narrow ones by column) and
+**functional partitioning** (giving each service its own database). Vertical and functional buy some
+headroom, but only horizontal partitioning scales writes and dataset size without bound, so it is the
+technique interviewers mean by "shard it."
+
+The design choice is the **partition function**: given a key, which partition owns it. Three families
+dominate.
+
+**Range partitioning** assigns contiguous key ranges to partitions (users A to F on p0, G to M on p1;
+or time ranges for events). Its superpower is **range scans**: "all orders from last Tuesday" touches
+one or two partitions. Its curse is **hotspots on sequential keys**. If you range-partition by an
+auto-increment ID or a timestamp, every new write lands on the highest partition, so one node absorbs
+100% of the write traffic while the rest sit idle. This is the single most common partitioning
+mistake.
+
+**Hash partitioning** applies a hash to the key and assigns by the result (often
+\`hash(key) mod N\`). It spreads load **evenly** and kills sequential hotspots, because adjacent keys
+scatter. The cost is that you **lose efficient range queries**: "orders from last Tuesday" now fans
+out to every partition (scatter-gather). The other trap is \`hash mod N\` specifically: change N (add
+a node) and almost every key remaps, forcing a near-total reshuffle. Consistent hashing exists to fix
+exactly that.
+
+**Directory (lookup-based) partitioning** keeps an explicit routing table mapping key ranges or key
+groups to partitions, maintained in a coordination service (ZooKeeper/etcd) or a metadata store. It
+gives maximum flexibility: split a hot range, move a heavy tenant to its own node, rebalance
+surgically. The price is an extra **lookup hop** on the request path and a routing service you must
+keep highly available, since it is now on the critical path.
+
+### Secondary indexes get partitioned too
+
+A **local (document-partitioned) index** stores each partition's index alongside its own data, so a
+query on a non-partition-key column must **scatter-gather** across all partitions and merge (DynamoDB
+LSI, Elasticsearch by default). A **global (term-partitioned) index** partitions the index itself by
+the indexed term, so a lookup hits one index partition, but writes must update an index partition
+that may live on a different node, making writes slower and asynchronous (DynamoDB GSI). The index
+does not live for free on one node.
+
+**Interview nuance:** always map the dominant queries onto the partition scheme out loud. "This query
+hits one partition, that one is scatter-gather bounded by the slowest node." Interviewers are
+checking whether you know which reads got expensive, not just that you sprinkled the word "shard."
+
+\`\`\`
+RANGE                    HASH                     DIRECTORY
+A-F | G-M | N-Z          h(k)%N spreads evenly    lookup table -> partition
++ range scans hit 1      + no sequential hotspot  + surgical rebalance/split
+- seq keys = hot p       - range scan = fan-out   - extra hop + HA routing svc
+\`\`\`
+
+Recap: horizontal partitioning is the only way to scale writes and data past one node; range wins
+range scans but hotspots on sequential keys, hash spreads evenly but loses ranges and reshuffles on
+mod N, directory adds a flexible routing hop, and secondary indexes are either scatter-gather locals
+or write-costly globals.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -340,6 +399,63 @@ export const systemDesignLevel3: DesignLevel = {
               "**Scaling it:** the token check is a cheap comparison against replica-reported LSNs (replicas heartbeat their applied position to the router). The vast majority of the 400k QPS carry a token already satisfied by most replicas (lag is normally sub-second), so they route normally with no wait; only reads whose token is newer than a candidate replica pay a small wait or a primary fallback: a tiny fraction. Keep the user's high-water token advancing for monotonic reads so the timeline never regresses across refreshes.",
               "**The tradeoff:** one small per-user token write on the hot post path and a token comparison on reads buys cross-device correctness, instead of buying it with primary reads (does not scale) or global linearizability (unnecessary).",
               "Common wrong turn: relying on sticky sessions, which silently works in single-device testing and then shows the missing-tweet bug the instant the user switches devices.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l3-m2",
+      title: "Partitioning & Sharding",
+      description:
+        "Split a dataset or write rate past one machine: pick a partition strategy that survives skew, rebalance with consistent hashing, choose shard keys that dodge the celebrity problem, and design correct cross-shard operations.",
+      lessons: [
+        {
+          id: "sd-l3-partitioning-strategies",
+          title: "Partitioning Strategies: Range vs Hash vs Directory",
+          summary:
+            "Range wins range scans but hotspots on sequential keys, hash spreads evenly but loses ranges, directory adds a flexible routing hop; map every dominant query to its partitions.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["partitioning", "sharding", "skew"],
+          teach: {
+            markdown: partitioningStrategiesTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l3-partitioning-strategies-apply",
+            prompt:
+              "Design the partitioning scheme for a 20 TB messaging store doing 200k writes/sec; pick a partition strategy and defend it against skew.",
+            thinkAbout: [
+              "What does range vs hash vs directory partitioning optimize and cost?",
+              "How do local vs global secondary indexes work across partitions?",
+              "How does each query map to partitions?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a chat/messaging store. Dominant write: append a message to a conversation. Dominant read: load the last N messages of a conversation. Secondary read: load a user's conversation list. 20 TB and 200k writes/sec are far past one node: real horizontal sharding, 40+ partitions for headroom (each ~500 GB and ~5k writes/sec).",
+              "**Shard by hash of conversation_id.** High cardinality, so hashing spreads the 200k writes evenly instead of piling on the newest partition. Critically it co-locates all messages of one conversation on one partition, so the hot-path read ('last N messages') is a single-partition ordered scan, not scatter-gather. Within a partition, cluster by (conversation_id, message_id) with a time-sortable Snowflake message_id, so 'last N' is a cheap reverse range scan.",
+              "**Why not range partition by timestamp:** timestamp ranges would send every new message to the single highest partition, recreating a one-node write bottleneck at exactly 200k/sec. That is the skew failure being defended against; hashing eliminates it.",
+              "**The user conversation-list query** must not scatter-gather 40 partitions on every app open, so maintain a global secondary index (or separate table) keyed by user_id, updated when a conversation is created or a message arrives. It costs a cross-partition write on new-conversation events but turns a frequent read into a single-partition lookup. Message search, which is rare, goes to Elasticsearch with a local index, accepting scatter-gather there.",
+              "**Residual skew acknowledged:** a huge active channel can still hot-spot one partition; mitigate by sub-partitioning very hot conversations with a bucket suffix.",
+              "Common wrong turn: range-partitioning by timestamp 'so recent messages are together,' which concentrates 100% of writes on one partition and defeats the entire point of sharding.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-partitioning-strategies-practice",
+            prompt:
+              "Design the partitioning scheme for Stripe-style payment events at 50 TB and 300k events/sec, where the two dominant access patterns fight each other: (1) low-latency single-object reads by event_id, and (2) an analytics/reconciliation job that must scan 'all events for merchant M in a date range.' Pick a scheme and defend it against both skew and the range-scan requirement.",
+            thinkAbout: [
+              "How can one scheme serve both hash-friendly point reads and range-friendly merchant scans?",
+              "What does a whale merchant at 40% of volume do to its partition, and what splits it?",
+              "How does encoding routing information into the event_id avoid a fan-out?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: events are immutable, write-once appends, each belonging to a merchant with a timestamp. Pattern 1 is high-QPS point reads on the serving path; pattern 2 is a lower-QPS but heavy scan for reconciliation and dashboards.",
+              "**Resolve the conflict with a compound key:** `hash(merchant_id)` for partition placement, and within a partition a clustering order of (merchant_id, event_time, event_id). Hashing merchant_id spreads the 300k/sec and prevents a timestamp hotspot; co-locating a merchant's events on one partition, sorted by time, turns pattern 2 into a single-partition ordered range scan instead of a 40-way scatter-gather.",
+              "**Point reads by event_id** go through a global secondary index (event_id to partition), or encode merchant_id into the event_id so the read routes directly, avoiding fan-out.",
+              "**Whale defense:** a marketplace doing a huge share of volume hotspots its partition. Detect high-volume merchants and sub-partition them with a bucket in the key (merchant_id:bucket, bucket = hash(event_id) mod K), spreading the whale across K partitions. The reconciliation scan then reads K buckets and merges: bounded and acceptable because that job is not latency-critical.",
+              "**Store choice:** a wide-column store (Cassandra/ScyllaDB or DynamoDB) whose native partition-key plus clustering-key model expresses exactly this.",
+              "**The committed tradeoff:** optimize the frequent merchant range scan and even write spread; pay for point reads with a global index hop and for whales with explicit sub-partitioning, rather than pretending one flat key serves both patterns for free.",
             ],
           },
         },
