@@ -832,6 +832,75 @@ durations vary, combine active and passive health checks with connection drainin
 stateless, and never leave the LB itself un-replicated.
 `.trim()
 
+const reverseProxyGatewayTeach = `
+## Cross-cutting concerns live once, at the door
+
+As soon as you have more than a couple of services, you face a question: where do the concerns that
+*every* request needs (TLS, auth, rate limiting, routing) actually live? The wrong answer is "in
+every service," because then you reimplement auth twelve times and update it twelve times. The edge
+tier exists to handle cross-cutting concerns once, in front of everything.
+
+### Reverse proxy, then API gateway
+
+The **reverse proxy** sits in front of your backends and forwards client requests to them. Its jobs
+are infrastructural: TLS termination, request routing, connection buffering (absorbing slow clients
+so backends are not tied up), response compression (gzip/brotli), and static asset serving. Nginx and
+Envoy are the canonical examples. A reverse proxy is content-aware (L7) but does not know about
+*your* business or *your* users.
+
+An **API gateway** is a reverse proxy that also owns application-edge policy. On top of routing and
+TLS it does: **authentication and authorization** (validate the JWT or session, reject anonymous
+calls before they reach a service), **rate limiting and quotas** (per-API-key token buckets),
+**request and response transformation** (rewrite headers, translate protocols), and sometimes
+**aggregation** (fan one client call out to several services and merge). Kong, AWS API Gateway,
+Apigee, and Envoy-plus-control-plane are typical. The value is that a request is authenticated,
+rate-limited, and validated once at the door, so internal services can trust it and stay focused on
+business logic.
+
+**Interview nuance:** The classic follow-up is "what belongs at the gateway versus in the service."
+The line: put *cross-cutting, request-shaped* concerns at the gateway (authn, coarse authz, rate
+limits, TLS, routing, WAF). Keep *business* concerns in the service (domain validation, fine-grained
+authorization like "can this user edit this specific document," pricing rules). Auth token
+*validation* is edge work; deciding *what this user may do to this resource* is service work.
+
+### BFFs and the mesh
+
+The **BFF (backend-for-frontend)** pattern is a gateway variant: instead of one general gateway, you
+run a thin per-client gateway. The web app talks to a web BFF, the mobile app to a mobile BFF. Each
+BFF aggregates and shapes exactly the payload its client wants, so the mobile client is not forced to
+over-fetch a web-sized response. BFFs prevent one generic API from being pulled in incompatible
+directions by different clients.
+
+For internal, service-to-service concerns, a **service mesh** (Istio, Linkerd) is often the better
+tool than the gateway. Each service gets a sidecar proxy (Envoy) that handles mTLS between services,
+retries, timeouts, circuit breaking, and traffic-shifting, controlled centrally without changing app
+code. Mental model: the **gateway is north-south** (client to system), the **mesh is east-west**
+(service to service). Add a **WAF** and **DDoS protection** at the very edge, in front of the
+gateway, to filter malicious traffic before it costs you anything.
+
+The failure mode to avoid: the gateway becoming a **logic monolith**. It is tempting to keep adding
+"just one more" business rule to the gateway until it holds pricing logic, feature flags, and
+per-endpoint special cases, at which point it is a distributed monolith that every team must
+coordinate on and a single bottleneck all traffic squeezes through. Keep the gateway thin and
+generic; push business logic down into services.
+
+\`\`\`
+Internet
+  |
+[ WAF / DDoS ]            <- filter junk before it costs you
+  |
+[ API Gateway ]           <- TLS, authn, rate limit, routing (north-south)
+  |     |     |
+ svcA  svcB  svcC         <- business logic + fine-grained authz
+   \\____|____/
+    service mesh sidecars <- mTLS, retries, timeouts (east-west)
+\`\`\`
+
+Recap: Push TLS, authn, rate limiting, and routing to a thin API gateway (north-south), handle
+service-to-service mTLS and retries in a mesh (east-west), use BFFs to shape per-client payloads,
+front it all with a WAF, and never let the gateway swell into a business-logic monolith.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1615,6 +1684,58 @@ export const systemDesignLevel1: DesignLevel = {
               "**Health checks:** active `GET /healthz` every 2 to 3 seconds with a low failure threshold, plus passive ejection on 5xx or timeout, so a node processing payments incorrectly is removed fast.",
               "**Deploys:** connection draining with a generous timeout so in-flight charges complete, plus graceful shutdown. Deploy region by region (or canary a small weighted slice via weighted routing) and watch error and latency SLOs before widening; a misbehaving canary's weight goes back to zero instantly.",
               "Common wrong turn: trusting the load balancer to guarantee exactly-once delivery. Networks retry and LBs fail over; only application-level idempotency makes double-charging impossible, and the LB design just has to avoid dropping in-flight work via draining.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-reverse-proxy-gateway",
+          title: "Reverse Proxy, API Gateway & the Edge",
+          summary:
+            "Push cross-cutting concerns (TLS, authn, rate limits, routing) to a thin gateway, shape per-client payloads with BFFs, and keep business logic in the services.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["gateway", "edge", "proxy"],
+          teach: {
+            markdown: reverseProxyGatewayTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-reverse-proxy-gateway-apply",
+            prompt:
+              "Design the edge tier for a microservices backend: list the responsibilities you push to the gateway and why.",
+            thinkAbout: [
+              "Which cross-cutting concerns belong at the gateway vs in the service?",
+              "What is the BFF pattern for, and when does a service mesh handle internal concerns?",
+              "How do you keep the gateway from becoming a logic monolith?",
+            ],
+            modelAnswerOutline: [
+              "Assume roughly 20 backend microservices, web and mobile clients, and a requirement that every service can trust that inbound requests are already authenticated and rate-limited.",
+              "**At the very front: a WAF and DDoS layer** (Cloudflare or AWS WAF/Shield) to drop obvious attacks and volumetric floods before they consume gateway or service capacity.",
+              "**The API gateway** (Kong or Envoy with a control plane) owns the cross-cutting, request-shaped concerns: TLS termination so backends speak plain HTTP inside the VPC (or mTLS via the mesh); authentication (validate the JWT or session and reject anonymous requests at the door, so no service reimplements this); coarse authorization (enforce scopes and roles in the token); rate limiting and quotas (per-API-key token buckets); routing (host and path to the right service, versioning); observability (assign a request/trace id, emit consistent access logs).",
+              "**Business logic stays out of the gateway.** Fine-grained authorization ('can THIS user edit THIS document'), domain validation, and pricing stay in the owning service, because they depend on domain state the gateway does not have and would otherwise turn the gateway into a distributed monolith every team must coordinate on.",
+              "**BFFs for clients:** a web BFF and a mobile BFF that each aggregate and shape payloads for their client, so mobile is not forced to over-fetch a web-shaped response and each client evolves independently.",
+              "**Service mesh for east-west:** sidecar proxies (Istio or Linkerd) handle mTLS, retries, timeouts, and circuit breaking between services, centrally configured without app changes. That keeps the north-south gateway thin.",
+              "**The anti-bloat rule:** only cross-cutting, non-domain policy lives at the gateway; anything needing business state goes to a service. If someone proposes adding pricing rules to the gateway, that is the signal to stop.",
+              "Common wrong turn: duplicating auth in every service (unmaintainable) or, at the other extreme, cramming business logic into the gateway until it is a bottleneck and a shared point of contention.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-reverse-proxy-gateway-practice",
+            prompt:
+              "Design the edge tier for Netflix-style traffic where the mobile app, TV app, and web app each need different payload shapes, one gateway pool handles hundreds of thousands of requests per second, and a bad gateway deploy must not black out every client at once. Explain your gateway topology and how you avoid a single global point of failure and a logic monolith.",
+            thinkAbout: [
+              "Why does one generic gateway get pulled in incompatible directions by three client types?",
+              "What blast-radius isolation do per-client BFFs buy during a bad deploy?",
+              "Which concerns still belong in a shared thin edge in front of the BFFs?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: three very different client types (constrained mobile, big-screen TV, rich web), extreme scale, and a hard requirement that no single deploy or region can take down all clients.",
+              "**Per-client BFFs, not one god-gateway.** Each client (mobile, TV, web) gets its own BFF, so the TV app can request large, image-heavy aggregated payloads while the mobile BFF returns lean responses tuned for cellular. One generic gateway would be pulled in three incompatible directions and every client change would risk the others. It also gives blast-radius isolation: a bad mobile-BFF deploy degrades mobile only, not TV or web.",
+              "**Shared edge, isolated logic.** In front of the BFFs, a thin common edge does the universal cross-cutting work: WAF/DDoS, TLS termination, authentication, coarse rate limiting, and routing to the right BFF. Universal concerns live once at this edge; client-specific aggregation lives in each BFF; business logic stays down in the domain services. That three-way split prevents any layer from becoming a monolith.",
+              "**No single global SPOF:** the edge runs active-active across multiple regions behind anycast, so a failing region is withdrawn and traffic shifts to the next-closest one. Within a region the gateway/BFF pools are horizontally scaled and health-checked.",
+              "**Safe deploys:** roll gateway and BFF changes as canaries: shift a small weighted slice of traffic, watch error and latency SLOs, widen only if healthy, roll back by dropping the weight to zero. Because BFFs are separate pools, a bad canary is contained to one client type and one region, never a global blackout.",
+              "**East-west** (BFF to domain services) goes through a service mesh for mTLS, retries, and circuit breaking, keeping resilience policy out of BFF code.",
+              "Common wrong turn: a single monolithic gateway serving all clients and holding client-specific logic: it becomes both a global SPOF and a coordination bottleneck, and one bad deploy blacks out every device at once.",
             ],
           },
         },
