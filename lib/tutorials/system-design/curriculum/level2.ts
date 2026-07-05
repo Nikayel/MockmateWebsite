@@ -729,6 +729,70 @@ efficiency, always add metadata filtering and hybrid (vector + BM25) search, use
 forces a dedicated store, and plan for re-embedding when the model changes.
 `.trim()
 
+const normalizationDenormTeach = `
+## The most fundamental lever in schema design
+
+Normalization and denormalization are the two ends of the single most fundamental lever in schema
+design: you are trading write integrity against read performance, and every schema sits somewhere on
+that line.
+
+### Normalization: each fact exactly once
+
+Third normal form (3NF), the practical target, says every non-key column depends on the key, the
+whole key, and nothing but the key. A product's name and price live in one \`products\` row; an
+\`order_items\` row references that product by \`product_id\` rather than copying the name and price.
+The payoff is write integrity: change the product name in one place and every order that references
+it sees the new name, with zero risk of two rows disagreeing. Normalized schemas make writes cheap
+and correct, and they make **update anomalies** (the same fact stored in two rows that drift apart)
+structurally impossible.
+
+The cost is joins on read. Joins are perfectly fine when they are indexed and bounded: an index on
+\`order_items.order_id\` and a primary-key lookup on \`products\` turns a 3-table join into a handful
+of B-tree seeks, and Postgres or MySQL will serve that in single-digit milliseconds even at hundreds
+of millions of rows. Joins fail to scale in two situations. First, when the join fan-out is large and
+unbounded (joining a user to all of their events across years). Second, and this is the one that
+actually forces the issue, **when the tables live on different shards**: a cross-shard join means a
+scatter-gather across the network, and that does not scale. Once your data is sharded, you must
+co-locate or denormalize.
+
+### Denormalization: pay at write time, on purpose
+
+Denormalization means deliberately storing a copy of a fact where it is read, to avoid a join or a
+cross-shard lookup on a hot read path. For a read-heavy order-history page you precompute a row that
+already contains the product name, the quantity, the line total, and the order status, so rendering
+the page is a single indexed range scan with no joins. The cost is symmetrical: you now have copies
+to keep in sync, so a product rename becomes a **fan-out write** that must touch every denormalized
+copy, and if you miss one you get an update anomaly. You have moved the pain from read time to write
+time, which is the right trade only when reads vastly outnumber writes.
+
+**Interview nuance:** the strong answer never says "denormalize for performance" in the abstract. It
+names the specific query, the read/write ratio, and the scale trigger: "this order-history query runs
+20k times per second, product data changes maybe once a day, so I denormalize the display fields into
+the order row and accept a rare backfill on rename."
+
+The managed middle ground is a **materialized view** (or a summary table). You keep the source of
+truth normalized, and the database maintains a precomputed, denormalized copy for you, refreshing it
+on a schedule or incrementally. You get join-free reads without hand-writing fan-out logic, at the
+cost of some staleness. Daily revenue rollups, leaderboards, and dashboard aggregates are the classic
+use.
+
+\`\`\`
+normalized (write-optimized)        denormalized (read-optimized)
+  orders                              order_history_rows
+    order_id, user_id, status          order_id, user_id, status,
+  order_items                          product_name, qty, line_total,
+    order_id, product_id, qty          created_at   <- copies, join-free
+  products                            trade: fan-out write on product change
+    product_id, name, price
+  join on read (indexed, ms)         source of truth stays normalized;
+                                     refresh via materialized view
+\`\`\`
+
+Recap: normalize by default for write integrity, denormalize only for a specific hot read path with a
+real read/write ratio and scale trigger (especially to dodge cross-shard joins), and reach for
+materialized views when you want join-free reads without hand-maintaining the copies.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1351,6 +1415,64 @@ export const systemDesignLevel2: DesignLevel = {
               "**Sharding:** partition the 5B vectors across many shards (by IVF cluster or hash), each shard an IVF-PQ index on its own nodes; a query fans out to relevant shards and merges top-K (scatter-gather). Horizontal scale with bounded per-shard memory; replicas per shard give read throughput and availability.",
               "**Freshness: a two-tier index.** IVF training is expensive, so new content cannot wait for a full rebuild. Run a large, periodically rebuilt base IVF-PQ index for the bulk, plus a small, fast, freshly-updated HNSW (or flat) index for recent items that is cheap to insert into. Queries search both and merge, so a track uploaded a minute ago is retrievable immediately and folds into the base index at the next scheduled rebuild. User taste vectors update as people listen and are just another query vector against the item index.",
               "Common wrong turn: insisting on exact search or full in-memory HNSW at 5B scale (memory-infeasible, too slow to rebuild), or a single monolithic index that cannot ingest fresh content without a full retrain. The senior moves: IVF-PQ for the memory/latency budget, sharded scatter-gather for scale, and a hot fresh-item index layered over a periodically rebuilt base.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l2-m4",
+      title: "Data Modeling",
+      description:
+        "Turn a feature spec into a schema that survives real traffic: normalize for write integrity, denormalize for named hot reads, model NoSQL backward from access patterns, and pick ID/key strategies that avoid hotspots.",
+      lessons: [
+        {
+          id: "sd-l2-normalization-denorm",
+          title: "Normalization vs Denormalization",
+          summary:
+            "Normalize by default for write integrity; denormalize only a named hot read path with a real read/write ratio, and use materialized views as the managed middle ground.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["normalization", "denormalization", "modeling"],
+          teach: {
+            markdown: normalizationDenormTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-normalization-denorm-apply",
+            prompt:
+              "Design the schema for an e-commerce order, line-items, and product catalog, then denormalize it for a read-heavy order-history page.",
+            thinkAbout: [
+              "When are joins fine, and when do they fail to scale?",
+              "What is the cost of denormalization (update anomalies, fan-out writes)?",
+              "How do materialized views offer a managed middle ground?",
+            ],
+            modelAnswerOutline: [
+              "Assume a store doing thousands of orders per hour, an order-history page rendering hundreds of times per second, and a product catalog that changes slowly (a few updates a day, not per second).",
+              "**Normalized core (source of truth):** `products(product_id PK, name, price_cents)`, `orders(order_id PK, user_id FK, status, created_at, total_cents)`, `order_items(order_item_id PK, order_id FK, product_id FK, quantity, unit_price_cents)`. Critically, `unit_price_cents` is copied into order_items at purchase time: the price at the moment of sale is a distinct historical fact from the current catalog price. That is capturing the right fact, not denormalization. Index order_items(order_id) and orders(user_id, created_at).",
+              "**Are the joins fine?** For most reads, yes: rendering one order joins via primary and foreign keys, a few indexed seeks, single-digit milliseconds. Joins would fail if orders were sharded by user and products globally, because rendering history would scatter-gather across shards.",
+              "**Denormalize the hot page:** the order-history page is read-heavy and product data slow-changing, so build an `order_history` read model: one row per line item carrying order_id, user_id, status, created_at, product_name, quantity, line_total_cents. The page becomes a single indexed range scan on (user_id, created_at DESC) with zero joins.",
+              "**The cost, and how it is paid:** product_name is now duplicated, so a rename is a fan-out write: update the catalog, then backfill the read model asynchronously (a job or CDC stream), accepting brief staleness on a cosmetic field. Do NOT sync unit_price_cents (the historical sale price never changes). Status changes propagate off the same order-events stream.",
+              "**The managed middle ground:** define order_history as a materialized view refreshed incrementally, or maintain it via CDC (Debezium into a denormalized table), keeping the source of truth normalized while the pipeline owns the copy.",
+              "Common wrong turn: denormalizing the whole schema up front 'for speed' with no measured hot path, trading guaranteed write-time complexity for a read win nobody needed. Denormalize the one page that is actually hot, after naming its read/write ratio.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-normalization-denorm-practice",
+            prompt:
+              "Design the data model for the Amazon-scale 'Your Orders' page where the orders service is sharded by customer_id across hundreds of nodes and must render a customer's last 50 orders in under 100 ms at p99, while the product catalog is a separate, globally replicated service. Show exactly where you refuse to join and what you denormalize instead.",
+            thinkAbout: [
+              "What would a per-line-item catalog call cost against a 100ms p99 budget?",
+              "Which fields are frozen historical facts, safe to snapshot at order time?",
+              "Which fields must stay live, and where do they live so render needs no cross-service call?",
+            ],
+            modelAnswerOutline: [
+              "Assume hundreds of millions of customers, orders sharded by customer_id (all of one customer's orders on one shard), and a catalog service owned by another team, globally replicated, that cannot be joined against from the orders shard.",
+              "**Where to refuse to join:** orders and catalog live in different services and shard maps, so a join from an order shard to the catalog is a cross-service, cross-shard network fan-out per line item: unacceptable at a 100 ms p99. The 'Your Orders' read path performs ZERO live catalog joins.",
+              "**What to denormalize:** at order-placement time, snapshot the display fields needed forever: product_title, image_url, unit_price_cents, quantity into the order-item record on the customer's shard. These are captured facts (title and price as of purchase), correct to freeze, never needing a catalog lookup on read. The page becomes a single-shard query: `WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50` with an index on (customer_id, created_at DESC), comfortably under 100 ms.",
+              "**Handling change:** cosmetic catalog drift (title corrections, CDN URL rotation) does not rewrite history; the snapshot is the record of what was bought. Mutable fields the page must show live (delivery status, return eligibility) are stored on the order itself, same shard, updated via the order-events stream, never fetched from another service on render.",
+              "**Scale and hotspots:** sharding by customer_id keeps each customer's history co-located and spreads load evenly; no single customer is a hotspot the way a celebrity product would be. The LIMIT 50 plus index bound keeps the query cheap regardless of lifetime order count.",
+              "**Trade acknowledged:** snapshot staleness on cosmetic fields in exchange for a join-free, single-shard, sub-100 ms read. Common wrong turn: preserving normalization purity by calling the catalog service per line item, turning one page load into 50 cross-service RPCs and blowing the latency budget.",
             ],
           },
         },
