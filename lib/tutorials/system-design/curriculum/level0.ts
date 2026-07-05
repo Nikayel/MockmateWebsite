@@ -508,6 +508,57 @@ Recap: memorize the latency ladder (memory ~100 ns, SSD ~100 us, same-DC ~0.5 ms
 always translate a number into a design decision.
 `.trim()
 
+const phasedDeliveryClockTeach = `
+## A system-design round is a time-boxed delivery problem
+
+You have roughly 45 minutes, one interviewer, and one goal: end with a working design plus enough
+depth to prove you can build it. The single biggest reason strong engineers fail this round is not
+weak knowledge, it is pacing. They spend 15 minutes perfecting requirements, draw half a diagram, and
+the timer ends before there is anything to deep-dive on. A repeatable phase structure with an explicit
+minute budget prevents that.
+
+### The canonical 6-phase clock for a 45-minute round
+
+\`\`\`
+Phase                        Budget   Exit criterion
+1 Clarify + scope + NFRs     ~5 min   You have functional + non-functional reqs and the constraint that matters
+2 Estimation (entities/QPS)  ~2 min   You have a read/write QPS and rough storage number to size with
+3 API surface                ~5 min   The 3-5 core endpoints (or events) are named with inputs/outputs
+4 High-level design          ~15 min  A complete boxes-and-arrows design where every functional req is satisfied
+5 Deep dive(s)               ~10 min  The tightest NFR bottleneck is addressed with a committed choice
+6 Wrap-up                    ~3 min   Top remaining bottleneck, failure mode, monitoring, cost driver stated
+\`\`\`
+
+Notice that phases 1 and 2 together take only about 5 to 7 minutes. Requirements and estimation are
+the setup, not the main event. The bulk of the clock, phases 4 and 5, goes to design and depth,
+because that is what the interviewer is actually scoring.
+
+### The prime directive
+
+Reach a COMPLETE working design before you add any complexity. A simple design that satisfies every
+functional requirement beats an elaborate half-design every time. Do not shard, add Kafka, or optimize
+the cache until the plain version works end to end.
+
+Two skills make the clock work in practice. First, **exit criteria**. Each phase has a concrete
+condition that tells you it is done and you may move on. Without one you drift. When you have a read
+QPS and a storage estimate, estimation is over, stop refining the number. Second, **narrated
+transitions**. You say the phase change out loud so the interviewer follows your lead: "I have a
+working design now, so let me harden the availability, which is the tightest requirement here." This
+keeps you visibly in control and signals seniority.
+
+**Interview nuance:** treat the framework as a scaffold, not a script. If the interviewer jumps you to
+the data model in minute 3, follow them, then loop back to fill the gaps. Reordering on their cue is a
+strength. Rigidly reciting phases while they try to steer is the tell of a memorized answer.
+
+**Interview nuance:** if you are running long, say so and cut. "I am watching the clock, so I will
+lock the high-level design and move straight to the delivery bottleneck." Interviewers reward
+candidates who self-correct pacing over ones who need rescuing.
+
+Recap: budget about 5 to 7 minutes for requirements and estimation, spend the bulk on design and deep
+dives, use an exit criterion to leave each phase, and narrate every transition so you visibly lead the
+round to a complete design.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -927,6 +978,67 @@ export const systemDesignLevel0: DesignLevel = {
               "**Tradeoff accepted:** eventual consistency on inventory. Two shoppers in different regions might both reserve the last unit within the replication window, so accept a small oversell risk resolved by a compensating action (cancel and refund, or backorder) rather than paying a ~150 ms synchronous cross-region lock on every checkout.",
               "For extremely scarce, high-value inventory, invert the trade: route those SKUs' checkout to the US region and accept the higher latency for correctness.",
               "Common wrong turn: making checkout synchronously consistent across regions (correct but 600 ms+ from Asia), or ignoring the cross-region constant entirely and being surprised by tail latency.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l0-m3",
+      title: "The Structured Walkthrough",
+      description:
+        "Run the round on a fixed clock: a repeatable 6-phase plan, a boxes-and-arrows design proven by tracing one real request, then an NFR-driven deep dive and an operational wrap-up.",
+      lessons: [
+        {
+          id: "sd-l0-phased-delivery-clock",
+          title: "Phased Delivery & the Interview Clock",
+          summary:
+            "Budget the 45 minutes across six phases with exit criteria, reach a complete simple design before adding complexity, and narrate every transition.",
+          estimatedMinutes: 25,
+          difficulty: "easy",
+          skills: ["framework", "time-management"],
+          teach: {
+            markdown: phasedDeliveryClockTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-phased-delivery-clock-apply",
+            prompt:
+              "Produce a labeled 6-phase walkthrough plan for a 45-minute 'Design a URL shortener' round, with a minute budget per phase and the exit criterion for each.",
+            thinkAbout: [
+              "How much time goes to requirements+estimation vs design+deep dives?",
+              "What is the exit criterion that lets you move to the next phase?",
+              "How do you narrate transitions so the interviewer follows your lead?",
+            ],
+            modelAnswerOutline: [
+              "Assumption: 45-minute round, a URL shortener like Bitly, one interviewer scoring completeness and depth.",
+              "**Phase 1, Clarify and NFRs (~5 min).** Confirm the two features: create a short link, redirect to the long URL. Confirm scale (say 100M new URLs/month, 10:1 read:write on redirects) and the tightest NFR: redirect latency and high read availability, since a slow or down redirect breaks every embedded link. Exit: functional reqs stated and latency plus availability named as the constraint that matters.",
+              "**Phase 2, Estimation (~2 min).** 100M writes/month is ~40 writes/sec; at 10:1 about 400 reads/sec, peaks maybe 5x. Storage: 100M/month x 12 x 5 years x ~500 bytes is roughly 3 TB over 5 years. Exit: a QPS and a storage number to size the datastore and cache.",
+              "**Phase 3, API (~5 min).** `POST /urls {longUrl} -> {shortCode}` and `GET /{shortCode} -> 301/302 redirect`. Exit: the two core endpoints named with inputs and outputs.",
+              "**Phase 4, High-level design (~15 min).** Client, load balancer, stateless app servers, a key-generation strategy (base62 of a counter or a hash), a primary datastore keyed by shortCode (DynamoDB or a KV store), and a Redis cache in front of reads. Trace a create and a redirect end to end. Exit: a complete diagram where both features work.",
+              "**Phase 5, Deep dive (~10 min).** Attack the tightest NFR: redirect read latency and availability. Cache hot codes in Redis, use 301 vs 302 deliberately, discuss key-generation collisions. Exit: the read-path bottleneck has a committed solution.",
+              "**Phase 6, Wrap-up (~3 min).** Top remaining bottleneck (cache stampede on a viral link), main failure mode (datastore hot partition), monitoring (redirect p99, cache hit rate), cost driver (read QPS and storage). Exit: all four stated.",
+              "Common wrong turn: spending 12 minutes debating base62 vs hashing in phase 3 and never finishing the diagram. Lock a good-enough key scheme and move on.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-phased-delivery-clock-practice",
+            prompt:
+              "Produce a labeled phase plan for a compressed 35-minute 'Design Twitter/X home timeline' round where the interviewer has told you up front they care most about read fanout at 500M daily active users. Show how you re-budget the shortened clock and where you cut.",
+            thinkAbout: [
+              "When the interviewer pre-declares the scoring focus, which phases shrink and which grow?",
+              "What is the minimum breadth you still need before the deep dive is credible?",
+              "How do you quantify why fanout is the thing that matters at 500M DAU?",
+            ],
+            modelAnswerOutline: [
+              "Assumption: 35 minutes, and the interviewer pre-declared the scoring focus is read fanout at 500M DAU. That changes the budget: less breadth, more time reserved for the fanout deep dive.",
+              "**Clarify and NFRs (~4 min).** Scope: post a tweet, view home timeline. The NFR that matters is given: timeline read latency at massive fanout, with eventual consistency acceptable (a tweet appearing a few seconds late is fine). Exit: focus confirmed as read-path fanout.",
+              "**Estimation (~2 min).** 500M DAU reading timelines a few times a day is on the order of 100k+ timeline reads/sec at peak, far more reads than writes. This number is the whole reason fanout matters. Exit: the read QPS that justifies precomputation.",
+              "**API (~3 min).** `POST /tweets` and `GET /timeline?userId`. Keep it to two.",
+              "**High-level design (~9 min).** Clients, gateway, write service, fanout service, a per-user timeline cache (Redis), and a tweet store. Trace a post and a timeline read. Exit: a complete design where a tweet reaches followers' cached timelines.",
+              "**Deep dive, fanout (~14 min).** Where the extra time goes: compare fanout-on-write (precompute each follower's timeline) vs fanout-on-read (assemble at query time). Commit to a hybrid: fanout-on-write for normal users, fanout-on-read for celebrity accounts with millions of followers to avoid write amplification. Quantify the celebrity write storm.",
+              "**Wrap-up (~3 min).** Remaining bottleneck (hot celebrity accounts), failure mode (fanout queue backlog), monitoring (timeline read p99, fanout lag), cost driver (Redis timeline storage across 500M users).",
+              "The cut: compress API and component breadth so the fanout dive, the thing being scored, gets nearly half the round. Matching depth to the stated focus is the point.",
             ],
           },
         },
