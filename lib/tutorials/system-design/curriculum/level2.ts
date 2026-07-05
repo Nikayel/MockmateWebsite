@@ -982,6 +982,66 @@ the DB, move files with presigned URLs and multipart upload so they bypass your 
 cost and latency with lifecycle tiering and a CDN.
 `.trim()
 
+const choosingDbPolyglotTeach = `
+## Given a feature, pick a store and defend it
+
+This is the synthesis lesson. Strong candidates do not memorize "use NoSQL for scale." They reason
+from **decision drivers** to a **storage family**, then defend against the runner-up.
+
+The drivers, roughly in the order they decide things: **access patterns** (what queries do you
+actually run, and by what key), **read/write ratio and volume** (QPS now and in two years),
+**consistency needs** (does a stale read cause a real bug or just a cosmetic one), **scale** (does
+the working set fit one big node or not), **latency target** (p99 budget), and **query complexity**
+(joins, aggregations, ad hoc filters, full-text, geospatial). Two more sit underneath: **operational
+cost** (managed vs self-hosted, and does your team already run it) and **transactions** (do you need
+multi-row ACID).
+
+### Drivers to families
+
+- **Relational (Postgres, MySQL):** rich queries, joins, ACID transactions, strong consistency. The
+  correct default for most features. A single well-indexed Postgres box comfortably serves tens of
+  thousands of QPS.
+- **Key-value (Redis, DynamoDB):** always access by a known key, single-digit-ms latency, millions of
+  ops/sec. Sessions, carts, flags, counters. Weak at ad hoc queries.
+- **Document (MongoDB):** self-contained JSON documents, flexible schema, query by fields inside the
+  document. Catalogs and content where the aggregate loads whole.
+- **Wide-column (Cassandra, Bigtable, HBase):** massive write throughput, huge datasets, queries
+  known in advance and modeled as partitions. Weak at joins and ad hoc filters.
+- **Graph (Neo4j):** the value is in relationships and multi-hop traversals.
+- **Time-series (InfluxDB, TimescaleDB, Prometheus):** append-heavy timestamped metrics with rollups
+  and retention.
+- **Vector (pgvector, Pinecone, Milvus):** nearest-neighbor search over embeddings.
+- **Columnar / OLAP (Snowflake, BigQuery, ClickHouse):** large analytical scans and aggregations,
+  kept separate from your OLTP store.
+
+### NewSQL: the family people miss
+
+**NewSQL / distributed SQL (Spanner, CockroachDB, TiDB)** gives you **horizontal scale plus ACID and
+SQL** by auto-sharding data across nodes and using consensus (Raft/Paxos) to keep replicas
+consistent. The tradeoff versus a single Postgres is higher write latency per transaction (a commit
+needs a cross-node quorum) and operational complexity. So: choose NewSQL when you have genuinely
+outgrown one node **and** still need transactions and SQL, because the alternative is **app-level
+sharding** of MySQL/Postgres, where you hand-roll routing, cross-shard joins, resharding, and
+distributed transactions in application code. That is a large, permanent tax. NewSQL buys back most
+of that pain at the cost of latency and money.
+
+**Polyglot persistence** means using several stores, each for what it is best at, and syncing between
+them: Postgres as the system of record, Redis for a hot cache, Elasticsearch for full-text, S3 for
+blobs, a warehouse for analytics via CDC. The cost is operational surface area and keeping derived
+data in sync, so you justify each store, you do not collect them.
+
+**Interview nuance:** Reason with **PACELC**, not a CAP one-liner. CAP only speaks about behavior
+during a partition; PACELC adds the normal case: even when there is no partition (Else), you still
+trade **Latency** against **Consistency**. Spanner chooses consistency and pays latency; Dynamo
+chooses availability and latency and gives you eventual consistency. Naming PACELC signals you know
+CAP is not the whole story.
+
+Recap: Drive from access pattern, consistency, scale, and query shape to a family, default to boring
+well-indexed relational, reach for NewSQL only when you have outgrown one node yet still need SQL and
+ACID (versus hand-rolled sharding), and treat polyglot persistence as a justified set of specialized
+stores, not a collection.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1823,6 +1883,57 @@ export const systemDesignLevel2: DesignLevel = {
               "**Delivery:** viewers never hit the origin bucket. A multi-tier CDN caches segments at the edge; the player fetches a manifest, then pulls segments and switches rendition per segment based on measured bandwidth, so the 3G phone pulls 240p and the 4K TV pulls 2160p from the same library. Because segments are immutable and content-addressed, they cache with very long TTLs and edge hit rates exceed 95 percent: what makes the read side economically possible.",
               "**Metadata:** a horizontally scalable store (Cassandra/Bigtable or Vitess-sharded MySQL, as YouTube uses) holds video metadata, view counts, and manifests; the object store holds bytes; the CDN holds hot copies.",
               "Common wrong turn: serving a single MP4 per video (no adaptive bitrate) or transcoding synchronously in the upload request, which buffers on mobile and times out on large files.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-choosing-db-polyglot",
+          title: "Choosing a Database & Polyglot Persistence",
+          summary:
+            "Reason from decision drivers to a storage family, default to boring relational, adopt NewSQL only past one node when SQL+ACID still matter, and justify every polyglot store.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["database-selection", "newsql", "polyglot"],
+          teach: {
+            markdown: choosingDbPolyglotTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-choosing-db-polyglot-apply",
+            prompt:
+              "Recommend a datastore given a feature spec (workload mix, consistency needs, scale, and query shapes), justify it against the alternatives, and state explicitly when NewSQL beats app-level sharding.",
+            thinkAbout: [
+              "Which decision drivers (access patterns, consistency, scale, query shape) dominate this spec?",
+              "When does NewSQL / distributed SQL beat sharding MySQL/Postgres?",
+              "When should you default to boring relational?",
+            ],
+            modelAnswerOutline: [
+              "The strong answer is a **repeatable method plus a defended example**, and interviewers grade the method.",
+              "**Method: extract the drivers before naming a technology.** State the access patterns (query by which keys, joins needed?), read/write ratio and QPS now and projected, the consistency requirement (does a stale or lost write cause a real bug: money yes, a like count no), the scale (does the working set fit one large node, roughly a few TB and tens of thousands of QPS?), the p99 latency budget, and operational reality (what the team already runs). Only then map to a family.",
+              "**Worked example:** 'a payments ledger, 5k writes/sec, must never lose or double-count a transaction, needs multi-row transactions, queries by account and time range.' Consistency and transactions dominate, and 5k writes/sec fits one node, so: **boring relational, a single primary Postgres** with read replicas for reporting, ACID transactions for the debit/credit pair, and a unique idempotency key against doubles.",
+              "**Defend against the runners-up:** Cassandra rejected (no multi-row ACID; last-write-wins risks losing a financial write); Mongo rejected (needs cross-document transactions and strong consistency).",
+              "**When NewSQL beats app-level sharding:** when the same workload grows past one node (say 200k writes/sec and 40 TB) AND still needs SQL and ACID. The alternatives are (a) shard Postgres by account id in the application, hand-building routing, cross-shard transactions, resharding, and distributed joins forever, or (b) Spanner/CockroachDB, which auto-shard and give ACID across shards via Raft consensus. NewSQL wins there: it buys back the sharding tax for the price of higher per-commit latency (cross-node quorum) and cost. Framed with PACELC: NewSQL chooses consistency and pays latency, correct for money.",
+              "**Default to boring relational** whenever the data is relational, transactions matter, and it fits one node.",
+              "Common wrong turn: reaching for NoSQL 'for scale' with no QPS or size evidence, when a well-indexed Postgres would serve the load for years with far less operational pain.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-choosing-db-polyglot-practice",
+            prompt:
+              "Choose the datastores for building Discord (real-time chat) from scratch: billions of messages, a hot read pattern of 'the most recent messages in a channel,' presence for millions of concurrent users, and full-text search across message history. Justify each store and describe how they stay in sync (polyglot persistence).",
+            thinkAbout: [
+              "Which of the four workloads could a single relational database actually not survive, and why?",
+              "Which data is worthless if stale by a minute, and what store does that imply?",
+              "What spine keeps the derived stores (search) in sync with the source of truth?",
+            ],
+            modelAnswerOutline: [
+              "This is a polyglot problem: no single store wins all four workloads, so assign each to the family that fits and sync between them.",
+              "**Messages (the core): wide-column, Cassandra or ScyllaDB** (what Discord actually runs). Billions of rows, append-heavy writes, and the dominant query 'most recent N messages in channel X' is a partition-plus-range read, not an ad hoc join. Partition by (channel_id, time_bucket), cluster by message id descending so the hot read is a single-partition sequential scan. Explicitly reject a single Postgres: at billions of messages and this write rate it exceeds one node, and the access pattern needs no joins.",
+              "**Presence and sessions ('who is online,' typing): in-memory key-value, Redis,** keyed by user and channel with short TTLs. Ephemeral, constantly updated, worthless if stale by a minute: single-digit-ms reads/writes and durability does not matter, so Redis's weakness does not bite.",
+              "**Full-text search across history: Elasticsearch,** because neither Cassandra nor Redis does relevance-ranked text search.",
+              "**Systems of record for small relational data (users, servers, membership, permissions): Postgres or Vitess-sharded MySQL,** because it is joinable, transactional, and small.",
+              "**Keeping them in sync (the polyglot cost):** the message write goes to Cassandra as the source of truth, then a CDC/event stream (Kafka) fans it out to derived stores: an indexer consumes the stream and writes Elasticsearch, so search is eventually consistent and can lag a few seconds, acceptable. Presence never syncs to durable stores; it lives and dies in Redis.",
+              "Common wrong turn: serving recent-message reads, search, and presence all from one relational database, which either melts under write load or forces slow LIKE scans and hot-row contention. Each workload gets the store it deserves, and Kafka is the spine that keeps derived copies in sync.",
             ],
           },
         },
