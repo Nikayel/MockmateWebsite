@@ -601,6 +601,59 @@ return RFC 9457 structured errors with precise status codes so clients retry 5xx
 4xx.
 `.trim()
 
+const realtimeCommsTeach = `
+## "Real-time" is a menu, not a single choice
+
+You pick from short-poll, long-poll, SSE, WebSocket, and webhooks by four axes: latency, connection
+cost at your fan-out, direction of data flow, and delivery guarantee. Getting this right is mostly
+about not paying for a duplex, stateful connection when the workload is one-directional.
+
+**Short-polling**: the client re-requests every N seconds. Dead simple and fully stateless (any
+server can answer any poll), so it plays nicely with load balancers. The cost is wasted requests
+(most polls return nothing) and up to N seconds of latency. It fits low-urgency counters, like an
+unread badge that can lag a few seconds.
+
+**Long-polling**: the client makes a request and the server holds it open until there is data or a
+timeout, then the client immediately re-requests. This gets you near-real-time latency over plain
+HTTP that works through every proxy and firewall. The cost is that each waiting client ties up a
+connection and a server-side handler, and you must handle timeouts and reconnects carefully. It is
+the universal-compatibility fallback.
+
+**Server-Sent Events (SSE)**: one long-lived HTTP response over which the server streams events
+(\`text/event-stream\`). It is purpose-built for one-way server-to-client streaming: notifications,
+live feeds, and streaming LLM tokens. It has automatic reconnection and a \`Last-Event-ID\` for
+resume built into the browser \`EventSource\` API, and because it is plain HTTP it passes through
+proxies and CDNs easily. Limits: there is no client-to-server channel (the client uses normal
+requests for that), and on HTTP/1.1 browsers cap concurrent connections per domain (about 6), which
+HTTP/2 multiplexing relieves.
+
+**WebSocket**: after an HTTP upgrade you get a full-duplex TCP connection, so both sides can push at
+low latency. This is the right tool for genuinely bidirectional, low-latency work: chat, presence,
+collaborative editing, multiplayer. The costs are real: the connection is stateful, so scaling across
+many server nodes needs sticky sessions or, better, a pub/sub backbone (Redis, NATS, Kafka) so a
+message published on node A reaches a user connected to node B. You also own heartbeats (ping/pong)
+and reconnect/replay logic yourself.
+
+**Webhooks**: server-to-server HTTP callbacks. This is not browser delivery at all; it is how *your*
+server notifies *another* server of an event (Stripe calling your endpoint on \`payment.succeeded\`).
+Pair webhooks with retries, HMAC signing, and idempotency, because they will be redelivered.
+
+\`\`\`
+one-way, low urgency ....... short-poll
+one-way, near-real-time .... long-poll (fallback) / SSE (preferred)
+two-way, low latency ....... WebSocket
+server-to-server async ..... webhooks
+\`\`\`
+
+**Interview nuance:** the classic trap is reaching for WebSocket for everything. If the data flow is
+one-directional (a notifications feed, LLM tokens), SSE gives you the latency without the
+stateful-connection and sticky-session tax. Being able to say that out loud is the signal.
+
+Recap: choose by direction, latency, per-connection cost, and delivery guarantee: short-poll for lazy
+counters, long-poll as the universal fallback, SSE for one-way streaming, WebSocket for true duplex,
+and webhooks for server-to-server async.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1177,6 +1230,55 @@ export const systemDesignLevel1: DesignLevel = {
               "**p99 at depth:** serve pages from the per-user materialized Redis list (O(1) range reads by index/score), not by querying the tweet store with a deep scan. Deep scroll is just reading further into an in-memory ordered set. Cap page size and total scroll depth (older items fall out of the hot cache and are served from a colder store or cut off).",
               "**Errors:** RFC 9457 Problem Details with a correlation id, precise codes (429 with Retry-After for aggressive scrolling is common), and clients retry only 5xx/429. At this scale rate limiting is first-class, so client-side 429 handling is essential.",
               "Common wrong turn: offset pagination or re-ranking the entire timeline on every page (unstable and slow), or querying the source-of-truth tweet DB per page instead of a precomputed per-user timeline cache, which blows p99 at deep scroll.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-realtime-comms",
+          title: "Real-Time Delivery: Short-Poll, Long-Poll, SSE, WebSocket & Webhooks",
+          summary:
+            "Choose by direction, latency, per-connection cost, and delivery guarantee: SSE for one-way streaming, WebSocket for true duplex, webhooks for server-to-server.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["real-time", "api-design", "networking"],
+          teach: {
+            markdown: realtimeCommsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-realtime-comms-apply",
+            prompt:
+              "Choose a real-time delivery mechanism for three features (a chat app, a notifications bell, and streaming LLM tokens back to a browser) and justify each choice against short-poll, long-poll, SSE, WebSocket, and webhooks.",
+            thinkAbout: [
+              "Is the data flow one-directional server-to-client, or does the client also need to push at low latency?",
+              "What does each open connection cost at your fan-out, and how does that interact with load balancers and proxies?",
+              "What delivery guarantee does the feature need, and who reconnects and replays missed messages?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: browser clients, a stateless service tier behind an L7 load balancer, millions of concurrent users at peak.",
+              "**Chat app -> WebSocket.** Chat is genuinely bidirectional and latency-sensitive: users both send and receive constantly, and typing/presence indicators push both ways. Accept the costs: the connection is stateful, so scale it with a pub/sub backbone (Redis or NATS) rather than sticky sessions alone, so a message from a user on node A reaches a recipient on node B. Add heartbeats and client reconnect with replay of missed messages (each message carries a sequence id).",
+              "**Notifications bell -> SSE, with long-poll fallback.** The flow is one-directional server-to-client; the client never pushes over this channel. SSE gives near-real-time delivery, automatic reconnection, and `Last-Event-ID` resume, all over plain HTTP that traverses proxies and CDNs. WebSocket would be over-engineering: the stateful-connection tax for no bidirectional benefit. Long-poll is the fallback for old clients or hostile proxies.",
+              "**Streaming LLM tokens -> SSE.** Token streaming is strictly one-way, incremental, and resumable: exactly SSE's sweet spot, proxy-friendly with no duplex channel needed. This is why most LLM chat UIs stream over SSE. The user's prompt is a normal POST; the token stream comes back as SSE.",
+              "**Delivery and reconnect:** for the bell and LLM stream, SSE auto-reconnect plus event ids handle resume. For chat, you own reconnect and replay via sequence ids and the pub/sub backbone.",
+              "Common wrong turn: using WebSocket for the bell and the LLM stream. Both are one-directional, so SSE delivers the same latency without sticky sessions, per-connection state, and custom reconnect logic.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-realtime-comms-practice",
+            prompt:
+              "Design the real-time delivery for a live-sports scoreboard that pushes score updates to 5 million concurrent viewers during a World Cup final, where the update is one-way (server to client), viewers join and leave in huge waves, and a few seconds of staleness is acceptable but a server meltdown is not. Choose the mechanism and explain how you fan out to 5M connections.",
+            thinkAbout: [
+              "Why does one-way flow at 5M connections rule out the stateful duplex option?",
+              "How does publish-once-broadcast-many keep origin load at O(events) instead of O(viewers)?",
+              "What absorbs the reconnect stampede after a goal?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 5M concurrent browsers, strictly one-directional score pushes, seconds of staleness tolerable, massive join/leave waves at kickoff and goals.",
+              "**Mechanism: SSE, not WebSocket.** The flow is purely server-to-client, so SSE gives streaming updates with auto-reconnect and `Last-Event-ID` resume over plain HTTP, avoiding the stateful-duplex, sticky-session, and heartbeat costs of WebSocket at 5M connections. Because a few seconds of staleness is fine, you need cheap resilient fan-out, not per-viewer low latency.",
+              "**Fan-out architecture:** viewers do not connect to origin. They connect through a large fleet of edge/proxy nodes (or a CDN that supports streaming), each holding a share of the connections; at ~50k per node that is ~100 nodes. A score-update event is published once to a pub/sub backbone (Redis Cluster, NATS, or Kafka), and every edge node subscribes and broadcasts the same event down its held SSE connections. One publish fans out to millions of reads, so origin does O(events), not O(viewers).",
+              "**Join/leave waves:** SSE connections are cheap (a file descriptor plus a little memory on an event-loop server), so a goal-triggered reconnect stampede is absorbed by the horizontally scaled edge fleet, with jittered client reconnect to avoid a thundering herd. `Last-Event-ID` lets a reconnecting viewer resume without a gap.",
+              "**Meltdown protection:** rate-limit and shed at the edge (429/503 with Retry-After) so a reconnect storm cannot take down origin, and cache the latest score so a cold viewer gets current state immediately on connect.",
+              "Common wrong turn: WebSocket for a one-way scoreboard, paying the stateful-connection and sticky-session tax on 5M connections for a duplex channel nobody uses, or fanning out per-viewer from origin instead of publish-once-broadcast-many across an edge fleet.",
             ],
           },
         },
