@@ -177,6 +177,73 @@ Recap: Write NFRs as quantified, testable numbers (percentiles, nines, QPS), tak
 consistency stance, split read and write SLAs, and tie each NFR to the specific design lever it forces.
 `.trim()
 
+const coreEntitiesApiTeach = `
+## Two artifacts that anchor the whole design
+
+Once the problem is scoped, estimated, and its NFRs are set, the abstract problem becomes concrete in
+two artifacts: the core entities (the nouns your system stores) and the API sketch (the interface
+clients call). Doing these two before you draw any boxes anchors the whole design, because every
+service, cache, and datastore you add later exists to serve some entity through some endpoint.
+
+### Core entities: nouns, not schemas
+
+Core entities come straight from the nouns in your functional requirements. For a URL shortener, "users
+can create a short link" and "users can be redirected" give you the entity ShortLink, and if you support
+accounts, User. The discipline here is to list only the fields that matter for the design, not a fully
+normalized schema. A ShortLink needs \`code\` (the short slug), \`long_url\`, \`created_at\`, maybe
+\`owner_id\` and \`expires_at\`. It does not need you to enumerate every column and index up front; that
+is a rabbit hole that burns time and reveals nothing about your systems thinking. You are naming
+entities to establish the data model's shape, not writing a migration.
+
+**Interview nuance:** Resist fully normalizing the schema at this stage. Interviewers read a candidate
+who spends five minutes on third-normal-form column design as someone who cannot tell the load-bearing
+decisions from the details. Name the entity, list the three or four fields that drive the design (the
+ones that get indexed, sharded, or looked up), and move on.
+
+### The API sketch: one endpoint per requirement
+
+The API sketch is one endpoint per functional requirement, with request and response shapes concrete
+enough to reveal the data flow. For a URL shortener:
+
+\`\`\`
+POST /links
+  req:  { "long_url": "https://...", "custom_alias?": "promo" }
+  resp: { "code": "aZ3xK", "short_url": "https://sho.rt/aZ3xK" }
+  (idempotency-key header so retrying the same long_url is stable)
+
+GET /{code}
+  resp: 302 redirect, Location: <long_url>
+  (302 not 301, so you keep control of the link and can gather analytics;
+   301 is cached by browsers and you lose the redirect and the click data)
+\`\`\`
+
+The 301-versus-302 choice is a classic probe: 301 (permanent) is cached hard by browsers and CDNs,
+which is great for read latency but means the browser stops asking your service, so you lose click
+analytics and can never repoint the link. 302 (temporary) keeps every redirect flowing through you.
+Most shorteners choose 302 to retain control and analytics, accepting the extra request. Knowing that
+tradeoff is the point.
+
+### Choose the protocol deliberately
+
+REST over HTTP is the right default for a public-facing API: it is cacheable, universally understood,
+and works through any client. Use gRPC for internal service-to-service calls where you control both
+ends and want lower latency and typed contracts (a Protobuf schema, binary framing, HTTP/2
+multiplexing). Use a streaming protocol (WebSocket, Server-Sent Events, or gRPC streaming) when the
+server must push, like a live location feed or a chat. State which and why: "REST for the public create
+and redirect endpoints, gRPC between the API gateway and the internal link service."
+
+Two boundary concerns belong in the API sketch because they are easy to forget and interviewers look
+for them. **Idempotency:** for creates, an idempotency key makes retries safe (the client can retry a
+timed-out \`POST /links\` without creating duplicate codes for the same URL). **Pagination and auth:**
+any endpoint returning a list needs cursor-based pagination (\`?cursor=...&limit=25\`), and any write or
+private read needs an auth token at the boundary. Mentioning where these live shows you have designed
+real APIs, not just toy ones.
+
+Recap: Turn requirement nouns into entities with only the design-relevant fields, define one endpoint
+per requirement with concrete request/response shapes, choose REST vs gRPC vs streaming deliberately,
+and place idempotency, pagination, and auth at the boundary.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -339,6 +406,57 @@ export const systemDesignLevel0: DesignLevel = {
               "**99.99%+ availability with a full audit trail.** Forces multi-region active-passive failover (not active-active, to preserve a single source of truth for consistency) plus an append-only ledger of every state transition for compliance and reconciliation.",
               "Name the contrast explicitly: a feed favors availability and eventual consistency because stale data is harmless, so it fans out asynchronously and caches aggressively. Payments favor consistency and durability because incorrect data is catastrophic, so they use synchronous transactional writes, idempotency, and an immutable ledger, accepting higher latency to get there.",
               "Common wrong turn: importing feed habits (aggressive caching, eventual consistency, fire-and-forget writes) into a money path, or promising strong consistency and active-active availability at once without saying what a partition does to charges.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-core-entities-api",
+          title: "Core Entities & the API Sketch",
+          summary:
+            "Turn requirement nouns into design-relevant entities and one endpoint per requirement, with protocol, idempotency, and auth chosen deliberately.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["api-design", "data-modeling"],
+          teach: {
+            markdown: coreEntitiesApiTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-core-entities-api-apply",
+            prompt:
+              "Define the core entities and the REST/RPC endpoints (create, redirect) for a URL shortener with request/response shapes, and note where you would choose REST vs gRPC vs a stream.",
+            thinkAbout: [
+              "Which nouns in the requirements become entities, and which fields actually matter?",
+              "What is the minimal endpoint set, one per functional requirement?",
+              "Where do idempotency keys, pagination, and auth belong at the boundary?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: two functional requirements, create a short link and redirect from a short code, with optional user accounts and custom aliases. That gives two core entities.",
+              "**Entities with design-relevant fields only.** ShortLink: `code` (PK, the short slug, indexed for O(1) lookup), `long_url`, nullable `owner_id`, `created_at`, optional `expires_at`. User (only if accounts are in scope): id, email, created_at. Deliberately no further normalization; `code` is the field that matters because it is the sharding and lookup key.",
+              "**`POST /links` (create).** Headers: Authorization, Idempotency-Key. Request { long_url, custom_alias?, expires_at? }, response 201 { code, short_url }. The idempotency key means a client retrying a timed-out request gets the same code back instead of minting a duplicate; server-side the key maps to the created link for a short window.",
+              "**`GET /{code}` (redirect).** Responds 302 Found with Location: long_url (404 if missing, 410 if expired). Choose 302 over 301 so every click flows through the service, preserving analytics and the ability to repoint or expire links, accepting one extra hop per redirect. 301 is cached hard by browsers and CDNs, so you lose the click data and control.",
+              "**`GET /links?cursor=...&limit=25`** for listing a user's links: needs auth and cursor-based pagination.",
+              "**Protocol choice with reasons.** REST over HTTPS for the public create and redirect endpoints (clients are browsers and arbitrary HTTP callers; cacheable, universal). gRPC internally between the API gateway and the link service for lower latency and typed Protobuf contracts. No streaming needed; nothing is pushed. Auth (bearer token) sits at the gateway for writes and private reads; the public redirect needs none.",
+              "Common wrong turn: fully normalizing the schema with a dozen columns and indexes, or forgetting idempotency and the 301 vs 302 decision, which are exactly what a senior interviewer probes.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-core-entities-api-practice",
+            prompt:
+              "Sketch the core entities and the API for requesting a ride and streaming live driver location to the rider in a ride-hailing app like Lyft. Specify where you use REST, where you use a streaming protocol, and why.",
+            thinkAbout: [
+              "Which fields on Ride and Driver actually drive the design (state machine, location freshness, matching keys)?",
+              "Which interaction is request/response and which is a continuous server push, and what protocol fits each?",
+              "Where does an idempotency key protect the rider from double-charging over a flaky mobile network?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the flow in scope is a rider requests a ride, gets matched to a driver, and watches the driver approach on a live map.",
+              "**Entities with only the design-driving fields.** Ride: id (PK), rider_id, nullable driver_id (null until matched), `status` enum(requested, matched, enroute, arrived, completed, cancelled), pickup {lat, lng}, dropoff {lat, lng}, requested_at. Driver: id, status (available/ontrip), current_location {lat, lng}, updated_at. The `status` state machine governs the flow; `current_location` updates every few seconds.",
+              "**REST for the transactional flow.** `POST /rides` with Authorization and Idempotency-Key headers, request { pickup, dropoff }, response 201 { ride_id, status: requested }; `GET /rides/{id}` for current status and matched driver. The idempotency key matters: a rider double-tapping request on a flaky mobile network must not create two rides or two charges.",
+              "**Streaming for live driver location.** The server must push a new position every 4 to 5 seconds; polling `GET /rides/{id}` every second would be wasteful and laggy at scale. Open a WebSocket (or SSE) after matching: `WS /rides/{id}/track` pushing { driver_location, eta_seconds } every ~4s.",
+              "**Behind the scenes:** drivers publish location updates into a geospatial index (Redis with geohashing); a location service pushes the matched driver's position down the rider's WebSocket. Internal services talk gRPC for the low-latency matching and location calls.",
+              "The split, stated as a rule: REST for one-shot transactional actions (create, status, cancel) where request/response fits and idempotency protects money movement; a streaming protocol for continuous server push where polling would not scale.",
+              "Common wrong turn: serving live location over repeated REST polls (wastes QPS, choppy map), or opening a WebSocket for the one-shot ride request where plain REST is simpler and cacheable at the edge.",
             ],
           },
         },
