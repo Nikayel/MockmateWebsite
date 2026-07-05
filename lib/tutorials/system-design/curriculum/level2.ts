@@ -297,6 +297,70 @@ leftmost-prefix rule, make it covering when a hot query justifies the width, and
 taxes every write.
 `.trim()
 
+const physicalStorageWalTeach = `
+## What commit actually guarantees, and why it is fast
+
+This lesson connects the abstractions above to real latency and durability by following data down to
+the metal.
+
+### Pages
+
+Databases do not read or write individual rows from disk; they move fixed-size **pages** (Postgres
+8KB, InnoDB 16KB). A page holds many rows plus a header and a slot directory. This is why row layout
+matters: a **row-oriented** page stores whole rows together, great for "give me this order" (OLTP); a
+**column-oriented** layout stores each column contiguously across rows, great for "sum revenue over
+10M rows" (OLAP) because you read only the columns you need and they compress extremely well.
+
+### Buffer pool
+
+The database keeps hot pages in an in-memory **buffer pool** (the biggest knob in most databases,
+e.g. InnoDB \`innodb_buffer_pool_size\`). Reads check the buffer pool first; a hit is a memory
+access, a miss is a disk read that pulls the page in and evicts a cold one (usually via an LRU
+variant). Writes modify the page **in the buffer pool**, marking it **dirty**. Dirty pages are not
+written to their data-file home immediately; they are flushed later, in batches, at a **checkpoint**.
+This is what lets a database absorb many writes to the same hot page as one eventual disk write.
+
+Which raises the durability problem: if a committed change lives only as a dirty page in volatile
+memory, a crash loses it. The fix is the **write-ahead log (WAL)**.
+
+### WAL
+
+Before a change is considered committed, the database appends a small **redo record** describing the
+change to the WAL and forces it to stable storage with **fsync**. The rule is "log before data": the
+WAL record hits disk before the corresponding data page does. Because the WAL is written
+**sequentially** (append-only), this is fast even though a fsync is still the single slowest thing in
+the commit path. On crash recovery the database replays WAL records after the last checkpoint to
+reconstruct any dirty pages that were lost, which is why a committed transaction survives a crash
+even though its data page never reached disk before the failure.
+
+**Interview nuance:** the number that drives all of this is that **sequential I/O is roughly 100x
+faster than random I/O** on spinning disks, and still meaningfully faster on SSDs (which also suffer
+write amplification from random writes). This one fact explains why the WAL is a sequential append
+rather than random page writes, why LSM-trees win at writes, and why databases batch and checkpoint.
+To amortize the fsync cost, databases use **group commit**: many concurrent transactions' WAL records
+are batched into one fsync, so 500 commits can cost a handful of fsyncs instead of 500.
+
+**Interview nuance:** the OS **page cache** sits underneath the database, so a "disk write" from the
+DB may only reach the OS buffer, which is exactly why an explicit fsync (not just \`write()\`) is
+required for real durability. Also, compression happens at the page level, and column stores compress
+far better because adjacent values share a type and range.
+
+\`\`\`
+INSERT ... COMMIT
+  1. change row in a page inside the BUFFER POOL (RAM) -> page now dirty
+  2. append redo record to WAL buffer
+  3. COMMIT: fsync WAL to disk (sequential, group-committed)  <-- durability point
+  4. return success to client
+  ...later...
+  5. CHECKPOINT: flush dirty data pages to their home (random-ish)
+  crash before 5? replay WAL from last checkpoint to rebuild the page.
+\`\`\`
+
+Recap: writes land in in-memory pages in the buffer pool and are flushed lazily at checkpoints, while
+a sequentially-written, fsync'd WAL provides the actual durability and crash recovery, all of it
+shaped by the ~100x gap between sequential and random I/O.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -562,6 +626,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**customer_id:** occasional analyst use, not hot path. Use a partial index if most lookups target a subset (e.g. non-terminal charges), or scope it as (merchant_id, customer_id) so it stays cheap and tenant-local. If truly rare, index nothing and let it run as a scoped scan.",
               "**JSONB metadata: no broad GIN index by default.** GIN maintenance is expensive on a write-heavy table and metadata is high-cardinality and rarely filtered. If a specific key becomes a common filter, add a targeted expression index on just that extracted key (`(metadata->>'invoice_id')`), far cheaper than indexing the whole document.",
               "**The discipline:** every index taxes the write hot path. Index the one query that must be fast for every tenant, serve secondary patterns narrowly with partial and expression indexes, and refuse the broad 'index everything' reflex. The committed tradeoff: rare analyst queries pay with slower scoped scans so billions of daily writes and the interactive dashboard stay fast.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-physical-storage-wal",
+          title: "Physical Storage: Pages, Buffer Pool & WAL",
+          summary:
+            "Writes land in dirty buffer-pool pages flushed lazily at checkpoints; the fsync'd sequential WAL is the durability point and the crash-recovery source.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["storage", "wal", "durability"],
+          teach: {
+            markdown: physicalStorageWalTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-physical-storage-wal-apply",
+            prompt:
+              "Explain what physically happens on disk and in memory when a row is inserted and the transaction commits.",
+            thinkAbout: [
+              "What is the role of the buffer pool and dirty-page flushing?",
+              "Why does the WAL give durability and enable crash recovery?",
+              "Why is the 100x gap between sequential and random I/O a design driver?",
+            ],
+            modelAnswerOutline: [
+              "Assume a row-store OLTP database like Postgres or InnoDB, following `INSERT ...; COMMIT`.",
+              "**First:** the engine locates the target page (8KB or 16KB) for the new row. If not resident, it is read from disk into the buffer pool, possibly evicting a cold page. The row is written into the page *in memory* and the page is marked dirty. Nothing has touched the data file on disk yet.",
+              "**Second, the durability point:** before the commit can return, the engine appends a redo record describing this insert to the write-ahead log and calls fsync to force the WAL to stable storage. The WAL write is a sequential append, which is why it is cheap relative to a random write, and multiple concurrent commits are batched into one fsync via group commit. Once the WAL is fsync'd, the transaction is durable and success returns to the client.",
+              "**Third, asynchronously:** the dirty data page is eventually flushed to its home location at a checkpoint, along with other accumulated dirty pages. This flush is more random and is deliberately deferred and batched so many updates to the same hot page collapse into one physical write.",
+              "**Crash recovery ties it together:** if the machine dies after the WAL fsync but before the checkpoint flush, the data page is gone, but on restart the engine replays WAL records since the last checkpoint and reconstructs it. The guarantee is precise: commit means the WAL record is fsync'd, not that the data page is on disk.",
+              "**Why this structure:** the roughly 100x advantage of sequential over random I/O. Making durability depend on a sequential WAL append rather than a random data-page write is what lets a database commit thousands of transactions per second while surviving power loss.",
+              "Common wrong turn: claiming the insert is durable once it is in the buffer pool, or once `write()` returns, forgetting that the buffer pool is volatile and the OS page cache means only an fsync'd WAL is truly safe.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-physical-storage-wal-practice",
+            prompt:
+              "Explain the durability and latency tradeoffs when a payments service commits at 20,000 write transactions/sec on a single Postgres primary, and choose settings for synchronous_commit, group commit, and synchronous replication. Justify where you would relax durability and where you would not.",
+            thinkAbout: [
+              "What is the binding physical constraint at 20K write TPS, and what amortizes it?",
+              "Which writes on this system can tolerate losing the last few milliseconds on a crash?",
+              "What does a synchronous standby add beyond a local fsync, and what does it cost?",
+            ],
+            modelAnswerOutline: [
+              "At 20K write TPS the fsync on the WAL is the binding constraint: a single fsync costs tens of microseconds to a few milliseconds depending on the device, and one per transaction serially would cap throughput well below target. The design is about batching fsyncs without lying about durability.",
+              "**Payment transactions: `synchronous_commit = on`, full stop.** Money movement must be durable before the API returns success. Lean on group commit (`commit_delay` / `commit_siblings`) so under high concurrency hundreds of in-flight commits share a single fsync: the key move that preserves per-transaction durability while amortizing the expensive fsync, which is how you hit 20K TPS without 20K fsyncs.",
+              "**Non-critical writes on the same system** (audit-log rows, analytics events where losing the last few milliseconds on a crash is acceptable): set `synchronous_commit = off` per-transaction, letting those commits return before the WAL fsync. Never for the ledger.",
+              "**Replication:** run a synchronous standby (`synchronous_commit = remote_write` or `remote_apply`) so a committed payment survives loss of the primary, not just a local fsync. The cost is a network round trip on every commit, so place the sync standby region-local/AZ-adjacent to keep it under a couple of milliseconds, and keep additional replicas asynchronous.",
+              "**The committed tradeoff:** money transactions pay full local-plus-remote durability and accept the latency; group commit keeps per-transaction fsync cost low enough for 20K TPS; only genuinely disposable writes relax synchronous_commit.",
+              "Common wrong turn: globally disabling synchronous_commit to hit the throughput number, silently making the ledger lose committed payments on a crash.",
             ],
           },
         },
