@@ -279,6 +279,70 @@ per-stream reliability over UDP plus connection migration, so use H3 at the loss
 keep stable internal RPC on H2/gRPC.
 `.trim()
 
+const requestLifecycleTeach = `
+## What happens when you hit enter
+
+This is the integrative lesson: "what happens when you type a URL and hit enter" for a signed-in user
+loading a dynamic page. Everything from the previous five lessons appears as one hop in this chain.
+The skill is naming every hop, the RTT it adds, the cache that can short-circuit it, and how it can
+fail.
+
+The path, top to bottom:
+
+\`\`\`
+Browser cache/SW  ->  DNS  ->  TCP  ->  TLS  ->  [CDN/anycast POP -> WAF -> LB -> reverse proxy/API gateway]
+   ->  app server  ->  auth  ->  app cache (Redis)  ->  database / downstream services
+   ->  response: serialize -> compress -> cache headers -> CDN fill -> client render
+\`\`\`
+
+Walk it:
+
+1. **Browser cache / service worker**: before any network, the browser checks its own cache. A fresh
+   cached response short-circuits the entire chain (0 RTT). This is the cheapest possible hit.
+2. **DNS**: resolve the hostname. Cached at browser/OS/resolver, so usually 0 RTT; on a cold miss, a
+   resolver walk adds one or more RTTs.
+3. **TCP**: 3-way handshake, ~1 RTT. Reused/pooled connections skip this.
+4. **TLS**: ~1 RTT for TLS 1.3 (0-RTT on resumption). So a cold HTTPS connection is roughly 2 RTTs
+   before the first request byte.
+5. **Edge: CDN/anycast POP**: anycast routes you to the nearest POP. For static or cacheable content,
+   a **CDN hit returns here** without ever touching origin, the biggest short-circuit after the
+   browser cache. A miss makes the POP fetch from origin (CDN fill) and cache it.
+6. **WAF**: inspects for attacks (SQLi, XSS, bot patterns); can block before origin.
+7. **Load balancer -> reverse proxy / API gateway**: L4 then L7; the gateway does routing, auth
+   offload, rate limiting.
+8. **App server**: now real work. **Auth** (validate the session/JWT). Then business logic.
+9. **App cache (Redis/Memcached)**: before hitting the database, check the cache. A **hit** returns
+   in ~1ms and skips the DB. A **miss** falls through to the database (read-through), then populates
+   the cache.
+10. **Database / downstream services**: the authoritative read/write, plus any fan-out to other
+    microservices (each its own network hop with its own timeout).
+11. **Response path**: serialize (JSON/Protobuf), compress (gzip/brotli), set **cache headers**
+    (Cache-Control, ETag) that decide what the browser and CDN may cache next time, the CDN fills its
+    cache on the way out, and the client renders.
+
+### Hit versus miss is the whole game
+
+On a warm path (browser cache fresh, or CDN hit, or Redis hit) most hops are skipped and you answer
+in single-digit ms. On a full cold miss (cold DNS, new connection, CDN miss, Redis miss) you pay
+every RTT plus the DB query, easily hundreds of ms.
+
+**Interview nuance:** for a **signed-in user on a dynamic page**, the CDN usually cannot cache the
+personalized HTML, so the browser cache and the app-tier Redis cache do the heavy lifting, and the
+CDN mostly accelerates static assets and terminates TLS near the user. Say this; it is the
+distinction between caching a public marketing page and a logged-in dashboard.
+
+Failure points and timeouts, per hop: DNS resolution timeout, TCP connect timeout, TLS handshake
+failure (expired cert), LB/gateway 502/503/504 when a backend is down or slow, app-to-DB query
+timeout, and downstream-service timeouts that need circuit breakers so one slow dependency does not
+cascade. Every hop needs a bounded timeout and a fallback, or a single slow dependency stalls the
+whole request.
+
+Recap: a request walks browser cache -> DNS -> TCP -> TLS -> CDN/WAF/LB/gateway -> app -> auth -> app
+cache -> DB/downstream and back through serialize/compress/cache-header/render, where each layer adds
+an RTT and offers a cache that can short-circuit the rest, and every hop needs its own timeout so one
+slow dependency cannot stall the whole path.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -539,6 +603,58 @@ export const systemDesignLevel1: DesignLevel = {
               "**Internal matchmaking and game services: H2/gRPC.** Contract-first Protobuf RPC on a stable, low-loss datacenter network. Exactly where NOT to use H3: the loss-resilience and migration benefits do not apply on a clean internal link, and H3's user-space congestion control just adds CPU and operational complexity.",
               "**Tradeoff:** H3 on mobile buys survival of loss and network handoffs at the cost of UDP-middlebox risk (mitigated by fallback); H2/gRPC internally is the boring correct choice where H3 earns nothing.",
               "Common wrong turn: forcing H3 on internal services for consistency, paying its cost with none of its mobile-network benefit, or running reliable game events over plain UDP and then reinventing retransmission badly.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-request-lifecycle",
+          title: "End-to-End Request Lifecycle",
+          summary:
+            "Name every hop from browser cache to database and back, the RTT each adds, the cache that can short-circuit it, and the timeout that bounds it.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["request-lifecycle", "caching"],
+          teach: {
+            markdown: requestLifecycleTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-request-lifecycle-apply",
+            prompt:
+              "Trace a request from browser to database and back for a signed-in user hitting a dynamic page, naming every hop and the cache at each layer.",
+            thinkAbout: [
+              "What RTTs are added at each step from DNS through TLS to first byte?",
+              "Where can a cache short-circuit the path, and what changes on a hit vs miss?",
+              "What are the failure points and timeouts at each hop?",
+            ],
+            modelAnswerOutline: [
+              "Assume a signed-in user loading their dashboard at `https://app.example.com/dashboard`, dynamic and personalized, served from a CDN-fronted, multi-tier backend.",
+              "**1-4, getting connected:** browser cache / service worker first (0 RTT; personalized HTML usually not cacheable here, but static assets and prior API responses may be; a fresh hit ends the chain). DNS: usually cached (0 RTT), cold miss adds a resolver walk; failure mode is a resolution timeout. TCP: ~1 RTT handshake, skipped on a pooled connection; failure is a connect timeout. TLS 1.3: ~1 RTT (0-RTT on resumption), so cold is ~2 RTTs before the first request byte; failure is an expired cert.",
+              "**5-7, the edge:** CDN/anycast POP routes to the nearest POP and terminates TLS near the user. For this dynamic personalized page the CDN cannot cache the HTML, so it proxies to origin while still caching the page's static assets: the key point for a signed-in user. WAF inspects and can block early. LB (L4) then reverse proxy / API gateway (L7) do routing, rate limiting, auth offload; failure is 502/503/504 when backends are unhealthy.",
+              "**8-10, the app tier:** app server validates the session token/JWT (failure: 401), then checks the app cache (Redis) before the DB. Hit: ~1ms, skip the DB. Miss: query the DB, then populate Redis (read-through). This cache is the real short-circuit for a logged-in user. The database plus downstream services are the authoritative read and fan-out, each hop with its own timeout and ideally a circuit breaker.",
+              "**11, the response path:** serialize (JSON), compress (brotli), set Cache-Control/ETag so the browser can revalidate cheaply next time, CDN fills static assets, client renders.",
+              "**Hit vs miss:** a warm path (reused connection plus Redis hit) answers in single-digit ms; a cold path (new connection, Redis miss, DB plus fan-out) is hundreds of ms.",
+              "Common wrong turn: assuming the CDN caches the signed-in HTML. It generally cannot; the browser cache and Redis do the caching, and the CDN's job is TLS termination near the user and static-asset acceleration. Also: forgetting per-hop timeouts, so one slow downstream stalls the whole request.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-request-lifecycle-practice",
+            prompt:
+              "Trace and optimize the request lifecycle for an Amazon-style product page under a Black Friday spike (200k RPS, 60% signed-in) where p99 must stay under 300ms. Name each hop's cache, say what you cache versus what you cannot, and identify the two hops most likely to be your bottleneck.",
+            thinkAbout: [
+              "How do you split the page between shared cacheable data and per-user data?",
+              "What does a hot doorbuster product do to a single cache key, and how do you defend?",
+              "Which hop absorbs the connection-setup flood at 200k RPS?",
+            ],
+            modelAnswerOutline: [
+              "Assume a product detail page: mostly-shared product data (title, images, price, description) plus a personalized strip (cart, recommendations, 'buy again'). Split the page by cacheability; that split is what makes 200k RPS at p99 under 300ms possible.",
+              "**Browser cache / CDN:** shared product data and all static assets cached aggressively at the CDN with a short TTL plus stale-while-revalidate, so the vast majority of product-data reads never reach origin. At 200k RPS the CDN absorbing the shared load is the only way to survive. Edge-cache the product HTML fragment or serve a cacheable shell and hydrate the personalized parts client-side.",
+              "**Personalized strip (60% signed-in):** cannot be CDN-cached (per-user). Fetched via a separate API call and served from an app-tier Redis cache keyed per user, with the cart in Redis and recommendations precomputed offline and cached. Redis hit ~1ms; the DB only on miss.",
+              "**Database:** authoritative product and inventory data behind Redis (read-through) and read replicas; writes (inventory decrement) go to the primary.",
+              "**Bottleneck 1: the database on cache misses / hot keys.** A doorbuster product is a single cache key every request wants; a miss or expiry causes a thundering herd. Defend with request coalescing (single-flight so one miss repopulates while others wait), jittered TTLs, and pre-warming hot products. Inventory decrement is a write hot spot: atomic Redis counters or a dedicated inventory service, not a row lock.",
+              "**Bottleneck 2: TLS/connection setup at the edge.** 200k RPS of new mobile connections is a handshake flood: keep connections warm/pooled, terminate TLS at the POP with session resumption, and use H2/H3 multiplexing so one connection carries many requests.",
+              "**Holding p99 under 300ms:** shared data from the edge, Redis with herd protection for personalized data, aggressive connection reuse, per-hop timeouts with circuit breakers so a slow recommendations service degrades to a generic strip instead of stalling the page, and graceful degradation (show the product even if recs are slow).",
+              "Common wrong turn: trying to cache the whole personalized page at the CDN (impossible for signed-in users) instead of splitting cacheable shared data from per-user data, or ignoring the hot-key thundering herd a single doorbuster creates.",
             ],
           },
         },
