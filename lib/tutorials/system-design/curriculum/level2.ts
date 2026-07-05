@@ -603,6 +603,66 @@ index-free adjacency that keeps traversal cost local; recursive SQL joins explod
 is horizontal scaling.
 `.trim()
 
+const timeSeriesTeach = `
+## Time is the primary axis
+
+A time-series database (TSDB) is specialized for a distinct workload: **append-heavy, time-ordered
+writes** of measurements, where **time is the primary axis** of both storage and query. Metrics and
+monitoring (Prometheus), IoT sensor data (InfluxDB, TimescaleDB), observability, financial ticks, and
+anything that is fundamentally "value at timestamp, tagged by source" fits. Writes almost always
+append at the current time (you rarely update the past), reads are overwhelmingly **range scans**
+("CPU for host X over the last hour"), and old data is queried less and less as it ages.
+
+### Why not just use Postgres?
+
+You can start there, but three properties of the workload make a purpose-built engine win at scale.
+
+**1. Columnar storage + specialized compression.** A time series is a column of numbers with
+regularly spaced timestamps, which compresses extraordinarily well stored column-wise.
+**Delta-of-delta** encoding on timestamps: if points arrive every 10 seconds, the delta is constant
+and the delta-of-delta is 0, packing to almost nothing. **Gorilla / XOR** compression on values
+(Facebook's Gorilla paper): consecutive float values are often close, so XORing them leaves mostly
+zero bits. Together these routinely hit **10x or better** compression versus row storage, the
+difference between affordable and ruinous at millions of points per second.
+
+**2. Time-partitioned storage and retention.** Data is written into **time-bucketed partitions**
+(chunks by day or hour). Range queries touch only the relevant chunks, dropping old data is an O(1)
+partition drop instead of a mass DELETE, and tiering puts recent hot data on fast SSD, warm data on
+cheaper disk, and ancient data downsampled or in object storage.
+
+**3. Downsampling and rollups.** You do not keep raw per-second points forever. **Retention
+policies** plus **rollups** keep raw data for, say, 7 days, 1-minute aggregates for 30 days, and
+1-hour aggregates for 2 years. A dashboard showing last-year trends reads the cheap hourly rollup,
+not billions of raw points.
+
+### The signature failure mode: cardinality explosion
+
+This is the single thing interviewers test. A time series is identified by its metric name plus its
+**set of tag/label key-value pairs**: \`http_requests{host, region, status, endpoint, user_id}\`.
+The number of distinct series is the **product** of the distinct values of every tag. Add a
+high-cardinality tag like \`user_id\` (millions of values) or \`request_id\` (unbounded) and you
+multiply your series count into the millions or billions. Each distinct series needs its own index
+entry and storage stream, so cardinality explosion blows up index memory, slows every query, and can
+OOM the database. Prometheus falling over because someone added a \`user_id\` label is a real, common
+outage.
+
+**Controlling cardinality** is the core design skill: keep labels **low-cardinality and bounded**
+(host, region, status code, endpoint template), never put unbounded identifiers (user id, request id,
+full URL with query params, email) into labels. If you need per-user analytics, that belongs in an
+OLAP store (ClickHouse) or logs, not in a metrics TSDB. Use endpoint **templates** (\`/users/:id\`)
+not raw paths.
+
+**Interview nuance:** Know the landscape. **Prometheus** is pull-based metrics with its own TSDB,
+great for infra monitoring, not for long-term high-cardinality analytics. **InfluxDB / TimescaleDB**
+(the latter is Postgres with time-series superpowers, so you keep SQL and joins) are general TSDBs.
+**ClickHouse** is a columnar OLAP database often used for high-cardinality, high-volume time-series
+analytics where you need arbitrary group-bys that would kill a label-indexed TSDB.
+
+Recap: TSDBs exploit append-only, time-ordered, columnar data with delta-of-delta and Gorilla
+compression, time-partitioning, retention tiers, and downsampling to make metrics affordable, and the
+failure mode you must design against is cardinality explosion from unbounded tags.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1125,6 +1185,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Query:** on a new transaction, traverse 3 to 4 hops from the transaction's entities looking for a path to any `:Flagged` node or structural red flags (a device linked to more than K accounts): `MATCH (t)-[*1..4]-(bad:Flagged) RETURN bad LIMIT 1`, plus fan-out checks. Index-free adjacency keeps this touching only the transaction's local neighborhood.",
               "**Meeting the budget despite scaling limits: split the work.** A live 4-hop traversal per transaction at 10k TPS is where the graph database's horizontal-scaling weakness bites (cross-partition hops and contention blow 100ms). Offline/near-real-time, a graph-processing job continuously computes connected components and risk scores and materializes 'distance-to-known-fraud' and 'cluster risk' scores onto each entity node. In the hot path, the decision becomes a cheap lookup of the precomputed scores of the transaction's 4-5 directly involved entities plus a shallow 1-2 hop live check, fitting sub-100ms. New edges feed the next incremental recompute.",
               "The senior move: use the graph engine's traversal strength offline to precompute, keep the synchronous 10k-TPS path to a bounded shallow lookup. Common wrong turn: a full 4-hop live traversal per transaction, correct but unable to hold the latency budget at scale given graph sharding limits.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-time-series",
+          title: "Time-Series Databases",
+          summary:
+            "Exploit append-only time-ordered data with columnar compression, time-partitioning, and downsampling tiers, and design against cardinality explosion from unbounded tags.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["time-series", "metrics", "cardinality"],
+          teach: {
+            markdown: timeSeriesTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-time-series-apply",
+            prompt:
+              "Design storage for a metrics/monitoring system ingesting millions of points/sec with fast recent-range queries and cheap long-term retention.",
+            thinkAbout: [
+              "Why is cardinality explosion the key failure mode?",
+              "How do downsampling and retention tiers bound cost?",
+              "Why is columnar + delta-of-delta compression a good fit?",
+            ],
+            modelAnswerOutline: [
+              "Assume a fleet-monitoring system ingesting ~2M points/sec, dashboards querying the last hour heavily and last year occasionally, and 2 years of affordable retention required.",
+              "**Data model:** each point is `metric_name{labels} -> (timestamp, value)`. Labels are strictly low-cardinality and bounded: host, region, service, status_code, endpoint_template. Unbounded labels (user_id, request_id, raw URL) are explicitly forbidden because series count is the product of label cardinalities, and one unbounded label explodes it into millions of series that OOM the index. Per-user needs go to an OLAP store or logs.",
+              "**Storage engine:** a purpose-built TSDB (Prometheus plus a long-term store like Thanos/Mimir, or InfluxDB/TimescaleDB). Data is columnar, compressed with delta-of-delta on timestamps (near-zero for regular intervals) and Gorilla/XOR on values, yielding 10x+ compression: what makes 2M points/sec economical.",
+              "**Time-partitioning:** write into time-bucketed chunks (2-hour or daily blocks). Recent-range queries touch only current chunks; dropping expired data is a cheap partition drop, not a mass DELETE.",
+              "**Retention tiers + downsampling:** raw resolution for 7 days (hot, SSD), 1-minute rollups for 30 days (warm), 1-hour rollups for 2 years (cold, cheap disk or object storage). A 'last hour' dashboard reads raw; a 'last year' trend reads hourly rollups, so query cost is bounded by resolution, not raw volume. Rollups are precomputed continuously (recording rules / continuous aggregates).",
+              "**Query path:** recent-range queries hit hot chunks at raw resolution in tens of ms; long-range queries transparently read the rollup tier. Ingest is decoupled with a remote-write buffer so a query spike never backs up ingestion.",
+              "Common wrong turn: allowing high-cardinality labels ('tag by user for flexibility'), quietly growing series count until the index OOMs, or keeping raw points forever, blowing up long-range queries and storage cost. The fix to both is bounded labels plus downsampling and retention tiers.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-time-series-practice",
+            prompt:
+              "Design the time-series storage for Datadog-style multi-tenant observability ingesting 20M points/sec across thousands of customers, where any one customer can accidentally emit a runaway high-cardinality metric that must not degrade other tenants. Explain your ingestion, cardinality guardrails, and how you isolate a noisy tenant.",
+            thinkAbout: [
+              "Where in the pipeline do you enforce cardinality limits so a runaway never reaches the index?",
+              "What makes cardinality an isolation boundary rather than just a performance concern in multi-tenant?",
+              "How do per-tenant quotas cover ingest, series count, and query cost?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 20M points/sec, thousands of tenants, per-tenant isolation required, dashboards over minutes-to-months, and the certainty that some customer will emit a metric tagged by request_id or pod_uid and explode cardinality.",
+              "**Ingestion:** a horizontally scaled write path fronted by Kafka: agents remote-write to a stateless ingestion tier that validates, then produces to Kafka partitioned by (tenant_id, metric). Kafka absorbs bursts and decouples ingest from storage so a storage hiccup never drops customer data. Consumers write into a columnar TSDB (Mimir/Cortex-style) with delta-of-delta + Gorilla compression and time-bucketed blocks in object storage (S3) for cheap long-term retention, SSD for hot.",
+              "**Cardinality guardrails (the crux):** enforce a per-tenant active-series limit and per-metric label-cardinality limits at ingest. When a tenant's series count crosses a threshold, reject or drop the offending high-cardinality label (or the metric) and surface a 'cardinality limit exceeded' warning in their UI rather than accepting it. Detect the usual culprits (UUID-looking label values, unbounded growth) and auto-quarantine. This is the difference between a runaway metric being one customer's dashboard problem versus a cluster-wide OOM.",
+              "**Tenant isolation:** every write and query carries tenant_id; storage blocks and index are partitioned per tenant so one tenant's cardinality never shares an index with another's. Per-tenant quotas cover ingest rate, active series, and query concurrency/cost, so a noisy tenant hits their own limit first; an expensive year-long high-resolution query is throttled, not allowed to starve others.",
+              "**Downsampling/retention** is per-tenant policy: raw for days, rollups for months to years, all in S3 tiers.",
+              "Common wrong turn: a shared global index with no per-tenant cardinality caps: the first customer to tag by pod_uid takes down everyone. The senior insight: in a multi-tenant TSDB, cardinality is a security/isolation boundary, not just a performance concern, so it must be quota-enforced per tenant at the ingest gate.",
             ],
           },
         },
