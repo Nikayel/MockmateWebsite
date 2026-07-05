@@ -654,6 +654,63 @@ throttles throughput, so at scale you either replicate the coordinator with cons
 sagas.
 `.trim()
 
+const sagasTeach = `
+## Local transactions, compensating undos
+
+When a business transaction spans services and 2PC is too blocking, the standard answer is a
+**saga**: a sequence of *local* transactions, one per service, where each step has a **compensating
+action** that semantically undoes it. There is no global lock and no global commit. You make forward
+progress step by step, and if a later step fails you run the compensations for the steps that already
+succeeded, in reverse. A saga gives you **atomicity of outcome** (fully done or fully undone) but
+crucially *not* isolation.
+
+### Orchestration vs choreography
+
+- **Orchestration:** a central orchestrator (a Temporal/Cadence workflow, an AWS Step Functions state
+  machine) explicitly calls step 1, step 2, step 3, and on failure invokes the compensations. Pros:
+  the flow lives in one place, easy to reason about, trace, and add timeouts/retries. Cons: the
+  orchestrator is a component you must run and make reliable.
+- **Choreography:** no central brain. Each service listens for events and reacts: Order emits
+  \`OrderCreated\`, Inventory reacts and emits \`InventoryReserved\`, Payment reacts, and so on.
+  Pros: highly decoupled. Cons: the end-to-end flow is *implicit*, scattered across services, hard to
+  trace and debug, especially for compensations. Cyclic event dependencies sneak in.
+
+Rule of thumb: choose **orchestration** for anything with more than a couple of steps, non-trivial
+compensation logic, or where on-call must be able to see "where is this order stuck?" Choose
+choreography only for short, simple, truly decoupled flows.
+
+### The interview-critical property: no isolation
+
+Between steps, intermediate states are *visible* to other transactions. In an order saga, inventory
+is reserved (visible) before payment succeeds; another request can observe "reserved but unpaid."
+This is a real anomaly a single ACID transaction would never expose. Manage it with
+**countermeasures**:
+
+- **Semantic lock:** mark a record with a pending/in-saga flag (order status \`PENDING\`) so others
+  treat it as tentative.
+- **Commutative updates:** design operations so order does not matter (increment/decrement rather
+  than absolute set).
+- **Reread / version check:** verify a version/state before compensating, so you compensate against
+  current reality, not a stale snapshot.
+
+### Compensations are their own hazard
+
+A compensation **must be idempotent** (it may be retried) and it **may itself fail**. "Un-charge a
+card" is fine as a refund, but "un-send an email" or "un-ship a package" is not truly reversible, so
+you compensate *semantically* (issue a recall, send an apology, restock on return). For compensations
+that fail: retries with backoff, a dead-letter queue, and ultimately operator escalation. This
+durability and retry machinery is exactly what Temporal / Step Functions give you for free.
+
+**Interview nuance:** the two things interviewers probe are (1) "sagas give atomicity but not
+isolation, what anomaly does that allow and how do you contain it?" and (2) "what happens when a
+compensation fails?" Concrete answers to both put you ahead of most candidates.
+
+Recap: a saga chains local transactions each with a compensating undo, coordinated centrally
+(orchestration, preferred for anything non-trivial) or via events (choreography); it guarantees the
+outcome is all-or-nothing but exposes intermediate state, so you add semantic locks and version
+checks, and make compensations idempotent with retries, DLQ, and escalation.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1223,6 +1280,56 @@ export const systemDesignLevel5: DesignLevel = {
               "**Locks and isolation:** participants still take write locks during prepare, but each shard's writes are replicated via its own consensus group, so a prepared state survives replica failure. Spanner adds TrueTime commit-wait to order transactions globally: a deliberate few-ms wait for clock uncertainty.",
               "**Where the latency goes:** a multi-shard commit pays one WAN round trip for prepare to reach each participant leader, a Raft majority-replication round trip inside each shard to make prepare durable, then the commit phase and its replication. Cross-region, each consensus round trip is tens of ms, so a global multi-shard write is often 50-150 ms versus sub-millisecond for a single-shard local write. The price of strict serializability at global scale.",
               "**The tradeoff:** atomic, strongly-consistent, non-blocking distributed transactions, paying extra WAN round trips and consensus replication on every distributed commit. The wrong turn: assuming Spanner 'solved' 2PC for free. It made every role consensus-backed and accepted higher commit latency, which is why architects keep transactions single-shard whenever possible.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-sagas",
+          title: "Sagas: Orchestration vs Choreography & Compensation",
+          summary:
+            "Chain local transactions with compensating undos: atomicity of outcome without isolation, contained by semantic locks, with idempotent compensations backed by retries and a DLQ.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["saga", "compensation", "orchestration"],
+          teach: {
+            markdown: sagasTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l5-sagas-apply",
+            prompt:
+              "Design an order-checkout saga that reserves inventory, charges payment, and books shipping across three services, with compensations, and specify the exact behavior when payment fails after inventory has already been reserved.",
+            thinkAbout: [
+              "What does a saga give (atomicity of outcome) and NOT give (isolation)?",
+              "Orchestration vs choreography: which do you pick and why?",
+              "How do you handle non-idempotent or failing compensations?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: three services (Inventory, Payment, Shipping), each with its own database; the checkout must not double-charge, must not sell inventory it cannot ship, and must release held stock on failure. Strict cross-service ACID is off the table.",
+              "**Coordination: orchestration** with a durable workflow engine (Temporal or Step Functions). Checkout has multiple steps, real compensation logic, and on-call needs 'where is this order?' A central orchestrator makes the flow explicit with built-in retries, timeouts, and durable state. Choreography would scatter this across event handlers and make the failure path hard to trace.",
+              "**Forward path:** (1) Inventory reserves the items (local txn, stock marked reserved for this order); (2) Payment charges the card (local txn with an idempotency key so retries do not double-charge); (3) Shipping books the delivery. Each step commits locally; the orchestrator advances on success.",
+              "**The specified failure, payment fails after inventory reserved:** the orchestrator catches it and runs compensation for the one completed step: Inventory.release(orderId) un-reserves the stock, and the order is marked FAILED. Payment never succeeded, so nothing to refund. The compensation is idempotent (releasing an already-released reservation is a no-op keyed on orderId), so a retry is safe.",
+              "**The missing isolation:** between step 1 and the failure, inventory is reserved-but-unpaid and visible. Contain it with a semantic lock: the order sits in PENDING, the reservation is explicitly a hold with a TTL, not a sale; a stalled saga auto-releases via the TTL so stock is not stranded, and availability counts treat reserved-pending as tentative.",
+              "**Failing / non-reversible compensations:** if Inventory.release fails, retry with backoff; persistent failure goes to a DLQ and pages an operator, with durable workflow state guaranteeing the owed release is never forgotten. Refunds are semantic compensations (idempotent by key). Shipping, once a label prints, may not be reversible, so its compensation is a cancellation/recall, and charge-then-ship sequencing ensures shipping never precedes cleared payment.",
+              "Common wrong turn: treating the saga as if it had isolation (exposing reserved-but-unpaid inventory as sold), or ignoring that a compensation can fail with no retry/DLQ/escalation path.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-sagas-practice",
+            prompt:
+              "Design the booking saga for a service like Expedia or Booking.com that reserves a flight, a hotel, and a rental car from three independent third-party suppliers in one trip, where any supplier can be slow or reject the booking and some confirmations are effectively non-reversible. Lead with the deliverable, then walk the compensation and isolation strategy.",
+            thinkAbout: [
+              "How do hold-then-confirm APIs change the compensation story?",
+              "Where do you sequence the non-reversible step, and why?",
+              "What do you do when a supplier call times out ambiguously?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: three external suppliers, each its own API with its own latency and failure behavior, no shared transaction, some confirmations (a non-refundable fare) that cannot be cleanly undone. Goal: a trip books fully or the customer is left in a clean, refunded state.",
+              "**Deliverable: an orchestrated saga with a durable workflow per trip** (Temporal or equivalent), one workflow instance per booking, calling each supplier as an activity with per-supplier timeouts and retries. Durable state is essential because a trip can span minutes and the process must survive orchestrator restarts.",
+              "**Ordering to minimize irreversible exposure:** sequence the hardest-to-reverse or most-likely-to-fail step so failures are cheap. Prefer suppliers that support two-step hold-then-confirm: hold all three (reversible), then confirm. Holds are semantic locks with supplier-side TTLs: the isolation mechanism, since an expired hold auto-releases and a stalled saga does not strand supplier inventory.",
+              "**Compensation:** if the car fails after flight and hotel are held, cancel the flight and hotel holds (idempotent, keyed on booking id). If a supplier only supports confirm (no hold) and the fare is non-refundable, place that step last; if an earlier reversible step later fails after this non-reversible confirm, compensate semantically (rebook the failed leg, offer credit, escalate to an agent) and never silently drop the customer's money.",
+              "**Slow/uncertain suppliers:** timeouts are ambiguous (did the booking happen?), so every call carries an idempotency key, and on timeout QUERY the supplier for booking status rather than blindly retrying, avoiding a double-booking. Failed compensations retry with backoff, then DLQ and page ops.",
+              "**The trade:** no isolation across suppliers means a customer can briefly see a partially-booked trip: contained with holds/TTLs and a PENDING trip status. Wrong turn: firing all three confirmations in parallel with no holds, so a single rejection leaves confirmed, non-refundable bookings you cannot cleanly undo.",
             ],
           },
         },
