@@ -559,6 +559,67 @@ dives, use an exit criterion to leave each phase, and narrate every transition s
 round to a complete design.
 `.trim()
 
+const highLevelDataflowTeach = `
+## Draw the system, then prove it works
+
+The high-level design phase is where you draw the system and prove it works by tracing one concrete
+request through it. Two failure modes bracket this phase. Some candidates draw a beautiful diagram
+with 15 boxes and never show how a single request flows, so nobody knows if it actually works. Others
+draw so little that the design is ambiguous. The fix for both is the same discipline: start with the
+simplest set of boxes that satisfies the requirements, then evolve it by introducing each new
+component with an explicit justification, and finally walk one request end to end.
+
+### Start simple
+
+Almost every system begins as the same skeleton:
+
+\`\`\`
+[Client] --> [Load Balancer] --> [App Servers] --> [Database]
+                                       |
+                                    [Cache]
+\`\`\`
+
+That is a complete, working system for a huge class of problems. Only now do you add components, and
+only with a reason tied to a requirement:
+
+- A **gateway / reverse proxy** (Envoy, NGINX) when you need auth, rate limiting, or TLS termination
+  in one place.
+- A **cache** (Redis) when reads dominate and repeat, to cut datastore load and tail latency.
+- A **message queue** (Kafka, SQS) when work is async, spiky, or must survive a consumer being down.
+- A **CDN** (CloudFront) when you serve static or geographically distributed content.
+- An **object store** (S3) for large blobs (images, video, files) that do not belong in a row.
+- A **search index** (Elasticsearch) when you need full-text or faceted queries the primary store
+  cannot serve.
+
+The discipline is that you say why each box exists. "I am adding Redis here because reads are 10x
+writes and the same hot keys repeat, so caching cuts p99 and datastore QPS." A box without a
+justification is the single most common wrong turn: adding Kafka or sharding you cannot yet defend
+makes you look like you are pattern-matching, not designing.
+
+### Trace a concrete request
+
+Now the part that separates a strong answer: pick one real operation and follow it through every box,
+both the write path and the read or delivery path. For a chat message the write path is client to
+gateway to chat service, persist to the message store, enqueue for delivery. The read path is the
+recipient's connection receiving a push, or the recipient client pulling on reconnect. Tracing forces
+you to notice gaps: where is the message stored before delivery, what happens if the recipient is
+offline, how does the sender get an ack.
+
+**Interview nuance:** label your arrows. An arrow should carry what flows and how: "WebSocket frame,"
+"gRPC call," "async event on Kafka topic \`messages\`." Unlabeled arrows hide the exact decisions
+interviewers probe. Group boxes into tiers (edge, service, data) so the diagram stays legible as it
+grows.
+
+**Interview nuance:** explicitly point at where each functional requirement is satisfied. "Requirement
+1, send a message, happens on this write path; requirement 2, delivery, happens on this arrow." This
+is how you prove completeness before you move to deep dives, and it is what lets you honestly say "I
+have a working design now."
+
+Recap: start with the minimal client-LB-app-DB-cache skeleton, add each component only with a
+requirement-tied justification, label arrows with data and protocol, and prove the design by tracing
+one concrete request through both its write and its read or delivery path.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -1039,6 +1100,57 @@ export const systemDesignLevel0: DesignLevel = {
               "**Deep dive, fanout (~14 min).** Where the extra time goes: compare fanout-on-write (precompute each follower's timeline) vs fanout-on-read (assemble at query time). Commit to a hybrid: fanout-on-write for normal users, fanout-on-read for celebrity accounts with millions of followers to avoid write amplification. Quantify the celebrity write storm.",
               "**Wrap-up (~3 min).** Remaining bottleneck (hot celebrity accounts), failure mode (fanout queue backlog), monitoring (timeline read p99, fanout lag), cost driver (Redis timeline storage across 500M users).",
               "The cut: compress API and component breadth so the fanout dive, the thing being scored, gets nearly half the round. Matching depth to the stated focus is the point.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-high-level-dataflow",
+          title: "High-Level Architecture & Data-Flow",
+          summary:
+            "Start from the minimal skeleton, justify every added box against a requirement, label arrows, and prove the design by tracing one request end to end.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["architecture", "diagramming"],
+          teach: {
+            markdown: highLevelDataflowTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l0-high-level-dataflow-apply",
+            prompt:
+              "Draw the boxes-and-arrows for a chat app and narrate a single message's full path from sender client to recipient device, including the write and the delivery.",
+            thinkAbout: [
+              "What is the simplest set of components that satisfies the requirements?",
+              "Can you trace both the write path and the read/delivery path concretely?",
+              "Where is each functional requirement satisfied in the picture?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 1:1 chat, messages must persist and be delivered even if the recipient is briefly offline, ordering per conversation matters, near-real-time delivery.",
+              "**The diagram:** Sender --WSS--> Gateway/LB --> Chat Service --> Message Store (Cassandra); Chat Service --> Delivery Queue (Kafka) --> Presence/Connection Manager --WSS--> Recipient.",
+              "**Why each box:** clients hold a persistent WebSocket to a connection manager so the server can push; a gateway terminates TLS and authenticates; the chat service owns write logic; Cassandra as the message store because writes are heavy, sharded by conversation ID with a clustering key on timestamp for per-conversation ordering; a presence/connection manager tracks which server holds each user's live socket; a delivery queue (Kafka) decouples persistence from delivery so a slow or offline recipient never blocks the write.",
+              "**Write path traced:** sender sends a WebSocket frame to the gateway; the chat service assigns a message ID and sequence number, persists to Cassandra partitioned by conversation ID (satisfies 'send and store'), publishes a delivery event to Kafka, and returns an ack so the sender's UI shows 'sent.'",
+              "**Delivery path traced:** a delivery worker consumes the event and asks presence which server holds the recipient's socket. If online, it forwards the message over that WebSocket (satisfies 'deliver in real time') and marks delivered. If offline, the message stays in Cassandra; on reconnect the client pulls all messages with sequence greater than its last-seen (satisfies 'deliver after being offline').",
+              "**Key tradeoff:** persisting before delivering (write then async fanout) costs a little latency but guarantees no message is lost if delivery fails, the right call for chat.",
+              "Common wrong turn: adding sharding, read replicas, and a search cluster before proving the basic send-store-deliver loop works.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-high-level-dataflow-practice",
+            prompt:
+              "Draw the boxes-and-arrows for Uber-style ride matching and trace one request from a rider tapping 'request ride' to a nearby driver's phone ringing, at 1M concurrent riders. Handle both the write (request) and the delivery (dispatch to driver) paths and show where geospatial matching lives.",
+            thinkAbout: [
+              "Where do continuous driver location updates land, and why can that not be the primary database?",
+              "What happens between 'trip row created' and 'driver phone rings', box by box?",
+              "How does the design handle a driver declining or timing out on the offer?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: riders and drivers both stream location; a request must match to a nearby available driver within a couple of seconds; at 1M concurrent riders, location updates and matching dominate.",
+              "**The diagram:** Rider App --> Gateway --> Trip Service --> Trip Store (Postgres/Dynamo); Trip Service --> Matching Service <--> Geo Index (Redis geohash / QuadTree); Matching Service --> Dispatch Queue --> Driver Connection Manager --push--> Driver App.",
+              "**Why these boxes:** driver apps continuously push location into an ingest path updating a geospatial index (Redis with geohash buckets, or an in-memory QuadTree sharded by region); the matching service queries that index for nearby available drivers; a trip store records trip state; a dispatch queue decouples matching from notifying drivers.",
+              "**Write path traced:** rider taps request, gateway authenticates, trip service creates a trip row in state REQUESTED (the durable write), then calls matching. Matching queries the geo index for the N nearest available drivers in the rider's geohash cell and neighbors, ranks by ETA, picks a candidate.",
+              "**Dispatch path traced:** the match is published to the dispatch queue; the driver connection manager finds the chosen driver's live connection and pushes an offer, ringing their phone. On decline or a ~15s timeout, matching falls back to the next candidate. On accept, the trip transitions to MATCHED and both apps are notified.",
+              "**Scale note at 1M concurrent:** the geo index is the hot component; shard it by city or geohash region and keep it in memory for sub-100ms lookups.",
+              "Common wrong turn: putting matching directly on Postgres with a `SELECT ... ORDER BY distance`, which cannot serve the query rate; geospatial matching needs a purpose-built in-memory index.",
             ],
           },
         },
