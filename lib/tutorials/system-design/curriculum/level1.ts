@@ -654,6 +654,63 @@ counters, long-poll as the universal fallback, SSE for one-way streaming, WebSoc
 and webhooks for server-to-server async.
 `.trim()
 
+const httpSemanticsTeach = `
+## Decades of distributed-systems thinking, already encoded
+
+HTTP already encodes decades of distributed-systems thinking about safety, idempotency, caching, and
+concurrency. Using its semantics correctly gets you free caching and safe retries; ignoring them
+silently loses data.
+
+### Methods: safe and idempotent are orthogonal
+
+Safe means read-only (no server state change): \`GET\` and \`HEAD\`. Idempotent means repeating it
+lands the same final state: \`GET\`, \`HEAD\`, \`PUT\`, \`DELETE\`. \`POST\` is neither safe nor
+idempotent, \`PATCH\` generally is not idempotent. This directly drives retry behavior: an
+intermediary or client can safely auto-retry \`GET\`/\`PUT\`/\`DELETE\` after a network blip, but
+must not blindly auto-retry \`POST\` (that is what idempotency keys are for). Safe methods are also
+the cacheable ones.
+
+Status families are a contract with the client:
+
+- \`2xx\` success: \`200\` OK, \`201\` Created (return a \`Location\` header pointing at the new
+  resource), \`204\` No Content.
+- \`3xx\`: redirects and, importantly, \`304 Not Modified\` for conditional requests.
+- \`4xx\` client error: \`400\`, \`401\`, \`403\`, \`404\`, \`409\` conflict, \`422\` unprocessable,
+  \`429\` rate limited. Do not retry these blindly.
+- \`5xx\` server error: \`500\`, \`503\`. Retry with backoff.
+
+### Read caching: Cache-Control plus a validator
+
+On a \`GET\` you send \`Cache-Control\` (\`max-age\` for private/browser caches, \`s-maxage\` for
+shared/CDN caches, \`no-store\` for sensitive data) plus a validator: an \`ETag\` (an opaque version
+hash) or \`Last-Modified\` timestamp. The validator enables the conditional GET: the client sends
+\`If-None-Match: <etag>\` (or \`If-Modified-Since\`), and if nothing changed the server returns
+\`304 Not Modified\` with no body. That saves bandwidth and origin rendering while keeping the client
+current.
+
+### Optimistic concurrency: ETag + If-Match
+
+The same \`ETag\` gives you optimistic concurrency control, which prevents the lost-update problem.
+Two editors both \`GET\` a document (ETag \`v5\`). Editor A saves with \`If-Match: v5\`; the server
+sees the current version is still \`v5\`, applies the write, and the ETag becomes \`v6\`. Editor B
+then saves with \`If-Match: v5\`; the server sees the current version is now \`v6\`, refuses, and
+returns \`412 Precondition Failed\`. B is forced to re-read and merge instead of silently clobbering
+A's change. This is far cheaper than pessimistic locking and is exactly how you avoid last-write-wins
+data loss.
+
+Content negotiation completes the picture: honor \`Accept\` and \`Accept-Language\`, and set
+\`Vary: Accept, Accept-Encoding\` on responses so a shared cache does not serve a JSON body to a
+client that asked for XML, or a Brotli body to a client that cannot decode it.
+
+**Interview nuance:** the two high-signal moves are (1) tying method idempotency to retry safety, and
+(2) describing ETag + If-Match -> 412 as optimistic concurrency to prevent lost updates. Saying
+"return 200 and last-write-wins" is the wrong turn interviewers listen for.
+
+Recap: use safe/idempotent method semantics to drive retry and caching, add Cache-Control plus ETag
+for cheap conditional GETs (304), and use ETag + If-Match -> 412 for optimistic concurrency that
+prevents lost updates.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1279,6 +1336,57 @@ export const systemDesignLevel1: DesignLevel = {
               "**Join/leave waves:** SSE connections are cheap (a file descriptor plus a little memory on an event-loop server), so a goal-triggered reconnect stampede is absorbed by the horizontally scaled edge fleet, with jittered client reconnect to avoid a thundering herd. `Last-Event-ID` lets a reconnecting viewer resume without a gap.",
               "**Meltdown protection:** rate-limit and shed at the edge (429/503 with Retry-After) so a reconnect storm cannot take down origin, and cache the latest score so a cold viewer gets current state immediately on connect.",
               "Common wrong turn: WebSocket for a one-way scoreboard, paying the stateful-connection and sticky-session tax on 5M connections for a duplex channel nobody uses, or fanning out per-viewer from origin instead of publish-once-broadcast-many across an edge fleet.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-http-semantics",
+          title: "HTTP Semantics: Methods, Status Codes & Caching Headers",
+          summary:
+            "Use safe/idempotent method semantics to drive retries and caching, conditional GETs with ETag for cheap 304s, and ETag + If-Match for optimistic concurrency.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["http", "api-design", "caching", "concurrency"],
+          teach: {
+            markdown: httpSemanticsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-http-semantics-apply",
+            prompt:
+              "Design the HTTP semantics for a document API: choose methods and status codes for read, create, update, and delete, and explain how you would use ETag, If-None-Match, and If-Match to cache reads and prevent lost updates.",
+            thinkAbout: [
+              "Which methods are safe, which are idempotent, and why does that distinction drive retry behavior?",
+              "How do Cache-Control, ETag, and Last-Modified turn a GET into a cheap conditional request?",
+              "How does ETag plus If-Match give you optimistic concurrency, and what status code signals a conflict?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a JSON document API behind a CDN and shared caches, with clients that retry on failure and multiple editors per document.",
+              "**Read:** `GET /v1/docs/{id}` -> 200 with the document and an ETag; HEAD for metadata only. Both safe and idempotent, so caches and clients can auto-retry them. **Create:** `POST /v1/docs` -> 201 Created with a `Location: /v1/docs/{id}` header and the body; POST is not idempotent, so no auto-retry (add an idempotency key if duplicates are costly). **Update:** `PUT /v1/docs/{id}` -> 200/204; idempotent, safe to retry. **Delete:** `DELETE /v1/docs/{id}` -> 204; idempotent (deleting twice still ends deleted), retry-safe.",
+              "**Errors:** 404 missing, 409/412 conflict, 422 validation, 429 rate limit, 5xx server.",
+              "**Read caching:** on GET return `Cache-Control: max-age=60` (or `s-maxage` for the CDN, `no-store` for private docs) plus an ETag. The client later sends `If-None-Match: <etag>`; if unchanged the server returns 304 Not Modified with no body, saving bandwidth and origin work while keeping the client current.",
+              "**Optimistic concurrency (prevent lost updates):** each GET returns the current ETag. An update must send `If-Match: <etag>`. If the document's current version still matches, the write applies and the ETag advances; if another editor already changed it, the server returns 412 Precondition Failed, forcing the client to re-read and merge instead of overwriting. Two editors on the same doc cannot silently clobber each other.",
+              "**Negotiation:** honor `Accept`/`Accept-Language` and set `Vary: Accept, Accept-Encoding` so shared caches never serve the wrong representation or encoding.",
+              "Common wrong turn: returning 200 for everything and doing last-write-wins updates, which silently loses concurrent edits and defeats caching, plus auto-retrying non-idempotent POST.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-http-semantics-practice",
+            prompt:
+              "Design the HTTP concurrency and caching model for Google Docs-style collaborative editing where dozens of users edit the same document simultaneously, edits must not be lost, and reads should be cheap. Explain where simple ETag + If-Match optimistic concurrency is sufficient and where it breaks down, and what you would use instead.",
+            thinkAbout: [
+              "What contention level does optimistic concurrency assume, and does the document body meet it?",
+              "Which writes on this product are actually low-contention and ETag-friendly?",
+              "What protocol family merges concurrent edits instead of rejecting them?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: many concurrent editors per document, sub-second edit frequency, no acceptable data loss, and a desire to keep read traffic cheap.",
+              "**Where ETag + If-Match works:** coarse-grained, low-frequency writes (document metadata: title, sharing settings, folder). Each GET returns an ETag; a metadata PUT sends If-Match, and a stale write gets 412 Precondition Failed and re-reads. Contention is rare, so 412 retries are cheap, and lost updates are prevented without locking.",
+              "**Where it breaks down:** the document *body* under dozens of sub-second edits. If-Match would 412 almost every keystroke, because the version advances constantly. Optimistic concurrency assumes low write contention; collaborative body editing is the opposite. Reject it here.",
+              "**What to use instead:** a real-time collaboration protocol, either Operational Transformation (OT, what Google Docs historically used) or CRDTs. Edits are fine-grained operations (insert char at position, delete range) that are transformed or merged so concurrent operations converge to the same document without a whole-document version check. These flow over a WebSocket, with the server ordering and rebroadcasting operations to all editors. Operations are merged, not clobbered; nothing is lost.",
+              "**Caching reads:** the shareable published/read-only view is cached aggressively at the CDN with `s-maxage` plus an ETag and fingerprinted URLs, so viewers (not editors) hit cache. Live editors do not use HTTP read caching; they read the live OT/CRDT stream.",
+              "**The hybrid model:** ETag + If-Match optimistic concurrency for coarse metadata, OT/CRDT over WebSocket for the hot collaborative body, and CDN + ETag caching for read-only viewers.",
+              "Common wrong turn: forcing whole-document If-Match optimistic concurrency onto high-frequency collaborative editing, which produces constant 412s and a broken editor, or using last-write-wins and losing edits.",
             ],
           },
         },
