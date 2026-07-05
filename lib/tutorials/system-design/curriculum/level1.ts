@@ -110,6 +110,65 @@ query load but never gives instant failover because of resolver caching, and Geo
 routing plus health checks steer users to the nearest healthy region before a real LB takes over.
 `.trim()
 
+const tcpUdpTeach = `
+## Every avoidable round trip is a visible stall
+
+The single most important latency fact in networking: setting up a TCP connection costs a round trip
+before any application data flows, and if you also do TLS you pay more. On a fast intra-datacenter
+link (RTT under 1ms) nobody notices. On a mobile user in Jakarta hitting a US server (RTT 200ms+),
+every avoidable round trip is a visible stall.
+
+### The handshake and slow start
+
+The 3-way handshake: client sends SYN, server replies SYN-ACK, client sends ACK. Only after that ACK
+can the client send the request. That is 1 RTT of pure setup. Layer TLS 1.3 on top and you add
+roughly 1 more RTT (TLS 1.2 added 2). So a brand-new HTTPS connection is about 2 RTTs before the
+first request byte, then more RTTs for the response. Over a 200ms link that is 400ms+ of overhead
+spent on nothing but ceremony.
+
+TCP earns that cost by giving reliability: every byte has a sequence number, the receiver ACKs what
+it got, and unacknowledged data is retransmitted, so the application sees an ordered, gap-free
+stream. It also runs **congestion control**: a new connection starts in slow start with a small
+congestion window and ramps up as ACKs return, probing for available bandwidth. This is why
+throughput on a fresh connection is low at first and climbs, and why short-lived connections never
+reach full speed: they die in slow start before the window opens up. Reusing a warmed connection
+means you keep the opened window.
+
+### The fixes for a chatty API
+
+If each of 30 API calls opens a new connection, you pay the handshake and restart slow start 30
+times. The fixes, none of which touch business logic:
+
+- **Keep-alive and connection pooling**: reuse one warm connection for many requests, amortizing the
+  handshake and keeping the congestion window open. HTTP keep-alive and client pools (a database
+  connection pool is the same idea) do this.
+- **HTTP/2 multiplexing**: many concurrent requests share one connection, so you pay one handshake
+  and one slow start for all of them.
+- **Move the endpoint closer**: an edge POP or CDN near the user shrinks the RTT itself, so every
+  round trip is cheaper. A TLS terminator at a nearby POP means the expensive handshakes happen over
+  a short hop, and the long-haul leg is a reused warm connection.
+
+### When UDP is right
+
+UDP is the other L4 protocol: connectionless, no handshake, no ordering, no retransmission, no
+congestion control by default. You send a datagram and hope. That sounds worse, but it is exactly
+right when late data is useless: real-time voice and video (a retransmitted audio packet arrives
+after the moment it was needed, so drop it and move on), gaming, DNS (one small request/reply, a
+handshake would double the cost), and high-volume telemetry where losing a few samples is fine. QUIC
+(HTTP/3) is built on UDP precisely to escape TCP's handshake and head-of-line-blocking constraints
+while rebuilding reliability itself.
+
+**Interview nuance:** at scale, watch **TIME_WAIT** and ephemeral-port exhaustion. A client that
+opens and closes connections rapidly leaves each in TIME_WAIT (about 60s) holding an ephemeral port;
+a single source IP has ~28k usable ports, so a busy proxy talking to one backend IP can run out and
+start failing to connect. Connection reuse fixes this too. This is another reason pooling is not
+optional at scale.
+
+Recap: the TCP handshake costs a round trip (plus TLS) before data and starts slow in congestion
+control, so reuse connections (keep-alive, pooling, HTTP/2) and move endpoints closer to cut RTTs;
+reach for UDP when late data is worthless and watch TIME_WAIT/port exhaustion under churn.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -217,6 +276,57 @@ export const systemDesignLevel1: DesignLevel = {
               "**Rollback sequence:** alert fires on green p99 error spike; automation flips the proxy weight for green to 0 (seconds), and separately sets green's DNS weight to 0 (minutes, to drain cached clients). Green fleet stays warm until traffic drains so the canary can be retried.",
               "**Tradeoff:** a pure DNS canary is simple but its rollback is bounded below by TTL plus resolver misbehavior, so it is minutes-scale and unreliable for a 2-minute SLO. Fronting with an L7 proxy gives second-scale, deterministic shifting at the cost of an extra hop.",
               "Common wrong turn: promising a 2-minute rollback from DNS weight changes alone; resolver caching makes that unsafe. Put the fast shift in the proxy, use DNS for the coarse split.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-tcp-udp",
+          title: "TCP & UDP Fundamentals",
+          summary:
+            "The TCP handshake and slow start make new connections expensive; reuse connections, multiplex, move endpoints closer, and reach for UDP when late data is worthless.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["tcp", "udp", "latency"],
+          teach: {
+            markdown: tcpUdpTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-tcp-udp-apply",
+            prompt:
+              "Explain why a chatty API over new connections is slow on a high-latency link, and list three ways to fix it without changing business logic.",
+            thinkAbout: [
+              "What does the 3-way handshake cost before any data flows?",
+              "How does connection reuse amortize that cost?",
+              "When is UDP the right choice despite losing reliability?",
+            ],
+            modelAnswerOutline: [
+              "Assume a mobile client on a 200ms RTT link calling an API that makes 30 small sequential requests, each opening a fresh HTTPS connection.",
+              "**Why it is slow:** each new connection pays a TCP 3-way handshake (1 RTT = 200ms) plus a TLS 1.3 handshake (~1 more RTT = 200ms) before the first request byte, then at least 1 RTT for the response. Roughly 600ms per call of overhead doing no work, times 30 calls if serialized: seconds of pure ceremony. On top of that, every fresh connection restarts TCP slow start with a tiny congestion window, so even the data transfer is throttled and never reaches full throughput before the short connection closes.",
+              "**Fix 1, keep-alive plus connection pooling:** reuse one warm connection for all 30 requests. Pay the handshake once and keep the congestion window that slow start opened, so later requests are both handshake-free and full-speed. Almost every HTTP client and database driver does this via a pool; the fix is often just enabling and sizing it.",
+              "**Fix 2, HTTP/2 multiplexing:** one TCP+TLS connection carries all 30 requests concurrently as independent streams. One handshake, one slow start, and the requests do not even serialize, so wall-clock time collapses toward a single round trip's worth of latency.",
+              "**Fix 3, move the endpoint closer (edge POP / CDN):** terminate TLS at a POP near the user so the expensive handshakes traverse a 20ms hop instead of 200ms, and let the POP hold a warm, pooled long-haul connection to origin. Every remaining round trip is simply cheaper.",
+              "**Tradeoff and the UDP scope:** pooling and H2 add a little client/proxy complexity and connection-management state, but the latency win on high-RTT links is enormous. If the data were loss-tolerant and latency-critical (voice/video/telemetry), consider UDP, accepting no retransmission because late data is useless there; not the case for a transactional API.",
+              "Common wrong turn: opening a new connection per request, which multiplies handshake and slow-start cost by the request count and can exhaust ephemeral ports (TIME_WAIT) on a busy client.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-tcp-udp-practice",
+            prompt:
+              "Design the transport strategy for Zoom-scale live video where 1 million concurrent participants need sub-150ms glass-to-glass latency, plus a separate reliable control channel for join/leave and chat. Choose TCP vs UDP for each path and justify, and explain how you handle packet loss on the media path.",
+            thinkAbout: [
+              "Why does retransmission fundamentally conflict with a 150ms glass-to-glass budget?",
+              "Which data in this system cannot tolerate loss, and what transport does it deserve?",
+              "Without TCP, where do loss handling and congestion control come from on the media path?",
+            ],
+            modelAnswerOutline: [
+              "Split media and control onto different transports because they have opposite requirements.",
+              "**Media path: UDP** (typically SRTP over UDP, or a QUIC/WebRTC data path). Glass-to-glass under 150ms is impossible with retransmission: a lost packet, retransmitted, arrives 1+ RTT late, after the moment it was meant to be played, so it is useless. TCP would also stall the entire stream on any single loss (head-of-line blocking) while retransmitting, causing the freeze-then-catch-up artifact.",
+              "**Loss handling without retransmission:** forward error correction (send redundant parity so the receiver reconstructs a lost packet without asking), packet loss concealment (interpolate a missing audio frame), and adaptive bitrate that lowers resolution when the network degrades. Congestion control happens at the app layer (WebRTC/GCC bandwidth estimation) since UDP gives none for free.",
+              "**Control path: TCP** (or a reliable QUIC stream). Join, leave, mute state, chat, and roster updates must be delivered in order and not lost; a dropped 'user left' event corrupts UI state. Latency here is human-scale, so TCP's reliability and ordering are worth the handshake and retransmit cost. Keep this connection warm and pooled per client.",
+              "**Scale:** 1M concurrent participants means no peer mesh; route media through Selective Forwarding Units (SFUs) in regional POPs near users, so each client has one short-RTT UDP path to its nearest SFU and the SFU fans out. Keeping per-hop RTT low is the only way to stay under 150ms once encode/decode and jitter-buffer time are subtracted.",
+              "**Tradeoff:** UDP forces rebuilding loss handling (FEC, concealment, app-layer congestion control), real complexity, but it is the only way to hit the latency target. TCP for control is the easy, correct default because its data cannot tolerate loss and can tolerate latency.",
+              "Common wrong turn: running media over TCP for 'reliability.' Its head-of-line blocking and retransmits guarantee missing the latency budget; reliability is the wrong goal for live media.",
             ],
           },
         },
