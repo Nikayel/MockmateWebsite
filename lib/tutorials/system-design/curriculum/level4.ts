@@ -735,6 +735,69 @@ because queues blow up near 100%, add N+1 AZ redundancy so losing a zone stays a
 the resulting capacity across reserved/on-demand/spot by peak-to-average ratio.
 `.trim()
 
+const cellShuffleShardingTeach = `
+## Bounding the blast radius
+
+The failure this lesson prevents: in a single global fleet, *any* systemic problem hits *everyone*. A
+poison-pill request, a bad deploy, a runaway tenant, a corrupted cache entry: all of them can cascade
+across the whole fleet because every node shares the same pool, the same code version, and the same
+downstream dependencies. Cell-based architecture and shuffle sharding are the two techniques for
+**bounding blast radius** so a failure takes down a slice, not the service.
+
+### Cells
+
+**A cell is a complete, self-contained copy of the stack**: its own load balancer, service instances,
+cache, and often its own database partition, serving a *subset* of users or tenants. Ten cells means
+ten independent stacks, each carrying ~10% of traffic. Cells share almost nothing at runtime. The
+point is a **fault domain**: a bad deploy, a resource exhaustion, or a poison request confined to
+cell 3 affects only cell 3's ~10% of users. This is how AWS runs many services and how Slack and
+Salesforce limit outage scope.
+
+Routing to cells is done by a **thin, extremely simple, highly-available cell router**: it maps a
+tenant/user ID to a cell (a lookup table or a hash) and forwards. The router must be *dumb and
+rock-solid*, because it is the one shared component. You deploy changes **cell by cell**: canary cell
+1, watch its metrics, then roll the rest. A bad release is caught at 10% blast radius instead of
+100%.
+
+\`\`\`
+        cell router (dumb, HA, the only shared thing)
+        /          |           \\
+   +--------+  +--------+   +--------+
+   | Cell 1 |  | Cell 2 |   | Cell 3 |   ...
+   | LB     |  | LB     |   | LB     |
+   | svc    |  | svc    |   | svc    |
+   | cache  |  | cache  |   | cache  |
+   | db-part|  | db-part|   | db-part|
+   +--------+  +--------+   +--------+
+   tenants A-J  tenants K-T  tenants U-Z
+\`\`\`
+
+### Shuffle sharding
+
+Shuffle sharding solves a finer-grained problem: noisy neighbors *within* a shared pool. Say you have
+8 workers and you shard tenants into 4 fixed shards of 2 workers each: a single abusive tenant
+saturates its 2 workers and takes down every tenant on that shard. Shuffle sharding instead gives
+each tenant a *random subset* (say 2 of the 8 workers), chosen so that the probability any two
+tenants share their *entire* subset is tiny. With 8 choose 2 there are 28 possible pairs; two tenants
+fully overlap only 1-in-28 of the time. One bad tenant degrades only the handful of tenants who share
+a worker, and *never* a tenant who shares zero workers. Combined with per-request fault isolation (a
+client retries on its other worker), the practical blast radius of one bad tenant drops to a rounding
+error. This is exactly how AWS Route 53 isolates customers.
+
+**Interview nuance:** the tradeoffs are real and you must name them. Cells cause **capacity
+fragmentation**: each cell needs its own headroom, so ten cells cost more idle capacity than one big
+pool, and a hot cell cannot borrow a quiet cell's spare capacity without rebalancing. **Cross-cell
+operations** get hard: global queries, a tenant that outgrows a cell, moving tenants between cells.
+And the **cell router becomes the critical shared dependency** you must obsess over. The honest
+trade: higher cost and operational complexity for a hard ceiling on how many users any single failure
+can hurt.
+
+Recap: a cell is a self-contained stack serving a user subset behind a dumb HA router, so a bad
+deploy or tenant is contained to one cell's ~10%, while shuffle sharding assigns each tenant a random
+worker subset so full overlap between any two tenants is rare; you pay with capacity fragmentation
+and harder cross-cell operations.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -1399,6 +1462,56 @@ export const systemDesignLevel4: DesignLevel = {
               "**Downstream check:** the Redis timeline cache and the 2 downstreams must also be sized for the failover surge, or the compute fleet just moves the bottleneck. Verify Redis has connection and throughput headroom for 1.5x regional load.",
               "**Cost mix:** baseline reserved, failover margin on-demand, and consider running the failover headroom warm-but-light rather than fully provisioned 24/7 if RTO tolerance allows a brief autoscale ramp.",
               "Common wrong turn: sizing each region only for its own 100k RPS, so the day a region dies the survivors instantly saturate and cascade.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-cell-shuffle-sharding",
+          title: "Cell-Based Architecture & Shuffle Sharding",
+          summary:
+            "Cells are self-contained stacks behind a dumb HA router that cap any failure at one cell's share; shuffle sharding makes full overlap between two tenants statistically rare.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["cells", "shuffle-sharding", "blast-radius"],
+          teach: {
+            markdown: cellShuffleShardingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-cell-shuffle-sharding-apply",
+            prompt:
+              "Partition a multi-tenant service into cells so one tenant's traffic surge or a bad deploy cannot take down all tenants.",
+            thinkAbout: [
+              "What is a cell, and how does it contain failure?",
+              "How does shuffle sharding minimize tenant overlap?",
+              "What are the tradeoffs (capacity fragmentation, cross-cell ops)?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a multi-tenant SaaS API, thousands of tenants of very uneven size, currently one global fleet plus shared database, and all-or-nothing outages. Goal: no single tenant surge or bad deploy hurts more than a small fraction of tenants.",
+              "**Cell design:** split into N cells (say 10), each a self-contained stack: its own load balancer, service instances, cache, and database partition, carrying ~10% of tenants. Cells share nothing at runtime, so a resource exhaustion, poison request, or crash in cell 4 is confined to cell 4's tenants. A hard fault-domain boundary a single global pool cannot give.",
+              "**Routing:** a thin, highly-available cell router maps tenant_id -> cell via a cached lookup table (source of truth in a small, heavily replicated store). The router does almost nothing else, because it is the one shared component and thus the scariest SPOF: over-provision it, keep it stateless, cache mappings aggressively. Placement balances load and can be rebalanced by updating the table and draining.",
+              "**Bad-deploy containment:** deploy cell by cell: canary cell 1, bake and watch error rate / p99, then progressively roll. A bad release blows up at most one cell (~10%) before the rollout halts, versus 100% for a global deploy.",
+              "**Noisy tenant containment:** within a cell, shuffle sharding across the cell's workers: each tenant gets a random subset, so a single tenant's surge saturates only its few workers, and the odds another tenant shares that entire subset are small. Per-tenant rate limits remain the first line of defense.",
+              "**Tradeoffs stated up front:** capacity fragmentation (each cell needs its own headroom; a hot cell cannot trivially borrow a quiet cell's slack), cross-cell operations need extra tooling (global analytics, tenant migration), and the router is the critical shared dependency. Accepted because a firm cap on blast radius is worth it for a multi-tenant platform.",
+              "Common wrong turn: a single global fleet 'with good rate limiting,' which still shares one code version and one dependency graph, so one bad deploy is a total outage.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-cell-shuffle-sharding-practice",
+            prompt:
+              "Design cell-based isolation for a service like AWS DynamoDB or Route 53 serving millions of customers where a single misbehaving customer (a request flood or a poison-pill query pattern) must not be able to degrade service for others, and no more than a tiny fraction of customers can share fate. Lead with your isolation strategy.",
+            thinkAbout: [
+              "Why are cells alone not enough when millions of customers share each cell?",
+              "What is the probability math that makes shuffle sharding a provable guarantee?",
+              "What role do per-customer throttling and admission control still play?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a foundational multi-tenant service, millions of customers, extreme reliability bar, and a threat model where any one customer may send a traffic flood or a pathological request pattern. The requirement is a quantifiable cap on how many others any one customer can affect.",
+              "**Strategy: cells plus shuffle sharding, sized for a probabilistic overlap guarantee.** Partition the fleet into many cells behind a dumb, ultra-redundant router keyed on customer ID: that caps blast radius per cell. But with millions of customers, '10% share a cell' is still millions sharing fate, so shuffle sharding inside each cell is the primary isolation mechanism.",
+              "**The key math:** each customer is assigned a random subset of k workers out of the cell's M. With M choose k distinct subsets, the probability that another specific customer shares your entire subset (and can fully take you down) is roughly 1 / (M choose k). Tune M and k so this is negligible: a few workers out of a few dozen gives thousands of distinct combinations. When a customer floods, only their k workers are hit; every customer whose subset does not fully overlap keeps at least one healthy worker and, with client-side retry across their subset, stays up.",
+              "**Layered defenses:** per-customer throttling / token buckets at the front door (stops most floods before they reach workers) and request-level admission control to shed poison-pill patterns. Deploys go cell by cell with automated rollback on health regression.",
+              "**Tradeoffs:** shuffle sharding needs enough workers per cell for the combinatorics to work, and the routing/assignment layer must be extremely reliable and stable (a customer's subset must not churn). The payoff is a provable isolation property: 'no single customer can affect more than X% of others,' exactly the guarantee a foundational service must state.",
+              "Common wrong turn: relying on throttling alone, which caps rate but still lets a flood within the limit, or a novel query pattern, degrade every customer sharing the pool.",
             ],
           },
         },
