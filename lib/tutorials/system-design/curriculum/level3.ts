@@ -781,6 +781,68 @@ reranker over the top-k for precision, and plan for metadata filtering and the m
 re-embedding.
 `.trim()
 
+const geospatialIndexingTeach = `
+## "Find drivers near me" is a scaling trap
+
+The naive query, \`WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?\` or worse a full distance scan,
+cannot use a normal B-tree index effectively (two independent range predicates) and does not scale.
+Worse, distance on a sphere is not Euclidean. The real problem is turning a **2D nearest-neighbor
+query into a 1D or hierarchical key** you can index, shard, and range-scan.
+
+### Geohash: nearby points share a prefix
+
+Interleave the bits of latitude and longitude and encode them base-32 into a short string. The magic
+property: **nearby points share a prefix**. \`9q8yy\` and \`9q8yz\` are adjacent cells; truncating
+the string zooms out. This means a geohash stores trivially in **any B-tree or a Redis sorted set**
+and **shards by prefix**, and a proximity query becomes a prefix range scan. The flaw is **boundary
+problems**: two points a meter apart can straddle a cell edge and share almost no prefix. The fix is
+to query the target cell **plus its 8 neighbors** (a 3x3 ring) so you never miss a nearby point.
+
+\`\`\`
+  geohash "9q8yy" and neighbors (query a 3x3 ring to avoid edge misses):
+     9q8yw 9q8yx 9q8yz
+     9q8yt [9q8yy] 9q8zn      <- center cell + 8 neighbors
+     9q8ym 9q8yq 9q8yr
+\`\`\`
+
+### Quadtree, S2, and H3
+
+**Quadtree** recursively subdivides space into four quadrants, but only where it is dense: a downtown
+block splits into fine cells while an ocean stays one coarse cell. This **adapts to non-uniform
+density** at the cost of maintaining a tree rather than flat key math.
+
+**S2 (Google)** projects the sphere onto a cube and orders cells along a **Hilbert curve**, giving
+excellent spatial locality (nearby cells have nearby ids, so range scans are tight) and true
+spherical geometry, with 30 levels of precision. **H3 (Uber)** tiles the world in **hexagons**.
+Hexagons matter because every neighbor is equidistant (a square has 4 close and 4 diagonal
+neighbors), which makes movement, coverage, and radius queries cleaner: exactly what a rideshare or
+delivery system wants.
+
+### Cell size, hot cells, and moving points
+
+The central tuning knob is **cell size versus cell count**. Finer cells hold fewer points (cheap
+scans) but a radius query must enumerate more cells; coarser cells mean fewer cells but more points
+per cell to scan and filter. Rule of thumb: pick a resolution near your **typical query radius**,
+query a **ring of neighbor cells**, then do a final exact-distance filter and sort on the small
+candidate set.
+
+The failure mode that separates seniors from juniors is the **hot cell**. A dense downtown or a
+stadium at concert-end becomes a single cell with a huge point set: a hotspot on both writes and
+reads. Fixes: **subdivide adaptively** (quadtree, or drop to a finer S2/H3 resolution just for that
+cell), **cap points per cell**, **shard hot cells separately** so one node does not carry Manhattan,
+and **cache** popular cell results.
+
+**Interview nuance:** for moving points, storage and refresh matter as much as the index. Keep
+\`cell_id -> set of driver_ids\` in **Redis** and refresh a moving driver on a **short TTL** so stale
+positions age out; the source of truth for a driver's live position is the fast store, not your
+durable DB.
+
+Recap: encode points into a prefix-shareable or hierarchical cell key (geohash, S2, H3) so 2D
+proximity becomes an indexable/shardable range query, query the cell plus a neighbor ring to beat
+boundary misses, tune cell size to your query radius, and defuse hot cells by adaptive subdivision,
+per-cell caps, separate sharding, and caching.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1457,6 +1519,55 @@ export const systemDesignLevel3: DesignLevel = {
               "**Freshness:** index on commit via CDC/webhooks, chunk by function/symbol, and re-embed only changed files.",
               "**The tradeoff:** per-repo pre-filtering shrinks the candidate pool and can hurt recall for broad queries, which is correct because a leak is catastrophic and a slightly narrower result set is not.",
               "Common wrong turn: a single shared index queried then filtered afterward (leaks via ranking side channels and counts), or leaning on vector similarity alone so exact symbol lookups fail.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-geospatial-indexing",
+          title: "Geospatial Indexing: Geohash, Quadtree, S2 & H3",
+          summary:
+            "Encode points into cell keys (geohash/S2/H3) so 2D proximity becomes an indexable range query, ring-query neighbors, tune cell size to radius, and defuse hot cells.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["geospatial", "indexing", "data-modeling"],
+          teach: {
+            markdown: geospatialIndexingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-geospatial-indexing-apply",
+            prompt:
+              "Design the spatial index for a 'find drivers near me' query over millions of moving points, and justify a choice among geohash, quadtree, S2, and H3 for range and k-nearest-neighbor lookups.",
+            thinkAbout: [
+              "How do you turn a 2D nearest-neighbor query into a 1D or hierarchical key you can index and shard?",
+              "How does cell size trade recall (missing a nearby point) against cost (scanning too many points)?",
+              "What happens to a dense downtown cell, and how do you keep it from becoming a hotspot?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: millions of points, some static (restaurants, pickup spots) and many moving (drivers pinging every few seconds); queries are 'drivers within radius R' and 'nearest K drivers'; latency budget in the low tens of ms.",
+              "**Turning 2D into an indexable key:** map each point to a cell id so proximity becomes a range/hierarchical lookup. Geohash interleaves lat/lng bits into a base-32 string where nearby points share a prefix, so it stores in any B-tree or Redis sorted set and shards by prefix. Its boundary problem (adjacent points across a cell edge diverge) is handled by querying the center cell plus its 8 neighbors, then an exact haversine distance filter and sort on the candidates.",
+              "**Precision tradeoff:** pick a cell resolution near the typical query radius. Finer cells hold fewer points (cheap per-cell scans) but a radius query enumerates more cells and larger rings; coarser cells enumerate fewer but each holds more points to scan. Size to the common case (e.g. ~1 km cells for city pickups).",
+              "**Hot cells:** a downtown or event cell hotspots on writes and reads. Subdivide adaptively (a finer S2/H3 level or a quadtree there), cap points per cell, shard hot cells onto separate nodes, and cache their results.",
+              "**Choice and storage:** for moving points, pick H3 (or S2) over plain geohash. H3's hexagons give uniform neighbor distance, making ring queries and movement cleaner; S2's Hilbert-curve ordering gives tight range scans and true spherical geometry. Store `cell_id -> set of driver_ids` in Redis and refresh each moving driver on a short TTL so stale positions expire; the durable DB is not in the hot path.",
+              "**The tradeoff:** geohash is simplest and shards trivially but has ugly boundaries; H3/S2 cost a library and cell math but pay off for moving points and radius coverage. Common wrong turn: a bounding-box SELECT or full distance scan over all rows, which ignores the sphere's geometry and does not scale.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-geospatial-indexing-practice",
+            prompt:
+              "Design the geospatial layer for a ride-matching system like Uber at 5M active drivers pinging their location every 4 seconds and 1M rider 'cars near me' queries per second at peak, where surge zones create extreme density spikes. Lead with how you absorb the write storm and keep dense cells from hot-spotting.",
+            thinkAbout: [
+              "Why do 1.25M location writes/sec belong in an in-memory grid rather than the durable DB?",
+              "How does a short TTL replace explicit deletes for drivers who stop pinging?",
+              "What splits a surge-zone cell that overloads its node?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 5M drivers x a ping every 4 seconds is ~1.25M location writes/sec, ~1M proximity reads/sec, geographically skewed (dense cities, surge events), sub-50ms match latency.",
+              "**Write storm:** driver pings are high-volume, low-durability updates, so the live position store is an in-memory grid, not the primary DB. Keep `h3_cell -> {driver_id: (lat, lng, ts)}` in Redis (sharded by cell) with a short TTL (~10s) so a driver who stops pinging ages out automatically with no delete needed. If pings are also needed durably, buffer through Kafka to a warehouse, but the match path reads only the memory grid.",
+              "**Index and reads:** H3 at a resolution matched to city pickup radius. A 'cars near me' query resolves the rider's cell, gathers the cell plus a kRing of neighbors to cover the radius, unions the driver sets, then does exact distance + ETA ranking on the small candidate set. H3 cell ids are the shard key, so reads and writes for a city colocate.",
+              "**Hot cells (the crux):** surge zones and airports overload a single cell. Shard by cell so dense cells spread across nodes; for a pathologically hot cell, drop to a finer H3 resolution locally so it splits into many sub-cells; cap drivers scanned per cell; and cache the recent nearby-driver result for a second (riders a block apart get the same answer). Precompute surge-zone cell sets.",
+              "**The tradeoff:** a short TTL and in-memory grid trade durability (a crashed Redis shard loses live positions, rebuilt in one ping cycle) for the throughput to absorb 1.25M writes/sec: the right call because positions are ephemeral anyway.",
+              "Common wrong turn: writing every ping to the durable DB (it melts) or a single global index without per-cell sharding (surge cells hotspot one node).",
             ],
           },
         },
