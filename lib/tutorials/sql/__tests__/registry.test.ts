@@ -15,8 +15,8 @@ import {
 } from "../registry"
 
 describe("sql registry — level-scoped navigation", () => {
-  it("lists four levels with ids 1–4", () => {
-    expect(listSqlLevels().map((level) => level.id)).toEqual([1, 2, 3, 4])
+  it("lists five levels with ids 1–5", () => {
+    expect(listSqlLevels().map((level) => level.id)).toEqual([1, 2, 3, 4, 5])
   })
 
   it("advances to the next lesson within the same level", () => {

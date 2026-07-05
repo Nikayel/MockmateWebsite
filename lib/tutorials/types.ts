@@ -235,7 +235,12 @@ export interface SqlExercise {
   workspace?: SqlWorkspaceGrading
 }
 
-export type SqlLevelSlug = "foundations" | "aggregation" | "modeling" | "engineering"
+export type SqlLevelSlug =
+  | "foundations"
+  | "aggregation"
+  | "modeling"
+  | "engineering"
+  | "advanced-company-sql"
 
 export type SqlLesson = TutorialLesson<SqlExercise>
 export type SqlModule = TutorialModule<SqlExercise>
