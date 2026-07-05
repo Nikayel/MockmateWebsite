@@ -422,6 +422,67 @@ local transactions with compensating actions, make retries safe with idempotency
 atomically with the outbox pattern, and denormalize to avoid cross-shard joins.
 `.trim()
 
+const cachingPatternsTeach = `
+## A cache is a bet, and the bet needs terms
+
+A cache is a bet that the same data will be read many times before it changes. Getting the bet right
+means choosing how reads populate the cache, how writes keep it honest, and how stale entries leave.
+Get it wrong and you serve wrong data or you overload the database you were trying to protect.
+
+### The read path
+
+**Cache-aside (lazy loading)** is the default in almost every real system. The application checks the
+cache; on a hit it returns; on a miss it loads from the database, writes the value back into the
+cache, and returns it. Only requested data is ever cached (no wasted memory), and a cache outage
+degrades to slower DB reads rather than an outage. The downside is that every cold key pays one miss,
+and your app code owns the population logic. **Read-through** hides that logic behind the cache
+client, which is cleaner but couples you to a client that understands your data source.
+
+### The write path, where the real tradeoffs live
+
+- **Write-through:** every write goes to the cache and the database synchronously before the write
+  returns. The cache is always consistent with the DB, but every write pays two hops of latency, and
+  you cache data that may never be read again.
+- **Write-back (write-behind):** the write updates the cache and returns immediately, and the cache
+  flushes to the DB asynchronously in batches. Lowest write latency, absorbs bursts, but you now own
+  a durability risk: if the cache node dies before the flush, those writes are gone. Use it only
+  where some loss is tolerable (view counts, metrics).
+- **Write-around:** writes go straight to the DB and skip the cache, so the cache fills only on the
+  next read. Avoids polluting the cache with write-once data, at the cost of a guaranteed miss on
+  freshly written keys.
+
+The most common pattern in practice is **cache-aside for reads plus invalidate-on-write**: on a
+write, update the DB and then delete (not update) the cache key, so the next read re-populates from
+the source of truth. Deleting rather than updating avoids a subtle race where two concurrent writers
+leave a stale value behind.
+
+### Expiry, sizing, and the numbers
+
+Every entry gets a **TTL**, and you add **jitter** (say 300s plus or minus a random 30s) so a cohort
+of keys written together does not all expire at the same instant. Eviction policy (**LRU** for
+recency, **LFU** for frequency) decides what leaves when memory fills. The number you optimize is the
+**cache hit ratio**: at 95% hits your DB sees 5% of read traffic, so a drop from 95% to 90% doubles
+DB load. Size the cache so the **hot working set** fits in memory; caching the long cold tail buys
+nothing. **Negative caching** (caching "this key does not exist" for a short TTL) stops repeated
+misses from hammering the DB for absent keys.
+
+**Interview nuance:** saying "add a cache" with no invalidation story is the fastest way to lose a
+senior interviewer. Always pair a write policy with how and when entries become stale, and name your
+consistency window: with a 60s TTL and no invalidation you are promising up-to-60s-stale reads, fine
+for a product page and unacceptable for an account balance.
+
+\`\`\`
+READ (cache-aside)                WRITE (invalidate-on-write)
+  app -> cache?                     app -> DB (source of truth)
+   hit  -> return                   then -> DELETE cache key
+   miss -> DB -> set cache          next read re-populates
+\`\`\`
+
+Recap: default to cache-aside reads plus invalidate-on-write, pick a write policy by its durability
+and latency tradeoff, and always attach a TTL-with-jitter and a stated consistency window so the
+cache is defensible, not just present.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -783,6 +844,63 @@ export const systemDesignLevel3: DesignLevel = {
               "**No oversell:** the inventory reservation is a local atomic decrement with a floor at zero, so two concurrent orders for the last unit cannot both succeed; the loser's saga fails and compensates. **No double-charge:** payment authorization is idempotent on order_id, so a retried authorize after a timeout returns the existing authorization instead of charging again.",
               "**Partial failure:** every step uses the outbox pattern (business write + next-step event in one local txn, relayed to Kafka), so a crash mid-saga does not lose a step. If a service is briefly down, the orchestrator retries with backoff; the order sits pending ('processing') and the saga resumes on recovery rather than failing the checkout. A timeout policy eventually compensates and releases the inventory hold so stock is not stranded.",
               "**The committed tradeoff:** eventual consistency and visible intermediate states (a brief inventory hold, a pending order) plus orchestration/idempotency/outbox complexity, in exchange for availability and throughput that 2PC across three services could never sustain at tens of thousands of orders/sec.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l3-m3",
+      title: "Caching at Scale",
+      description:
+        "Put a cache in front of a database and defend every part: the right write policy and invalidation story, stampede and hot-key protection, and a shared cache tier that survives node failures at a million ops/sec.",
+      lessons: [
+        {
+          id: "sd-l3-caching-patterns",
+          title: "Caching Patterns & Write Policies",
+          summary:
+            "Default to cache-aside reads plus invalidate-on-write, pick the write policy by its durability/latency trade, and always state the TTL and consistency window.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["caching", "write-policies"],
+          teach: {
+            markdown: cachingPatternsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-caching-patterns-apply",
+            prompt:
+              "Design the caching layer for a read-heavy product page (95% reads) backed by a database that can serve only 10% of peak read traffic.",
+            thinkAbout: [
+              "Which write policy fits, and what is its durability tradeoff?",
+              "How do you size the working set so the hot data fits in memory?",
+              "How do you keep cache and source of truth in sync?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an e-commerce product page at ~100K read QPS peak with the DB able to serve only 10K QPS. Product data changes rarely except inventory. So at least 90% of reads must come from cache, and the consistency requirement differs by field.",
+              "**Design: Redis as a cache-aside layer.** On a read, fetch `product:{id}`; on a miss, load from the DB, set with a TTL, return. To hit the required 90%+ offload, the hot working set must fit in memory: product traffic follows a heavy Pareto distribution, so caching the top few percent of SKUs covers the large majority of reads. Size Redis for that hot set with headroom (tens of GB), set LRU eviction under maxmemory, and confirm the hit ratio empirically.",
+              "**Write policy: cache-aside plus invalidate-on-write** for mostly-static fields. On an admin edit, write the DB then DELETE `product:{id}` (delete, not update, to avoid the concurrent-writer stale-value race), so the next read re-populates fresh. TTL is a backstop (10 minutes with jitter) in case an invalidation is missed.",
+              "**Inventory is split into its own key** `inventory:{id}` with a very short TTL (a few seconds) or a write-through update, accepting a few seconds of staleness on the displayed count. No write-back anywhere: the DB is the source of truth and a committed product edit must never be lost in a cache flush.",
+              "**Safety:** TTL jitter prevents synchronized cohort expiry; negative caching of missing product IDs stops 404-scanning traffic from reaching the DB. If Redis fails entirely, reads fall through to a DB that can only take 10%, so add a request-coalescing/stampede guard and a small in-process L1 cache to survive a cache-tier blip.",
+              "Common wrong turn: write-through for everything 'to stay consistent,' doubling every write's latency and caching write-once data, or naming Redis with no invalidation and no working-set sizing, so the hit ratio is unknown and the DB still melts at peak.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-caching-patterns-practice",
+            prompt:
+              "Design the caching strategy for Amazon's product detail page during a Prime Day spike where a small set of doorbuster SKUs draws 500K reads/sec while their price and inventory change every few seconds. Explain how you keep the displayed price correct while surviving the read volume, and lead with the concrete cache topology.",
+            thinkAbout: [
+              "Why does the hottest tier of the cache need to live in-process rather than in Redis?",
+              "Where is the authoritative price actually enforced, and why is display staleness acceptable?",
+              "What stops each 1-second expiry from stampeding the pricing service?",
+            ],
+            modelAnswerOutline: [
+              "**Topology: a two-tier cache**, an in-process L1 near cache on each app server plus a shared Redis L2, in front of the product/pricing services. The doorbuster SKUs are a tiny hot set, so an L1 with a 1-2 second TTL absorbs the bulk of 500K reads/sec without crossing the network: essential because no single Redis shard wants half a million ops/sec for one key.",
+              "**Split the page into fragments by volatility.** Static fragments (title, description, images) cache long with invalidate-on-write.",
+              "**Price is the sensitive field:** a very short L1 TTL (1 second) bounds worst-case display staleness at one second, legally and commercially acceptable, and the checkout path re-validates the price against the pricing service at add-to-cart and order time, so the authoritative price is always confirmed before money moves. The cached price is a display optimization, never the source of truth.",
+              "**Inventory** gets the same 1-second treatment plus a fail-safe 'low stock' signal ('limited availability' rather than a precise flickering count).",
+              "**Stampede protection:** request coalescing at both tiers so only one refresh per key per node hits the origin, jittered L1 TTLs across nodes, and pricing changes pushed as invalidations (or a versioned price key) so a price cut propagates within a second or two rather than waiting on TTL.",
+              "**The committed tradeoff:** up to ~1 second of price/inventory display staleness in exchange for serving 500K reads/sec from L1, with all correctness-critical price checks moved to the low-volume checkout path. Common wrong turn: keeping the displayed price perfectly live by reading the pricing service on every page view, which collapses under the read volume for no real benefit, since the binding price is the one confirmed at checkout.",
             ],
           },
         },
