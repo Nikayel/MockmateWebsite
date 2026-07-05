@@ -767,6 +767,71 @@ internal/CPU), never compress tiny or already-compressed payloads, and keep sche
 adding optional fields and never reusing field tags.
 `.trim()
 
+const loadBalancingTeach = `
+## Scale out, not up, and notice when a node dies
+
+A load balancer is the primitive that lets you scale out instead of up. Once one machine cannot serve
+your traffic, you run N identical machines and put a load balancer in front to spread requests across
+them. Everything else in this lesson is about doing that spreading correctly and about noticing when
+one of those N machines is dead.
+
+### The layer
+
+An **L4 (transport) load balancer** works at the TCP/UDP level. It sees IP addresses and ports, not
+HTTP. It picks a backend, forwards packets, and stays out of the way. Because it never parses the
+request body or terminates TLS, it is extremely fast and cheap per connection, and it is
+content-blind: it cannot route \`/api/*\` to one pool and \`/images/*\` to another. AWS NLB and IPVS
+are L4. An **L7 (application) load balancer** terminates the connection, reads the HTTP request, and
+can route on host, path, header, or cookie. It usually terminates TLS, can retry failed requests,
+inject headers, and do sticky routing. AWS ALB, Nginx, Envoy, and HAProxy in HTTP mode are L7. The
+cost is CPU and latency: it does real work per request. Rule of thumb: use L7 when you need
+HTTP-aware routing, TLS termination, or per-request features, and L4 when you need raw throughput or
+non-HTTP protocols.
+
+**Interview nuance:** Interviewers love to ask "L4 or L7 and why," then probe TLS. The clean answer:
+L7 terminates TLS at the edge so backends speak plain HTTP inside the trusted network (or re-encrypt
+for zero-trust); L4 passes TLS straight through, so the backend does the handshake and the LB never
+sees plaintext.
+
+### The algorithm
+
+**Round robin** rotates evenly and is fine when every request costs about the same. **Least
+connections** sends the next request to the backend with the fewest in-flight connections, which is
+the right default when request durations vary a lot (some calls take 2 ms, some take 2 s), because it
+naturally avoids piling long requests onto one node. **Weighted** variants let a bigger box take more
+traffic. **Consistent hashing** pins a given key (user id, cache key) to the same backend so you get
+cache affinity with minimal reshuffling when the pool changes.
+
+### Failure detection and draining
+
+**Active health checks** have the LB probe each backend on a schedule (\`GET /healthz\` every few
+seconds); miss a threshold of probes and the node is marked down and pulled from rotation. **Passive
+health checks** watch real traffic: if a backend returns errors or times out, eject it. You want
+both. When you deploy, you do not want to kill in-flight requests, so you use **connection
+draining**: the LB stops sending new requests to a node, waits for existing ones to finish (up to a
+timeout), then removes it. Pair that with graceful shutdown in the app (stop accepting, finish work,
+exit).
+
+Two traps. First, prefer **stateless** services so any node can serve any request; sticky sessions
+(pinning a user to one node) are a crutch that breaks when that node dies and complicates deploys.
+Push session state to Redis instead. Second, the load balancer itself is a **single point of
+failure**. One LB in front of ten app servers just moves the SPOF up a layer. Run it redundant:
+active-active pairs, or an anycast VIP fronting multiple LBs, with health-checked failover.
+
+\`\`\`
+        anycast VIP (redundant LBs)
+              |
+        [ L7 load balancer ]  <- TLS terminate, path routing, least-conn
+         /        |        \\
+     app-1     app-2     app-3   (stateless; session in Redis)
+       ^ active healthz probes every 3s; drain on deploy
+\`\`\`
+
+Recap: Pick L4 for raw speed or L7 for HTTP-aware routing and TLS, use least-connections when
+durations vary, combine active and passive health checks with connection draining, keep services
+stateless, and never leave the LB itself un-replicated.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1491,6 +1556,65 @@ export const systemDesignLevel1: DesignLevel = {
               "**Governance (the real protection):** the Schema Registry enforces a compatibility mode per topic, typically BACKWARD (new schema can read old data) or FULL. On registration, a proposed schema is checked against the existing one and rejected if it would break compatibility (removing a field a consumer needs, changing a type). The bad change is blocked at publish time, before any event is produced. Allowed evolution is additive: add fields with defaults, never change or reuse a field's identity.",
               "**Operational:** consumers use tolerant resolution (unknown fields ignored, new data has defaults), and the registry's version history plus per-topic compatibility gives an auditable contract across teams.",
               "Common wrong turn: raw JSON on Kafka with no registry (no enforcement, breakage found in production), or forcing global lockstep upgrades of thousands of producers and consumers, impossible at this scale. Registry-enforced Avro compatibility is what lets everyone deploy independently and safely.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l1-m3",
+      title: "Edge, Proxies & Caching Foundations",
+      description:
+        "Design the front half of any system: redundant load balancing over a stateless tier, an API gateway that owns cross-cutting concerns, and a full browser-to-database caching stack with a defensible invalidation strategy.",
+      lessons: [
+        {
+          id: "sd-l1-load-balancing",
+          title: "Load Balancing: L4 vs L7 & Health Checks",
+          summary:
+            "Pick L4 for raw speed or L7 for HTTP-aware routing and TLS, use least-connections for variable durations, and combine health checks with connection draining.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["load-balancing", "health-checks"],
+          teach: {
+            markdown: loadBalancingTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-load-balancing-apply",
+            prompt:
+              "Place and configure load balancing for a stateless API tier and explain how a dead instance is detected and drained.",
+            thinkAbout: [
+              "What does L4 vs L7 change about routing, TLS, and content awareness?",
+              "Which algorithm fits variable request durations?",
+              "How are active vs passive health checks and connection draining used?",
+            ],
+            modelAnswerOutline: [
+              "Assume a stateless HTTP/JSON API tier of about 12 instances behind one virtual IP, serving a mix of fast reads and slower search calls, with rolling deploys several times a day.",
+              "**L7 load balancer** (Envoy or an AWS ALB): chosen for TLS termination at the edge, path-based routing (`/v1/search` may go to a differently sized pool than `/v1/read`), and per-request retries on idempotent GETs. TLS terminates at the LB; inside the VPC either speak plain HTTP on a trusted network or re-encrypt for zero-trust. For a non-HTTP protocol or millions of PPS with minimal latency, drop to an L4 NLB instead, accepting no path routing.",
+              "**Algorithm: least connections, not round robin**, precisely because request durations vary: a 2-second search must not get round-robined onto a node already busy with three other searches while a neighbor sits idle. Least-connections tracks in-flight work and steers around hot nodes.",
+              "**Failure detection:** active health checks probe `GET /healthz` every 3 seconds; after 3 consecutive failures the node is removed from rotation and must pass 2 checks to return. `/healthz` checks real readiness (DB pool reachable), not just process-up. Passive checks eject a node returning 5xx or timing out on live traffic immediately rather than waiting for the next probe.",
+              "**Deploys: connection draining.** The LB stops routing new requests to the target, waits up to 30 seconds for in-flight requests to complete, then removes it; the app cooperates with graceful shutdown (stop accepting, drain, exit). This gives zero-downtime rolling deploys.",
+              "**Statelessness and LB redundancy:** any node serves any request, so no sticky sessions; session state lives in Redis. The LB itself is redundant (active-active ALB across AZs, or anycast VIP over multiple Envoys) so it is not the new single point of failure.",
+              "Common wrong turn: turning on sticky sessions 'to be safe,' which reintroduces state and breaks graceful failover, or leaving a single LB as an un-replicated SPOF.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-load-balancing-practice",
+            prompt:
+              "Design the load-balancing tier for Stripe's payments API at roughly 100k requests per second, global, where mis-routing a request during a deploy can double-charge a customer. Explain how you route, health-check, and deploy without dropping or duplicating a single in-flight payment.",
+            thinkAbout: [
+              "Which layer actually guarantees no double charge: the load balancer or the application?",
+              "When is it safe for the LB to auto-retry a payment request?",
+              "How do you deploy so in-flight charges complete and a bad canary is contained?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: global traffic, strict correctness (no dropped or duplicated charges), p99 latency budget in the low hundreds of ms, and frequent deploys.",
+              "**Global entry:** anycast so clients hit the nearest point of presence, terminating TLS at regional L7 load balancers (Envoy). Anycast plus health-checked withdrawal means a failing region is pulled from BGP and traffic shifts to the next-closest region without client changes. Within a region, active-active Envoy behind a shared VIP so no single LB is a SPOF.",
+              "**Routing:** L7 on path and API version. For the payment-execution path use least connections because charge calls have variable latency (some hit slow card networks).",
+              "**The key insight: do NOT rely on the LB to prevent duplicates.** Duplication is solved at the application layer with idempotency keys: every charge carries a client-supplied key and the service dedupes on it, so even if the LB retries or a request lands twice during failover, the customer is charged once. The LB is for availability; idempotency is for correctness. Only enable automatic LB retries on requests carrying an idempotency key.",
+              "**Health checks:** active `GET /healthz` every 2 to 3 seconds with a low failure threshold, plus passive ejection on 5xx or timeout, so a node processing payments incorrectly is removed fast.",
+              "**Deploys:** connection draining with a generous timeout so in-flight charges complete, plus graceful shutdown. Deploy region by region (or canary a small weighted slice via weighted routing) and watch error and latency SLOs before widening; a misbehaving canary's weight goes back to zero instantly.",
+              "Common wrong turn: trusting the load balancer to guarantee exactly-once delivery. Networks retry and LBs fail over; only application-level idempotency makes double-charging impossible, and the LB design just has to avoid dropping in-flight work via draining.",
             ],
           },
         },
