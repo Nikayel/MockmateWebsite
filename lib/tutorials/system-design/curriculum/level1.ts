@@ -169,6 +169,63 @@ control, so reuse connections (keep-alive, pooling, HTTP/2) and move endpoints c
 reach for UDP when late data is worthless and watch TIME_WAIT/port exhaustion under churn.
 `.trim()
 
+const tlsHttpsTeach = `
+## Update your TLS mental model to 1.3
+
+Most engineers carry stale TLS mental models from the 1.2 era. Update them: **TLS 1.3 is a 1-RTT
+handshake**, and 0-RTT on resumption. That single fact changes the latency math for every HTTPS
+design.
+
+What the handshake does in one round trip: the client sends a \`ClientHello\` with its key share and
+supported ciphers; the server responds with its key share, certificate, and \`Finished\`; the client
+verifies and can send application data on its next flight. One RTT and you have a shared symmetric
+key. The certificate lets the client verify server identity: the cert is signed by a Certificate
+Authority (CA) the client trusts, forming a chain up to a root CA in the client's trust store. **SNI**
+(Server Name Indication) is the client telling the server, in the clear, which hostname it wants, so
+one IP hosting many tenants (a CDN, a shared LB) can present the right certificate.
+
+**Interview nuance:** certificate expiry is one of the most common real-world outage causes (an
+unrotated cert on a load balancer takes the whole site down at midnight). Always mention automated
+rotation (ACME/Let's Encrypt, AWS ACM) as part of a TLS design.
+
+### Cutting handshake cost
+
+- **Session resumption**: after a first full handshake, the server issues a session ticket; a
+  returning client presents it and skips the certificate exchange, dropping to a cheaper handshake.
+- **0-RTT (early data)**: on resumption, TLS 1.3 lets the client send application data in its very
+  first flight, before the handshake completes, saving a full round trip. The caveat that
+  interviewers will push on: **0-RTT early data is replayable**. An attacker who captures it can
+  resend it, so you must only allow 0-RTT for idempotent requests (GET, or writes guarded by an
+  idempotency key). Never let a non-idempotent \`POST /charge\` ride on 0-RTT.
+- **Connection reuse**: the cheapest handshake is the one you do not do. Keep connections warm so you
+  handshake once and reuse.
+
+### Where do you terminate TLS?
+
+Three common choices; the tradeoff is latency/operational-simplicity versus how far encryption
+reaches:
+
+- **Terminate at the edge/LB**: the ALB, CDN POP, or Envoy front proxy decrypts, and traffic behind
+  it is plaintext (or re-encrypted). This offloads crypto from app servers, centralizes cert
+  management, and lets the L7 proxy read requests for routing. The cost: the internal network sees
+  plaintext, which is only acceptable if that network is trusted.
+- **End-to-end / passthrough**: TLS is not terminated until the app, so even the LB cannot read the
+  request (it must be an L4 LB). Maximum confidentiality, but you lose L7 routing and pay crypto on
+  every app server.
+- **Re-encrypt inside the mesh**: terminate at the edge for routing, then open a fresh TLS connection
+  to the backend. This is the common enterprise answer: edge features plus encrypted internal hops.
+
+**mTLS** (mutual TLS) extends this: not only does the client verify the server, the server verifies
+the client's certificate too. This gives cryptographic **service-to-service identity**, the backbone
+of zero-trust architectures and service meshes (Istio, Linkerd) where "is this caller really the
+orders service" cannot rely on network location. Each service gets a short-lived cert from an
+internal CA, and the mesh rotates them automatically.
+
+Recap: TLS 1.3 is a 1-RTT handshake (0-RTT on resumption, but only for idempotent requests due to
+replay), you cut cost with session resumption and connection reuse, you choose termination by trading
+internal visibility for edge features, and mTLS gives services cryptographic identity for zero-trust.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -327,6 +384,57 @@ export const systemDesignLevel1: DesignLevel = {
               "**Scale:** 1M concurrent participants means no peer mesh; route media through Selective Forwarding Units (SFUs) in regional POPs near users, so each client has one short-RTT UDP path to its nearest SFU and the SFU fans out. Keeping per-hop RTT low is the only way to stay under 150ms once encode/decode and jitter-buffer time are subtracted.",
               "**Tradeoff:** UDP forces rebuilding loss handling (FEC, concealment, app-layer congestion control), real complexity, but it is the only way to hit the latency target. TCP for control is the easy, correct default because its data cannot tolerate loss and can tolerate latency.",
               "Common wrong turn: running media over TCP for 'reliability.' Its head-of-line blocking and retransmits guarantee missing the latency budget; reliability is the wrong goal for live media.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-tls-https",
+          title: "TLS / HTTPS & the Secure Handshake",
+          summary:
+            "TLS 1.3 is a 1-RTT handshake; cut cost with resumption and reuse, choose the termination point deliberately, and use mTLS for service identity.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["tls", "security", "mtls"],
+          teach: {
+            markdown: tlsHttpsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-tls-https-apply",
+            prompt:
+              "Design TLS termination for a multi-region service: decide where you terminate, how you cut handshake latency, and how services authenticate each other.",
+            thinkAbout: [
+              "Where do you terminate TLS and what is the latency vs security tradeoff?",
+              "How do session resumption and 0-RTT cut handshake cost, and what is the replay caveat?",
+              "Why use mTLS between services?",
+            ],
+            modelAnswerOutline: [
+              "Assume a multi-region service behind a CDN, with regional L7 proxies (Envoy/ALB) in front of app fleets, and internal service-to-service calls within each region.",
+              "**Termination: at the regional edge proxy** (and optionally at the CDN POP for static content). This offloads TLS crypto from app servers, centralizes certificate management, and lets the L7 proxy read the request for path/header routing, which an L4 passthrough could not do. Behind the edge, re-encrypt to backends rather than sending plaintext, because 'internal network is trusted' is a weak assumption in a multi-tenant cloud VPC. Terminate at edge for features and offload, re-encrypt inward for confidentiality.",
+              "**The explicit tradeoff:** full end-to-end passthrough would hide requests even from your own LB but costs L7 routing and puts crypto on every app server; edge-terminate-plus-reencrypt is the pragmatic middle.",
+              "**Cutting handshake latency:** (1) TLS 1.3 everywhere, so a fresh handshake is 1 RTT, not 1.2's two. (2) Session resumption with tickets so returning clients skip the certificate exchange. (3) Terminate at a nearby POP so full handshakes happen over a short RTT, and keep warm pooled connections from POP to origin so the long-haul leg rarely re-handshakes. (4) Enable 0-RTT only for idempotent GETs, never mutations: 0-RTT early data is replayable, so a captured `POST /charge` could be resent.",
+              "**Automate cert rotation** (ACM/ACME): an expired cert on the edge is a classic total outage.",
+              "**Service-to-service auth: mTLS** via a service mesh (Istio/Linkerd) or SPIFFE identities. Each service presents a short-lived cert from an internal CA and both sides verify, so 'is this really the orders service' is answered cryptographically, not by IP allowlist. That is the zero-trust posture: network location grants nothing; identity is the cert.",
+              "Common wrong turn: treating the handshake as free (it is 1 RTT plus crypto, worth optimizing), forgetting cert rotation (the top outage cause), or enabling 0-RTT on non-idempotent endpoints.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-tls-https-practice",
+            prompt:
+              "Design the TLS and identity architecture for a bank's payment microservices where a compliance rule forbids plaintext on any wire, even inside the VPC, and every service call must be cryptographically attributable to a specific service identity for audit. Explain termination, key rotation, and how you keep the added crypto from blowing the latency budget.",
+            thinkAbout: [
+              "Where does plaintext exist in an edge-terminate design, and why does that violate the rule here?",
+              "How do short-lived, auto-rotated certificates change the blast radius of a leaked key?",
+              "Which crypto cost dominates (handshakes or steady-state), and what amortizes it?",
+            ],
+            modelAnswerOutline: [
+              "The 'no plaintext anywhere' and 'every call attributable' rules push to end-to-end mTLS with a service mesh, not edge-terminate-and-trust-the-network.",
+              "**Encryption on every wire:** do not terminate to plaintext behind the edge. The public edge terminates the client's TLS (or passes through), and every internal hop runs its own mTLS connection, so no packet is ever plaintext on any wire. A sidecar proxy (Envoy via Istio/Linkerd) sits next to each service and handles the TLS so app code stays simple; plaintext only exists inside the loopback between app and its own sidecar, which never touches a wire.",
+              "**Attributable identity:** mTLS with SPIFFE/SPIRE-issued identities. Each service gets an X.509 SVID encoding its identity (e.g. `spiffe://bank/payments/settlement`). Both sides verify certs on every connection, so every call is provably from a named service, and the mesh emits audit logs keyed by that identity. Authorization policies ('only settlement may call ledger-write') are enforced on identity, not IP.",
+              "**Key rotation:** short-lived certs, on the order of hours, auto-rotated by SPIRE. Short lifetimes shrink the blast radius of a leaked key and remove the manual-rotation outage risk; the mesh rotates transparently, so no midnight cert-expiry outage.",
+              "**Keeping latency in budget:** (1) TLS 1.3 for 1-RTT handshakes; (2) aggressive connection reuse/pooling between sidecars so the handshake amortizes over thousands of requests (steady state is symmetric-key encryption, cheap and often hardware-accelerated AES-NI); (3) session resumption for reconnects; (4) shallow call graphs so handshake RTTs do not stack. Do not enable 0-RTT: these are payment mutations, and 0-RTT's replay risk is unacceptable for a charge.",
+              "**Tradeoff:** full mesh mTLS is operationally heavy (CA, sidecars, rotation infra) and adds a small per-connection cost, but it is the only way to satisfy 'encrypted everywhere, attributable everywhere.' The latency hit is contained because reuse makes handshakes rare and symmetric crypto is cheap.",
+              "Common wrong turn: edge-terminating to plaintext internally 'because the VPC is private,' which violates the compliance rule, or using long-lived certs that become a rotation-outage and leak-blast-radius problem.",
             ],
           },
         },
