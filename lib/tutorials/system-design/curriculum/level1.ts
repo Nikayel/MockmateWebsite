@@ -343,6 +343,58 @@ an RTT and offers a cache that can short-circuit the rest, and every hop needs i
 slow dependency cannot stall the whole path.
 `.trim()
 
+const apiParadigmsTeach = `
+## A paradigm is a bet about your consumer
+
+An API paradigm is a bet about who the consumer is and what the traffic looks like. Pick it after you
+know those two things, not before.
+
+### REST
+
+REST is resource-oriented over HTTP. You model nouns (\`/orders/123\`), lean on HTTP methods and
+status codes, and get the entire HTTP ecosystem for free: caching via \`Cache-Control\` and \`ETag\`,
+proxies, CDNs, browser tooling, and near-universal client support. That ubiquity is why REST is the
+default for public developer APIs. The cost is chattiness. A mobile screen that needs a user, their
+last five orders, and a loyalty balance may make three round trips, and REST tends to over-fetch (you
+get the whole resource) or under-fetch (you need another call).
+
+### gRPC
+
+gRPC is contract-first RPC. You define services and messages in a Protobuf \`.proto\` file, generate
+typed clients and servers in every language, and send compact binary frames over HTTP/2 with
+multiplexing and bidirectional streaming. On an internal service mesh at high QPS this is the winner:
+a Protobuf payload is often 3 to 10 times smaller than the equivalent JSON, parsing is faster, and
+the generated stubs make cross-service calls feel like local function calls. The cost is that it is
+unfriendly to browsers (you need grpc-web plus a proxy) and to casual \`curl\` debugging, and HTTP
+caches cannot see inside a binary POST.
+
+### GraphQL
+
+GraphQL exposes a single typed schema and lets the client ask for exactly the fields it wants in one
+request. That directly solves the over/under-fetching problem for clients with varied, evolving data
+needs, which is why product teams with many screens and one flexible backend reach for it. The costs
+are real: HTTP caching mostly stops working because everything is a POST to \`/graphql\`, you must
+add explicit query-cost limiting and depth limiting to stop a client from asking for the whole graph,
+and the resolver layer invites N+1 database calls unless you add DataLoader-style batching.
+
+### The real answer is usually hybrid
+
+Put REST or GraphQL at the edge where public or client-facing consumers live, and use gRPC between
+your own services where you control both ends and care about latency and bytes. Netflix, Uber, and
+Google all run this split.
+
+Two more tools round out the picture. WebSocket and SSE handle server push (chat, live updates) where
+request/response does not fit. Message queues (Kafka, SQS) handle asynchronous decoupling, where the
+caller should not wait at all.
+
+**Interview nuance:** interviewers probe whether you can name what each paradigm *costs*, not just
+what it optimizes. "GraphQL is flexible" is a junior answer; "GraphQL trades HTTP caching and needs
+query-cost limits" is a senior one.
+
+Recap: match paradigm to consumer and traffic (REST public, gRPC internal, GraphQL flexible clients),
+and expect the real answer to be a hybrid.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -655,6 +707,63 @@ export const systemDesignLevel1: DesignLevel = {
               "**Bottleneck 2: TLS/connection setup at the edge.** 200k RPS of new mobile connections is a handshake flood: keep connections warm/pooled, terminate TLS at the POP with session resumption, and use H2/H3 multiplexing so one connection carries many requests.",
               "**Holding p99 under 300ms:** shared data from the edge, Redis with herd protection for personalized data, aggressive connection reuse, per-hop timeouts with circuit breakers so a slow recommendations service degrades to a generic strip instead of stalling the page, and graceful degradation (show the product even if recs are slow).",
               "Common wrong turn: trying to cache the whole personalized page at the CDN (impossible for signed-in users) instead of splitting cacheable shared data from per-user data, or ignoring the hot-key thundering herd a single doorbuster creates.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l1-m2",
+      title: "API Design & Contracts",
+      description:
+        "Choose the right API paradigm, design schema-first contracts that evolve without breaking clients, make mutations safe to retry, and use HTTP semantics, pagination, real-time delivery, and serialization like production systems do.",
+      lessons: [
+        {
+          id: "sd-l1-api-paradigms",
+          title: "REST vs gRPC vs GraphQL",
+          summary:
+            "Match the paradigm to the consumer and traffic shape (REST public, gRPC internal, GraphQL flexible clients) and name what each choice costs.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["api-design", "grpc", "graphql"],
+          teach: {
+            markdown: apiParadigmsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-api-paradigms-apply",
+            prompt:
+              "Recommend the API style for (a) a public developer API, (b) internal service-to-service calls, and (c) a mobile client with varied data needs, and defend each.",
+            thinkAbout: [
+              "What does each paradigm optimize, and what does it cost?",
+              "Why is a hybrid (REST/GraphQL edge, gRPC internal) the common real answer?",
+              "Where do WebSocket/SSE and queues fit for push and async?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a company with external developers, dozens of internal microservices, and a mobile app with many screens.",
+              "**(a) Public developer API: REST.** External developers already know REST, want `curl`-debuggable endpoints, and benefit from HTTP caching, standard status codes, and OpenAPI-generated docs and SDKs. The chattiness cost is acceptable because you cannot dictate client behavior and ubiquity matters more than bytes. Version it (`/v1`) and document with OpenAPI.",
+              "**(b) Internal service-to-service: gRPC.** You own both ends, so contract-first Protobuf gives typed generated clients, compact binary frames over HTTP/2, and streaming. At high internal QPS the 3 to 10x payload reduction and faster parsing directly cut CPU and tail latency, and the shared `.proto` becomes the enforced contract. Browser-unfriendliness does not matter here.",
+              "**(c) Mobile client with varied data needs: GraphQL at the edge** (often via a BFF). Mobile screens need different field combinations and mobile networks punish extra round trips, so letting the client fetch exactly what a screen needs in one request removes over/under-fetching. Add persisted queries plus query-depth and cost limits so a bad client cannot ask for the entire graph, and DataLoader batching to avoid N+1.",
+              "**The unifying point:** these coexist. GraphQL or REST at the edge resolves down into gRPC calls between services. For push (a live order-status screen) add SSE or WebSocket; for async work (the confirmation email) drop an event on Kafka rather than block the request.",
+              "Common wrong turn: choosing GraphQL or gRPC because they sound modern, before establishing the consumer and traffic shape. gRPC on a public browser API or GraphQL with no cost limiting both cause real production pain.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-api-paradigms-practice",
+            prompt:
+              "Design the API surface for Stripe-scale infrastructure: a public payments API used by millions of external developers, plus the internal fraud, ledger, and notification services behind it that must handle tens of thousands of charge requests per second. Choose paradigms per layer and justify against caching, debuggability, latency, and contract enforcement.",
+            thinkAbout: [
+              "What do millions of external developers need that internal services do not?",
+              "Which parts of a charge's fan-out should not block the request at all?",
+              "Why does GraphQL buy nothing for a small, stable set of payment resources?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: external developers integrate over the internet with mixed languages; internally a charge fans out to fraud scoring, ledger writes, and notifications at 10k to 50k QPS.",
+              "**Public layer: REST with JSON.** Developers need to `curl` a charge, read predictable status codes, and paste examples into any language. Stripe does exactly this and pairs it with Idempotency-Key support so retries are safe. Version with a date-based scheme, keep evolution additive, document with OpenAPI and auto-generate SDKs.",
+              "**Internal layer: gRPC** between the API service and fraud, ledger, and notification services. At 10k+ QPS the Protobuf payload savings and HTTP/2 multiplexing cut both bytes and CPU, and generated stubs make the fan-out ergonomic. The `.proto` files are the enforced cross-team contract, and Protobuf field-number rules keep them evolvable. Fraud scoring can use a streaming RPC if signals arrive incrementally.",
+              "**Async layer:** the charge request should not block on sending a receipt email or updating analytics. Publish `charge.succeeded` to Kafka; the notification service consumes independently, decoupling latency and letting each side scale and fail on its own.",
+              "**Why not GraphQL here:** the public payments API is a small, stable set of resources (charges, refunds, customers), not a screen-driven UI with varied field needs, so GraphQL's flexibility buys nothing while costing HTTP caching and cost-limiting complexity.",
+              "Common wrong turn: forcing one paradigm everywhere. REST internally would waste bytes and CPU at this QPS; gRPC publicly would break `curl` and browser developers. The layered split is what makes it work.",
             ],
           },
         },
