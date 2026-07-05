@@ -729,6 +729,55 @@ Recap: Frame every major choice through a principled lens, commit to one option 
 assumption, quantify the trade, and name what you gave up.
 `.trim()
 
+const levelCalibrationTeach = `
+## The same prompt, graded three different ways
+
+The same prompt, "Design a rate limiter," is a pass or a fail depending on the level you are
+interviewing for, and the difference is not "more" but "aimed differently." A staff-depth answer to a
+junior loop can fail if it never finishes, and a junior-depth answer to a staff loop fails for lack of
+proactive depth. Calibration is knowing which one you are in and steering to that rubric.
+
+Most companies grade a system-design round on roughly four axes:
+
+- **Problem navigation**: scoping, requirements, handling ambiguity.
+- **Technical excellence**: correct components, sound data model, working design.
+- **Communication**: narration, structure, responsiveness.
+- **Proactive depth**: finding bottlenecks and going deep without being asked.
+
+### What "complete" means per level
+
+- **Junior**: a correct high-level design. Core components (LB, app tier, database, cache), a basic
+  path from request to response, and awareness that scale exists. Completeness beats depth. Finishing
+  a clean, correct end-to-end design is a strong junior answer. You are not expected to derive novel
+  tradeoffs; you are expected to not have holes.
+- **Senior**: everything junior, plus you find the bottlenecks yourself and quantify the tradeoffs.
+  You do one or two real deep dives (the hot partition, the cache invalidation strategy, the fan-out)
+  unprompted. You drive the round without the interviewer pulling you along. Estimation is not
+  decoration; it justifies a design decision.
+- **Staff+**: everything senior, plus you own the ambiguity. You frame an under-specified prompt into
+  a crisp problem, and your tradeoffs extend past the technical into org, cost, and reliability ("this
+  doubles our on-call surface," "this triples storage spend at our scale"). You reason about how the
+  system evolves over two years, and you make the call on what not to build.
+
+For "Design a rate limiter," concretely: a junior nails token-bucket in a single service plus Redis
+for shared state. A senior adds the distributed-counter race, the sliding-window-vs-token-bucket
+tradeoff, and what happens when Redis is down (fail-open vs fail-closed). A staff candidate
+additionally frames whose traffic and which tier, argues the cost of per-user vs per-IP granularity,
+and picks a degradation policy tied to a business risk.
+
+**Interview nuance:** Match estimation depth and deep-dive count to the level. A junior doing three
+deep dives runs out of time on the basics. A senior who does zero looks shallow. Budget roughly one
+deep dive for senior, two for staff, in a 45-minute round.
+
+**Interview nuance:** If you do not know the level, ask, or infer it from the recruiter's title and
+the interviewer's follow-ups. When in doubt, deliver a complete junior-plus backbone first, then go
+deep, so you always have a finished answer before you gamble time on depth.
+
+Recap: Aim depth and breadth at the target rubric; junior wants a complete correct design, senior
+wants unaided bottleneck-finding and quantified tradeoffs, staff wants ambiguity-framing plus
+org/cost/reliability and evolution thinking.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -1370,6 +1419,55 @@ export const systemDesignLevel0: DesignLevel = {
               "**The data that must never be lost goes elsewhere:** trip records (fares, receipts, dispute history) go to a separate durable store, sharded SQL or a durable document store, written asynchronously off the hot path.",
               "**Revisit seam:** if match quality needs richer filters (driver rating, vehicle type) at query time, enrich from a cache alongside Redis rather than moving the hot geo query into a heavier store.",
               "Common wrong turn: putting live location in Postgres with PostGIS 'because it does geo.' It does, but a single relational primary cannot absorb 1M writes/sec of ephemeral data, and you would pay for durability on exactly the data that does not need it.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-level-calibration",
+          title: "Level Calibration: Junior vs Senior vs Staff",
+          summary:
+            "Know the four rubric axes and aim your depth at the target level: complete design (junior), unaided deep dives (senior), ambiguity plus org/cost/evolution (staff).",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["calibration", "rubric"],
+          teach: {
+            markdown: levelCalibrationTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-level-calibration-apply",
+            prompt:
+              "Take 'Design a rate limiter' and describe how a passing answer differs at junior, senior, and staff level on scope, depth, and trade-off sophistication.",
+            thinkAbout: [
+              "What does 'complete' look like at each level?",
+              "How many deep dives and how much estimation depth fit each level?",
+              "What are the graded rubric axes?",
+            ],
+            modelAnswerOutline: [
+              "Grade against four axes: problem navigation, technical excellence, communication, proactive depth. The prompt is the same; the aim differs.",
+              "**Junior (completeness over depth):** define the goal (cap requests per user per window), pick token bucket, place the limiter as middleware in the API gateway backed by a shared Redis counter so multiple app instances agree, draw the request path, and state the response (HTTP 429 with Retry-After). No holes, correct components, end to end. Zero to one estimation, no unprompted deep dives expected. Finishing cleanly is the win.",
+              "**Senior (unaided depth and quantified tradeoffs):** everything above, plus proactively raising the concurrency problem: two instances read-modify-write the same Redis counter and race, so reach for atomic INCR with expiry or a Lua script. Compare fixed window (cheap, allows a 2x burst at the boundary) vs sliding-window-log (accurate, more memory) vs token bucket (smooth, tunable) and commit with a reason. Ask what happens when Redis is unavailable and pick fail-open or fail-closed on purpose. One solid deep dive, estimation that sizes the Redis memory. Drive without prompting.",
+              "**Staff+ (ambiguity, org, cost, evolution):** first frame the under-specified prompt: rate limiting for what, external API abuse, internal service protection, or fairness? Who is the key: user, IP, or API token, and what does each choice cost? Extend tradeoffs past the technical: a per-user distributed limiter adds a Redis dependency to every request, expanding the on-call and failure surface, so an approximate local limiter with periodic sync may be worth the accuracy loss. Reason about evolution (start centralized, move to a sidecar/local-token design as QPS grows) and make an explicit call on what not to build now.",
+              "Budget roughly one deep dive for senior, two for staff, in a 45-minute round; a junior spending the clock on three dives never finishes the basics.",
+              "Common wrong turn: giving a staff-depth, never-finished answer to a junior prompt, or a bare token-bucket sketch with no bottleneck-finding to a staff loop.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-level-calibration-practice",
+            prompt:
+              "Describe what specifically lifts your answer from a strong senior answer to a staff answer in a Staff Engineer interview at Stripe where the prompt is 'Design a rate limiter for our public payments API,' given that this is real money and real merchants.",
+            thinkAbout: [
+              "What is the real business requirement behind rate limiting a payments API: abuse, fairness, or blast radius?",
+              "Which degradation policy decisions are business decisions rather than technical defaults?",
+              "What two-year evolution and deliberate deferrals would a staff answer name?",
+            ],
+            modelAnswerOutline: [
+              "A strong senior answer is already good: token bucket per API key, atomic counters in a Redis cluster, tiered limits by plan, 429 with Retry-After, a deep dive on the distributed-counter race, and a fail-open-vs-fail-closed decision. Staff means making it specific to Stripe's business.",
+              "**First, frame the ambiguity as a product question:** rate limiting a payments API is not primarily abuse prevention, it is fairness and blast-radius control. One merchant's runaway retry loop must not exhaust capacity for everyone else, so the real requirement is per-merchant isolation with global protection underneath. That reframing is the staff move.",
+              "**Second, org and cost tradeoffs:** a hard fail-closed limiter that wrongly blocks a legitimate merchant during a Black Friday spike is lost revenue and a support escalation, so the degradation policy is a business decision. Fail-open on the limiter's own infrastructure failure (never block a real payment because Redis blinked) while keeping the per-key ceiling enforced, and separate the idempotency layer so retries stay safe even when limits are loose.",
+              "**Also flag the money-path dependency:** a synchronous Redis call on every payment adds latency to the money path and a dependency to on-call, which argues for a local token cache synced asynchronously, trading a little accuracy for a smaller failure surface on the critical path.",
+              "**Third, evolution and what not to build:** start with centralized counters, plan the migration to a cell-based or sidecar limiter as QPS grows, and explicitly defer ML-based anomaly limiting as out of scope for v1. Naming the two-year path and the deliberate cut is what a staff interviewer listens for.",
+              "Common wrong turn: adding more algorithms and more Redis tuning (deeper senior) instead of reframing the problem in business terms (staff): isolation, revenue risk, failure surface, and evolution.",
             ],
           },
         },
