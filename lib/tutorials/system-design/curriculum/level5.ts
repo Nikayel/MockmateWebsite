@@ -192,6 +192,57 @@ DynamoDB and Cassandra are PA/EL while Spanner and CockroachDB are PC/EC, and th
 tying the L-vs-C choice to a concrete latency SLO.
 `.trim()
 
+const consistencySpectrumTeach = `
+## Name the exact point, not the ends
+
+"Strongly consistent" and "eventually consistent" are the two phrases most people know, and they are
+not enough. Between them sits a spectrum, and a senior engineer names the exact point rather than
+waving at the ends.
+
+**Linearizability** is the strong end. Every operation appears to take effect instantaneously at some
+point between its invocation and its response, and that single point respects real-time order: if
+write B started after write A returned, every reader sees them in that order. The system behaves as
+if there is one copy of the data. This is what lets you build a unique-username check, a distributed
+lock, or a leader election, because "did anyone already take this?" has a single global answer. The
+cost is coordination: a leader or a quorum, and round trips to agree on order.
+
+**Sequential consistency** relaxes the real-time part. All clients agree on one total order, and each
+client's own operations keep their program order, but that global order need not match wall-clock
+reality. Cheaper than linearizable, and enough for many caches, but it can surprise you when two
+users compare notes out of band ("I posted first, why is mine below yours?").
+
+**Causal consistency** keeps only the orderings that matter: if event A *causally influenced* B (you
+read a post, then reply to it), everyone sees A before B. Operations with no causal link can appear
+in different orders on different replicas. The crucial property, from the COPS and Bayou research
+lines: **causal consistency is the strongest model you can provide while staying available under a
+network partition**. Anything stronger forces you to block or reject writes when the network splits.
+
+**Eventual consistency** promises only that if writes stop, replicas converge. Along the way you see
+stale reads, reordered updates, and (without conflict handling) lost writes. Cheapest to run, highest
+availability: shopping-cart-scale and like-count-scale systems live here.
+
+\`\`\`
+strong <--------------------------------------------------> weak
+linearizable   sequential   causal   |   eventual
+(real-time)    (total ord)  (cause)  |   (converges)
+      more coordination  <-----  |  ----->  more availability
+                          partition line
+\`\`\`
+
+**Interview nuance:** the coordination cost rises monotonically to the left. Stronger models need
+leaders, quorums, or waiting, which costs latency and availability. The design skill is picking the
+*weakest* model that is still correct for the specific data.
+
+One more axis people conflate. **Replication consistency** (this spectrum: how up-to-date are the
+copies) is *not* the same as **ACID isolation** (serializable, snapshot, read-committed: how
+concurrent transactions interleave). Spanner is linearizable *and* serializable; a system can be one
+without the other. Naming which axis you mean is a fast credibility signal.
+
+Recap: name the specific model (linearizable, sequential, causal, eventual) and its coordination
+cost, remember causal is the strongest model available under partition, keep replication consistency
+separate from ACID isolation, and always reach for the weakest model that is still correct.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -349,6 +400,63 @@ export const systemDesignLevel5: DesignLevel = {
               "**The write path (create post):** durability and no lost writes matter more than raw latency, and 50k writes/s must not bottleneck on a global quorum. Make the post write local-region durable first (quorum within the author's region: a few ms), replicating asynchronously to other regions. Still PA/EL globally: the user's post is not blocked on an APAC ack.",
               "**Carve out the rare truly-global operation:** if something genuinely needs global linearizability (username uniqueness at signup), put THAT operation on a PC/EC store (Spanner or a CockroachDB table) and let it eat the cross-region quorum latency, because it is rare and correctness-critical.",
               "**The load-bearing point:** pick a PACELC posture per operation, not one database for the product: EL for hot feed reads and regional writes to hit the SLO, EC only for the rare global-uniqueness case. Exactly how real multi-region systems reconcile a tight latency budget with correctness where it counts.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l5-m2",
+      title: "Consistency & Time",
+      description:
+        "Place any system precisely on the consistency spectrum with its coordination cost, fix staleness bugs with the four session guarantees, order events without a shared clock, and treat clock drift as a correctness input.",
+      lessons: [
+        {
+          id: "sd-l5-consistency-spectrum",
+          title: "Consistency Models Spectrum",
+          summary:
+            "Linearizable, sequential, causal, eventual: name the exact model and its coordination cost, and always pick the weakest model that is still correct for the data.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["consistency-models", "linearizability"],
+          teach: {
+            markdown: consistencySpectrumTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l5-consistency-spectrum-apply",
+            prompt:
+              "Design the read path for a bank balance versus a social like-count, and for each pick the weakest consistency model that is still correct, justifying the choice.",
+            thinkAbout: [
+              "What separates linearizable, sequential, causal, and eventual?",
+              "Why is causal the strongest model available under partition?",
+              "Why is replication consistency a different axis from ACID isolation?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the bank balance drives overdraft decisions and is legally binding; the like-count is engagement UI that tolerates being off by a few for a few seconds.",
+              "**Bank balance: linearizable reads.** The read a withdrawal or overdraft check depends on must reflect every committed write in real-time order, because two concurrent withdrawals both reading a stale positive balance is exactly how you double-spend. Serve balance reads from the leader (or a quorum read with R+W>N plus read-repair): a Spanner/CockroachDB-style or single-leader Postgres primary read. The price: leader-round-trip latency and lost availability on the minority side during a partition: correct, because a bank prefers rejecting a request over authorizing an overdraft.",
+              "**The separate axis, stated:** that was the *replication* choice; on top of it the transfer still needs serializable *isolation* so the read-modify-write does not interleave. A system can have either without the other.",
+              "**Like-count: eventual consistency.** A like is commutative (an increment), the exact value is not safety-critical, and users cannot tell 4,207 from 4,209 for a second. Serve from local replicas or an edge cache, accept per-replica counters that merge (a G-Counter CRDT or periodic aggregation), and let the number converge. Buys single-digit-ms local reads and full availability under partition. If 'did *I* like this?' must feel instant, that is a read-your-writes session guarantee on top, not linearizability for the global count.",
+              "**Where causal fits:** threaded comments (a reply must not appear before the comment it answers): the strongest model that stays available under partition, sitting between the two examples.",
+              "Common wrong turn: treating consistency as a binary and making the like-count linearizable 'to be safe,' forcing global coordination on the hottest write path for correctness nobody needs.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-consistency-spectrum-practice",
+            prompt:
+              "Choose consistency models for Amazon's checkout flow at Prime Day scale (tens of thousands of orders/sec) across three surfaces: the shopping cart, the 'only 2 left in stock' inventory badge, and the final 'place order' decrement of real inventory. Justify the weakest correct model for each and name the anomaly you are accepting.",
+            thinkAbout: [
+              "Which surface is advisory UI and which holds a hard invariant?",
+              "How do you scope the expensive coordination to a single hot key?",
+              "What spreads contention when one SKU becomes the doorbuster?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: cart is per-user, the stock badge is advisory UI, and final inventory must not oversell beyond a small tolerable margin.",
+              "**Cart: eventual + causal per user.** The cart is Dynamo's canonical case: availability wins, writes accepted on any replica and merged. The accepted anomaly: temporary divergence and even a resurrected deleted item (Dynamo's add-to-cart bias), resolved by conflict merge (union add-to-cart, or vector-clock siblings). Within one user's session, add read-your-writes so their own add is instantly visible.",
+              "**Stock badge ('only 2 left'): eventual.** Advisory. Serving from a cache that lags a few seconds is fine; the accepted anomaly is showing '2 left' when there is really 1 or 3. Making it linearizable would put a coordinated read on every product-page view at Prime Day scale: absurd.",
+              "**Place-order decrement: linearizable, single-key.** The actual 'reserve one unit' must be a linearizable conditional decrement on the item's stock key (compare-and-set: decrement only if remaining > 0), so the (N+1)th sale of an N-stock item is never authorized. Scope the coordination to the single hot key (a per-item leader/partition or an atomic counter in a strongly consistent store): per-SKU coordination, not global.",
+              "**The hot-SKU mitigation:** a doorbuster becomes a serialization point, so pre-allocate stock into per-shard buckets (sell 1000 units as 10 buckets of 100) to spread contention.",
+              "**The through-line:** each surface gets the weakest model that keeps *its* invariant, with the anomaly named (stale badge, resurrected cart item) and real coordination spent only where overselling is unacceptable.",
             ],
           },
         },
