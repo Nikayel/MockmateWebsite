@@ -412,6 +412,61 @@ bounded interval plus commit-wait buys global external consistency at the cost o
 infrastructure and a few ms per commit.
 `.trim()
 
+const smrTotalOrderTeach = `
+## One machine underneath them all
+
+Almost every strongly consistent distributed system (etcd, ZooKeeper, Kafka's controller,
+CockroachDB, Spanner) is secretly the same machine underneath. That machine is **state-machine
+replication (SMR)**, and understanding it collapses a dozen scary systems into one idea.
+
+Start with a deterministic state machine: a program whose next state depends only on its current
+state and the next input. A key-value store is a perfect example. \`SET x=5\`, \`DELETE y\`,
+\`INCR z\` are commands, and if you apply the same commands in the same order starting from the same
+empty state, you land in exactly the same final state, every time, on every machine. That is the
+whole trick. If you can get N replicas to apply the **same sequence of commands in the same order**,
+they will all hold identical state, with no further coordination needed.
+
+So the replication problem reduces to one thing: getting every replica to agree on a single ordered
+log of commands. This ordering primitive has a name, **total-order broadcast** (atomic broadcast):
+every correct node delivers the same set of messages in the same order. The deep result:
+**total-order broadcast is equivalent to consensus**. You can build one from the other. This is why
+"how do I keep my replicas consistent" and "I need a consensus algorithm" are the same question
+wearing different clothes.
+
+\`\`\`
+  clients ->  [ append ]  ->  replicated ordered log
+                              idx:  1     2     3     4
+                              cmd: SET   INCR  DEL   SET
+                                    |     |     |     |
+              replica A  apply ---> same order ---> state S
+              replica B  apply ---> same order ---> state S
+              replica C  apply ---> same order ---> state S
+\`\`\`
+
+### The two non-negotiable preconditions
+
+First, **apply must be deterministic**. If a command reads the wall clock, a random number, a map's
+iteration order, or calls an external service, two replicas fed the identical log will diverge, and
+your replicas silently disagree while the log looks perfectly healthy. This is the number one wrong
+turn. The fix: move all nondeterminism into the command before it enters the log: the leader stamps
+the timestamp or random seed into the entry, and every replica applies that recorded value. Second,
+apply should be idempotent enough that replaying an entry twice (after a crash mid-apply) is safe.
+
+The remaining practical problem is that the log grows forever. Bound it with **snapshots (log
+compaction)**: periodically serialize the full state machine to disk, record the log index it
+covers, and truncate everything at or below. A recovering or newly added replica installs the latest
+snapshot and replays only the tail. Raft, Kafka, and etcd all do exactly this.
+
+**Interview nuance:** if asked "how do you keep replicas consistent," do not jump to gossip or
+last-write-wins. Say "I model each replica as a deterministic state machine and feed them one agreed
+ordered log via a consensus protocol; consistency then falls out for free," then mention snapshots
+for log growth. That framing signals you understand the primitive rather than a specific product.
+
+Recap: identical replicas come from applying the same deterministic commands in the same order,
+achieving that order is total-order broadcast which is equivalent to consensus, nondeterministic
+apply is the classic silent-divergence bug, and snapshots bound otherwise-unbounded log growth.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -771,6 +826,62 @@ export const systemDesignLevel5: DesignLevel = {
               "**Close the residual skew window on reads** with CockroachDB's trick: an uncertainty interval around each read timestamp; if a read encounters a value written within the interval it cannot safely order, it restarts at a higher timestamp, never returning a result that violates the real order. Correctness on commodity hardware, paying consensus latency rather than clock hardware.",
               "**On owned datacenters:** deploy TrueTime-style GPS + atomic clocks and use commit-wait: stamp each committed transaction and wait out epsilon (a few ms) before acknowledging, so any later transaction gets a strictly higher timestamp and the timestamp order IS the true global order: no read-restart dance. What Spanner does, and the natural fit for a ledger, at the cost of clock hardware in every region and ~epsilon per commit.",
               "**Decision:** for a financial ledger the external total order is worth the most robust available option: TrueTime + commit-wait on owned hardware; HLC + per-shard consensus + uncertainty-interval read restarts on commodity cloud. Either way the total order comes from a bounded-uncertainty clock or from consensus, never from a bare wall-clock comparison.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l5-m3",
+      title: "Consensus & Coordination",
+      description:
+        "Replicating a service correctly reduces to agreeing on an ordered log; reason through Raft across a leader crash, and pick concrete N/R/W quorum settings while naming exactly what consistency you get.",
+      lessons: [
+        {
+          id: "sd-l5-smr-total-order",
+          title: "State-Machine Replication & Total-Order Broadcast",
+          summary:
+            "Identical replicas come from deterministic commands applied in one agreed order; that order is total-order broadcast, equivalent to consensus, with snapshots bounding the log.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["smr", "total-order-broadcast"],
+          teach: {
+            markdown: smrTotalOrderTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-smr-total-order-apply",
+            prompt:
+              "Design a replicated state machine for a key-value store and explain why an ordered replicated log is the core primitive.",
+            thinkAbout: [
+              "Why do deterministic, ordered ops give identical replicas?",
+              "Why is atomic broadcast equivalent to consensus?",
+              "How do snapshots bound log growth?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a 3- or 5-replica KV store that must survive node crashes and serve linearizable reads/writes, commodity hosts in one region, a few thousand writes per second.",
+              "**Model each replica as a deterministic state machine:** state is the key-value map, commands are SET/DELETE/compare-and-swap. The core decision: replicas never talk about state directly. They agree on a single ordered log of commands and apply it in index order. Because the state machine is deterministic, applying the same commands in the same order from the same start produces byte-identical maps: consistency is a consequence of ordering, not something maintained separately.",
+              "**Getting the agreed order IS total-order broadcast**, which is equivalent in power to consensus, so implement the log with a consensus protocol (Raft in practice): a leader assigns each command a monotonically increasing index, replicates to a majority, and only then marks it committed; replicas apply committed entries in index order.",
+              "**Correctness rule 1, determinism:** any nondeterministic input (timestamps, random values, TTL expiry moments) must be resolved by the leader and written INTO the log entry, so every replica uses the recorded value. Apply that reads the local clock or map iteration order silently diverges despite an identical log: the classic wrong turn. **Rule 2, idempotent replay:** applying an entry twice after a crash must be safe, so track the last-applied index durably.",
+              "**Snapshots stop unbounded log growth:** periodically serialize the entire map plus the covered log index, persist, truncate the log up to that index. A restarting or newly joined replica installs the latest snapshot and replays only the tail.",
+              "**Tradeoffs:** writes cost a round trip to a majority (higher latency than a single node); reads come from the leader for linearizability or followers for stale-but-cheap. The payoff: node crashes never lose committed data and replicas cannot disagree.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-smr-total-order-practice",
+            prompt:
+              "Explain how Apache Kafka replicates a partition and why its design is state-machine replication in disguise, then identify the one place Kafka deliberately trades away strict SMR semantics for throughput.",
+            thinkAbout: [
+              "What plays the role of the log index and the commit point in a Kafka partition?",
+              "Why does Kafka not need per-record consensus like Raft?",
+              "Which configuration combination can lose acknowledged records?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a topic partition with replication factor 3, one leader and two followers, high write throughput (hundreds of MB/s).",
+              "**A Kafka partition IS an ordered, append-only log: the SMR primitive made explicit.** The leader assigns each record a monotonically increasing offset (the log index). Followers pull records in order and append; the leader advances the high-water mark only once records are replicated to the in-sync replica (ISR) set. Consumers read only up to the high-water mark, so every replica and consumer observes the same records in the same offset order: total-order broadcast over that partition.",
+              "**Why no per-record consensus:** the 'state machine' is trivial (append the byte record), so Kafka needs agreement on the log and on who the leader is, not Raft per record. Leader/ISR metadata historically lived in ZooKeeper; KRaft now runs an actual Raft log for it. The split: metadata consensus is strict (Raft), data replication is leader + tunable ISR acks: exactly how Kafka gets correctness where it matters and multi-GB/s throughput where strict consensus per record would be too slow.",
+              "**The deliberate trade:** Kafka does not use a strict majority quorum for data. With acks=all, a write is acknowledged once all *current ISR* members have it, and ISR can shrink to just the leader under failures. Leaving min.insync.replicas=1 and allowing unclean leader election means a lagging replica can become leader and truncate acknowledged records: durability sacrificed for availability and throughput.",
+              "**The safe configuration:** acks=all with min.insync.replicas=2 on RF=3 and unclean election disabled, restoring majority-like overlap. Log growth is bounded with retention and log compaction: the streaming analog of SMR snapshots (compaction keeps the latest value per key).",
             ],
           },
         },
