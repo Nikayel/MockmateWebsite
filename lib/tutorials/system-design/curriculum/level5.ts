@@ -467,6 +467,75 @@ achieving that order is total-order broadcast which is equivalent to consensus, 
 apply is the classic silent-divergence bug, and snapshots bound otherwise-unbounded log growth.
 `.trim()
 
+const raftPaxosTeach = `
+## The consensus protocol you will actually name
+
+Raft powers etcd (and therefore Kubernetes), Consul, CockroachDB, TiKV, and countless control planes.
+Its selling point over Paxos is that it was designed to be *understandable*, by decomposing consensus
+into three separable problems: leader election, log replication, and safety.
+
+### Leader election
+
+Raft time is divided into **terms**, each a monotonically increasing integer acting as a logical
+clock. At most one leader exists per term. Every node is follower, candidate, or leader. If a
+follower hears nothing from a leader within its **election timeout**, it becomes a candidate,
+increments the term, votes for itself, and requests votes. A candidate that collects votes from a
+**majority** wins. The clever bit that avoids endless split votes: each node's election timeout is
+**randomized** (say 150 to 300ms), so nodes rarely time out simultaneously; one usually starts first,
+gathers a majority, and shuts the others down. A node only grants its vote to a candidate whose log
+is **at least as up to date** as its own, which prevents a stale node from ever becoming leader and
+clobbering committed data.
+
+### Log replication
+
+Clients send commands to the leader. The leader appends the entry and sends \`AppendEntries\` to
+followers. Once an entry is stored on a **majority**, the leader marks it **committed** and applies
+it. The **commit rule** is the heart: an entry is durable the instant a majority has it. Majority
+quorums work because any two majorities of N nodes must **overlap in at least one node**. That
+overlapping node carries committed entries forward into any future leader's election, so committed
+data is never lost.
+
+\`\`\`
+  5-node cluster, leader crashes:
+    term 4 leader (S1) dies
+    S2..S5 election timeouts fire (randomized) -> S3 first
+    S3 (up-to-date log) requests votes -> S2,S4 grant -> majority 3/5
+    S3 becomes leader for term 5, resumes AppendEntries
+    an uncommitted term-4 entry only on S1 is overwritten, never was committed
+\`\`\`
+
+### Safety
+
+Raft guarantees: *election safety* (one leader per term), *leader append-only*, *log matching* (if
+two logs share an entry at an index/term, all prior entries match), and *leader completeness* (a new
+leader contains every committed entry from prior terms). Together: an entry, once committed, survives
+every future leader change. An entry replicated but **not yet committed** when the old leader crashed
+can be safely overwritten, and that is correct precisely because no client was ever told it
+committed.
+
+A **minority partition** cannot make progress: a partitioned old leader with 2 of 5 nodes can append
+locally but never commits, and on heal it discovers a higher term and steps down, discarding its
+uncommitted tail. **Membership changes** use **joint consensus** (a transitional configuration
+requiring majorities of both old and new sets) so two disjoint majorities can never exist
+mid-reconfiguration.
+
+**Interview nuance on cluster size:** always use an **odd** number. A 5-node cluster tolerates 2
+failures (majority 3); a 4-node cluster *also* tolerates only 1 failure (majority still 3) while
+costing an extra machine and an extra vote to collect. The classic wrong turn is a 2-node cluster:
+majority is 2, so a single failure leaves no majority and a hung, unwritable system.
+
+**Paxos family.** Basic Paxos solves single-value consensus; Multi-Paxos chains it for a log and
+underlies Chubby and Spanner. Paxos is more flexible but famously hard to implement correctly, which
+is why Raft constrains leadership to trade flexibility for a protocol engineers can get right. The
+**FLP impossibility** result says no deterministic consensus can guarantee termination in a fully
+asynchronous network with even one crash; real systems dodge it by assuming **partial synchrony**,
+which randomized timeouts operationalize.
+
+Recap: Raft splits consensus into randomized-timeout leader election, majority-quorum log replication
+with commit-on-majority, and four safety properties that make committed entries immortal; minority
+partitions stall safely, membership changes use joint consensus, and clusters should be odd-sized.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -882,6 +951,54 @@ export const systemDesignLevel5: DesignLevel = {
               "**Why no per-record consensus:** the 'state machine' is trivial (append the byte record), so Kafka needs agreement on the log and on who the leader is, not Raft per record. Leader/ISR metadata historically lived in ZooKeeper; KRaft now runs an actual Raft log for it. The split: metadata consensus is strict (Raft), data replication is leader + tunable ISR acks: exactly how Kafka gets correctness where it matters and multi-GB/s throughput where strict consensus per record would be too slow.",
               "**The deliberate trade:** Kafka does not use a strict majority quorum for data. With acks=all, a write is acknowledged once all *current ISR* members have it, and ISR can shrink to just the leader under failures. Leaving min.insync.replicas=1 and allowing unclean leader election means a lagging replica can become leader and truncate acknowledged records: durability sacrificed for availability and throughput.",
               "**The safe configuration:** acks=all with min.insync.replicas=2 on RF=3 and unclean election disabled, restoring majority-like overlap. Log growth is bounded with retention and log compaction: the streaming analog of SMR snapshots (compaction keeps the latest value per key).",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-raft-paxos",
+          title: "Consensus in Depth: Raft (and the Paxos Family)",
+          summary:
+            "Randomized-timeout election, majority-quorum commit, and four safety properties make committed entries immortal; minority partitions stall safely and clusters should be odd-sized.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["raft", "paxos", "consensus"],
+          teach: {
+            markdown: raftPaxosTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l5-raft-paxos-apply",
+            prompt:
+              "Walk through how Raft keeps a 5-node cluster consistent across a leader crash: cover election, log replication, and what happens to an uncommitted entry.",
+            thinkAbout: [
+              "How does randomized-timeout election avoid split votes?",
+              "What is the commit rule, and why do majority quorums guarantee overlap?",
+              "How does a minority partition behave, and why is an even cluster wasteful?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 5 nodes (S1 to S5), S1 is the term-4 leader, clients write through the leader, majority is 3.",
+              "**Normal replication:** a client sends SET x=5 to S1, which appends it at the next log index in term 4 and sends AppendEntries to S2-S5. When at least 3 nodes (including S1) have persisted it, S1 marks it committed, applies it, and returns success. The commit rule: durable once a majority holds it. Any two majorities of 5 share at least one node, and any future leader election also needs 3 votes: at least one voter held the committed entry with an up-to-date log, so the entry propagates forward and cannot be lost.",
+              "**Leader crash and election:** S1 dies. S2-S5 stop hearing heartbeats; after randomized election timeouts, one (say S3) fires first, increments the term to 5, votes for itself, and requests votes. Randomized timeouts mean nodes rarely become candidates simultaneously, so split votes are rare; when one happens, nobody reaches 3 and nodes retry with fresh random timeouts. Critically, votes are granted only to a candidate whose log is at least as up to date, so a node missing committed entries can never win. S3 collects 3 votes and resumes replication as term-5 leader.",
+              "**The uncommitted entry:** S1 had appended SET y=9 in term 4 but crashed before a majority stored it: never committed, client never told it succeeded. S3's AppendEntries consistency check detects the mismatch and overwrites the dangling entry on any follower holding it. Correct precisely because no client observed it as durable; a *committed* entry, by contrast, survives via leader completeness.",
+              "**Minority partition:** if S1 returns but is partitioned with only S2, it cannot reach majority 3, so it appends locally but never commits. On heal it sees term 5 > 4, steps down, truncates its uncommitted tail.",
+              "**Cluster size:** 5 is odd and tolerates 2 failures; a 4-node cluster tolerates only 1 (majority still 3) while wasting a machine. The 2-node trap: one failure leaves no majority and the system hangs.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-raft-paxos-practice",
+            prompt:
+              "Design the coordination layer for a Kubernetes-style control plane storing cluster state in etcd across three regions with 80ms inter-region round-trip latency. Explain how you place the Raft members, what write latency you should expect, and how you avoid the split-brain and stale-read pitfalls.",
+            thinkAbout: [
+              "Which member placement guarantees no single region holds a majority?",
+              "What is the physical floor on write latency across 80ms links?",
+              "How do you serve a linearizable read without trusting a possibly-deposed leader?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: etcd runs a single Raft group holding all control-plane state, read-heavy but writes must be strongly consistent, three regions A/B/C with ~80ms RTT.",
+              "**Member placement:** a 5-member cluster spread so no single region holds a majority: 2 in A, 2 in B, 1 in C. Majority is 3, so losing any one region still leaves at least 3 reachable members and the cluster stays writable. Putting 3 members in region A means an A failure loses the majority and the control plane goes read-only: the placement mistake to avoid. Five members (not 3) tolerates a full region loss plus one more node.",
+              "**Write latency:** every committed write needs the leader plus a majority to persist, and members are cross-region, so a commit costs one inter-region round trip to the nearest quorum member: expect tens of milliseconds per write (order 40-80ms), far above a single-region cluster. Pin the leader to the region with the most members, use etcd leases and batching, and if that latency is unacceptable, the honest answer is that strong consensus across 80ms links has a floor: the fix is fewer cross-region hops (regional clusters federated), not pretending Raft is free.",
+              "**Split-brain:** Raft makes it impossible: a partitioned minority (region C's single member, or a 2-member island) can never reach majority 3, so it cannot elect a leader or commit, and it steps down on heal. Disable any unclean/forced reconfiguration that could manufacture a second majority.",
+              "**Stale reads:** follower reads can lag committed state. For linearizable reads, route through the leader with a ReadIndex confirmation (the leader verifies it is still leader via a heartbeat quorum before serving), accepting the latency. Where staleness is tolerable (dashboards, watches), allow serializable follower reads for speed. The wrong turn: serving follower reads and calling them consistent.",
             ],
           },
         },
