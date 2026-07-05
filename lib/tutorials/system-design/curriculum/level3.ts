@@ -67,6 +67,69 @@ watch replication lag, add followers online for zero-downtime read capacity, and
 dataset size outgrow one leader.
 `.trim()
 
+const replicationTopologiesTeach = `
+## Each topology buys a capability by exposing an anomaly
+
+Once one leader is not enough (you need multi-region writes, or you want no write SPOF), you choose
+among three **replication topologies**, and each one buys a capability by exposing a specific class
+of anomaly. Knowing which anomaly you are signing up for is the whole skill.
+
+**Single-leader:** all writes go through one node, which serializes them, so there are **no
+write-write conflicts**, and it is the easiest to reason about. The costs are that the leader is a
+write SPOF (failover is required and risky) and cross-region writers pay the latency to reach the one
+leader's region. This is the default for most OLTP systems.
+
+**Multi-leader:** several leaders (typically one per region) each accept writes and replicate to the
+others. This gives **low-latency local writes** everywhere and survives a region outage for writes.
+The price is brutal: two leaders can accept **conflicting writes** to the same key concurrently, and
+you must define how to merge them. Use it when local write latency or offline/multi-datacenter
+operation genuinely requires it, not by default.
+
+**Leaderless (Dynamo-style):** any replica accepts a write, and the client (or a coordinator) writes
+to and reads from multiple replicas. Cassandra, DynamoDB, and Riak work this way. Consistency comes
+from **quorums**: with N replicas, if you require W replicas to ack a write and R to answer a read,
+then **R + W > N** guarantees the read set and write set overlap on at least one node, so a read sees
+the latest acked write. Common config is N=3, W=2, R=2. Tuning W and R trades consistency against
+availability and latency: W=1 is fast but weakly durable, R=1 can read stale data.
+
+Two more leaderless mechanics interviewers probe. **Sloppy quorums with hinted handoff** keep the
+system available during failures by letting writes land on temporary "stand-in" nodes when the home
+replicas are down, then handing the data off when they recover; this trades consistency for
+availability. **Anti-entropy** converges divergent replicas in the background: **read repair** fixes
+stale replicas noticed during a read, and **Merkle trees** let two replicas efficiently find and
+reconcile the exact ranges that differ.
+
+### Conflict resolution: where these designs live or die
+
+- **Last-write-wins (LWW):** pick the write with the highest timestamp, discard the rest. Simple, and
+  Cassandra's default, but it **silently loses data** for concurrent writes and depends on clock
+  sync.
+- **Version vectors:** track a per-replica counter so the system can tell whether two writes were
+  concurrent or causally ordered, then surface genuine conflicts to the app or merge them.
+- **CRDTs:** data types (counters, sets, sequences) mathematically designed so concurrent updates
+  always merge deterministically without loss.
+- **Application merge:** hand both versions to business logic (shopping-cart union is the classic
+  Dynamo example).
+
+**Interview nuance:** do not answer with a CAP binary ("CP or AP"). Reason with **PACELC**: if there
+is a **P**artition, choose **A**vailability or **C**onsistency; **E**lse (normal operation) choose
+**L**atency or **C**onsistency. Dynamo-style stores are PA/EL; a single-leader RDBMS is PC/EC. Then
+name the **concrete anomaly** a user sees ("two edits from two regions, one silently overwrites the
+other under LWW"), which shows you reason about data, not letters.
+
+\`\`\`
+SINGLE-LEADER          MULTI-LEADER              LEADERLESS (quorum)
+ all writes -> L         L(us) <--> L(eu)          client -> W of N replicas
+ no conflicts            local writes, but         reads <- R of N
+ leader = write SPOF     concurrent conflicts      R + W > N => overlap
+\`\`\`
+
+Recap: single-leader avoids conflicts but has a write SPOF; multi-leader enables multi-region writes
+at the cost of write-write conflicts; leaderless uses R + W > N quorums (plus sloppy quorums, hinted
+handoff, read repair, and Merkle trees) for availability; resolve conflicts with LWW (lossy), version
+vectors, CRDTs, or app merge, and reason with PACELC and named anomalies rather than CAP.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -126,6 +189,54 @@ export const systemDesignLevel3: DesignLevel = {
               "**The 'only 3 left!' badge** can serve a slightly stale count from a replica because it is advisory; it never authorizes a sale. The authoritative check happens at checkout against the primary.",
               "**Protecting the primary under the burst:** put hot SKUs behind a per-SKU inventory service or Redis counter that is the source of truth during the sale and reconciles to Postgres, avoiding row-lock contention on the hottest rows.",
               "**The committed tradeoff:** accept 4s staleness for metadata (cheap, cacheable, high volume) while refusing any staleness for the money-correct inventory decrement. Common wrong turn: serving inventory from async replicas to shed load, trading a financial correctness guarantee for read capacity, and overselling during exactly the traffic spike the system was built for.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-replication-topologies",
+          title: "Replication Topologies & Consistency",
+          summary:
+            "Single-leader avoids conflicts, multi-leader buys local writes at the cost of write-write conflicts, leaderless uses R+W>N quorums; resolve conflicts losslessly and reason with PACELC.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["replication", "consistency", "conflict-resolution"],
+          teach: {
+            markdown: replicationTopologiesTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l3-replication-topologies-apply",
+            prompt:
+              "Design the replication + consistency scheme for a globally-used note app where two users may edit from different regions; state exactly which stale reads and conflicts are possible.",
+            thinkAbout: [
+              "Where does each topology fit, and what conflicts does it create?",
+              "How do quorum reads/writes (R + W > N) give strong-ish consistency?",
+              "How is a write-write conflict resolved (LWW, version vectors, CRDT)?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a shared-notes app with users in multiple regions, where two people (or one person on two devices) may edit the same note near-simultaneously. Requirements: low-latency local edits worldwide, high availability, and no silently lost edits, because a vanished paragraph is the cardinal sin of a notes product. A few seconds of cross-region convergence is acceptable.",
+              "**Topology: multi-leader,** one leader per region, so every user gets local write latency and the app keeps working per-region during a cross-region partition. This directly creates the anomalies to design for: two regions can accept concurrent edits to the same note (write-write conflicts), and until replication propagates, a reader in region A sees a stale version relative to a just-made edit in region B.",
+              "**Conflict resolution: refuse last-write-wins on wall-clock timestamps.** It would silently drop one user's concurrent paragraph and depends on synced clocks. For the note body, model the document as a sequence CRDT (RGA/LSEQ, as Yjs/Automerge implement), so concurrent inserts and deletes from both regions merge deterministically without loss: exactly the guarantee a notes product needs. For coarse metadata with a real either/or choice (archived vs active), keep version vectors to detect true concurrency and apply a defined rule or surface the conflict.",
+              "**Consistency framing with PACELC:** under a partition favor availability (regions keep accepting edits); in normal operation favor latency (local writes). A PA/EL system, acceptable precisely because the CRDT removes the usual downside of choosing availability, namely lost updates. The stale reads explicitly accepted: a reader may briefly see a note without the other region's latest edit; convergence happens within seconds via replication and read repair.",
+              "Common wrong turn: promising a single global consistent view with LWW to 'keep it simple,' which under concurrent cross-region edits silently discards one editor's changes. If the product truly required a single serialized truth, pick single-leader and pay the cross-region write latency, and say so explicitly rather than pretend multi-leader is conflict-free.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-replication-topologies-practice",
+            prompt:
+              "Design the replication and consistency model for a DynamoDB-style shopping cart backing a large e-commerce site: N=3 replicas per key, writes must never be rejected (an 'add to cart' always succeeds even during a node or network failure), and a user must never lose an item they added from two devices.",
+            thinkAbout: [
+              "What quorum settings and mechanisms keep a write succeeding when home replicas are down?",
+              "Why does LWW on the whole cart object violate the never-lose-an-item requirement?",
+              "What makes deletes the subtle case in a merge-by-union cart?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the original Dynamo use case. 'Add to cart' is a high-value, high-availability write that must succeed even during failures, and losing an added item costs revenue. Carts are small, per-user, and tolerate brief inconsistency across devices.",
+              "**Topology and quorum: leaderless with N=3.** To guarantee writes never fail even when replicas are down, set W=1 or use a sloppy quorum with hinted handoff so a write lands on a stand-in node when a home replica is unavailable, handing off on recovery. Reads use R tuned to desired freshness; the availability requirement means prioritizing accepting the write over strict R + W > N overlap, leaning on conflict resolution plus read repair to converge.",
+              "**Conflict resolution is the crux, and LWW is wrong here:** two devices adding different items concurrently would, under LWW, keep only one cart version and drop the other item. Instead model the cart as an add-wins set / CRDT (or use version vectors and merge at read time by unioning items across sibling versions, exactly what Dynamo did). Concurrent adds from two devices produce siblings that merge to a cart containing both items.",
+              "**Removes are the subtle case:** a naive union resurrects deleted items, so use tombstones or an OR-Set CRDT so a delete beats a concurrent stale add.",
+              "**Availability and convergence:** sloppy quorum plus hinted handoff keeps 'add to cart' succeeding during a partition; read repair and Merkle-tree anti-entropy converge replicas afterward. In PACELC terms: PA/EL, correct because the merge semantics make the temporary inconsistency non-lossy.",
+              "Common wrong turn: LWW on the whole cart object, which meets the availability bar but violates 'never lose an added item' the moment a user adds from two devices at once.",
             ],
           },
         },
