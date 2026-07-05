@@ -1824,6 +1824,165 @@ SELECT id FROM (
   }),
 }
 
+const dataQualityGates: SqlLesson = {
+  id: "sql-l5-data-quality-gates",
+  title: "Write-Audit-Publish: Freshness, Volume, and Null-Rate Blocking Gates",
+  summary:
+    "Stage a batch to audit, run freshness/volume/null-rate violation checks, and publish to the served table only when every check returns zero.",
+  estimatedMinutes: 30,
+  difficulty: "medium",
+  skills: [
+    "dbt-orchestration",
+    "write-audit-publish",
+    "freshness SLA check",
+    "volume anomaly vs trailing baseline",
+    "null-rate check",
+    "blocking gate",
+  ],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Beyond a passing test: a gate that blocks the bad batch
+
+L4 taught the four dbt tests (unique, not_null, accepted_values, relationships) that fail a build after the fact. Write-audit-publish (WAP) goes further: it stops a bad batch from ever reaching the table readers query. The shape is three steps. Write the batch to an audit (staging) table. Audit it with a battery of checks. Publish to the served table only if every check passes.
+
+## The checks are violation counts
+
+Each check is a query that returns the offending rows, so zero rows means pass, the same convention as the dbt tests. Three checks cover most of what breaks a load:
+
+- **Freshness.** The newest \`updated_at\` in the batch must be within the SLA. A stale batch (the upstream job silently died) fails because \`MAX(updated_at)\` is too old.
+- **Volume anomaly.** Today's row count must sit within a band around a trailing baseline. Half the usual rows means a partial extract; triple means a duplicated one. Both are caught by comparing \`COUNT(*)\` to an average of \`trailing_daily_counts\`.
+- **Null rate.** The share of NULLs in a key column must stay under a threshold. A schema change upstream often shows up as a column that suddenly goes mostly null.
+
+## The gate
+
+The publish is guarded so it is all-or-nothing: every batch row is inserted into the served table only when all three conditions hold, and nothing is inserted otherwise. In SQL that is a single \`INSERT\` whose \`WHERE\` conjoins the three checks, so a failing check drops the whole batch. The demo runs the checks on a healthy batch (all return pass), and mutating the batch makes exactly one check fail so the publish writes nothing.
+
+**Interview nuance:** the point of WAP is that readers never see a half-bad table. A test that fails after publish has already exposed bad data to every dashboard downstream. Stage, check, then publish, in that order, and the bad batch is quarantined in audit where only you see it.
+
+> **In the warehouse this differs.** This is dbt source freshness (\`loaded_at_field\` plus \`warn_after\`) combined with dbt-expectations, Great Expectations, Databricks expectations, or Monte Carlo monitors scheduled as gates in the DAG. The SQL you wrote is the check body those tools run and alert on.`,
+    demoSeedSql: `CREATE TABLE trailing_daily_counts (day TEXT, cnt INTEGER);
+INSERT INTO trailing_daily_counts VALUES ('2026-03-06', 4), ('2026-03-07', 5), ('2026-03-08', 6);
+CREATE TABLE incoming_batch (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+INSERT INTO incoming_batch VALUES
+  (1, '2026-03-09 10:00', 100, 10), (2, '2026-03-09 11:00', 101, 20),
+  (3, '2026-03-09 12:00', 102, 30), (4, '2026-03-09 13:00', 103, 40),
+  (5, '2026-03-09 14:00', 104, 50);`,
+    demoCode: `-- All three checks pass on this healthy batch (5 rows, fresh, no null user_id).
+SELECT
+  CASE WHEN (SELECT MAX(updated_at) FROM incoming_batch) >= '2026-03-09 00:00' THEN 'pass' ELSE 'FAIL' END AS freshness,
+  CASE WHEN (SELECT COUNT(*) FROM incoming_batch)
+            BETWEEN (SELECT AVG(cnt) * 0.5 FROM trailing_daily_counts)
+                AND (SELECT AVG(cnt) * 1.5 FROM trailing_daily_counts) THEN 'pass' ELSE 'FAIL' END AS volume,
+  CASE WHEN (SELECT CAST(SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) AS REAL) / COUNT(*) FROM incoming_batch) <= 0.2
+       THEN 'pass' ELSE 'FAIL' END AS null_rate;`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l5-data-quality-gates-apply",
+    prompt: `Write a script that stages a batch to an audit table, runs freshness, volume-anomaly, and null-rate checks, and publishes to the served table only when all three pass, over \`incoming_batch(id, updated_at, user_id, amount)\`, an empty \`audit\` and \`published\` with the same columns, and \`trailing_daily_counts(day, cnt)\`.
+
+Insert the batch into \`audit\`, then insert \`audit\` into \`published\` only when: the newest \`updated_at\` is on or after \`'2026-03-09 00:00'\` (freshness), the audit row count is within 50 to 150 percent of the average trailing daily count (volume), and the null share of \`user_id\` is at most \`0.2\` (null rate).`,
+    starterCode: `-- Write the batch to audit, then publish only if all three checks pass.
+INSERT INTO audit (id, updated_at, user_id, amount)
+SELECT id, updated_at, user_id, amount FROM incoming_batch;
+
+INSERT INTO published (id, updated_at, user_id, amount)
+SELECT id, updated_at, user_id, amount FROM audit
+WHERE /* freshness AND volume AND null-rate all hold */ ;`,
+    hints: [
+      "Freshness: `(SELECT MAX(updated_at) FROM audit) >= '2026-03-09 00:00'`.",
+      "Volume: `(SELECT COUNT(*) FROM audit) BETWEEN (SELECT AVG(cnt)*0.5 FROM trailing_daily_counts) AND (SELECT AVG(cnt)*1.5 FROM trailing_daily_counts)`.",
+      "Null rate: `(SELECT CAST(SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) AS REAL)/COUNT(*) FROM audit) <= 0.2`. Conjoin all three with AND.",
+    ],
+    referenceSolution: `INSERT INTO audit (id, updated_at, user_id, amount)
+SELECT id, updated_at, user_id, amount FROM incoming_batch;
+
+INSERT INTO published (id, updated_at, user_id, amount)
+SELECT id, updated_at, user_id, amount FROM audit
+WHERE (SELECT MAX(updated_at) FROM audit) >= '2026-03-09 00:00'
+  AND (SELECT COUNT(*) FROM audit) BETWEEN (SELECT AVG(cnt) * 0.5 FROM trailing_daily_counts)
+                                       AND (SELECT AVG(cnt) * 1.5 FROM trailing_daily_counts)
+  AND (SELECT CAST(SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) AS REAL) / COUNT(*) FROM audit) <= 0.2;`,
+    seedSql: `CREATE TABLE audit (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+CREATE TABLE published (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+CREATE TABLE trailing_daily_counts (day TEXT, cnt INTEGER);
+INSERT INTO trailing_daily_counts VALUES ('2026-03-06', 4), ('2026-03-07', 5), ('2026-03-08', 6);
+
+CREATE TABLE incoming_batch (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+INSERT INTO incoming_batch VALUES
+  (1, '2026-03-09 10:00', 100, 10),
+  (2, '2026-03-09 11:00', 101, 20),
+  (3, '2026-03-09 12:00', 102, 30),
+  (4, '2026-03-09 13:00', 103, 40),
+  (5, '2026-03-09 14:00', 104, 50);`,
+    assertions: [
+      {
+        suite: "freshness",
+        name: "freshness_ok",
+        sql: `SELECT 1 WHERE (SELECT MAX(updated_at) FROM audit) < '2026-03-09 00:00'`,
+      },
+      {
+        suite: "volume",
+        name: "volume_ok",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM audit) NOT BETWEEN (SELECT AVG(cnt) * 0.5 FROM trailing_daily_counts) AND (SELECT AVG(cnt) * 1.5 FROM trailing_daily_counts)`,
+      },
+      {
+        suite: "nullrate",
+        name: "null_rate_ok",
+        sql: `SELECT 1 WHERE (SELECT CAST(SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) AS REAL) / COUNT(*) FROM audit) > 0.2`,
+      },
+      {
+        suite: "publish",
+        name: "published_matches_staged",
+        sql: `SELECT id FROM (SELECT id, updated_at, user_id, amount FROM published EXCEPT SELECT id, updated_at, user_id, amount FROM audit)
+UNION ALL
+SELECT id FROM (SELECT id, updated_at, user_id, amount FROM audit EXCEPT SELECT id, updated_at, user_id, amount FROM published)`,
+      },
+    ],
+  }),
+  practice: scriptExercise({
+    id: "sql-l5-data-quality-gates-practice",
+    prompt: `Write a script that applies the same write-audit-publish gate to a batch that fails one check, and keeps the served table empty while the batch sits quarantined in audit, over the same \`incoming_batch\`, empty \`audit\` and \`published\`, and \`trailing_daily_counts\` tables.
+
+Stage the batch to \`audit\`, then gate the publish on freshness, volume, and null-rate so a batch violating any one check publishes nothing. This batch is a volume anomaly, so \`published\` must end empty while \`audit\` holds the full batch.`,
+    starterCode: `-- Stage to audit, then gate the publish so a bad batch publishes nothing.
+INSERT INTO audit (id, updated_at, user_id, amount)
+SELECT id, updated_at, user_id, amount FROM incoming_batch;
+
+INSERT INTO published (id, updated_at, user_id, amount)
+SELECT id, updated_at, user_id, amount FROM audit
+WHERE /* freshness AND volume AND null-rate all hold */ ;`,
+    hints: [
+      "Use the same three-condition gate as the apply; the volume check is what fails here.",
+      "Always stage the full batch to `audit` first; the gate only controls the publish.",
+      "When the gate is false for the batch, the publish `INSERT ... SELECT ... WHERE <false>` writes zero rows.",
+    ],
+    seedSql: `CREATE TABLE audit (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+CREATE TABLE published (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+CREATE TABLE trailing_daily_counts (day TEXT, cnt INTEGER);
+INSERT INTO trailing_daily_counts VALUES ('2026-03-06', 4), ('2026-03-07', 5), ('2026-03-08', 6);
+
+CREATE TABLE incoming_batch (id INTEGER, updated_at TEXT, user_id INTEGER, amount INTEGER);
+INSERT INTO incoming_batch VALUES
+  (1, '2026-03-09 10:00', 100, 10), (2, '2026-03-09 10:05', 101, 20), (3, '2026-03-09 10:10', 102, 30),
+  (4, '2026-03-09 10:15', 103, 40), (5, '2026-03-09 10:20', 104, 50), (6, '2026-03-09 10:25', 105, 60),
+  (7, '2026-03-09 10:30', 106, 70), (8, '2026-03-09 10:35', 107, 80), (9, '2026-03-09 10:40', 108, 90),
+  (10, '2026-03-09 10:45', 109, 100);`,
+    assertions: [
+      {
+        suite: "gate",
+        name: "bad_batch_blocked_published_empty",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM published) > 0`,
+      },
+      {
+        suite: "audit",
+        name: "batch_was_staged_to_audit",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM audit) = 0`,
+      },
+    ],
+  }),
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -1863,7 +2022,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.3: The Streaming and Pipeline Round",
       description:
         "The operational reasoning the pipeline round scores: CDC changelog apply, high-water-mark incremental loads with safe backfill, and write-audit-publish quality gates.",
-      lessons: [cdcChangelogApply, incrementalWatermarkBackfill],
+      lessons: [cdcChangelogApply, incrementalWatermarkBackfill, dataQualityGates],
     },
   ],
 }
