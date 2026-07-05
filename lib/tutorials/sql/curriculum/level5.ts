@@ -529,6 +529,183 @@ INSERT INTO events (user_id, event_date) VALUES
   },
 }
 
+const funnelConversion: SqlLesson = {
+  id: "sql-l5-funnel-conversion",
+  title: "Funnel and Conversion Analysis",
+  summary:
+    "Collapse an event log to one row per user with MAX(CASE) step flags, enforce step order with timestamps, and read conversion between steps.",
+  estimatedMinutes: 28,
+  difficulty: "medium",
+  skills: [
+    "product-analytics",
+    "conditional aggregation",
+    "MAX(CASE)",
+    "funnel step flags",
+    "step ordering",
+    "conversion rate",
+  ],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## A funnel is one row per user, one flag per step
+
+A funnel question asks how many users made it through an ordered sequence of steps (view, then add to cart, then purchase) and where they dropped off. The portable answer is conditional aggregation: collapse the event log to one row per user with a flag per step, then count the flags. No self-joins and no window functions, just \`MIN(CASE ...)\` per step.
+
+## The build
+
+Work on \`events(user_id, step, event_ts)\`.
+
+1. **First timestamp per step, per user.** \`MIN(CASE WHEN step = 'view' THEN event_ts END)\` gives each user the time they first hit that step, or \`NULL\` if they never did. One \`GROUP BY\` over the user produces \`t_view\`, \`t_cart\`, and \`t_purchase\`.
+2. **Enforce order with the timestamps.** A step counts only if it happened at or after the previous step. Reaching the cart means \`t_view IS NOT NULL AND t_cart IS NOT NULL AND t_cart >= t_view\`. An add-to-cart that precedes the view is a real event but not a real funnel step, so it must not count. Chain the same condition through to purchase.
+3. **Count the flags and divide.** \`SUM(reached_step)\` is the users at each step, and the conversion from the prior step is this step's count over the previous step's count.
+
+The base population matters: everyone who entered the funnel stays in the denominator, so a drop-off lowers the rate instead of vanishing. The demo shows three users (one in order, one who stops early, one whose cart precedes the view) and the reached flags each one earns.
+
+**Interview nuance:** the ordering guard is the whole difference between a naive funnel and a correct one. Without it, any user with both a cart event and a view event counts as converted even if they added to cart first and viewed later, which quietly inflates every downstream rate.
+
+> **In the warehouse this differs.** The SQL is unchanged in every dialect. Some engines add helpers (Snowflake \`MATCH_RECOGNIZE\`, or product-analytics funnel primitives that take a step list and a time window), but the conditional-flag-plus-timestamp-ordering approach is the portable answer an interviewer expects, and it is the one that survives when the helper is not available.`,
+    demoSeedSql: `CREATE TABLE events (user_id INTEGER, step TEXT, event_ts TEXT);
+INSERT INTO events (user_id, step, event_ts) VALUES
+  (1, 'view', '2026-03-01 10:00:00'), (1, 'add_to_cart', '2026-03-01 10:05:00'), (1, 'purchase', '2026-03-01 10:10:00'),
+  (2, 'view', '2026-03-01 11:00:00'), (2, 'add_to_cart', '2026-03-01 11:05:00'),
+  (4, 'add_to_cart', '2026-03-01 09:00:00'), (4, 'view', '2026-03-01 09:05:00');`,
+    demoCode: `-- reached_cart is 0 for user 4: the cart event precedes the view, so it is not a real funnel step.
+WITH per_user AS (
+  SELECT user_id,
+    MIN(CASE WHEN step = 'view'        THEN event_ts END) AS t_view,
+    MIN(CASE WHEN step = 'add_to_cart' THEN event_ts END) AS t_cart,
+    MIN(CASE WHEN step = 'purchase'    THEN event_ts END) AS t_purchase
+  FROM events GROUP BY user_id
+)
+SELECT user_id, t_view, t_cart, t_purchase,
+  CASE WHEN t_view IS NOT NULL THEN 1 ELSE 0 END AS reached_view,
+  CASE WHEN t_view IS NOT NULL AND t_cart IS NOT NULL AND t_cart >= t_view THEN 1 ELSE 0 END AS reached_cart
+FROM per_user ORDER BY user_id;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-funnel-conversion-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns, for each funnel step (\`view\`, then \`add_to_cart\`, then \`purchase\`), the count of users who reached it and the conversion rate from the prior step, as \`(step, users_reached, conversion_from_prior)\`, over \`events(user_id, step, event_ts)\`.
+
+A user reaches a step only if they reached the previous step and this step's first timestamp is at or after the previous step's. The first step (\`view\`) has no prior step, so its \`conversion_from_prior\` is \`NULL\`; each later step's rate is its count divided by the prior step's count, rounded to 4 places. Alias the columns exactly as named.`,
+    starterCode: `-- Funnel step counts + conversion from the prior step.
+WITH per_user AS (
+  SELECT user_id,
+    MIN(CASE WHEN step = 'view'        THEN event_ts END) AS t_view,
+    MIN(CASE WHEN step = 'add_to_cart' THEN event_ts END) AS t_cart,
+    MIN(CASE WHEN step = 'purchase'    THEN event_ts END) AS t_purchase
+  FROM events GROUP BY user_id
+)
+SELECT
+  -- reached flags with the >= ordering guard, summed, then one row per step
+FROM per_user;`,
+    hints: [
+      "Reached-cart flag: `t_view IS NOT NULL AND t_cart IS NOT NULL AND t_cart >= t_view`; extend the same chain for purchase.",
+      "Sum the three flags in a `totals` CTE to get `n_view`, `n_cart`, `n_purchase`.",
+      "Emit one row per step with `UNION ALL`; `view` gets `NULL` conversion, later steps get `ROUND(1.0 * this / prior, 4)`.",
+    ],
+    referenceSolution: `WITH per_user AS (
+  SELECT user_id,
+    MIN(CASE WHEN step = 'view'        THEN event_ts END) AS t_view,
+    MIN(CASE WHEN step = 'add_to_cart' THEN event_ts END) AS t_cart,
+    MIN(CASE WHEN step = 'purchase'    THEN event_ts END) AS t_purchase
+  FROM events GROUP BY user_id
+),
+flags AS (
+  SELECT
+    CASE WHEN t_view IS NOT NULL THEN 1 ELSE 0 END AS r_view,
+    CASE WHEN t_view IS NOT NULL AND t_cart IS NOT NULL AND t_cart >= t_view THEN 1 ELSE 0 END AS r_cart,
+    CASE WHEN t_view IS NOT NULL AND t_cart IS NOT NULL AND t_cart >= t_view
+              AND t_purchase IS NOT NULL AND t_purchase >= t_cart THEN 1 ELSE 0 END AS r_purchase
+  FROM per_user
+),
+totals AS (
+  SELECT SUM(r_view) AS n_view, SUM(r_cart) AS n_cart, SUM(r_purchase) AS n_purchase FROM flags
+)
+SELECT 'view' AS step, n_view AS users_reached, NULL AS conversion_from_prior FROM totals
+UNION ALL
+SELECT 'add_to_cart', n_cart, ROUND(1.0 * n_cart / n_view, 4) FROM totals
+UNION ALL
+SELECT 'purchase', n_purchase, ROUND(1.0 * n_purchase / n_cart, 4) FROM totals;`,
+    singleFile: {
+      seedSql: `CREATE TABLE events (
+  user_id  INTEGER,
+  step     TEXT,
+  event_ts TEXT
+);
+INSERT INTO events (user_id, step, event_ts) VALUES
+  (1, 'view',        '2026-03-01 10:00:00'),
+  (1, 'add_to_cart', '2026-03-01 10:05:00'),
+  (1, 'purchase',    '2026-03-01 10:10:00'),
+  (2, 'view',        '2026-03-01 11:00:00'),
+  (2, 'add_to_cart', '2026-03-01 11:05:00'),
+  (3, 'view',        '2026-03-01 12:00:00'),
+  (4, 'add_to_cart', '2026-03-01 09:00:00'),
+  (4, 'view',        '2026-03-01 09:05:00'),
+  (5, 'purchase',    '2026-03-01 08:00:00');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["step", "users_reached", "conversion_from_prior"],
+        rows: [
+          ["view", 4, null],
+          ["add_to_cart", 2, 0.5],
+          ["purchase", 1, 0.5],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-funnel-conversion-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the **step-to-step conversion rate** for each transition in the funnel as \`(from_step, to_step, conversion_rate)\`, over the same \`events(user_id, step, event_ts)\` table.
+
+Compute two transitions, \`view\` to \`add_to_cart\` and \`add_to_cart\` to \`purchase\`, where each rate is the users who reached the later step divided by the users who reached the earlier step (applying the same at-or-after ordering guard), rounded to 4 places. Alias the columns exactly as named.`,
+    starterCode: `-- Step-to-step conversion for each funnel transition.
+WITH per_user AS (
+  SELECT user_id,
+    MIN(CASE WHEN step = 'view'        THEN event_ts END) AS t_view,
+    MIN(CASE WHEN step = 'add_to_cart' THEN event_ts END) AS t_cart,
+    MIN(CASE WHEN step = 'purchase'    THEN event_ts END) AS t_purchase
+  FROM events GROUP BY user_id
+)
+SELECT
+  -- one row per transition: from_step, to_step, reached_later / reached_earlier
+FROM per_user;`,
+    hints: [
+      "Reuse the reached-flag chain to get `n_view`, `n_cart`, `n_purchase` in a `totals` CTE.",
+      "Emit two rows with `UNION ALL`: one per transition.",
+      "Each `conversion_rate` is `ROUND(1.0 * later_count / earlier_count, 4)`.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE events (
+  user_id  INTEGER,
+  step     TEXT,
+  event_ts TEXT
+);
+INSERT INTO events (user_id, step, event_ts) VALUES
+  (1, 'view',        '2026-03-01 10:00:00'),
+  (1, 'add_to_cart', '2026-03-01 10:05:00'),
+  (1, 'purchase',    '2026-03-01 10:10:00'),
+  (2, 'view',        '2026-03-01 11:00:00'),
+  (2, 'add_to_cart', '2026-03-01 11:05:00'),
+  (3, 'view',        '2026-03-01 12:00:00'),
+  (4, 'add_to_cart', '2026-03-01 09:00:00'),
+  (4, 'view',        '2026-03-01 09:05:00'),
+  (5, 'purchase',    '2026-03-01 08:00:00');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["from_step", "to_step", "conversion_rate"],
+        rows: [
+          ["view", "add_to_cart", 0.5],
+          ["add_to_cart", "purchase", 0.5],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -543,7 +720,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.1: The Advanced SQL Power Round",
       description:
         "The live SQL screen an intern actually sits: gaps-and-islands, sessionization, cohort retention, funnels, and advanced window frames.",
-      lessons: [gapsAndIslands, sessionization, cohortRetention],
+      lessons: [gapsAndIslands, sessionization, cohortRetention, funnelConversion],
     },
   ],
 }
