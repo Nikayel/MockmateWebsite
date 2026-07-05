@@ -277,6 +277,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-json-variant-flatten` — Semi-Structured Data: JSON/VARIANT Extraction and Array Flattening
 
 - **difficulty:** hard
+- **interview level:** Intern-stretch (scalar extraction is intern-core; array fan-out and the double-count trap lean new-grad)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 36m (teach ~12m)
 - **skills:** `snowflake-warehouse` (stack), json_extract, `->>` operator, json_each, array fan-out, semi-structured modeling, double-count trap
 
@@ -295,6 +296,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-fact-grains-accumulating-snapshot` — Fact Grains: The Accumulating Snapshot and UPDATE-in-Place
 
 - **difficulty:** hard
+- **interview level:** Junior-to-Senior (the most-asked advanced fact question, but advanced-fact modeling sits above the intern bar)
 - **pattern:** runnable-equivalent · **grading:** workspace · **est:** 32m (teach ~10m)
 - **skills:** `snowflake-warehouse` (stack), fact-table grains, accumulating snapshot, UPDATE-in-place, milestone lag durations, idempotent rebuild
 
@@ -318,6 +320,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-as-of-scd2-join` — Point-in-Time (As-Of) Joins Against an SCD2 Dimension
 
 - **difficulty:** medium
+- **interview level:** Intern-stretch / Junior (builds on L4 SCD2; a junior modeling-round ask, reachable for a strong intern)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 28m (teach ~9m)
 - **skills:** `snowflake-warehouse` (stack), point-in-time join, as-of join, SCD2 history, effective_from/effective_to range predicate, late-arriving fact
 
@@ -336,6 +339,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-join-fan-out-and-skew` — Join Fan-Out and Data Skew: Diagnose, Fix, and Keep Metrics Consistent
 
 - **difficulty:** hard
+- **interview level:** Intern-stretch (fan-out double-counting is intern-reachable; the skew / salting / broadcast note is senior distributed-systems flavor)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 28m (teach ~10m)
 - **skills:** `lakehouse` (stack), join fan-out, grain-first pre-aggregation, COUNT(DISTINCT), define-metric-once CTE, hot-key detection, skew/broadcast reasoning
 
