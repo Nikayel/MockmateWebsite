@@ -1095,6 +1095,67 @@ a budget, trip a circuit breaker to fail fast when a dependency is down, and iso
 so one slow dependency cannot drain the whole caller.
 `.trim()
 
+const backpressureSheddingTeach = `
+## What happens when traffic exceeds capacity
+
+Every system has a maximum sustainable throughput. The question is what happens when arriving traffic
+exceeds it. The wrong answer is "queue it all and hope," because that quietly trades a latency
+problem for a crash. The right answer is a deliberate overload strategy built from backpressure,
+bounded queues, and load shedding.
+
+### Backpressure and the unbounded-queue trap
+
+**Backpressure** is the signal that flows upstream telling producers to slow down. In a well-designed
+pipeline, a full downstream buffer stops the upstream from producing, all the way back to the source.
+TCP flow control does this at the socket level; reactive stream libraries (Reactive Streams, gRPC
+flow control) do it at the application level; a bounded queue does it implicitly, because a producer
+that cannot enqueue must block or drop. The enemy of backpressure is the **unbounded queue**. It
+looks like it is absorbing the spike, but it is really accumulating latency (a request that waits 30
+seconds in a queue is useless, the user left) and memory, until the process runs out of heap and
+OOM-crashes, taking down everything including the in-flight work that was fine. Bound every queue.
+
+### Why you cannot run hot
+
+As utilization (rho) approaches 100%, queue length and wait time do not rise linearly, they explode.
+A rough mental model from M/M/1 queues: average time in system scales like \`1 / (1 - rho)\`. At 50%
+utilization latency is roughly 2x the service time; at 90% it is 10x; at 99% it is 100x. This is why
+you provision to run at 60 to 70% and treat the last 30% as headroom for spikes, not capacity to
+sell. A system run at 95% "efficient" utilization has a brutal tail.
+
+**Interview nuance:** If asked "why not just run at 100% utilization, isn't that efficient," answer
+with the 1/(1-rho) intuition. Utilization is bought with latency, and near saturation the price is
+unbounded.
+
+### Load shedding: reject early, on purpose
+
+**Load shedding (admission control)** is the deliberate choice to reject some work so the rest
+survives. When you are over capacity, it is far better to reject early with a **429** or **503** at
+the edge than to accept a request, let it sit in a queue, and time it out after doing partial work.
+Rejecting early is cheap and preserves latency for accepted requests; queue-and-timeout burns
+capacity on work nobody will use (this is "goodput" collapsing even as "throughput" stays busy). Shed
+at the front door, before you have invested resources.
+
+Do it with real tools: **concurrency limits** (cap in-flight requests, the most robust knob because
+it directly bounds Little's Law's L), **token-bucket rate limiters** (smooth bursts to a sustainable
+rate), and **adaptive concurrency** (algorithms like Netflix's that watch latency and dynamically
+lower the limit as latency rises, no hand-tuned magic number). Pair shedding with **prioritization**:
+shed low-value traffic first (batch, retries, free tier) so critical traffic (checkout, paying users,
+health of the system) survives. And **drop stale work**: if a request has already exceeded its
+deadline while queued, discard it instead of processing it, because the caller has already given up.
+
+\`\`\`
+arrivals --> [admission control] --accept--> [bounded queue] --> workers
+                    |                              |
+                  reject                       drop if stale/
+                429/503                        past deadline
+\`\`\`
+
+Recap: Bound every queue and let backpressure propagate, run below saturation because latency
+explodes as utilization nears 100%, and when overloaded reject early with 429/503, prioritize
+critical traffic, and drop stale requests instead of letting an unbounded queue hide the overload
+until an OOM.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -2089,6 +2150,57 @@ export const systemDesignLevel1: DesignLevel = {
               "**Circuit breaker with a business-decision fallback:** when the breaker opens because fraud scoring is broadly down, failing fast is correct, but the fallback is a policy choice: decline (safest, hurts conversion), route to a cheaper cached/heuristic model, or approve-and-async-review small low-risk charges under a strict cap. Degrade to the heuristic model for low-risk charges and fail closed above a risk/amount threshold.",
               "**Bulkhead:** fraud scoring gets its own bounded pool so its stall never drains the charge service's threads.",
               "Common wrong turn: retrying the non-idempotent charge itself (not just the fraud read) without an idempotency key, or failing OPEN on a fraud timeout and letting unscored charges through under load.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-backpressure-shedding",
+          title: "Backpressure, Flow Control & Load Shedding",
+          summary:
+            "Bound every queue, run below saturation (latency explodes near 100% utilization), and reject early with 429/503 while prioritizing critical traffic.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["backpressure", "load-shedding", "overload"],
+          teach: {
+            markdown: backpressureSheddingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-backpressure-shedding-apply",
+            prompt:
+              "Design overload protection for an ingestion endpoint that receives more traffic than it can process.",
+            thinkAbout: [
+              "How do bounded queues and backpressure prevent memory blowup?",
+              "Why reject early (429/503) rather than queue-and-hope?",
+              "What does queueing theory say about latency near 100% utilization?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an HTTP ingestion endpoint for event/telemetry writes, downstream of which events are validated and written to Kafka then a datastore. Sustainable capacity ~20,000 events/sec per instance; spikes hit 60,000.",
+              "**Bound everything.** The intake buffer between the HTTP handler and the Kafka producer is a bounded queue (say 10,000 slots). When it fills, that is backpressure: the handler cannot enqueue, so it stops accepting new work rather than growing the queue. An unbounded queue would appear to absorb the 60k spike while silently accumulating multi-second latency and heap until the process crashes and drops everything, including the 20k it could have served.",
+              "**Admission control at the front door:** a concurrency limiter and a token-bucket rate limiter at the edge. The concurrency limit directly bounds in-flight work (Little's Law: at 20k/sec sustainable and 5ms of processing, L = 100, so cap in-flight near that). When over the limit, reject immediately with 429 plus a `Retry-After` header (the client backs off, ideally into a durable client-side buffer). Rejecting early is cheap and keeps p99 healthy for the accepted 20k; accepting all 60k into a queue would collapse goodput as everything times out after wasting CPU.",
+              "**Run below saturation:** target ~70% utilization, because wait time scales like 1/(1 - rho): fine at 70%, catastrophic at 99%. The headroom absorbs bursts without the tail exploding.",
+              "**Prioritize and drop stale:** shed free-tier or low-priority events first so paying/critical streams survive, and drop any event that has sat past its deadline in the buffer rather than writing it, because it is stale and the producer has moved on.",
+              "**Scale-out seam:** shedding buys survival now; horizontally, add instances behind the LB, and since ingestion is naturally async, let clients buffer and retry into a durable queue so a spike is absorbed over time rather than dropped.",
+              "Common wrong turn: an unbounded in-memory queue that 'handles' the spike right up until the OOM, plus accepting-then-timing-out instead of rejecting at admission.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-backpressure-shedding-practice",
+            prompt:
+              "Design overload protection for Cloudflare's edge accepting a sudden 10x legitimate traffic surge (a flash sale plus a viral event) across thousands of edge nodes, where dropping paying customers' checkout traffic is unacceptable but best-effort analytics traffic is expendable. Specify how you decide what to shed.",
+            thinkAbout: [
+              "Why does a uniform global rate limit fail this requirement?",
+              "How do per-class budgets (bulkheads by priority) keep cheap traffic from starving critical traffic?",
+              "What can the edge serve instead of an error when it sheds?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a global edge fleet, a 10x surge exceeding origin capacity, and traffic classes: checkout/payment (must survive), authenticated app traffic (should survive), analytics/prefetch/bot traffic (expendable).",
+              "**Load shedding must be priority-aware, not uniform.** A dumb global rate limit would drop 90% of everything including checkouts. Classify requests at the edge (by route, auth state, customer tier, a cost/priority header) and shed from the bottom up: expendable analytics and prefetch first, then anonymous browsing, protecting checkout and authenticated traffic to the last.",
+              "**Bulkhead by priority:** each class gets its own token bucket / concurrency budget, so a flood of cheap traffic cannot starve the expensive-but-critical class.",
+              "**Shed at the edge, before origin:** rejecting a 429 at the nearest PoP is nearly free and protects scarce origin capacity. The edge tracks origin health via backpressure signals (rising latency, 503s, connection limits), and adaptive concurrency lowers admitted load automatically as origin latency climbs, rather than relying on a static hand-set limit that is wrong at 10x.",
+              "**Graceful behavior for shed traffic:** serve stale-but-cached content from the edge cache where possible (a slightly old product page beats an error), return 429 with Retry-After for the truly rejectable, queue nothing unboundedly. For write-ish analytics, accept-and-async or simply drop, since it is best-effort.",
+              "**Origin protection:** run origins below saturation and let the edge soak the burst via caching, so the 1/(1-rho) latency cliff never hits the origin.",
+              "Common wrong turn: a single global rate limit applied uniformly, which sheds checkout and analytics at the same rate and loses revenue to protect telemetry.",
             ],
           },
         },
