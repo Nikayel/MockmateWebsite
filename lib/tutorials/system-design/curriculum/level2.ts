@@ -547,6 +547,62 @@ bound partitions with time-bucketing, sub-partition hot keys, and tune quorum fo
 need.
 `.trim()
 
+const graphTeach = `
+## Built for one thing: traversing relationships
+
+A graph database (Neo4j, JanusGraph, Amazon Neptune, TigerGraph) models data as **nodes** (entities),
+**edges** (relationships), and **properties** on both. It is purpose-built for one thing:
+**traversing relationships**, especially deep, multi-hop ones. If your dominant queries are "friends
+of friends," "who influenced whom across 5 hops," "find the fraud ring connecting these accounts," or
+"recommend items bought by people who bought what you bought," a graph database is the right tool. If
+your queries are mostly "get this row by id" or "filter this table," it is the wrong tool.
+
+### Index-free adjacency
+
+In a relational database, a relationship is a foreign key, and following it means a lookup (often an
+index seek into another table). Following it N times, a multi-hop traversal, means N joins, and each
+join can multiply the intermediate result set. In a native graph database, each node holds **direct
+pointers to its adjacent edges and nodes**. Traversing from a node to its neighbors is a pointer hop,
+roughly O(1) per step regardless of how big the total graph is, because you never consult a global
+index to find neighbors. The cost of a traversal is proportional to the portion of the graph you
+actually touch (the local neighborhood), not the size of the whole dataset. This is why "friends of
+friends of friends" stays fast in Neo4j while the equivalent 3-way self-join degrades in SQL.
+
+**Why recursive relational joins blow up.** Friends-of-friends in SQL on a
+\`friendships(user_a, user_b)\` table: one hop is one self-join, two hops is a self-join of a
+self-join, and the intermediate result is roughly users times average degree squared. At depth 4 or 5
+on a social graph with average degree 200+, intermediate rows explode into the billions and the
+optimizer chokes. The graph engine instead walks outward from the start node, visiting only reachable
+nodes, deduplicating as it goes.
+
+**Query languages.** Neo4j uses **Cypher**, an ASCII-art pattern language:
+\`MATCH (me:User {id:1})-[:FRIEND*1..2]-(fof) RETURN DISTINCT fof\` finds everyone 1 to 2 hops away.
+Gremlin (Apache TinkerPop) is the imperative traversal alternative, and GQL is the emerging standard.
+Knowing that \`-[:REL*1..3]-\` expresses variable-length paths is the interview-relevant literacy.
+
+### When you do NOT need a graph database
+
+This is the senior judgment call. If your traversals are **shallow (1 or 2 hops)**, a plain
+**adjacency table in SQL with the right indexes** is completely adequate and saves you a whole new
+datastore, its operational burden, and its scaling weaknesses. "Show a user's direct friends" is one
+indexed query. Only when depth grows, the patterns get variable-length, or path/relationship queries
+dominate does the graph engine earn its place.
+
+**Interview nuance:** The tradeoff interviewers want you to name is **horizontal scaling**. Graphs
+are hard to shard because a good partition would cut edges, and the whole point is fast
+edge-following, so a traversal that crosses partitions pays a network hop per boundary and the
+index-free-adjacency advantage evaporates. Native graph databases often prefer to scale up (bigger
+machine, replicas for read scaling) rather than out. So the honest position is: graph databases are
+unbeatable for deep-traversal query complexity but weaker on raw horizontal write scale than
+Cassandra. Recommendation and fraud systems at extreme scale often precompute or use specialized
+graph-processing systems rather than a single serving graph database.
+
+Recap: Graph databases win when relationships are first-class and traversals are deep, thanks to
+index-free adjacency that keeps traversal cost local; recursive SQL joins explode at depth, but a
+1-to-2-hop adjacency table in SQL is often the right, simpler choice, and the graph engine's weakness
+is horizontal scaling.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1019,6 +1075,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Edits and deletes in an LSM store:** never update in place. An edit rewrites the row (same primary key, new body); latest write wins by timestamp during compaction. A delete writes a **tombstone** that shadows the row until compaction removes it after gc_grace_seconds.",
               "**The tombstone trap:** a channel that deletes many messages accumulates tombstones that slow range reads (Cassandra must scan and skip them). Keep bulk deletion rare, tune gc_grace_seconds, and rely on time-bucketing so old buckets (and their tombstones) age out of the hot read path entirely.",
               "Common wrong turn: a single unbucketed channel_id partition (a busy server's partition grows into gigabytes and dies) or per-message dynamic bucket sizes that make the bucket un-computable from the id. The senior insight: one bucket size that bounds the worst case, plus time-ordered ids so the id itself encodes both order and location.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-graph",
+          title: "Graph Databases",
+          summary:
+            "Index-free adjacency keeps deep traversals local while recursive SQL joins explode; a 1-2 hop adjacency table in SQL is often the simpler right choice.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["graph-db", "neo4j"],
+          teach: {
+            markdown: graphTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l2-graph-apply",
+            prompt:
+              "Design the graph model for a social network's friends-of-friends and mutual-connection queries.",
+            thinkAbout: [
+              "Why do recursive relational joins blow up at traversal depth?",
+              "What does index-free adjacency buy you?",
+              "When does an adjacency table in SQL suffice instead?",
+            ],
+            modelAnswerOutline: [
+              "Assume Neo4j, a social network with tens of millions of users, average degree in the low hundreds, and target queries 'people you may know' (friends-of-friends) and 'mutual connections between A and B.'",
+              "**Model:** `(:User {id, name})` nodes with a `[:FRIEND]` relationship between mutual friends (stored once and traversed both directions, or as a reciprocal pair). Edge properties like `since` live on the relationship. Relationships are first-class: no join table.",
+              "**Friends-of-friends in Cypher:** `MATCH (me:User {id:$id})-[:FRIEND]-(f)-[:FRIEND]-(fof) WHERE fof <> me AND NOT (me)-[:FRIEND]-(fof) RETURN fof, count(*) AS mutuals ORDER BY mutuals DESC LIMIT 20`. Two pointer hops out from `me`, touching only the local neighborhood (~degree-squared nodes, not the whole 10M-user graph), with `count(*)` giving the mutual-connection ranking for free.",
+              "**Mutual connections:** `MATCH (a:User {id:$a})-[:FRIEND]-(m)-[:FRIEND]-(b:User {id:$b}) RETURN m`: two short traversals intersecting at the shared node.",
+              "**Why not SQL:** in a relational friendships table, friends-of-friends is a self-join of a self-join; at average degree 200 the intermediate result is ~40k rows per user before dedup, and mutual-connection ranking across the base becomes a heavy aggregate. Works at small scale, degrades as depth or degree grows.",
+              "**When SQL would suffice:** if the product only showed direct friends (1 hop) and a simple mutual count, a `friendships(user_a, user_b)` table indexed on both columns answers both with one indexed query each, and Neo4j would not be introduced at all. The graph database earns its place specifically because 'people you may know' is an inherently 2-hop, ranked-by-shared-edges query.",
+              "**Scaling caveat stated up front:** Neo4j is hard to shard because partitioning cuts the very edges being traversed; scale reads with replicas and, for a truly massive graph, precompute PYMK suggestions in a batch job rather than traversing live per request.",
+              "Common wrong turn: reaching for a graph database when the product only needs 1-hop direct-friend lookups, adding operational cost for no query-complexity benefit.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-graph-practice",
+            prompt:
+              "Design the graph model for a payments company's real-time fraud-ring detection, where you must flag whether a new transaction connects (within 3 to 4 hops through shared devices, cards, IPs, and accounts) to a known fraudulent entity, at 10k transactions per second with a sub-100ms decision budget. Explain the model, the query, and how you meet the latency budget given graph scaling limits.",
+            thinkAbout: [
+              "What does a fraud ring look like structurally in a heterogeneous entity graph?",
+              "Can a live 4-hop traversal per transaction hold a sub-100ms budget at 10k TPS?",
+              "What can be precomputed offline so the hot path becomes a shallow lookup?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 10k TPS, sub-100ms per-decision budget, entities are accounts, cards, devices, IPs, and merchants, and fraud manifests as many entities clustered around shared identifiers (one device using 40 cards, one card across 30 accounts).",
+              "**Model:** a heterogeneous graph: `(:Account)`, `(:Card)`, `(:Device)`, `(:IP)`, `(:Merchant)` nodes with edges like `(:Account)-[:USED]->(:Device)` and `(:Card)-[:BELONGS_TO]->(:Account)`. Known-bad entities carry a `:Flagged` label. Fraud rings show up as dense subgraphs where many accounts share a device, card, or IP: exactly a graph-shaped query and miserable in SQL.",
+              "**Query:** on a new transaction, traverse 3 to 4 hops from the transaction's entities looking for a path to any `:Flagged` node or structural red flags (a device linked to more than K accounts): `MATCH (t)-[*1..4]-(bad:Flagged) RETURN bad LIMIT 1`, plus fan-out checks. Index-free adjacency keeps this touching only the transaction's local neighborhood.",
+              "**Meeting the budget despite scaling limits: split the work.** A live 4-hop traversal per transaction at 10k TPS is where the graph database's horizontal-scaling weakness bites (cross-partition hops and contention blow 100ms). Offline/near-real-time, a graph-processing job continuously computes connected components and risk scores and materializes 'distance-to-known-fraud' and 'cluster risk' scores onto each entity node. In the hot path, the decision becomes a cheap lookup of the precomputed scores of the transaction's 4-5 directly involved entities plus a shallow 1-2 hop live check, fitting sub-100ms. New edges feed the next incremental recompute.",
+              "The senior move: use the graph engine's traversal strength offline to precompute, keep the synchronous 10k-TPS path to a bounded shallow lookup. Common wrong turn: a full 4-hop live traversal per transaction, correct but unable to hold the latency budget at scale given graph sharding limits.",
             ],
           },
         },
