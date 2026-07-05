@@ -477,6 +477,76 @@ entities, respect the 16MB document cap, and treat per-document atomicity as a d
 rather than assuming relational multi-row transactions.
 `.trim()
 
+const wideColumnTeach = `
+## A distributed, sorted map of maps
+
+Wide-column stores (Cassandra, ScyllaDB, HBase, Bigtable) are the write-heavy workhorse of
+internet-scale systems: message history, activity feeds, event logs, time-series, and anything
+ingesting a firehose of writes that must never block. The mental model is not a spreadsheet of
+columns. It is a **distributed, sorted map of maps**: data is grouped into **partitions** (spread
+across the cluster by a hash of the partition key), and within a partition, rows are **sorted** by
+clustering columns. Get those two concepts right and this family is straightforward; get them wrong
+and it falls over.
+
+**Why it is write-optimized.** Cassandra uses an **LSM tree**. A write appends to a commit log and an
+in-memory memtable and returns immediately: no in-place update, no read-before-write. Memtables flush
+to immutable **SSTables** on disk, later merged by compaction. This makes writes extremely cheap and
+sequential, so a cluster absorbs millions of writes per second and scales writes linearly by adding
+nodes. The cost is read amplification (a read may touch several SSTables) and the operational weight
+of compaction.
+
+### Query-first modeling
+
+There are **no joins** and essentially no ad-hoc queries. You cannot efficiently query a column that
+is not part of the key. So you model **one denormalized table per access pattern**: decide the query
+first, then build a table whose partition key and clustering columns serve exactly that query in a
+single partition read. If you have two query shapes, you write the data twice into two tables. This
+feels wasteful to a relational mind and is completely normal here; storage is cheap, and
+denormalization is the price of linear-scale reads and writes.
+
+The **partition key** decides which node owns the data and must both spread load evenly and gather
+everything a query needs into one partition. The **clustering columns** decide the sort order inside
+the partition, so a "most recent first" query becomes a contiguous slice. For message history:
+partition by \`conversation_id\` so all of a conversation's messages live together, cluster by
+\`created_at\` **descending** so "load the latest 50" is the first 50 rows of the partition.
+
+### The two lethal failure modes
+
+1. **Unbounded partitions.** Partition purely by \`conversation_id\` and a chatty conversation grows
+   forever. Cassandra partitions have practical limits (aim for under ~100MB and ~100k rows); an
+   unbounded partition eventually causes slow reads, GC pressure, and node instability. The fix is
+   **time-bucketing**: make the partition key composite, \`(conversation_id, month)\`, so each
+   partition is bounded and old buckets age out.
+2. **Hot partitions.** A celebrity conversation or viral thread concentrates traffic on the one node
+   owning that partition. Mitigate with **sub-partitioning**: add a bucket to the key
+   (\`(conversation_id, bucket)\` where bucket is 0..N) to spread a hot entity across N partitions,
+   at the cost of a scatter-gather read.
+
+**Consistency is tunable per query.** Cassandra is a Dynamo-style AP system with **tunable
+consistency**: you choose how many replicas must acknowledge. \`ONE\` (fast, may read stale),
+\`QUORUM\` (majority). If reads and writes both use QUORUM on replication factor 3, read-quorum (2)
+plus write-quorum (2) overlap by at least one replica, giving read-your-writes strong consistency for
+that key while tolerating one node down.
+
+**Interview nuance:** The classic question is "why not just add a secondary index in Cassandra?"
+Answer: Cassandra secondary indexes query across all partitions (a scatter-gather that does not
+scale) and are an anti-pattern for high-cardinality columns; the idiomatic solution is a second
+denormalized table, not an index.
+
+\`\`\`
+messages_by_conversation
+  PRIMARY KEY ((conversation_id, month), created_at)
+                 ^partition key^         ^clustering, DESC
+  -> "latest 50 in conversation" = first 50 rows of current-month partition, one node
+  -> month bucket bounds partition size; hot convo adds a sub-partition bucket
+\`\`\`
+
+Recap: Wide-column stores are LSM-based write machines; model one denormalized table per query,
+choose a partition key that spreads load and co-locates the query, cluster to serve the sort, always
+bound partitions with time-bucketing, sub-partition hot keys, and tune quorum for the consistency you
+need.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -899,6 +969,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Nesting depth** is handled by parentId, not physical embedding, so arbitrary depth costs nothing in document size. Sub-pages are blocks of type `page` pointing at another page document.",
               "**The accepted tradeoff:** rendering is now N block reads instead of one document read, mitigated by a single indexed query on pageId, client-side assembly, and caching the assembled tree.",
               "Common wrong turn: embedding the tree for 'one fast read' and hitting the size cliff plus write contention the moment a page gets popular.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-wide-column",
+          title: "Wide-Column / Column-Family Stores",
+          summary:
+            "Model one denormalized table per query: a partition key that spreads load and co-locates the read, clustering for the sort, time-bucketed bounded partitions, tunable quorum.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["wide-column", "cassandra", "modeling"],
+          teach: {
+            markdown: wideColumnTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-wide-column-apply",
+            prompt:
+              "Design the Cassandra table(s) for a messaging app's message history optimized for 'load recent messages in a conversation.'",
+            thinkAbout: [
+              "How do partition key and clustering columns serve the query?",
+              "How do you avoid unbounded and hot partitions?",
+              "What consistency does a quorum read/write give?",
+            ],
+            modelAnswerOutline: [
+              "Assume Cassandra with replication factor 3, millions of conversations, the dominant read being 'load the latest 50 messages in a conversation and page backward,' and heavy concurrent writes.",
+              "**The table, modeled to the query:** `CREATE TABLE messages_by_conversation (conversation_id uuid, bucket text, created_at timeuuid, message_id timeuuid, sender_id uuid, body text, PRIMARY KEY ((conversation_id, bucket), created_at)) WITH CLUSTERING ORDER BY (created_at DESC)` where bucket is a month like '2026-07'.",
+              "**Why this serves the query:** the partition key (conversation_id, bucket) co-locates a conversation's messages for a month on one replica set, so 'load recent' is a single-partition read with no scatter-gather. The clustering column created_at DESC stores rows newest-first, so 'latest 50' is literally the first 50 rows, LIMIT 50, no read-time sort. Paging backward continues the slice; crossing a month boundary walks to the previous bucket.",
+              "**Unbounded partitions avoided:** without the bucket, a busy conversation's partition grows without bound and eventually degrades reads and destabilizes the node. The month bucket keeps partitions well under the ~100MB / 100k-row guidance; shrink to a day bucket for extreme volume.",
+              "**Hot partitions:** a viral group chat concentrates writes on one partition's replicas. If needed, sub-partition by adding a small shard (0..N) to the partition key and scatter-gather across shards on read, trading a fan-out read for spread write load. Only pay that for genuinely hot conversations.",
+              "**Consistency:** write and read at QUORUM on RF=3. Write-quorum (2 of 3) and read-quorum (2 of 3) overlap by at least one replica, so a reader always sees the latest acknowledged write (read-your-writes) while tolerating one replica down. Drop to ONE for low-value paths like typing indicators.",
+              "Common wrong turn: partitioning by conversation_id alone (unbounded partition), or adding a secondary index on sender_id instead of building a second messages_by_sender table.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-wide-column-practice",
+            prompt:
+              "Design the Cassandra data model for Discord's message storage, roughly a trillion messages, where channels range from a 2-person DM to a 500k-member server firehose, and the read 'jump to any point in a channel's history and page' must stay fast. Explain the partition strategy that survives both extremes and how you handle deletes/edits in an append-optimized store.",
+            thinkAbout: [
+              "Why can no single fixed idea of 'bucket per conversation' serve both a DM and a firehose channel?",
+              "What lets 'jump to any point in history' compute its partition directly from the message id?",
+              "What do tombstones do to range reads, and how do you keep them out of the hot path?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: trillions of messages, channels spanning six orders of magnitude in volume, the core read being 'load messages around a point in a channel and page in both directions,' and edits/deletes rare relative to writes. (This mirrors Discord's real Cassandra/ScyllaDB design.)",
+              "**Partition strategy: bucket by time window, sized to the worst case.** Partition key (channel_id, bucket) where bucket is a coarse time window. One fixed bucket size cannot be perfect for both extremes: a 2-person DM wants large buckets (else reads span dozens of tiny partitions) and a 500k firehose wants small ones (else the partition blows past 100MB). Discord uses a **static ~10-day bucket derived from the Snowflake message id timestamp**, chosen so even high-traffic channels stay under the partition-size ceiling, accepting sparse partitions for quiet channels.",
+              "**Reads:** message ids are Snowflakes (time-ordered), so the bucket is computable from the id. 'Jump to a point' computes the bucket from the target message id and does a single-partition slice; paging walks adjacent buckets. Clustering by message_id gives time order for free, with no separate created_at and no read-time sort.",
+              "**Edits and deletes in an LSM store:** never update in place. An edit rewrites the row (same primary key, new body); latest write wins by timestamp during compaction. A delete writes a **tombstone** that shadows the row until compaction removes it after gc_grace_seconds.",
+              "**The tombstone trap:** a channel that deletes many messages accumulates tombstones that slow range reads (Cassandra must scan and skip them). Keep bulk deletion rare, tune gc_grace_seconds, and rely on time-bucketing so old buckets (and their tombstones) age out of the hot read path entirely.",
+              "Common wrong turn: a single unbucketed channel_id partition (a busy server's partition grows into gigabytes and dies) or per-message dynamic bucket sizes that make the bucket un-computable from the id. The senior insight: one bucket size that bounds the worst case, plus time-ordered ids so the id itself encodes both order and location.",
             ],
           },
         },
