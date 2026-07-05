@@ -483,6 +483,68 @@ and latency tradeoff, and always attach a TTL-with-jitter and a stated consisten
 cache is defensible, not just present.
 `.trim()
 
+const cacheStampedeHotkeyTeach = `
+## A cache works right up until a popular key expires
+
+In the instant a popular entry disappears, every concurrent request for it misses at once, and each
+one independently tries to rebuild it by querying the database. This is the **cache stampede**
+(thundering herd, dog-piling), and it is one of the most common ways a healthy system takes itself
+down: the cache was hiding, say, 10K req/s worth of a 300ms query, and now all of those requests hit
+the origin in the same window, so the DB suddenly has roughly 3,000 concurrent copies of a slow query
+and its CPU goes to 100%. Worse, because the DB is now slow, each rebuild takes longer, so more
+requests pile up before the first one finishes, and the cache never gets re-populated. The system
+spirals.
+
+Three families of defense exist, and a good design layers them rather than betting on one.
+
+### Request coalescing (singleflight)
+
+When a key is missing, only the first requester rebuilds it, and every other concurrent requester for
+the same key waits for that single in-flight rebuild and shares its result. Go's \`singleflight\`
+package is the canonical implementation, but the pattern is universal: a per-key lock serializes
+recomputation. The first thread acquires the lock and rebuilds; the rest block briefly and then read
+the freshly populated cache. This turns 3,000 concurrent DB queries into exactly one. If the lock is
+process-local you protect one app node; to protect the DB from a whole fleet you use a **distributed
+lock** (a short-lived Redis \`SET NX\` key) so exactly one node across the fleet rebuilds.
+
+### Beating the synchronized expiry
+
+Even with coalescing, a hard TTL means the key vanishes at a single instant. **TTL jitter** spreads
+the expiry of a cohort of related keys over a window so they do not all expire together.
+**Probabilistic early recomputation** (the XFetch algorithm) refreshes a key slightly before its TTL,
+with a probability that rises as expiry approaches, so a single lucky reader rebuilds the value in
+the background while the still-valid cached value keeps serving everyone else. The key never actually
+expires under load. A simpler cousin is **stale-while-revalidate**: serve the stale value immediately
+and kick off one async refresh.
+
+### The genuinely hot key
+
+Sometimes the problem is not expiry but sheer volume: one key (a viral tweet, a flash-sale SKU) is
+read so often that even a single Redis shard cannot serve it, because all requests for one key hash
+to one shard. Coalescing does not help here since the value is present; the shard is simply
+saturated. The fixes are **key replication** (write the value under N suffixed keys
+\`hotkey:0..N\` spread across shards and have clients read a random one) and a **client-side near
+cache (L1)** on each app server so most reads never reach Redis at all. Hot-key detection (per-key
+request rates) tells you which keys need this treatment.
+
+**Interview nuance:** the subtlety interviewers push on is what happens right after a cache flush or
+cold start. A cold cache is a stampede on every key at once, so "just flush and warm up" is dangerous
+at scale. You **warm** the cache before taking traffic, or ramp traffic gradually, and keep
+coalescing on. Treating a flush as free is the classic mistake.
+
+\`\`\`
+NAIVE (stampede)                 COALESCED (singleflight)
+ key expires                      key expires
+  req1 -> DB \\                     req1 -> lock -> DB -> set cache
+  req2 -> DB  }  N queries         req2..N -> wait -> read cache
+  reqN -> DB /  DB at 100%         => exactly 1 DB query
+\`\`\`
+
+Recap: stop expiry stampedes with request coalescing (singleflight) plus jittered TTLs and
+probabilistic early refresh, and handle a genuinely hot key with replication across shards or an L1
+near cache, layering the defenses and never treating a cold cache as safe.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -901,6 +963,55 @@ export const systemDesignLevel3: DesignLevel = {
               "**Inventory** gets the same 1-second treatment plus a fail-safe 'low stock' signal ('limited availability' rather than a precise flickering count).",
               "**Stampede protection:** request coalescing at both tiers so only one refresh per key per node hits the origin, jittered L1 TTLs across nodes, and pricing changes pushed as invalidations (or a versioned price key) so a price cut propagates within a second or two rather than waiting on TTL.",
               "**The committed tradeoff:** up to ~1 second of price/inventory display staleness in exchange for serving 500K reads/sec from L1, with all correctness-critical price checks moved to the low-volume checkout path. Common wrong turn: keeping the displayed price perfectly live by reading the pricing service on every page view, which collapses under the read volume for no real benefit, since the binding price is the one confirmed at checkout.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-cache-stampede-hotkey",
+          title: "Cache Stampede, Thundering Herd & Hot Keys",
+          summary:
+            "Layer the defenses: singleflight coalescing with a distributed lock, jittered TTLs and probabilistic early refresh, plus L1 caches and key replication for genuinely hot keys.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["cache-stampede", "hot-key", "singleflight"],
+          teach: {
+            markdown: cacheStampedeHotkeyTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-cache-stampede-hotkey-apply",
+            prompt:
+              "Design so that when a key served at 10k req/s backed by a 300ms query is about to expire, its expiry does not leak thousands of concurrent queries to the DB.",
+            thinkAbout: [
+              "How does request coalescing (singleflight) protect the DB?",
+              "How do jittered TTLs and early recompute prevent synchronized expiry?",
+              "How do you handle a genuinely hot key?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: one key at 10K req/s, rebuild cost 300ms. Without protection, at the expiry instant roughly 10,000 x 0.3s = ~3,000 concurrent rebuild queries hit the DB in the first window, and because the DB slows under that load, the pile-up grows before the first rebuild completes. Goal: at most one rebuild per expiry, and ideally the key never hard-expires under load.",
+              "**Primary defense: request coalescing with a per-key distributed lock.** On a miss, a requester tries `SET lock:{key} nonce NX PX 2000` in Redis. The winner runs the 300ms query and repopulates; all other concurrent requesters, seeing the lock held, wait a few milliseconds and re-read the cache or serve the last stale value. 3,000 concurrent queries collapse into exactly one across the entire fleet. The lock is fleet-wide, not a process-local mutex, because the shared DB is what needs protecting.",
+              "**Prevent the hard expiry: probabilistic early recomputation (XFetch).** Store the value with its computed cost and TTL; on each read, compute a small refresh probability that rises as expiry nears. One reader rebuilds in the background while the still-valid value serves everyone else, so the key is refreshed before it ever disappears. Add TTL jitter so this key's cohort does not synchronize expiry.",
+              "**The hot-key dimension:** 10K req/s on a single key also merits an L1 near cache on each app server with a 1-second TTL, so the vast majority is served in-process and only a trickle reaches Redis and the DB. At far higher load, replicate the key across shards.",
+              "**Layering:** coalescing bounds the blast radius to one query, early recompute removes the expiry cliff, and L1 removes the volume. On a cold start or after a flush, keep coalescing on and warm the key first.",
+              "Common wrong turn: a single TTL with no coalescing (expiry deterministically stampedes the origin), or a process-local mutex only, which still lets one query per app server through: a 100-node fleet still fires 100 concurrent queries at the DB.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-cache-stampede-hotkey-practice",
+            prompt:
+              "Design so that neither the frequent updates nor the read volume overloads the cache tier or the scoring backend during a World Cup final, where one match's live-score key on a sports platform is read at 2M req/s and its value changes every few seconds when a goal is scored, and lead with the concrete mechanism.",
+            thinkAbout: [
+              "Is this an expiry problem or a hot-key problem, and what changes because updates are event-driven?",
+              "How does push-updating the cache remove the rebuild-on-miss path entirely?",
+              "Where does the remaining cold-start miss risk live, and what guards it?",
+            ],
+            modelAnswerOutline: [
+              "**Mechanism: a push-updated, replicated hot key served from an L1 near cache.** This is a hot-key problem, not an expiry problem: the value changes on real events (goals), not on TTL, so readers should never rebuild it. The scoring backend pushes the new score into the cache; readers only ever read.",
+              "**Read path:** an L1 near cache on every app server holds the current score with a sub-second TTL. At 2M req/s across hundreds of app nodes, each node serves its share locally and refreshes from L2 a few times per second, so Redis sees thousands of ops/sec instead of millions. Because a single shard still cannot take the aggregate refresh load for one key, replicate the key across N shards (`score:match123:0..N`) and have each node read a random replica. Optionally push updates to app nodes over pub/sub or SSE so L1 is updated rather than polled.",
+              "**Write path:** on a goal, the scoring backend writes the authoritative score once to the DB, then publishes the new value to all cache replicas (write-through to the N keys) and the pub/sub channel. A handful of updates per match: trivial write cost. The entire design absorbs reads, not writes.",
+              "**No rebuild-on-miss in the hot loop, so no stampede to coalesce.** The only miss is a cold node start, guarded with singleflight so a restarting node does not fan out to the backend.",
+              "**The tradeoff:** up to ~1 second of score staleness at the edge (L1 TTL / push latency), imperceptible for a live-score display, in exchange for cutting 2M req/s to a few thousand backend-facing ops/sec.",
+              "Common wrong turn: caching the score with a short TTL and letting readers rebuild on expiry, which turns every goal into a 2M-request stampede against the scoring backend; push updates plus L1 plus key replication avoid the rebuild entirely.",
             ],
           },
         },
