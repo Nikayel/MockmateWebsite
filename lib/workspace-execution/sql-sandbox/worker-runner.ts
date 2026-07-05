@@ -9,7 +9,7 @@ export interface SqlWorkerRunResult {
 }
 
 export interface SqlWorkerData {
-  mode: "single-file" | "workspace" | "warm" | "introspect"
+  mode: "single-file" | "workspace" | "warm" | "introspect" | "workspace-preview"
   seedSql?: string
   code?: string
   assertions?: Array<{ suite: string; name: string; sql: string; isHidden?: boolean }>

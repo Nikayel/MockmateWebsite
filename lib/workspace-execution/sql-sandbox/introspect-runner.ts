@@ -17,6 +17,16 @@ export interface SqlIntrospectResult {
   error?: string
 }
 
+export interface SqlWorkspacePreviewResult {
+  success: boolean
+  /** Every user table AFTER the learner's script ran, with sample rows + true row count. */
+  tables: SqlTablePreview[]
+  /** A SQL error INSIDE the learner's script (tables reflect the state up to that statement). */
+  scriptError?: string
+  /** A harness/engine failure (nothing ran), distinct from a SQL error in the learner's script. */
+  error?: string
+}
+
 /**
  * Read-only preview of the tables a seed defines — powers the lesson "Data" panel so a learner can
  * always see the columns and sample rows a query runs against. Executes the seed alone in the
@@ -41,6 +51,51 @@ export async function introspectSqlSeed(
   }
 
   return { success: true, tables: extractTables(runResult.result) }
+}
+
+/**
+ * Run a workspace lesson's seed + the learner's script in a throwaway client-side sql.js DB, then
+ * read back the RESULTING tables — so an L3/L4 learner can SEE the database their script produced,
+ * not just a green/red assertion result. This mirrors grading's execution (same seed, same script)
+ * but is display-only: it runs no assertions and never affects the grade. A SQL error inside the
+ * script is returned as `scriptError` alongside whatever tables were built before it, so partial
+ * state stays visible. An empty/blank script yields no tables.
+ */
+export async function previewSqlWorkspace(
+  seedSql: string | undefined,
+  code: string,
+  previewLimit: number = DEFAULT_PREVIEW_LIMIT
+): Promise<SqlWorkspacePreviewResult> {
+  if (!code || !code.trim()) {
+    return { success: true, tables: [] }
+  }
+
+  const runResult = await runSqlInWorker({
+    mode: "workspace-preview",
+    seedSql: seedSql ?? "",
+    code,
+    previewLimit,
+  })
+  if (!runResult.success || runResult.error) {
+    return {
+      success: false,
+      tables: [],
+      error: runResult.error || "Couldn't read your resulting tables.",
+    }
+  }
+
+  return {
+    success: true,
+    tables: extractTables(runResult.result),
+    scriptError: extractScriptError(runResult.result),
+  }
+}
+
+/** Pull the optional `scriptError` string off the worker payload, ignoring anything malformed. */
+function extractScriptError(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object" || !("scriptError" in payload)) return undefined
+  const raw = (payload as { scriptError?: unknown }).scriptError
+  return typeof raw === "string" && raw.length > 0 ? raw : undefined
 }
 
 /** Narrow the worker's `{ tables: [...] }` payload, dropping anything malformed rather than throwing. */

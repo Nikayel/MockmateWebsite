@@ -15,6 +15,9 @@
 //                 "__WORKSPACE_TEST_RESULTS__:" + JSON marker the Python workspace runner emits.
 //   introspect  → run the seed ALONE (no learner code) and return every user table's schema + first
 //                 rows + true row count, so the lesson can SHOW the data a query runs against.
+//   workspace-preview → run seed + the learner's script (like grading, but WITHOUT the assertions)
+//                 and read back the resulting tables, so an L3/L4 learner SEES the database their
+//                 script produced — not just pass/fail. Display-only; never grades.
 let sqlReadyPromise = null
 
 function postStatus(message) {
@@ -230,6 +233,34 @@ self.onmessage = async function (event) {
         if (seedSql) db.exec(seedSql)
         const tables = introspectTables(db, previewLimit)
         self.postMessage({ type: "result", success: true, result: { tables }, logs: [] })
+      } finally {
+        db.close()
+      }
+      return
+    }
+
+    if (mode === "workspace-preview") {
+      // Seed a fresh DB, run the learner's script, then read back the resulting tables — the SAME
+      // execution grading performs, minus the assertions. Powers the post-run "Resulting tables"
+      // view so pass/fail becomes concrete. A SQL error mid-script still returns whatever tables
+      // were created before it (sql.js stops at the failing statement) plus the error message, so
+      // partial state stays visible instead of collapsing to a bare failure.
+      const db = new SQL.Database()
+      try {
+        if (seedSql) db.exec(seedSql)
+        let scriptError = null
+        try {
+          if (code) db.exec(code)
+        } catch (error) {
+          scriptError = error && error.message ? error.message : String(error)
+        }
+        const tables = introspectTables(db, previewLimit)
+        self.postMessage({
+          type: "result",
+          success: true,
+          result: { tables, scriptError },
+          logs: [],
+        })
       } finally {
         db.close()
       }

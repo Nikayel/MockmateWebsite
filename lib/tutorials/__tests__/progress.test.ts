@@ -36,7 +36,8 @@ describe("tutorialProgressInputSchema", () => {
   })
 
   it("rejects an unknown level id", () => {
-    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: 5 }).success).toBe(false)
+    // 1–5 are valid (SQL adds level 5); 6 is out of range.
+    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: 6 }).success).toBe(false)
   })
 
   it("rejects an invalid section status", () => {
