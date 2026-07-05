@@ -345,6 +345,63 @@ connections stable with Maglev-style consistent hashing, and never claim DNS fai
 because resolver caching bounds it.
 `.trim()
 
+const apiGatewayBffTeach = `
+## Where the cross-cutting concerns live
+
+As a monolith splits into dozens of microservices, a hard question appears: where do the
+cross-cutting concerns live? Every client call needs authentication, TLS, rate limiting, routing, and
+observability. You do not want thirty services reimplementing all of that, and you do not want each
+client talking directly to thirty services. The **API gateway** is the single north-south entry point
+that owns those concerns so the services behind it stay thin.
+
+A gateway centralizes: **TLS termination**, **authentication and authorization**, **rate limiting and
+quotas**, **routing**, **request/response transformation**, **response aggregation**, **API
+versioning and canary routing**, and **observability**. Concrete implementations: Kong, AWS API
+Gateway, Envoy-based gateways, Apigee, or a Netflix Zuul-style edge service.
+
+Draw the boundary carefully. The gateway handles **north-south** traffic (client to system).
+Service-to-service **east-west** traffic is the job of a **service mesh** (Istio, Linkerd, Envoy
+sidecars), which handles mTLS, retries, and load balancing *between* services. Routing internal calls
+through the public gateway is a common design error. Business logic belongs *inside services*, not in
+either the gateway or the mesh.
+
+### Backend-for-frontend (BFF)
+
+One generic API rarely fits every client. A mobile app on a slow network wants a small, denormalized
+payload in one round trip; a web SPA wants richer data; a partner API needs stable, versioned
+contracts. A single endpoint serving all three leads to **over-fetching** (mobile downloads fields it
+never renders) or **under-fetching** (five calls to build one screen). A **BFF** is a thin gateway
+*per client type*: \`bff-mobile\`, \`bff-web\`, \`bff-partner\`. Each aggregates and shapes exactly
+what its client needs and is owned by that client's team, so a mobile change does not ripple through
+the web contract. GraphQL is one way to give clients field-level selection and reduce the need for
+many hand-written BFFs, at the cost of its own query-cost and caching complexity.
+
+\`\`\`
+web  -> bff-web    \\
+mobile -> bff-mobile -> [API gateway: authn, rate limit, routing] -> services
+partner -> bff-partner /                                   (mesh handles east-west)
+\`\`\`
+
+### The two big risks
+
+First, the gateway is a **single point of failure and a latency tax**: every request pays one extra
+hop, and if it is down the whole product is down. So it must be horizontally scaled, stateless,
+health-checked, and kept fast (offload heavy work, cache authz decisions and hot responses). Second,
+and worse, the gateway can rot into a **god-object**: teams keep adding "just one more" piece of
+business logic until the edge holds orchestration and domain rules that belong in services. Then
+every service change requires a gateway change, deploys serialize on one component, and you have
+rebuilt the distributed monolith you split up to avoid.
+
+**Interview nuance:** the strongest answers name *what does not* belong at the gateway (domain
+business rules, per-feature orchestration, data ownership) as crisply as what does. Pre-empt the
+god-object probe by stating a rule: the gateway does cross-cutting concerns and routing only,
+business logic lives in the owning service.
+
+Recap: put auth, TLS, rate limiting, routing, and observability at a horizontally scaled gateway for
+north-south traffic, use a BFF per client type to avoid over/under-fetching, leave service-to-service
+concerns to the mesh, and hold the line against business logic creeping into the edge.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -655,6 +712,52 @@ export const systemDesignLevel4: DesignLevel = {
               "**Data residency changes the routing rules:** EU-pinned tenants must never be steered outside the EU. Encode residency as a routing policy keyed on the API key or token, so those requests only ever select among EU regions. If the single EU region is unhealthy, a second EU region is required for failover, because spilling EU-pinned traffic to us-east violates the contract. The common trap: latency-based routing that ignores residency happily sends an EU tenant to the nearest non-EU region during failover.",
               "**Idempotency ties it together:** payment retries during a failover must not double-charge, so the API is idempotency-key based and writes go to a region-aware replicated store, letting a retried request land in a different region and still be deduplicated.",
               "**Connections:** consistent hashing keeps shifting load from reshuffling every in-flight flow.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-api-gateway-bff",
+          title: "API Gateway & Backend-for-Frontend",
+          summary:
+            "A thin, horizontally scaled gateway owns north-south cross-cutting concerns, BFFs shape payloads per client type, the mesh owns east-west, and business logic stays in services.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["gateway", "bff"],
+          teach: {
+            markdown: apiGatewayBffTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-api-gateway-bff-apply",
+            prompt:
+              "Design an API gateway layer for a microservices product with web, mobile, and partner API clients.",
+            thinkAbout: [
+              "What belongs at the gateway vs inside services vs the mesh?",
+              "When is a BFF the right pattern?",
+              "How do you keep the gateway from becoming a god-object?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 20-plus microservices and three client classes (a web SPA, native mobile apps, and third-party partners), all needing authentication, rate limiting, and consistent observability.",
+              "**Layering:** a horizontally scaled, stateless API gateway (Envoy-based or Kong) as the single north-south entry point, owning the cross-cutting concerns exactly once: TLS termination, authentication (validate JWT/session), coarse authorization, rate limiting and quotas (tighter per-partner-key limits), routing to upstreams, and trace/metric/log injection. Service-to-service traffic inside the cluster does not go through this gateway: a service mesh handles east-west mTLS, retries, and inter-service load balancing. Domain business logic lives inside the owning services, never at the edge.",
+              "**BFFs:** the three clients have genuinely different needs, so a BFF per client type sits behind the gateway. bff-mobile returns small, denormalized, single-round-trip payloads to protect battery and radio; bff-web composes richer views; bff-partner exposes a stable, explicitly versioned contract with stricter quotas. Each BFF aggregates the handful of service calls its screens need, killing mobile over-fetching and the 'five calls to render one page' problem, and each is owned by that client's team so shape changes do not ripple. (If field-level flexibility dominates, GraphQL can replace hand-written BFFs, accepting its caching and query-cost tradeoffs.)",
+              "**Keeping it thin and available:** the gateway is a SPOF and a latency tax, so run several stateless replicas behind the load balancer, health-check them, cache authz decisions and hot responses, and keep per-request work minimal. Hold an explicit rule against the god-object: the gateway does cross-cutting concerns, routing, and (in BFFs) client-shaped aggregation only; orchestration of domain workflows stays in services. Versioning and canary routing live at the edge so 5% of traffic can shift to a new version and roll back at the router.",
+              "Common wrong turn: letting the gateway accrete business logic until it is a distributed monolith where every feature change needs a gateway deploy, or routing internal service-to-service calls through the public gateway instead of the mesh.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-api-gateway-bff-practice",
+            prompt:
+              "Design the API gateway and BFF layer for Netflix-scale streaming, where a single home-screen load fans out to dozens of microservices (recommendations, artwork, continue-watching, billing status) and the same backend must serve TVs, phones, browsers, and game consoles with wildly different capabilities. Lead with the request topology.",
+            thinkAbout: [
+              "Why does one generic API fail across TVs, phones, and consoles?",
+              "At a dozens-of-services fan-out, what must happen when one non-critical service is slow?",
+              "Which fields fail differently from cosmetic ones?",
+            ],
+            modelAnswerOutline: [
+              "**Topology:** an anycast edge terminates TLS and hands off to a scaled API gateway (Zuul-style) doing authn, rate limiting, and routing, then to a device-specific BFF/edge-aggregation layer that fans out to dozens of services and composes one home-screen response. The home screen is the classic aggregation case: recommendations, per-row artwork, continue-watching state, and billing/entitlement status come from different services, and the client should get one composed payload, not make forty calls over a phone radio.",
+              "**Device diversity is why one generic API fails:** a 4K TV, a low-end Android phone, and a console differ in screen size, codec support, memory, and network. The aggregation layer is device-aware: it shapes payloads (image resolutions, row counts, field sets) per device class, ideally driven by device capability metadata. Netflix's real answer let device teams run their own adapter logic at the edge so each client controls its own shaping: the BFF idea taken to its scaled conclusion.",
+              "**Resilience dominates at this fan-out:** because one screen depends on dozens of services, the aggregator must degrade gracefully. Wrap each downstream in a circuit breaker and timeout (Hystrix-style); when a non-critical service (a single recommendation row) is slow or down, return the screen without that row rather than failing the whole load. Critical fields (is the account active, is playback allowed) fail differently from cosmetic ones.",
+              "**Caching and thinness:** hot shared responses (artwork, common rows) cache at the edge to cut fan-out volume. The gateway stays thin and stateless; per-device shaping and partial-failure composition live in the aggregation/BFF layer; domain logic stays in the individual services.",
             ],
           },
         },
