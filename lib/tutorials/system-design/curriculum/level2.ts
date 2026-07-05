@@ -793,6 +793,65 @@ real read/write ratio and scale trigger (especially to dodge cross-shard joins),
 materialized views when you want join-free reads without hand-maintaining the copies.
 `.trim()
 
+const accessPatternModelingTeach = `
+## List the access patterns first
+
+Relational modeling starts with entities: you draw the nouns, normalize them, and trust the query
+planner to join them at read time. NoSQL modeling inverts this completely. In a system like DynamoDB
+or Cassandra there is no join and no flexible query planner, so if you model entities first and hope
+to query them later, you will find that the query you need is impossible or requires a full-table
+scan. The mindset shift is: **list the access patterns first, then design keys and tables so each
+pattern is a single lookup.**
+
+Start by writing every read and write your feature performs, as concrete sentences: "list a user's
+conversations, most recent first," "load the last 50 messages in a thread," "get the unread count per
+conversation." Each of these must become one query against one partition. If any access pattern would
+require scanning or a scatter-gather, the model is wrong, not the database.
+
+### Composite keys co-locate the data
+
+The core tool is the **composite primary key**: a **partition key** plus a **sort key**. The
+partition key decides which physical node the item lives on; everything with the same partition key
+is stored together, sorted by the sort key. To store a thread's messages, set partition key =
+\`THREAD#<id>\` and sort key = \`MSG#<timestamp>\`; "load the last 50 messages" is then a single
+Query on that partition, \`ScanIndexForward=false, Limit=50\`. No join, one partition, one round
+trip.
+
+Modeling relationships is about **embedding versus referencing**. A one-to-many where the many are
+always read with the one, and are bounded, can be embedded: store the child items in the same
+partition as the parent (same partition key, distinct sort keys). If the many are large or unbounded,
+or read independently, reference them: give them their own partition and store just an id. A
+many-to-many is handled with an adjacency-list pattern or a global secondary index that lets you
+query the relationship from both directions.
+
+**Interview nuance:** the tell of a weak NoSQL answer is designing a users table, a conversations
+table, and a messages table that mirror a relational schema, then discovering you cannot list a
+user's conversations without a scan. The strong answer often puts multiple entity types in **one
+table** (single-table design), keyed so each access pattern hits one partition.
+
+### Hot partitions and secondary indexes
+
+The failure mode you must actively design against is the **hot partition**. Because the partition key
+routes to a physical node with a throughput ceiling (DynamoDB caps a single partition around 3,000
+read and 1,000 write units per second), a key that concentrates traffic becomes a bottleneck no
+matter how much total capacity you provision. A celebrity user's thread, or a partition key of
+\`status=ACTIVE\` that every write touches, will throttle. Spread heat with a high-cardinality
+partition key and, for known-heavy keys, **write sharding**: append a suffix
+(\`THREAD#123#<0..9>\`) to fan one logical partition across ten physical ones, then scatter-read the
+ten on the way out.
+
+**Secondary indexes** buy additional access patterns without a second table. A **global secondary
+index (GSI)** has its own partition and sort key over the same items, so you can query by a different
+attribute. GSIs are eventually consistent and cost extra write capacity (every base write replicates
+to the index), so add them per access pattern, not by default. A **local secondary index (LSI)**
+shares the partition key but offers an alternate sort key, and can be strongly consistent.
+
+Recap: enumerate access patterns first, turn each into a single-partition lookup using composite
+partition and sort keys, choose embedding versus referencing by how the related data is read, design
+the partition key to avoid hot partitions, and add secondary indexes only to serve a named additional
+access pattern.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1473,6 +1532,56 @@ export const systemDesignLevel2: DesignLevel = {
               "**Handling change:** cosmetic catalog drift (title corrections, CDN URL rotation) does not rewrite history; the snapshot is the record of what was bought. Mutable fields the page must show live (delivery status, return eligibility) are stored on the order itself, same shard, updated via the order-events stream, never fetched from another service on render.",
               "**Scale and hotspots:** sharding by customer_id keeps each customer's history co-located and spreads load evenly; no single customer is a hotspot the way a celebrity product would be. The LIMIT 50 plus index bound keeps the query cheap regardless of lifetime order count.",
               "**Trade acknowledged:** snapshot staleness on cosmetic fields in exchange for a join-free, single-shard, sub-100 ms read. Common wrong turn: preserving normalization purity by calling the catalog service per line item, turning one page load into 50 cross-service RPCs and blowing the latency budget.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-access-pattern-modeling",
+          title: "Query-First Data Modeling",
+          summary:
+            "Enumerate access patterns first, then design composite keys so each pattern is a single-partition lookup, with write sharding for hot partitions and GSIs added per named pattern.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["access-patterns", "modeling", "nosql"],
+          teach: {
+            markdown: accessPatternModelingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-access-pattern-modeling-apply",
+            prompt:
+              "Design the primary keys and item layout for the top 3 access patterns of a chat app (list conversations, load a thread, unread counts).",
+            thinkAbout: [
+              "What are the access patterns, and how does each become a single lookup?",
+              "How do partition key + sort key co-locate related data?",
+              "How do you avoid a hot partition in the key design?",
+            ],
+            modelAnswerOutline: [
+              "Assume DynamoDB single-table design, chat with direct and small group conversations. Write the access patterns first as one-lookup requirements: (1) list a user's conversations by recency, (2) load the last N messages in a thread, (3) get unread count per conversation.",
+              "**Messages (pattern 2):** `PK = THREAD#<threadId>`, `SK = MSG#<ts>`. All of a thread's messages are co-located and time-sorted, so 'load last 50' is one Query with ScanIndexForward=false, Limit=50. New messages are cheap appends.",
+              "**Membership and conversation list (pattern 1):** a membership item per (user, thread): `PK = USER#<userId>`, `SK = CONV#<lastActivityTs>#<threadId>`, with conversation title and peer attributes. Querying PK = USER#<userId> descending returns the user's conversations already ordered by recency, one lookup. On a new message, update the member items' lastActivityTs (rewriting the sort key); for small groups this fan-out write is bounded and fine.",
+              "**Unread counts (pattern 3):** an `unreadCount` counter on each membership item. On a new message, atomically ADD 1 for every member except the sender; opening a thread resets the reader's to 0. Pattern 3 is then free: it comes back with the conversation-list query, no extra read.",
+              "**Co-location twice:** messages co-located under THREAD#, a user's conversations co-located and pre-sorted under USER#. Each access pattern is exactly one Query.",
+              "**Hot partitions:** a busy group thread concentrates writes on one THREAD# partition. If a thread can exceed ~1,000 writes/sec, write-shard it: `PK = THREAD#<id>#<shard 0..N>` chosen by message hash, scatter-reading N shards for history. Membership writes spread naturally across USER# partitions.",
+              "Common wrong turn: mirroring a relational schema (separate users, conversations, messages tables) and needing a scan to list a user's conversations, or computing unread counts on read by scanning a thread.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-access-pattern-modeling-practice",
+            prompt:
+              "Design the DynamoDB key schema for Slack-scale messaging where a single channel can have 500,000 members and a viral message triggers hundreds of thousands of unread-count updates in seconds. Show how you keep 'list my channels,' 'load channel history,' and 'unread badge' as single lookups without a hot partition melting down.",
+            thinkAbout: [
+              "What does one message cost if unread is a per-member counter in a 500k-member channel?",
+              "How does a sequence-number difference turn an O(members) write into O(1)?",
+              "Where does channel history need write sharding, and what does the read pay for it?",
+            ],
+            modelAnswerOutline: [
+              "Assume hundreds of millions of users, channels up to 500k members, and fan-out spikes when a message lands in a mega-channel. The naive design (increment an unreadCount on every member item per message) means one message = 500k writes, melting write capacity and doing pointless work for offline users.",
+              "**History (channel partition, write-sharded):** `PK = CHAN#<id>#<shard>`, `SK = TS#<ts>`, shard chosen by hash of message id across ~16 shards. A mega-channel's writes spread across 16 physical partitions, staying under the per-partition write ceiling; 'load history' scatter-reads the 16 shards and merges by timestamp, still bounded and low-latency.",
+              "**List my channels:** `PK = USER#<id>`, `SK = CHAN#<lastActivityTs>#<channelId>` membership items, so a user's channel list is one pre-sorted Query keyed by the user, spreading load perfectly across users.",
+              "**Unread badge without 500k writes:** no per-member counter fan-out. Each channel stores a monotonic `lastMessageSeq`; each membership item stores the user's `lastReadSeq`. Unread = lastMessageSeq - lastReadSeq, computed at read time, returned with the channel-list query. One message is a single write (bump the channel's seq) instead of 500k; reading a channel updates only that user's lastReadSeq. O(members) write becomes O(1).",
+              "**The trade:** a per-message mention badge (distinct from unread) still needs targeted fan-out, but only to the people actually @-mentioned: a small, bounded set, which is exactly the fan-out that is fine.",
+              "Common wrong turn: treating a 500k-member channel like a 5-member DM and fanning out counters, or keeping channel history on one partition key and throttling the moment a channel goes viral.",
             ],
           },
         },
