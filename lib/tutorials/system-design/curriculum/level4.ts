@@ -171,6 +171,64 @@ for sticky routing or sharded state; session affinity keeps a user on a cache-wa
 even load and loses that node's state when it dies, so use it deliberately.
 `.trim()
 
+const healthChecksTeach = `
+## Send traffic only to nodes that can serve it
+
+A load balancer only helps if it sends traffic to nodes that can actually serve it and stops sending
+to nodes that cannot. That is the job of **health checks**, and the subtlety is doing it without
+evicting healthy nodes or dropping in-flight work during a deploy.
+
+There are two ways to know a node is bad. **Active checks** have the LB **probe** each backend on an
+interval (an HTTP GET \`/healthz\`, a TCP connect) and mark it unhealthy after N consecutive
+failures: fast, proactive detection at the cost of probe traffic. **Passive checks** (outlier
+detection) **observe real traffic**: if a backend starts returning 5xx or timing out on actual
+requests, eject it from the pool for a cooldown. Passive checks catch failures a shallow probe
+misses. Production uses both.
+
+### Liveness vs readiness
+
+- **Liveness** asks "is this process alive at all?" A failed liveness check means the node is broken
+  and should be **restarted/replaced.**
+- **Readiness** asks "is this node ready to receive traffic right now?" A node can be alive but
+  **not ready**: still warming its cache, loading a model, filling connection pools, or temporarily
+  shedding load. A not-ready node should be **pulled from the LB pool but not killed.**
+
+Conflating them is a classic bug. If you treat "not warmed up yet" as a liveness failure, the
+orchestrator keeps killing and restarting perfectly good nodes in a crash loop. Gate a newly started
+node behind readiness until it is warm, then admit it.
+
+### Deploys: draining and slow-start
+
+- **Connection draining (graceful shutdown):** when a node is going away, first mark it **not ready**
+  so the LB stops sending it **new** requests, but let its **in-flight** requests (and long-lived
+  streams) **finish** up to a drain timeout before the process exits. The sequence: stop advertising
+  -> stop new traffic -> wait for in-flight to complete (or hit the deadline) -> terminate.
+- **Slow-start / ramp:** a freshly joined node starts with zero warm cache and cold connection pools.
+  If the LB immediately gives it a full 1/N share, it can fall over or spike latency. Slow-start
+  ramps its traffic share up over some seconds.
+
+**Interview nuance: deep vs shallow health checks.** A shallow check returns 200 as long as the web
+server is up, even if the database or a critical downstream is unreachable, so the node keeps
+receiving traffic and failing every real request. A **deep** check verifies the critical
+dependencies. But deep checks have their own trap: if every node's health check hits a shared
+dependency and that dependency blips, **every node marks itself unhealthy at once and the whole fleet
+drops out**, turning a minor blip into a total outage. The mature answer: deep enough to catch a
+truly broken node, with hysteresis, and not so coupled that a shared-dependency blip fails the entire
+fleet simultaneously.
+
+\`\`\`
+  drain sequence on node removal / deploy:
+  mark NOT-READY -> LB stops NEW traffic -> in-flight finishes (<= drain deadline) -> terminate
+  join sequence:
+  start -> READINESS gates traffic until warm -> slow-start ramps share up
+\`\`\`
+
+Recap: use active probes plus passive outlier ejection; keep liveness (restart) separate from
+readiness (pull from pool, do not kill); drain connections and slow-start new nodes so a rolling
+deploy drops nothing; and make checks deep enough to catch a broken downstream without letting one
+shared-dependency blip fail the whole fleet at once.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -328,6 +386,54 @@ export const systemDesignLevel4: DesignLevel = {
               "**The viral-guild escape valve:** pair with bounded-load consistent hashing so a hot guild does not overload its assigned node: past a load threshold, overflow spills to the next node in the ring.",
               "**Deploy handling:** affinity loses in-memory state on node death, so drain connections gracefully, let clients reconnect, and treat per-guild fan-out state as rebuildable (reload from the authoritative store on reconnect) rather than durable.",
               "Common wrong turn: `hash % N` stickiness, which turns every deploy into a fleet-wide cache stampede as nearly every guild remaps at once; consistent hashing bounds that churn to a small fraction.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-health-checks",
+          title: "Health Checks, Draining & Graceful Rollout",
+          summary:
+            "Separate liveness (restart) from readiness (pull from pool), drain in-flight work before terminating, slow-start cold nodes, and keep deep checks from failing the whole fleet.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["health-checks", "draining", "deploy"],
+          teach: {
+            markdown: healthChecksTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l4-health-checks-apply",
+            prompt:
+              "Design health checking and drain behavior so a rolling deploy of 50 nodes never drops in-flight requests or a long-lived stream.",
+            thinkAbout: [
+              "What is the difference between liveness and readiness?",
+              "How do connection draining and slow-start protect requests?",
+              "Why can a shallow 200 mask a broken dependency?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 50 nodes behind an L7 LB, a mix of short HTTP requests and long-lived streams (gRPC streams or WebSockets), rolling deploy in batches of ~5, and a goal of zero dropped requests and no severed stream.",
+              "**Two separate endpoints.** `/livez` is shallow and cheap (process up, event loop responsive); a liveness failure tells the orchestrator to restart/replace the node. `/readyz` is deeper: it confirms the node has warmed (caches primed, pools filled) and critical dependencies are reachable, and it controls whether the LB sends traffic. Keeping them separate means a node that is merely warming or briefly shedding is pulled from the pool but not killed. Active probes every 2-5s (unhealthy after 2-3 consecutive failures), plus passive outlier ejection so a node returning 5xx on real traffic is ejected even if its probe still passes.",
+              "**Draining, per batch:** flip the node to not-ready so the LB stops routing new requests, then wait for in-flight requests to complete up to a drain deadline. For long-lived streams, a hard deadline would sever them, so set the drain timeout longer than a normal request and signal the client to reconnect (a GOAWAY on HTTP/2 or an app-level 'please reconnect') so it re-establishes on a healthy node before termination. Sequence per node: mark not-ready -> stop new traffic -> drain in-flight -> terminate -> new node boots.",
+              "**Joining:** each replacement stays out of the pool until readiness passes, with slow-start so its traffic share ramps over seconds rather than getting a full 1/50 share cold. Deploy in small batches with a health gate between batches: if error rate or latency rises, halt and roll back.",
+              "Common wrong turn: a single shallow `/health` used for both liveness and LB routing. It returns 200 while a downstream is broken (bad nodes keep serving errors) and conflates 'warming up' with 'dead' (warming nodes get killed). Splitting liveness from readiness with a deep-but-decoupled readiness check is the fix.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-health-checks-practice",
+            prompt:
+              "Design the health-check and rollout strategy for a Kubernetes fleet of 500 pods behind an Envoy mesh where a critical shared dependency (a central auth service) occasionally has a 10-second blip, and explain how you avoid a deep health check turning that blip into a fleet-wide outage.",
+            thinkAbout: [
+              "What happens if all 500 readiness probes hard-depend on the shared auth service?",
+              "What do ejection caps and probe hysteresis each protect against?",
+              "How can the sidecar make a 10-second auth blip invisible to requests?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 500 pods, Envoy sidecars routing, and a shared central auth dependency that blips for ~10s occasionally. The naive deep check ('verify I can reach auth') would make all 500 pods fail readiness simultaneously during the blip, draining the entire fleet and turning a 10s hiccup into a full outage.",
+              "**Keep Kubernetes liveness and readiness distinct:** liveness is shallow (process healthy) so pods are not restarted for a transient dependency issue; readiness controls Endpoint membership.",
+              "**Make readiness not hard-fail on the shared dependency:** (1) the readiness check verifies local health (can serve, pools warm) and treats the auth dependency as degraded, not down, so a brief blip does not eject the pod; (2) rely on Envoy passive outlier ejection with a max-ejection-percentage cap (never eject more than ~20-30% of the pool), so even if many pods look bad at once, the mesh refuses to drain the whole fleet; (3) give probes hysteresis (several consecutive failures over a window longer than a 10s blip) so a sub-threshold blip never flips readiness at all.",
+              "**Handle the dependency itself at the sidecar:** circuit breaking plus caching of recent auth decisions/keys so a 10s auth blip is served from cache rather than failing requests, and fail degraded where policy permits rather than fail-closed for the whole fleet.",
+              "**Rollouts:** small maxUnavailable/maxSurge with health gates between batches.",
+              "Common wrong turn: a deep readiness check that hard-depends on a shared service with no ejection cap and no hysteresis, so the shared blip synchronously fails every pod and takes the service fully down: exactly the correlated-failure amplification a good design prevents.",
             ],
           },
         },
