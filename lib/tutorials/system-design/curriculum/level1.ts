@@ -711,6 +711,62 @@ for cheap conditional GETs (304), and use ETag + If-Match -> 412 for optimistic 
 prevents lost updates.
 `.trim()
 
+const serializationCompressionTeach = `
+## A CPU-versus-bytes trade, decided by your bottleneck
+
+Serialization and compression are a CPU-versus-bytes trade, and the right answer depends entirely on
+where your bottleneck is: bandwidth (mobile, cross-region, metered) or CPU (very high QPS internal
+traffic). You also have to keep schemas evolvable when producers and consumers deploy independently.
+
+### Serialization formats
+
+- **JSON**: human-readable, self-describing, universal, debuggable in a browser. But verbose (field
+  names repeat on every object) and comparatively slow to parse. It is the correct default for public
+  APIs where developer ergonomics and debuggability beat raw efficiency.
+- **Protobuf**: compact binary driven by an IDL, fast to encode/decode, with generated types. Fields
+  are tagged by number, not name, so payloads are small. Ideal for internal high-QPS RPC (it pairs
+  with gRPC).
+- **Avro**: the schema is registered centrally or travels with the data (in the file header), which
+  makes it strong for data pipelines and Kafka, where a schema registry lets producers and consumers
+  evolve independently.
+- **Thrift**: RPC plus serialization from one IDL, similar niche to Protobuf, common in older
+  Facebook-lineage stacks.
+
+### Compression, negotiated via Accept-Encoding
+
+- **gzip**: universal and cheap, the safe default.
+- **Brotli**: better ratio than gzip, especially on text over HTTPS to browsers.
+- **zstd**: excellent ratio and speed with tunable levels, great for internal transfer where you
+  control both ends.
+
+The tradeoff to state explicitly: compression and binary encoding cut bytes but add CPU, and
+aggressive compression can add tail latency on large responses (the compressor has to run before the
+first byte goes out). So set a payload-size threshold below which you do not compress (compressing a
+200-byte response is a net loss), and do not double-compress already-compressed data (images, video).
+
+### Schema evolution: the part people forget
+
+Protobuf, Avro, and Thrift all support forward and backward compatibility if you follow the rules:
+add only optional/new fields, and never reuse or renumber a field tag (mark removed tags
+\`reserved\`). That is what lets a new producer and an old consumer coexist during a rolling deploy.
+JSON has no built-in schema, so it relies on the tolerant-reader discipline: consumers ignore unknown
+fields and tolerate missing optional ones.
+
+Putting it together with content negotiation: a public API defaults to JSON, honors
+\`Accept-Encoding\` to pick Brotli for browsers, and sets \`Vary: Accept-Encoding\` so a shared cache
+does not hand a Brotli body to a client that only speaks gzip. An internal mesh uses Protobuf with
+zstd because both ends are controlled and CPU/bytes dominate.
+
+**Interview nuance:** the trap is "Protobuf everywhere because it is faster." On a public browser API
+the network savings are usually tiny relative to the developer and debugging cost, and you lose
+\`curl\`-ability. The senior move is to locate the bottleneck first (bandwidth vs CPU) and choose per
+surface.
+
+Recap: choose format and codec by bottleneck (JSON+Brotli for public/bandwidth, Protobuf+zstd for
+internal/CPU), never compress tiny or already-compressed payloads, and keep schemas evolvable by
+adding optional fields and never reusing field tags.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1387,6 +1443,54 @@ export const systemDesignLevel1: DesignLevel = {
               "**Caching reads:** the shareable published/read-only view is cached aggressively at the CDN with `s-maxage` plus an ETag and fingerprinted URLs, so viewers (not editors) hit cache. Live editors do not use HTTP read caching; they read the live OT/CRDT stream.",
               "**The hybrid model:** ETag + If-Match optimistic concurrency for coarse metadata, OT/CRDT over WebSocket for the hot collaborative body, and CDN + ETag caching for read-only viewers.",
               "Common wrong turn: forcing whole-document If-Match optimistic concurrency onto high-frequency collaborative editing, which produces constant 412s and a broken editor, or using last-write-wins and losing edits.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-serialization-compression",
+          title: "Serialization, Content Negotiation & Compression",
+          summary:
+            "Choose format and codec by bottleneck (JSON+Brotli public, Protobuf+zstd internal), skip compressing tiny payloads, and keep schemas evolvable with field-tag discipline.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["serialization", "api-design", "performance", "schema-evolution"],
+          teach: {
+            markdown: serializationCompressionTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-serialization-compression-apply",
+            prompt:
+              "Choose a serialization format and compression scheme for a high-fan-out internal API and for a public mobile API, and justify each against JSON, Protobuf, Avro, Thrift, and gzip, Brotli, zstd on the size, CPU, and schema-evolution axes.",
+            thinkAbout: [
+              "Where is the bottleneck: bandwidth (mobile, cross-region) or CPU (very high QPS)?",
+              "How does each format handle schema evolution when producers and consumers deploy independently?",
+              "How do you pick a compression codec via Accept-Encoding without paying tail latency on large payloads?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: two surfaces, a chatty internal service mesh at very high QPS, and a public API serving mobile clients on slow, metered networks.",
+              "**Internal high-fan-out API -> Protobuf with zstd.** You own both ends and the bottleneck is CPU and bytes at high QPS, so a compact binary format matters. Protobuf is small (tag-numbered fields, no repeated field names), fast to encode/decode, and IDL-driven so it pairs with gRPC and generated stubs. zstd adds strong compression at low CPU with tunable levels. Schema evolution via Protobuf rules: add optional fields, never renumber or reuse tags, mark removed tags `reserved`, so rolling deploys with mixed versions interoperate. (Avro would be the choice specifically for Kafka pipelines, where a schema registry shines.)",
+              "**Public mobile API -> JSON with Brotli, plus `Vary: Accept-Encoding`.** The bottleneck is bandwidth and the consumers are external, so debuggability and ubiquity matter. JSON is universal and `curl`-able; Brotli beats gzip on text over HTTPS to browsers and mobile clients, negotiated via Accept-Encoding. `Vary: Accept-Encoding` keeps a shared cache from serving a Brotli body to a gzip-only client. Schema evolution relies on tolerant readers and additive-only changes.",
+              "**Compression discipline on both:** a size threshold (roughly 1KB) below which compression is skipped, because compressing tiny payloads is a net CPU loss, and never re-compress already-compressed assets (images). For very large responses watch tail latency, since the compressor runs before the first byte.",
+              "Common wrong turn: forcing Protobuf onto the public browser/mobile API for 'speed,' paying a large developer and debugging cost and losing `curl`-ability for byte savings the network barely needed, or compressing 200-byte responses and adding CPU for no gain.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-serialization-compression-practice",
+            prompt:
+              "Design the serialization and schema-evolution strategy for a Kafka-based event platform at LinkedIn scale, where thousands of producers emit events consumed by hundreds of independently-deployed consumers, producers and consumers upgrade on their own schedules, and a bad schema change must never break downstream consumers. Choose the format and the governance.",
+            thinkAbout: [
+              "What lets a consumer decode an event written by a producer it has never coordinated with?",
+              "Where is the enforcement point that blocks a breaking schema change before any event is produced?",
+              "Why does raw JSON on Kafka fail this requirement even though it is flexible?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: thousands of producers, hundreds of consumers, fully independent deploys, events durable in Kafka for days, zero tolerance for a schema change silently breaking a consumer.",
+              "**Format: Avro with a central Schema Registry** (essentially LinkedIn's own design; Confluent Schema Registry is the productized version). Avro's schema-on-read model and registry integration fit streaming: each message carries a small schema id, the consumer fetches the writer schema from the registry, and Avro resolves it against the consumer's reader schema. Producers and consumers do not deploy in lockstep.",
+              "**Why not JSON:** at this volume JSON's verbosity wastes storage and bandwidth across billions of events, and it has no enforced schema, so a bad producer change is discovered only when a consumer crashes. **Why Avro over Protobuf:** the registry-plus-schema-resolution model is the standard, well-tooled fit for Kafka; Protobuf also works but Avro is the canonical choice in this ecosystem.",
+              "**Governance (the real protection):** the Schema Registry enforces a compatibility mode per topic, typically BACKWARD (new schema can read old data) or FULL. On registration, a proposed schema is checked against the existing one and rejected if it would break compatibility (removing a field a consumer needs, changing a type). The bad change is blocked at publish time, before any event is produced. Allowed evolution is additive: add fields with defaults, never change or reuse a field's identity.",
+              "**Operational:** consumers use tolerant resolution (unknown fields ignored, new data has defaults), and the registry's version history plus per-topic compatibility gives an auditable contract across teams.",
+              "Common wrong turn: raw JSON on Kafka with no registry (no enforcement, breakage found in production), or forcing global lockstep upgrades of thousands of producers and consumers, impossible at this scale. Registry-enforced Avro compatibility is what lets everyone deploy independently and safely.",
             ],
           },
         },
