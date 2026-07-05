@@ -570,6 +570,67 @@ overshoot, and always decide the fail-open path plus hot-key sharding so the lim
 the outage.
 `.trim()
 
+const loadSheddingBackpressureTeach = `
+## Systems die by accepting more than they can finish
+
+Rate limiting caps a client's demand. It does nothing when total legitimate demand simply exceeds
+your capacity, or a dependency slows down and requests pile up. The goal of overload protection is
+blunt: at 150% of capacity, stay up and keep serving the most important traffic, instead of trying to
+serve everything and serving nothing.
+
+Understand the failure mode first. A server has finite concurrency. When arrival rate exceeds
+completion rate, in-flight requests and queues grow, each request waits longer, latency climbs,
+clients hit timeouts and **retry** (often amplifying load 3x), memory for queued work grows, and
+eventually the box GCs itself to death or OOMs. This is the **congestion collapse / retry-storm death
+spiral**: throughput actually drops toward zero under increasing load. The defining mistake that
+enables it is the **unbounded queue**, which hides overload by accepting work it will never complete
+in time until memory runs out.
+
+### Load shedding: reject early, by priority
+
+A request you reject in 1ms costs almost nothing; a request you accept, queue for 5s, then fail costs
+capacity you needed for good traffic. So you **shed before collapse**, at a threshold below 100%, and
+you shed the **right** traffic. **Priority-aware shedding** classifies traffic (health checks and
+paying-customer writes are critical; bulk exports, retries, and best-effort reads are droppable) and
+drops low-priority first, so the checkout path survives while a recommendation call is dropped.
+
+### Adaptive concurrency limits
+
+A static "max 500 concurrent" is wrong the moment your dependency's latency changes: at 50ms per
+request 500 concurrency is fine, at 500ms it is 10x too much. Instead, discover the limit dynamically
+the way TCP congestion control does. By **Little's Law**, \`concurrency = throughput * latency\`; a
+system probes by raising its concurrency limit while latency stays flat and backing off when latency
+rises (a gradient / TCP-Vegas style loop, as in Netflix's adaptive concurrency limiter). The limit
+tracks the real, current capacity with no operator-tuned magic number.
+
+### Backpressure
+
+Refuse upstream when you are full, so pressure propagates back to the source instead of accumulating
+in you. Use **bounded queues** that reject (or return a fast 503) when full. Propagate
+**deadlines**: pass a per-request deadline through the call chain and drop any request whose deadline
+has already passed, since finishing already-dead work is pure waste.
+
+**Interview nuance:** graceful degradation / **brownout** is the senior move. Under overload you can
+shed **features**: serve a cached or partial response, skip the personalization call, drop the
+recommendation carousel, return the core page. Combine with retry hygiene (exponential backoff plus
+jitter, and **circuit breakers**) and you break the retry storm at both ends.
+
+\`\`\`
+demand ---> [ admission: shed low-priority first if over threshold ]
+             |
+             v
+        [ bounded queue: reject/503 when full, drop past-deadline ]
+             |
+             v
+        [ worker pool: adaptive concurrency = probe via Little's Law ]
+   overload -> brownout: cached/partial responses, drop optional features
+\`\`\`
+
+Recap: shed early and by priority, replace static thresholds with adaptive concurrency limits derived
+from Little's Law, bound every queue and drop past-deadline work so latency cannot explode, and brown
+out optional features rather than failing everything: never an unbounded queue.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -1077,6 +1138,56 @@ export const systemDesignLevel4: DesignLevel = {
               "**Consistency choice, stated deliberately:** bounded eventual consistency on the global limit. Overshoot is capped at roughly the sum of one refresh interval's in-flight traffic across regions: a small percentage of a 1M/min limit. Perfect global exactness is not worth adding 100ms to every request; rate limits are a coarse abuse control, not a financial ledger.",
               "**Failure and shifts:** if the coordinator is unreachable, each PoP fails open to its last known lease (or a conservative default) rather than blocking traffic, with origin shielding / load shedding as the real backstop. A viral event moving load to one region is absorbed as leases re-divide toward live demand within an interval; until then the affected region briefly under- or over-limits, which is acceptable.",
               "This is essentially how large CDNs and Envoy-style global rate limiting operate: local speed, async global truing, fail-open safety.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-load-shedding-backpressure",
+          title: "Load Shedding, Adaptive Concurrency & Backpressure",
+          summary:
+            "Shed early and by priority, adapt concurrency limits via Little's Law, bound every queue, propagate deadlines, and brown out features instead of failing everything.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["load-shedding", "backpressure", "concurrency"],
+          teach: {
+            markdown: loadSheddingBackpressureTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-load-shedding-backpressure-apply",
+            prompt:
+              "Design overload protection so that at 150% of capacity the service stays up and still serves its most important traffic.",
+            thinkAbout: [
+              "How do you shed the right traffic first?",
+              "Why are adaptive concurrency limits better than static thresholds?",
+              "How do bounded queues and deadline propagation prevent collapse?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an API service with ~10k RPS capacity before latency degrades, hit with 15k RPS (150%). Success: stay up, keep p99 bounded for admitted traffic, and preserve the highest-value requests while dropping the rest cleanly.",
+              "**Layer 1, priority-aware admission control at the edge:** every request is tagged with a priority tier (critical: auth, payments, writes; normal: interactive reads; low: bulk exports, prefetch, retries). Over threshold, shed from the bottom tier up: at 150% the low tier is rejected fast with 503/429 + Retry-After, normal is partially shed, critical is protected. Rejecting in ~1ms is nearly free; the expensive mistake is accepting, queuing for seconds, then failing, burning capacity critical traffic needed.",
+              "**Layer 2, adaptive concurrency limits instead of a static cap:** each node runs a gradient limiter (Netflix adaptive-concurrency / TCP-Vegas style) that raises its concurrency limit while measured latency stays flat and backs off when latency rises. By Little's Law (concurrency = throughput x latency) this tracks true current capacity even as a downstream slows: something a static threshold cannot do. Requests beyond the limit are shed by priority.",
+              "**Layer 3, bounded queues plus deadline propagation:** every internal queue is bounded and returns a fast 503 when full: never unbounded (that hides overload until OOM). Each request carries a deadline propagated through the call chain; any request whose deadline has passed is dropped without processing.",
+              "**On top: brownout and retry hygiene.** Shed features, not just requests: cached or partial responses, skip optional calls (recommendations, personalization) so the core path stays fast. Clients use exponential backoff with jitter, circuit breakers trip on failing dependencies, so a retry storm does not amplify 150% into 400%.",
+              "**Net effect:** at 150% load the service admits roughly its 100% of highest-value traffic, sheds the rest quickly and legibly, and keeps latency bounded: rather than accepting everything and collapsing to zero throughput.",
+              "Common wrong turn: an unbounded queue to 'absorb the spike' (grows until OOM and takes down critical traffic too), or a static concurrency threshold that is wildly wrong the moment dependency latency changes.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-load-shedding-backpressure-practice",
+            prompt:
+              "Design overload protection for a Black Friday checkout service that gets a 5x traffic spike where dropping a checkout costs real revenue but the payment provider has a hard fixed TPS ceiling you cannot exceed. Justify what you shed and what you queue.",
+            thinkAbout: [
+              "Why is a checkout not droppable the way a read is, and what does that imply?",
+              "Which algorithm smooths a 20k spike into a fixed 5k TPS drain?",
+              "What bounds the checkout queue so late charges never happen?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: checkout normally peaks at 4k RPS, Black Friday brings ~20k RPS (5x). Two constraints pull against each other: dropped checkouts are lost revenue, but the payment provider enforces a fixed TPS ceiling (say 5k) that must never be exceeded. This is not 'shed to survive'; it is 'smooth to the payment ceiling while preserving intent.'",
+              "**Queue the money path, shed everything around it.** A checkout represents real revenue and intent, so do not reject excess checkouts. Put confirmed checkouts into a bounded, durable queue (Kafka or SQS) and drain into the payment provider at a leaky-bucket rate matched to the ceiling (5k TPS): exactly the leaky-bucket use case, protecting a hard-throughput downstream. Users see 'order confirmed, processing' (async completion) rather than an error.",
+              "**What gets shed:** everything not on the money path. Recommendation carousels, related items, live inventory refresh, and personalization are browned out or served from cache so fleet capacity goes to accepting and enqueuing checkouts. Best-effort and retry traffic is shed first with 503 + Retry-After.",
+              "**Guardrails:** the checkout queue is bounded with a sane max depth and a per-request deadline: if a checkout would sit past the point where the payment authorization or cart lock expires, drop it explicitly and tell the user to retry rather than charge late. Idempotency keys prevent a double-charge on retried confirmations; a circuit breaker on the payment provider stops feeding it if it degrades. Adaptive concurrency governs the web tier so accepting-and-enqueuing stays fast.",
+              "**The justification of the split:** queue the payment path because each item is scarce, high-value, and the downstream constraint is a rate ceiling that queuing directly solves; shed the surrounding features because they are cheap to lose and their capacity is better spent capturing revenue.",
+              "Common wrong turn: an unbounded checkout queue that promises everyone success then melts, or naively shedding checkouts as if they were droppable reads.",
             ],
           },
         },
