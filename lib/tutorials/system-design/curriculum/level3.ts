@@ -610,6 +610,60 @@ tier L1-near plus L2-remote, keep L2 consistent via invalidate-on-write or versi
 bring a cold cache online under full load.
 `.trim()
 
+const cdnScaleTeach = `
+## Move bytes closer, and shield the origin
+
+A CDN exists to do two things: move bytes physically closer to users so latency drops, and absorb
+read traffic so your origin never sees the full load. A user in Sydney fetching from a single
+us-east-1 origin pays roughly 150 to 250 ms of round-trip time per request; an edge PoP 20 ms away
+turns that into a snappy response and, because the object is cached, the origin never handles the
+request at all.
+
+There are two CDN fill models. A **pull CDN** is lazy: the edge fetches from origin on the first miss
+for an object, caches it, and serves subsequent hits locally. A **push CDN** is eager: you publish
+objects into the CDN ahead of demand. Pull is the default for almost everything because it is
+self-managing; push is reserved for large predictable launches (a game patch, a video premiere).
+
+### The multi-tier hierarchy and the origin shield
+
+The structure that actually protects a fragile origin: many L1 edge caches close to users, a smaller
+set of L2 regional PoPs behind them, and a single **origin shield** in front of the origin. The
+shield is the key trick. When a popular object expires, thousands of edges could each miss and hammer
+the origin simultaneously. The shield **coalesces** those misses: it lets one request through to
+origin, holds the others, and fans the single response back out. On a burst the origin sees thousands
+of QPS instead of millions. Set \`stale-while-revalidate\` so the edge keeps serving the slightly
+stale object while one background fetch refreshes it.
+
+\`\`\`
+  users -> [ L1 edge PoPs ] -> [ L2 regional ] -> [ origin shield ] -> origin
+   millions of QPS            coalesced misses      ~1 fetch/object     protected
+\`\`\`
+
+### Invalidation and cache keys
+
+You have three tools. **TTL expiry** is simplest but coarse. **Explicit purge** is precise but slow
+to propagate globally and easy to over-use. The production default is **versioned or content-hashed
+URLs**: \`app.4f9c2a.js\` instead of \`app.js\`. A new deploy is a new URL, so you can cache the old
+one forever (immutable) and never purge; the HTML that references it gets a short TTL. This sidesteps
+invalidation almost entirely.
+
+**Cache-key normalization** decides your hit rate. By default the key is the full URL including query
+string, so \`?utm_source=twitter\` and \`?utm_source=email\` are two cache entries for one image.
+Strip tracking params, normalize casing, and only \`Vary\` on headers that actually change the body
+(like \`Accept-Encoding\`). Vary on \`Cookie\` and your hit rate collapses to near zero.
+
+**Interview nuance:** the sharpest question is "what can you cache and what must you never cache?"
+Static assets and public semi-dynamic HTML: yes, with **micro-caching** (a 1 to 5 second TTL on the
+homepage still collapses a 100k-QPS spike to ~20 origin fetches/sec). Personalized or authenticated
+responses: never at a shared edge, or you leak one user's account page to another. Do personalization
+with **edge compute** (Cloudflare Workers, Lambda@Edge) that assembles a cached shell plus a small
+per-user fragment.
+
+Recap: use a pull CDN with an L1/L2/shield hierarchy so the shield coalesces misses down to ~1 fetch
+per object, prefer versioned URLs over purging, normalize cache keys, micro-cache semi-dynamic HTML
+with stale-while-revalidate, and never cache authenticated bodies at a shared edge.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1128,6 +1182,64 @@ export const systemDesignLevel3: DesignLevel = {
               "**Consistency:** tweets are largely immutable, so use versioned/immutable keys for tweet objects (an edit or delete writes a new version and invalidates the old), sidestepping most invalidation races. Timelines are rebuilt or invalidated on the fan-out path. Accept a few seconds of cross-region eventual consistency, fine for a social feed.",
               "**Tradeoff:** strict global consistency traded for regional availability and massive read scale, accepting seconds of cross-region staleness.",
               "Common wrong turn: a single global cache cluster (a shared failure domain and a cross-region latency tax), or caching a celebrity tweet under one key with no L1 and no replication, which turns one shard into the whole system's bottleneck when a tweet goes viral.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l3-m4",
+      title: "CDN, Search & Geo",
+      description:
+        "Push bytes to the edge behind a multi-tier CDN, stand up a search tier on an inverted index kept in sync via CDC, extend it with vector and hybrid retrieval, and index millions of points on a sphere without hot-spotting.",
+      lessons: [
+        {
+          id: "sd-l3-cdn-scale",
+          title: "CDN & Edge Caching at Scale",
+          summary:
+            "An L1/L2/origin-shield hierarchy coalesces misses to ~1 fetch per object; version URLs instead of purging, normalize cache keys, and never cache authenticated bodies.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["cdn", "edge", "origin-shield"],
+          teach: {
+            markdown: cdnScaleTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-cdn-scale-apply",
+            prompt:
+              "Design content delivery for a media site serving images, video, and semi-dynamic HTML to a global audience, where the origin is fragile and cannot absorb spikes.",
+            thinkAbout: [
+              "How does an origin shield coalesce fetches to protect the origin?",
+              "How do you invalidate: TTL, purge, or versioned URLs?",
+              "What dynamic content is cacheable, and what must never be cached?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: global readership, read-heavy, spiky traffic (an article can go viral), origin is a modest app+DB tier that falls over above a few thousand QPS.",
+              "**High-level:** front everything with a pull CDN in a multi-tier hierarchy: L1 edges near users, L2 regional PoPs, and an origin shield as the single choke point. On a viral spike the shield coalesces all edge misses for a hot object into one origin fetch and fans the response back, so the origin sees thousands of QPS, not millions.",
+              "**Images and video:** immutable, content-hashed keys (`img/9af3c1.jpg`), cached at the edge with long TTLs. Video served as HLS/DASH segments, each cached independently. The bulk of bytes never touches origin after first fill.",
+              "**Semi-dynamic HTML** (article pages, homepage): micro-caching with a 1 to 5 second TTL plus stale-while-revalidate, so a 100k-QPS burst collapses to ~20 origin fetches/sec while readers still get fresh-enough pages.",
+              "**Authenticated/personalized responses:** never cached at a shared edge. Use edge compute to stitch a cached public shell with a per-user fragment, or mark them `private, no-store`.",
+              "**Invalidation:** default to versioned URLs so a new asset is a new URL cached immutably; reserve explicit purge for 'take this down now'; TTL for the micro-cached HTML. Normalize the cache key: strip UTM/tracking params, Vary only on Accept-Encoding, never on Cookie.",
+              "**The tradeoff:** micro-caching trades a few seconds of staleness for surviving spikes, almost always worth it for a media site. Common wrong turn: caching a personalized response at a shared edge (leaking user A's page to user B), or skipping cache-key normalization so query-string variants shatter the hit rate.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-cdn-scale-practice",
+            prompt:
+              "Design the edge delivery for a live sports streaming event like a World Cup final peaking at 5 million concurrent viewers, where the origin encoder produces new HLS segments every 2 seconds and cannot be hit by more than a few thousand requests per second. Lead with how a fresh, uncacheable-by-age segment still shields the origin.",
+            thinkAbout: [
+              "How does a brand-new segment get served to 5M players with roughly one origin fetch?",
+              "What TTL does the constantly-updating manifest deserve?",
+              "What does the 2-second segment size trade against?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: single global live event, ~5M concurrent viewers, adaptive bitrate ladder (240p to 4K), new 2-second segments continuously, fragile origin encoder.",
+              "**The hard part:** every segment is brand new, so there is no warm cache when 5M players request `seg_1050.ts` in the same 2-second window. The answer is request coalescing at the origin shield plus the tiered hierarchy: all 5M requests fan into L1 edges, then L2, then a shield that lets exactly one request per segment through to the encoder and holds the rest. The origin sees roughly (segments/sec) x (ladder size): a few dozen QPS, not millions.",
+              "**Manifest handling:** the HLS playlist updates every 2 seconds and is the one genuinely dynamic object. Cache it with a ~1-2 second TTL so players poll the edge, not origin; even a 1-second micro-cache collapses millions of manifest polls to one origin fetch per second.",
+              "**Prewarming:** segments are predictable, so push each new segment to L2 PoPs the instant the encoder emits it, making the first viewer request a hit. Use stale-while-revalidate so a late manifest refresh serves the last good version rather than stalling playback.",
+              "**Scale math:** 5M viewers x ~5 Mbps average is ~25 Tbps of egress, which only a large CDN footprint serves: multi-CDN across providers with DNS/steering-based failover.",
+              "**The tradeoff:** 2-second segments put viewers ~6-10 seconds behind live in exchange for cacheability and resilience; shrinking segments cuts latency but multiplies request rate and origin risk. Common wrong turn: caching the manifest with a long TTL (viewers freeze on stale playlists) or skipping the shield (the encoder melts on segment rollover).",
             ],
           },
         },
