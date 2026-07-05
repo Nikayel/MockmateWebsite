@@ -291,6 +291,65 @@ routing or version/LSN tokens, remember tokens are required for cross-device, an
 read-your-writes off async replicas with neither routing nor a token.
 `.trim()
 
+const logicalClocksTeach = `
+## Ordering events without a shared clock
+
+In a distributed system you cannot trust wall clocks to order events, and there is no shared clock at
+all. Yet you constantly need to answer "did A happen before B, or were they concurrent?" **Logical
+clocks** answer that using only message passing, via Lamport's **happens-before** relation (written
+A -> B):
+
+- If A and B are on the same node and A came first, then A -> B.
+- If A is a *send* and B is the matching *receive*, then A -> B.
+- Transitivity: if A -> B and B -> C then A -> C.
+- If neither A -> B nor B -> A, the events are **concurrent** (A || B). Concurrency is the
+  interesting case: it is where two clients may have independently updated the same thing.
+
+### Lamport clocks
+
+Each node keeps an integer counter. Increment it on every local event; stamp outgoing messages; on
+receive, set your counter to \`max(local, received) + 1\`. The guarantee: if A -> B then
+\`L(A) < L(B)\`. This gives a **total order** (break ties by node id) that never contradicts
+causality: enough to agree on a single order for a replicated log.
+
+The catch, and the single most-probed point here: the implication only goes one way. \`L(A) < L(B)\`
+does **not** imply A -> B. Two concurrent events on different nodes can have any Lamport values, so a
+smaller timestamp tells you nothing about causation. **Lamport clocks cannot detect concurrency.**
+They can order everything; they cannot tell you *which orderings were forced by causality and which
+were arbitrary*.
+
+### Vector clocks
+
+Each node keeps a vector with one counter per node. On a local event, increment your own slot. On
+send, attach your whole vector. On receive, take the element-wise max, then increment your own slot.
+Compare two vectors:
+
+- V(A) < V(B) (every element <=, at least one <) means **A -> B**.
+- V(B) < V(A) means B -> A.
+- Neither dominates means **A || B, concurrent**, and if they touched the same key, a **conflict**.
+
+\`\`\`
+node A: [1,0,0] --send--> node B receives, takes max, bumps self -> [1,1,0]
+meanwhile node C, no contact: [0,0,1]
+compare [1,1,0] vs [0,0,1]: A-slot 1>0 but C-slot 0<1 -> neither dominates -> CONCURRENT
+\`\`\`
+
+That detection is why **Dynamo and Riak use vector clocks (technically version vectors, one entry per
+replica) to surface *siblings***: when a read finds two concurrent versions, it returns both to the
+application (or a merge function / LWW / CRDT) rather than silently picking one and losing a write.
+
+**Interview nuance, the costs.** Vector clocks are **O(N)** in the number of participants. Worse, in
+a system with many transient actors (mobile clients writing directly), the vector grows without bound
+because each new writer adds a slot, and you cannot easily garbage-collect entries for actors that
+may still return. This **GC / unbounded-growth problem** is why Dynamo keys version vectors on the
+small fixed set of storage nodes rather than per-client, and why pruning old entries risks
+false-concurrent readings.
+
+Recap: Lamport clocks give a causality-respecting total order but cannot detect concurrency;
+vector/version clocks do detect concurrency and let leaderless stores surface conflict siblings, at
+O(N) size and a real garbage-collection problem when actors churn.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -553,6 +612,55 @@ export const systemDesignLevel5: DesignLevel = {
               "**Deliberately stay eventual for everyone else:** other users seeing the tweet a second or two later is fine and buys full availability and cheap fan-out.",
               "**The scale trick:** do not make the whole timeline linearizable. Special-case the author's own recent writes: prepend the just-written tweet from a small 'my recent tweets' authoritative read merged over the eventually-consistent fanned-out timeline. Read-your-writes only for your own content gives the instant-feedback UX while keeping the hot fan-out path eventually consistent.",
               "Common wrong turn: relying on client-side stickiness, which cannot survive the mobile-to-web device switch and leaves the user staring at a timeline missing the tweet they just posted.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-logical-clocks",
+          title: "Logical Time: Lamport & Vector Clocks",
+          summary:
+            "Lamport clocks give a causality-respecting total order but cannot detect concurrency; vector clocks detect it and surface siblings, at O(N) size with a GC problem.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["logical-clocks", "vector-clocks", "causality"],
+          teach: {
+            markdown: logicalClocksTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-logical-clocks-apply",
+            prompt:
+              "Use vector clocks to detect concurrent conflicting writes in a leaderless key-value store, and specify how the read path surfaces siblings.",
+            thinkAbout: [
+              "Why can Lamport clocks give a total order but not detect concurrency?",
+              "What do vector clocks capture that Lamport clocks cannot?",
+              "What is the O(N) cost and GC problem of vector clocks?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a Dynamo-style leaderless store, N replicas per key, writes accepted on any replica, clients that may write the same key from different replicas concurrently.",
+              "**Why not Lamport:** a Lamport timestamp puts all writes in one total order, but it forces an order even between genuinely concurrent writes, and picking the 'later' value silently discards the other write. Since L(A) < L(B) does not imply A -> B, Lamport cannot even tell that two writes were concurrent, so the conflict cannot be detected, let alone resolved. The need is to distinguish 'B is an update built on A' from 'A and B are rival updates.'",
+              "**Design with version vectors** keyed on the replica nodes (a small fixed set, not clients, to bound size). Every write bumps its replica's slot and carries the vector it derived from. When a write W with V_w arrives against stored V_s: if V_w dominates V_s, W is a strict successor: overwrite. If V_s dominates V_w, W is stale: drop. If neither dominates, W is concurrent: keep **both** as siblings under the same key.",
+              "**Read path surfacing siblings:** on a read with multiple concurrent versions, return all siblings plus a context (the combined causal metadata). The application resolves (a merge function, an OR-Set CRDT for a cart, or LWW if truly acceptable) and writes back the merged value carrying the context, which dominates the siblings and collapses the conflict. Read-repair and hinted handoff propagate the resolution. Amazon's cart is the canonical example: concurrent add/remove become siblings merged by union so an item is never silently lost.",
+              "**Costs acknowledged:** the vector is O(replica count) per key. The dangerous version keys the vector on clients, which grows unbounded as devices churn and cannot be safely garbage-collected (an actor might return), so key on the fixed replica set and prune with care.",
+              "Common wrong turn: a Lamport total order (or a wall-clock timestamp) declaring the higher value the winner, claiming causality it cannot prove and silently dropping one of two concurrent writes.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-logical-clocks-practice",
+            prompt:
+              "Design conflict detection and resolution for a collaborative note-taking app like Notion or Apple Notes syncing across a laptop, phone, and tablet that all edit the same note offline and reconnect, at a scale of millions of devices. Explain why plain vector clocks keyed on devices are a trap here and what you use instead.",
+            thinkAbout: [
+              "What happens to a device-keyed vector when the device population is huge and churning?",
+              "What converts 'concurrent edit' into automatic convergence instead of a sibling to reconcile?",
+              "Where can a small version vector still be used safely?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: each device edits offline then syncs; the same note can be edited concurrently on multiple devices; users must never silently lose text; the device population is huge and churning.",
+              "**The trap:** keying a version vector on devices is exactly the unbounded-growth failure. With millions of devices constantly added/reinstalled/retired, the vector per note grows without bound, every sync ships and compares a giant vector, and a retired device's slot cannot be safely garbage-collected because it might sync again. Pruning risks two later edits looking causally ordered when they were concurrent, corrupting merges.",
+              "**What to use instead: make the data structure converge automatically with CRDTs.** Text becomes a sequence CRDT (RGA / Yjs / Automerge-style), where each character/block gets a unique, causally-stamped id and concurrent inserts merge by a deterministic total order, so all devices converge to the same document without a central coordinator and without losing anyone's text.",
+              "**Causality inside the CRDT** is tracked with compact per-replica clocks and Lamport-style timestamps, and the CRDT's own GC (tombstone compaction after all peers acknowledge) bounds growth: no ever-growing device vector at the note level.",
+              "**Where a small vector survives:** coarse whole-note metadata (title, last-edited) can use a small version vector keyed on a fixed server-side sync layer plus LWW, keeping the unbounded client set from ever becoming the ordering key.",
+              "**The through-line:** vector clocks are the right idea (detect concurrency by causality, not wall clock), but at device-churn scale conflict handling moves into a CRDT that merges deterministically, so 'concurrent edit' becomes 'automatic convergence' instead of a sibling a human reconciles.",
             ],
           },
         },
