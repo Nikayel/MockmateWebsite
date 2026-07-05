@@ -901,6 +901,69 @@ make reads O(1) lookups; for feeds, use a hybrid that precomputes normal-user fe
 celebrity posts at read time, and accept that you now own write amplification and copy consistency.
 `.trim()
 
+const cdcDualWriteTeach = `
+## The dual write: the most common production sync bug
+
+The moment you have a primary database plus any derived store (a Redis cache, an Elasticsearch index,
+a read replica, an analytics warehouse), you have a sync problem. The naive solution is the **dual
+write**: in your request handler, write to the DB, then write to the cache/index in the same code
+path.
+
+\`\`\`
+handler:
+  db.save(order)          # write 1
+  cache.set(order)        # write 2   <-- if this fails or the process
+  search.index(order)     # write 3       dies here, stores diverge
+\`\`\`
+
+This is broken because the writes are **not atomic** and there is no shared transaction across a
+database and a cache. Any of these happens routinely: write 1 commits and the process crashes before
+write 2 (cache stale forever); write 2 succeeds but write 1's transaction rolls back (the cache holds
+a row the DB never persisted); or two concurrent requests apply their DB writes in one order and
+their cache writes in the opposite order (the cache ends on the older value). Under load, partial
+failure is a steady drip of divergence you discover weeks later as "search shows a product that was
+deleted."
+
+### The disciplined fix, in two parts
+
+**Transactional outbox:** stop writing to the second system from the handler. Instead, in the **same
+database transaction** as your business write, insert a row into an \`outbox\` table describing the
+event (\`{id, aggregate_id, type: OrderPlaced, payload, created_at}\`). The business change and the
+intent-to-publish commit together or not at all. A separate **relay** process reads unpublished
+outbox rows and publishes them to a message broker (Kafka), marking them sent.
+
+**Log-based change data capture (CDC):** rather than write an outbox by hand, tap the database's own
+replication log, which already records every committed change durably and in order. **Debezium**
+reads Postgres logical decoding, the MySQL binlog, or the MongoDB oplog and emits an ordered stream
+of row changes to Kafka. Downstream consumers (a cache updater, an Elasticsearch sink, a warehouse
+loader) subscribe and apply. The outbox is the right tool when you need domain events
+(\`OrderPlaced\`) rather than raw row diffs; CDC is the right tool when you want to mirror table
+state to derived stores with no application changes.
+
+### The honest delivery guarantee
+
+**Exactly-once end-to-end is a fantasy** across a broker and heterogeneous sinks: the relay can crash
+after publishing but before marking the outbox row sent, so it republishes. The realistic and correct
+target is **at-least-once delivery plus idempotent consumers**. Make every consumer safe to re-apply
+the same event: key the cache/index write by the event's primary key and use last-writer-wins on a
+version/LSN, or dedupe on event id. Then a duplicate is a no-op.
+
+Operational reality: you also need **backfills and replays** (snapshot the current table state to
+bootstrap a brand-new index, then switch to the live stream), and you must **monitor replication slot
+/ consumer lag**. A Postgres logical replication slot that a stalled Debezium connector stops
+advancing will pin WAL and eventually fill the disk, taking the primary down.
+
+**Interview nuance:** if the interviewer says "just write to the DB and the cache," name the
+dual-write problem explicitly and reach for outbox or CDC. If they push on "why not exactly-once,"
+say the honest thing: at-least-once plus idempotent, versioned consumers is simpler and strictly more
+robust, and it is what Kafka-based pipelines actually run.
+
+Recap: never dual-write to a DB and a derived store; commit the change and its event together via a
+transactional outbox, or tap the DB log with CDC (Debezium), publish through Kafka, and make
+consumers idempotent so at-least-once delivery is correct, while monitoring replication-slot lag and
+supporting snapshot backfills.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1683,6 +1746,55 @@ export const systemDesignLevel3: DesignLevel = {
               "**Trending top 10:** a Count-Min Sketch or a windowed rollup: a stream job (Kafka Streams/Flink) aggregates viewer-join events into per-stream counts over a sliding window and writes a small sorted materialized table that the board reads directly.",
               "**The through-line:** reads are on the hot path and vastly outnumber writes, so all aggregation moves off the read path into precomputed counters, sketches, and rollup tables, trading a little exactness and a few seconds of freshness for O(1) lookups against Redis or a tiny serving table.",
               "Common wrong turn: `SELECT COUNT(DISTINCT viewer_id)` on every read, or storing every viewer id for exact uniques: either melts the DB and the memory budget at 300k concurrent viewers when a HyperLogLog answers the same question in 12 KB.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-cdc-dual-write",
+          title: "Keeping Derived Stores in Sync (CDC & Outbox)",
+          summary:
+            "Never dual-write to a DB and a derived store: use the transactional outbox or log-based CDC through Kafka, with at-least-once delivery and idempotent, versioned consumers.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["cdc", "outbox", "dual-write"],
+          teach: {
+            markdown: cdcDualWriteTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-cdc-dual-write-apply",
+            prompt:
+              "Design how a write to the primary DB reliably updates a Redis cache and an Elasticsearch index without a dual-write race.",
+            thinkAbout: [
+              "Why can two independent writes partially fail and diverge?",
+              "How do the transactional outbox and log-based CDC fix it?",
+              "Why is at-least-once + idempotent consumers the realistic target?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a primary Postgres holds the source of truth, a Redis cache serves hot reads, and an Elasticsearch index serves full-text search. Sub-second staleness is acceptable; permanent divergence is not.",
+              "**Name the problem first:** dual-writing (handler writes Postgres, then Redis, then Elasticsearch) has three independent, non-atomic writes. A crash after the DB commit leaves Redis and Elasticsearch stale; concurrent requests can apply side effects in a different order than their DB commits, settling a derived store on an older value. No cross-system transaction exists, so this drifts under load.",
+              "**Design: a single atomic DB write, everything else derived from the change log.** Log-based CDC: Debezium reads Postgres logical decoding and streams every committed row change, in commit order, into a Kafka topic per table. Two consumer groups subscribe: a cache updater that sets/deletes the Redis key, and an Elasticsearch sink that indexes/deletes the document. The handler writes only to Postgres. (For rich domain events rather than raw row diffs, use a transactional outbox instead: insert an outbox row in the same transaction, a relay publishes to Kafka. Same guarantee, different granularity.)",
+              "**Delivery guarantee: at-least-once, not exactly-once,** because the relay/connector can republish after a crash. Both consumers are idempotent: the cache write is keyed by primary id and guarded by the event's LSN/version (last-writer-wins, an older duplicate never overwrites newer); the Elasticsearch write uses the row id as document id and external version = DB version, so a stale event is rejected. Duplicates become no-ops.",
+              "**Bootstrapping and ops:** a new index or flushed cache fills via a snapshot backfill (Debezium's initial snapshot), then cuts over to the live stream. Monitor consumer lag and the Postgres replication slot: a stalled connector that stops advancing the slot pins WAL and can fill the primary's disk, so slot lag gets an alert and poison events go to a dead-letter queue.",
+              "Common wrong turn: keeping the dual write and adding retries. Retries do not make two non-atomic writes atomic; they narrow the window but the divergence class remains. The fix is structural (outbox/CDC), not more retries.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-cdc-dual-write-practice",
+            prompt:
+              "Design the change-propagation pipeline for a marketplace (Shopify-scale: 5M product mutations/day across thousands of merchant DB shards) that must keep a global Elasticsearch search index, a Redis price cache, and a Snowflake analytics warehouse in sync with per-shard Postgres primaries, and explain how you bootstrap a brand-new search index without downtime.",
+            thinkAbout: [
+              "Why one CDC connector per shard rather than a single global one?",
+              "How do three sinks with very different speeds avoid backpressuring each other?",
+              "How can a snapshot and the live stream interleave safely into a new index?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: product data sharded across many Postgres primaries (by merchant), each with its own WAL. 5M mutations/day is a modest ~60 writes/sec average but bursty (flash sales, bulk imports). Search and cache tolerate seconds of lag; the warehouse tolerates minutes.",
+              "**Design:** one Debezium CDC connector per shard, each tapping that shard's logical replication slot and publishing row changes to Kafka topics keyed by product id, partitioned so all events for a product land on one partition and stay ordered.",
+              "**Three independent consumer groups fan out:** an Elasticsearch sink (idempotent upserts keyed by product id with external version = DB version), a Redis price-cache updater (last-writer-wins on version), and a Snowflake loader that micro-batches changes (Kafka Connect Snowflake sink, or Flink writing Parquet to S3 then COPY INTO), because a warehouse wants batched loads. Decoupled consumers mean the slow warehouse loader never backpressures the fast search/cache path.",
+              "**Delivery:** at-least-once plus idempotent consumers; with thousands of shards and connectors, redeliveries on restarts are constant, so every sink dedupes/versions. Poison events go to a dead-letter topic rather than stalling a partition.",
+              "**Bootstrapping a new index without downtime:** build it in the background. Kick off Debezium's initial snapshot (or a bounded historical scan) writing into a new index alias, while the live CDC stream also applies to it, so the new index converges. Because writes are idempotent and version-guarded, snapshot and live stream interleave safely. When the new index's lag reaches near zero, atomically flip the Elasticsearch alias; readers never see downtime, and the old index drops after a soak period.",
+              "Common wrong turn: a single global CDC connector or app-tier dual writes across shards. The per-shard-slot design keeps ordering correct and prevents one merchant's bulk import from pinning every shard's WAL; app-tier dual writes reintroduce exactly the divergence CDC exists to remove.",
             ],
           },
         },
