@@ -843,6 +843,64 @@ boundary misses, tune cell size to your query radius, and defuse hot cells by ad
 per-cell caps, separate sharding, and caching.
 `.trim()
 
+const denormFanoutTeach = `
+## Trade write cost for cheap reads, on purpose
+
+Normalization optimizes for write correctness: every fact lives in exactly one place. That is the
+wrong default when reads outnumber writes by 100:1 or 1000:1, which is the common web shape.
+**Denormalization** deliberately duplicates data so the read path does no joins and no aggregation at
+request time. You pay with write amplification (one logical write fans out to many physical writes)
+and the ongoing job of keeping the copies consistent. The trade is almost always worth it when a read
+is on the hot path and a write is not.
+
+### The three concrete tools
+
+- **Precomputed/materialized views:** instead of running \`SELECT count(*) ... GROUP BY\` on every
+  dashboard load, maintain a rollup table (\`daily_orders_by_region\`) that a job or a stream
+  updates. Reads become a single indexed lookup. You trade freshness and storage for read latency.
+- **Approximate structures:** when the answer does not need to be exact, use sketches.
+  **HyperLogLog** counts unique visitors in ~12 KB per counter with ~2% error instead of storing
+  every visitor id. **Count-Min Sketch** gives approximate frequencies for "top trending" in fixed
+  memory. Redis ships both. Exactness is a cost you should only pay when the product needs it.
+- **Feed fan-out:** the canonical denormalization problem. A user opens their home timeline and wants
+  the merged, time-sorted posts of everyone they follow, in under ~100 ms.
+
+### The two feed strategies
+
+- **Fan-out-on-write (push):** when Alice posts, immediately write that post id into the precomputed
+  timeline of every follower (a per-user list, often in Redis). Reads are trivial: read your own
+  list. But a post by someone with 50M followers triggers 50M writes. Write amplification is
+  O(followers).
+- **Fan-out-on-read (pull):** store each post once. At read time, query the recent posts of everyone
+  the reader follows and merge-sort them. Writes are O(1), but a read for someone following 5,000
+  accounts is a large scatter-gather merge on the hot path.
+
+\`\`\`
+ fan-out-on-write            fan-out-on-read
+ Alice posts                 Bob opens feed
+   |                           |
+   +-> write to each of        +-> query recent posts of
+       Alice's followers'          each account Bob follows,
+       precomputed feed            then merge-sort at read time
+ cheap reads, costly writes  cheap writes, costly reads
+\`\`\`
+
+Neither pure form survives real distributions, because follower counts are power-law. The production
+answer is a **hybrid**: fan-out-on-write for normal accounts, but **do not** push posts from
+celebrity/whale accounts. Instead, at read time, pull the celebrity posts the reader follows and
+merge them into the precomputed list. This is exactly what Twitter/X described.
+
+**Interview nuance:** the disqualifying mistake is proposing pure fan-out-on-write and not noticing
+that one celebrity post is now 50M writes and a thundering write storm. Say the threshold out loud:
+accounts above roughly 10k to 1M followers are handled on read; everyone else on write. The second
+nuance is owning the consistency cost you just created: denormalized copies (a cached follower count,
+a duplicated author name) can drift, and now you own an invalidation or reconciliation job.
+
+Recap: denormalize when reads dominate, using materialized/rollup views and approximate sketches to
+make reads O(1) lookups; for feeds, use a hybrid that precomputes normal-user feeds and merges
+celebrity posts at read time, and accept that you now own write amplification and copy consistency.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1568,6 +1626,63 @@ export const systemDesignLevel3: DesignLevel = {
               "**Hot cells (the crux):** surge zones and airports overload a single cell. Shard by cell so dense cells spread across nodes; for a pathologically hot cell, drop to a finer H3 resolution locally so it splits into many sub-cells; cap drivers scanned per cell; and cache the recent nearby-driver result for a second (riders a block apart get the same answer). Precompute surge-zone cell sets.",
               "**The tradeoff:** a short TTL and in-memory grid trade durability (a crashed Redis shard loses live positions, rebuilt in one ping cycle) for the throughput to absorb 1.25M writes/sec: the right call because positions are ephemeral anyway.",
               "Common wrong turn: writing every ping to the durable DB (it melts) or a single global index without per-cell sharding (surge cells hotspot one node).",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l3-m5",
+      title: "Derived Data & Sync",
+      description:
+        "Trade write cost for cheap reads with denormalization, precomputation, and hybrid feed fan-out, and keep every derived store from drifting by replacing dual writes with the transactional outbox and log-based CDC.",
+      lessons: [
+        {
+          id: "sd-l3-denorm-fanout",
+          title: "Denormalization, Precomputation & Materialized Views",
+          summary:
+            "Precompute rollups and sketches so reads are O(1) lookups, and feed timelines with hybrid fan-out: push for normal users, pull-and-merge for celebrities.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["fan-out", "materialized-views", "feed"],
+          teach: {
+            markdown: denormFanoutTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-denorm-fanout-apply",
+            prompt:
+              "Design a social timeline/feed, choosing between fan-out-on-write and fan-out-on-read for a mix of normal and celebrity users, and specify where the hybrid boundary sits.",
+            thinkAbout: [
+              "When does fan-out-on-write beat fan-out-on-read, and vice versa?",
+              "How does a hybrid handle celebrity accounts?",
+              "What is the write-amplification and consistency cost you now own?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a Twitter/Instagram-shaped home feed. Reads dominate writes heavily, the feed must load in under ~100 ms at p99, follower counts follow a power law (median in the hundreds, top 0.01% in the tens of millions), and a post appearing a few seconds late is acceptable.",
+              "**Hybrid fan-out. Normal authors: fan-out-on-write.** On post, a fan-out worker (consuming a Kafka topic of new posts) appends the post id into each follower's precomputed timeline, a capped per-user list in Redis (the most recent ~800 ids). The home-feed read is a single Redis list read plus hydration of post bodies from a post store (Cassandra/DynamoDB) by id, with bodies cached. O(1) list lookups keep p99 low.",
+              "**Celebrity accounts above a follower threshold (~100k to 1M, tuned): do NOT push.** Their posts are stored once; at read time, after loading the reader's precomputed list, pull the recent posts of the small set of celebrities that reader follows and merge-sort them in. A reader follows only a handful of celebrities, so the read-time merge is bounded and cheap, while saving the tens of millions of writes a celebrity post would cause.",
+              "**Quantify the trade:** pure fan-out-on-write for a 50M-follower account is 50M writes per post: a write storm that saturates the fan-out fleet and delays everyone's feed. Pure fan-out-on-read turns every feed load into a scatter-gather over thousands of followees, blowing the 100 ms budget. The hybrid caps write amplification at the threshold.",
+              "**Consistency and edges owned:** fan-out lag under bursts (monitor fan-out queue depth), unfollow/block must filter posts, deletes must tombstone, denormalized author names can drift. New follows backfill from the author's recent posts; the precomputed list is a cache rebuildable from the source of truth.",
+              "Common wrong turn: pure fan-out-on-write with no celebrity carve-out, which looks clean in a diagram and detonates in production the first time a celebrity posts.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-denorm-fanout-practice",
+            prompt:
+              "Design the analytics/counts layer for a live-streaming platform (Twitch-scale: a top stream has 300k concurrent viewers) that must show a near-real-time viewer count, unique-viewer count for the session, and a 'top 10 trending streams' board, without hammering the primary DB on every read.",
+            thinkAbout: [
+              "Which of these numbers actually needs to be exact?",
+              "What does a HyperLogLog buy over storing every viewer id?",
+              "Where does the trending board's aggregation run so reads stay O(1)?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the live viewer count can be approximate within a percent or two, unique-viewer count needs to be close but not audit-grade, the trending board updates every few seconds, and read volume is enormous, so reads must never touch a relational primary.",
+              "**Live concurrent count:** a maintained counter in Redis per stream, incremented/decremented on join/leave events (or derived from a heartbeat TTL set so crashed clients age out). Clients read the counter or, better, subscribe via pub/sub or WebSocket push so 300k viewers do not each poll.",
+              "**Unique viewers per session: a HyperLogLog per stream** (Redis PFADD/PFCOUNT), ~12 KB and ~2% error: exactness is too expensive here, since storing 300k+ viewer ids per stream to dedupe is wasteful, and '1.2M unique viewers' does not need audit precision.",
+              "**Trending top 10:** a Count-Min Sketch or a windowed rollup: a stream job (Kafka Streams/Flink) aggregates viewer-join events into per-stream counts over a sliding window and writes a small sorted materialized table that the board reads directly.",
+              "**The through-line:** reads are on the hot path and vastly outnumber writes, so all aggregation moves off the read path into precomputed counters, sketches, and rollup tables, trading a little exactness and a few seconds of freshness for O(1) lookups against Redis or a tiny serving table.",
+              "Common wrong turn: `SELECT COUNT(DISTINCT viewer_id)` on every read, or storing every viewer id for exact uniques: either melts the DB and the memory budget at 300k concurrent viewers when a HyperLogLog answers the same question in 12 KB.",
             ],
           },
         },
