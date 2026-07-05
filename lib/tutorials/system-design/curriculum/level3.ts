@@ -545,6 +545,71 @@ probabilistic early refresh, and handle a genuinely hot key with replication acr
 near cache, layering the defenses and never treating a cold cache as safe.
 `.trim()
 
+const distributedCacheArchTeach = `
+## The cache tier becomes its own distributed system
+
+Once one cache node is not enough, the cache tier has to shard, replicate, and survive failures
+without becoming a new single point of failure or a new source of stale data. The starting decision
+is the engine.
+
+**Redis vs Memcached.** Memcached is a lean, **multithreaded**, in-memory key-value store with LRU
+eviction and almost nothing else; it scales vertically across cores well and is ideal when you want a
+simple, fast, sharded blob cache. Redis is **single-threaded per instance** (for command execution)
+but gives you rich data structures, optional **persistence** (RDB snapshots, AOF log),
+**replication**, pub/sub, Lua scripting, and clustering. The crisp answer: pick Memcached when you
+want a pure, multi-core, evict-freely cache of opaque values; pick Redis when you need data
+structures, replication, persistence, or atomic operations (counters, rate limiters, leaderboards).
+Most systems reach for Redis and scale it horizontally by running many shards.
+
+**Sharding.** Redis Cluster divides the keyspace into **16,384 hash slots**; each key hashes (CRC16
+mod 16384) to a slot, and slots are assigned to shards, so adding a shard means moving some slots
+rather than rehashing everything. The important property is consistent-hashing-style behavior: a
+topology change moves only a fraction of keys, avoiding a mass-miss event. Client-side sharding (a
+smart client hashing keys to nodes) is the Memcached equivalent.
+
+**Replication and HA.** Each shard is a primary with one or more **replicas**. Replication is
+**asynchronous**, so a failover can lose the last few writes: acceptable for a cache, not for a
+system of record. **Redis Sentinel** (or Cluster's built-in failover) promotes a replica when a
+primary dies, so a node failure is a brief blip. The design principle that makes this safe: the
+**cache is disposable**. The source of truth is the database, so losing a cache node loses only
+performance, never data, as long as the application falls through to the DB on a miss.
+
+**Tiering.** A remote cache is a network hop, too slow for the very hottest keys at high QPS. So you
+add an **L1 near cache** in the app process (a local LRU) in front of the **L2 remote cache**
+(Redis). L1 kills the hottest reads and shields Redis shards from hot keys. The cost of L1 is a
+second consistency layer: an invalidation now has to reach every app node's L1 (via pub/sub or a
+short L1 TTL), or you accept a small staleness window locally.
+
+**Consistency and operational hazards.** Keep L2 in sync with the DB via **invalidate-on-write**,
+**versioned keys** (\`user:123:v7\`, so a stale value is simply never read), or a **short TTL
+backstop**. Under memory pressure, \`maxmemory\` plus an eviction policy (\`allkeys-lru\`) decides
+what leaves; a wrong policy (\`noeviction\`) turns a full cache into write errors. Two
+scale-specific hazards: a **big key** (a huge value or a million-element collection) blocks Redis's
+single thread when accessed or deleted and unbalances shards, so split it; and a **hot key**
+saturates one shard, handled with L1 and key replication.
+
+**Interview nuance: the flush trap.** A **cold cache is not safe to bring online under load**,
+because every read misses and the full read volume hits the origin at once: the stampede across the
+whole keyspace. A cache restart, region failover, or \`FLUSHALL\` must be paired with cache warming
+or a gradual traffic ramp, with coalescing on. Treating a flush as free is the wrong turn
+interviewers listen for.
+
+\`\`\`
+app server                    app server
+ [L1 near cache]               [L1 near cache]
+       \\                          /
+        \\----- L2: Redis Cluster ----/
+        slot 0..5460   5461..10922  10923..16383
+        shardA(P+R)    shardB(P+R)   shardC(P+R)   <- Sentinel/failover
+                     source of truth: DB (cache is disposable)
+\`\`\`
+
+Recap: pick Redis for structures/persistence/replication or Memcached for a lean multi-core blob
+cache, shard by hash slots so topology changes move few keys, replicate each shard with failover,
+tier L1-near plus L2-remote, keep L2 consistent via invalidate-on-write or versioned keys, and never
+bring a cold cache online under full load.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1012,6 +1077,57 @@ export const systemDesignLevel3: DesignLevel = {
               "**No rebuild-on-miss in the hot loop, so no stampede to coalesce.** The only miss is a cold node start, guarded with singleflight so a restarting node does not fan out to the backend.",
               "**The tradeoff:** up to ~1 second of score staleness at the edge (L1 TTL / push latency), imperceptible for a live-score display, in exchange for cutting 2M req/s to a few thousand backend-facing ops/sec.",
               "Common wrong turn: caching the score with a short TTL and letting readers rebuild on expiry, which turns every goal into a 2M-request stampede against the scoring backend; push updates plus L1 plus key replication avoid the rebuild entirely.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-distributed-cache-arch",
+          title: "Distributed Cache Architecture",
+          summary:
+            "Shard by hash slots, replicate each shard with failover, tier L1-near plus L2-remote, treat the cache as disposable, and never bring a cold cache online under load.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["distributed-cache", "redis", "ha"],
+          teach: {
+            markdown: distributedCacheArchTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-distributed-cache-arch-apply",
+            prompt:
+              "Design a shared cache tier for a fleet of app servers needing sub-ms reads at 1M ops/sec with node failures tolerated.",
+            thinkAbout: [
+              "Redis vs Memcached: what do you gain from each?",
+              "How do you shard and replicate the cache for HA?",
+              "How do you keep cache and DB consistent, and treat the cache as disposable?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: many app servers sharing one logical cache, 1M ops/sec aggregate, sub-millisecond read target, node failures tolerated without an outage. The DB remains the source of truth.",
+              "**Engine: Redis Cluster.** Chosen over Memcached because the HA requirement wants replication and automatic failover, and atomic operations and data structures are usually needed somewhere. Memcached would be a fine, simpler choice for purely opaque-blob caching with no HA-via-replication need.",
+              "**Sharding:** partition across Redis Cluster's 16,384 hash slots. A single instance handles ~100K+ ops/sec, so run roughly 10 to 20 primary shards for 1M ops/sec with headroom, with the client routing each key by slot. Slots move individually, so scaling out avoids a full rehash and a mass-miss event.",
+              "**HA:** each shard is a primary plus at least one replica on a different host/AZ, with Cluster failover (or Sentinel) promoting a replica within seconds. Replication is async, so a failover may drop the last few milliseconds of writes: acceptable precisely because the cache is disposable and the app falls through to the DB on a miss.",
+              "**Sub-ms reads:** a remote hop plus Redis is typically well under a millisecond in-datacenter, but for the hottest keys add an L1 near cache in each app process so those reads never leave the box and no shard is saturated by a hot key. L1 also cushions a shard failover.",
+              "**Consistency:** invalidate-on-write to L2 (delete the key after the DB write) with a short TTL backstop, and versioned keys where any stale read is unacceptable. Set maxmemory with allkeys-lru so a full cache evicts rather than errors; split big keys; give hot keys L1 plus replication.",
+              "**Operational:** never FLUSHALL under load or bring a cold cluster online at full traffic; warm the hot set or ramp traffic and keep request coalescing on.",
+              "Common wrong turn: treating a cache flush or cold failover as safe and sending full read traffic at a cold cache (stampedes the origin), or running a single unreplicated Redis: a single point of failure that violates the fault-tolerance requirement.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-distributed-cache-arch-practice",
+            prompt:
+              "Design Twitter/X's cache tier that fronts the timeline and tweet-object services at tens of millions of reads per second across multiple regions, where a single celebrity tweet can be read millions of times per second and a region can fail. Lead with the topology and explain how you keep it available and consistent enough.",
+            thinkAbout: [
+              "Why cache tweet objects and timelines separately?",
+              "What two mechanisms absorb a single tweet read millions of times per second?",
+              "What does per-region cache independence buy during a region failure?",
+            ],
+            modelAnswerOutline: [
+              "**Topology: a per-region, multi-tier cache.** L1 near cache in each app process plus a regional Redis Cluster L2, with the DB (and cross-region replication of the source of truth) behind it. Timelines and tweet objects are cached separately: a tweet object is shared by millions of timelines and is the true hot spot, while a timeline is per-user.",
+              "**Scale and hot keys, two mechanisms.** First, L1 near caches on every app server serve the hottest tweet objects in-process with a short TTL, so a viral tweet is answered locally on thousands of nodes and only trickles to L2. Second, for the very hottest keys, replicate the key across shards so its read load spreads instead of hammering one shard. Hot-key detection promotes keys into this treatment automatically.",
+              "**Availability across regions:** an independent cache cluster per region, so a region failure does not take the cache down globally; traffic fails over to a healthy region whose cache is warm for its own users. Within a region, each shard has replicas with Cluster failover. The source of truth replicates across regions asynchronously.",
+              "**Consistency:** tweets are largely immutable, so use versioned/immutable keys for tweet objects (an edit or delete writes a new version and invalidates the old), sidestepping most invalidation races. Timelines are rebuilt or invalidated on the fan-out path. Accept a few seconds of cross-region eventual consistency, fine for a social feed.",
+              "**Tradeoff:** strict global consistency traded for regional availability and massive read scale, accepting seconds of cross-region staleness.",
+              "Common wrong turn: a single global cache cluster (a shared failure domain and a cross-region latency tax), or caching a celebrity tweet under one key with no L1 and no replication, which turns one shard into the whole system's bottleneck when a tweet goes viral.",
             ],
           },
         },
