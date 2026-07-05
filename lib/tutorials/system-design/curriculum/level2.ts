@@ -923,6 +923,65 @@ Recap: avoid monotonic keys for hotspots and random UUIDv4 for fragmentation, de
 constraints, enforce invariants with DB constraints, and pick types that encode correctness.
 `.trim()
 
+const blobObjectStorageTeach = `
+## Bytes belong in object storage, pointers in the database
+
+The single most common storage mistake juniors make is putting a 5 MB image, or worse a 500 MB video,
+into a database column. Relational and document databases are tuned for small, structured,
+frequently-queried rows. A large binary object (a "blob") is the opposite: big, opaque, write-once,
+read-many. Stuffing blobs into Postgres or MongoDB bloats the table, blows out your backup and
+replication times, wrecks the buffer cache (one video eviction flushes thousands of hot rows), and
+forces every byte to flow through your app servers. The right home for bytes is **object storage**:
+S3, Google Cloud Storage, or Azure Blob Storage.
+
+The mental model is a split. **Object storage holds the bytes; the database holds the metadata plus a
+pointer (the object key).** A \`photos\` row stores \`id\`, \`owner_id\`, \`caption\`, \`width\`,
+\`height\`, \`content_type\`, and \`object_key = "photos/2026/u123/abc.jpg"\`. The actual JPEG lives
+in the bucket at that key. Your DB stays small and fast; the blobs live somewhere built for them.
+Object stores give you flat key-value semantics (a key maps to an immutable object plus metadata),
+effectively unlimited capacity, and roughly **eleven nines of durability** (99.999999999 percent),
+achieved by replicating each object across multiple facilities.
+
+### Presigned URLs: keep bytes off your servers
+
+When a client wants to upload, it asks your app server for permission. The app authorizes the user,
+then generates a short-lived, cryptographically signed URL that grants \`PUT\` to one specific key
+for, say, 15 minutes, and returns it. The client \`PUT\`s the file **directly to S3**. Downloads work
+the same way with a signed \`GET\`. Your app never touches the file body: it only mints capability
+tokens. This is what lets a tiny fleet of app servers support petabytes of transfer.
+
+For large files use **multipart upload**: split the file into parts (say 8 MB each), upload parts in
+parallel, retry only failed parts, and finalize with a "complete" call that stitches them
+server-side. This gives resumability and parallel throughput. Where history matters enable
+**versioning** or write objects **immutably** with a content hash in the key.
+
+### The two cost and latency levers
+
+**Lifecycle and tiering**: hot data stays in the standard tier, and a policy automatically moves
+objects to infrequent-access, then cold, then archive (S3 Glacier) as they age, cutting storage cost
+by 5 to 20x for data nobody reads. **A CDN in front for reads**: CloudFront or Cloudflare caches
+objects at edge PoPs near users, so a popular video is served from an edge 20 ms away instead of a
+single region 150 ms away, and your origin bucket sees a fraction of the traffic. You almost never
+serve public media directly from the bucket at scale.
+
+**Interview nuance:** If asked "why not just base64 the image into a JSON column," the crisp answer
+is durability, cost, cache pollution, and egress path: object storage is cheaper per GB, more
+durable, and lets clients transfer directly via presigned URLs and a CDN, so bytes never bottleneck
+on your database or app tier.
+
+\`\`\`
+  client --(1) ask to upload--> app server (authz) --(2) presigned PUT URL-->
+  client --(3) PUT bytes directly--------------------------------> S3 bucket
+                                                                     |
+  DB row: {id, owner, key, w, h, type}  <--(4) app writes metadata--/
+  read:  client <-- CDN edge cache <-- (signed GET) <-- S3 origin
+\`\`\`
+
+Recap: Keep bytes in object storage with eleven-nines durability and only the key plus metadata in
+the DB, move files with presigned URLs and multipart upload so they bypass your servers, and control
+cost and latency with lifecycle tiering and a CDN.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -1705,6 +1764,65 @@ export const systemDesignLevel2: DesignLevel = {
               "**Ledger shape:** every entry is immutable and append-only; corrections are new reversing entries, never updates. Enforce double-entry with a CHECK/trigger that debits and credits sum to zero per transaction. No soft delete on a ledger: reversals instead.",
               "**Constraints and types carrying correctness:** UNIQUE(idempotency_key), FOREIGN KEY from entries to accounts, CHECK(amount_minor <> 0), NOT NULL on amount/currency/account, timestamptz UTC for global ordering. The invariants live in the database, where no service, retry, or manual fix can bypass them.",
               "Common wrong turn: relying on application-code checks to prevent double charges (racy under retries), or storing money as float and reconciling penny drift later.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l2-m5",
+      title: "Blob Storage & Choosing a Store",
+      description:
+        "Design the storage and delivery path for large binary files with object storage, presigned URLs, and a CDN, then defend any datastore choice from decision drivers, including when NewSQL beats app-level sharding.",
+      lessons: [
+        {
+          id: "sd-l2-blob-object-storage",
+          title: "Blob / Object Storage",
+          summary:
+            "Bytes go to object storage with only the key and metadata in the DB, moved via presigned URLs and multipart upload, with lifecycle tiering and a CDN for cost and latency.",
+          estimatedMinutes: 25,
+          difficulty: "easy",
+          skills: ["object-storage", "blob", "cdn"],
+          teach: {
+            markdown: blobObjectStorageTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l2-blob-object-storage-apply",
+            prompt:
+              "Design storage and delivery for user-uploaded images and videos, including the upload path, the metadata model, and the serving path.",
+            thinkAbout: [
+              "Why store blobs in object storage and only the key/URL in the DB?",
+              "How do presigned URLs let clients upload and download directly?",
+              "How do lifecycle/tiering and a CDN control cost and latency?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: consumer app, images up to ~20 MB and videos up to ~2 GB, read-heavy (each upload viewed many times), public-ish media over HTTPS.",
+              "**High-level split:** bytes live in an S3 bucket; Postgres holds only metadata.",
+              "**Upload, direct-to-storage in three steps:** (1) client calls `POST /uploads` with content type and size; the app authorizes, creates a `media` row in state `pending` with a generated object_key like `media/{userId}/{uuid}`, and returns a presigned URL (single presigned PUT for images; multipart upload with presigned per-part URLs, 8-16 MB parts uploaded in parallel with per-part retry, for videos). (2) The client uploads bytes directly to S3, never through the app. (3) On completion, an S3 event notification (S3 -> SQS/Lambda) or a client `complete` call flips the row to `ready` and enqueues async processing (virus scan, thumbnails, transcode to HLS renditions).",
+              "**Metadata model:** `media(id, owner_id, object_key, content_type, bytes, width, height, duration, status, created_at)`. The DB stays tiny; every listing/feed query hits only these small rows.",
+              "**Serving:** a CDN (CloudFront) in front of the bucket: client -> edge cache -> origin, so popular objects serve from a PoP ~20 ms away and origin sees a fraction of traffic. Private media gets short-lived signed CDN URLs; public media caches with long TTLs and a content-hash in the key so a new upload is a new URL (immutable, cache-friendly).",
+              "**Cost and durability:** S3 gives eleven-nines durability with no disk management. A lifecycle policy moves originals to infrequent-access after 30 days and Glacier after a year while keeping thumbnails hot, cutting storage cost several-fold.",
+              "Common wrong turn: storing image or video bytes in a BLOB column or routing every upload/download through the app tier: pollutes the DB cache, balloons backups, and makes the app fleet the transfer bottleneck. Bytes belong in object storage; the DB holds a pointer.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-blob-object-storage-practice",
+            prompt:
+              "Design the ingest and delivery pipeline for a video platform like YouTube handling 500 hours of video uploaded per minute, where a single upload can be 4 GB and must play back adaptively on a 3G phone and a 4K TV. Lead with how raw bytes enter storage and how a viewer eventually streams them.",
+            thinkAbout: [
+              "How does a 4 GB upload survive a flaky network without touching your app servers?",
+              "What turns one raw file into something a 3G phone and a 4K TV can both play?",
+              "What makes the read side economically possible at this fan-out?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: massive write ingest, far larger read fan-out, global audience, adaptive bitrate required.",
+              "**Ingest:** creators upload directly to an object store via resumable multipart upload with presigned part URLs, so 4 GB uploads survive flaky networks (retry only failed parts) and never touch app servers. The raw object lands under a `raw/` prefix and fires an event notification onto a queue (SQS/Kafka); the DB writes a `video` row in state `uploaded`.",
+              "**Processing:** a fleet of transcode workers consumes the queue and fans each raw file into a ladder of renditions (240p through 4K) segmented for HLS/DASH adaptive streaming, plus thumbnails and captions. Segments write back to object storage under `hls/{videoId}/{rendition}/seg_{n}.ts`. Embarrassingly parallel, autoscaled off queue depth, idempotent and checkpointed so a crashed worker re-runs only its segment. When the ladder completes, the row flips to `ready`.",
+              "**Storage layout and cost:** originals are cold, so a lifecycle policy pushes `raw/` to archive quickly (you rarely re-transcode); the HLS segments are the hot read set. Popular videos stay in standard storage; long-tail videos tier down.",
+              "**Delivery:** viewers never hit the origin bucket. A multi-tier CDN caches segments at the edge; the player fetches a manifest, then pulls segments and switches rendition per segment based on measured bandwidth, so the 3G phone pulls 240p and the 4K TV pulls 2160p from the same library. Because segments are immutable and content-addressed, they cache with very long TTLs and edge hit rates exceed 95 percent: what makes the read side economically possible.",
+              "**Metadata:** a horizontally scalable store (Cassandra/Bigtable or Vitess-sharded MySQL, as YouTube uses) holds video metadata, view counts, and manifests; the object store holds bytes; the CDN holds hot copies.",
+              "Common wrong turn: serving a single MP4 per video (no adaptive bitrate) or transcoding synchronously in the upload request, which buffers on mobile and times out on large files.",
             ],
           },
         },
