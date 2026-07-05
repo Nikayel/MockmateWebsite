@@ -597,6 +597,63 @@ slowest node in the set, and sloppy quorum plus hinted handoff buy availability 
 the cost of consistency.
 `.trim()
 
+const twoPcThreePcTeach = `
+## No shared log, no single owner
+
+A single-node database transaction is atomic because one process owns the commit decision and one
+write-ahead log records it. The moment your transaction spans two independently-owned services or two
+databases, there is no shared log and no single owner, so you need a protocol to make N participants
+agree to commit or abort together. Two-phase commit (2PC) is that baseline, and every alternative in
+this module is defined against it.
+
+2PC has a **coordinator** and **participants**. Phase 1 (prepare/vote): the coordinator asks every
+participant "can you commit?" Each participant does the work, writes it durably in a *prepared*
+state, locks the affected rows, and votes yes or no. A yes vote is a binding promise: "I will commit
+if you tell me to, even if I crash and restart." Phase 2 (commit/abort): if all voted yes, the
+coordinator writes a commit record and tells everyone to commit; if any voted no, it broadcasts
+abort. This guarantees atomicity: all commit or all abort.
+
+### The fatal flaw: blocking
+
+Between voting yes and hearing the decision, a participant holds locks and cannot unilaterally
+decide. If the coordinator crashes *after* participants voted yes but *before* broadcasting the
+decision, every participant is stuck: it cannot commit (maybe someone voted no) and cannot abort
+(maybe everyone voted yes and the coordinator already told others to commit). They hold their locks
+and wait. This is the classic in-doubt window, and it lasts as long as the coordinator is down.
+
+\`\`\`
+Coordinator          P1            P2
+   |---- prepare ---->|             |
+   |---- prepare ------------------>|
+   |<---- yes --------|             |
+   |<---- yes ----------------------|
+   X (crash here)                       <- P1, P2 now BLOCKED holding locks
+   |                 (wait...)     (wait...)
+\`\`\`
+
+The second problem is **throughput**. Locks are held across the *entire* protocol: multiple network
+round trips plus disk forces. A single-node commit holds a lock for microseconds; a 2PC lock is held
+for milliseconds to seconds across the fleet. Contended rows serialize behind it, so 2PC caps
+concurrency hard. This is why it does not survive at internet scale.
+
+**3PC** inserts a pre-commit phase so participants can time out and make progress if the coordinator
+vanishes, reducing blocking. But it assumes a synchronous network with bounded delays; under a real
+partition it can violate atomicity (different sides decide differently), so it is almost never used
+in production.
+
+**Interview nuance:** modern systems do not abandon 2PC, they *harden the coordinator*. Spanner and
+CockroachDB run 2PC but replicate the coordinator's state via Paxos/Raft, so a coordinator crash is
+just a failover to a replica that knows the decision, and the in-doubt window closes in seconds. XA
+(the classic 2PC standard) is acceptable *within one cluster or trust domain* where the coordinator
+is HA and latencies are bounded. It is a poor fit *across* independently-deployed microservices,
+which is exactly why sagas exist.
+
+Recap: 2PC guarantees cross-participant atomicity via prepare-then-commit, but a coordinator crash
+after the vote leaves participants blocked holding locks, and lock-holding across the whole protocol
+throttles throughput, so at scale you either replicate the coordinator with consensus or switch to
+sagas.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1109,6 +1166,63 @@ export const systemDesignLevel5: DesignLevel = {
               "**Partition behavior:** if the regions partition, each keeps accepting LOCAL_QUORUM writes independently (the deliberate AP choice: never reject telemetry), and the regions diverge for the duration. Cassandra reconciles on heal via hinted handoff (hints stored for the unreachable region, replayed later), read repair, and anti-entropy repair, with last-write-wins by timestamp resolving conflicts. For append-only telemetry keyed by time, conflicts are rare and LWW is safe.",
               "**What 'breaks':** cross-region read consistency during the partition: a global query misses the other region's just-written points until heal, absorbed by the seconds-of-staleness tolerance.",
               "Common wrong turn: demanding EACH_QUORUM or SERIAL (lightweight-transaction) consistency here, tanking throughput and rejecting writes during exactly the partition you most need to keep ingesting through.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l5-m4",
+      title: "Distributed Transactions",
+      description:
+        "Atomicity across independently-owned services: why 2PC blocks at scale, how sagas trade isolation for progress, how the outbox kills the dual-write problem, and why exactly-once is an application property.",
+      lessons: [
+        {
+          id: "sd-l5-2pc-3pc",
+          title: "Distributed Transactions: 2PC / 3PC & Their Limits",
+          summary:
+            "2PC gives atomicity via prepare-then-commit, but a coordinator crash after the vote blocks participants holding locks; harden the coordinator with consensus or use sagas.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["2pc", "distributed-transactions"],
+          teach: {
+            markdown: twoPcThreePcTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-2pc-3pc-apply",
+            prompt:
+              "Design an atomic transfer of $100 across two independently-owned services (an Accounts service and a Ledger service, each with its own database) and explain why classic 2PC is a poor fit, including the exact failure that blocks it.",
+            thinkAbout: [
+              "What blocks participants when the coordinator crashes after prepare?",
+              "Why is holding locks across the protocol a throughput killer?",
+              "How do modern systems harden the coordinator?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: two services, two databases, separately deployed and possibly separately owned. The transfer must be atomic. Show the 2PC design first, then argue it is the wrong tool.",
+              "**The 2PC version:** a coordinator runs the transfer. Phase 1: 'prepare: debit $100 from A' to Accounts and 'prepare: credit $100 to B' to Ledger. Each performs the write in a prepared state, locks the affected rows, and votes yes only if it can durably guarantee the commit. Phase 2: on all-yes, the coordinator writes a commit record and broadcasts commit; on any no, abort and both roll back. True atomicity.",
+              "**The exact blocking failure:** both vote yes, then the coordinator crashes before broadcasting the decision. Both services are in-doubt: they hold row locks and cannot decide alone. Accounts cannot commit (Ledger might have been told to abort) and cannot abort (the coordinator may have durably decided commit and told others). Account A's balance is locked until the coordinator recovers: an unbounded in-doubt window.",
+              "**Throughput cost:** balance-row locks are held across two full round trips plus disk forces (milliseconds to seconds, not microseconds). Any other transfer touching account A serializes behind it; for a hot account this collapses concurrency.",
+              "**Hardening, if 2PC were insisted upon:** replicate the coordinator's log via Raft/Paxos so a crash is a fast failover to a replica that already knows the decision (the Spanner/CockroachDB approach). Keep XA only inside one cluster with bounded latency.",
+              "**What to actually build across independently-owned services: a saga.** Accounts commits the debit locally and emits an event, Ledger commits the credit locally, and if the credit fails a compensating transaction re-credits A. No cross-service locks, no coordinator in-doubt blocking. The trade: strict isolation (a brief window where the debit is visible without the credit) for availability and throughput: right across service boundaries.",
+              "Common wrong turn: proposing 2PC across microservices and stopping there, without naming the coordinator-crash blocking window or the lock-held-across-the-protocol throughput hit.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-2pc-3pc-practice",
+            prompt:
+              "Explain how a system like Google Spanner or CockroachDB runs 2PC across shards at global scale without the classic coordinator-blocking problem crippling it, and quantify roughly where the latency goes. Lead with the mechanism that removes the blocking.",
+            thinkAbout: [
+              "What makes the coordinator's decision survive its own crash?",
+              "How long is the in-doubt window after the fix, and why?",
+              "Why do architects still keep transactions single-shard when possible?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a horizontally-sharded SQL database where one transaction can touch rows on multiple shards, each shard replicated across zones/regions.",
+              "**The mechanism: consensus under the 2PC.** Each shard is a Raft/Paxos group. The 2PC coordinator is not a single process: it is one of the participant groups, and its transaction record is written through Raft, replicated to a majority before the protocol proceeds. When the leader coordinating the commit crashes, a new leader elected in that Raft group *already has the committed transaction record in its log*, knows the decision, and finishes the protocol. The in-doubt window shrinks from 'until a single coordinator recovers' to one leader-election round (single-digit seconds), and correctness is never lost because the decision was durable in a majority before anyone acted on it.",
+              "**Locks and isolation:** participants still take write locks during prepare, but each shard's writes are replicated via its own consensus group, so a prepared state survives replica failure. Spanner adds TrueTime commit-wait to order transactions globally: a deliberate few-ms wait for clock uncertainty.",
+              "**Where the latency goes:** a multi-shard commit pays one WAN round trip for prepare to reach each participant leader, a Raft majority-replication round trip inside each shard to make prepare durable, then the commit phase and its replication. Cross-region, each consensus round trip is tens of ms, so a global multi-shard write is often 50-150 ms versus sub-millisecond for a single-shard local write. The price of strict serializability at global scale.",
+              "**The tradeoff:** atomic, strongly-consistent, non-blocking distributed transactions, paying extra WAN round trips and consensus replication on every distributed commit. The wrong turn: assuming Spanner 'solved' 2PC for free. It made every role consensus-backed and accepted higher commit latency, which is why architects keep transactions single-shard whenever possible.",
             ],
           },
         },
