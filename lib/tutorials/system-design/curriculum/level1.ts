@@ -395,6 +395,55 @@ Recap: match paradigm to consumer and traffic (REST public, gRPC internal, Graph
 and expect the real answer to be a hybrid.
 `.trim()
 
+const contractDesignTeach = `
+## The contract is a schema, not a wiki page
+
+A contract is the promise your API makes to its consumers about shape, names, types, and behavior.
+The durable version of that promise is a machine-readable schema that is the single source of truth,
+not prose in a wiki and not whatever the code happens to return today.
+
+Schema-first means you write the schema before or alongside the code and generate everything else
+from it: OpenAPI for REST, a Protobuf IDL for gRPC, or SDL for GraphQL. From that one artifact you
+generate typed server stubs, client SDKs in every language, request validation, and reference docs.
+The payoff is that the contract cannot silently drift from the implementation, because the
+implementation is generated from (or validated against) the contract in CI.
+
+### Disciplined naming and typing
+
+- Resources are nouns, not verbs: \`POST /orders\`, not \`POST /createOrder\`. The HTTP method
+  already carries the verb.
+- Casing is consistent everywhere (pick \`snake_case\` or \`camelCase\` and never mix).
+- Types are explicit, including nullability. A field is either always present or documented optional;
+  "sometimes null, sometimes missing" is how clients break.
+- Enums are closed sets with documented values, and unknown values are handled by tolerant readers
+  rather than crashing.
+- Units and formats are explicit: \`amount_cents\` not \`amount\`, ISO-8601 timestamps, currency
+  codes.
+
+### Design for evolution
+
+You want additive, non-breaking change to be the default: adding an optional field or a new endpoint
+must never break an existing consumer. The tolerant-reader pattern (ignore fields you do not
+recognize, do not choke on extra data) is what makes that safe on the consumer side. In Protobuf you
+never renumber or reuse a field tag; in GraphQL you deprecate a field rather than delete it; in REST
+you add fields rather than repurpose them.
+
+### Enforcement: contract tests in CI
+
+Enforcement is where teams actually get burned. Consumer-driven contract testing (Pact is the common
+tool) captures each consumer's real expectations as a contract and replays them against the provider
+in CI. If a provider is about to ship a change that violates a consumer's expectation, the build
+fails *before* deploy, not at 2am in production. This is the single highest-leverage practice for
+teams shipping independent services.
+
+**Interview nuance:** when asked "how do you keep two teams' services compatible," the strong answer
+is "schema as source of truth plus consumer-driven contract tests in CI," not "we coordinate
+releases." Coordination does not scale past a handful of services.
+
+Recap: make a machine-readable schema the source of truth, name and type it for tolerant additive
+evolution, and enforce it with consumer-driven contract tests in CI.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -764,6 +813,58 @@ export const systemDesignLevel1: DesignLevel = {
               "**Async layer:** the charge request should not block on sending a receipt email or updating analytics. Publish `charge.succeeded` to Kafka; the notification service consumes independently, decoupling latency and letting each side scale and fail on its own.",
               "**Why not GraphQL here:** the public payments API is a small, stable set of resources (charges, refunds, customers), not a screen-driven UI with varied field needs, so GraphQL's flexibility buys nothing while costing HTTP caching and cost-limiting complexity.",
               "Common wrong turn: forcing one paradigm everywhere. REST internally would waste bytes and CPU at this QPS; gRPC publicly would break `curl` and browser developers. The layered split is what makes it work.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-contract-design",
+          title: "Contract & Schema-First Design",
+          summary:
+            "Make a machine-readable schema the source of truth, design for tolerant additive evolution, and enforce compatibility with consumer-driven contract tests in CI.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["api-design", "contracts", "schema"],
+          teach: {
+            markdown: contractDesignTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-contract-design-apply",
+            prompt:
+              "Design the contract for a 'create order' endpoint: resource naming, request/response schema, required vs optional fields, and how a client discovers it.",
+            thinkAbout: [
+              "What is the source of truth for the contract, and how is it enforced?",
+              "How do you design for additive, non-breaking evolution?",
+              "How do consumer-driven contract tests catch breakage in CI?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a REST API consumed by a web app and a mobile app maintained by other teams.",
+              "**Source of truth:** an OpenAPI 3 document, checked into the repo, from which the server stub, client SDKs, and docs are generated. CI validates that the running service conforms to it.",
+              "**Resource and method:** `POST /v1/orders`. Noun resource, POST to create, returns 201 Created with a `Location: /v1/orders/{id}` header and the created resource body.",
+              "**Request schema (JSON, snake_case):** `customer_id` (required), `currency` (required, ISO-4217), `line_items` (required, at least 1, each with sku and quantity), `idempotency_key` (optional but recommended), `note` (optional). Response includes a server-generated `id`, `status` (enum: pending|confirmed|failed), `amount_cents` (integer, explicit units), and `created_at` (ISO-8601). Required vs optional is explicit in the schema, and unknown fields sent by clients are ignored (tolerant reader).",
+              "**Discovery:** the client discovers the contract from published OpenAPI docs plus a generated SDK, not by reading source. A sandbox base URL lets them integrate before going live.",
+              "**Evolution:** all future change is additive. Adding `discount_cents` later is safe because existing clients ignore unknown fields; never rename `amount_cents` or change `status` from a string to an object. Removing or renaming a field forces a version bump.",
+              "**Enforcement:** consumer-driven contract tests (Pact). The web and mobile teams publish the fields and shapes they actually depend on, and provider CI replays those and fails the build if a change would break them.",
+              "Common wrong turn: an ad-hoc contract that renames or removes fields between releases, or 'optional' fields that are sometimes missing and sometimes null, both of which break consumers silently.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-contract-design-practice",
+            prompt:
+              "Design the contract governance for a company with 200 microservices owned by 40 teams, where the payments team's PaymentIntent message is consumed by 15 other services. Explain how you prevent one team's schema change from breaking the other 14 consumers, and how the contract stays the source of truth at that scale.",
+            thinkAbout: [
+              "Where do the schemas live so no team can drift from the wire contract?",
+              "What mechanically blocks a breaking change before merge, without a meeting?",
+              "How does a field ever actually get removed at this scale?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: gRPC internally with Protobuf, services deploy independently many times a day, no shared release train.",
+              "**Single source of truth:** all `.proto` files live in a central schema repository (a proto monorepo or schema registry). Nobody hand-writes message types; every service generates its stubs from the published protos, so the wire contract and the code cannot drift.",
+              "**Compatibility enforcement in CI:** a schema linter (Buf is the standard) runs on every proto change and rejects breaking changes automatically, enforcing the Protobuf rules that matter: never reuse or renumber a field tag, never change a field's type, mark removed fields `reserved`. Additive change (new optional fields, new RPCs) passes; a breaking change fails the PR before merge.",
+              "**Consumer awareness:** the schema registry tracks which of the 15 services consume PaymentIntent. A proposed change surfaces the consumer list on the PR so the payments team knows the blast radius. For behavioral (not just structural) expectations, consumer-driven contract tests capture what each of the 14 consumers actually reads, and the provider build replays them.",
+              "**Evolution discipline:** to change semantics, add `payment_intent_v2` fields alongside the old ones and migrate consumers one at a time, deprecating the old field with a documented sunset rather than deleting it. Removal happens only after telemetry shows zero readers.",
+              "At 200 services, coordination-by-meeting does not scale. The system holds because the schema is centralized, breaking changes are mechanically blocked in CI, and evolution is additive-first with per-consumer contract tests.",
+              "Common wrong turn: letting each team keep its own copy of the proto, or relying on release coordination. Both guarantee some consumer breaks the first time two teams deploy out of sync.",
             ],
           },
         },
