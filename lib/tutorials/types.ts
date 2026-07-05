@@ -21,14 +21,17 @@ import type { DifficultyLevel, WorkspaceScenarioConfig } from "@/lib/scenarios/t
 
 // ---- shared, course-agnostic skeleton ----
 
-export type CourseId = "python" | "sql"
+export type CourseId = "python" | "sql" | "system-design"
 
 /**
- * SQL ships 5 levels (L5 is the advanced/company-specific DE-interview capstone); Python ships 4.
+ * SQL ships 5 levels (L5 is the advanced/company-specific DE-interview capstone); Python ships 4;
+ * System Design ships 12 levels numbered **L0–L11** (L0 is the "Interview & Communication Method").
  * `PythonLevelId` stays pinned to 1-4 so Python-only maps (e.g. `LEVEL_PREVIEWS`) are not forced to
- * add a level-5 entry, while `TutorialLevelId` (used by the SQL level id) allows 5.
+ * grow, while the shared `TutorialLevelId` (used by `TutorialLessonProgress.levelId` and the SQL /
+ * System-Design level ids) spans the full 0..11 range. Widening it is a type-only change — the
+ * serialized shape is unaffected and the progress Zod schema widens in lockstep.
  */
-export type TutorialLevelId = 1 | 2 | 3 | 4 | 5
+export type TutorialLevelId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
 export type PythonLevelId = 1 | 2 | 3 | 4
 
 /** The three phases of every lesson — the spine of the learning loop. */
@@ -93,8 +96,12 @@ export interface TutorialLevel<E, Id extends TutorialLevelId = TutorialLevelId> 
   /** e.g. `"Level 1 — Python Fundamentals"`. */
   title: string
   tagline: string
-  /** L1/L2 default to `"single-file"`, L3/L4 to `"workspace"`. */
-  defaultExecutionMode: ExerciseExecutionMode
+  /**
+   * Which runner a level's exercises default to. Optional because not every course executes: the
+   * System-Design course is free-response (no runner), so its levels omit this rather than carry a
+   * bogus value. Python (L1/L2 `"single-file"`, L3/L4 `"workspace"`) and SQL always set it.
+   */
+  defaultExecutionMode?: ExerciseExecutionMode
   estimatedHours: number
   modules: TutorialModule<E>[]
 }
@@ -245,6 +252,54 @@ export type SqlLevelSlug =
 export type SqlLesson = TutorialLesson<SqlExercise>
 export type SqlModule = TutorialModule<SqlExercise>
 export type SqlLevel = TutorialLevel<SqlExercise>
+
+// ---- System Design course (concrete instantiation) ----
+
+/**
+ * A free-response system-design exercise — the third payload plugged into the shared content tree,
+ * the mirror image of `PythonExercise` / `SqlExercise`. It has **no** execution fields at all
+ * (`executionMode`, `starterCode`-grading, `testCases`, `seedSql`, `workspace`): system design is
+ * not code-graded. The learner reads the concept, writes a free-text design answer, saves it, then
+ * reveals the `modelAnswerOutline` to self-compare. The saved answer is persisted separately in the
+ * `user_design_answers` collection keyed by `id` (see `lib/tutorials/design-answers.ts`).
+ */
+export interface DesignExercise {
+  /** `sd-l{N}-{slug}-{apply|practice}`. Stable; used as the answer-persistence key. */
+  id: string
+  /**
+   * Markdown prompt. MUST lead with the deliverable ("Write...", "Design...", "Explain how you
+   * would...") per the content style rules.
+   */
+  prompt: string
+  /** Guiding questions shown beside the editor to structure thinking. Ordered. */
+  thinkAbout: string[]
+  /**
+   * The model answer, revealed on demand (never auto-shown), rendered as a bullet list. Built from
+   * the curriculum map's `modelAnswerOutline`. No auto-grading — the learner self-compares.
+   */
+  modelAnswerOutline: string[]
+  /** Optional seed text for the answer editor (e.g. a scaffold the learner fills in). */
+  starterAnswer?: string
+}
+
+/** The twelve System-Design level slugs (L0–L11), verbatim from `CURRICULUM-MAP.md`. */
+export type SystemDesignLevelSlug =
+  | "interview-method" // L0
+  | "foundations" // L1
+  | "data-storage" // L2
+  | "scaling-data" // L3
+  | "scaling-compute" // L4
+  | "distributed-core" // L5
+  | "event-driven" // L6
+  | "reliability-ops" // L7
+  | "security-privacy" // L8
+  | "modern-architecture" // L9
+  | "case-studies" // L10
+  | "specialized-systems" // L11
+
+export type DesignLesson = TutorialLesson<DesignExercise>
+export type DesignModule = TutorialModule<DesignExercise>
+export type DesignLevel = TutorialLevel<DesignExercise>
 
 // ---- progress (per-user state — 100% shared across courses) ----
 

@@ -35,9 +35,22 @@ describe("tutorialProgressInputSchema", () => {
     expect(result.success).toBe(true)
   })
 
-  it("rejects an unknown level id", () => {
-    // 1–5 are valid (SQL adds level 5); 6 is out of range.
-    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: 6 }).success).toBe(false)
+  it("accepts level 0 (System Design's interview-method level)", () => {
+    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: 0 }).success).toBe(true)
+  })
+
+  it("accepts level 11 (System Design's last level)", () => {
+    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: 11 }).success).toBe(true)
+  })
+
+  it("rejects an out-of-range level id", () => {
+    // 0–11 span the shared TutorialLevelId range (SD L0-11, SQL L1-5, Python L1-4); 12 is out of range.
+    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: 12 }).success).toBe(
+      false
+    )
+    expect(tutorialProgressInputSchema.safeParse({ ...validInput, levelId: -1 }).success).toBe(
+      false
+    )
   })
 
   it("rejects an invalid section status", () => {
