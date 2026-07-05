@@ -361,6 +361,60 @@ a sequentially-written, fsync'd WAL provides the actual durability and crash rec
 shaped by the ~100x gap between sequential and random I/O.
 `.trim()
 
+const keyValueTeach = `
+## The simplest database, and the discipline it forces
+
+A key-value store is the simplest possible database: a distributed hash map. You \`GET(key)\`, you
+\`PUT(key, value)\`, you \`DELETE(key)\`. There is no query language over the value, no \`WHERE\`
+clause, no join. Because the access path is a hash lookup, point reads and writes are O(1) and the
+fastest thing in your architecture: Redis serves reads in tens of microseconds in-process and
+sub-millisecond p99 over the network, and a single node handles 100k+ ops/sec easily. This is why KV
+stores are the default for caches, session stores, feature flags, rate-limit counters, and as a
+building block inside bigger systems.
+
+The defining constraint is **value opacity**. To the store, the value is a blob of bytes. You cannot
+ask "give me all sessions where \`lastActive < X\`" because the store cannot see inside the value.
+Whatever you want to query on must be encoded into the key. This forces the key-design discipline
+that is the whole skill of this family.
+
+### Key design
+
+Namespace with a prefix and a delimiter so different data types never collide:
+\`session:{sessionId}\`, \`user:123:profile\`, \`ratelimit:{userId}:{minuteBucket}\`. Composite keys
+co-locate related lookups. The danger is **hot keys**: a single key that takes a wildly
+disproportionate share of traffic (a global counter, a celebrity's profile) becomes a hotspot on
+whichever shard owns it. You fight this by sharding the key (\`counter:{shard}\` summed across N
+shards) or by fronting the hot key with a client-side or local cache.
+
+**Interview nuance:** Interviewers probe "cache or source of truth?" Memcached and a Redis instance
+with no persistence are caches: if the box dies, the data is gone, and that is fine because you can
+recompute it from the real database. If you use a KV store as a durable source of truth (DynamoDB, or
+Redis with AOF/RDB persistence and replication), you must reason about durability, replication, and
+backups just like any primary database. The common wrong turn is treating a cache-configured Redis as
+a system of record, then losing data on a restart.
+
+### TTL, eviction, and the rich data structures
+
+Every session and counter should carry an expiry (\`SET key val EX 3600\`) so stale data
+self-cleans. When memory fills, Redis evicts by policy: \`allkeys-lru\` for a pure cache,
+\`volatile-lru\` to only evict keys that have a TTL, \`noeviction\` to fail writes instead of
+dropping data (what you want for a source of truth).
+
+**Redis is more than KV.** It ships data structures that make it a Swiss-army server: sorted sets
+(leaderboards, sliding-window rate limits, priority queues), lists (simple queues), hashes (store a
+session as fields you can update individually), streams (append-only log with consumer groups),
+pub/sub, HyperLogLog (cardinality estimation), and vector similarity. Reaching for these instead of
+raw string blobs is often the difference between a clean design and a clumsy one.
+
+Choose the engine to the job: **Memcached** for a dumb, multi-threaded, memory-only cache; **Redis**
+for a single-threaded rich-data-structure store that can also persist; **DynamoDB** for a managed,
+durable, auto-sharded KV/document store with predictable single-digit-ms latency at any scale.
+
+Recap: KV stores give O(1) opaque-blob lookups, so encode everything you query on into a namespaced
+key, guard against hot keys, always TTL cache data, and never treat a non-persistent cache as your
+source of truth.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -676,6 +730,63 @@ export const systemDesignLevel2: DesignLevel = {
               "**Replication:** run a synchronous standby (`synchronous_commit = remote_write` or `remote_apply`) so a committed payment survives loss of the primary, not just a local fsync. The cost is a network round trip on every commit, so place the sync standby region-local/AZ-adjacent to keep it under a couple of milliseconds, and keep additional replicas asynchronous.",
               "**The committed tradeoff:** money transactions pay full local-plus-remote durability and accept the latency; group commit keeps per-transaction fsync cost low enough for 20K TPS; only genuinely disposable writes relax synchronous_commit.",
               "Common wrong turn: globally disabling synchronous_commit to hit the throughput number, silently making the ledger lose committed payments on a crash.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l2-m3",
+      title: "NoSQL Families",
+      description:
+        "Pick the right non-relational store and defend it: key-value for O(1) lookups, document for read-together trees, wide-column for write-heavy feeds, graph for deep traversals, time-series for metrics, and vector for semantic search.",
+      lessons: [
+        {
+          id: "sd-l2-key-value",
+          title: "Key-Value Stores",
+          summary:
+            "Encode everything you query on into a namespaced key, guard against hot keys, TTL cache data, and never treat a non-persistent cache as a source of truth.",
+          estimatedMinutes: 25,
+          difficulty: "easy",
+          skills: ["key-value", "redis", "sessions"],
+          teach: {
+            markdown: keyValueTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l2-key-value-apply",
+            prompt:
+              "Design the data layout for user sessions and rate-limit counters in a key-value store, including key schema and TTLs.",
+            thinkAbout: [
+              "How do you design keys and namespaces to avoid hot keys?",
+              "When is a KV store a cache vs a source of truth?",
+              "What does value-blob opacity mean for your model?",
+            ],
+            modelAnswerOutline: [
+              "Assume Redis, a web app with a few million DAU, 30-minute sliding session timeout, and a rate limit of 100 API calls per user per minute.",
+              "**Sessions.** Key `session:{sessionId}` where sessionId is a 128-bit random token. Store the session as a Redis **hash** so individual fields (userId, csrfToken, lastSeen, roles) update without rewriting the blob. TTL `EXPIRE session:{id} 1800`, refreshed on each authenticated request for a sliding window. Because the value is opaque, 'all sessions for user 123' needs a reverse index: `user:{userId}:sessions` as a set of session ids, deleted explicitly for 'log out everywhere.'",
+              "**Sessions are a source of truth for live logins:** run Redis with AOF persistence and a replica, and `noeviction` (or `volatile-lru` so only expiring keys drop) to avoid silently evicting a logged-in user.",
+              "**Rate-limit counters.** Key `ratelimit:{userId}:{minuteBucket}` where minuteBucket is floor(epochSeconds / 60). Each request does INCR then, on first creation, EXPIRE 60; the bucketed key self-expires with no cleanup job. This is **cache-like**: losing a counter on restart means a user briefly gets extra calls, acceptable, so persistence is optional. For a smoother sliding window, use a **sorted set** per user keyed by timestamp, counting entries in the trailing 60s and trimming with ZREMRANGEBYSCORE.",
+              "**Hot keys:** a global counter (`ratelimit:global`) concentrates traffic on one shard; shard it into `ratelimit:global:{0..15}`, increment a random shard, sum on read. Per-user keys naturally spread across the keyspace.",
+              "Common wrong turn: putting queryable attributes (like lastActive) inside the opaque value and then discovering you cannot query them, or running the session store as a non-persistent cache and logging every user out on a restart.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-key-value-practice",
+            prompt:
+              "Design the key-value layer for Twitch's live-stream viewer-count and chat rate-limiting during a top event peaking at 5 million concurrent viewers on a single channel, where a naive global counter would melt one shard. Explain the key schema, the hot-key mitigation, and the consistency you accept.",
+            thinkAbout: [
+              "What makes a single channel's viewer count the archetypal hot key?",
+              "Does the displayed count actually need to be exact, and what does relaxing that buy?",
+              "Where can rate-limit enforcement move so a channel-wide limit is not a global lock?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: one channel with 5M concurrent viewers, viewer count displayed with a few seconds of staleness tolerance, chat rate-limited per user and per channel, sub-second update latency.",
+              "**Viewer count is the archetypal hot key:** 5M clients incrementing `viewers:{channelId}` would serialize on one shard. Use **sharded counters**: `viewers:{channelId}:{0..255}`. Each edge server increments a random (or edge-id-hashed) shard with INCR, and a background aggregator sums the 256 shards every 2 seconds into `viewers:{channelId}:total`, which clients read. Exactness is traded for throughput: the displayed count lags by seconds, fine for a viewer badge.",
+              "**Drift correction:** increments on connect and decrements on disconnect miss occasionally, so reconcile periodically against the connection manager's true socket count.",
+              "**Chat rate-limiting, two scopes.** Per-user: `ratelimit:chat:{userId}:{secondBucket}` with INCR/EXPIRE 1, enforcing a few messages per second. Per-channel (slow mode): a channel-wide limit is itself a hot key, so push enforcement to the chat edge nodes with a local token bucket per node and only periodically sync aggregate state to Redis, accepting slight over-admission rather than a global lock on every message.",
+              "**Consistency accepted:** deliberately eventual/approximate for counts (AP-style), because a viewer badge off by 0.1% for 2 seconds costs nothing, whereas exact synchronous counting at 5M concurrent would require coordination that blows the latency budget. Redis Cluster shards the keyspace; sharded-counter keys spread write load, replicas serve the aggregated-total read.",
+              "Common wrong turn: a single `INCR viewers:{channelId}` for correctness: exact, but concentrates millions of writes on one node and falls over. The senior move is recognizing the count does not need to be exact and buying massive throughput with sharding plus periodic aggregation.",
             ],
           },
         },
