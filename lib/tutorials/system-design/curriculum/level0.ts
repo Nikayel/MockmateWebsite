@@ -116,6 +116,67 @@ Recap: State exactly the three user capabilities that define the core loop as "u
 nouns as entities and verbs as endpoints, and defer everything else out loud with a reason it is safe.
 `.trim()
 
+const nonfunctionalRequirementsTeach = `
+## NFRs are where the architecture is decided
+
+Functional requirements say what the system does; non-functional requirements (NFRs) say how well it
+must do it, and they are where most of the architecture is actually decided. The trap is that NFRs are
+easy to fake. "The system should be scalable and reliable" is filler: it is true of every system and
+changes no decision. A real NFR is quantified and testable. Compare "the feed should be fast" with
+"p99 feed load latency under 200ms." Only the second one tells you whether you need a cache, and only
+the second one can be verified against a dashboard.
+
+The rule: every NFR must be a number you could put on a Grafana panel and alert on. That means
+percentiles, not averages (p99, not "average latency"), because tail latency is what users feel and
+averages hide it. It means specific availability targets (99.99%, which is about 52 minutes of downtime
+per year, versus 99.9% which is about 8.7 hours) because the extra nine changes whether you need
+multi-region failover. It means concrete scale (100M DAU, 50k peak QPS) because that is what forces
+sharding.
+
+### The categories worth walking every time
+
+- **Scalability:** target DAU and peak QPS. Lever: horizontal sharding, stateless services behind a
+  load balancer.
+- **Latency:** p99 targets, split by read and write path. Lever: caching and CDN for reads, async
+  processing for writes.
+- **Availability:** the number of nines. Lever: replication, multi-region, no single points of failure.
+- **Durability:** can you ever lose committed data? Lever: replication factor, write-ahead logs,
+  quorum writes.
+- **Consistency:** strong or eventual, and where. Lever: this is your CAP/PACELC stance.
+
+### Take a consistency stance out loud
+
+The consistency stance is the one interviewers probe hardest. For a feed, take an explicit position:
+"I favor availability over strong consistency. If a follower sees a new tweet a few seconds late, that
+is fine; if the feed is unavailable, that is not. So per PACELC, I choose AP during a partition and,
+even without a partition, I trade latency for consistency by serving from replicas and caches." That is
+a defensible stance with a reason, which is what scores. Saying "it should be consistent and available"
+fails, because CAP says you cannot have both under a partition and the interviewer will make you pick.
+
+Split read-path and write-path SLAs, because they are genuinely different systems. The read path
+(loading a feed) must be fast and is cacheable, so p99 under 200ms is reasonable. The write path
+(posting a tweet) must be durable and ordered but can be slower, so "the write is acknowledged in under
+500ms and the tweet is durably stored" is the goal, with fan-out happening asynchronously afterward.
+Conflating them leads you to either make writes too slow or reads not durable enough.
+
+\`\`\`
+NFR                          -> forces
+------------------------------------------------
+p99 read < 200ms             -> Redis cache + CDN
+100M DAU, ~50k peak QPS      -> shard datastore, stateless app tier
+99.99% availability          -> multi-region replication, failover
+No data loss on ack          -> quorum/replicated writes, WAL
+Feed eventual consistency OK -> AP stance, async fan-out via Kafka
+\`\`\`
+
+**Interview nuance:** When you state an NFR, immediately name the design lever it forces. That single
+habit, NFR then lever, is what separates a candidate who lists requirements from one who uses them to
+drive architecture. If an NFR does not force a lever, it is filler and you should drop it.
+
+Recap: Write NFRs as quantified, testable numbers (percentiles, nines, QPS), take an explicit
+consistency stance, split read and write SLAs, and tie each NFR to the specific design lever it forces.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -225,6 +286,59 @@ export const systemDesignLevel0: DesignLevel = {
               "**Users should be able to create and play a playlist.** Entity Playlist (an ordered list of track ids), endpoints `POST /playlists` and `GET /playlists/{id}`. Playlists define the repeat-usage loop.",
               "Defer recommendations, social features, podcasts, offline downloads, and Wrapped, with a structural justification: recommendations are a separate ML-driven read path over the same catalog and play history; social sharing is additive metadata; offline is client-side caching layered on the same stream endpoint. None alter how a track is searched, streamed, or grouped.",
               "Common wrong turn: putting recommendations in the top three. It is a whole subsystem that assumes streaming and play history already work, so it cannot be part of the irreducible core.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-nonfunctional-requirements",
+          title: "Non-Functional Requirements, Quantified",
+          summary:
+            "Turn 'scalable and reliable' into quantified, testable targets (p99, nines, QPS) and name the design lever each one forces.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["nfr", "slo", "capacity"],
+          teach: {
+            markdown: nonfunctionalRequirementsTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-nonfunctional-requirements-apply",
+            prompt:
+              "List 4-5 non-functional requirements for a 100M-DAU feed system as quantified, testable statements and name the design lever each one forces.",
+            thinkAbout: [
+              "Which NFRs actually change your architecture, and which are generic filler?",
+              "What is your explicit CAP/PACELC stance for this system and why?",
+              "How do read-path and write-path SLAs differ here?",
+            ],
+            modelAnswerOutline: [
+              "State assumptions first: 100M DAU, read-heavy at roughly 100:1, global, a few seconds of feed staleness acceptable. Rough math: tens of feed loads per user per day is on the order of 50k peak read QPS and maybe 500 write QPS.",
+              "**p99 feed-load latency under 200ms.** Forces a read-through cache (Redis) holding precomputed timelines plus a CDN for media, because a database query per feed load cannot hit that tail at 50k QPS.",
+              "**Sustain 50k peak read QPS (2-3x the average).** Forces horizontal sharding of the timeline store and a stateless app tier behind a load balancer so reads scale independently of writes.",
+              "**99.99% availability (about 52 minutes of downtime per year).** Forces multi-region deployment with replication and automatic failover, and eliminating single points of failure. 99.9% would be 8.7 hours, unacceptable for a global consumer feed.",
+              "**Durability: a post, once acknowledged, is never lost.** Forces replicated quorum writes (for example Cassandra with replication factor 3) plus a write-ahead log, so a single node failure cannot drop a committed post.",
+              "**Eventual consistency for the feed with bounded staleness of a few seconds.** The explicit PACELC stance: AP during a partition, and even without one favor latency over consistency by serving replicas and caches. Forces asynchronous fan-out through a queue like Kafka rather than synchronous timeline updates.",
+              "Split the paths deliberately: read path p99 under 200ms and heavily cached; write path acknowledges the post durably in under 500ms, then fans out asynchronously so the writer never waits on millions of follower timelines.",
+              "Common wrong turn: listing 'scalable, reliable, fast, consistent' with no numbers (forces no decisions), or claiming strong consistency and high availability together, which CAP forbids under partition.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-nonfunctional-requirements-practice",
+            prompt:
+              "Write 4-5 quantified non-functional requirements for a payment processing system like Stripe handling 5,000 transactions per second, and the lever each forces. Note where your consistency stance differs from a social feed and why.",
+            thinkAbout: [
+              "Which failure is catastrophic here: stale data, lost data, or a double charge? How does that invert the feed's priorities?",
+              "What makes retries dangerous in a payment API, and which mechanism makes them safe?",
+              "Why might you choose active-passive failover over active-active for money movement?",
+            ],
+            modelAnswerOutline: [
+              "Open by naming the inversion: payments flip a feed's priorities. Correctness beats availability, and a lost or double-charged transaction is a business-ending failure, not a cosmetic glitch. Assumptions: 5,000 TPS peak, global, strict regulatory and audit requirements.",
+              "**Strong consistency and exactly-once semantics on every charge.** The opposite of the feed's AP stance: per PACELC choose CP, rejecting a payment during a partition rather than risking a double charge. Forces a transactional store (PostgreSQL or Spanner) with idempotency keys on every charge request so retries never double-charge.",
+              "**Zero tolerance for losing a committed transaction.** Forces synchronous replication with quorum acknowledgement and a durable write-ahead log before returning success. Never acknowledge a charge that is not persisted on multiple replicas.",
+              "**p99 charge latency under 500ms.** Payments can be slower than a feed read because correctness dominates, but users still abandon slow checkouts. Forces an efficient synchronous write path and connection pooling, not caching (you cannot cache a money movement).",
+              "**Sustain 5,000 TPS with headroom to 15,000 for peaks (Black Friday).** Forces horizontal partitioning by merchant or account and careful hot-partition handling, since large merchants concentrate volume.",
+              "**99.99%+ availability with a full audit trail.** Forces multi-region active-passive failover (not active-active, to preserve a single source of truth for consistency) plus an append-only ledger of every state transition for compliance and reconciliation.",
+              "Name the contrast explicitly: a feed favors availability and eventual consistency because stale data is harmless, so it fans out asynchronously and caches aggressively. Payments favor consistency and durability because incorrect data is catastrophic, so they use synchronous transactional writes, idempotency, and an immutable ledger, accepting higher latency to get there.",
+              "Common wrong turn: importing feed habits (aggressive caching, eventual consistency, fire-and-forget writes) into a money path, or promising strong consistency and active-active availability at once without saying what a partition does to charges.",
             ],
           },
         },
