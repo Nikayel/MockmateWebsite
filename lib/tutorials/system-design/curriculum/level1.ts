@@ -543,6 +543,64 @@ unique constraint with a TTL, and return it on any retry so at-least-once delive
 effectively-once and nobody double-charges.
 `.trim()
 
+const paginationErrorsTeach = `
+## Two boring details where APIs fall over at scale
+
+Two boring-looking API details, pagination and error shape, are where APIs quietly fall over at
+scale. Both have a correct answer.
+
+### Pagination: offset is the trap
+
+The naive approach is offset/limit: \`?offset=100000&limit=20\`. Two problems. It is O(n) deep: to
+return page 5,000 the database must scan and discard the first 100,000 rows, so deep pages get
+linearly slower and hammer the DB. And it is unstable under inserts: if a new row is added at the top
+between fetching page 1 and page 2, every item shifts down by one, so the user sees a duplicate or
+skips a row. On a live feed this is constant.
+
+The fix is cursor (keyset) pagination. Instead of "skip N rows," you say "give me rows after this
+position." With an indexed ordering column:
+
+\`\`\`
+WHERE (created_at, id) < (:cursor_ts, :cursor_id)
+ORDER BY created_at DESC, id DESC
+LIMIT 20
+\`\`\`
+
+Because the DB seeks directly into the index rather than counting from the start, each page is O(1)
+regardless of depth, and because the cursor points at a stable row identity, inserts at the top do
+not shift the window. You return an opaque \`next_cursor\` (base64 of the last row's sort key) so the
+client cannot fabricate positions and you can change the encoding later. Always enforce a server-side
+max page size, and prefer a \`has_more\` boolean over an exact total count, because \`COUNT(*)\` on a
+large table is itself an expensive scan.
+
+### Errors: machine-readable and precisely coded
+
+Clients need machine-readable, consistent errors to retry correctly, and humans need enough detail to
+debug. The standard shape is RFC 9457 Problem Details (the successor to RFC 7807): a JSON body with
+\`type\` (a URI naming the error class), \`title\`, \`status\`, \`detail\`, and \`instance\`, plus a
+correlation id so a support ticket maps to a specific log line.
+
+Status codes must be used precisely, because they drive client retry logic:
+
+- \`400\` malformed request, \`422\` well-formed but semantically invalid (validation).
+- \`401\` not authenticated, \`403\` authenticated but not allowed, \`404\` not found.
+- \`409\` conflict (for example a version clash or duplicate), \`429\` rate limited.
+- \`5xx\` server error.
+
+The critical distinction is retryable versus not. \`5xx\` and \`429\` are retryable (with backoff,
+and honor \`Retry-After\` on \`429\`). \`4xx\` other than \`429\` are the client's fault and must not
+be blindly retried, because retrying a \`400\` just wastes calls and can amplify load.
+
+**Interview nuance:** two things separate strong answers. Saying "keyset pagination is O(1) and
+stable, offset is O(n) and shifts under inserts" (with the SQL), and saying "structured errors so
+clients can distinguish retryable 5xx/429 from non-retryable 4xx," plus the warning to never leak
+stack traces to clients.
+
+Recap: use opaque cursor/keyset pagination with a bounded page size for O(1) stable paging, and
+return RFC 9457 structured errors with precise status codes so clients retry 5xx/429 but not other
+4xx.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1067,6 +1125,58 @@ export const systemDesignLevel1: DesignLevel = {
               "**Offset commits:** each consumer commits its Kafka offset only after its idempotent write succeeds, so a crash before commit causes a safe reprocess (absorbed by dedup) rather than a lost event.",
               "**Why no distributed transaction:** a 2PC across a card processor, a database, and an email API is unavailable and slow. Independent per-consumer idempotency plus at-least-once delivery gives effectively-once end to end without coupling the three systems.",
               "Common wrong turn: trying to make the pipeline exactly-once with a global transaction, or deduping in only one consumer and letting the others double-act, so inventory drifts or customers get two emails.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-pagination-errors",
+          title: "Pagination & Error Modeling",
+          summary:
+            "Use opaque cursor/keyset pagination for O(1) stable paging, and RFC 9457 structured errors with precise status codes so clients retry 5xx/429 but never other 4xx.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["pagination", "errors", "api-design"],
+          teach: {
+            markdown: paginationErrorsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-pagination-errors-apply",
+            prompt:
+              "Design a feed/list endpoint that stays fast at page 10,000 and is stable while new items are inserted, and define the error response shape for validation, auth, conflict, rate-limit, and server errors.",
+            thinkAbout: [
+              "Why does offset pagination degrade and become unstable under inserts?",
+              "What does a cursor/keyset page look like, and why is it O(1)?",
+              "What structured error body and status codes let clients retry correctly?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a `GET /v1/feed` returning items newest-first, with new items inserted continuously.",
+              "**Reject offset:** `offset=200000` forces the DB to scan and discard 200k rows (O(n), slow at depth) and shifts every item when new rows are inserted at the top (duplicates and skips).",
+              "**Request:** `GET /v1/feed?limit=20&cursor=<opaque>`. Query: `WHERE (created_at, id) < (:cursor_ts, :cursor_id) ORDER BY created_at DESC, id DESC LIMIT :limit + 1`, with a composite index on `(created_at, id)`. Fetch limit + 1 to compute `has_more` without a count.",
+              "**Response:** `{ items, next_cursor, has_more }`. The cursor is base64 of the last row's `(created_at, id)` so clients cannot forge positions and the encoding can evolve. Enforce a server max limit (say 100) and prefer `has_more` over `COUNT(*)`, which is an expensive scan.",
+              "**Why O(1) and stable:** the index seek jumps straight to the cursor position instead of counting from row zero, and the cursor pins a real row identity, so inserts above it do not move the window.",
+              "**Error shape (RFC 9457 Problem Details):** JSON with `type` (URI naming the error class), `title`, `status`, `detail`, `instance`, plus a `correlation_id` so a support ticket maps to a log line. Example: type `.../errors/validation`, title 'Invalid request', status 422, detail 'limit must be <= 100'.",
+              "**Status codes:** 422 validation, 401 unauthenticated, 403 forbidden, 409 conflict, 429 rate limit (with Retry-After), 5xx server error. Clients retry 5xx and 429 with backoff and never blindly retry other 4xx. Never leak stack traces.",
+              "Common wrong turn: offset pagination on a large table (slow deep pages, unstable under inserts) and dumping raw exceptions or returning 200 with an error body, which breaks both retry logic and security.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-pagination-errors-practice",
+            prompt:
+              "Design pagination and error handling for the Twitter/X home timeline at 500M tweets per day, where users scroll infinitely, new tweets stream in constantly, and the timeline is ranked (not strictly chronological). Explain how the cursor survives ranking and inserts, and how you keep p99 fast at deep scroll.",
+            thinkAbout: [
+              "What does the cursor point into when the feed is ranked rather than time-ordered?",
+              "Where do new tweets go so they do not disrupt a user's downward scroll?",
+              "What store serves page 500 in O(1) instead of re-querying the tweet database?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: hundreds of millions of daily tweets, infinite scroll, a ranked (not purely time-ordered) timeline, and a fan-out-on-write timeline cache per user.",
+              "**Pagination: keyset cursor, never offset.** Offset at deep scroll on this volume would be catastrophically slow and would shift wildly as new tweets arrive. The timeline is materialized per user (fan-out-on-write) into a cache like Redis, so the 'list' is a precomputed, ordered set of tweet ids.",
+              "**Cursor design for a ranked feed:** the cursor is opaque and encodes the position in the materialized ranked list, not a raw `created_at`. Because ranking can reorder items, the cursor pins a stable snapshot boundary: where the last page ended in the already-materialized list, so continued scrolling reads forward from that point rather than re-ranking from scratch.",
+              "**Inserts:** new tweets go to the head of the materialized list; since the cursor points into the middle/tail, they do not disrupt the downward scroll. They appear on pull-to-refresh at the top instead. This is the standard 'stable pagination over a snapshot, refresh brings new items at the top' model.",
+              "**p99 at depth:** serve pages from the per-user materialized Redis list (O(1) range reads by index/score), not by querying the tweet store with a deep scan. Deep scroll is just reading further into an in-memory ordered set. Cap page size and total scroll depth (older items fall out of the hot cache and are served from a colder store or cut off).",
+              "**Errors:** RFC 9457 Problem Details with a correlation id, precise codes (429 with Retry-After for aggressive scrolling is common), and clients retry only 5xx/429. At this scale rate limiting is first-class, so client-side 429 handling is essential.",
+              "Common wrong turn: offset pagination or re-ranking the entire timeline on every page (unstable and slow), or querying the source-of-truth tweet DB per page instead of a precomputed per-user timeline cache, which blows p99 at deep scroll.",
             ],
           },
         },
