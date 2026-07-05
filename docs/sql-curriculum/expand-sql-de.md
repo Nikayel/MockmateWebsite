@@ -115,6 +115,8 @@ Grading modes: `single-file` = learner writes one SELECT, graded by multiset com
 
 Goal: rehearse the analytics-in-SQL problems that filter most DE candidates on the live screen.
 
+**Interview level: all five are Intern-core.** The live screen an intern actually sits; grind these first and until they are automatic.
+
 | id | title | skills (stack tag first) | companies | pattern | grading | est | Read / Apply / Practice |
 |---|---|---|---|---|---|---|---|
 | `sql-l5-gaps-and-islands` | Gaps and Islands: Consecutive Streaks and Run Detection | product-analytics; ROW_NUMBER, gaps-and-islands, streak detection, date arithmetic, GROUP BY on derived key | Meta, Amazon, Google, Databricks, Stripe | runnable-equivalent | single-file | 42m | R: the flag-then-running-sum island template. A: longest login streak per user. P: price-unchanged date ranges. |
@@ -129,6 +131,8 @@ Module total: **174m**
 
 Goal: rehearse the modeling-round asks on a Snowflake/BigQuery/Databricks-shaped stack.
 
+**Interview level: mixed.** JSON extraction and join fan-out are Intern-stretch; the accumulating-snapshot fact and the as-of SCD2 join are Junior-to-Senior modeling asks an intern almost never gets.
+
 | id | title | skills (stack tag first) | companies | pattern | grading | est | Read / Apply / Practice |
 |---|---|---|---|---|---|---|---|
 | `sql-l5-json-variant-flatten` | Semi-Structured Data: JSON/VARIANT Extraction and Array Flattening | snowflake-warehouse; json_extract, ->> operator, json_each, array fan-out, double-count trap | Snowflake, Databricks, BigQuery, Stripe, Datadog, Amazon | runnable-equivalent | single-file | 36m | R: scalar projection + json_each array fan-out + the double-count trap. A: shred country and amount from payload. P: total quantity per sku, exploding in isolation. |
@@ -142,6 +146,8 @@ Module total: **124m**
 
 Goal: rehearse the operational reasoning the pipeline round scores.
 
+**Interview level: Junior-to-Senior.** Pipeline-engineering work (CDC apply, watermark incremental and backfill, write-audit-publish gates) that interns are seldom asked to implement; new-grad and full-time DE candidates are. Kept as the trojan horse's return-offer upside.
+
 | id | title | skills (stack tag first) | companies | pattern | grading | est | Read / Apply / Practice |
 |---|---|---|---|---|---|---|---|
 | `sql-l5-cdc-changelog-apply` | CDC Changelog Apply: MERGE-Shaped Upsert with Deletes and Version Ordering | streaming; CDC change stream, ROW_NUMBER latest-per-key, ON CONFLICT upsert, tombstone delete, last-write-wins, idempotency | Amazon, Databricks, Instacart, Uber, Confluent, Netflix | runnable-equivalent | workspace | 38m | R: dedup to latest version, upsert I/U, delete D; the duplicate-source trap. A: apply a changelog to match last-write-wins end state. P: hidden assertions on end state, deletes, one-row-per-key, idempotency. |
@@ -153,6 +159,8 @@ Module total: **108m**
 ### Module 5.4 — Round 4: The DE System Design Round
 
 Goal: convert the verbal system-design round into runnable reasoning and one end-to-end build.
+
+**Interview level: Junior-to-Senior.** Interns are rarely given a full system-design round; this module exists to build the vocabulary early and to carry the medallion capstone that ties the level together.
 
 | id | title | skills (stack tag first) | companies | pattern | grading | est | Read / Apply / Practice |
 |---|---|---|---|---|---|---|---|
