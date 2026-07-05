@@ -182,6 +182,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-gaps-and-islands` — Gaps and Islands: Consecutive Streaks and Run Detection
 
 - **difficulty:** hard
+- **interview level:** Intern-core (the single most-failed live-screen pattern; the highest-ROI row in the level)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 42m (teach ~14m)
 - **skills:** `product-analytics` (stack), window functions, ROW_NUMBER, gaps-and-islands, streak detection, date arithmetic, GROUP BY on derived key
 
@@ -200,6 +201,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-sessionization` — Sessionization: Grouping Events with an Inactivity Timeout
 
 - **difficulty:** hard
+- **interview level:** Intern-core (standard analytics-SQL screen question)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 36m (teach ~11m)
 - **skills:** `streaming` (stack), LAG, cumulative-sum flag, event-time windowing, sessionization, session_id assignment
 
@@ -218,6 +220,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-cohort-retention` — Cohort Retention and the Denominator Trap
 
 - **difficulty:** hard
+- **interview level:** Intern-core (product-analytics screen staple; the denominator trap is the filter)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 38m (teach ~13m)
 - **skills:** `product-analytics` (stack), cohort analysis, Day-N retention, LEFT JOIN denominator, COUNT(DISTINCT), date arithmetic
 
@@ -236,6 +239,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-funnel-conversion` — Funnel and Conversion Analysis
 
 - **difficulty:** medium
+- **interview level:** Intern-core (conditional-aggregation screen staple)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 28m (teach ~9m)
 - **skills:** `product-analytics` (stack), conditional aggregation, MAX(CASE), funnel step flags, step ordering, conversion rate
 
@@ -254,6 +258,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-window-frames-and-qualify` — Advanced Window Frames and the QUALIFY Rewrite
 
 - **difficulty:** hard
+- **interview level:** Intern-core (upper-intern depth; ROWS vs RANGE and the LAST_VALUE trap are fair game on the screen)
 - **pattern:** runnable-equivalent · **grading:** single-file · **est:** 30m (teach ~11m)
 - **skills:** `product-analytics` (stack), ROWS vs RANGE, LAST_VALUE frame trap, NTILE, named WINDOW, subquery filter, top-N-per-group
 
