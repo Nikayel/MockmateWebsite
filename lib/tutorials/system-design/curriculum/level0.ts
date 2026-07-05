@@ -244,6 +244,67 @@ per requirement with concrete request/response shapes, choose REST vs gRPC vs st
 and place idempotency, pagination, and auth at the boundary.
 `.trim()
 
+const fermiEstimationTeach = `
+## Get to a defensible number in under five minutes
+
+Fermi estimation is the skill of getting a number that is right to within one order of magnitude,
+fast, by decomposing a big unknown into small quantities you are willing to assume. The physicist
+Enrico Fermi famously estimated the yield of a nuclear test by dropping bits of paper and watching how
+far the blast pushed them. In a system design interview the same move applies: you never actually know
+the QPS, so you build it out of assumptions you state out loud.
+
+The process matters more than the precision. Four rules:
+
+1. Decompose the unknown into things you can assume (users, actions per user, object sizes).
+2. Write down every assumption explicitly so the interviewer can challenge one number, not the whole
+   result.
+3. Label units on every line (requests/day, bytes/object, seconds). Most estimation mistakes are unit
+   mistakes.
+4. Round aggressively to powers of ten. 86,400 seconds/day becomes 10^5. You are choosing a sharding
+   strategy, not filing taxes.
+
+### Worked example
+
+Suppose 50M daily active users, each doing 10 reads and 1 write per day.
+
+\`\`\`
+reads/day  = 50M x 10 = 500M   = 5 x 10^8
+writes/day = 50M x 1  =  50M   = 5 x 10^7
+seconds/day ~= 86,400          ~= 10^5
+
+avg read QPS  = 5 x 10^8 / 10^5 = 5,000
+avg write QPS = 5 x 10^7 / 10^5 =   500
+\`\`\`
+
+Average is not what your capacity must survive. Real traffic is peaky: a diurnal curve plus launch
+spikes. A 2x to 3x peak multiplier over the daily average is the standard defensible assumption. So
+plan for roughly 15k peak read QPS and 1.5k peak write QPS.
+
+**Interview nuance:** interviewers do not care whether you land on 5,000 or 6,200 QPS. They care that
+you can defend the shape of the calculation and that you convert average to peak. Saying "I will assume
+a 3x peak multiplier because of the daily traffic curve" scores; a single unexplained number does not.
+
+### Only compute what changes a decision
+
+The last rule is the one that separates a senior answer: only compute a number if it changes a
+decision. Peak write QPS of 1.5k tells you a single well-tuned Postgres primary can likely absorb
+writes, so you may not need to shard yet. A read QPS of 15k tells you that you want a cache tier and
+read replicas. A daily storage number tells you whether you need object storage plus a sharded metadata
+DB. If a calculation cannot move the architecture, skip it.
+
+\`\`\`
+assumptions  ->  arithmetic  ->  a number  ->  a design decision
+   (state)        (round)        (label)         (justify)
+\`\`\`
+
+**Interview nuance:** the classic failure here is analysis paralysis, spending eight minutes deriving
+storage to three significant figures while the design goes untouched. Estimate only enough to unblock
+the next decision, then move.
+
+Recap: decompose into stated assumptions, label units, round to powers of ten, convert average to peak
+with a 2 to 3x multiplier, and compute only the numbers that change the architecture.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -457,6 +518,64 @@ export const systemDesignLevel0: DesignLevel = {
               "**Behind the scenes:** drivers publish location updates into a geospatial index (Redis with geohashing); a location service pushes the matched driver's position down the rider's WebSocket. Internal services talk gRPC for the low-latency matching and location calls.",
               "The split, stated as a rule: REST for one-shot transactional actions (create, status, cancel) where request/response fits and idempotency protects money movement; a streaming protocol for continuous server push where polling would not scale.",
               "Common wrong turn: serving live location over repeated REST polls (wastes QPS, choppy map), or opening a WebSocket for the one-shot ride request where plain REST is simpler and cacheable at the edge.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l0-m2",
+      title: "Back-of-the-Envelope Estimation",
+      description:
+        "Turn a vague prompt into defensible numbers for QPS, storage, bandwidth, and cache size in under five minutes, and use each number to justify a concrete architecture decision.",
+      lessons: [
+        {
+          id: "sd-l0-fermi-estimation",
+          title: "The Fermi Estimation Method",
+          summary:
+            "Decompose an unknown into stated assumptions, round to powers of ten, convert average to peak, and compute only numbers that change a decision.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["estimation", "capacity"],
+          teach: {
+            markdown: fermiEstimationTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l0-fermi-estimation-apply",
+            prompt:
+              "Estimate peak QPS, daily storage, and cache size for a service with 50M DAU averaging 10 reads and 1 write per day, showing every assumption and unit.",
+            thinkAbout: [
+              "What assumptions must you state so the numbers are defensible?",
+              "How do you get from average to peak, and what spike multiplier is reasonable?",
+              "Which computed number actually changes a design decision?",
+            ],
+            modelAnswerOutline: [
+              "State assumptions up front: 50M DAU, 10 reads and 1 write per user per day, average object size 1 KB (a row of structured data plus metadata), 90-day retention for the hot dataset, and a 3x peak-to-average multiplier for the diurnal curve.",
+              "**QPS.** Reads/day = 50M x 10 = 5 x 10^8; writes/day = 5 x 10^7. Dividing by ~10^5 seconds/day gives avg 5,000 read QPS and 500 write QPS; a 3x peak multiplier gives ~15k peak read QPS and ~1,500 peak write QPS.",
+              "**QPS design implication:** 15k read QPS wants a cache tier plus a few read replicas; 1,500 write QPS is comfortably inside a single tuned primary, so no write sharding on day one.",
+              "**Storage.** New objects/day = writes/day = 5 x 10^7. At 1 KB each that is 50 GB/day; over 90 days about 4.5 TB, and with replication factor 3 for durability roughly 13 to 14 TB provisioned. Implication: beyond a single node's comfortable working set, so a sharded or managed store (DynamoDB, Cassandra) is justified, with blobs kept out of the primary DB.",
+              "**Cache.** Size from the hot working set, not the full corpus: assume the hot ~20% of recent objects serves ~80% of reads. The truly hot set (last few days of writes plus popular older items) is tens of GB, so a 50 to 100 GB Redis cluster captures the bulk of read traffic, cheap relative to the read-replica load it removes.",
+              "The number that most changes the design is peak read vs peak write QPS: read-heavy by 10:1 pushes toward caching and replication rather than write sharding.",
+              "Common wrong turn: computing storage to three significant figures while never stating the peak multiplier, then optimizing a write path that was never the bottleneck.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-fermi-estimation-practice",
+            prompt:
+              "Estimate peak ingest QPS and daily storage for Instagram-scale photo uploads: assume 500M DAU, each uploading 2 photos per day and viewing 50, average photo 2 MB after server-side compression. State assumptions and call out which number forces a specific storage choice.",
+            thinkAbout: [
+              "What does the read:write skew tell you about where the serving load actually lands?",
+              "Which storage number rules out a relational database for the blobs, and what does it force instead?",
+              "Where do thumbnails and metadata live, and how much smaller is metadata than the blobs?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 500M DAU, 2 uploads/day and 50 views/day per user, 2 MB per stored photo (post-compression, before thumbnails), 3x peak multiplier, replication factor 3.",
+              "**QPS.** Uploads/day = 500M x 2 = 10^9; views/day = 2.5 x 10^10. Dividing by ~10^5 s/day: avg upload QPS ~10,000 and avg view QPS ~250,000; with a 3x peak, ~30k peak upload QPS and ~750k peak view QPS. The 75:1 read:write skew screams CDN plus object store, not database-served images.",
+              "**Storage.** New photos/day = 10^9 at 2 MB each = 2 PB/day of raw blobs; with RF=3 about 6 PB/day provisioned, plus 10 to 20% for thumbnails. Over a year the blob footprint is on the order of an exabyte.",
+              "That single number forces the storage choice: photos must live in an object store (S3-class) fronted by a CDN, with only compact metadata (photo id, owner, S3 key, timestamps, ~1 KB/photo, so ~1 TB/day) in a sharded database. You cannot put multi-petabyte-per-day blobs in Postgres.",
+              "**Serving implications:** 750k peak view QPS is served almost entirely from the CDN edge, so origin QPS is a small fraction. 30k peak upload QPS goes through an ingest tier that writes blobs to the object store and enqueues thumbnail generation (Kafka or SQS plus workers). Metadata writes at 30k QPS need sharding by photo id or user id.",
+              "Common wrong turn: sizing a database to hold the images themselves, or forgetting that egress at this view volume is a CDN and bandwidth-cost problem, not a database problem.",
             ],
           },
         },
