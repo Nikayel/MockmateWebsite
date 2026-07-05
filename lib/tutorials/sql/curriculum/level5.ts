@@ -13,6 +13,7 @@
  * feature that stands in for them, so every lesson is a real graded exercise.
  */
 import type { SqlLevel } from "@/lib/tutorials/types"
+import { scriptExercise } from "./script-exercise"
 
 type SqlLesson = SqlLevel["modules"][number]["lessons"][number]
 
@@ -993,6 +994,190 @@ INSERT INTO raw_events (id, payload) VALUES
   },
 }
 
+const factGrainsAccumulatingSnapshot: SqlLesson = {
+  id: "sql-l5-fact-grains-accumulating-snapshot",
+  title: "Fact Grains: The Accumulating Snapshot and UPDATE-in-Place",
+  summary:
+    "The three fact grains, and the one that mutates: build an accumulating-snapshot fact with NULLable milestone dates, computed lags, and an idempotent rebuild.",
+  estimatedMinutes: 32,
+  difficulty: "hard",
+  skills: [
+    "snowflake-warehouse",
+    "fact-table grains",
+    "accumulating snapshot",
+    "UPDATE-in-place",
+    "milestone lag durations",
+    "idempotent rebuild",
+  ],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Three fact grains, and the one that updates in place
+
+A fact table's grain is the answer to "what does one row mean". Three grains cover most of dimensional modeling, and interviewers ask you to tell them apart:
+
+| Grain | One row per | Changes after insert? |
+|---|---|---|
+| Transaction | event (an order, a click, a payment) | No, append only |
+| Periodic snapshot | entity per period (account per day) | No, one new row each period |
+| Accumulating snapshot | process instance (an order's lifecycle) | Yes, updated in place as it advances |
+
+The **accumulating snapshot** is the one that updates. It models a process with a known set of milestones (order, picked, shipped, delivered) as one row per instance, with a NULLable date column per milestone and computed lag columns between them. As each milestone lands you fill in its date and recompute the lags. It is the most-asked advanced-fact modeling question because it is the only grain where a row is mutable.
+
+## Building it
+
+Two ways, and both come up in an interview:
+
+- **UPDATE in place.** Open a row when the order is placed (later milestone dates NULL), then \`UPDATE\` it as each milestone arrives.
+- **Rebuild from source.** Pivot the milestone event log into one row per order with \`MIN(CASE WHEN milestone = 'shipped' THEN event_ts END)\` per milestone, and \`DELETE\` then \`INSERT\` the whole table each run.
+
+The rebuild is naturally idempotent (run it twice, same table), which is why column-store warehouses prefer it. The lag columns are date differences: \`days_order_to_ship = julianday(shipped_ts) - julianday(order_ts)\`, left \`NULL\` while the later milestone has not happened.
+
+**Interview nuance:** a not-yet-reached milestone is \`NULL\`, and its lag is \`NULL\`, never zero. An order that shipped but has not been delivered has a real \`days_order_to_ship\` and a \`NULL\` \`days_ship_to_deliver\`. Coalescing those NULLs to 0 would silently claim instant delivery.
+
+> **In the warehouse this differs.** The \`UPDATE\` becomes a \`MERGE\` in Snowflake and BigQuery, and column-store warehouses often rebuild the whole table from source each run rather than mutate rows, because a row-level \`UPDATE\` is expensive on columnar storage. The grain and milestone-lag reasoning is identical.`,
+    demoSeedSql: `CREATE TABLE raw_order_events (order_id INTEGER, milestone TEXT, event_ts TEXT);
+INSERT INTO raw_order_events VALUES
+  (1, 'order', '2026-03-01'), (1, 'picked', '2026-03-02'), (1, 'shipped', '2026-03-03'), (1, 'delivered', '2026-03-06'),
+  (2, 'order', '2026-03-02'), (2, 'shipped', '2026-03-05');   -- order 2 not delivered yet`,
+    demoCode: `-- Pivot the event log into the accumulating-snapshot row. Order 2's delivered_ts and lag stay NULL.
+SELECT order_id,
+  MIN(CASE WHEN milestone = 'order'     THEN event_ts END) AS order_ts,
+  MIN(CASE WHEN milestone = 'shipped'   THEN event_ts END) AS shipped_ts,
+  MIN(CASE WHEN milestone = 'delivered' THEN event_ts END) AS delivered_ts,
+  CAST(julianday(MIN(CASE WHEN milestone = 'delivered' THEN event_ts END))
+     - julianday(MIN(CASE WHEN milestone = 'shipped'   THEN event_ts END)) AS INTEGER) AS days_ship_to_deliver
+FROM raw_order_events
+GROUP BY order_id;`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l5-fact-grains-accumulating-snapshot-apply",
+    prompt: `Write a script that rebuilds \`fct_order_pipeline\` as an accumulating-snapshot fact, one row per order, from the \`raw_order_events(order_id, milestone, event_ts)\` log.
+
+Pivot each order's milestones into the NULLable columns \`order_ts\`, \`picked_ts\`, \`shipped_ts\`, \`delivered_ts\`, and compute the lag columns \`days_order_to_ship\` and \`days_ship_to_deliver\` as whole-day differences (left NULL while the later milestone has not happened). Lead with \`DELETE FROM fct_order_pipeline;\` so re-running the script rebuilds instead of duplicating.`,
+    starterCode: `-- Rebuild the accumulating-snapshot fact: one row per order, milestone columns + lag columns.
+DELETE FROM fct_order_pipeline;
+
+INSERT INTO fct_order_pipeline
+  (order_id, order_ts, picked_ts, shipped_ts, delivered_ts, days_order_to_ship, days_ship_to_deliver)
+SELECT
+  order_id,
+  -- MIN(CASE WHEN milestone = '...' THEN event_ts END) for each of the four milestones,
+  -- then the two lag columns as CAST(julianday(later) - julianday(earlier) AS INTEGER)
+FROM raw_order_events
+GROUP BY order_id;`,
+    hints: [
+      "Pivot with `MIN(CASE WHEN milestone = 'shipped' THEN event_ts END)`; a milestone that has not happened yields NULL automatically.",
+      "Lag columns are `CAST(julianday(shipped_ts) - julianday(order_ts) AS INTEGER)`, and stay NULL when either milestone is NULL.",
+      "The leading `DELETE FROM fct_order_pipeline;` is what makes the rebuild idempotent (run twice, same rows).",
+    ],
+    referenceSolution: `DELETE FROM fct_order_pipeline;
+
+INSERT INTO fct_order_pipeline
+  (order_id, order_ts, picked_ts, shipped_ts, delivered_ts, days_order_to_ship, days_ship_to_deliver)
+SELECT
+  order_id,
+  MIN(CASE WHEN milestone = 'order'     THEN event_ts END),
+  MIN(CASE WHEN milestone = 'picked'    THEN event_ts END),
+  MIN(CASE WHEN milestone = 'shipped'   THEN event_ts END),
+  MIN(CASE WHEN milestone = 'delivered' THEN event_ts END),
+  CAST(julianday(MIN(CASE WHEN milestone = 'shipped'   THEN event_ts END))
+     - julianday(MIN(CASE WHEN milestone = 'order'     THEN event_ts END)) AS INTEGER),
+  CAST(julianday(MIN(CASE WHEN milestone = 'delivered' THEN event_ts END))
+     - julianday(MIN(CASE WHEN milestone = 'shipped'   THEN event_ts END)) AS INTEGER)
+FROM raw_order_events
+GROUP BY order_id;`,
+    seedSql: `CREATE TABLE raw_order_events (
+  order_id  INTEGER,
+  milestone TEXT,
+  event_ts  TEXT
+);
+INSERT INTO raw_order_events (order_id, milestone, event_ts) VALUES
+  (1, 'order', '2026-03-01'), (1, 'picked', '2026-03-02'), (1, 'shipped', '2026-03-03'), (1, 'delivered', '2026-03-06'),
+  (2, 'order', '2026-03-02'), (2, 'picked', '2026-03-03'), (2, 'shipped', '2026-03-05'),
+  (3, 'order', '2026-03-04');
+
+CREATE TABLE fct_order_pipeline (
+  order_id             INTEGER PRIMARY KEY,
+  order_ts             TEXT,
+  picked_ts            TEXT,
+  shipped_ts           TEXT,
+  delivered_ts         TEXT,
+  days_order_to_ship   INTEGER,
+  days_ship_to_deliver INTEGER
+);`,
+    assertions: [
+      {
+        suite: "grain",
+        name: "grain_one_row_per_order",
+        sql: `SELECT order_id FROM fct_order_pipeline GROUP BY order_id HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "completeness",
+        name: "every_order_present",
+        sql: `SELECT DISTINCT order_id FROM raw_order_events WHERE order_id NOT IN (SELECT order_id FROM fct_order_pipeline)`,
+      },
+      {
+        suite: "lag",
+        name: "no_negative_delivered_lag",
+        sql: `SELECT order_id FROM fct_order_pipeline WHERE days_ship_to_deliver < 0`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["fct_order_pipeline"],
+  }),
+  practice: scriptExercise({
+    id: "sql-l5-fact-grains-accumulating-snapshot-practice",
+    prompt: `Write a script that backfills a late-arriving \`delivered_ts\` into an already-built \`fct_order_pipeline\` and recomputes the delivery lag, without changing the grain.
+
+The \`late_deliveries(order_id, delivered_ts)\` table holds deliveries that landed after the fact was built. For each, set \`delivered_ts\` on the matching pipeline row and recompute \`days_ship_to_deliver\` from the new \`delivered_ts\` and the existing \`shipped_ts\`. Touch only those orders, and keep exactly one row per order.`,
+    starterCode: `-- Backfill the late delivered_ts and recompute the delivery lag; grain stays one row per order.
+UPDATE fct_order_pipeline
+SET
+  -- delivered_ts from late_deliveries, and days_ship_to_deliver recomputed from it and shipped_ts
+WHERE order_id IN (SELECT order_id FROM late_deliveries);`,
+    hints: [
+      "Pull the value with a correlated subquery: `delivered_ts = (SELECT l.delivered_ts FROM late_deliveries l WHERE l.order_id = fct_order_pipeline.order_id)`.",
+      "Recompute the lag in the same `SET`: `CAST(julianday(new delivered_ts) - julianday(shipped_ts) AS INTEGER)`.",
+      "Scope the update with `WHERE order_id IN (SELECT order_id FROM late_deliveries)` so untouched orders and the grain stay intact.",
+    ],
+    seedSql: `CREATE TABLE fct_order_pipeline (
+  order_id             INTEGER PRIMARY KEY,
+  order_ts             TEXT,
+  picked_ts            TEXT,
+  shipped_ts           TEXT,
+  delivered_ts         TEXT,
+  days_order_to_ship   INTEGER,
+  days_ship_to_deliver INTEGER
+);
+INSERT INTO fct_order_pipeline VALUES
+  (1, '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-06', 2, 3),
+  (2, '2026-03-02', '2026-03-03', '2026-03-05', NULL, 3, NULL);
+
+CREATE TABLE late_deliveries (order_id INTEGER, delivered_ts TEXT);
+INSERT INTO late_deliveries VALUES (2, '2026-03-08');`,
+    assertions: [
+      {
+        suite: "grain",
+        name: "grain_one_row_per_order",
+        sql: `SELECT order_id FROM fct_order_pipeline GROUP BY order_id HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "backfill",
+        name: "late_delivery_backfilled",
+        sql: `SELECT l.order_id FROM late_deliveries l JOIN fct_order_pipeline f ON f.order_id = l.order_id WHERE f.delivered_ts IS NULL`,
+      },
+      {
+        suite: "lag",
+        name: "no_negative_delivered_lag",
+        sql: `SELECT order_id FROM fct_order_pipeline WHERE days_ship_to_deliver < 0`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["fct_order_pipeline"],
+  }),
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -1020,7 +1205,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.2: The Warehouse and Modeling Round",
       description:
         "Modeling-round asks on a Snowflake, BigQuery, or Databricks-shaped stack: semi-structured JSON extraction, advanced fact grains, as-of joins, and join fan-out.",
-      lessons: [jsonVariantFlatten],
+      lessons: [jsonVariantFlatten, factGrainsAccumulatingSnapshot],
     },
   ],
 }
