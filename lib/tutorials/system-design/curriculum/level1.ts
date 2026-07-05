@@ -493,6 +493,56 @@ versioning for true public breaks, and retire old versions with a deprecate then
 sequence.
 `.trim()
 
+const idempotencyRetriesTeach = `
+## The two-generals problem in every network call
+
+The problem idempotency solves is the two generals nature of a network call. A client sends "submit
+payment," the server processes it, and then the response is lost to a timeout or a dropped
+connection. The client does not know whether the charge happened. If it retries naively, you
+double-charge. If it gives up, you might drop a real payment. Idempotency lets the client retry
+safely and get the *same* result every time.
+
+Start with what HTTP already gives you. \`GET\`, \`PUT\`, and \`DELETE\` are idempotent by
+definition: sending them twice leaves the server in the same state as sending them once (\`PUT\` sets
+a value; setting it twice is the same value; \`DELETE\` twice still ends deleted). \`POST\` and
+\`PATCH\` are not idempotent, because "create" or "add $50" applied twice does two things. Those are
+exactly the methods that need explicit help.
+
+### The idempotency key
+
+The client generates a unique key (a UUID) for the logical operation and sends it, typically as an
+\`Idempotency-Key\` header. The server, on first receipt, processes the request and stores the *full
+response* keyed by that key with a TTL (24 hours is a common window). On any retry with the same key,
+the server does not reprocess; it returns the stored response.
+
+The subtle, commonly-missed detail: store the response, not just a boolean "seen it" flag. Two things
+force this. First, the retry must get the actual result (the charge id, the status), not just "yes."
+Second, concurrency: the original request and the retry can arrive at the same instant. You need a
+way for the second one to either wait for the first to finish or detect an in-flight operation, so
+they converge on one answer instead of both charging. In practice you insert the key into a store
+with a unique constraint (a Redis \`SETNX\` or a unique DB row) before doing work; the loser of that
+race waits and returns the winner's stored response.
+
+### From at-least-once to effectively-once
+
+Networks and queues give you at-least-once delivery: a message can arrive more than once. Idempotency
+(deduplication on a key) is what turns at-least-once into effectively-once processing. You cannot get
+true exactly-once over an unreliable network; you get at-least-once plus idempotent handling, which
+is behaviorally equivalent and is what payment systems actually do.
+
+The same pattern extends beyond synchronous APIs. Webhooks should carry an event id so the receiver
+can dedupe redelivered events, and message-queue consumers should dedupe on a key so a redelivered
+Kafka or SQS message is processed once.
+
+**Interview nuance:** interviewers push on the concurrency case. "Store a flag" is the answer that
+fails; "store the response behind a unique-constraint insert so concurrent duplicates converge" is
+the one that passes.
+
+Recap: give mutating requests a client-generated idempotency key, store the full response behind a
+unique constraint with a TTL, and return it on any retry so at-least-once delivery becomes
+effectively-once and nobody double-charges.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -964,6 +1014,59 @@ export const systemDesignLevel1: DesignLevel = {
               "**Upgrading:** a caller opts in by changing their pinned version in the dashboard or sending the header, after reading the changelog for that date. No forced /v2 migration and no sunset, because old versions cost only a thin transformer, not a parallel service.",
               "**Why not /v1, /v2:** coarse URL versions force periodic painful migrations and tempt you to sunset old versions. Fine-grained dated versions plus transformers let evolution be continuous and backward compatibility be effectively permanent.",
               "Common wrong turn: forking the whole service per version (unmaintainable at decade scale) or relying on tolerant readers alone, which handles additive change but not the genuine behavioral breaks a payments API accumulates over ten years. The transformer chain is what makes 'never break, always evolve' simultaneously true.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-idempotency-retries",
+          title: "Idempotency & Safe Retries",
+          summary:
+            "Give mutations a client-generated idempotency key, store the full response behind a unique-constraint insert, and turn at-least-once delivery into effectively-once.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["idempotency", "retries", "payments"],
+          teach: {
+            markdown: idempotencyRetriesTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-idempotency-retries-apply",
+            prompt:
+              "Make a 'submit payment' POST safe to retry after a client timeout, and specify the server behavior on the duplicate.",
+            thinkAbout: [
+              "Which HTTP methods are idempotent by definition, and which need explicit handling?",
+              "What does the server store so concurrent duplicates get the same answer?",
+              "How does at-least-once become effectively-once?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a `POST /v1/payments` that charges a card, called by clients over flaky networks that will retry on timeout. POST is not idempotent, so a naive retry after a lost response double-charges; 'charge a card' is inherently a create.",
+              "**Design:** the client generates a UUID per logical payment and sends it as `Idempotency-Key: <uuid>`, reusing the *same* key on every retry of that payment.",
+              "**Server behavior, step 1:** on receipt, atomically insert the key into a store with a unique constraint (a unique DB row, or Redis `SET key NX` with a 24h TTL). This is the concurrency gate.",
+              "**Step 2:** if the insert wins (first time), process the charge, persist the full response (status, `payment_id`, amount) against the key, and return it.",
+              "**Step 3:** if the insert loses (duplicate, whether a retry or a concurrent twin), do not charge again. Wait for the in-flight original to finish if needed, then return the *stored response*, so both callers get the identical `payment_id` and status. Storing the full response, not a boolean, is what makes this correct: the retry needs the real result, and two simultaneous requests must converge on one charge.",
+              "**Edge cases:** if the same key arrives with a *different* request body, return 422 (key reuse for a different operation). Give the stored record a TTL so keys do not accumulate forever.",
+              "**Delivery semantics:** the network is at-least-once. The idempotency key deduplicates, turning at-least-once into effectively-once processing, the practical stand-in for exactly-once, which is unachievable over an unreliable link. Extend the same keys to webhooks (event id dedupe) and queue consumers.",
+              "Common wrong turn: retrying without an idempotency key (double charge), or storing only a 'seen' flag so concurrent duplicates either both charge or the retry gets no usable result.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-idempotency-retries-practice",
+            prompt:
+              "Design idempotency for an event-driven order pipeline where a checkout publishes an order.placed event to Kafka, and three consumers (charge the card, decrement inventory, send confirmation) each process it. Kafka guarantees at-least-once delivery, so every consumer will occasionally see the same event twice. Make the whole pipeline effectively-once without a distributed transaction.",
+            thinkAbout: [
+              "Why must idempotency live in each consumer rather than in one global transaction?",
+              "How does the transactional-inbox pattern make 'already handled?' and 'the effect' atomic?",
+              "When is it safe to commit the Kafka offset?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: Kafka at-least-once delivery, consumers can crash and reprocess after rebalance, no two-phase commit across the card processor, inventory DB, and email provider.",
+              "**Core idea:** idempotency is per consumer, keyed on the event id (or a deterministic derivative), because effectively-once must hold independently for each side effect. There is no global transaction; each consumer makes its own action idempotent.",
+              "**Charge consumer:** use the `order_id` (or event id) as the `Idempotency-Key` to the payment API. Redelivery of order.placed reuses the same key, so the card is charged once even if the event is processed twice. This reuses the exact synchronous idempotency mechanism.",
+              "**Inventory consumer:** record processed event ids. Insert `(event_id, order_id)` into a `processed_events` table with a unique constraint inside the *same* DB transaction that decrements stock. On redelivery the insert violates the constraint, the transaction aborts, and inventory is not double-decremented. This is the transactional-inbox pattern: 'did I already handle this' and 'the effect' are atomic.",
+              "**Email consumer:** dedupe on event id before sending, and lean on the provider's own idempotency (SendGrid/SES message keys) so a redelivery does not send a second confirmation.",
+              "**Offset commits:** each consumer commits its Kafka offset only after its idempotent write succeeds, so a crash before commit causes a safe reprocess (absorbed by dedup) rather than a lost event.",
+              "**Why no distributed transaction:** a 2PC across a card processor, a database, and an email API is unavailable and slow. Independent per-consumer idempotency plus at-least-once delivery gives effectively-once end to end without coupling the three systems.",
+              "Common wrong turn: trying to make the pipeline exactly-once with a global transaction, or deduping in only one consumer and letting the others double-act, so inventory drifts or customers get two emails.",
             ],
           },
         },
