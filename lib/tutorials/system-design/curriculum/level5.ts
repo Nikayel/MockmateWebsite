@@ -536,6 +536,67 @@ with commit-on-majority, and four safety properties that make committed entries 
 partitions stall safely, membership changes use joint consensus, and clusters should be odd-sized.
 `.trim()
 
+const quorumsTunableTeach = `
+## Raft gives one fixed answer; Dynamo hands you a dial
+
+Dynamo-style systems (DynamoDB's underpinnings, Cassandra, Riak, ScyllaDB) let you choose three
+numbers per operation, trading durability, consistency, and latency against each other.
+
+The three knobs:
+
+- **N**: the replication factor, how many nodes store each key (say 3).
+- **W**: how many replicas must acknowledge a **write** before the client is told it succeeded.
+- **R**: how many replicas must respond to a **read** before the client gets an answer.
+
+The one rule to memorize is **R + W > N**. When that holds, the set of nodes a read touches and the
+set a write touched must **overlap in at least one node** (pigeonhole: two subsets of N whose sizes
+sum to more than N cannot be disjoint). That overlapping node has seen the latest write, so a read is
+guaranteed to observe at least one copy of the freshest value.
+
+\`\`\`
+  N=3 nodes: [1][2][3]
+  W=2 write acked by {1,2}
+  R=2 read from {2,3}   -> overlap = node 2 -> sees latest
+  since 2+2 > 3, no read/write pair can miss each other
+\`\`\`
+
+### What R+W>N does NOT give you
+
+This is the number-one trap. Quorum overlap guarantees a read sees the latest *acknowledged* write,
+but it does **not** give you **linearizability**. Concurrent writes to different quorums can produce
+conflicting versions that must be reconciled with **version vectors** (Dynamo returns siblings) or
+**last-write-wins** by timestamp (Cassandra, which silently drops the loser). A read during an
+in-flight write may see the old or new value depending on timing, and there is no guarantee about the
+order two clients observe events in. If you need true linearizability, you need consensus
+(Raft/Paxos), not quorums. Claiming "R+W>N gives strong consistency" is the classic wrong turn; it
+gives **quorum consistency**, which is weaker.
+
+### Latency, sloppy quorums, and intent
+
+**Latency is bounded by the slowest node in the quorum.** A write with W=2 of N=3 waits for the
+2nd-fastest replica. Raising W or R toward N makes latency track a higher tail percentile: with N=3,
+R=3, one slow node (GC pause, hot disk) drags every read to its p99. Mitigate with
+**speculative/hedged reads** (send to R+1, take the first R) and keep W and R as low as the
+consistency requirement allows.
+
+**Sloppy quorum and hinted handoff** trade consistency for availability. In a strict quorum, if the W
+home replicas are unreachable, the write fails. A **sloppy quorum** writes to the next W healthy
+nodes on the ring even if they are not the key's usual owners, storing a **hint** so those temporary
+holders forward the data back once the rightful replicas recover. Writes stay accepted during
+partitions at the cost of a window where a strict-quorum read might miss the value.
+
+**Interview nuance, map numbers to intent:** W=N maximizes durability but breaks writes if any
+replica is down. R=1, W=N gives fast reads and slow fragile writes. R=N, W=1 the reverse. W=1, R=1 is
+fastest and weakest (no overlap). Also mention **flexible quorums** (write and read sets defined to
+intersect without both being majorities) and **witness replicas** (vote for quorum without storing
+full data, cutting storage cost while preserving overlap).
+
+Recap: N/R/W is a per-operation dial, R+W>N forces read/write overlap so a read sees the latest
+acknowledged write, but that is quorum consistency not linearizability, quorum latency tracks the
+slowest node in the set, and sloppy quorum plus hinted handoff buy availability during partitions at
+the cost of consistency.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -999,6 +1060,55 @@ export const systemDesignLevel5: DesignLevel = {
               "**Write latency:** every committed write needs the leader plus a majority to persist, and members are cross-region, so a commit costs one inter-region round trip to the nearest quorum member: expect tens of milliseconds per write (order 40-80ms), far above a single-region cluster. Pin the leader to the region with the most members, use etcd leases and batching, and if that latency is unacceptable, the honest answer is that strong consensus across 80ms links has a floor: the fix is fewer cross-region hops (regional clusters federated), not pretending Raft is free.",
               "**Split-brain:** Raft makes it impossible: a partitioned minority (region C's single member, or a 2-member island) can never reach majority 3, so it cannot elect a leader or commit, and it steps down on heal. Disable any unclean/forced reconfiguration that could manufacture a second majority.",
               "**Stale reads:** follower reads can lag committed state. For linearizable reads, route through the leader with a ReadIndex confirmation (the leader verifies it is still leader via a heartbeat quorum before serving), accepting the latency. Where staleness is tolerable (dashboards, watches), allow serializable follower reads for speed. The wrong turn: serving follower reads and calling them consistent.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-quorums-tunable",
+          title: "Quorums & Dynamo-Style Tunable Consistency",
+          summary:
+            "R+W>N forces read/write overlap (quorum consistency, NOT linearizability); latency tracks the slowest quorum member, and sloppy quorums buy availability during partitions.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["quorums", "tunable-consistency", "dynamo"],
+          teach: {
+            markdown: quorumsTunableTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-quorums-tunable-apply",
+            prompt:
+              "Choose N/R/W for a session store that must survive one AZ loss and still serve fast reads, and state the consistency you actually get.",
+            thinkAbout: [
+              "What does R+W>N guarantee, and what does it NOT guarantee?",
+              "Why is quorum latency bounded by the slowest node?",
+              "How do sloppy quorum and hinted handoff trade consistency for availability?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a session/token store on a Dynamo-style system across 3 AZs, read-heavy (every request validates a session), writes on login/refresh, must tolerate losing one full AZ, reads must be single-digit ms, and rare briefly-stale reads are acceptable.",
+              "**Choose N=3, one replica per AZ, W=2, R=2.** R+W = 4 > N = 3, so every read quorum overlaps every write quorum in at least one node: a read is guaranteed to see at least one copy of the latest acknowledged write.",
+              "**AZ-loss survival:** losing an AZ removes exactly one replica. W=2 still succeeds (two AZs remain) and R=2 still succeeds, so reads and writes keep working through a full AZ outage. W=3 would maximize durability but a single AZ loss would halt all writes: the tradeoff consciously avoided.",
+              "**What you actually get: quorum consistency, not linearizability.** A read sees the latest acknowledged write, but concurrent writes to the same session (a login racing a refresh) can create conflicting versions reconciled by LWW timestamp or version vectors, and two clients are not guaranteed a single real-time order. Fine for a session store where tokens are effectively immutable per issuance. Linearizable semantics would require a consensus-backed store, deliberately not chosen to keep reads fast.",
+              "**Latency:** both R and W wait on the 2nd-fastest of 3 replicas, so latency tracks a moderate tail, not the slowest node (which R=3 would). Protect read p99 with hedged reads (query all 3, take the first 2).",
+              "**Availability under partition:** enable sloppy quorum + hinted handoff so that if two home replicas are briefly unreachable, writes land on the next healthy nodes and forward back on recovery: favoring availability (a login should not fail on a transient blip) at the cost of a small window where a strict read might miss the newest value.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-quorums-tunable-practice",
+            prompt:
+              "Design the replication settings for a Cassandra-backed IoT telemetry store ingesting 500k writes/sec from sensors across two regions, where writes must almost never be rejected but analytics reads can tolerate seconds of staleness. Choose consistency levels and explain what breaks if a region is partitioned.",
+            thinkAbout: [
+              "Why does LOCAL_QUORUM beat EACH_QUORUM for the never-reject-writes requirement?",
+              "Where does R+W>N hold in this design, and where deliberately not?",
+              "What reconciles the regions after a partition heals?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: Cassandra, time-series telemetry keyed by sensor+time, 500k writes/sec, append-mostly, batch analytics reads tolerating staleness. Two regions, each a datacenter with per-region replication factor 3 (N=6 total).",
+              "**Write path: LOCAL_QUORUM** (2 of the 3 local replicas), optimizing for write availability. Writes stay fast and confined to one region's replicas (no cross-region latency on the write path) and survive one local replica being down. Avoid EACH_QUORUM (needing a quorum in both regions): a single-region blip would reject writes, violating the requirement. CL=ONE would be even faster but LOCAL_QUORUM is the right durability/availability balance.",
+              "**Read path: LOCAL_QUORUM or LOCAL_ONE** for speed. Because writes and reads are both LOCAL_QUORUM within a region, R+W>N holds *within the region* (2+2>3), so intra-region reads see the latest local write. Cross-region propagation is asynchronous and lags by replication delay: fine for batch analytics.",
+              "**Partition behavior:** if the regions partition, each keeps accepting LOCAL_QUORUM writes independently (the deliberate AP choice: never reject telemetry), and the regions diverge for the duration. Cassandra reconciles on heal via hinted handoff (hints stored for the unreachable region, replayed later), read repair, and anti-entropy repair, with last-write-wins by timestamp resolving conflicts. For append-only telemetry keyed by time, conflicts are rare and LWW is safe.",
+              "**What 'breaks':** cross-region read consistency during the partition: a global query misses the other region's just-written points until heal, absorbed by the seconds-of-staleness tolerance.",
+              "Common wrong turn: demanding EACH_QUORUM or SERIAL (lightweight-transaction) consistency here, tanking throughput and rejecting writes during exactly the partition you most need to keep ingesting through.",
             ],
           },
         },
