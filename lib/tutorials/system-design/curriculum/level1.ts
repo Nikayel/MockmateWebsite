@@ -444,6 +444,55 @@ Recap: make a machine-readable schema the source of truth, name and type it for 
 evolution, and enforce it with consumer-driven contract tests in CI.
 `.trim()
 
+const versioningTeach = `
+## The best versioning strategy is to rarely need it
+
+Versioning exists to let you change an API without breaking the integrations already depending on it.
+The core insight most engineers miss: the best versioning strategy is to need it as rarely as
+possible. Most changes should be additive and never trigger a version bump at all.
+
+### What breaks a client and what does not
+
+Adding an optional field, adding an endpoint, adding an enum value that clients already ignore when
+unknown: non-breaking. Removing a field, renaming a field, changing a type, tightening validation,
+changing default behavior: breaking. If you design for additive change and your clients are tolerant
+readers (they ignore unknown fields and do not assume the response is exhaustive), the large majority
+of your evolution costs zero version bumps.
+
+### When you genuinely must break
+
+- **URL-path versioning** (\`/v1/orders\`, \`/v2/orders\`). Visible, trivial to route, trivial to
+  test with \`curl\`, and easy for developers to reason about. This is the pragmatic default for
+  public REST APIs (Stripe, Twilio, GitHub all expose a visible version).
+- **Header or media-type versioning** (\`Accept: application/vnd.acme.v2+json\`). Purer from a REST
+  standpoint because the resource URL is stable, but it is invisible in a browser address bar, harder
+  to test casually, and easy for a proxy to strip or ignore.
+
+Per-paradigm nuance: GraphQL avoids URL versions entirely and evolves field by field, marking old
+fields \`@deprecated\` with a reason and adding new ones. gRPC follows Protobuf's field-number rules:
+add new fields with new tags, never renumber, mark removed tags \`reserved\`, so old and new binaries
+interoperate.
+
+Compatibility runs two directions. **Backward** compatibility: a new server can still serve old
+clients. **Forward** compatibility: an old client can tolerate data from a new server (this is
+exactly what the tolerant-reader pattern buys you). You want both, because in a distributed deploy
+the two sides are never upgraded at the same instant.
+
+### Retiring a version is a sequenced migration
+
+Deprecate (announce, document the replacement), warn (return \`Deprecation\` and \`Sunset\` headers,
+log usage, email the top callers), then remove only after telemetry shows traffic has drained. A hard
+cutover with no warning is how you generate an angry customer incident.
+
+**Interview nuance:** the strongest signal is saying "I would design so most changes are additive and
+never bump the version, and only cut /v2 for a true break," then describing the deprecate-warn-remove
+sequence. Jumping straight to "put v1 in the URL" misses that versioning is a last resort.
+
+Recap: prefer additive change with tolerant readers so you rarely version, use visible /v1 path
+versioning for true public breaks, and retire old versions with a deprecate then warn then remove
+sequence.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -865,6 +914,56 @@ export const systemDesignLevel1: DesignLevel = {
               "**Evolution discipline:** to change semantics, add `payment_intent_v2` fields alongside the old ones and migrate consumers one at a time, deprecating the old field with a documented sunset rather than deleting it. Removal happens only after telemetry shows zero readers.",
               "At 200 services, coordination-by-meeting does not scale. The system holds because the schema is centralized, breaking changes are mechanically blocked in CI, and evolution is additive-first with per-consumer contract tests.",
               "Common wrong turn: letting each team keep its own copy of the proto, or relying on release coordination. Both guarantee some consumer breaks the first time two teams deploy out of sync.",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-versioning",
+          title: "Versioning & Backward Compatibility",
+          summary:
+            "Prefer additive change with tolerant readers so you rarely version, use visible /v1 path versioning for true breaks, and retire versions with deprecate-warn-remove.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["versioning", "compatibility"],
+          teach: {
+            markdown: versioningTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-versioning-apply",
+            prompt:
+              "Design a versioning strategy that lets you ship a breaking change to a public API without breaking existing integrations.",
+            thinkAbout: [
+              "URL-path vs header/media-type versioning, and which is the visible default?",
+              "How do additive changes and tolerant readers avoid version bumps?",
+              "How do you sequence a migration: deprecate, warn, remove?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a public REST API with thousands of external integrations you do not control and cannot force to upgrade.",
+              "**Default posture: minimize versioning.** Design every response as additive-friendly and require tolerant readers in your own SDKs, so adding fields, endpoints, or enum values never breaks anyone and never needs a new version. Version bumps are reserved for true breaks: removing or renaming a field, changing a type, or changing default behavior.",
+              "**Mechanism: URL-path versioning** (`/v1`, `/v2`) as the visible default, because external developers can see it, route it, and `curl` it without ceremony. Offer header/media-type versioning only if a client base specifically needs stable URLs. `/v1` and `/v2` run side by side; `/v2` is a new deployment or routing target, not a mutation of `/v1`.",
+              "**Shipping the break:** stand up `/v2` with the new shape while `/v1` keeps working unchanged. New integrations use `/v2`; existing ones keep running on `/v1`.",
+              "**Migration sequence:** (1) Deprecate: announce `/v2`, publish a migration guide and diff, update SDKs. (2) Warn: return `Deprecation: true` and a `Sunset: <date>` header on `/v1`, log per-caller usage, proactively email the highest-volume `/v1` callers. (3) Remove: only after telemetry shows `/v1` traffic has drained to near zero past the sunset date, and even then return a clear 410 Gone rather than a silent failure.",
+              "**Compatibility both ways:** the `/v1` server must still serve old clients (backward), and old clients must tolerate any additive data (forward, via tolerant readers).",
+              "Common wrong turn: having no versioning story from day one, then discovering a design flaw you cannot fix without breaking everyone, or hard-removing `/v1` on a date with no warning headers and no drain, which turns a routine change into an outage for paying customers.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-versioning-practice",
+            prompt:
+              "Design a versioning model that lets you evolve a payments API for a decade while every integration written on day one still works (as Stripe has done since 2011, shipping changes constantly without ever breaking its API). Explain the mechanism and how new behavior reaches new callers without a /v2.",
+            thinkAbout: [
+              "What does pinning a version per account (rather than per URL) change about migration pressure?",
+              "How can one canonical implementation serve a decade of historical response shapes?",
+              "Why do coarse /v1-/v2 URL versions fail at a ten-year horizon?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: hundreds of thousands of live integrations, many never touched after launch, that must not break, yet the product must keep evolving.",
+              "**Mechanism: date-based, per-account pinned versions** (Stripe's real model). Each account is pinned to the API version current when it integrated, e.g. `2020-08-27`. Every request runs against that pinned behavior unless explicitly overridden with a `Stripe-Version` header. A business that integrated in 2013 keeps getting exactly the responses it was coded against, forever.",
+              "**How new behavior ships:** each breaking change becomes a new dated version. The backend keeps a chain of request and response transformers, one per dated version, translating between the internal current model and each historical shape. A request from an old pinned account is up-converted to the current internal model, processed once, and the response is down-converted back through the transformer chain to that account's dated shape. One canonical implementation plus a stack of small, tested shims, not N forked codebases.",
+              "**Upgrading:** a caller opts in by changing their pinned version in the dashboard or sending the header, after reading the changelog for that date. No forced /v2 migration and no sunset, because old versions cost only a thin transformer, not a parallel service.",
+              "**Why not /v1, /v2:** coarse URL versions force periodic painful migrations and tempt you to sunset old versions. Fine-grained dated versions plus transformers let evolution be continuous and backward compatibility be effectively permanent.",
+              "Common wrong turn: forking the whole service per version (unmaintainable at decade scale) or relying on tolerant readers alone, which handles additive change but not the genuine behavioral breaks a payments API accumulates over ten years. The transformer chain is what makes 'never break, always evolve' simultaneously true.",
             ],
           },
         },
