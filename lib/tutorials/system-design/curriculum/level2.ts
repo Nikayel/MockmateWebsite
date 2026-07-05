@@ -187,6 +187,65 @@ and bloat from long transactions; choose optimistic control under low contention
 under high, and for a hot key shard the counter instead of serializing writers behind one lock.
 `.trim()
 
+const btreeVsLsmTeach = `
+## Two engine families, one read-versus-write trade
+
+Every durable database is built on one of two storage engine families, and the choice is
+fundamentally a read-versus-write tradeoff. Knowing which one sits under Postgres versus Cassandra is
+the difference between guessing at a database and reasoning about one.
+
+### B+tree: in-place pages, fast reads and ranges
+
+A **B+tree** (Postgres, MySQL/InnoDB, most SQL engines) keeps data in fixed-size pages, typically 8KB
+or 16KB, arranged as a balanced tree with all rows in the leaf pages. Updates happen **in place**: to
+change a row you find its leaf page, load it into memory, modify it, and eventually write the whole
+page back. This gives excellent point reads (a lookup is 3 to 4 page reads for billions of rows) and,
+crucially, excellent **range scans**, because leaves are linked in sorted order, so "created_at
+between X and Y" is a sequential walk. The cost is **write amplification**: changing one 200-byte row
+can force an 8KB page write, plus a write-ahead log record, and page splits when a page fills. Random
+in-place writes are also unfriendly to SSDs, which prefer large sequential erases.
+
+### LSM-tree: append-only writes, compacted reads
+
+An **LSM-tree** (Cassandra, RocksDB, ScyllaDB, LevelDB) inverts this. Writes go to an in-memory
+sorted structure, the **memtable**, plus a sequential commit log. When the memtable fills it is
+flushed to disk as an immutable, sorted **SSTable**. Writes are therefore append-only and sequential,
+so throughput is very high and SSD-friendly. The catch is reads: a key might live in the memtable or
+in any of several SSTables, so a read may have to check many files. Two mechanisms rescue read
+latency. **Bloom filters** (a small probabilistic set per SSTable) let a read skip an SSTable that
+definitely does not contain the key. **Compaction** merges SSTables in the background, discarding
+overwritten and deleted (tombstoned) rows, which bounds how many files a read must touch.
+
+### The three amplifications
+
+- **Write amplification:** bytes written to disk per byte of logical write. B-tree pays it via
+  full-page writes and the WAL. LSM pays it via compaction rewriting the same data across levels.
+- **Read amplification:** disk reads per logical read. LSM is worse (multiple SSTables plus bloom
+  checks); B-tree is a clean 3 to 4 pages.
+- **Space amplification:** disk used per byte of live data. LSM can hold stale copies until
+  compaction reclaims them; B-tree wastes space via partially-full pages and fragmentation.
+
+**Interview nuance:** compaction is the LSM landmine. It runs in the background and competes for disk
+I/O and CPU, so under sustained write pressure you get **compaction stalls** and latency spikes right
+when you are busiest. "Leveled" compaction (RocksDB default) gives better read and space
+amplification but more write amplification; "size-tiered" (Cassandra default) is the reverse. Naming
+this tradeoff signals you have actually operated one.
+
+\`\`\`
+B+TREE (read/update-heavy OLTP)     LSM-TREE (write-heavy ingest)
+  in-place page updates               memtable (RAM) --> flush
+  sorted leaves, fast range scan          |
+  writes = random + WAL               immutable SSTables on disk
+  amp: low read, higher write             |  bloom filter per SSTable
+                                      compaction merges in background
+                                      amp: high write, higher read
+\`\`\`
+
+Recap: B-tree updates pages in place for fast reads and range scans at the cost of write
+amplification; LSM appends to a memtable then compacts immutable SSTables for high write throughput,
+using bloom filters and compaction to keep reads sane.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -347,6 +406,62 @@ export const systemDesignLevel2: DesignLevel = {
               "**Regional layout:** each region writes to its local Kafka cluster to keep write latency low; cross-region aggregation rolls regional partials into the global total, avoiding a single global write bottleneck. A deliberate move from strong single-row consistency to eventual consistency, justified because the invariant (exact eventual total) is preserved by the durable log while the real-time display trades precision for throughput.",
               "**Anti-fraud dedup** (bot views, replays) lives in the stream layer, keyed by viewer/session, before events count toward payout.",
               "Common wrong turn: trying to keep an ACID row counter authoritative at 100,000 writes/sec, which no single-primary relational row survives; the scale forces the counter out of the transactional database into a durable event log with tiered consistency, while still preserving eventual accuracy for money.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l2-m2",
+      title: "Storage Engines & Indexing",
+      description:
+        "Say whether a workload wants a B-tree or an LSM-tree and why, design composite indexes that fully serve filter-plus-sort queries, and trace the pages/buffer-pool/WAL sequence that makes a committed row fast and durable.",
+      lessons: [
+        {
+          id: "sd-l2-btree-vs-lsm",
+          title: "B-Tree vs LSM-Tree",
+          summary:
+            "B-trees update pages in place for fast reads and range scans; LSM-trees append and compact for write throughput, paying read amplification and compaction stalls.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["storage-engine", "lsm", "btree"],
+          teach: {
+            markdown: btreeVsLsmTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-btree-vs-lsm-apply",
+            prompt:
+              "Choose and justify a storage engine for a write-heavy IoT/event-ingestion service versus a read-heavy transactional app.",
+            thinkAbout: [
+              "Why does LSM suit write-heavy workloads and SSDs?",
+              "What are read, write, and space amplification, and how do they differ per engine?",
+              "How do bloom filters and compaction affect LSM behavior?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the IoT service ingests device telemetry at ~500K writes/sec, mostly appends keyed by (device_id, timestamp), with queries for recent windows per device. The transactional app is an order/account system: moderate write rate, heavy point reads and updates of the same rows, plus range scans for reporting, needing strong per-row consistency.",
+              "**IoT ingestion -> LSM engine** (Cassandra or ScyllaDB distributed, or RocksDB embedded). The workload is append-dominated, and LSM turns those writes into sequential memtable flushes and SSTable writes, exactly what SSDs are optimized for, sustaining high write throughput without random-write amplification. Reads target recent data, which lives in the memtable or newest SSTables, and bloom filters keep older-SSTable reads from hitting disk for absent keys.",
+              "**LSM operational care:** tune compaction (size-tiered or time-window for time-series), provision headroom so background compaction does not stall ingestion, and monitor pending compactions as a leading indicator of trouble.",
+              "**Transactional app -> B+tree engine** (Postgres or MySQL/InnoDB). The access pattern is read and update heavy on individual rows, and B-tree in-place updates give clean 3-to-4-page point reads with low read amplification. Range scans and ordered reads ride the sorted leaves. Write amplification via WAL and page writes is acceptable at a moderate write rate, and you get mature transactions, secondary indexes, and a query planner for free.",
+              "**The committed tradeoff:** LSM trades read amplification and background compaction cost for write throughput; B-tree trades write amplification for predictable low-latency reads and range scans.",
+              "Common wrong turn: picking LSM 'because it is web-scale' for the OLTP app and being surprised by read amplification and compaction-induced latency spikes on a workload that reads and updates hot rows, where a B-tree would have been simpler and faster.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-btree-vs-lsm-practice",
+            prompt:
+              "Design the storage engine choice and compaction strategy for Discord's message store, which moved from Cassandra to ScyllaDB and handles trillions of messages with billions of writes per day and read patterns dominated by 'load the most recent messages in a channel.' Justify the engine and explain how you would prevent compaction and hot-partition problems at that scale.",
+            thinkAbout: [
+              "What made ScyllaDB's shard-per-core design fix the p99 spikes Cassandra suffered?",
+              "Why does time-window compaction fit write-once, read-recent message data?",
+              "What bounds a huge active channel's partition from growing and overheating?",
+            ],
+            modelAnswerOutline: [
+              "At trillions of stored messages and billions of daily writes, this is an append-heavy write workload with time-ordered reads: squarely LSM territory, so keep an **LSM engine (ScyllaDB)** rather than a B-tree store. ScyllaDB is a C++ rewrite of Cassandra's LSM design with a shard-per-core architecture that removes JVM garbage-collection pauses, exactly the tail-latency win Discord needed: the old pain was p99 spikes, largely from JVM GC and compaction contention, not the data model.",
+              "**Data model:** partition by channel plus a time bucket, cluster by message_id (a Snowflake ID, so it sorts by time). Clustering descending means 'recent messages in a channel' is a sequential read of the front of a partition, touching the memtable and newest SSTables where bloom filters and the row cache keep latency low.",
+              "**Compaction: time-window compaction (TWCS),** not size-tiered. Messages are written once and rarely updated, and reads are recent-heavy, so grouping SSTables by time window means old windows compact once and are left alone, slashing write amplification and stopping cold data from being rewritten forever. Old windows can be dropped or tiered cheaply by TTL.",
+              "**Hot partitions are the real risk:** a huge active channel would create an unbounded hot partition that overloads its replica set. Bound partitions with time bucketing (e.g. one bucket per 10-day window) so no partition grows without limit; sub-partition pathologically hot channels; and front the store with a cache for the hottest recent reads so a viral channel does not hammer one shard.",
+              "**The committed tradeoff:** LSM plus TWCS accepts higher read amplification on old data (rarely read here) in exchange for cheap sustained writes and bounded compaction cost.",
             ],
           },
         },
