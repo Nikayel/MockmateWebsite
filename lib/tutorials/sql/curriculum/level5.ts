@@ -1983,6 +1983,336 @@ INSERT INTO incoming_batch VALUES
   }),
 }
 
+// ---------------------------------------------------------------------------
+// Module 5.4 — Round 4: The DE System Design Round
+// ---------------------------------------------------------------------------
+
+const systemDesignRoundReasoning: SqlLesson = {
+  id: "sql-l5-system-design-round-reasoning",
+  title: "Reasoning Like the System-Design Round: Pruning, Consumer Lag, Windows, DAG Deps",
+  summary:
+    "Make the four un-runnable system-design mechanisms concrete: sargable pruning, Kafka consumer lag, event-time tumbling windows, and DAG eligibility.",
+  estimatedMinutes: 30,
+  difficulty: "hard",
+  skills: [
+    "streaming",
+    "partition pruning / sargability",
+    "EXPLAIN QUERY PLAN",
+    "tumbling event-time windows",
+    "Kafka consumer lag",
+    "DAG dependency eligibility",
+  ],
+  teach: {
+    estimatedMinutes: 12,
+    markdown: `## The system-design round, made runnable
+
+The DE system-design round is a conversation: you are handed a vague prompt ("design a pipeline for clickstream analytics") and judged on how you reason through requirements, latency SLA, batch versus streaming, backfill, observability, and lineage. Four mechanisms come up in almost every one of these rounds, and none of them literally runs in SQLite. This lesson makes each one a real query so the reasoning is concrete rather than hand-waved.
+
+## Four mechanisms, each reduced to SQL
+
+- **Partition pruning (does my filter scan the whole table).** A filter on the partition or clustering column lets the engine skip files. The SQL analog is a sargable predicate that can use an index: \`WHERE ts >= '2026-07-03' AND ts < '2026-07-04'\` uses the index, while \`WHERE date(ts) = '2026-07-03'\` wraps the column in a function and forces a full scan. \`EXPLAIN QUERY PLAN\` shows the difference (SEARCH USING INDEX versus SCAN), the same reason a function on a partition key defeats pruning and bills terabytes in BigQuery.
+- **Kafka consumer lag (is my consumer keeping up).** Lag is \`latest_offset - committed_offset\` per partition. That one subtraction over an offsets table is exactly what \`kafka-consumer-groups --describe\` reports, and a partition whose lag keeps climbing is a consumer falling behind.
+- **Event-time tumbling windows (count per fixed interval, flag late data).** Floor the event timestamp into fixed buckets with \`strftime\` and group. An event whose ingest time lands more than a window past its bucket is late data, the thing a streaming watermark decides whether to admit.
+- **DAG dependency eligibility (which task can run now).** A task is eligible when every upstream dependency has succeeded, a join over a dependency edge table, the same check an orchestrator makes before it schedules a task.
+
+## Why this matters
+
+Naming the mechanism and writing its one-line query is what separates a candidate who has operated a pipeline from one who has only read about them. When the interviewer asks "how would you know the consumer is behind", the answer is not "monitoring", it is "lag is latest minus committed offset per partition, alert when it crosses a threshold".
+
+**Interview nuance:** the sargability point is the most transferable. A function wrapped around a partition or indexed column (\`date(ts)\`, \`UPPER(name)\`, \`CAST(id AS TEXT)\`) defeats the index or the partition prune every time. Filter the raw column against computed bounds instead.
+
+> **In the warehouse this differs.** Filtering on the partition or clustering column drops BigQuery bytes billed from terabytes to gigabytes and prunes Snowflake micro-partitions, exactly as a sargable predicate uses a B-tree here. Flink \`TUMBLE(event_time, INTERVAL '1' HOUR)\` with watermarks is the streaming form of the strftime bucketing. The offsets table stands in for Kafka internals, and the lag arithmetic is what you monitor in production.`,
+    demoSeedSql: `CREATE TABLE offsets (topic TEXT, partition INTEGER, committed_offset INTEGER, latest_offset INTEGER, consumer_group TEXT);
+INSERT INTO offsets VALUES
+  ('orders', 0, 1000, 1500, 'g1'), ('orders', 1, 5000, 200000, 'g1'), ('clicks', 0, 100, 100, 'g2');`,
+    demoCode: `-- Total and worst consumer lag per topic: the kafka-consumer-groups --describe view.
+SELECT topic,
+       SUM(latest_offset - committed_offset) AS total_lag,
+       MAX(latest_offset - committed_offset) AS worst_partition_lag
+FROM offsets
+GROUP BY topic
+ORDER BY topic;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-system-design-round-reasoning-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the consumer lag per partition as \`(topic, partition, lag, lag_alert)\`, over \`offsets(topic, partition, committed_offset, latest_offset, consumer_group)\`.
+
+\`lag\` is \`latest_offset - committed_offset\`, and \`lag_alert\` is \`1\` when lag exceeds \`100000\` and \`0\` otherwise. Order by \`topic\` then \`partition\`. Alias the columns exactly as named.`,
+    starterCode: `-- Per-partition consumer lag and a high-lag alert flag.
+SELECT topic, partition,
+  -- lag and lag_alert
+FROM offsets
+ORDER BY topic, partition;`,
+    hints: [
+      "`lag` is `latest_offset - committed_offset`.",
+      "`lag_alert` is `CASE WHEN latest_offset - committed_offset > 100000 THEN 1 ELSE 0 END`.",
+      "Order by `topic, partition` so the output is stable.",
+    ],
+    referenceSolution: `SELECT topic, partition,
+       latest_offset - committed_offset AS lag,
+       CASE WHEN latest_offset - committed_offset > 100000 THEN 1 ELSE 0 END AS lag_alert
+FROM offsets
+ORDER BY topic, partition;`,
+    singleFile: {
+      seedSql: `CREATE TABLE offsets (
+  topic TEXT, partition INTEGER, committed_offset INTEGER, latest_offset INTEGER, consumer_group TEXT
+);
+INSERT INTO offsets VALUES
+  ('orders', 0, 1000, 1500, 'g1'),
+  ('orders', 1, 5000, 200000, 'g1'),
+  ('clicks', 0, 100, 100, 'g2'),
+  ('clicks', 1, 0, 150000, 'g2');`,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["topic", "partition", "lag", "lag_alert"],
+        rows: [
+          ["clicks", 0, 0, 0],
+          ["clicks", 1, 150000, 1],
+          ["orders", 0, 500, 0],
+          ["orders", 1, 195000, 1],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-system-design-round-reasoning-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns, per 1-hour tumbling window, the event count and the count of late-arriving events, as \`(window_start, event_count, late_count)\`, over \`events(event_id, event_time, ingest_time)\`.
+
+Bucket \`event_time\` into 1-hour windows (the hour floor), count events per window, and count an event as late when its \`ingest_time\` is more than one hour past the end of its window (more than two hours after the window start). Order by \`window_start\`. Alias the columns exactly as named.`,
+    starterCode: `-- Event count and late-event count per 1-hour tumbling window.
+SELECT
+  -- floor event_time to the hour as window_start, COUNT(*), and a late-event count
+FROM events
+GROUP BY 1
+ORDER BY 1;`,
+    hints: [
+      "Floor to the hour with `strftime('%Y-%m-%d %H:00:00', event_time)` as `window_start`.",
+      "Late test: `ingest_time > datetime(window_start, '+2 hours')` (more than one window past the window end).",
+      "`SUM(CASE WHEN <late> THEN 1 ELSE 0 END)` gives the late count per window.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE events (event_id INTEGER, event_time TEXT, ingest_time TEXT);
+INSERT INTO events VALUES
+  (1, '2026-03-01 10:15:00', '2026-03-01 10:16:00'),
+  (2, '2026-03-01 10:45:00', '2026-03-01 10:50:00'),
+  (3, '2026-03-01 11:05:00', '2026-03-01 11:06:00'),
+  (4, '2026-03-01 10:30:00', '2026-03-01 12:30:00'),
+  (5, '2026-03-01 11:30:00', '2026-03-01 11:35:00');`,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["window_start", "event_count", "late_count"],
+        rows: [
+          ["2026-03-01 10:00:00", 3, 1],
+          ["2026-03-01 11:00:00", 2, 0],
+        ],
+      },
+    },
+  },
+}
+
+const medallionStreamingCapstone: SqlLesson = {
+  id: "sql-l5-medallion-streaming-capstone",
+  title: "Capstone: JSON Events to a Sessionized, Incremental, DQ-Gated Medallion Pipeline",
+  summary:
+    "The whole level in one build: Bronze JSON to a deduped, sessionized Silver to a reconciling Gold aggregate, idempotent end to end.",
+  estimatedMinutes: 44,
+  difficulty: "hard",
+  skills: [
+    "lakehouse",
+    "medallion Bronze/Silver/Gold",
+    "JSON shred",
+    "dedup ROW_NUMBER keep-latest",
+    "sessionization",
+    "idempotency",
+  ],
+  teach: {
+    estimatedMinutes: 12,
+    markdown: `## One build that ties the whole level together
+
+This capstone is a small take-home: turn a stream of raw JSON events into a clean, sessionized, aggregated set of tables using a medallion architecture. Bronze is the raw landing zone, Silver is the cleaned and modeled layer, and Gold is the business aggregate. You will use most of the techniques from this level in one script.
+
+## The three layers
+
+- **Bronze (\`raw_events\`).** Landed as-is: a JSON payload, an \`event_id\` that can repeat (the same event delivered twice with different versions), and an ingest timestamp. You do not clean Bronze; you keep it exactly as received.
+- **Silver (\`silver_events\`).** The typed, deduplicated, sessionized clean layer. Shred \`event_time\` out of the JSON, keep one row per \`event_id\` (the latest version, with ROW_NUMBER keep-latest), and assign a \`session_id\` per user with the 30-minute-gap sessionization from earlier in this level.
+- **Gold (\`gold_daily_metrics\`).** The business aggregate: per day, the number of distinct sessions and the number of events. Gold reads only from Silver, so it inherits Silver's cleanliness.
+
+## The build, and idempotency
+
+The whole thing is one script that rebuilds Silver and Gold from Bronze. Lead with \`DELETE FROM silver_events;\` and \`DELETE FROM gold_daily_metrics;\` so re-running it produces the same tables, the run-twice-same-result property you have enforced all level. The dedup is load-bearing: without ROW_NUMBER keep-latest, the duplicate \`event_id\` inflates the event count and can move a session boundary.
+
+**Interview nuance:** the medallion layers are a naming and quality-gate discipline, not a product feature. Bronze is immutable raw, Silver is the contract every downstream reads, and Gold is the metric. When you narrate a pipeline in a system-design round, mapping your transforms onto Bronze, Silver, and Gold shows you know where cleaning, modeling, and aggregation each belong.
+
+> **In the warehouse this differs.** Each layer is a Delta or Iceberg table, and the transitions run as MERGE or CREATE TABLE AS jobs orchestrated by a workflow (Kafka to Flink sessionization to a dbt incremental model to a dbt test). You are writing the transform SQL that sits inside those layers.`,
+    demoSeedSql: `CREATE TABLE raw_events (event_id INTEGER, user_id INTEGER, payload TEXT, version INTEGER, ingest_ts TEXT);
+INSERT INTO raw_events VALUES
+  (2, 100, '{"event_time":"2026-03-01 09:10:00"}', 1, '2026-03-01 09:11:00'),
+  (2, 100, '{"event_time":"2026-03-01 09:10:00"}', 2, '2026-03-01 09:12:00');`,
+    demoCode: `-- rn = 1 keeps the latest version of a repeated event_id; the JSON event_time is shredded out.
+SELECT event_id, version,
+       json_extract(payload, '$.event_time') AS event_time,
+       ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY version DESC) AS rn
+FROM raw_events
+ORDER BY event_id, version DESC;`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l5-medallion-streaming-capstone-apply",
+    prompt: `Write a script that builds Silver and Gold from the Bronze \`raw_events\` log, over \`raw_events(event_id, user_id, payload, version, ingest_ts)\` (JSON payloads, with a duplicate \`event_id\`), an empty \`silver_events(event_id, user_id, event_time, session_id)\`, and an empty \`gold_daily_metrics(day, session_count, event_count)\`.
+
+Build \`silver_events\` by shredding \`event_time\` from the JSON payload, keeping one row per \`event_id\` (the latest version), and assigning a \`session_id\` per user with a 30-minute inactivity gap. Then build \`gold_daily_metrics\` as, per day, the count of distinct sessions and the count of events. Lead with a \`DELETE\` from both target tables so the rebuild is idempotent.`,
+    starterCode: `-- Bronze -> Silver (dedup keep-latest + sessionize) -> Gold (daily aggregate). Idempotent rebuild.
+DELETE FROM silver_events;
+DELETE FROM gold_daily_metrics;
+
+INSERT INTO silver_events (event_id, user_id, event_time, session_id)
+WITH deduped AS (
+  SELECT event_id, user_id,
+         json_extract(payload, '$.event_time') AS event_time,
+         ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY version DESC) AS rn
+  FROM raw_events
+)
+-- keep rn = 1, sessionize per user (LAG gap + running-sum session_id), then select the four columns
+;
+
+-- then INSERT the per-day distinct-session and event counts into gold_daily_metrics
+`,
+    hints: [
+      "Dedup: keep `rn = 1` from `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY version DESC)`.",
+      "Sessionize the kept rows exactly as in the sessionization lesson: LAG the gap, flag a new session past 30 minutes, running-sum into `user_id || '-' || seq`.",
+      "Gold is `SELECT date(event_time), COUNT(DISTINCT session_id), COUNT(*) FROM silver_events GROUP BY date(event_time)`.",
+    ],
+    referenceSolution: `DELETE FROM silver_events;
+DELETE FROM gold_daily_metrics;
+
+INSERT INTO silver_events (event_id, user_id, event_time, session_id)
+WITH deduped AS (
+  SELECT event_id, user_id,
+         json_extract(payload, '$.event_time') AS event_time,
+         ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY version DESC) AS rn
+  FROM raw_events
+),
+kept AS (SELECT event_id, user_id, event_time FROM deduped WHERE rn = 1),
+with_prev AS (
+  SELECT event_id, user_id, event_time,
+         LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_ts
+  FROM kept
+),
+flagged AS (
+  SELECT event_id, user_id, event_time,
+         CASE WHEN prev_ts IS NULL OR (julianday(event_time) - julianday(prev_ts)) * 1440 > 30 THEN 1 ELSE 0 END AS new_session
+  FROM with_prev
+),
+sessioned AS (
+  SELECT event_id, user_id, event_time,
+         user_id || '-' || SUM(new_session) OVER (PARTITION BY user_id ORDER BY event_time) AS session_id
+  FROM flagged
+)
+SELECT event_id, user_id, event_time, session_id FROM sessioned;
+
+INSERT INTO gold_daily_metrics (day, session_count, event_count)
+SELECT date(event_time), COUNT(DISTINCT session_id), COUNT(*)
+FROM silver_events
+GROUP BY date(event_time);`,
+    seedSql: `CREATE TABLE raw_events (event_id INTEGER, user_id INTEGER, payload TEXT, version INTEGER, ingest_ts TEXT);
+INSERT INTO raw_events VALUES
+  (1, 100, '{"event_time":"2026-03-01 09:00:00"}', 1, '2026-03-01 09:01:00'),
+  (2, 100, '{"event_time":"2026-03-01 09:10:00"}', 1, '2026-03-01 09:11:00'),
+  (3, 100, '{"event_time":"2026-03-01 10:30:00"}', 1, '2026-03-01 10:31:00'),
+  (2, 100, '{"event_time":"2026-03-01 09:10:00"}', 2, '2026-03-01 09:12:00'),
+  (4, 200, '{"event_time":"2026-03-01 14:00:00"}', 1, '2026-03-01 14:01:00');
+
+CREATE TABLE silver_events (event_id INTEGER, user_id INTEGER, event_time TEXT, session_id TEXT);
+CREATE TABLE gold_daily_metrics (day TEXT, session_count INTEGER, event_count INTEGER);`,
+    assertions: [
+      {
+        suite: "dedup",
+        name: "no_duplicate_event_id",
+        sql: `SELECT event_id FROM silver_events GROUP BY event_id HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "dedup",
+        name: "silver_row_count_is_4",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM silver_events) <> 4`,
+      },
+      {
+        suite: "session",
+        name: "sessionization_correct",
+        sql: `SELECT 1 WHERE (SELECT session_id FROM silver_events WHERE event_id = 1) <> (SELECT session_id FROM silver_events WHERE event_id = 2)
+UNION ALL
+SELECT 1 WHERE (SELECT session_id FROM silver_events WHERE event_id = 2) = (SELECT session_id FROM silver_events WHERE event_id = 3)`,
+      },
+      {
+        suite: "gold",
+        name: "gold_reconciles_to_silver",
+        sql: `SELECT g.day FROM gold_daily_metrics g
+WHERE g.event_count <> (SELECT COUNT(*) FROM silver_events s WHERE date(s.event_time) = g.day)
+   OR g.session_count <> (SELECT COUNT(DISTINCT s.session_id) FROM silver_events s WHERE date(s.event_time) = g.day)`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["silver_events", "gold_daily_metrics"],
+  }),
+  practice: scriptExercise({
+    id: "sql-l5-medallion-streaming-capstone-practice",
+    prompt: `Write a script that rebuilds Silver and Gold when a late second batch has landed in Bronze with an out-of-order event and a duplicate \`event_id\`, over the same \`raw_events\`, \`silver_events\`, and \`gold_daily_metrics\` tables.
+
+Use the same rebuild as before: shred and dedup to one row per \`event_id\` (latest version), sessionize per user by event time so the out-of-order event lands in the right session, and rebuild Gold from Silver. Lead with a \`DELETE\` from both targets so the late and duplicate rows are absorbed and re-running leaves the tables unchanged.`,
+    starterCode: `-- Same medallion rebuild; the late and out-of-order rows are absorbed by ordering on event_time.
+DELETE FROM silver_events;
+DELETE FROM gold_daily_metrics;
+
+INSERT INTO silver_events (event_id, user_id, event_time, session_id)
+-- dedup keep-latest by version, sessionize per user ordered by event_time
+;
+
+-- rebuild gold_daily_metrics from silver_events
+`,
+    hints: [
+      "Nothing structural changes: the dedup keeps the latest version and the sessionization orders by `event_time`, so an out-of-order arrival lands in its correct session.",
+      "Order the session window by `event_time`, not by ingest order, so a late event is placed by when it happened.",
+      "The leading `DELETE` from both targets is what keeps the rebuild idempotent across batches.",
+    ],
+    seedSql: `CREATE TABLE raw_events (event_id INTEGER, user_id INTEGER, payload TEXT, version INTEGER, ingest_ts TEXT);
+INSERT INTO raw_events VALUES
+  (1, 100, '{"event_time":"2026-03-01 09:00:00"}', 1, '2026-03-01 09:01:00'),
+  (2, 100, '{"event_time":"2026-03-01 09:10:00"}', 1, '2026-03-01 09:11:00'),
+  (3, 100, '{"event_time":"2026-03-01 10:30:00"}', 1, '2026-03-01 10:31:00'),
+  (2, 100, '{"event_time":"2026-03-01 09:10:00"}', 2, '2026-03-01 11:00:00'),
+  (5, 100, '{"event_time":"2026-03-01 09:05:00"}', 1, '2026-03-01 11:05:00'),
+  (4, 200, '{"event_time":"2026-03-01 14:00:00"}', 1, '2026-03-01 14:01:00');
+
+CREATE TABLE silver_events (event_id INTEGER, user_id INTEGER, event_time TEXT, session_id TEXT);
+CREATE TABLE gold_daily_metrics (day TEXT, session_count INTEGER, event_count INTEGER);`,
+    assertions: [
+      {
+        suite: "dedup",
+        name: "no_duplicate_event_id",
+        sql: `SELECT event_id FROM silver_events GROUP BY event_id HAVING COUNT(*) > 1`,
+      },
+      {
+        suite: "dedup",
+        name: "silver_row_count_is_5",
+        sql: `SELECT 1 WHERE (SELECT COUNT(*) FROM silver_events) <> 5`,
+      },
+      {
+        suite: "gold",
+        name: "gold_reconciles_to_silver",
+        sql: `SELECT g.day FROM gold_daily_metrics g
+WHERE g.event_count <> (SELECT COUNT(*) FROM silver_events s WHERE date(s.event_time) = g.day)
+   OR g.session_count <> (SELECT COUNT(DISTINCT s.session_id) FROM silver_events s WHERE date(s.event_time) = g.day)`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["silver_events", "gold_daily_metrics"],
+  }),
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -2023,6 +2353,13 @@ export const sqlLevel5: SqlLevel = {
       description:
         "The operational reasoning the pipeline round scores: CDC changelog apply, high-water-mark incremental loads with safe backfill, and write-audit-publish quality gates.",
       lessons: [cdcChangelogApply, incrementalWatermarkBackfill, dataQualityGates],
+    },
+    {
+      id: "sql-l5-system-design-round",
+      title: "Module 5.4: The DE System Design Round",
+      description:
+        "Convert the verbal system-design round into runnable reasoning: partition pruning, consumer lag, tumbling windows, DAG eligibility, and an end-to-end medallion capstone.",
+      lessons: [systemDesignRoundReasoning, medallionStreamingCapstone],
     },
   ],
 }
