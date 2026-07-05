@@ -131,6 +131,67 @@ means every non-failing node answers, and most production systems are tunable pe
 than globally CP or AP.
 `.trim()
 
+const pacelcTeach = `
+## CAP's blind spot: the other 99.99% of the time
+
+CAP only describes behavior **during a partition**, which is a rare event. It says nothing about the
+tradeoff you pay on every single request when the network is fine. **PACELC** (Abadi) fills that
+hole. Read it as: **if Partition (P), choose Availability or Consistency (A/C); Else (E), choose
+Latency or Consistency (L/C).** The first half is just CAP. The second half, the **ELC** part, is the
+one that actually shapes your latency budget day to day.
+
+### The else-case insight: strong consistency is never free
+
+To guarantee a linearizable read or write, a system must coordinate, and coordination is round trips:
+
+- A **linearizable write** must reach a majority **quorum** (or a single leader that then replicates
+  to a quorum) before acknowledging. In a 3-region deployment, that quorum round trip can add **tens
+  to over a hundred milliseconds** to every write, because you wait for the second-fastest region.
+- A **linearizable read** cannot just read the nearest replica, because that replica might be stale.
+  It must either go to the **leader** (a round trip, possibly cross-region) or read from a **quorum**
+  and take the newest value.
+
+That is the ELC tax. A system that chooses **EL** (latency over consistency in the normal case)
+answers from the nearest replica immediately and risks a stale read. A system that chooses **EC**
+pays the coordination round trip on every strongly-consistent operation. A real, measurable
+tail-latency cost, not a philosophical one.
+
+### The major stores on the spectrum
+
+- **DynamoDB: PA/EL.** Available under partition; normally favors latency, serving
+  eventually-consistent reads from the nearest copy, with an opt-in strongly-consistent read as the
+  per-operation EC lever.
+- **Cassandra: PA/EL.** Available under partition, low-latency by default, with per-query tunable
+  consistency (ONE is EL, QUORUM/ALL push toward EC).
+- **Spanner: PC/EC.** Consistent during a partition (minority steps down), and even normally it pays
+  for consistency: TrueTime commit-wait and Paxos quorum round trips on every commit.
+- **CockroachDB: PC/EC.** Same posture via Raft per-range and hybrid logical clocks: strongly
+  consistent, paying quorum latency to be so.
+- **PA/EC** also exists (some tunable stores): available under partition but preferring consistency
+  when healthy.
+
+**Interview nuance:** the mistake that reads as junior is reasoning **only about partitions**. If you
+say "we'll use strong consistency, partitions are rare so it's cheap," you have missed that strong
+consistency taxes **every** request. The staff-level move ties it to an **SLO**: "our read p99 budget
+is 20ms and we serve from three regions, so I cannot afford a cross-region quorum on the read path; I
+choose EL (nearest-replica reads) and layer session guarantees for the cases that need
+read-your-writes."
+
+\`\`\`
+   PACELC:  if P -> (A or C)   |   else E -> (L or C)
+   ------------------------------------------------
+   DynamoDB    PA / EL     nearest-copy read, may be stale
+   Cassandra   PA / EL     tunable: ONE=EL, QUORUM=EC
+   Spanner     PC / EC     quorum + commit-wait on every commit
+   CockroachDB PC / EC     Raft quorum per range
+\`\`\`
+
+Recap: PACELC extends CAP with the else-case, the latency-vs-consistency tax paid on every request
+even with no partition, because linearizable reads and writes need leader or quorum round trips;
+DynamoDB and Cassandra are PA/EL while Spanner and CockroachDB are PC/EC, and the senior move is
+tying the L-vs-C choice to a concrete latency SLO.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -238,6 +299,56 @@ export const systemDesignLevel5: DesignLevel = {
               "**Choose CP for 'commit the last unit.'** C here is linearizability on the room count: a single authoritative decrement so two data centers cannot both sell unit number one. During the partition, the side that cannot reach the authority (or form a quorum) refuses to confirm the booking, sacrificing availability for that operation. The user-visible consequence: some booking attempts fail or fall back to 'on request' during the partition: acceptable because a failed booking is far cheaper than an oversell. The deliberate inverse of the cart: same CAP machinery, opposite choice, because the cost of inconsistency flipped.",
               "**Mechanics:** hold inventory in a CP store (a consensus-backed row in Spanner/CockroachDB, or a single-leader Postgres behind a quorum) and perform the decrement as a conditional compare-and-set (`UPDATE rooms SET available = available - 1 WHERE available > 0`). During a partition, only the majority/leader side can commit; the minority returns 'unavailable' rather than risk a phantom sale.",
               "**The nuance that scores points: not all inventory is scarce.** For a hotel with 200 rooms and 3 booked, run AP and reconcile, because the odds of a true conflict are negligible and availability is worth more. Apply the CP tax only to the scarce tail (near-sold-out inventory). The mature design is tunable by scarcity: AP when plentiful, CP when down to the last few units, optimizing availability without ever overselling the resource that matters.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-pacelc",
+          title: "PACELC & the Steady-State Tradeoff",
+          summary:
+            "The else-case tax: linearizable reads and writes cost leader or quorum round trips on every request, so place stores on PA/EL vs PC/EC and tie the choice to a latency SLO.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["pacelc", "consistency", "latency"],
+          teach: {
+            markdown: pacelcTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-pacelc-apply",
+            prompt:
+              "Classify DynamoDB, Cassandra, Spanner, and CockroachDB on the PACELC spectrum and explain what each choice costs a request in the no-partition case.",
+            thinkAbout: [
+              "What does the else-case (no partition) tradeoff cost per request?",
+              "Why do linearizable reads need a leader round-trip or read quorum?",
+              "How is consistency often per-operation tunable?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: all four run multi-region or multi-AZ, so coordination has real network cost, and the concern is read/write p99, not just the partition edge case.",
+              "**DynamoDB: PA/EL.** Available under partition. Normally favors latency: a default read is eventually consistent, served from the nearest replica (one local hop, single-digit ms) but possibly stale. The per-operation lever: a strongly-consistent read flips that call to EC, paying a round trip to the item's leader replica, roughly doubling read latency for freshness.",
+              "**Cassandra: PA/EL.** Available under partition, low latency by default, with the ELC cost fully tunable per query: ONE reads/writes a single replica (EL, fastest, may be stale), QUORUM waits for a majority (EC-leaning, higher latency), ALL waits for every replica (strongest, worst tail, fragile to one slow node). One cluster spans the spectrum; the cost is however many replicas the request blocks on.",
+              "**Spanner: PC/EC.** Consistent under partition (the minority loses the ability to commit). Normally it still chooses consistency over latency: every read-write transaction goes through Paxos to a majority and then does TrueTime commit-wait, deliberately waiting out the clock-uncertainty epsilon so timestamps are externally consistent. Per-request cost: a quorum round trip (cross-region if spread) plus commit-wait, which is why Spanner writes are tens of ms. Stale/bounded-staleness reads are the escape hatch.",
+              "**CockroachDB: PC/EC.** Same posture, different plumbing: each range replicated by Raft, writes need a quorum ack, and hybrid logical clocks (no atomic-clock hardware) mean it sometimes restarts transactions under uncertainty instead of commit-waiting. Cost: the Raft quorum round trip to the range leaseholder.",
+              "**Why a linearizable read costs a round trip:** the nearest replica may not have applied the latest committed write, so reading it locally can return the past. To be linearizable you must confirm you have the newest value: go to the leader/leaseholder or read a quorum and take the max: a coordination hop you cannot skip.",
+              "Common wrong turn: reasoning only about the partition column and ignoring the ELC tax, then being surprised that a 'strongly consistent' store has 40ms writes when the network is perfectly healthy.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-pacelc-practice",
+            prompt:
+              "Design the datastore choice for a multi-region social feed's two hardest operations, the write of a new post and the read of a user's home timeline, at 50,000 writes/second with a 30ms read p99 SLO across US, EU, and APAC. Pick the PACELC posture for each operation and justify it against the SLO.",
+            thinkAbout: [
+              "Is a cross-region quorum read physically possible under a 30ms budget?",
+              "Which single user-visible staleness case must be patched, and how?",
+              "Which rare operation might genuinely deserve a PC/EC store?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 3 regions, users read mostly their own region, a 30ms read p99 budget, the product tolerates a timeline a second or two stale but not a post silently vanishing.",
+              "**The read path is SLO-binding.** A cross-region quorum read is physically impossible under 30ms when US-to-EU RTT alone is ~80ms. The timeline read must be EL: serve from the nearest regional replica, accepting eventual consistency. Back the fan-out/timeline store with a PA/EL store (Cassandra or DynamoDB) replicated per region, so a Tokyo user reads from the APAC replica in single-digit ms.",
+              "**Patch the one staleness case users notice:** their own new post missing from their own timeline. Add a read-your-writes session guarantee: route the author's timeline read through their home region or merge their recent writes client-side, rather than making the whole feed strongly consistent.",
+              "**The write path (create post):** durability and no lost writes matter more than raw latency, and 50k writes/s must not bottleneck on a global quorum. Make the post write local-region durable first (quorum within the author's region: a few ms), replicating asynchronously to other regions. Still PA/EL globally: the user's post is not blocked on an APAC ack.",
+              "**Carve out the rare truly-global operation:** if something genuinely needs global linearizability (username uniqueness at signup), put THAT operation on a PC/EC store (Spanner or a CockroachDB table) and let it eat the cross-region quorum latency, because it is rare and correctness-critical.",
+              "**The load-bearing point:** pick a PACELC posture per operation, not one database for the product: EL for hot feed reads and regional writes to hit the SLO, EC only for the rare global-uniqueness case. Exactly how real multi-region systems reconcile a tight latency budget with correctness where it counts.",
             ],
           },
         },
