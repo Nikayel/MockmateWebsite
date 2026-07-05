@@ -9,6 +9,7 @@ import { ColdStartNote } from "./ColdStartNote"
 import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExerciseLayout } from "./ExerciseLayout"
 import { SqlDataPreview } from "./SqlDataPreview"
+import { SqlWorkspaceResult } from "./SqlWorkspaceResult"
 import { useExerciseRun } from "./useExerciseRun"
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 import type { PythonExercise } from "@/lib/tutorials/types"
@@ -20,6 +21,14 @@ import type { PythonExercise } from "@/lib/tutorials/types"
  * `__init__.py`s) are never shown — so hidden-test source never leaks — but still execute. Grading
  * shares `useExerciseRun`; the Pyodide runner reports `__WORKSPACE_TEST_RESULTS__:` rows.
  */
+/** The learner's in-progress editor state, lifted so it can outlive a runner unmount. */
+export interface WorkspaceEditorState {
+  /** Editable file path → current content. */
+  edits: Record<string, string>
+  /** The open file tab. */
+  activePath: string
+}
+
 export interface WorkspaceExerciseRunnerProps {
   exercise: PythonExercise
   workspace: NonNullable<PythonExercise["workspace"]>
@@ -36,6 +45,14 @@ export interface WorkspaceExerciseRunnerProps {
   seedSql?: string
   /** Phase framing for the left brief (eyebrow + title + resurfaces chip). */
   brief?: ExerciseBriefMeta
+  /**
+   * Persisted editor state. When provided, seeds the initial edits + open tab and is kept in sync via
+   * `onPersistState`, so switching sections (which unmounts this runner) doesn't discard the learner's
+   * work — the parent re-seeds it on remount. Omitted by callers that don't need it (the Python
+   * player), which leaves the runner fully self-managed.
+   */
+  persistedState?: WorkspaceEditorState
+  onPersistState?: (state: WorkspaceEditorState) => void
 }
 
 export function WorkspaceExerciseRunner({
@@ -46,6 +63,8 @@ export function WorkspaceExerciseRunner({
   engine = "python",
   seedSql,
   brief,
+  persistedState,
+  onPersistState,
 }: WorkspaceExerciseRunnerProps) {
   const editablePaths = useMemo(() => new Set(workspace.editableFilePaths), [workspace])
   const isEditable = (file: WorkspaceScenarioFile) =>
@@ -64,8 +83,31 @@ export function WorkspaceExerciseRunner({
     return seed
   }, [workspace])
 
-  const [edits, setEdits] = useState<Record<string, string>>(starterEdits)
-  const [activePath, setActivePath] = useState<string>(workspace.primaryFilePath)
+  // Seeded from the parent's cache (if any) so edits survive a section switch; the parent stays
+  // authoritative on remount, but this internal state is the live source of truth while mounted.
+  const [edits, setEditsState] = useState<Record<string, string>>(
+    () => persistedState?.edits ?? starterEdits
+  )
+  const [activePath, setActivePathState] = useState<string>(
+    () => persistedState?.activePath ?? workspace.primaryFilePath
+  )
+
+  // Mirror every edit/tab change up so the parent's cache stays current. Imperative (not an effect)
+  // to avoid a mount-time write-back loop; a no-op when the caller doesn't pass `onPersistState`.
+  const applyEdits = (next: Record<string, string>) => {
+    setEditsState(next)
+    onPersistState?.({ edits: next, activePath })
+  }
+  const selectPath = (path: string) => {
+    setActivePathState(path)
+    onPersistState?.({ edits, activePath: path })
+  }
+
+  // SQL-only: after each graded Run, re-run the same seed + script (display-only, no assertions) to
+  // show the RESULTING tables. `runNonce` triggers a fresh preview; `submittedScript` pins the exact
+  // content that ran, so later typing doesn't desync the shown tables from the graded result.
+  const [runNonce, setRunNonce] = useState(0)
+  const [submittedScript, setSubmittedScript] = useState("")
 
   const isDirty = useMemo(
     () => Object.keys(starterEdits).some((path) => edits[path] !== starterEdits[path]),
@@ -85,6 +127,14 @@ export function WorkspaceExerciseRunner({
       .filter(isEditable)
       .map((file) => ({ path: file.path, content: edits[file.path] ?? file.content }))
     void run({ workspaceFiles })
+
+    // SQL workspaces: capture the primary script that just ran and bump the nonce so the resulting
+    // tables refresh alongside the test results. No-op for Python (the panel never renders).
+    if (engine === "sql") {
+      const primaryFile = workspace.files.find((file) => file.path === workspace.primaryFilePath)
+      setSubmittedScript(edits[workspace.primaryFilePath] ?? primaryFile?.content ?? "")
+      setRunNonce((n) => n + 1)
+    }
   }
 
   return (
@@ -121,7 +171,7 @@ export function WorkspaceExerciseRunner({
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                onClick={() => setActivePath(file.path)}
+                onClick={() => selectPath(file.path)}
                 className={[
                   "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-xs transition-colors",
                   selected
@@ -146,7 +196,7 @@ export function WorkspaceExerciseRunner({
               }
               onChange={
                 isEditable(activeFile)
-                  ? (value) => setEdits((prev) => ({ ...prev, [activeFile.path]: value }))
+                  ? (value) => applyEdits({ ...edits, [activeFile.path]: value })
                   : undefined
               }
               language={activeFile.language}
@@ -174,7 +224,7 @@ export function WorkspaceExerciseRunner({
         <ColdStartNote warming={warming} engine={engine} />
         <Button
           variant="ghost"
-          onClick={() => setEdits(starterEdits)}
+          onClick={() => applyEdits(starterEdits)}
           disabled={!isDirty}
           className="gap-2"
         >
@@ -199,6 +249,12 @@ export function WorkspaceExerciseRunner({
       )}
 
       <TestResultsPanel results={results} isRunning={running} />
+
+      {/* SQL workspaces: show the actual tables the learner's script produced, so the pass/fail
+          assertions above are backed by data they can see. No-op for Python. */}
+      {engine === "sql" && (
+        <SqlWorkspaceResult seedSql={seedSql} script={submittedScript} runNonce={runNonce} />
+      )}
     </ExerciseLayout>
   )
 }
