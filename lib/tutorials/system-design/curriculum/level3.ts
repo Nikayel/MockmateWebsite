@@ -363,6 +363,65 @@ sub-partitioning, or dedicated shards; use entity groups and compound keys to ke
 single-shard; and plan resharding and online migration early.
 `.trim()
 
+const crossShardOpsTeach = `
+## Sharding breaks joins and atomic multi-key writes
+
+Sharding buys scale by breaking two things you took for granted on a single database: **joins** and
+**atomic multi-key writes**. Once related rows can live on different nodes, a query that spans them
+is a distributed operation, and a write that must change both is a distributed transaction.
+
+### Cross-shard reads (scatter-gather)
+
+A query that is not scoped to one shard key must fan out to every partition, and it is bounded by the
+**slowest shard**, not the average. This is **tail latency amplification**: if each shard's p99 is
+10ms and you hit 50 shards, the chance that *at least one* is slow approaches certainty, so the
+overall p99 is far worse than 10ms. Mitigations: avoid the fan-out by choosing the shard key to match
+the query, **denormalize** so the data you need is co-located, cap the fan-out width, and use
+hedged/speculative requests to blunt single-shard tail latency. The senior instinct is to design most
+reads to touch one shard and treat scatter-gather as the rare, budgeted case.
+
+### Cross-shard writes: avoid 2PC on the hot path
+
+The textbook answer is **two-phase commit (2PC)**: a coordinator asks all participants to *prepare*
+(lock and promise), and if all vote yes, tells them to *commit*. It gives atomicity, and you should
+know it, but **avoid it on the hot path**. 2PC holds locks across a network round trip, so it kills
+throughput, and it is **blocking**: if the coordinator dies after prepare, participants sit holding
+locks indefinitely, unsure whether to commit or abort. It is defensible only for low-frequency,
+must-be-atomic operations, and modern systems (Spanner, CockroachDB) make it viable only by pairing
+it with tight clock/consensus machinery you do not want to hand-roll.
+
+### Sagas: the standard replacement
+
+A saga breaks the operation into a sequence of **local** transactions, each on one shard, and for
+every step defines a **compensating action** that semantically undoes it. If a later step fails, you
+run the compensations for the completed steps in reverse. A money transfer becomes: debit A (local),
+credit B (local); if credit fails, compensate by re-crediting A. You give up isolation (intermediate
+states are visible, so you design for them, e.g. a "pending" balance) in exchange for no distributed
+locks and independent, available shards. Sagas are **orchestrated** (a central coordinator drives
+steps, easier to reason about and monitor) or **choreographed** (each step emits an event the next
+reacts to, more decoupled but harder to trace).
+
+Two patterns make sagas safe under real-world **at-least-once** delivery:
+
+- **Idempotency keys.** Every step carries a unique key; the receiving shard records processed keys
+  and **dedups retries**, so replaying "credit B" after a timeout does not double-credit.
+- **The outbox pattern.** The problem: you must both write the DB row *and* publish an event, but
+  they are separate systems, so a crash between them loses one. The fix: in the **same local
+  transaction**, write the business row and an "outbox" row; a separate relay reads the outbox and
+  publishes to Kafka, marking rows sent. Now the DB write and the intent-to-publish are atomic, and
+  the relay retries publishing idempotently. This is how you drive a saga's next step reliably.
+
+**Interview nuance:** the failure mode interviewers hunt for is hand-waving cross-shard joins and
+multi-key writes as if they were free. When the design crosses shards, say it: "this is now a
+distributed transaction; I will use a saga with compensations and idempotency keys, not 2PC on the
+hot path, and I will denormalize to keep the frequent reads single-shard."
+
+Recap: sharding breaks joins (scatter-gather, bounded by the slowest shard) and atomic multi-key
+writes; avoid 2PC on the hot path because it locks and blocks on coordinator failure; use a saga of
+local transactions with compensating actions, make retries safe with idempotency keys, publish events
+atomically with the outbox pattern, and denormalize to avoid cross-shard joins.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -675,6 +734,55 @@ export const systemDesignLevel3: DesignLevel = {
               "**The long tail** of small tenants is packed many-to-a-partition by hash(tenant_id), efficient because none is individually hot.",
               "**A directory/routing table** (tenant to shard-tier mapping) allows promoting a growing tenant from the shared pool to a dedicated shard online, via double-write and backfill, when it crosses a load threshold.",
               "**The committed tradeoff:** two placement regimes plus a routing directory and tenant-promotion migrations, in exchange for hard noisy-neighbor isolation and independent scaling of the tenants that drive cost. A single uniform hash(tenant_id) would either waste a whole node on tiny tenants or let the whale dominate whatever partition it lands on.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-cross-shard-ops",
+          title: "Cross-Shard Operations & Distributed Transactions",
+          summary:
+            "Avoid 2PC on the hot path (locks, blocks on coordinator failure); use sagas of local transactions with compensations, idempotency keys, and the outbox pattern.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["cross-shard", "saga", "transactions"],
+          teach: {
+            markdown: crossShardOpsTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l3-cross-shard-ops-apply",
+            prompt:
+              "Design a money-transfer or order-checkout flow that must update two records living on different shards without losing consistency.",
+            thinkAbout: [
+              "Why avoid 2PC on the hot path, and what does it cost?",
+              "How does a saga with compensations replace a cross-shard transaction?",
+              "How do the outbox pattern and idempotency keys make it safe?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a money transfer of amount X from account A to account B, sharded by account_id onto different shards. Requirements: no money created or destroyed, no double-debit under retries, available and fast at scale.",
+              "**Why not 2PC:** a two-phase commit across A's and B's shards would lock both rows across network round trips and, worse, block holding those locks if the coordinator crashes between prepare and commit, exactly on the highest-value hot path. A throughput and availability liability.",
+              "**Saga design, orchestrated for traceability:** (1) create a transfer record in PENDING with a unique transfer_id (the idempotency key); (2) local txn on A's shard: debit A by X, tagged with transfer_id (a dedup table rejects a replayed debit); (3) local txn on B's shard: credit B by X, same dedup; (4) mark the transfer COMPLETED.",
+              "**Compensation:** if step 3 fails permanently, run a local txn on A's shard that re-credits X (again keyed by transfer_id so it runs once) and mark the transfer FAILED. Isolation is relaxed: the debit is visible before the credit, so model A's balance as available vs pending and never let the same funds be spent twice.",
+              "**Reliability:** each step uses the outbox pattern: the local DB write and the event that triggers the next step are written in one local transaction to an outbox table, and a relay publishes to Kafka and retries idempotently, so a crash between 'debit A' and 'emit credit-B event' cannot lose the step. Delivery is at-least-once, so idempotency keys (transfer_id + step) and per-shard dedup tables make every retry safe.",
+              "Common wrong turn: reaching for 2PC (or an ambient distributed transaction) on the hot path, or waving away the two-shard write as atomic. It is not atomic; it is a saga, and the honest answer names the compensations and the idempotency/outbox machinery that keep it correct under retries and crashes.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-cross-shard-ops-practice",
+            prompt:
+              "Design the order-placement flow for an Amazon-scale checkout that must, as one logical operation, reserve inventory (inventory service/shard), charge payment (payment service/shard), and create the order (order service/shard), each on a different data store, at tens of thousands of orders/sec. Guarantee no oversell and no double-charge, and keep it available if any one service is briefly down.",
+            thinkAbout: [
+              "Which local mechanism guarantees no oversell without any cross-service lock?",
+              "What happens to the saga when the payment service is down for two minutes?",
+              "Why must inventory holds eventually expire?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: three independent services with their own sharded stores; the operation spans all three; peak is high; hard invariants are no overselling and no double-charging, while staying available under partial failures.",
+              "**An orchestrated saga, not a distributed transaction.** An order orchestrator drives an order_id-keyed state machine: (1) reserve inventory (local txn on the inventory shard: decrement available, create a reservation keyed by order_id; compensation: release the reservation); (2) authorize payment (local txn on the payment shard, keyed by order_id; compensation: void/refund); (3) create the order as CONFIRMED and capture payment.",
+              "**Failure paths:** if step 2 fails (card declined), compensate step 1 (release inventory) and mark the order FAILED. If step 3 fails, compensate payment (void) and inventory (release). No 2PC: each step is a local transaction, so no cross-service locks and each service stays independently available.",
+              "**No oversell:** the inventory reservation is a local atomic decrement with a floor at zero, so two concurrent orders for the last unit cannot both succeed; the loser's saga fails and compensates. **No double-charge:** payment authorization is idempotent on order_id, so a retried authorize after a timeout returns the existing authorization instead of charging again.",
+              "**Partial failure:** every step uses the outbox pattern (business write + next-step event in one local txn, relayed to Kafka), so a crash mid-saga does not lose a step. If a service is briefly down, the orchestrator retries with backoff; the order sits pending ('processing') and the saga resumes on recovery rather than failing the checkout. A timeout policy eventually compensates and releases the inventory hold so stock is not stranded.",
+              "**The committed tradeoff:** eventual consistency and visible intermediate states (a brief inventory hold, a pending order) plus orchestration/idempotency/outbox complexity, in exchange for availability and throughput that 2PC across three services could never sustain at tens of thousands of orders/sec.",
             ],
           },
         },
