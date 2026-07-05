@@ -14,10 +14,11 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Routes that require authentication
-// "/learn/python" and "/learn/sql" hard-gate the tutorials (progress requires a real user);
-// execution stays free/no-quota (client-side WASM), so the page is auth-gated instead. The
-// prefix match covers all sub-paths (/learn/sql, /learn/sql/<level>/<lesson>).
-const PROTECTED_ROUTES = ["/admin", "/learn/python", "/learn/sql"]
+// "/learn/python", "/learn/sql", and "/learn/system-design" hard-gate the tutorials (progress +
+// saved answers require a real user); execution stays free/no-quota (client-side WASM, or none for
+// system design), so the page is auth-gated instead. The prefix match covers all sub-paths
+// (/learn/sql, /learn/sql/<level>/<lesson>).
+const PROTECTED_ROUTES = ["/admin", "/learn/python", "/learn/sql", "/learn/system-design"]
 
 // Routes that should redirect authenticated users away
 const AUTH_ROUTES = ["/login", "/signup"]
