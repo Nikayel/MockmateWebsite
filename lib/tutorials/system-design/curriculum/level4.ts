@@ -519,6 +519,57 @@ and always return 429 plus Retry-After and RateLimit headers with a stated fail-
 policy.
 `.trim()
 
+const distributedRateLimitingTeach = `
+## One global limit across N nodes
+
+A single-node limiter is easy because one process owns the counter. Production limiters run on a
+**fleet of gateway nodes** behind a load balancer, and a user's requests land on any of them. If each
+of 20 nodes independently enforces "100 req/min," a user spraying across all 20 gets **2000
+req/min**, 20x the intended limit. The whole problem of distributed rate limiting is enforcing one
+global limit across N nodes without paying an unacceptable latency or availability tax.
+
+**Approach 1: centralized exact, with a shared store.** Put the counter in **Redis** and have every
+node read-modify-write it. The trap is the race: two nodes doing \`GET count; if under limit INCR\`
+can both read 99 and both allow, overshooting. You must make the decision **atomic**. For simple
+counters, \`INCR\` returns the new value in one round trip, so the node increments first and rejects
+if the result exceeds the limit. For token bucket you need multiple fields updated together (refill
+then decrement), so you run a **Lua script** via \`EVAL\`, which Redis executes atomically. This
+gives exact global enforcement. The cost is a network round trip to Redis on **every request** (0.5
+to 1ms added per call) and Redis becoming a hot dependency.
+
+**Approach 2: local approximation.** Give each node a slice of the budget: 2000/min total across 20
+nodes means 100/min per node, enforced purely in local memory with zero coordination. Fast, no shared
+dependency, but only correct when traffic is evenly balanced. If the load balancer sends a hot user
+disproportionately to a few nodes, those nodes throttle early while the global budget is underused.
+It also wastes budget: idle nodes' slices are unusable by busy nodes.
+
+**Approach 3: hybrid, the common production answer.** Nodes enforce locally from a **local token
+cache** for speed, and **asynchronously sync** their consumption to Redis every short interval (say
+100ms) to true up the shared view and re-divide the remaining global budget. This bounds overshoot to
+at most one sync interval's worth of traffic while keeping the hot path in local memory. Envoy's
+global rate limiting and many CDNs work roughly this way.
+
+**Interview nuance:** you will always be asked "what if Redis is down?" A rate limiter must not
+become a **single point of failure** for the whole API. The standard answer is **fail open**: if the
+shared store is unreachable, fall back to permissive local limits and let downstream load shedding
+protect the backend. Also handle **hot keys** (one celebrity key hammering a single Redis slot) with
+key sharding or local caching, and **clock skew / window alignment** across nodes: use the store's
+time or logical windows, not each node's wall clock.
+
+\`\`\`
+naive per-node (BROKEN)          hybrid (production)
+ node1: 100/min                   local cache enforces fast
+ node2: 100/min   x20 nodes       async sync -> Redis every 100ms
+ ...              = 2000/min       true up + re-divide budget
+ user sprays -> 20x limit         overshoot bounded to ~1 interval
+\`\`\`
+
+Recap: naive per-node limits grant Nx, so either enforce exactly via atomic Redis ops (INCR / Lua,
+paying a per-request round trip) or approximate locally and async-sync to a shared store for bounded
+overshoot, and always decide the fail-open path plus hot-key sharding so the limiter never becomes
+the outage.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -978,6 +1029,54 @@ export const systemDesignLevel4: DesignLevel = {
               "**Layer 2, hard ceiling: sliding-window counter** at a coarser granularity (per-hour) to cap total volume even if the token bucket is continuously refilled: catches sustained abuse that stays just under the per-second bucket, without the fixed-window boundary spike.",
               "**Layer 3, anomaly-triggered clamp:** payments are money, so add a fast reactive control: if a key's charge rate or failure/decline rate jumps far above its own trailing baseline (a fraud signal), automatically drop that key to a tiny emergency limit and alert. This is the 'contain a compromised key fast' requirement; no static limit provides it.",
               "**Contract:** 429 with Retry-After, and critically the API requires idempotency keys so a client retrying after a 429 cannot double-charge. **Fail closed** at the payment tier when the limiter state store is unavailable for a suspicious key: unusual for public APIs but correct here, since wrongly allowing a fraud burst is worse than briefly rejecting legitimate traffic, and legitimate merchants retry safely via idempotency keys.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-distributed-rate-limiting",
+          title: "Distributed Rate Limiting",
+          summary:
+            "Naive per-node limits grant Nx; enforce exactly with atomic Redis ops or hybrid local-cache-plus-async-sync for bounded overshoot, always with a fail-open plan.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["rate-limiting", "distributed", "redis"],
+          teach: {
+            markdown: distributedRateLimitingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-distributed-rate-limiting-apply",
+            prompt:
+              "Extend a single-node rate limiter to a fleet of 20 gateway nodes without letting a user get 20x their limit.",
+            thinkAbout: [
+              "How do you keep the shared counter atomic under races?",
+              "What is the tradeoff of local approximation vs centralized exactness?",
+              "What happens if the shared store (Redis) is down?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 20 stateless gateway nodes behind an L7 load balancer, a user keyed by API key lands on any node, target 100 req/min per key, tight p99 budget. The naive design where each node independently enforces 100/min is the bug: it yields up to 2000/min per user.",
+              "**Design: a hybrid limiter with a shared Redis backing store.** The per-request hot path checks a local token cache on the node (in-memory), so most decisions cost zero network. Every node asynchronously syncs its consumed tokens to Redis on a short interval (100ms) and receives an updated view of global consumption plus its re-divided share of the remaining budget. The effective limit stays close to 100/min with overshoot bounded to roughly one sync interval of traffic, not 20x.",
+              "**Atomic shared state:** for a plain counter, `INCR` (returns the post-increment value in one round trip) and reject when it exceeds the limit, avoiding the read-modify-write race where two nodes both read 99 and both allow. For token-bucket semantics (refill by elapsed time, then decrement), a Lua script via EVAL executes atomically so concurrent nodes cannot interleave and overshoot.",
+              "**The explicit tradeoff:** pure centralized-exact (Redis on every request) is most accurate but adds 0.5-1ms per call and makes Redis a hot dependency; pure local approximation (budget/N per node) is fastest but goes fuzzy under uneven balancing and wastes idle nodes' shares. The hybrid buys most of the accuracy for most of the speed: right for a 20-node fleet.",
+              "**Failure handling:** if Redis is unreachable, nodes fail open to a conservative local limit (budget/N) and rely on downstream load shedding as the real backstop, because a limiter outage must not become a total API outage. Shard hot keys across Redis slots (or serve them from local cache with looser sync), and align windows using the store's clock or logical windows to avoid per-node clock skew.",
+              "Common wrong turn: independent per-node limits 'because the nodes are stateless' (silently grants 20x), or centralizing on Redis with a non-atomic GET-then-INCR that races and overshoots under concurrency.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-distributed-rate-limiting-practice",
+            prompt:
+              "Design global rate limiting for a CDN edge with 200 points of presence across the globe where the per-customer limit must hold worldwide but a synchronous call to a central store on every request would add unacceptable latency. Justify your consistency choice.",
+            thinkAbout: [
+              "Why is strict centralized exactness off the table by requirement here?",
+              "How do budget leases follow live demand across regions?",
+              "What is the honest bound on overshoot, and why is it acceptable?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 200 geographically distributed PoPs, a customer with a global limit of say 1M req/min, and a synchronous round trip from Tokyo to a US store adding 100ms+ per request: unacceptable for a CDN whose value is latency. Strict centralized exactness is off the table by requirement; approximate and be honest about the consistency window.",
+              "**Design: hierarchical, eventually-consistent budgeting.** A central coordinator (or regional tier of coordinators) holds the authoritative global budget and hands out **leases** of budget to each PoP, proportional to that PoP's recent share of the customer's traffic. Within a PoP, nodes enforce against the local lease using in-memory token buckets: the hot path is entirely local, zero cross-region latency. PoPs report consumption and renew leases asynchronously every 250ms to 1s, and the coordinator re-divides the remaining budget toward live demand.",
+              "**Consistency choice, stated deliberately:** bounded eventual consistency on the global limit. Overshoot is capped at roughly the sum of one refresh interval's in-flight traffic across regions: a small percentage of a 1M/min limit. Perfect global exactness is not worth adding 100ms to every request; rate limits are a coarse abuse control, not a financial ledger.",
+              "**Failure and shifts:** if the coordinator is unreachable, each PoP fails open to its last known lease (or a conservative default) rather than blocking traffic, with origin shielding / load shedding as the real backstop. A viral event moving load to one region is absorbed as leases re-divide toward live demand within an interval; until then the affected region briefly under- or over-limits, which is acceptable.",
+              "This is essentially how large CDNs and Envoy-style global rate limiting operate: local speed, async global truing, fail-open safety.",
             ],
           },
         },
