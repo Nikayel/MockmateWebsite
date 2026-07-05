@@ -246,6 +246,57 @@ amplification; LSM appends to a memtable then compacts immutable SSTables for hi
 using bloom filters and compaction to keep reads sane.
 `.trim()
 
+const indexingCostTeach = `
+## Which index, in what order, at what cost
+
+An index is a sorted, auxiliary copy of some columns that lets the database find rows without
+scanning the whole table. The core senior skill is not "add an index," it is knowing *which* index
+serves a given query, in what column order, and what that index costs you on every write.
+
+### Clustered vs secondary
+
+A **clustered / primary index** determines the physical order of the rows themselves; the table *is*
+the index (InnoDB tables are clustered on the primary key). A **secondary index** is a separate
+B-tree that maps indexed columns to a row locator (the primary key in InnoDB, or a physical tuple
+pointer in Postgres, whose tables are unordered "heaps"). This matters because in a heap table, a
+secondary index match still needs a second read to fetch the row from the heap.
+
+### The leftmost-prefix rule
+
+The single most tested idea: an index on (a, b, c) is sorted first by a, then by b within equal a,
+then by c within equal (a, b). So it can serve queries that use a prefix of those columns: \`a=?\`,
+\`a=? AND b=?\`, \`a=? AND b=? AND c=?\`. It cannot efficiently serve \`b=?\` alone, because b is
+only sorted within each a group. This is why **column order is a design decision, not an alphabetical
+accident**. The rule of thumb: equality-filtered columns first, then the column you sort or
+range-scan on last, so that after the equality prefix pins a contiguous slice, the sort column is
+already in order inside that slice and no separate sort step is needed.
+
+A **covering index** (index-only scan) is the next lever. If the index contains *every* column the
+query needs, in its keys or as included non-key columns (Postgres \`INCLUDE\`, SQL Server included
+columns), the database answers entirely from the index and never touches the table/heap. That removes
+the second read per row and can turn a slow query fast, at the cost of a wider index.
+
+**Selectivity / cardinality** decides whether the planner even uses your index. An index on a boolean
+\`is_active\` that is 95% true is nearly useless: matching most of the table via an index
+(random-ish lookups) is slower than a sequential full scan. High-cardinality columns (user_id, email)
+are the good candidates. The planner estimates rows returned and picks index versus full scan on
+cost; a stale statistics estimate is a classic cause of "it stopped using my index."
+
+### The cost side
+
+**Interview nuance:** the cost side is where juniors get exposed. Every index is a second data
+structure the database must **keep in sync on every insert, update, and delete**. Ten indexes means
+one insert becomes eleven B-tree writes plus more WAL and more storage. Write-heavy tables should be
+deliberately under-indexed. Beyond the default B-tree, know the specialized types: **hash** (equality
+only, no ranges), **partial** (index only rows matching a predicate, e.g. \`WHERE status='active'\`,
+keeping it tiny), and **GIN/GiST** (Postgres inverted/generalized indexes for arrays, JSONB,
+full-text, and geospatial).
+
+Recap: pick the index by the query, order composite columns as equality-then-sort per the
+leftmost-prefix rule, make it covering when a hot query justifies the width, and remember every index
+taxes every write.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -462,6 +513,55 @@ export const systemDesignLevel2: DesignLevel = {
               "**Compaction: time-window compaction (TWCS),** not size-tiered. Messages are written once and rarely updated, and reads are recent-heavy, so grouping SSTables by time window means old windows compact once and are left alone, slashing write amplification and stopping cold data from being rewritten forever. Old windows can be dropped or tiered cheaply by TTL.",
               "**Hot partitions are the real risk:** a huge active channel would create an unbounded hot partition that overloads its replica set. Bound partitions with time bucketing (e.g. one bucket per 10-day window) so no partition grows without limit; sub-partition pathologically hot channels; and front the store with a cache for the hottest recent reads so a viral channel does not hammer one shard.",
               "**The committed tradeoff:** LSM plus TWCS accepts higher read amplification on old data (rarely read here) in exchange for cheap sustained writes and bounded compaction cost.",
+            ],
+          },
+        },
+        {
+          id: "sd-l2-indexing-cost",
+          title: "Indexing: Types, Structure & Cost",
+          summary:
+            "Order composite indexes equality-then-sort per the leftmost-prefix rule, make hot queries covering, and remember every index taxes every write.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["indexing", "query-performance"],
+          teach: {
+            markdown: indexingCostTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l2-indexing-cost-apply",
+            prompt:
+              "Design the indexes for a query that filters by user_id, filters by status, and sorts by created_at, and explain the index that serves it fully.",
+            thinkAbout: [
+              "How does the leftmost-prefix rule drive composite column ordering?",
+              "What makes an index-only (covering) scan possible?",
+              "Why does over-indexing hurt writes?",
+            ],
+            modelAnswerOutline: [
+              "The query is roughly `SELECT ... FROM orders WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT 20`. The right index is a **composite on (user_id, status, created_at)**.",
+              "**Why that order:** `user_id` and `status` are both equality filters, so they go first; together they pin a single contiguous run of index entries. Within that run the entries are already sorted by `created_at`, so the ORDER BY ... LIMIT 20 becomes 'walk the tail of that run backward and stop after 20 rows': no separate sort step, no scanning rows that get discarded.",
+              "**Why other orders fail:** (created_at, user_id, status) is useless for this query because `created_at` leads with no equality on it; putting `created_at` before `status` breaks the free sort because entries interleave across statuses.",
+              "**Direction:** define `created_at DESC` (or rely on the engine reading the B-tree backward, which Postgres and InnoDB both do) so the newest-first LIMIT is a cheap prefix read.",
+              "**Covering:** add the columns the SELECT returns as included payload (`INCLUDE (total, currency)` in Postgres, or extend the key in MySQL) so the query becomes an index-only scan that never visits the heap, removing one random read per returned row. Only do this for a genuinely hot query: included columns widen every entry and increase storage and write cost.",
+              "**The cost accepted:** this index must be maintained on every insert and every status update. Fine here because reads of a user's orders dominate.",
+              "Common wrong turn: creating three single-column indexes on user_id, status, and created_at and expecting the planner to combine them. A bitmap-AND of separate indexes usually cannot serve the sort, so it filters then sorts in memory, far slower than the one composite index, while quietly tripling write amplification.",
+            ],
+          },
+          practice: {
+            id: "sd-l2-indexing-cost-practice",
+            prompt:
+              "Design the indexing strategy for Stripe's charges table, a write-heavy multi-tenant table with billions of rows where the dashboard runs WHERE merchant_id = ? AND status = ? ORDER BY created_at DESC but analysts also occasionally filter by customer_id and by a JSONB metadata field. Justify what you index, what you deliberately do not, and how you keep writes cheap.",
+            thinkAbout: [
+              "Which single query must be fast for every tenant, and what exact index serves it?",
+              "What do partial and expression indexes buy you on a write-heavy table?",
+              "Which queries should deliberately stay slow, and why is that the right trade?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the table is on the write hot path (every charge, refund, and status transition writes here), multi-tenant so almost every query is scoped by merchant_id, and billions of rows, so a full scan is never acceptable for the interactive dashboard but tolerable for rare analyst jobs.",
+              "**Primary serving index: composite (merchant_id, status, created_at DESC)**, exactly matching the dashboard query. merchant_id leads because it is always present and high-cardinality (keeping each merchant's slice small); status is the second equality; created_at last gives the free reverse-time sort for the paginated LIMIT. Consider making it covering only for the handful of columns the dashboard list view renders, accepting the width because that view is extremely hot.",
+              "**customer_id:** occasional analyst use, not hot path. Use a partial index if most lookups target a subset (e.g. non-terminal charges), or scope it as (merchant_id, customer_id) so it stays cheap and tenant-local. If truly rare, index nothing and let it run as a scoped scan.",
+              "**JSONB metadata: no broad GIN index by default.** GIN maintenance is expensive on a write-heavy table and metadata is high-cardinality and rarely filtered. If a specific key becomes a common filter, add a targeted expression index on just that extracted key (`(metadata->>'invoice_id')`), far cheaper than indexing the whole document.",
+              "**The discipline:** every index taxes the write hot path. Index the one query that must be fast for every tenant, serve secondary patterns narrowly with partial and expression indexes, and refuse the broad 'index everything' reflex. The committed tradeoff: rare analyst queries pay with slower scoped scans so billions of daily writes and the interactive dashboard stay fast.",
             ],
           },
         },
