@@ -18,7 +18,7 @@ const clarifyScopeTeach = `
 
 "Design Twitter." Four seconds in, and you already have everything you need to lose the round: a
 prompt so broad that any two engineers would build two different systems. The strongest candidates do
-not start drawing. They start **scoping** — turning a vague ask into a small, agreed problem they can
+not start drawing. They start **scoping**: turning a vague ask into a small, agreed problem they can
 actually finish in the time on the clock.
 
 Scoping has three moves, and it should take three to five sharp questions, not fifteen.
