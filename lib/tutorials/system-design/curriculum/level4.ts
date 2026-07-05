@@ -290,6 +290,61 @@ hop and adds locality at the cost of per-client complexity, and the classic wron
 IPs or long-TTL DNS that keeps sending traffic to terminated instances.
 `.trim()
 
+const globalGslbTeach = `
+## Steer users to the nearest healthy region, and fail fast
+
+Once your product serves users on multiple continents from multiple regions, you need a way to steer
+each user to a nearby healthy region and, when a region catches fire, to pull all traffic off it
+fast. There are two distinct mechanisms, and interviewers want you to know they operate at different
+layers.
+
+**GeoDNS / DNS-based GSLB** steers at name resolution. When a client resolves \`api.example.com\`, an
+authoritative DNS service (Route 53, NS1, Akamai) returns different IPs based on the resolver's
+location or measured latency. You get **geo-routing**, **latency-based routing**, **weighted
+records** (send 10% to a new region for a canary), and **health-checked failover** (stop handing out
+a region's IP once its health check fails). The catch is that DNS is a *caching* system. Every answer
+carries a **TTL**, and resolvers, OS stub resolvers, and browsers cache it. Even a 30 to 60 second
+TTL means some clients keep hitting a dead region for a minute or more after you flip the record, and
+some misbehaving resolvers ignore short TTLs entirely. So DNS failover is never instant, and that
+single fact is the most-probed point in this topic.
+
+**Anycast** steers at the network layer. You announce the *same* IP address from many points of
+presence via BGP. The internet's routing fabric delivers each client's packets to the topologically
+nearest PoP announcing that prefix. Withdraw the BGP announcement at a failing PoP and traffic
+reconverges to the next-nearest one in seconds, with no DNS change and no client-side caching to wait
+out. **ECMP** spreads flows across equal-cost paths. The subtlety: plain ECMP rehashes flows when the
+server set changes, which breaks in-flight connections. Production anycast load balancers (Google's
+**Maglev**, AWS **Hyperplane**) use **consistent hashing** so a backend change only remaps a small
+fraction of connections.
+
+The two combine in practice: anycast to the nearest edge/CDN PoP terminates TLS and absorbs the
+connection close to the user, then the edge forwards over warm long-haul connections to a healthy
+origin region chosen by GSLB.
+
+\`\`\`
+User -> [Anycast IP, BGP -> nearest PoP] -> edge TLS terminate
+     -> GSLB picks healthy origin region -> origin
+  fail a region: withdraw BGP (seconds)  |  flip DNS (minutes, TTL-bound)
+\`\`\`
+
+### Active-active vs active-passive, and draining
+
+Active-active runs live traffic in every region, so failing one out is just shifting its share onto
+the survivors (which must have the headroom to absorb it). Active-passive keeps a warm standby that
+only takes traffic on failover: simpler but wastes capacity and has a colder failover path. To
+**drain** a region cleanly you stop sending it new traffic (lower its DNS weight to zero or withdraw
+its anycast announcement), let in-flight requests finish, then take it down.
+
+**Interview nuance:** if you say "DNS failover, done" you will be asked "how long until the last user
+leaves the dead region?" The honest answer is bounded by TTL plus resolver misbehavior, which is why
+anycast (BGP withdrawal) or connection-level draining is what actually gives you sub-minute regional
+failover.
+
+Recap: use GeoDNS for coarse region steering and anycast plus BGP for fast, cache-free failover, keep
+connections stable with Maglev-style consistent hashing, and never claim DNS failover is instant
+because resolver caching bounds it.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -544,6 +599,62 @@ export const systemDesignLevel4: DesignLevel = {
               "**Invisible-within-seconds:** short heartbeat and check intervals plus client-side passive detection: the client ejects an instance that errors or times out on real requests immediately, without waiting for the registry to catch up, then rechecks the registry. Retries with budgets and circuit breaking cover an ejected instance's in-flight requests on a healthy peer. This is why client-side wins the requirement: the caller reacts to its own observed failures instantly.",
               "**Tradeoff:** client-side/mesh pushes complexity into every caller and depends on fast registry propagation: accepted for the cost and latency wins at this scale.",
               "Common wrong turn: a single central LB tier for all east-west traffic (extra hop, scaling choke point, blind to AZ locality so it burns cross-AZ cost), or a single global registry whose propagation lag makes 'invisible within seconds' impossible across regions.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l4-m2",
+      title: "Global Traffic & Gateway",
+      description:
+        "Route global users to the nearest healthy region and fail a region out in under a minute, design gateways and BFFs that keep services thin, and manage TLS termination plus long-lived connections at scale.",
+      lessons: [
+        {
+          id: "sd-l4-global-gslb",
+          title: "Global & DNS-Level Load Balancing (GSLB, Anycast)",
+          summary:
+            "GeoDNS steers coarsely but is TTL-bound; anycast plus BGP withdrawal gives seconds-scale failover; active-active regions need headroom to absorb a lost region.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["gslb", "anycast", "multi-region"],
+          teach: {
+            markdown: globalGslbTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-global-gslb-apply",
+            prompt:
+              "Design how a global user is routed to the nearest healthy region and how you fail an entire region out in under a minute.",
+            thinkAbout: [
+              "How do GeoDNS and anycast differ for steering?",
+              "Why does client DNS caching limit failover speed?",
+              "Active-active vs active-passive: how do you drain a region?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an API and web product served from three active-active regions (us-east, eu-west, ap-south), users worldwide, and an SLO that a full regional outage is invisible within ~60 seconds.",
+              "**Steering, two layers.** At the edge, an anycast IP fronting a CDN/edge network: the same IP announced by BGP from every PoP, so each user's packets land at the topologically nearest PoP with no client-side decision. The edge terminates TLS close to the user and holds warm pooled connections back to origin regions. Behind that, latency-based GSLB (Route 53 latency records or the edge's own origin selection) maps each PoP to the lowest-RTT healthy origin region, with health checks removing a failed region, weighted records for canarying, and geo rules for data residency.",
+              "**Failing a region out in under a minute:** DNS alone will not reliably hit 60 seconds because resolvers cache past the TTL, so it is not the primary lever. The fast lever is at the anycast/edge layer: withdraw the failing region from the edge's origin pool (or withdraw its BGP announcement if the region is a PoP). Reconvergence is seconds, and because the edge owns the origin connections, no end user re-resolves DNS. Lower the region's DNS weight to zero as a slower backstop.",
+              "**Headroom:** because the regions are active-active, failover is redistributing the dead region's share onto the survivors, so each region runs with roughly N/(N-1) headroom (about 50% spare at three regions) to absorb it without tipping over.",
+              "**Draining cleanly:** stop new traffic first (weight to zero / announcement withdrawn), let in-flight requests finish within a grace window, then decommission. Keep connections stable during backend changes with Maglev-style consistent hashing so scaling or partial failure remaps only a small fraction of flows.",
+              "Common wrong turn: assuming DNS failover is instant. A 30-second TTL flip leaves a long tail of clients hammering the dead region because resolvers and browsers cache (and some ignore short TTLs); the real sub-minute story comes from anycast/BGP or edge-level origin removal.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-global-gslb-practice",
+            prompt:
+              "Design global traffic steering and 60-second regional failover for a payments API like Stripe running active-active in five regions at 200K requests/sec, where a region can go unhealthy partially (elevated p99 and error rate, not a clean crash) and some tenants are contractually pinned to an EU region for data residency.",
+            thinkAbout: [
+              "How do you detect and respond to a gray failure that never trips a binary health check?",
+              "What must routing never do with EU-pinned tenants, even during failover?",
+              "What keeps retried payment requests from double-charging across regions?",
+            ],
+            modelAnswerOutline: [
+              "**Topology:** five active-active regions behind an anycast edge fleet, TLS terminated at the nearest PoP, per-region origin pools selected by health-and-latency-aware routing. At 200K rps, each region runs near 60% utilization so any one region's load spills onto the other four without collapse.",
+              "**Partial failure is the interesting case:** a clean crash trips a health check, but 'elevated p99 and 2% errors' does not. Health checks must be outlier-detection style, driven by real request success rate and latency (Envoy-style ejection), not a TCP ping. When a region crosses an error/latency threshold, the edge sheds a growing fraction of its traffic to healthy regions rather than an all-or-nothing flip, so a gray failure degrades gracefully. Full ejection (withdraw from the origin pool) happens in seconds and never waits on a DNS TTL: how the 60-second SLO is met.",
+              "**Data residency changes the routing rules:** EU-pinned tenants must never be steered outside the EU. Encode residency as a routing policy keyed on the API key or token, so those requests only ever select among EU regions. If the single EU region is unhealthy, a second EU region is required for failover, because spilling EU-pinned traffic to us-east violates the contract. The common trap: latency-based routing that ignores residency happily sends an EU tenant to the nearest non-EU region during failover.",
+              "**Idempotency ties it together:** payment retries during a failover must not double-charge, so the API is idempotency-key based and writes go to a region-aware replicated store, letting a retried request land in a different region and still be deduplicated.",
+              "**Connections:** consistent hashing keeps shifting load from reshuffling every in-flight flow.",
             ],
           },
         },
