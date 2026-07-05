@@ -7,5 +7,10 @@
 import type { DesignLevel } from "@/lib/tutorials/types"
 import { systemDesignLevel0 } from "./level0"
 import { systemDesignLevel1 } from "./level1"
+import { systemDesignLevel2 } from "./level2"
 
-export const SYSTEM_DESIGN_LEVELS: DesignLevel[] = [systemDesignLevel0, systemDesignLevel1]
+export const SYSTEM_DESIGN_LEVELS: DesignLevel[] = [
+  systemDesignLevel0,
+  systemDesignLevel1,
+  systemDesignLevel2,
+]
