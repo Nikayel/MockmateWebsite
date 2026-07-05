@@ -70,6 +70,67 @@ distributed computing are the false assumptions that ignore this, and the fix is
 for retries, reordering, duplication, and stale reads, made safe by idempotency.
 `.trim()
 
+const capCorrectTeach = `
+## The most misquoted result in system design
+
+The folklore version of CAP, "pick 2 of Consistency, Availability, Partition-tolerance," is wrong in
+a way that will sink an interview. The correct statement, from Gilbert and Lynch's proof of Brewer's
+conjecture, is much narrower: **when a network partition occurs, a system must choose between
+consistency and availability.** That is it. CAP says nothing about normal operation, and it is not a
+permanent three-way menu.
+
+### What the letters actually mean
+
+- **C (Consistency)** in CAP is **linearizability**: there is a single, up-to-date copy of the data,
+  and every read sees the most recent completed write in real-time order. Far stronger than "the
+  database doesn't corrupt data." It means no stale reads, ever.
+- **A (Availability)** means **every request to a non-failing node gets a non-error response**,
+  eventually. A node that returns "try again later" or refuses the write is not available in the CAP
+  sense, even though the process is up.
+- **P (Partition tolerance)** means the system keeps operating when the network drops or delays
+  messages between nodes.
+
+Here is why "pick 2" is nonsense: **P is not optional.** Networks partition. Cables get cut, switches
+reboot, a cross-region link saturates. You do not get to choose a world without partitions, so you
+cannot "give up P" to keep C and A. That means **CA is not a real operating point** for any system
+that spans more than one machine. A single-node database is trivially "CA" only because it has no
+network to partition, and calling it CA is the tell that someone learned CAP from a slide, not the
+proof.
+
+### The real decision, during a partition
+
+Two nodes that cannot talk each get a write. They cannot both accept it and stay consistent, because
+their copies would diverge. So:
+
+- A **CP** system sacrifices availability during the partition: the minority side (or both sides)
+  **refuses** writes it cannot safely coordinate, returning errors, to guarantee it never serves or
+  accepts inconsistent data. Examples: ZooKeeper, etcd, HBase, a leader-based store where the
+  minority steps down.
+- An **AP** system sacrifices consistency: **both sides accept** the write and reconcile later
+  (last-writer-wins, CRDTs, or surfacing siblings). Examples: DynamoDB, Cassandra, Riak in their
+  default modes.
+
+**Interview nuance:** the strongest candidates immediately add that real systems are **not globally
+CP or AP.** Consistency is usually **tunable per operation or per key.** Cassandra lets you pick
+consistency level ONE (AP-ish) or QUORUM/ALL (CP-ish) on each query. DynamoDB offers eventually
+consistent reads (cheap) or strongly consistent reads (a leader round trip). So "is X CP or AP?" is
+often the wrong question; the right one is "what does X do to *this* operation during a partition?"
+
+\`\`\`
+             partition!
+   client -> [ node1 ] --X-- [ node2 ] <- client
+                 |                 |
+   CP: node2 (minority) refuses -> availability lost, C kept
+   AP: both accept, reconcile later -> A kept, C lost
+   CA: not an option; P is a fact of nature
+\`\`\`
+
+Recap: CAP is a forced choice **only during a partition** between linearizable consistency and
+availability, P is non-negotiable so CA is not a real operating point, C means linearizability and A
+means every non-failing node answers, and most production systems are tunable per operation rather
+than globally CP or AP.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -130,6 +191,53 @@ export const systemDesignLevel5: DesignLevel = {
               "**Reordering:** because the key is per checkout, out-of-order retries are harmless; Stripe resolves them to one outcome.",
               "**The backend's second line of defense:** record the Stripe charge id under the cart id with a unique constraint, so even an application-level replay cannot create two orders.",
               "The load-bearing insight: correctness comes from the idempotency key end to end (client generates, Stripe dedups, your DB uniquely constrains), not from trying to make the flaky network reliable, which is impossible.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-cap-correct",
+          title: "CAP Theorem (Correct Framing)",
+          summary:
+            "CAP forces a choice only during a partition: linearizability or availability. P is non-negotiable, CA is not real, and production systems tune the choice per operation.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["cap", "consistency", "partition"],
+          teach: {
+            markdown: capCorrectTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-cap-correct-apply",
+            prompt:
+              "Decide CP vs AP behavior for a globally-replicated shopping cart during a cross-region partition and justify the user-visible consequence of each choice.",
+            thinkAbout: [
+              "Why is CA not a real operating point?",
+              "What exactly do C and A mean in CAP?",
+              "Why are most systems tunable/mixed rather than globally CP or AP?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a shopping cart replicated across US and EU regions. During a partition, the replicas cannot exchange writes, and the cart may be touched from multiple devices. Decide what the cart does while the link is down.",
+              "**CA is off the table first:** the system spans two regions connected by a network that will partition (transatlantic links degrade, BGP flaps), so P is a fact, not a dial. The only real choice is CP or AP during the partition.",
+              "**Choose AP for the cart, defended hard.** C means linearizability, A means every non-failing region still answers. Going CP would mean the minority region rejects writes during the partition: the user clicks 'Add to cart' and gets an error. For a cart that directly costs conversion, and the data is not safety-critical. So keep the cart available: both regions accept 'add item' writes locally and reconcile when the partition heals. The user-visible consequence of AP: a stale or divergent cart that must merge after healing.",
+              "**The reconciliation is the real design work:** a cart is close to an add/remove set, so model it as a CRDT (an OR-Set) or track per-item add/remove with causal metadata, so a concurrent 'add socks' in the US and 'add shoes' in the EU merge to a union rather than one clobbering the other via naive last-writer-wins.",
+              "**Flip to stronger guarantees at checkout/payment:** route to a single authoritative region or use a CP path (quorum write) so there is never a double-charge or oversell, accepting that checkout can fail during a partition where cart edits do not. Exactly the 'tunable per operation' point: the cart is AP, the purchase is CP, in the same product.",
+              "Common wrong turn: calling this system 'CA,' or claiming a global 'the cart is a CP system.' The honest framing is per-operation, naming linearizability vs availability precisely rather than hand-waving 'consistency.'",
+            ],
+          },
+          practice: {
+            id: "sd-l5-cap-correct-practice",
+            prompt:
+              "Choose CP or AP for a hotel-booking inventory system (like Booking.com) holding the last room in a hotel during a partition between the booking service's two data centers, and justify the choice against the cart decision you just made.",
+            thinkAbout: [
+              "How does the business cost structure here invert the cart's?",
+              "What mechanism guarantees two data centers cannot both sell the last room?",
+              "Does all inventory deserve the CP tax, or only the scarce tail?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: inventory tracks a finite, oversell-sensitive resource (the last available room). Two data centers each receive a booking request for that room during a partition. The cost structure is the opposite of a cart: a rejected booking is a lost sale (recoverable), but an oversell is a real-world failure (a guest arrives to no room, compensation, brand damage).",
+              "**Choose CP for 'commit the last unit.'** C here is linearizability on the room count: a single authoritative decrement so two data centers cannot both sell unit number one. During the partition, the side that cannot reach the authority (or form a quorum) refuses to confirm the booking, sacrificing availability for that operation. The user-visible consequence: some booking attempts fail or fall back to 'on request' during the partition: acceptable because a failed booking is far cheaper than an oversell. The deliberate inverse of the cart: same CAP machinery, opposite choice, because the cost of inconsistency flipped.",
+              "**Mechanics:** hold inventory in a CP store (a consensus-backed row in Spanner/CockroachDB, or a single-leader Postgres behind a quorum) and perform the decrement as a conditional compare-and-set (`UPDATE rooms SET available = available - 1 WHERE available > 0`). During a partition, only the majority/leader side can commit; the minority returns 'unavailable' rather than risk a phantom sale.",
+              "**The nuance that scores points: not all inventory is scarce.** For a hotel with 200 rooms and 3 booked, run AP and reconcile, because the odds of a true conflict are negligible and availability is worth more. Apply the CP tax only to the scarce tail (near-sold-out inventory). The mature design is tunable by scarcity: AP when plentiful, CP when down to the last few units, optimizing availability without ever overselling the resource that matters.",
             ],
           },
         },
