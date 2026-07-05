@@ -833,6 +833,75 @@ component palette, and trade-off lenses, and actively counter the five classic p
 template to the actual prompt.
 `.trim()
 
+const communicationWhiteboardingTeach = `
+## The interviewer's attention is the scarce resource
+
+In a system-design round the interviewer is not a passive grader watching from behind glass. They are
+one person, usually with about 45 minutes, who is simultaneously your collaborator and your scoring
+signal. Their attention is the scarce resource you manage. Everything below is about keeping them
+inside your head and using their input as a steering wheel rather than a distraction.
+
+### Narrate continuously
+
+Silent thinking is invisible, and invisible thinking reads as being stuck. The habit to build is
+saying the assumption, the option set, and the pick, out loud, in that order: "I am assuming reads
+dominate, so I have two options for the timeline, fan-out on write or on read, and I am going to start
+with fan-out on write because reads are the hot path; I will revisit for celebrity accounts." Now the
+interviewer can follow, agree, or redirect. A pause to think is fine if you announce it: "let me think
+for a few seconds about the write path" is night-and-day better than ten silent seconds.
+
+### Organize the board into fixed zones
+
+A layout that always works:
+
+\`\`\`
++-----------------------------+------------------+
+| Requirements & numbers      |  Parking lot     |
+| - 10M DAU, 4K QPS peak      |  - analytics     |
+| - p99 < 100ms, read-heavy   |  - custom alias  |
++-----------------------------+------------------+
+|                                                |
+|      [Client]->[LB]->[API]->[Cache]->[DB]      |
+|                          box-and-arrow         |
+|                                                |
++------------------------------------------------+
+\`\`\`
+
+Requirements and estimates pinned top-left so you and the interviewer share a reference. The
+box-and-arrow diagram in the center where it can grow. A parking lot on the side for topics you
+deliberately defer, which both shows discipline and reassures the interviewer you did not forget them.
+
+### Treat every interviewer comment as a hint with intent
+
+When they ask "what happens if two writes hit the same counter?" they are almost never curious in the
+abstract; they are steering you toward a deep dive they want to see. Follow it, and confirm the intent
+out loud: "sounds like you want me to focus on the concurrency there, let me do that." The skill is
+telling a hint (follow now) from a rabbit hole (defer to the parking lot). A hint from the
+interviewer: follow it. A tangent you generated yourself that is not on the critical path: park it and
+move on.
+
+### Lead without steamrolling
+
+Leading is proposing a path and checking in: "I will cover the data model, then scaling, does that
+order work for you?" Steamrolling is marching through a rehearsed outline and ignoring interjections.
+The first reads as senior and collaborative; the second reads as not listening, which tanks the
+communication axis even when the design is correct.
+
+**Interview nuance:** Remote and shared-whiteboard rounds (Excalidraw, a Google Doc, CoderPad's
+diagram tool) change the physics. You lose body-language signal and drawing is slower, so pre-learn
+the tool's shortcuts before the interview, keep shapes to plain boxes and labeled arrows, and talk a
+little more to compensate for the interviewer's reduced ability to read your face. Do not burn two
+minutes making a box pretty.
+
+**Interview nuance:** The two most common self-inflicted wounds are going silent to think and ignoring
+a hint because it was not in your planned outline. Both read as not listening. Announce every pause,
+and treat every hint as a course correction you welcome.
+
+Recap: Narrate assumption-option-choice continuously, lay the board out in fixed zones with a parking
+lot, follow interviewer hints as intentional steering while parking your own tangents, and lead by
+proposing and checking rather than steamrolling.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -1576,6 +1645,57 @@ export const systemDesignLevel0: DesignLevel = {
               "**(5) One deep dive, 8 min:** read scaling and cache strategy, since that is where this design lives, not the write path.",
               "**(6) Wrap-up, 6 min:** the bottleneck is the redirect read path, so cache heavily and consider read replicas; call out the counter as a single point of contention and how key-range pre-allocation fixes it.",
               "**Where the cut lands:** a single deep dive instead of two, and estimation kept to the two numbers that drive a decision (read:write ratio and total storage class). Refuse to cut scoping or wrap-up, the phases whose absence a grader notices most.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-communication-whiteboarding",
+          title: "Communication, Whiteboarding & Reading the Interviewer",
+          summary:
+            "Narrate assumption-option-choice continuously, keep the board in fixed zones with a parking lot, and treat interviewer hints as intentional steering.",
+          estimatedMinutes: 25,
+          difficulty: "easy",
+          skills: ["communication", "whiteboarding", "interview-technique"],
+          teach: {
+            markdown: communicationWhiteboardingTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l0-communication-whiteboarding-apply",
+            prompt:
+              "Explain how you would run the first 20 minutes of a system-design round out loud: how you narrate your thinking, lay out the diagram, and respond when the interviewer nudges you toward a topic you had not planned to cover.",
+            thinkAbout: [
+              "How do you keep the interviewer inside your head instead of leaving them to guess what you are thinking silently?",
+              "What is the difference between a hint you should follow and a rabbit hole you should defer?",
+              "How do you lay out a diagram so it stays readable as the design grows?",
+              "What changes when the whiteboard is a shared remote tool instead of a physical wall?",
+            ],
+            modelAnswerOutline: [
+              "Assume a 45-minute round, one interviewer, whose attention is both collaborator and score. The first 20 minutes: scope, estimate, and get a high-level design on the board, narrating throughout.",
+              "**Minutes 0 to 5, requirements, narrated:** say what you are doing before doing it ('Before I design anything I want to nail requirements, so let me ask a few questions'). Ask users/DAU, read vs write, consistency, latency, scope, and write the answers top-left on the board as the shared reference. State assumptions out loud: 'I will assume eventual consistency is fine for the feed, tell me if that is wrong.'",
+              "**Minutes 5 to 10, estimation, narrated:** derive QPS and storage out loud so the interviewer sees the reasoning, not just the number, and pin the results next to the requirements. If you need a moment, announce it: 'give me a few seconds to size the write rate.'",
+              "**Minutes 10 to 20, high-level design:** propose an order and check in ('I will lay out the request path first, then go deep on the hot spot, does that work?'), then draw in the center zone, plain boxes and labeled arrows, client to LB to API to cache to DB, saying each component's job and the one assumption it rests on as you add it.",
+              "**Handling an unplanned nudge:** treat it as intentional steering, not a distraction. Confirm the intent ('sounds like you want me to go deep on durability, happy to, let me do that now') and follow it. A self-generated tangent gets parked instead: write it in the parking-lot zone, say 'I will come back to analytics later,' and move on. A hint from them you follow; a tangent from you, you park.",
+              "**Remote variant:** on a shared tool like Excalidraw, pre-learn shortcuts, keep shapes minimal, narrate a bit more because they cannot read your face, and never spend time beautifying boxes.",
+              "Common wrong turn: going silent to think (announce the pause instead) or ignoring the nudge because it was not in the outline (reads as not listening).",
+            ],
+          },
+          practice: {
+            id: "sd-l0-communication-whiteboarding-practice",
+            prompt:
+              "Explain out loud how you read the signal and adjust when, 30 minutes into a fully remote round on Excalidraw designing a chat system, the interviewer has gone mostly quiet then interrupts with 'I am a bit worried about message ordering,' given you cannot see their face and had planned to talk about storage next.",
+            thinkAbout: [
+              "What does a long silence followed by a specific interruption tell you about where the interviewer thinks your gap is?",
+              "How do you verbally re-sync when you cannot read body language?",
+              "What is the technically rigorous answer to per-conversation message ordering?",
+            ],
+            modelAnswerOutline: [
+              "**Reading the signal:** a mostly-silent remote interviewer who suddenly interrupts with a specific concern is giving a high-value signal, and remote makes it higher-value because you get fewer of them. 'I am a bit worried about message ordering' is not idle curiosity; it says exactly where they want depth and probably where they suspect the design has a gap. Drop the planned storage detour without resistance.",
+              "**Confirm intent out loud** because on a shared tool you cannot nod and read a reaction: 'Good flag, sounds like you want me to make ordering rigorous before I move on to storage. Let me do that now.' That sentence shows you heard them and verbally re-syncs the two of you.",
+              "**Then actually go deep, narrating and drawing:** within a single conversation you need a total order; across conversations you do not. Commit to a per-conversation sequence number assigned by the owning partition (the conversation is the partition key), so all messages in a chat get a monotonic sequence from one authority, avoiding cross-node clock disagreement.",
+              "**Cover the edges:** client send-time cannot be trusted for ordering, so order by server-assigned sequence and use client timestamps only for display. Handle out-of-order delivery (a client receives seq 5 before seq 4) by having the client buffer and reorder by sequence.",
+              "**Board hygiene for remote:** plain boxes and labeled arrows, write 'ordering: per-conversation seq #' directly on the diagram so the decision is visible without re-explaining, and talk a little more to fill the missing body-language channel.",
+              "**Close the loop:** check in ('does that resolve the ordering concern, or should I go further?') before returning to storage, confirming you actually closed their worry rather than assuming it from silence.",
             ],
           },
         },
