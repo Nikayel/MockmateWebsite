@@ -981,6 +981,59 @@ URLs instead of purging, defend hot keys against stampedes, and never let a shar
 authenticated responses.
 `.trim()
 
+const latencyPercentilesTeach = `
+## Three numbers, one law, and a lying average
+
+Three numbers describe how a system behaves under load, and confusing them is the fastest way to
+sound junior. **Latency** is how long one request takes. **Throughput** is how many requests complete
+per second (QPS). **Concurrency** is how many requests are in flight at once. They are not
+independent, and the glue between them is Little's Law.
+
+### Averages lie
+
+Imagine 100 requests, 99 at 10ms and one at 2000ms. The mean is 30ms, which sounds healthy, but 1% of
+your users just waited two seconds. The number that matters is a **percentile**: p50 (median) is the
+typical request, p99 is the request that only 1 in 100 users beats, and p99.9 is the tail your
+biggest, most active users hit constantly. Report p50, p95, p99, and p99.9, and treat **p99 as the
+user number**, because a heavy user who makes 100 requests per page load will almost certainly hit
+your p99 on every single page.
+
+### Fan-out makes the tail common
+
+Tail latency gets worse, not better, as you scale, because of **fan-out**. If one API request fans
+out to 20 backend calls and you must wait for all of them, your response is as slow as the slowest of
+the 20. Even if each backend has a clean 1% chance of a slow (p99) response, the probability that at
+least one of 20 is slow is 1 minus 0.99^20, roughly 18%. So a backend p99 becomes a frontend p82.
+Fan-out turns rare tails into common ones, which is why Google's "tail at scale" work pushes
+techniques like hedged requests (send a duplicate after the p95 mark, take the first to answer).
+
+### Little's Law
+
+\`L = arrival_rate x latency\`, where L is the average number of requests concurrently in the system.
+If you serve 2000 QPS and each request takes 50ms (0.05s), then on average \`2000 x 0.05 = 100\`
+requests are in flight, so you need at least 100 units of concurrency (threads, connections, or async
+slots). Turn it around: if you have a fixed pool of 200 workers and latency creeps to 200ms, your
+ceiling is \`200 / 0.2 = 1000 QPS\`, no matter how much traffic arrives. Little's Law is how you size
+pools and how you spot that rising latency is silently capping throughput.
+
+**Interview nuance:** When asked "how many threads/connections do you need," reach for Little's Law
+out loud. \`concurrency = QPS x latency\` is a one-line answer that signals you can size a system
+rather than guess.
+
+### The measurement trap: coordinated omission
+
+Many load testers send the next request only after the previous one returns. When the server stalls,
+the tester stalls with it and simply fails to send the requests that would have piled up, so those
+never get timed. The result badly understates the tail. Fix it by measuring against intended send
+time (record when a request *should* have started), or use tools like \`wrk2\` or HdrHistogram that
+correct for it. Always aggregate with histograms, not by averaging per-node p99s, because you cannot
+average percentiles.
+
+Recap: Averages hide the tail, p99 is the number users feel and fan-out makes it common, and Little's
+Law (L = arrival_rate x latency) sizes your concurrency and exposes when latency is capping
+throughput.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -1868,6 +1921,63 @@ export const systemDesignLevel1: DesignLevel = {
               "**Stampede protection at the edge:** rely on the CDN's origin shielding / request coalescing: a designated shield POP talks to the origin, and concurrent misses for the same key collapse into one origin fetch (single-flight) while the rest wait or serve stale. Add small TTL jitter so POPs do not expire in lockstep.",
               "**Origin resilience:** the origin sits behind its own cache (Redis/Varnish) so even revalidation requests rarely hit the database, and the CDN TTL can be raised during an incident to shed origin load.",
               "Common wrong turn: a long TTL with no purge (corrections invisible for minutes) or a very short TTL with no request coalescing (every expiry stampedes the origin at 500k RPS and takes it down).",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l1-m4",
+      title: "Performance & Resilience Fundamentals",
+      description:
+        "Reason about latency the way users experience it (tails, not averages), size systems with Little's Law, design timeouts/retries/breakers, protect against overload, and pick the right concurrency model.",
+      lessons: [
+        {
+          id: "sd-l1-latency-percentiles",
+          title: "Latency, Throughput, Percentiles & Little's Law",
+          summary:
+            "Averages hide the tail: target p99, understand how fan-out amplifies it, and size concurrency with Little's Law (L = arrival rate x latency).",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["latency", "percentiles", "littles-law"],
+          teach: {
+            markdown: latencyPercentilesTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l1-latency-percentiles-apply",
+            prompt:
+              "Define the SLIs/SLOs for an API endpoint and explain why you target p99 latency rather than the mean, using Little's Law to relate concurrency, throughput, and latency.",
+            thinkAbout: [
+              "Why does tail latency dominate when one request fans out to many services?",
+              "How does Little's Law (L = arrival rate x latency) bound concurrency?",
+              "What is coordinated omission and why does it distort measured latency?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a read-heavy JSON API (a product-detail endpoint) serving 3000 QPS at peak, fronting a service that fans out to a catalog store, a pricing service, and an inventory service.",
+              "**SLIs vs SLOs:** SLIs are the measured signals: latency distribution (p50/p95/p99/p99.9), availability (fraction of requests returning non-5xx within the latency budget), error rate. SLOs are the targets: 'p99 under 200ms and success rate >= 99.9%, over a rolling 28-day window,' with an error budget (0.1% of requests may miss; burning it too fast pages someone).",
+              "**Why p99, not the mean:** the mean hides the tail users actually feel. A page fanning out to 3 backends returns only when the slowest returns, so a backend p99 shows up far more often than 1 in 100 at page level (1 minus 0.99^3, about 3% of pages). Users with many items on screen hit p99 on nearly every load: the tail is the experience, not the outlier.",
+              "**Little's Law sizes the system:** at 3000 QPS and 50ms latency, average concurrency is 3000 x 0.05 = 150 in-flight requests, so thread pools and downstream connection pools must comfortably exceed 150 or requests queue and latency spikes. If a downstream slows to 150ms, concurrency demand triples to 450; a pool capped at 200 bounds throughput at 200 / 0.15 = 1333 QPS and everything above queues.",
+              "**Guard measurement against coordinated omission:** a closed-loop load test that waits for each response stops sending during a stall and never records the requests that should have piled up, understating the tail. Measure against intended send time, aggregate with HdrHistogram, and never average per-host p99s.",
+              "Common wrong turn: quoting average latency ('we're at 30ms average, we're fine') while p99 is 800ms and fan-out is making that 800ms the common case.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-latency-percentiles-practice",
+            prompt:
+              "Design the latency SLOs and capacity model for Amazon's product-page assembly service during a Prime Day peak, where a single page renders by fanning out to about 100 backend services (recommendations, pricing, reviews, inventory, ads) and must return in 300ms at p99. Quantify why the tail dominates and how you size for it.",
+            thinkAbout: [
+              "At fan-out 100, what fraction of pages hit at least one backend's p99?",
+              "Which techniques collapse the tail: hedged requests, per-backend deadlines, degradation?",
+              "What utilization headroom does the latency-vs-utilization curve force you to keep?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: peak of 500,000 page assemblies per second, a strict 300ms p99 page budget, fan-out to ~100 independent backends where the page needs most of them to render.",
+              "**Tail amplification quantified:** if each backend hit its own p99 independently, the chance a page dodges every tail is 0.99^100, about 37%, meaning 63% of pages would hit at least one slow backend. A per-backend p99 is nowhere near good enough; each backend needs roughly p99.99 to keep the page's p99 in budget. Push per-backend budgets down to single-digit milliseconds and treat the tail, not the mean, as the design target.",
+              "**Techniques:** hedged requests (after a backend passes its p95, fire a duplicate to a second replica and take the first answer, collapsing the tail for a few percent extra load); hard per-backend deadlines with graceful degradation (if reviews or ads miss their budget, render the page without them rather than blowing the whole SLO); and a skeleton with critical blocks (price, buy button) prioritized over optional blocks.",
+              "**Capacity by Little's Law:** at 500k pages/sec and a 300ms budget, in-flight pages average 500000 x 0.3 = 150000, and each page holds up to 100 downstream calls, so downstream connection pools and thread/async budgets must be sized against the fan-out, not the page count.",
+              "**Headroom:** provision to keep every tier well under ~70% utilization at peak, because latency explodes as utilization approaches 100%.",
+              "Common wrong turn: setting a single p99 SLO on the page and assuming healthy per-backend p99s will deliver it, when fan-out math says they will not.",
             ],
           },
         },
