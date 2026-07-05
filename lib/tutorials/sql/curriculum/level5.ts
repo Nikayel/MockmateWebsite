@@ -1480,6 +1480,175 @@ INSERT INTO order_items VALUES
   },
 }
 
+// ---------------------------------------------------------------------------
+// Module 5.3 — Round 3: The Streaming and Pipeline Round
+// ---------------------------------------------------------------------------
+
+const cdcChangelogApply: SqlLesson = {
+  id: "sql-l5-cdc-changelog-apply",
+  title: "CDC Changelog Apply: MERGE-Shaped Upsert with Deletes and Version Ordering",
+  summary:
+    "Apply an I/U/D change stream to a target: dedup to the latest version per key, upsert inserts and updates, delete tombstones, stay idempotent.",
+  estimatedMinutes: 38,
+  difficulty: "hard",
+  skills: [
+    "streaming",
+    "CDC change stream",
+    "ROW_NUMBER latest-per-key",
+    "ON CONFLICT upsert",
+    "tombstone delete",
+    "last-write-wins",
+    "idempotency",
+  ],
+  teach: {
+    estimatedMinutes: 12,
+    markdown: `## CDC hands you a stream of changes, and you apply them to a table
+
+Change Data Capture (CDC) turns a source table's inserts, updates, and deletes into a stream of change rows. Each row carries a primary key, an operation (\`I\` for insert, \`U\` for update, \`D\` for delete), a version (a sequence number or commit timestamp), and the new payload. Your job is to apply that changelog to a target table so it ends up matching the source, which is the MERGE-shaped upsert every pipeline runs.
+
+## The apply, in three moves
+
+Given \`changelog(pk, op, version, payload)\`:
+
+1. **Dedup to the latest version per key.** A key can have several changes in one batch, possibly out of order. Keep only the newest with \`ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) = 1\`. This is not optional: a real MERGE raises a nondeterministic-merge error when two source rows match one target row, so you must collapse to one row per key first.
+2. **Upsert the inserts and updates.** For the surviving \`I\` and \`U\` rows, \`INSERT ... ON CONFLICT(pk) DO UPDATE SET ...\` writes a new row or overwrites the existing one. Insert and update are the same operation once you hold the latest payload.
+3. **Delete the tombstones.** For keys whose latest op is \`D\`, \`DELETE\` them from the target. A delete that lost to a later insert in version order never fires, because step 1 already dropped it.
+
+## Last write wins, and idempotency
+
+The version ordering is what makes this last-write-wins: the highest version for a key is the truth, whatever order the changes arrived in. And because every step is keyed on \`pk\` with upsert and delete, running the whole apply twice leaves the same table. That run-twice-same-result property is what lets a pipeline retry a failed batch safely.
+
+**Interview nuance:** the dedup is the answer they are listening for. A candidate who upserts the raw changelog without collapsing to the latest version per key has written a query that works by luck on ordered input and corrupts on duplicates. Say "dedup to the latest version per key first, because MERGE is nondeterministic on duplicate source rows".
+
+> **In the warehouse this differs.** This is one statement in Snowflake, BigQuery, and Delta: \`MERGE ... WHEN MATCHED AND op = 'D' THEN DELETE WHEN MATCHED THEN UPDATE WHEN NOT MATCHED THEN INSERT\`. SQLite splits it into \`ON CONFLICT\` plus a \`DELETE\`, which is exactly what the MERGE compiles to. Snowflake and BigQuery also error on duplicate source keys, so the ROW_NUMBER dedup transfers directly.`,
+    demoSeedSql: `CREATE TABLE changelog (pk INTEGER, op TEXT, version INTEGER, payload TEXT);
+INSERT INTO changelog VALUES
+  (1, 'I', 1, 'a1'), (1, 'U', 3, 'a3'), (1, 'U', 2, 'a2'),   -- pk 1: latest is version 3
+  (2, 'I', 1, 'b1'), (2, 'D', 2, NULL);                      -- pk 2: latest is a delete`,
+    demoCode: `-- The rn = 1 row per pk is the winner: pk 1 -> U version 3, pk 2 -> D version 2.
+SELECT pk, op, version, payload,
+       ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn
+FROM changelog
+ORDER BY pk, version DESC;`,
+    showDemoInput: true,
+  },
+  apply: scriptExercise({
+    id: "sql-l5-cdc-changelog-apply-apply",
+    prompt: `Write a script that applies a changelog to the target so it matches the last-write-wins end state, over \`changelog(pk, op, version, payload)\` (op is \`I\`, \`U\`, or \`D\`) and a pre-seeded \`target(pk, version, payload)\`.
+
+Dedup to the latest version per \`pk\`, upsert the surviving \`I\` and \`U\` rows into \`target\` with \`ON CONFLICT(pk) DO UPDATE\`, and delete the keys whose final op is \`D\`.`,
+    starterCode: `-- Apply the changelog: dedup to latest version per pk, upsert I/U, delete D.
+WITH latest AS (
+  SELECT pk, op, version, payload,
+         ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn
+  FROM changelog
+)
+INSERT INTO target (pk, version, payload)
+SELECT pk, version, payload FROM latest WHERE rn = 1 AND op IN ('I', 'U')
+ON CONFLICT(pk) DO UPDATE SET version = excluded.version, payload = excluded.payload;
+
+-- then DELETE the keys whose latest op is 'D'
+`,
+    hints: [
+      "Keep only the newest change per key: `ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) = 1`.",
+      "Upsert the `I` and `U` survivors with `ON CONFLICT(pk) DO UPDATE SET version = excluded.version, payload = excluded.payload`.",
+      "Delete keys whose latest op is `D`: `DELETE FROM target WHERE pk IN (SELECT pk FROM (... rn = 1 ...) WHERE op = 'D')`.",
+    ],
+    referenceSolution: `WITH latest AS (
+  SELECT pk, op, version, payload,
+         ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn
+  FROM changelog
+)
+INSERT INTO target (pk, version, payload)
+SELECT pk, version, payload FROM latest WHERE rn = 1 AND op IN ('I', 'U')
+ON CONFLICT(pk) DO UPDATE SET version = excluded.version, payload = excluded.payload;
+
+DELETE FROM target WHERE pk IN (
+  SELECT pk FROM (
+    SELECT pk, op, ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn
+    FROM changelog
+  ) WHERE rn = 1 AND op = 'D'
+);`,
+    seedSql: `CREATE TABLE changelog (pk INTEGER, op TEXT, version INTEGER, payload TEXT);
+INSERT INTO changelog VALUES
+  (1, 'U', 2, 'a2'), (1, 'U', 3, 'a3'),
+  (2, 'U', 2, 'b2'), (2, 'D', 3, NULL),
+  (3, 'I', 1, 'c1'),
+  (4, 'I', 1, 'd1'), (4, 'D', 2, NULL);
+
+CREATE TABLE target (pk INTEGER PRIMARY KEY, version INTEGER, payload TEXT);
+INSERT INTO target VALUES (1, 1, 'a1'), (2, 1, 'b1');`,
+    assertions: [
+      {
+        suite: "endstate",
+        name: "matches_expected_end_state",
+        sql: `WITH latest AS (SELECT pk, op, version, payload, ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn FROM changelog),
+expected AS (SELECT pk, version, payload FROM latest WHERE rn = 1 AND op IN ('I','U'))
+SELECT * FROM (SELECT pk, version, payload FROM target EXCEPT SELECT pk, version, payload FROM expected)
+UNION ALL
+SELECT * FROM (SELECT pk, version, payload FROM expected EXCEPT SELECT pk, version, payload FROM target)`,
+      },
+      {
+        suite: "deletes",
+        name: "no_surviving_deletes",
+        sql: `SELECT t.pk FROM target t WHERE t.pk IN (
+  SELECT pk FROM (SELECT pk, op, ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn FROM changelog) WHERE rn = 1 AND op = 'D')`,
+      },
+      {
+        suite: "grain",
+        name: "one_row_per_key",
+        sql: `SELECT pk FROM target GROUP BY pk HAVING COUNT(*) > 1`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["target"],
+  }),
+  practice: scriptExercise({
+    id: "sql-l5-cdc-changelog-apply-practice",
+    prompt: `Write a script that applies two changelog batches in sequence to the target and stays correct even when the later batch carries a stale (older-version) update, over an empty \`target(pk, version, payload)\` and \`changelog_batch1\` then \`changelog_batch2\` (each \`pk, op, version, payload\`).
+
+Apply each batch as an upsert plus a tombstone delete, and guard the update so a change overwrites the target only when its version is newer, using \`WHERE excluded.version > target.version\` on the \`ON CONFLICT\` update.`,
+    starterCode: `-- Apply batch 1, then batch 2; reject any update whose version is not newer than the target's.
+INSERT INTO target (pk, version, payload)
+SELECT pk, version, payload FROM changelog_batch1 WHERE op IN ('I', 'U')
+ON CONFLICT(pk) DO UPDATE SET version = excluded.version, payload = excluded.payload
+  WHERE excluded.version > target.version;
+-- delete batch 1 tombstones, then repeat both for changelog_batch2
+`,
+    hints: [
+      "The version guard goes on the upsert: `ON CONFLICT(pk) DO UPDATE SET ... WHERE excluded.version > target.version`.",
+      "Apply the two batches as two separate upsert-plus-delete blocks, batch 1 then batch 2.",
+      "The guard is what rejects a late batch whose version is older than what the target already holds.",
+    ],
+    seedSql: `CREATE TABLE target (pk INTEGER PRIMARY KEY, version INTEGER, payload TEXT);
+
+CREATE TABLE changelog_batch1 (pk INTEGER, op TEXT, version INTEGER, payload TEXT);
+INSERT INTO changelog_batch1 VALUES (1, 'U', 7, 'a7'), (2, 'I', 1, 'b1');
+
+CREATE TABLE changelog_batch2 (pk INTEGER, op TEXT, version INTEGER, payload TEXT);
+INSERT INTO changelog_batch2 VALUES (1, 'U', 3, 'a3'), (2, 'U', 5, 'b5');`,
+    assertions: [
+      {
+        suite: "endstate",
+        name: "matches_expected_end_state",
+        sql: `WITH allcl AS (SELECT pk, op, version, payload FROM changelog_batch1 UNION ALL SELECT pk, op, version, payload FROM changelog_batch2),
+latest AS (SELECT pk, op, version, payload, ROW_NUMBER() OVER (PARTITION BY pk ORDER BY version DESC) AS rn FROM allcl),
+expected AS (SELECT pk, version, payload FROM latest WHERE rn = 1 AND op IN ('I','U'))
+SELECT * FROM (SELECT pk, version, payload FROM target EXCEPT SELECT pk, version, payload FROM expected)
+UNION ALL
+SELECT * FROM (SELECT pk, version, payload FROM expected EXCEPT SELECT pk, version, payload FROM target)`,
+      },
+      {
+        suite: "grain",
+        name: "one_row_per_key",
+        sql: `SELECT pk FROM target GROUP BY pk HAVING COUNT(*) > 1`,
+      },
+    ],
+    checkIdempotency: true,
+    idempotencyTables: ["target"],
+  }),
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -1513,6 +1682,13 @@ export const sqlLevel5: SqlLevel = {
         asOfScd2Join,
         joinFanOutAndSkew,
       ],
+    },
+    {
+      id: "sql-l5-pipeline-round",
+      title: "Module 5.3: The Streaming and Pipeline Round",
+      description:
+        "The operational reasoning the pipeline round scores: CDC changelog apply, high-water-mark incremental loads with safe backfill, and write-audit-publish quality gates.",
+      lessons: [cdcChangelogApply],
     },
   ],
 }
