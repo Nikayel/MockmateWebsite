@@ -631,6 +631,61 @@ from Little's Law, bound every queue and drop past-deadline work so latency cann
 out optional features rather than failing everything: never an unbounded queue.
 `.trim()
 
+const autoscalingTeach = `
+## Match capacity to demand, and respect the lag
+
+Autoscaling is the machinery that grows and shrinks a fleet so you pay for roughly what you use while
+still meeting your SLOs. There are three layers, and interviewers want you to name them distinctly.
+
+**Horizontal Pod/instance autoscaling (HPA)** adds or removes replicas based on a metric. The default
+metric is **CPU or memory utilization**: target 60% CPU, add pods when the average climbs above that.
+The problem is that CPU is a *lagging* signal: by the time CPU is pegged, requests are already
+queuing and your p99 is already blown. Better is to scale on a **leading business metric**:
+requests-per-second per pod, in-flight concurrency, or, best of all for async workers, **queue depth
+/ consumer lag**. If a Kafka or SQS backlog is growing, you need workers *now*, before any CPU number
+moves.
+
+**Event-driven autoscaling** is exactly this idea productized. **KEDA** scales a deployment directly
+off external event sources: Kafka lag, SQS queue length, Redis list size, Prometheus queries. A
+worker fleet can even **scale to zero** when the queue is empty. This reacts to the *cause* (work
+arriving) rather than the *symptom* (CPU rising), buying precious lead time.
+
+Below the pod layer sits the **cluster/node autoscaler**. HPA asking for 40 more pods does nothing if
+there is no node to place them on; the Cluster Autoscaler (or Karpenter) provisions new VMs when pods
+are unschedulable. Separately, the **Vertical Pod Autoscaler (VPA)** right-sizes each pod's
+CPU/memory *requests*. HPA and VPA on the same metric fight each other, so keep them on different
+signals.
+
+### Scaling lag: the concept that separates a senior answer
+
+Reactive autoscaling has an unavoidable pipeline of delays: metric scrape interval (15 to 60s) +
+controller decision/stabilization window + node provisioning (30 to 120s for a fresh VM) + container
+pull + app boot + JIT/cache warmup + health-check pass. That is often **2 to 5 minutes** end to end.
+A traffic burst that arrives in 20 seconds will overwhelm you long before new capacity is ready.
+Reactive scaling *always trails a fast burst.*
+
+Two tools hide the lag. **Warm pools** keep pre-booted, pre-warmed instances parked so a scale-out is
+just "attach," collapsing minutes to seconds. **Scheduled / predictive pre-scaling** grows the fleet
+*ahead* of a known pattern: if traffic 10x's every day at 9am, a scheduled scaler raises the floor at
+8:50. Predictive autoscalers learn the daily/weekly curve and pre-provision automatically.
+
+**Interview nuance:** the trap is claiming "autoscaling handles spikes" full stop. The correct
+framing: autoscaling handles *sustained load changes and gradual ramps* well, but for sharp bursts
+you must either pre-scale (if predictable) or hold **headroom** (run at 60% not 95%) so the existing
+fleet absorbs the burst while new capacity boots.
+
+\`\`\`
+  burst arrives ->  |####| traffic
+  reactive:         scrape(30s)+decide(30s)+boot(90s)+warm(30s) = ~3min late
+  warm pool:        attach pre-booted node = ~15s
+  scheduled:        capacity already up at 8:50 for the 9am spike
+\`\`\`
+
+Recap: scale on leading signals (queue depth via KEDA, RPS) not just lagging CPU, layer HPA + cluster
+autoscaler + VPA, and because reactive scaling always trails a fast burst by 2 to 5 minutes of lag,
+hide that lag with warm pools, scheduled pre-scaling, and standing headroom.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -1188,6 +1243,63 @@ export const systemDesignLevel4: DesignLevel = {
               "**Guardrails:** the checkout queue is bounded with a sane max depth and a per-request deadline: if a checkout would sit past the point where the payment authorization or cart lock expires, drop it explicitly and tell the user to retry rather than charge late. Idempotency keys prevent a double-charge on retried confirmations; a circuit breaker on the payment provider stops feeding it if it degrades. Adaptive concurrency governs the web tier so accepting-and-enqueuing stays fast.",
               "**The justification of the split:** queue the payment path because each item is scarce, high-value, and the downstream constraint is a rate ceiling that queuing directly solves; shed the surrounding features because they are cheap to lose and their capacity is better spent capturing revenue.",
               "Common wrong turn: an unbounded checkout queue that promises everyone success then melts, or naively shedding checkouts as if they were droppable reads.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l4-m4",
+      title: "Autoscaling & Isolation",
+      description:
+        "Match compute to demand with reactive, event-driven, and predictive autoscaling despite scaling lag, size fleets from Little's Law plus redundancy math, and bound blast radius with cells and shuffle sharding.",
+      lessons: [
+        {
+          id: "sd-l4-autoscaling",
+          title: "Autoscaling: Reactive, Event-Driven & Predictive",
+          summary:
+            "Scale on leading signals (queue depth, RPS) not lagging CPU, and hide the 2-5 minute reactive lag with warm pools, scheduled pre-scaling, and standing headroom.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["autoscaling", "keda", "capacity"],
+          teach: {
+            markdown: autoscalingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-autoscaling-apply",
+            prompt:
+              "Design autoscaling for a service with a sharp 10x traffic spike every day at 9am and unpredictable bursts otherwise.",
+            thinkAbout: [
+              "Which signal (CPU vs queue depth vs RPS) should trigger scaling?",
+              "Why does reactive scaling always trail a fast burst?",
+              "How do warm pools and scheduled pre-scaling help?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a stateless request-serving fleet on Kubernetes, baseline ~100 pods, 9am peak needs ~1000 pods, SLO p99 < 200ms. The 9am spike is predictable; the other bursts are not. Split the problem: the known spike and the unknown bursts need different tools.",
+              "**The known 9am 10x: scheduled pre-scaling.** A scheduled scaler (CronJob patching the HPA min, or AWS Scheduled Scaling) raises the replica floor from 100 to ~1000 at 8:50am, so capacity is warm and serving before the first user hits. This sidesteps scaling lag entirely: you anticipate the spike rather than react. A predictive autoscaler that learns the daily curve backstops it.",
+              "**The unpredictable bursts, two moves.** First, scale on a leading metric: RPS-per-pod or in-flight concurrency via a custom metric, not CPU, so the HPA reacts to load arriving rather than CPU already pegged; for async work, KEDA on queue depth reacts before utilization moves at all. Second, the key point: reactive scaling cannot catch a sharp burst because scaling lag (scrape + decide + node boot + warmup) is 2 to 5 minutes, and a 20-second burst overwhelms you long before pods are ready.",
+              "**Cover the lag:** a warm pool of pre-booted nodes turns scale-out from minutes into ~15 seconds, and standing headroom (target 60% utilization, not 95%) lets the existing fleet absorb the first minute of any burst while real capacity spins up.",
+              "**Underneath:** the Cluster Autoscaler / Karpenter must keep spare node capacity so HPA's new pods have somewhere to land. Bound HPA min/max by peak-to-average ratio so cost stays sane off-peak (scale the floor back down after 9am).",
+              "**Tradeoffs:** pre-scaling and headroom cost money for idle capacity: the price of meeting p99 under bursts. Common wrong turn: claiming 'the HPA will handle it': on a 20-second burst the HPA is still 3 minutes behind. Anticipate the known, buffer the unknown.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-autoscaling-practice",
+            prompt:
+              "Design autoscaling for a video transcoding pipeline like Mux or Cloudflare Stream where users upload files in bursty, unpredictable waves, each job takes 30 to 300 seconds of heavy CPU, and cost matters because transcoding is expensive. Lead with what signal you scale on.",
+            thinkAbout: [
+              "Why does CPU tell you nothing about pending transcode work?",
+              "What must scale-down respect when jobs run for minutes?",
+              "Where do spot instances fit for retryable work?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: uploads land in S3, an event enqueues a transcode job onto SQS (or Kafka), a worker fleet pulls jobs. Load is spiky and unpredictable, jobs are long and CPU-bound, idle transcode instances are costly.",
+              "**Scale on queue depth / consumer lag, not CPU, using KEDA** with the SQS or Kafka scaler. The textbook event-driven case: the moment jobs pile up, KEDA adds workers, and when the backlog drains it scales the fleet to zero: critical for cost. CPU-based scaling is wrong twice over: a worker mid-transcode is already at 100% CPU (so CPU says nothing about pending work), and it would keep expensive nodes alive with an empty queue.",
+              "**Graceful scale-down for long jobs:** KEDA/HPA must not kill a pod mid-job. Long termination grace periods plus a drain that lets in-flight transcodes finish (or checkpoint), and an SQS visibility timeout above the max job time so a job is not redelivered while still processing.",
+              "**Cold-start lag:** a warm pool of pre-provisioned nodes (or Karpenter with a small standing buffer) so the first burst of uploads does not wait 2 minutes for VMs. Scale the target ratio by desired backlog: one worker per ~5 queued jobs, so a 500-job wave provisions ~100 workers.",
+              "**Cost mix:** baseline on spot instances (transcoding is retryable and interruption-tolerant: a lost spot node just re-queues its job), with a small on-demand floor for latency-sensitive live jobs. The tradeoff: scale-to-zero adds cold-start latency on the first job after idle, acceptable for async transcoding.",
+              "Common wrong turn: autoscaling on CPU and paying for idle transcode nodes between upload waves.",
             ],
           },
         },
