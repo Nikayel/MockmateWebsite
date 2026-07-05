@@ -58,6 +58,58 @@ Recap: Reason in a practical 5-layer stack, remember IP routes packets and TCP/U
 by port, and know that L4 sees only the 4-tuple while L7 can read and route on request content.
 `.trim()
 
+const dnsTeach = `
+## DNS is your first routing and failover lever
+
+DNS is not just a phone book. It is the first routing and failover lever a request touches, and its
+main limitation, caching you do not control, is the single most misunderstood thing about it.
+
+### The resolver chain
+
+Your app calls the OS stub resolver, which asks a recursive resolver (your ISP's, or 8.8.8.8, or
+1.1.1.1). If that recursive resolver has no cached answer it walks the hierarchy: a root server
+returns the nameservers for \`.com\` (the TLD), the TLD returns the authoritative nameservers for
+\`example.com\`, and the authoritative server (Route 53, NS1, Cloudflare) returns the actual A
+record. Caching happens at every hop: the browser caches, the OS caches, the recursive resolver
+caches, each keyed by TTL. That is the whole point and the whole problem.
+
+Record types you must know: **A** (name to IPv4), **AAAA** (name to IPv6), **CNAME** (alias one name
+to another, cannot exist at the zone apex or alongside other records), **NS** (delegation), and
+provider **ALIAS/ANAME** records, which behave like a CNAME but are legal at the apex
+(\`example.com\` itself) because the provider resolves them server-side and returns an A record.
+
+**Interview nuance:** "why can't I CNAME my apex to my load balancer?" is a real, common gotcha.
+Answer: the apex needs SOA/NS records that a CNAME would forbid coexisting with; use ALIAS/ANAME.
+
+### TTL: the core tradeoff
+
+A short TTL (say 60s) means clients re-query often, so a failover or IP change propagates fast, at
+the cost of far more DNS queries and dependence on your DNS provider's availability. A long TTL (say
+3600s) is cheap and resilient but means an IP change takes up to an hour to be seen. The trap: even a
+60s TTL does not give instant failover, because misbehaving recursive resolvers and corporate caches
+ignore or clamp TTLs, and clients that already resolved keep using the stale IP until their cache
+expires. So DNS failover is best-effort and eventually-consistent, on the order of minutes, not
+milliseconds.
+
+### Steering traffic with DNS
+
+Authoritative providers return different answers based on the querier. **GeoDNS** returns the IP of
+the nearest region by the resolver's location. **Latency-based routing** (Route 53) returns the
+region with the lowest measured RTT to the user. **Weighted routing** splits traffic by percentage,
+which is how you do blue-green and canary at the DNS layer. Crucially, pair these with **health
+checks**: the authoritative server stops handing out a region's IP when its health check fails.
+Without health checks, plain round-robin DNS will keep sending one in N users to a dead box.
+
+The hard limit: DNS load balancing has no per-request awareness. It cannot see server load, cannot do
+sticky sessions, cannot retry. It steers at the granularity of "which IP do I hand back," resolved
+once and cached. So DNS gets a user to the right region or the right LB, and a real L4/L7 load
+balancer takes over from there.
+
+Recap: DNS resolves through a cached recursive-to-authoritative chain, TTL trades failover speed for
+query load but never gives instant failover because of resolver caching, and GeoDNS/latency/weighted
+routing plus health checks steer users to the nearest healthy region before a real LB takes over.
+`.trim()
+
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
@@ -116,6 +168,55 @@ export const systemDesignLevel1: DesignLevel = {
               "**Tier 2 is L7,** reached only by traffic that survived tier 1 and completed a TCP+TLS handshake (which already filters most spoofed sources, since a spoofer cannot complete the handshake). Envoy or NGINX terminates TLS, reads Host and path, and routes `/api/*` to the origin API pool and `/static/*` to the cache/object-store pool. L7 rate limiting, WAF rules, and bot scoring also run here because they need request content.",
               "**Why not one layer:** an L4 tier is blind to `/api` vs `/static`, so it physically cannot route by path. An L7-only edge would have to terminate TLS on the entire flood, and TLS handshakes are the expensive part, so a volumetric attack would exhaust CPU long before you filtered it. Layering lets cheap stateless work shed the bulk while expensive stateful work sees only legitimate-looking, handshake-completing traffic.",
               "Common wrong turn: trying to do WAF/path routing at L4 (impossible, it cannot see the path) or terminating TLS on raw attack traffic (burns the CPU you are trying to protect).",
+            ],
+          },
+        },
+        {
+          id: "sd-l1-dns",
+          title: "DNS Resolution & Traffic Steering",
+          summary:
+            "Use the cached resolver chain, TTL tradeoffs, and GeoDNS/latency/weighted routing with health checks to steer users to the nearest healthy region.",
+          estimatedMinutes: 25,
+          difficulty: "medium",
+          skills: ["dns", "routing", "failover"],
+          teach: {
+            markdown: dnsTeach,
+            estimatedMinutes: 10,
+          },
+          apply: {
+            id: "sd-l1-dns-apply",
+            prompt:
+              "Design the DNS setup for a globally deployed API: specify record types, TTLs, and how you steer users to the nearest healthy region.",
+            thinkAbout: [
+              "What is the resolver chain and where does caching happen at each hop?",
+              "What does TTL trade off, and why is failover not instant?",
+              "How does GeoDNS or latency-based routing steer traffic?",
+            ],
+            modelAnswerOutline: [
+              "Assume `api.example.com` served from three regions (us-east, eu-west, ap-south), each fronted by a regional load balancer with a stable IP or hostname. Goal: send each user to the nearest healthy region with fast-enough failover.",
+              "**Records:** at the apex `example.com` use an ALIAS/ANAME (not a CNAME, which is illegal at the apex) pointing at the CDN or LB. For `api.example.com` use latency-based routing on Route 53 (or GeoDNS if data residency matters more than raw latency), one record set per region, each an ALIAS to that region's ALB and each attached to a **health check** probing a real `/healthz` endpoint. Publish both A and AAAA so IPv6 clients get a native answer.",
+              "**TTL: 60s on the API records.** Short enough that a failover propagates in roughly a minute for well-behaved resolvers; accept the higher query volume because the authoritative provider is built for it. Not 5s (marginal benefit, resolver noise, some resolvers clamp it) and not 3600s (an hour to fail away from a dead region is unacceptable for an API).",
+              "**Steering and failover:** latency-based routing returns the region with the lowest RTT to the user's recursive resolver. When a region's health check fails, the authoritative server stops returning its IP, so new resolutions flow to the next-nearest healthy region. Existing clients keep using the dead IP until their cache expires (up to the TTL plus resolver misbehavior), so the regional LB and client retries must fail fast so a stuck user recovers on the next request.",
+              "**The tradeoff stated out loud:** DNS failover is eventually-consistent and best-effort, minutes not milliseconds, because you do not control downstream caches. For true instant failover within a region, rely on the L4/L7 LB and health checks, not DNS. DNS gets the user to the right region; the LB handles per-request routing and instant backend failover.",
+              "Common wrong turn: assuming a 60s TTL means 60s guaranteed failover. Resolvers cache and clamp; treat DNS failover as a coarse, minutes-scale lever and put the fast failover in the LB.",
+            ],
+          },
+          practice: {
+            id: "sd-l1-dns-practice",
+            prompt:
+              "Design the DNS and traffic-steering cutover for a Netflix-scale blue-green deploy where you must shift 5% of global traffic to a new stack, watch error rates, and roll back within 2 minutes if p99 errors spike. Specify records, TTLs, and exactly what 'roll back in 2 minutes' depends on.",
+            thinkAbout: [
+              "Can DNS weight changes alone honor a 2-minute rollback SLO, given resolver caching?",
+              "Where does the fast, deterministic traffic-shift lever actually live?",
+              "How do you keep the green fleet's error signal isolated and readable?",
+            ],
+            modelAnswerOutline: [
+              "Use weighted DNS routing as the coarse traffic split and lean on load-balancer-level shifting for the fast, precise control, because DNS alone cannot hit a 2-minute rollback reliably.",
+              "**Setup:** two record sets for `api.example.com`, blue (current, weight 95) and green (new, weight 5), each an ALIAS to its own regional LB fleet with health checks. TTL deliberately low, 30 to 60s, so a weight change propagates quickly. Roll out the 5% by setting green's weight, then watch green's p99 error rate and latency on its own dashboards (isolated because green is a distinct fleet).",
+              "**The catch, said explicitly:** 'roll back in 2 minutes' cannot depend purely on DNS, because even at a 30s TTL some resolvers cache longer and clients that already resolved green keep hitting it. The real fast lever is at the LB/app tier: put the blue-green split behind a single L7 proxy (Envoy) that shifts weights instantly via config push, so DNS just points everyone at the proxy and rollback is a proxy config change taking effect in seconds. (Alternative: a feature flag / router at the app edge.) DNS weighting becomes the coarse regional dial; proxy weighting is the instant one.",
+              "**Rollback sequence:** alert fires on green p99 error spike; automation flips the proxy weight for green to 0 (seconds), and separately sets green's DNS weight to 0 (minutes, to drain cached clients). Green fleet stays warm until traffic drains so the canary can be retried.",
+              "**Tradeoff:** a pure DNS canary is simple but its rollback is bounded below by TTL plus resolver misbehavior, so it is minutes-scale and unreliable for a 2-minute SLO. Fronting with an L7 proxy gives second-scale, deterministic shifting at the cost of an extra hop.",
+              "Common wrong turn: promising a 2-minute rollback from DNS weight changes alone; resolver caching makes that unsafe. Put the fast shift in the proxy, use DNS for the coarse split.",
             ],
           },
         },
