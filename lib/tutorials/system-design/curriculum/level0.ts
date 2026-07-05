@@ -620,6 +620,63 @@ requirement-tied justification, label arrows with data and protocol, and prove t
 one concrete request through both its write and its read or delivery path.
 `.trim()
 
+const deepDivesWrapupTeach = `
+## Depth on purpose, not a data dump
+
+Once you have a complete design, the interviewer wants to see depth. But depth chosen at random reads
+as a data dump. The skill is to let the non-functional requirements and the traffic model point you at
+the real bottleneck, dive there, compare two viable options, commit to one, and then close with a
+short operational wrap-up. This is the phase that most separates senior from junior signal, and it is
+also the phase most often skipped because candidates monologue their favorite topic until the clock
+runs out.
+
+### Step one: find the bottleneck from the NFRs
+
+Look at what the requirements and your QPS numbers stress:
+
+- Tight **read latency** with hot keys points to caching and a possible hot-partition problem.
+- High **availability** with a single primary points to a single point of failure that needs
+  replication or failover.
+- **Write-heavy** load past one node's capacity points to sharding and its partition-key choice.
+- **Tail latency** (p99) under fanout points to precomputation, async work, or backpressure.
+
+You name the bottleneck out loud: "My tightest NFR is redirect availability, and my design has the
+datastore as a single point of failure, so that is where I will dive."
+
+### Step two: reach for the right lever
+
+Use the standard levers deliberately: sharding (and the partition key), replication (and sync vs
+async), caching (and the invalidation rule), async and queues (to absorb spikes), and indexing (to
+serve a query the primary store cannot). You are not listing all of them, you are reaching for the one
+that removes this bottleneck.
+
+### Step three: compare two options and commit
+
+This is the heart of the dive. For a hot partition you might compare "add read replicas" vs "add a
+cache with request coalescing" and recommend the cache because reads repeat and replicas add
+replication lag. The recommendation, with a reason, is what earns the grade. Listing options without a
+stance is the classic senior-level miss.
+
+**Interview nuance:** quantify the tradeoff. "Fanout-on-write costs one write per follower, so a
+10M-follower account is a 10M-write storm, which is why I use fanout-on-read for celebrities." A
+number turns an opinion into an argument.
+
+### Step four: the operational wrap-up
+
+Reserve the last 2 to 3 minutes and deliver four things crisply: where it breaks first at 10x scale,
+the main failure mode, what you would monitor (specific metrics and alerts), and the dominant cost
+driver. Add any unaddressed security or privacy gap as a prioritized next step. This wrap-up is what
+makes you sound like someone who has run systems in production, not just drawn them.
+
+**Interview nuance:** the wrap-up is where you volunteer what you did not have time to cover. "I did
+not address abuse or rate limiting; at this scale I would put that behind the gateway as the next
+step." Naming your own gaps is a seniority signal, not a weakness.
+
+Recap: let the NFRs and traffic model pick the bottleneck, dive with the right lever, compare two
+options and commit with a quantified reason, then close in 2 to 3 minutes on the top remaining
+bottleneck, failure mode, monitoring, and cost driver.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -1151,6 +1208,58 @@ export const systemDesignLevel0: DesignLevel = {
               "**Dispatch path traced:** the match is published to the dispatch queue; the driver connection manager finds the chosen driver's live connection and pushes an offer, ringing their phone. On decline or a ~15s timeout, matching falls back to the next candidate. On accept, the trip transitions to MATCHED and both apps are notified.",
               "**Scale note at 1M concurrent:** the geo index is the hot component; shard it by city or geohash region and keep it in memory for sub-100ms lookups.",
               "Common wrong turn: putting matching directly on Postgres with a `SELECT ... ORDER BY distance`, which cannot serve the query rate; geospatial matching needs a purpose-built in-memory index.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-deep-dives-wrapup",
+          title: "Deep Dives & the Operational Wrap-Up",
+          summary:
+            "Let the tightest NFR pick the bottleneck, compare two options and commit with a quantified reason, then close on break point, failure mode, monitoring, and cost.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["deep-dive", "operations", "cost"],
+          teach: {
+            markdown: deepDivesWrapupTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l0-deep-dives-wrapup-apply",
+            prompt:
+              "Pick the tightest non-functional requirement from a completed design and do a deep dive that removes the bottleneck it exposes, then deliver a 2-minute wrap-up naming the top remaining bottleneck, failure mode, what you would monitor, and the biggest cost driver.",
+            thinkAbout: [
+              "Which NFR points to the real bottleneck (hot partition, SPOF, tail latency)?",
+              "What two viable approaches can you compare with an explicit recommendation?",
+              "What breaks first at 10x scale, and what is the dominant cost driver?",
+            ],
+            modelAnswerOutline: [
+              "Using the URL shortener as the completed design: its tightest NFR is redirect read latency and availability. Every embedded short link breaks if redirects are slow or down, reads are ~10x writes, and a small hot set of viral links concentrates traffic.",
+              "**The bottleneck named:** at read peak the datastore serves the redirect lookup on every hit, and a viral link concentrates traffic on one partition, so there is both datastore load and a hot-partition risk.",
+              "**Two options compared.** Option A: add read replicas so reads spread across nodes. Option B: put Redis in front, cache shortCode to longUrl with a long TTL, and add request coalescing so a cache miss on a hot key triggers exactly one datastore read while other requests wait.",
+              "**Commit with a reason:** Option B. Redirect reads are highly repetitive and the hot working set is small, so a cache gives a >95% hit rate and sub-millisecond p99, whereas replicas still pay full datastore latency and add replication lag. Keep the datastore for the long tail and misses. For a link going viral, request coalescing plus a short jittered lock prevents a thundering herd on first miss.",
+              "**Wrap-up, 10x break point:** a single viral link overwhelming one Redis shard; shard the cache by shortCode hash so hot keys spread, and consider an in-process cache on app servers for the very hottest.",
+              "**Wrap-up, failure mode:** Redis node loss causing a cache-miss flood onto the datastore hot partition; mitigate with a replica and coalescing so the miss storm is bounded.",
+              "**Wrap-up, monitoring and cost:** redirect p99, cache hit rate, datastore read QPS per partition, 5xx rate on `GET /{code}`, alert if hit rate drops below 90%. Cost drivers: read QPS (cache and compute) and long-term storage (~3 TB over 5 years, growing).",
+              "Common wrong turn: diving into fancy key generation or analytics while the read path, the actual NFR at risk, goes unaddressed and the wrap-up gets skipped.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-deep-dives-wrapup-practice",
+            prompt:
+              "Pick the tightest NFR for a completed Instagram-style photo feed design serving 500M users, run a deep dive that removes the bottleneck, and deliver a wrap-up. The hard constraint: feed load p99 must stay under 200ms even for users following 5,000 accounts, and photos are stored as large blobs.",
+            thinkAbout: [
+              "Why can assembling the feed at read time not hit 200ms for a 5,000-follow user?",
+              "Where does the fanout-on-write approach itself break, and which accounts break it?",
+              "How do you keep multi-megabyte photo blobs off the latency-critical feed path entirely?",
+            ],
+            modelAnswerOutline: [
+              "**Tightest NFR:** feed read p99 under 200ms at 500M users with heavy read fanout (a user following 5,000 accounts). Assembling a feed by querying every followed account at read time cannot hit 200ms, so feed assembly is the bottleneck.",
+              "**Option A, fanout-on-read:** query recent posts from all followed accounts at request time and merge. Simple and storage-cheap, but a 5,000-follow user triggers thousands of lookups per feed load, blowing the 200ms budget.",
+              "**Option B, fanout-on-write:** on post, push the post ID into each follower's precomputed feed list in Redis, so a feed read is a single fast range read of an already-sorted list.",
+              "**Commit to a hybrid:** fanout-on-write for normal accounts so reads are cheap; fanout-on-read for celebrity accounts with millions of followers, because writing one post into 50M feeds is a write storm and wasteful for users who may never open the app. At read time, merge the precomputed feed with a live pull of the handful of celebrities the user follows.",
+              "**Blobs off the hot path:** photos live in S3 and are served via CloudFront CDN; the feed carries only IDs and CDN URLs, never blob bytes, so blob size never touches the 200ms path.",
+              "**Wrap-up:** 10x break point is the fanout write pipeline backing up when many mid-size accounts post simultaneously (absorb with a Kafka fanout queue and autoscaled workers). Failure mode: Redis feed-store loss, rebuilt lazily from the post store on miss, accepting a slower first load. Monitoring: feed p99, fanout lag (post time to feed-visible time), CDN hit rate, Redis memory per shard. Cost driver: Redis memory for 500M precomputed feeds and CDN egress, which is exactly why celebrities are excluded from write fanout.",
+              "Common wrong turn: serving photo bytes through the app tier, which couples blob bandwidth to the latency-critical feed path instead of offloading to S3 and a CDN.",
             ],
           },
         },
