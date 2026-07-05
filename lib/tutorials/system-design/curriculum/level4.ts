@@ -62,6 +62,60 @@ file state externalized to Redis/JWT/S3), turning servers into interchangeable c
 wins for hard-to-shard stateful tiers until you are forced to shard.
 `.trim()
 
+const lbL4L7Teach = `
+## Which layer, and why it decides everything
+
+A load balancer sits between clients and your fleet and decides which backend gets each request. The
+first design choice is **which layer of the network stack it operates at**, and getting it wrong
+costs you either routing features or raw throughput.
+
+An **L4 (transport-layer) load balancer** works at TCP/UDP. It sees IP addresses and ports, not the
+HTTP payload. It picks a backend, often on the very first packet, and then just forwards packets
+without parsing anything above the transport layer. Because it does almost no work per packet, it is
+**fast and high-throughput**, handles millions of connections cheaply, and works for **any**
+protocol: raw TCP, database connections, WebSockets, custom protocols. AWS **NLB**, Google
+**Maglev**, and IPVS are L4. The price is that it is **content-blind**: it cannot route by URL path,
+read a header, terminate TLS, or rate-limit.
+
+An **L7 (application-layer) load balancer** terminates the connection, parses the HTTP/gRPC request,
+and routes on **content**: path (\`/api/*\` to one pool, \`/static/*\` to another), host header,
+cookies, or method. Because it understands requests it can also do **TLS termination**, **rate
+limiting**, **request/response transformation**, retries, and rich **observability** (per-route
+latency, status codes). AWS **ALB**, **Nginx**, **HAProxy** (HTTP mode), and **Envoy** are L7. The
+price is higher latency and lower throughput per node: parsing every request and terminating TLS
+costs CPU.
+
+### Stack them
+
+Real architectures stack the layers: a thin **L4 layer at the edge** absorbs the raw connection
+volume and spreads it across a fleet of **L7 proxies** behind it, which do the smart routing. The
+canonical shapes are **NLB in front of ALB** on AWS, or **Maglev in front of Envoy** at Google. The
+L4 layer gives you cheap, protocol-agnostic scale and DDoS surface; the L7 layer gives you features.
+
+\`\`\`
+            +------------------ L7 proxy (Envoy/ALB) --> app pool A  (/api)
+client --> L4 (NLB/Maglev) --+-- L7 proxy --------------> app pool B  (/static)
+  raw TCP, high throughput   +-- L7 proxy --------------> app pool C  (routing, TLS, rate limit)
+\`\`\`
+
+### The LB itself cannot be a SPOF
+
+If all traffic funnels through one LB box and it dies, you are down regardless of how healthy the
+fleet is. So the LB tier is made HA: **active-active** LB nodes, a **floating/virtual IP** that fails
+over (keepalived/VRRP), or **anycast** so many LB nodes share one IP and BGP routes around a dead
+one. Cloud LBs bake this in and are themselves horizontally scaled behind the scenes.
+
+**Interview nuance:** a common trap is choosing L4 for an HTTP API and then discovering you need
+path-based routing or TLS termination, which L4 cannot do. If the question mentions per-path routing,
+header-based canaries, or TLS termination, you need L7 somewhere. Conversely, if it is raw non-HTTP
+traffic or extreme throughput with minimal features, L4 alone is right.
+
+Recap: L4 balancers are fast, protocol-agnostic, and content-blind; L7 balancers parse requests to
+route by path/header, terminate TLS, and rate-limit at a latency cost; production stacks L4 at the
+edge in front of an L7 fleet, and the LB tier itself must be made HA (active-active, floating IP, or
+anycast) so it is never a SPOF.
+`.trim()
+
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
@@ -121,6 +175,55 @@ export const systemDesignLevel4: DesignLevel = {
               "**Load balancing:** an L4 balancer (NLB) for raw WebSocket throughput, spreading connections by least-connections (long-lived, variable-duration connections make round robin skew). Because room state is shared, participants of one meeting need not be co-located; for locality, route by a consistent hash of meeting ID so a room clusters on one node while still tolerating that node's loss via the shared store.",
               "**The tradeoff:** room state in Redis adds a network hop per state change and makes Redis HA a hard dependency, but converts 'one node crash kills every call on it permanently' into 'a brief reconnect blip.'",
               "Common wrong turn: treating signaling exactly like a stateless HTTP tier and assuming the LB can move live connections: it cannot. The design work is in fast client reconnect plus externalized room state, not in pretending the socket is stateless.",
+            ],
+          },
+        },
+        {
+          id: "sd-l4-lb-l4-l7",
+          title: "Load Balancer Fundamentals: L4 vs L7",
+          summary:
+            "L4 is fast, protocol-agnostic, and content-blind; L7 routes on content and terminates TLS at a CPU cost; production stacks L4 at the edge in front of an L7 fleet, all made HA.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["load-balancing", "l4-l7"],
+          teach: {
+            markdown: lbL4L7Teach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l4-lb-l4-l7-apply",
+            prompt:
+              "Choose and justify the load-balancing layers for a service handling both gRPC APIs and long-lived WebSocket connections.",
+            thinkAbout: [
+              "What does L4 give in throughput vs what L7 gives in routing features?",
+              "Why do real architectures stack L4 in front of L7?",
+              "How is the LB itself made highly available?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: two distinct traffic classes. gRPC is HTTP/2 request/response wanting per-service and per-method routing, TLS termination, and per-route metrics. WebSockets are long-lived, low-message-rate connections where connection count is large and the need is mostly fanning connections across the fleet.",
+              "**Design: a stacked L4-in-front-of-L7 topology.** At the edge, an L4 balancer (AWS NLB or Maglev-style) shares one anycast VIP, absorbing raw connection volume for both classes cheaply and protocol-agnostically: also the DDoS surface. Behind it, a fleet of L7 proxies (Envoy).",
+              "**For gRPC, the L7 layer does real work:** it speaks HTTP/2, routes by :path (service/method), terminates TLS, load-balances per-request across backends (critical: a naive L4 hash would pin all of one client's multiplexed gRPC calls to a single backend, defeating balancing), enforces rate limits, and emits per-method latency.",
+              "**For WebSockets, choose deliberately:** once established there is little per-message routing value, and an L7 proxy holding hundreds of thousands of idle sockets is expensive. Either route WebSocket traffic through L4 straight to backends (least-connections, since durations vary wildly), or terminate at L7 for auth/header inspection at connect time and accept the cost. Terminate TLS and authenticate at connect, then let the socket ride.",
+              "**HA:** the L4 edge is active-active behind anycast, so a dead LB node is routed around by BGP with no VIP failover step; the Envoy L7 fleet is horizontally scaled and health-checked.",
+              "Common wrong turn: only an L4 LB in front of gRPC (no method routing, no per-request balancing), or a pure L7 tier babysitting hundreds of thousands of idle WebSockets, paying L7 CPU/memory for sockets that need no request parsing.",
+            ],
+          },
+          practice: {
+            id: "sd-l4-lb-l4-l7-practice",
+            prompt:
+              "Choose the load-balancing layers for Cloudflare-scale edge traffic terminating tens of millions of concurrent TLS connections across hundreds of PoPs, where a single PoP or LB node failure must not drop the service, and justify where TLS terminates.",
+            thinkAbout: [
+              "What does consistent hashing at the L4 tier protect during L7 fleet changes?",
+              "Why terminate TLS at the PoP rather than at origin?",
+              "How does a whole-PoP failure disappear without a DNS change?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: global HTTPS traffic at tens of millions of concurrent connections, hundreds of points of presence, and a hard requirement that any single node or PoP failure is invisible to users.",
+              "**Topology, edge to origin:** one anycast IP announced by BGP from every PoP, so a client's packets go to the topologically nearest PoP, and if a PoP withdraws its route, BGP reroutes to the next-nearest with no DNS change. Inside a PoP, the first hop is an L4 layer (Maglev-style ECMP with consistent hashing) spreading connections across many L7 proxy nodes.",
+              "**Consistent hashing at L4 is the key detail:** when an L7 node is added or removed, only a small fraction of connections rehash, so live TLS sessions are not reset en masse. Behind L4, a fleet of L7 proxies terminates TLS at the edge, parses HTTP, applies WAF/rate-limit/cache rules, and reaches origin over pooled, keep-alive, often re-encrypted connections.",
+              "**Why TLS terminates at the edge:** the expensive handshake happens close to the user (low RTT, fast setup), the edge can cache and inspect requests, and origin connection count collapses because thousands of client connections multiplex onto a few pooled origin connections. The cost: edge-to-origin traffic must be independently secured (re-encrypted or over a private backbone).",
+              "**Failure handling:** L4 nodes are active-active and ECMP-balanced (one dying just removes a hash bucket); L7 nodes are health-checked and drained; a whole PoP failing withdraws its anycast route and the next PoP absorbs the load. No SPOF at any layer.",
+              "Common wrong turn: plain (non-consistent) hashing or round robin at L4, so scaling the L7 fleet mid-day resets a large share of live TLS connections and causes a reconnect storm.",
             ],
           },
         },
