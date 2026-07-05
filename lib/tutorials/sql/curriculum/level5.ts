@@ -706,6 +706,169 @@ INSERT INTO events (user_id, step, event_ts) VALUES
   },
 }
 
+const windowFramesAndQualify: SqlLesson = {
+  id: "sql-l5-window-frames-and-qualify",
+  title: "Advanced Window Frames and the QUALIFY Rewrite",
+  summary:
+    "The LAST_VALUE default-frame trap, ROWS vs RANGE on ties, why a window cannot go in WHERE, NTILE, and the QUALIFY rewrite.",
+  estimatedMinutes: 30,
+  difficulty: "hard",
+  skills: [
+    "product-analytics",
+    "ROWS vs RANGE",
+    "LAST_VALUE frame trap",
+    "NTILE",
+    "named WINDOW",
+    "subquery filter",
+    "top-N-per-group",
+  ],
+  teach: {
+    estimatedMinutes: 11,
+    markdown: `## Three window-frame traps interviewers love
+
+Window functions are L4 material, but the *frame* underneath them is where the senior-flavored questions live. Three things trip people up, and all three are fair game on a screen.
+
+## Trap 1: LAST_VALUE returns the current row, not the last row
+
+\`LAST_VALUE(amount) OVER (PARTITION BY region ORDER BY sale_date)\` looks like it returns each region's final sale amount. It does not. The default frame, once you supply an \`ORDER BY\`, is \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`, so the window ends at the current row and "last value in the frame" is just the current row's own value. To get the true partition final, widen the frame:
+
+\`\`\`sql
+LAST_VALUE(amount) OVER (
+  PARTITION BY region ORDER BY sale_date
+  ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+)
+\`\`\`
+
+\`FIRST_VALUE\` does not have this problem, because the default frame already starts at the partition beginning. \`LAST_VALUE\` is the one that bites.
+
+## Trap 2: ROWS and RANGE differ on ties
+
+\`ROWS\` counts physical rows; \`RANGE\` groups rows that are tied on the \`ORDER BY\` key into one step. On two sales that share a date, a running \`SUM\` under \`RANGE\` gives both tied rows the same total (it includes every peer), while \`ROWS\` gives them different running totals, one physical row at a time. When a running total looks too high on duplicate keys, an unintended \`RANGE\` default is usually why. The demo puts the two side by side on a tied date.
+
+## Trap 3: a window function cannot go in WHERE
+
+\`WHERE\` runs before window functions are evaluated, so \`WHERE ROW_NUMBER() OVER (...) = 1\` is an error. Compute the window in a subquery or CTE, then filter the derived column in the outer query. This is the standard top-N-per-group and keep-latest shape:
+
+\`\`\`sql
+SELECT region, sale_date, amount FROM (
+  SELECT region, sale_date, amount,
+         ROW_NUMBER() OVER (PARTITION BY region ORDER BY sale_date DESC) AS rn
+  FROM sales
+) WHERE rn = 1;
+\`\`\`
+
+**Interview nuance:** \`NTILE(n)\` splits a partition into n as-equal-as-possible buckets, which is how you cut customers into spend quartiles or latency deciles. When the earlier buckets come out one row larger than the later ones, that is NTILE distributing the remainder, not a bug.
+
+> **In the warehouse this differs.** Snowflake, BigQuery, and Databricks collapse the subquery-then-filter into one line with \`QUALIFY\`: \`... QUALIFY ROW_NUMBER() OVER (...) = 1\`. QUALIFY is to window functions what \`HAVING\` is to aggregates. SQLite has no \`QUALIFY\`, so the subquery form is what you write here, and it is the portable answer QUALIFY desugars to. The frame semantics (ROWS vs RANGE, the LAST_VALUE default-frame trap) are ANSI standard and identical across every dialect.`,
+    demoSeedSql: `CREATE TABLE sales (region TEXT, sale_date TEXT, amount INTEGER);
+INSERT INTO sales (region, sale_date, amount) VALUES
+  ('east', '2026-01-01', 100),
+  ('east', '2026-01-02', 200),
+  ('east', '2026-01-02', 50),    -- tied date with the row above
+  ('east', '2026-01-03', 300);`,
+    demoCode: `-- last_value_wrong drifts row to row; last_value_right is the true partition final (300).
+-- On the tied date, running_sum_range lumps both peers (350) while running_sum_rows does not.
+SELECT sale_date, amount,
+  LAST_VALUE(amount) OVER (ORDER BY sale_date) AS last_value_wrong,
+  LAST_VALUE(amount) OVER (ORDER BY sale_date ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_value_right,
+  SUM(amount) OVER (ORDER BY sale_date ROWS  BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_sum_rows,
+  SUM(amount) OVER (ORDER BY sale_date RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_sum_range
+FROM sales
+ORDER BY sale_date, amount DESC;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-window-frames-and-qualify-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns every sale with the final sale amount in its region, as \`(region, sale_date, amount, region_final_amount)\`, over \`sales(region, sale_date, amount)\`.
+
+\`region_final_amount\` is the amount of the region's latest sale by date, and it must appear on **every** row of the region, not only the last one. Use \`LAST_VALUE\` with a frame that spans the whole partition (the default frame gives you the current row instead). Alias the columns exactly as named.`,
+    starterCode: `-- Every sale plus its region's true final amount (mind the LAST_VALUE frame).
+SELECT region, sale_date, amount,
+  -- LAST_VALUE with an explicit full-partition frame
+  AS region_final_amount
+FROM sales;`,
+    hints: [
+      "The default frame ends at the current row, so a bare `LAST_VALUE(amount) OVER (PARTITION BY region ORDER BY sale_date)` just echoes `amount`.",
+      "Widen the frame: `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`.",
+      "Partition by `region` and order by `sale_date` so the final row of each region is the latest date.",
+    ],
+    referenceSolution: `SELECT region, sale_date, amount,
+       LAST_VALUE(amount) OVER (
+         PARTITION BY region ORDER BY sale_date
+         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+       ) AS region_final_amount
+FROM sales;`,
+    singleFile: {
+      seedSql: `CREATE TABLE sales (
+  region    TEXT,
+  sale_date TEXT,
+  amount    INTEGER
+);
+INSERT INTO sales (region, sale_date, amount) VALUES
+  ('east', '2026-01-01', 100),
+  ('east', '2026-01-02', 200),
+  ('east', '2026-01-03', 150),
+  ('west', '2026-01-01', 300),
+  ('west', '2026-01-02', 250);`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["region", "sale_date", "amount", "region_final_amount"],
+        rows: [
+          ["east", "2026-01-01", 100, 150],
+          ["east", "2026-01-02", 200, 150],
+          ["east", "2026-01-03", 150, 150],
+          ["west", "2026-01-01", 300, 250],
+          ["west", "2026-01-02", 250, 250],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-window-frames-and-qualify-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that splits customers into 4 spend quartiles with \`NTILE(4)\` and returns the min and max spend per quartile, as \`(quartile, min_spend, max_spend)\`, over \`customers(customer_id, total_spend)\`.
+
+Order the quartiles 1 through 4, and reuse one named \`WINDOW\` for the \`NTILE\` call rather than inlining the \`OVER (...)\`. Alias the columns exactly as named.`,
+    starterCode: `-- 4 spend quartiles with NTILE, min/max per quartile, using a named WINDOW.
+WITH q AS (
+  SELECT customer_id, total_spend,
+         NTILE(4) OVER w AS quartile
+  FROM customers
+  WINDOW w AS (ORDER BY total_spend)
+)
+SELECT
+  -- group by quartile, min and max spend
+FROM q;`,
+    hints: [
+      "Define the window once with a `WINDOW w AS (ORDER BY total_spend)` clause and reference it as `NTILE(4) OVER w`.",
+      "In the outer query, `GROUP BY quartile`.",
+      "`MIN(total_spend) AS min_spend`, `MAX(total_spend) AS max_spend`, ordered by `quartile`.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE customers (
+  customer_id INTEGER,
+  total_spend INTEGER
+);
+INSERT INTO customers (customer_id, total_spend) VALUES
+  (1, 100), (2, 200), (3, 300), (4, 400),
+  (5, 500), (6, 600), (7, 700), (8, 800);`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["quartile", "min_spend", "max_spend"],
+        rows: [
+          [1, 100, 200],
+          [2, 300, 400],
+          [3, 500, 600],
+          [4, 700, 800],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -720,7 +883,13 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.1: The Advanced SQL Power Round",
       description:
         "The live SQL screen an intern actually sits: gaps-and-islands, sessionization, cohort retention, funnels, and advanced window frames.",
-      lessons: [gapsAndIslands, sessionization, cohortRetention, funnelConversion],
+      lessons: [
+        gapsAndIslands,
+        sessionization,
+        cohortRetention,
+        funnelConversion,
+        windowFramesAndQualify,
+      ],
     },
   ],
 }
