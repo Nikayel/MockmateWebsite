@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useTutorialStore } from "@/lib/stores/tutorial-store"
 import { fetchLessonProgress, saveLessonProgress } from "@/lib/tutorials/progress-client"
 import type { TutorialProgressInput } from "@/lib/tutorials/progress"
-import type { PythonLevelId } from "@/lib/tutorials/types"
+import type { TutorialLevelId } from "@/lib/tutorials/types"
 
 /**
  * Resumes saved progress on mount and debounce-autosaves changes. Mirrors
@@ -16,7 +16,7 @@ import type { PythonLevelId } from "@/lib/tutorials/types"
  */
 const SAVE_DEBOUNCE_MS = 1000
 
-export function useTutorialProgressSync(lessonId: string | null, levelId: PythonLevelId | null) {
+export function useTutorialProgressSync(lessonId: string | null, levelId: TutorialLevelId | null) {
   const initLesson = useTutorialStore((s) => s.initLesson)
   const hydrate = useTutorialStore((s) => s.hydrate)
   const setLoading = useTutorialStore((s) => s.setLoading)

@@ -23,9 +23,13 @@ import type { DifficultyLevel, WorkspaceScenarioConfig } from "@/lib/scenarios/t
 
 export type CourseId = "python" | "sql"
 
-/** Both courses ship 4 levels. `PythonLevelId` is kept as an alias so existing call sites don't churn. */
-export type TutorialLevelId = 1 | 2 | 3 | 4
-export type PythonLevelId = TutorialLevelId
+/**
+ * SQL ships 5 levels (L5 is the advanced/company-specific DE-interview capstone); Python ships 4.
+ * `PythonLevelId` stays pinned to 1-4 so Python-only maps (e.g. `LEVEL_PREVIEWS`) are not forced to
+ * add a level-5 entry, while `TutorialLevelId` (used by the SQL level id) allows 5.
+ */
+export type TutorialLevelId = 1 | 2 | 3 | 4 | 5
+export type PythonLevelId = 1 | 2 | 3 | 4
 
 /** The three phases of every lesson — the spine of the learning loop. */
 export type LessonSection = "teach" | "apply" | "practice"
@@ -83,8 +87,8 @@ export interface TutorialModule<E> {
   lessons: TutorialLesson<E>[]
 }
 
-export interface TutorialLevel<E> {
-  id: TutorialLevelId
+export interface TutorialLevel<E, Id extends TutorialLevelId = TutorialLevelId> {
+  id: Id
   slug: string
   /** e.g. `"Level 1 — Python Fundamentals"`. */
   title: string
@@ -140,7 +144,7 @@ export type PythonLevelSlug = "fundamentals" | "intermediate" | "applied" | "eng
 
 export type PythonLesson = TutorialLesson<PythonExercise>
 export type PythonModule = TutorialModule<PythonExercise>
-export type PythonLevel = TutorialLevel<PythonExercise>
+export type PythonLevel = TutorialLevel<PythonExercise, PythonLevelId>
 
 // ---- SQL course (concrete instantiation) ----
 

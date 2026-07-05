@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 import type {
   LessonSection,
-  PythonLevelId,
+  TutorialLevelId,
   SectionStatus,
   TutorialLessonProgress,
 } from "@/lib/tutorials/types"
@@ -32,7 +32,7 @@ export function computeLessonProgress(sections: Record<LessonSection, SectionSta
 
 interface TutorialProgressState {
   lessonId: string | null
-  levelId: PythonLevelId | null
+  levelId: TutorialLevelId | null
   sections: Record<LessonSection, SectionStatus>
   lessonStatus: SectionStatus
   lastExerciseScore?: number
@@ -40,7 +40,7 @@ interface TutorialProgressState {
   error: string | null
 
   /** Point the store at a lesson, resetting to a pristine state (before any saved load). */
-  initLesson: (lessonId: string, levelId: PythonLevelId) => void
+  initLesson: (lessonId: string, levelId: TutorialLevelId) => void
   /** Overwrite with saved server progress (resume). */
   hydrate: (progress: TutorialLessonProgress) => void
   /** Mark a section in progress (first interaction). */
@@ -54,7 +54,7 @@ interface TutorialProgressState {
 
 const pristine = {
   lessonId: null as string | null,
-  levelId: null as PythonLevelId | null,
+  levelId: null as TutorialLevelId | null,
   sections: freshSections(),
   lessonStatus: "not_started" as SectionStatus,
   lastExerciseScore: undefined as number | undefined,

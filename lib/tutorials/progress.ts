@@ -27,7 +27,8 @@ const sectionStatusSchema = z.enum(["not_started", "in_progress", "completed"])
  */
 export const tutorialProgressInputSchema = z.object({
   lessonId: z.string().min(1),
-  levelId: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  // SQL ships 5 levels (the L5 DE-interview capstone); Python ships 4. Accept 1-5 so L5 progress persists.
+  levelId: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   sections: z.object({
     teach: sectionStatusSchema,
     apply: sectionStatusSchema,
