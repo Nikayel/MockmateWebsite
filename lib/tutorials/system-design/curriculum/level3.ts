@@ -664,6 +664,65 @@ per object, prefer versioned URLs over purging, normalize cache keys, micro-cach
 with stale-while-revalidate, and never cache authenticated bodies at a shared edge.
 `.trim()
 
+const searchInvertedIndexTeach = `
+## Why LIKE cannot power search
+
+A relational \`WHERE description LIKE '%wireless headphone%'\` cannot power real search: it does a
+full scan, cannot rank by relevance, cannot handle typos or word stems, and dies at scale. That is
+why a **dedicated search tier** exists. Its core data structure is the **inverted index**: instead of
+mapping a document to its words, it maps each word (term) to a **posting list** of the documents that
+contain it. Query "wireless headphones" and the engine intersects the posting lists for \`wireless\`
+and \`headphone\` in milliseconds, no scan required.
+
+Terms do not go into the index raw; they pass through an **analysis pipeline**. Tokenize the text
+into words, lowercase them, **stem** ("running", "ran", "runs" all collapse to "run"), drop
+stopwords, and expand **synonyms** ("tv" also indexes as "television"). The same analyzer must run at
+index time and query time so the terms match. Typo tolerance comes from **fuzzy matching** (edit
+distance) or n-gram indexing, so "hedphones" still finds "headphones".
+
+\`\`\`
+  doc: "Wireless Bluetooth Headphones"
+   -> analyze -> [wireless, bluetooth, headphone]
+  inverted index:
+    headphone -> [doc7, doc19, doc204, ...]
+    wireless  -> [doc7, doc44, doc204, ...]
+  query "wireless headphone" -> intersect posting lists -> [doc7, doc204] ranked by BM25
+\`\`\`
+
+### Ranking, queries, and filters
+
+The default ranking is **BM25** (a refined TF-IDF): a term matters more when it is rare across the
+corpus (high IDF) and appears often in a short document. On top you apply **boosting** (title matches
+worth more than description, in-stock and popular items lifted) and **filters**. Crucial distinction:
+a **query** contributes to the relevance score; a **filter** is a yes/no constraint (brand = Sony,
+price < 100) that does not score and, because it is deterministic, is **cached as a bitset** and
+reused cheaply across requests. Facets and highlighting come from the same index.
+
+At scale you run **Elasticsearch or OpenSearch**, which shards the index. A shard is a self-contained
+inverted index (a Lucene index); documents are **routed** to a primary shard by hash of the id, and
+each primary has **replica shards** for read throughput and failover. A 50M-document catalog might
+use 10 primaries; size shards to the tens-of-GB range because oversharding wastes memory.
+
+### Keeping the index in sync
+
+Search is **not a system of record**. The truth lives in your primary DB; the index is a **derived,
+rebuildable store**. Feed it with a **CDC / indexing pipeline**: capture DB changes (Debezium on the
+binlog, or an application event) onto a stream, and an indexer applies them to Elasticsearch. This is
+**eventually consistent**, so a product edit shows in search a second or two later, which is fine.
+Because it is derivable, plan for **full reindexing**: mapping changes require building a fresh index
+and switching an **alias** over atomically, with zero downtime.
+
+**Interview nuance:** the classic trap is **deep pagination**. \`from: 100000, size: 10\` forces
+every shard to sort 100,010 docs and is O(offset). Use **\`search_after\`** (a cursor on the last
+sort value) for deep result sets, and cap the max page. Also be ready to say why you would not make
+Elasticsearch your primary DB: weaker durability and consistency guarantees, and no transactions.
+
+Recap: search runs on a dedicated tier built on an inverted index plus an analysis pipeline, ranks
+with BM25 and boosting, separates scoring queries from cached filters, shards across primaries and
+replicas, stays in sync as an eventually-consistent derived store fed by CDC, and paginates deep sets
+with search_after, never large from offsets.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -1240,6 +1299,56 @@ export const systemDesignLevel3: DesignLevel = {
               "**Prewarming:** segments are predictable, so push each new segment to L2 PoPs the instant the encoder emits it, making the first viewer request a hit. Use stale-while-revalidate so a late manifest refresh serves the last good version rather than stalling playback.",
               "**Scale math:** 5M viewers x ~5 Mbps average is ~25 Tbps of egress, which only a large CDN footprint serves: multi-CDN across providers with DNS/steering-based failover.",
               "**The tradeoff:** 2-second segments put viewers ~6-10 seconds behind live in exchange for cacheability and resilience; shrinking segments cuts latency but multiplies request rate and origin risk. Common wrong turn: caching the manifest with a long TTL (viewers freeze on stale playlists) or skipping the shield (the encoder melts on segment rollover).",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-search-inverted-index",
+          title: "Full-Text Search & the Inverted Index",
+          summary:
+            "A dedicated search tier: inverted index plus analysis pipeline, BM25 with boosting, cached filters, shards and replicas, CDC-fed eventual consistency, search_after pagination.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["search", "inverted-index", "elasticsearch"],
+          teach: {
+            markdown: searchInvertedIndexTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-search-inverted-index-apply",
+            prompt:
+              "Design search for an e-commerce catalog of 50M products with typo tolerance, filters, and relevance-ranked results, including how the index stays in sync with the product database.",
+            thinkAbout: [
+              "What is the analysis pipeline (tokenize, stem, synonyms) and inverted index?",
+              "How do you keep the index in sync with the DB?",
+              "Why is search not a system of record?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 50M products, high read QPS with bursty spikes, product data owned by a relational primary (Postgres), search must tolerate typos, support faceted filtering, and rank by relevance.",
+              "**High-level:** a dedicated Elasticsearch/OpenSearch cluster holds an inverted index of products. At index and query time, run an analysis pipeline: tokenize, lowercase, stem, drop stopwords, expand a curated synonym list ('tv' -> 'television'). Typo tolerance via fuzzy matching (edit distance 1-2) or edge n-grams for autocomplete.",
+              "**Sharding:** route 50M docs across ~10 primary shards (tens of GB each) with 1-2 replicas per primary for read throughput and HA; documents route by product id hash.",
+              "**Query shape:** the free-text term is a scored query ranked by BM25, with boosting (title > description, in-stock and high-rating lifted). Structured constraints (brand, price range, category) are filters, not queries: they do not affect score and are cached as bitsets, so repeated 'Sony under $100' filters are nearly free. Return facets and highlighting from the same request.",
+              "**Sync:** the DB is the system of record; the index is a derived, rebuildable store. Capture product changes via CDC (Debezium on the DB log) or app events onto Kafka; an indexer applies them to Elasticsearch. Eventually consistent (a second or two of lag), acceptable for a catalog. Support full reindexing: for a mapping/analyzer change, build a new index and flip a read alias atomically for zero downtime.",
+              "**Why search is not the primary store:** weaker durability and consistency, no transactions, and a retrieval-tuned schema. If it corrupts or a mapping changes, rebuild it from the DB, never the other way around.",
+              "Common wrong turn: deep offset pagination (`from: 100000`) that sorts the whole prefix on every shard (use search_after cursors), or treating the search index as the system of record.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-search-inverted-index-practice",
+            prompt:
+              "Design log and event search for an observability platform like Datadog or Elastic Observability ingesting 2M log lines per second across thousands of customers, where engineers run ad-hoc keyword and field queries over the last 15 minutes constantly and over the last 30 days occasionally. Lead with the index layout that makes recent data fast and old data cheap.",
+            thinkAbout: [
+              "What does time-based index rollover buy for both queries and retention?",
+              "How do hot-warm-cold tiers match the access pattern to hardware cost?",
+              "Where does multi-tenancy shape routing and shard placement?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 2M events/sec ingest, write-once read-many, queries skew heavily to recent data, strict cost pressure at petabyte scale, multi-tenant.",
+              "**Index layout: time-based indices with ILM rollover** (one index per hour or per size threshold), aliased as `logs-write` and `logs-read-*`. This is the whole game: a query for the last 15 minutes touches one or two small hot shards, and 30-day queries are bounded and parallelized. Deletion becomes an O(1) drop-the-index operation instead of per-document deletes.",
+              "**Hot-warm-cold tiering:** recent indices on hot nodes (fast NVMe, in memory) for low-latency reads and writes; after a day they migrate to warm nodes (cheaper disk, fewer replicas); after a week to a cold/frozen tier backed by object storage (searchable snapshots on S3) where queries take seconds but storage is 10-20x cheaper. Matches the access pattern: recent is hot and pricey, old is cold and cheap.",
+              "**Ingest and sharding:** buffer through Kafka to absorb spikes and decouple producers from indexing; route by tenant + time so one noisy customer does not hotspot a shard, cap shard size, and force-merge plus reduce replicas on rolled-over indices to shrink footprint.",
+              "**Query:** mostly filters (service, host, level, time range) plus keyword match, so lean on cached filter bitsets and time pruning.",
+              "**The tradeoff:** cheaper cold storage means slow historical queries, which is right because engineers tolerate seconds for a 30-day search but never during a live incident. Common wrong turn: one giant append-only index (retention and deletes become impossible, every query scans everything) or keeping all data on hot nodes (cost explodes at petabyte scale).",
             ],
           },
         },
