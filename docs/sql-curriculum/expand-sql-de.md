@@ -358,6 +358,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-cdc-changelog-apply` — CDC Changelog Apply: MERGE-Shaped Upsert with Deletes and Version Ordering
 
 - **difficulty:** hard
+- **interview level:** Junior-to-Senior (pipeline-round CDC implementation; interns rarely build this)
 - **pattern:** runnable-equivalent · **grading:** workspace · **est:** 38m (teach ~12m)
 - **skills:** `streaming` (stack), CDC change stream, ROW_NUMBER latest-per-key, ON CONFLICT upsert, tombstone delete, last-write-wins, idempotency
 
@@ -382,6 +383,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-incremental-watermark-backfill` — High-Water-Mark Incremental Extraction and Safe Backfill
 
 - **difficulty:** hard
+- **interview level:** Junior-to-Senior (pipeline-engineering incremental and backfill design; new-grad and up)
 - **pattern:** runnable-equivalent · **grading:** workspace · **est:** 40m (teach ~13m)
 - **skills:** `dbt-orchestration` (stack), high-water-mark, incremental load, watermark state table, atomic staging swap, partition-overwrite backfill, late-arriving lookback, idempotency
 
@@ -405,6 +407,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-data-quality-gates` — Write-Audit-Publish: Freshness, Volume, and Null-Rate Blocking Gates
 
 - **difficulty:** medium
+- **interview level:** Junior (write-audit-publish is a junior/mid operational responsibility beyond intern scope)
 - **pattern:** runnable-equivalent · **grading:** workspace · **est:** 30m (teach ~10m)
 - **skills:** `dbt-orchestration` (stack), write-audit-publish, freshness SLA check, volume anomaly vs trailing baseline, null-rate check, blocking gate
 
@@ -429,6 +432,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-system-design-round-reasoning` — Reasoning Like the System-Design Round
 
 - **difficulty:** hard
+- **interview level:** Junior-to-Senior (system-design rounds are seldom given to interns)
 - **pattern:** concept-check · **grading:** single-file · **est:** 30m (teach ~12m)
 - **skills:** `streaming` (stack), partition pruning / sargability, EXPLAIN QUERY PLAN, tumbling event-time windows, late-data flagging, Kafka consumer lag, DAG dependency eligibility
 
@@ -447,6 +451,7 @@ Each spec below gives the loop agent everything needed to author one `SqlLesson`
 ### `sql-l5-medallion-streaming-capstone` — Capstone: JSON Events to a Sessionized, Incremental, DQ-Gated Medallion Pipeline
 
 - **difficulty:** hard
+- **interview level:** Junior-to-Senior (integrative take-home-style build; inherits the pipeline and system-design level)
 - **pattern:** runnable-equivalent · **grading:** workspace · **est:** 44m (teach ~12m)
 - **skills:** `lakehouse` (stack), medallion Bronze/Silver/Gold, JSON shred, sessionization, incremental watermark upsert, data-quality gate, idempotency
 
