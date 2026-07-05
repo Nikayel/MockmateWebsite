@@ -130,6 +130,60 @@ handoff, read repair, and Merkle trees) for availability; resolve conflicts with
 vectors, CRDTs, or app merge, and reason with PACELC and named anomalies rather than CAP.
 `.trim()
 
+const replicationLagSessionTeach = `
+## Lag is not a metric, it is a user-visible bug
+
+Replication lag shows up as concrete, infuriating user bugs. You post a comment, the write hits the
+leader, your refresh reads a lagging replica that has not received it yet, and **your comment
+vanishes**. The fix is not "make replication synchronous everywhere" (too slow and defeats the point
+of replicas). The fix is to provide the specific, cheap **session guarantee** that the buggy
+interaction actually needs. There are four, and matching a bug to its guarantee is the skill:
+
+- **Read-your-writes (read-after-write):** after you write something, *you* always see it. Violated
+  by the vanishing-comment bug. It only promises the writer sees their own write, not that others do.
+- **Monotonic reads:** you never see time go backwards. If read 1 shows a comment and read 2 (hitting
+  a more-lagged replica) does not, the comment appears to un-happen. This is the "refresh and content
+  disappears, refresh again and it comes back" flicker.
+- **Monotonic writes:** your own writes are applied in the order you issued them.
+- **Writes-follow-reads (causal):** if you read X and then write Y in reaction, everyone who sees Y
+  also sees X (a reply never appears before the comment it replies to).
+
+### Two implementation techniques cover most cases
+
+**Sticky routing to the leader.** For a bounded window after a user writes (say 10 to 30 seconds, or
+until the write is known to have propagated), route *that user's* reads to the leader or to a replica
+known to be caught up. Simplest read-your-writes fix. The catch is it is per-connection/per-session,
+so it breaks across devices: you write on your phone, read on your laptop with a different session,
+and the laptop still hits a lagging replica.
+
+**Version tokens (logical timestamps).** On a write, the leader returns a **version token** (a log
+sequence number / LSN, a commit timestamp, or an opaque cursor). The client stores it and sends it
+with subsequent reads. The read path then **waits for a replica to catch up to that token** (or picks
+a replica already past it) before serving. This bounds staleness precisely and works **across
+devices** if the token travels with the user (in a cookie, the session store, or the client). It is
+how you get read-your-writes without pinning everything to the leader.
+
+**Interview nuance:** be clear that these guarantees are **strictly weaker than linearizability**.
+Linearizability means a single, global, real-time order that every client agrees on; it is expensive
+(consensus, leader round trips, or reading from the leader with a read lease). Session guarantees
+only constrain what a *single session or causal chain* observes. The senior move is recognizing that
+the product almost never needs global linearizability; it needs "the user sees their own action,"
+which read-your-writes delivers far more cheaply. Reserve linearizability for the few operations that
+truly need it (a uniqueness constraint, a distributed lock, a "claim this seat" check).
+
+\`\`\`
+user writes comment -> LEADER (LSN=1042)  --returns token 1042-->
+   later read carries token 1042 ->
+      pick replica whose applied LSN >= 1042, else wait/route to leader
+   => the write is never missing for this user (read-your-writes)
+\`\`\`
+
+Recap: replication lag causes user-visible bugs, each violating a specific session guarantee;
+implement them with sticky routing to the leader (simple, single-device) or version tokens that make
+reads wait for a replica to catch up (works cross-device), and remember these are weaker than
+linearizability but usually exactly what the product needs.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -237,6 +291,55 @@ export const systemDesignLevel3: DesignLevel = {
               "**Removes are the subtle case:** a naive union resurrects deleted items, so use tombstones or an OR-Set CRDT so a delete beats a concurrent stale add.",
               "**Availability and convergence:** sloppy quorum plus hinted handoff keeps 'add to cart' succeeding during a partition; read repair and Merkle-tree anti-entropy converge replicas afterward. In PACELC terms: PA/EL, correct because the merge semantics make the temporary inconsistency non-lossy.",
               "Common wrong turn: LWW on the whole cart object, which meets the availability bar but violates 'never lose an added item' the moment a user adds from two devices at once.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-replication-lag-session",
+          title: "Replication Lag & Session Guarantees",
+          summary:
+            "Map each lag-induced bug to its session guarantee and fix it with sticky routing or version tokens, instead of over-promising linearizability.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["session-guarantees", "replication-lag"],
+          teach: {
+            markdown: replicationLagSessionTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-replication-lag-session-apply",
+            prompt:
+              "Add read-your-writes and monotonic-reads guarantees to a read-replica architecture where a user writes to the primary and reads from lagging replicas.",
+            thinkAbout: [
+              "Which session guarantee does each user-visible bug violate?",
+              "How do sticky routing and version tokens implement them?",
+              "Why are these weaker than linearizability but often exactly enough?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: single-leader Postgres with async read replicas lagging typically < 500ms but spiking to seconds. Two reported bugs: (1) a user posts a comment and it is missing right after (read-your-writes violation); (2) rapid refreshes make content appear, vanish, then reappear (monotonic-reads violation).",
+              "**Bug 1, read-your-writes via version tokens:** on a write to the primary, capture the commit position (`pg_current_wal_lsn()` or a logical commit timestamp) and store it in the user's session. On subsequent reads, compare the token against each replica's applied LSN (`pg_last_wal_replay_lsn()`) and route to a replica caught up past the token, falling back to the primary if none is within a short wait. This bounds staleness exactly and works across devices if the session travels with the user.",
+              "**The simpler first cut, sticky routing:** for ~15 seconds after any write, send that user's reads to the primary. Trivial, but single-device and adds primary load, so prefer the token approach for anything cross-device.",
+              "**Bug 2, monotonic reads:** the flicker happens because successive reads land on replicas at different lag, so the timeline jumps backward. Ensure a user's reads never move to a MORE stale replica: pin the session to a specific replica (consistent hashing on user/session id) so they read one timeline, and/or carry a high-water-mark token of the newest data the user has seen and refuse to serve a read from a replica behind that mark (wait or reroute).",
+              "**Why not just linearize everything:** global linearizability would require reading from the primary or a consensus read lease on every request, throwing away the read scaling replicas exist to provide. These bugs need each session to see a consistent, non-regressing view of its own actions, which read-your-writes and monotonic reads deliver for the cost of a token comparison.",
+              "Common wrong turn: promising read-your-writes while still round-robining reads across async replicas with no routing or token, which is exactly the architecture that produced the bug.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-replication-lag-session-practice",
+            prompt:
+              "Design the session-consistency layer for Twitter/X-style posting and timeline reads at 400k read QPS off async replicas, where a user posts from their phone and immediately opens the same account on their laptop, and neither device may ever show the tweet as missing.",
+            thinkAbout: [
+              "Why does sticky-to-primary routing fail the phone-then-laptop case?",
+              "Where must the version token live so any device can honor it?",
+              "What fraction of reads actually pay a wait, and why is that fraction small?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: single-leader-per-shard writes with a large async replica fleet serving 400k timeline QPS. The hard requirement is cross-device read-your-writes: post on phone, open laptop (different session, likely different replica), and the tweet must be present. Sticky-to-primary routing fails because the laptop is a different session, and pinning 400k QPS to primaries would collapse the read tier.",
+              "**Design: account-scoped version tokens.** On a successful post, the write path returns a version token (the shard's commit LSN or a global logical timestamp from an HLC-style clock). Persist the token against the user account, not the browser session, in a fast store (Redis keyed by user id, or the auth/session record). Any device for that user fetches the latest token on its next timeline read and includes it.",
+              "**The read router** selects a replica whose applied position is >= the token, or briefly waits for one, or falls back to the primary only for that specific user's request. Because the token is account-scoped, the laptop honors the phone's write, delivering cross-device read-your-writes without pinning the fleet.",
+              "**Scaling it:** the token check is a cheap comparison against replica-reported LSNs (replicas heartbeat their applied position to the router). The vast majority of the 400k QPS carry a token already satisfied by most replicas (lag is normally sub-second), so they route normally with no wait; only reads whose token is newer than a candidate replica pay a small wait or a primary fallback: a tiny fraction. Keep the user's high-water token advancing for monotonic reads so the timeline never regresses across refreshes.",
+              "**The tradeoff:** one small per-user token write on the hot post path and a token comparison on reads buys cross-device correctness, instead of buying it with primary reads (does not scale) or global linearizability (unnecessary).",
+              "Common wrong turn: relying on sticky sessions, which silently works in single-device testing and then shows the missing-tweet bug the instant the user switches devices.",
             ],
           },
         },
