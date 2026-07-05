@@ -366,6 +366,75 @@ write-optimized, model where fan-out happens (write vs read, and a celebrity hyb
 the hot key rather than the average.
 `.trim()
 
+const storageBandwidthCacheTeach = `
+## Three capacity numbers, three formulas, three classic mistakes
+
+Storage, bandwidth, and cache are the three capacity numbers that decide your datastore, your CDN
+strategy, and your cache tier. Each has a formula and a classic mistake.
+
+### Storage: metadata and blobs are different systems
+
+The base formula is:
+
+\`\`\`
+storage = objects/day  x  object size  x  retention (days)
+\`\`\`
+
+The critical discipline is to separate metadata from blobs. A photo is 2 MB of blob but only ~1 KB of
+metadata (id, owner, timestamps, storage key, caption). These belong in different systems: blobs in an
+object store (S3), metadata in a sharded database. Estimating them together hides the fact that your
+database only needs to hold gigabytes while your object store holds petabytes.
+
+Two multipliers people forget, both of which change the answer materially:
+
+- **Replication factor.** Durable stores keep 3 copies (RF=3), so multiply raw storage by 3. Erasure
+  coding can bring this down to ~1.3x to 1.5x for cold blobs, a real cost lever worth naming.
+- **Index and overhead.** Secondary indexes, B-tree overhead, and free space commonly add 20 to 50% on
+  top of raw row size for databases.
+
+### Bandwidth: ingress and egress separately
+
+\`\`\`
+bandwidth = QPS  x  payload size
+ingress = write QPS x write payload      (upload path)
+egress  = read QPS  x read payload       (download/serve path)
+\`\`\`
+
+Egress is usually the larger and more expensive number, and in cloud pricing egress leaves your
+provider's network at real dollar cost. A read-heavy media service serving 2 MB objects at 250k QPS is
+pushing 500 GB/s of egress, which is a "you must use a CDN" signal, not a "size your app servers"
+signal, because the CDN serves it from the edge and shields the origin.
+
+### Cache sizing with the 80/20 rule
+
+You do not cache the whole corpus; you cache the hot working set. The Pareto assumption is that ~20%
+of data serves ~80% of requests, and often it is far more skewed (the recent and the viral). Size the
+cache from that hot fraction:
+
+\`\`\`
+cache size ~= hot fraction (~20%) of the actively-read dataset
+\`\`\`
+
+For a service with a 4.5 TB actively-read dataset, an 80/20 cut suggests roughly 900 GB of hot data,
+but in practice the truly hot set is the last few days plus trending items, often a much smaller
+absolute number like tens to low hundreds of GB. Verify the hit rate assumption: if 100 GB of cache
+yields a 90%+ hit rate, you have removed 90% of read load from the datastore, which is what justifies
+the cache economically.
+
+**Interview nuance:** interviewers probe "how big is your cache and why that size." The winning answer
+ties cache size to a target hit rate and to the read load removed from the origin, not to a fraction of
+total storage pulled from thin air.
+
+\`\`\`
+raw payload -> x replication -> + index/overhead = provisioned storage
+hot 20% of reads -> cache size -> target hit rate -> read load removed
+\`\`\`
+
+Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply by
+replication factor and add index overhead, compute ingress and egress bandwidth separately (egress
+drives CDN), and size the cache from the hot ~20% against a target hit rate.
+`.trim()
+
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
@@ -687,6 +756,55 @@ export const systemDesignLevel0: DesignLevel = {
               "**Fan-out strategy.** On send, write the message once to a durable per-conversation log (Cassandra-class store), then fan out delivery per recipient: push over an existing persistent connection (WebSocket) if the device is online, or write to a per-user pending queue and trigger a push notification (APNs/FCM) if offline. Delivery is fan-out-on-write into per-recipient inboxes.",
               "**Bottleneck handling.** 17M peak delivery QPS demands a large fleet of connection servers, each holding hundreds of thousands of live WebSockets, sharded by user id, with a pub/sub or routing layer to find which connection server holds a given recipient. Large groups are the hot spots: a 1,000-member group turns one send into 1,000 deliveries, so cap group size and treat very large groups closer to a broadcast/read model.",
               "Common wrong turn: optimizing the send write (only 2.4M QPS) and under-provisioning the delivery fan-out (the 17M-QPS reality), or forgetting the online-vs-offline split that decides push-vs-queue.",
+            ],
+          },
+        },
+        {
+          id: "sd-l0-storage-bandwidth-cache",
+          title: "Storage, Bandwidth & Cache Sizing",
+          summary:
+            "Size storage with replication and overhead multipliers, compute ingress and egress separately, and size the cache from the hot working set.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["estimation", "storage", "cache"],
+          teach: {
+            markdown: storageBandwidthCacheTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l0-storage-bandwidth-cache-apply",
+            prompt:
+              "Size 5-year storage and the hot-cache tier for a media service, applying the 80/20 rule to decide what lives in cache vs cold storage.",
+            thinkAbout: [
+              "How do you separate metadata size from blob size in the storage estimate?",
+              "What working-set fraction belongs in the hot cache tier?",
+              "How does replication factor multiply your storage number?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 10M new media objects/day, average blob 2 MB, metadata ~1 KB/object, 5-year retention (~1,825 days), replication factor 3 for blobs, and RF 3 plus ~30% index overhead for metadata.",
+              "**Blob storage.** 10^7 objects/day x 2 MB = 20 TB/day of raw blobs. Over 5 years: ~36.5 PB raw; with RF=3 about 110 PB provisioned. Tier it: recent data on RF=3, archival on erasure coding (~1.4x instead of 3x) to cut the older tail's cost. Blobs live in an object store (S3-class), never in the database.",
+              "**Metadata storage.** 10^7 objects/day x 1 KB = 10 GB/day. Over 5 years: ~18 TB raw; with RF=3 and ~30% index overhead about 70 TB, in a sharded database (DynamoDB or sharded Postgres/Cassandra) sharded by object id. Note the 1000x gap between blobs (110 PB) and metadata (70 TB): keeping them separate is what keeps the database tractable.",
+              "**Cache tier.** Cache the hot working set, not 36 PB. The hot set is dominated by recency and virality: the last few days of uploads plus trending older items. Put a modest hot tier (a few hundred GB to a few TB of the hottest objects plus all hot metadata) in Redis, and rely primarily on a CDN for blob egress. The CDN edge cache, sized to the hot ~20% by request volume, is what actually absorbs read traffic; the origin cache handles metadata and cache-miss coalescing.",
+              "**What lives where:** hot metadata and hottest blobs in cache; recent blobs on RF=3 object store behind a CDN; archival blobs on erasure-coded cold storage; all metadata in the sharded DB.",
+              "Common wrong turn: forgetting the RF=3 multiplier (understating storage 3x), lumping blobs into the database, or sizing the cache as a fixed fraction of 36 PB rather than from the hot request distribution.",
+            ],
+          },
+          practice: {
+            id: "sd-l0-storage-bandwidth-cache-practice",
+            prompt:
+              "Size storage, egress bandwidth, and the cache/CDN tier for Netflix-scale video streaming: assume 250M subscribers, each streaming 2 hours/day at an average 5 Mbps bitrate, and a catalog of 100k titles at an average 15 GB per title (summed across encodings). Decide where the real capacity problem is.",
+            thinkAbout: [
+              "Is the catalog's total storage actually large by modern standards, or is it a fixed and modest number?",
+              "Why is bandwidth about peak concurrency rather than daily totals, and what does the peak egress number force?",
+              "How skewed is title popularity, and what does that mean an edge cache needs to hold?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 250M subscribers, 2 hours/day each, 5 Mbps average delivered bitrate, catalog 100k titles x 15 GB/title across encodings, 3x peak multiplier for concurrent viewing.",
+              "**Catalog storage.** 100k x 15 GB = 1.5 PB raw; with RF=3 plus geo-distribution a few PB. A fixed, modest number: the catalog is small and mostly static. Storage is not the hard problem.",
+              "**Egress bandwidth is the real problem.** Bandwidth is about concurrency, not daily totals: if ~10% of subscribers stream at peak, that is 25M concurrent streams x 5 Mbps = 125 Tbps of peak egress. That number is the entire design constraint. You cannot serve 125 Tbps from central origins; it must come from a CDN deployed deep into ISP networks (Netflix's Open Connect model), caching popular titles inside or adjacent to ISPs.",
+              "**Cache/CDN tier.** Apply the 80/20 rule hard: a small fraction of titles (new releases, trending shows) drives the overwhelming majority of streams. Each edge appliance caches the hot terabytes (a few thousand popular titles) and serves them locally; misses fall back to regional caches then origin. Because the catalog is only ~1.5 PB, a full copy fits in a regional cache. Fill happens off-peak overnight.",
+              "**Verdict:** not storage (1.5 PB is small), not control-plane QPS (playback starts are modest), but sustained peak egress at 125 Tbps, which forces a purpose-built edge CDN rather than a centralized serving tier.",
+              "Common wrong turn: sizing central data-center bandwidth for 125 Tbps, or fixating on catalog storage when the binding constraint is peak concurrent egress served from the edge.",
             ],
           },
         },
