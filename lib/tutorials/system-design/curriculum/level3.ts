@@ -243,6 +243,70 @@ mod N, directory adds a flexible routing hop, and secondary indexes are either s
 or write-costly globals.
 `.trim()
 
+const consistentHashingTeach = `
+## Why hash mod N is the wrong primitive
+
+The naive way to place keys across N nodes is \`node = hash(key) mod N\`. It spreads load evenly, and
+it is a disaster the moment N changes. Go from 10 nodes to 11 and the modulus changes for almost
+every key, so roughly **10 of 11 keys map to a different node**. For a cache that means a near-total
+miss storm that stampedes the database; for a database it means moving nearly the whole dataset to
+add one machine. Since adding and removing nodes is the entire point of horizontal scale, mod N is
+the wrong primitive.
+
+### The ring
+
+**Consistent hashing** fixes the remap cost. Imagine a ring of hash values from 0 to 2^32 - 1. Hash
+each **node** to a position on the ring, and hash each **key** to a position too. A key is owned by
+the **first node clockwise** from its position. Now add a node: it lands somewhere on the ring and
+takes over only the keys between it and its counter-clockwise neighbor. Remove a node: its keys pass
+to the next node clockwise. Either way you move only about **1/N of the keys**, and only between
+adjacent nodes, instead of remapping the world. This is why Dynamo, Cassandra, Riak, and most
+distributed caches are built on it.
+
+Plain consistent hashing has two problems. First, with few nodes the ring is lumpy: random placement
+means some nodes own huge arcs and others tiny ones, so load is uneven (a 2x imbalance is easy).
+Second, when a node leaves, all its load dumps onto a single neighbor rather than spreading.
+
+### Virtual nodes, bounded load, and rendezvous
+
+**Virtual nodes (vnodes)** solve both. Instead of one point per physical node, give each physical
+node **many tokens** (say 128 or 256) hashed to many ring positions. Now each physical node owns many
+small arcs scattered around the ring, so load smooths out toward even, and when a node fails its many
+arcs are inherited by **many different neighbors**, spreading the rebalance rather than crushing one
+node. Vnodes also give you **weighting**: a machine with 2x the RAM simply gets 2x the tokens.
+
+**Bounded-load consistent hashing** adds a cap: each node may hold at most \`(1 + epsilon)\` times
+the average load. When a key's target node is already at its cap, placement spills to the next node
+clockwise. This bounds hotspots at the cost of some keys not living on their "natural" node. Reach
+for it when even vnodes leave a hot node.
+
+**Rendezvous hashing (highest-random-weight, HRW)** is a simpler alternative for some jobs: to place
+a key, compute \`hash(key, node)\` for every node and pick the highest. Same minimal-movement
+property without maintaining a ring, and selecting the top-k replicas is trivial (take the k
+highest). The tradeoff is O(N) per lookup, so it suits smaller or bounded node sets, like choosing
+replicas or a load-balancer backend, rather than a thousand-node ring.
+
+**Interview nuance:** the phrase to earn is "only ~1/N keys move." If you are asked how a cache
+cluster survives a node loss and you say hash mod N, you have just described the failure. Say
+consistent hashing with vnodes, quantify the movement, and note that replicas are placed on the next
+distinct physical nodes clockwise.
+
+\`\`\`
+hash mod N: add node -> ~all keys remap  (miss storm / full reshuffle)
+
+consistent hash ring (with vnodes):
+      [n2]...[n1]
+     /            \\      key -> first node clockwise
+  [n3]    o key    [n1]  add node: steals ~1/N keys from one arc
+     \\            /      vnodes: many small arcs -> even load, spread rebalance
+      [n2]...[n3]
+\`\`\`
+
+Recap: hash mod N remaps nearly every key on resize; consistent hashing moves only ~1/N and only
+between neighbors; virtual nodes smooth load, spread rebalancing, and enable weighting; bounded-load
+caps hotspots; and rendezvous hashing is a ring-free alternative for small replica-selection cases.
+`.trim()
+
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
@@ -456,6 +520,55 @@ export const systemDesignLevel3: DesignLevel = {
               "**Whale defense:** a marketplace doing a huge share of volume hotspots its partition. Detect high-volume merchants and sub-partition them with a bucket in the key (merchant_id:bucket, bucket = hash(event_id) mod K), spreading the whale across K partitions. The reconciliation scan then reads K buckets and merges: bounded and acceptable because that job is not latency-critical.",
               "**Store choice:** a wide-column store (Cassandra/ScyllaDB or DynamoDB) whose native partition-key plus clustering-key model expresses exactly this.",
               "**The committed tradeoff:** optimize the frequent merchant range scan and even write spread; pay for point reads with a global index hop and for whales with explicit sub-partitioning, rather than pretending one flat key serves both patterns for free.",
+            ],
+          },
+        },
+        {
+          id: "sd-l3-consistent-hashing",
+          title: "Consistent Hashing, Virtual Nodes & Rebalancing",
+          summary:
+            "Hash mod N remaps nearly everything on resize; a ring with virtual nodes moves only ~1/N of keys, smooths load, and spreads rebalancing across many neighbors.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["consistent-hashing", "rebalancing"],
+          teach: {
+            markdown: consistentHashingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l3-consistent-hashing-apply",
+            prompt:
+              "Design node-membership handling for a distributed cache cluster so that losing 1 of 10 nodes does not invalidate the whole keyspace.",
+            thinkAbout: [
+              "Why does hash-mod-N remap nearly all keys on resize?",
+              "How do virtual nodes smooth load and speed rebalancing?",
+              "How does bounded-load consistent hashing cap hotspots?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 10 cache nodes fronting a database, serving 1M ops/sec at a 95% hit ratio, so the DB sees ~50k ops/sec. The design goal: a single node loss should invalidate only ~1/10 of keys, keeping the DB within ~2x of its normal miss load, not 10x.",
+              "**Consistent hashing on a ring, not hash mod N.** Under mod N, dropping to 9 nodes changes the modulus and remaps ~90% of keys, so 90% miss at once and the DB is hit with roughly 10x its normal read load: a cascading outage. Under consistent hashing, the dead node's arc passes to its clockwise neighbor, so only ~10% of keys move and only those miss; the DB sees ~2x normal miss traffic briefly while the cache refills, which is survivable.",
+              "**~200 virtual nodes per physical node:** load evens out to within a few percent instead of the lumpy imbalance of 10 single points, and when a node dies its ~200 arcs are inherited by many different survivors rather than dumping all its load on one unlucky neighbor. Vnodes also let a bigger machine take more tokens later.",
+              "**Membership:** nodes register in a coordination service (etcd/ZooKeeper) or gossip membership (as Cassandra does). Clients or a routing proxy watch the membership list and rebuild the ring on change, with a short failure-detection grace window so a brief network blip does not trigger a needless remap.",
+              "**Hotspot backstop:** on a genuinely skewed workload where one node still runs hot, enable bounded-load consistent hashing: cap each node at (1 + epsilon) times average and spill overflow to the next node clockwise.",
+              "Common wrong turn: hash mod N (or restarting all clients with a new node count), which reshuffles the whole keyspace and turns a routine node replacement into a database-melting miss storm.",
+            ],
+          },
+          practice: {
+            id: "sd-l3-consistent-hashing-practice",
+            prompt:
+              "Design the key placement and rebalancing for a DynamoDB-style storage cluster that runs replication factor 3 and must autoscale from 30 to 300 nodes during a Black Friday ramp without a read-availability dip or a thundering rebalance. Explain token assignment, replica placement, and how you throttle data movement.",
+            thinkAbout: [
+              "How are 3 replicas placed on the ring so one AZ loss does not take all of them?",
+              "What makes a 10x scale-out 'thundering,' and which knobs tame it?",
+              "When may a new node start serving reads?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: durable storage (not a disposable cache), RF=3, and the cluster must grow 10x over hours while serving traffic. Neither lost data nor a rebalance that saturates the network and starves live requests is tolerable.",
+              "**Placement:** consistent hashing on a ring with virtual nodes, each physical node owning a few hundred tokens. A key's 3 replicas are the next 3 *distinct physical* nodes clockwise (skipping additional vnodes of an already-chosen node), spread across availability zones so one AZ loss does not take all 3. This is the Dynamo replica model.",
+              "**Scaling out:** new nodes claim tokens and take over the corresponding arcs. With vnodes, each newcomer pulls small arcs from many existing nodes in parallel rather than draining one, so no single source node is hammered. Only ~1/N of keys per added node move.",
+              "**Throttling the rebalance (the crux):** rate-limit streaming (a bytes/sec cap per node pair), bootstrap new nodes in batches rather than all at once, and prioritize live read/write traffic over background streaming so p99 holds. New nodes serve reads only after their range is fully streamed and verified (Merkle-tree anti-entropy), so reads never route to a partially-filled replica. During the ramp, reads still have 3 replicas on the old owners until handoff completes: no availability dip.",
+              "**Shrinking after the peak** reverses the process gradually with the same throttle.",
+              "**The committed tradeoff:** a slower, throttled rebalance (hours, not minutes) protects live-traffic latency and correctness, rather than a fast reshuffle that would spike p99 and risk serving stale or missing replicas.",
             ],
           },
         },
