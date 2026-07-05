@@ -369,6 +369,166 @@ INSERT INTO events (event_id, user_id, event_ts) VALUES
   },
 }
 
+const cohortRetention: SqlLesson = {
+  id: "sql-l5-cohort-retention",
+  title: "Cohort Retention and the Denominator Trap",
+  summary:
+    "Anchor cohorts on first activity, pin one definition of retained, and keep the FULL cohort as the denominator with a LEFT JOIN.",
+  estimatedMinutes: 38,
+  difficulty: "hard",
+  skills: [
+    "product-analytics",
+    "cohort analysis",
+    "Day-N retention",
+    "LEFT JOIN denominator",
+    "COUNT(DISTINCT)",
+    "date arithmetic",
+  ],
+  teach: {
+    estimatedMinutes: 13,
+    markdown: `## Retention is where candidates corrupt the denominator
+
+Cohort retention answers "of the users who started in a given week, what fraction came back later". It is one of the highest-signal analytics questions on a DE screen, and it has a famous failure mode: fewer than a third of candidates get the denominator right. The mistake is always the same. They join the cohort to the return activity with an INNER JOIN (or filter on the return event in the \`WHERE\`), which silently drops every user who did NOT come back, so the denominator shrinks to exactly the retained users and the rate reads 100%. Retention is a full-cohort fraction, so the denominator must stay the whole cohort.
+
+## Building it correctly
+
+Work on \`events(user_id, event_date)\`.
+
+1. **Anchor each user's cohort on their first activity.** Use \`MIN(event_date)\` per user, not a \`signup_date\` column, which can be stale or backfilled. Bucket that first date into a cohort, here the ISO week with \`strftime('%Y-%W', first_date)\`.
+2. **Define "retained" and pin it.** There are three common readings: active exactly on day N, active within N days, or active during the day-N window. They give different numbers, so commit to one out loud. We use **active exactly 7 days after the first event**: \`event_date = date(first_date, '+7 days')\`.
+3. **Keep the full cohort as the denominator.** LEFT JOIN the cohort to the day-7 activity, never INNER. \`COUNT(*)\` over the cohort is the denominator, \`COUNT(matched_user)\` is the numerator, and their ratio is the rate. Cast to a float first with \`1.0 * ...\` or SQLite does integer division and every rate collapses to 0.
+
+The demo shows the trap directly: the same cohort, with the denominator computed both ways, so you watch the INNER-join version report 100% while the full-cohort version reports the real 67%.
+
+**Interview nuance:** use \`COUNT(DISTINCT user_id)\`, not \`COUNT(*)\`, on both sides. A user with two events on day 7 would otherwise count twice in the numerator and push the rate above 100%, which is the tell that the grain slipped.
+
+> **In the warehouse this differs.** The date math is \`date(first_date, '+7 days')\` here versus \`DATE_ADD\` or \`first_date + INTERVAL '7 days'\` in Snowflake and BigQuery, and the week bucket is \`DATE_TRUNC('week', first_date)\` rather than \`strftime\`. The discipline being tested (anchor on first activity, pin one definition, keep the full-cohort denominator) is identical in every dialect.`,
+    demoSeedSql: `CREATE TABLE events (user_id INTEGER, event_date TEXT);
+INSERT INTO events (user_id, event_date) VALUES
+  (1, '2026-03-02'), (1, '2026-03-09'),   -- retained on day 7
+  (2, '2026-03-02'),                       -- not retained (no day-7 event)
+  (3, '2026-03-03'), (3, '2026-03-10');    -- retained on day 7`,
+    demoCode: `-- Same cohort, two denominators. INNER JOIN keeps only retained users, so the rate is always 100%.
+WITH firsts AS (SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id),
+cohort AS (SELECT user_id, date(first_date, '+7 days') AS day7 FROM firsts),
+day7_activity AS (
+  SELECT DISTINCT c.user_id FROM cohort c JOIN events e ON e.user_id = c.user_id AND e.event_date = c.day7
+)
+SELECT
+  COUNT(*)                                            AS full_cohort,
+  COUNT(a.user_id)                                    AS retained,
+  ROUND(1.0 * COUNT(a.user_id) / COUNT(a.user_id), 4) AS wrong_rate_inner_denominator,
+  ROUND(1.0 * COUNT(a.user_id) / COUNT(*), 4)         AS correct_rate_full_cohort
+FROM cohort c
+LEFT JOIN day7_activity a ON a.user_id = c.user_id;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l5-cohort-retention-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the **Day-7 retention rate per weekly signup cohort** as \`(cohort_week, cohort_size, retained_day7, retention_rate)\`, over \`events(user_id, event_date)\`, keeping the full cohort in the denominator.
+
+Anchor each user's cohort on the ISO week of their first event (\`strftime('%Y-%W', MIN(event_date))\`). Count a user as retained if they have an event exactly 7 days after their first event. Keep every cohort member in \`cohort_size\` with a LEFT JOIN, and compute \`retention_rate\` as \`retained_day7 / cohort_size\` rounded to 4 places. Alias the columns exactly as named.`,
+    starterCode: `-- Day-7 retention per weekly cohort, full-cohort denominator.
+WITH firsts AS (
+  SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
+)
+SELECT
+  -- bucket into cohort weeks, LEFT JOIN to day-7 activity, count both sides
+FROM firsts;`,
+    hints: [
+      "Per user: `cohort_week = strftime('%Y-%W', first_date)` and `day7 = date(first_date, '+7 days')`.",
+      "Build a `day7_activity` set of users who have an event on their `day7`, then LEFT JOIN the cohort to it so non-returners survive.",
+      "`cohort_size = COUNT(*)`, `retained_day7 = COUNT(matched_user)`, `retention_rate = ROUND(1.0 * retained_day7 / cohort_size, 4)`.",
+    ],
+    referenceSolution: `WITH firsts AS (
+  SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
+),
+cohort AS (
+  SELECT user_id,
+         strftime('%Y-%W', first_date) AS cohort_week,
+         date(first_date, '+7 days')    AS day7
+  FROM firsts
+),
+day7_activity AS (
+  SELECT DISTINCT c.user_id
+  FROM cohort c
+  JOIN events e ON e.user_id = c.user_id AND e.event_date = c.day7
+)
+SELECT c.cohort_week,
+       COUNT(*)          AS cohort_size,
+       COUNT(a.user_id)  AS retained_day7,
+       ROUND(1.0 * COUNT(a.user_id) / COUNT(*), 4) AS retention_rate
+FROM cohort c
+LEFT JOIN day7_activity a ON a.user_id = c.user_id
+GROUP BY c.cohort_week
+ORDER BY c.cohort_week;`,
+    singleFile: {
+      seedSql: `CREATE TABLE events (
+  user_id    INTEGER,
+  event_date TEXT
+);
+INSERT INTO events (user_id, event_date) VALUES
+  (1, '2026-03-02'), (1, '2026-03-09'),
+  (2, '2026-03-03'), (2, '2026-03-05'),
+  (3, '2026-03-04'), (3, '2026-03-11'),
+  (4, '2026-03-09'), (4, '2026-03-16'),
+  (5, '2026-03-10');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["cohort_week", "cohort_size", "retained_day7", "retention_rate"],
+        rows: [
+          ["2026-09", 3, 2, 0.6667],
+          ["2026-10", 2, 1, 0.5],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l5-cohort-retention-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns a **cohort retention triangle** as \`(cohort_week, weeks_since_signup, retained_users)\` for weeks 0 through 4, over the same \`events(user_id, event_date)\` table.
+
+Bucket each user by the ISO week of their first event, compute how many whole weeks after that first event each of their events falls, and count the **distinct** retained users per \`(cohort_week, weeks_since_signup)\`. Keep only week offsets 0 through 4. Alias the columns exactly as named.`,
+    starterCode: `-- Retention triangle: distinct users active N whole weeks after their cohort's signup week.
+WITH firsts AS (
+  SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
+)
+SELECT
+  -- cohort_week, week offset per event, COUNT(DISTINCT user_id)
+FROM firsts;`,
+    hints: [
+      "Join each event back to its user's `first_date`, then `cohort_week = strftime('%Y-%W', first_date)`.",
+      "Whole weeks since signup: `CAST((julianday(event_date) - julianday(first_date)) / 7 AS INTEGER)`.",
+      "`GROUP BY cohort_week, weeks_since_signup` with `COUNT(DISTINCT user_id)`, filtered to offsets `BETWEEN 0 AND 4`.",
+    ],
+    singleFile: {
+      seedSql: `CREATE TABLE events (
+  user_id    INTEGER,
+  event_date TEXT
+);
+INSERT INTO events (user_id, event_date) VALUES
+  (1, '2026-03-02'), (1, '2026-03-09'),
+  (2, '2026-03-03'), (2, '2026-03-05'),
+  (3, '2026-03-04'), (3, '2026-03-11'),
+  (4, '2026-03-09'), (4, '2026-03-16'),
+  (5, '2026-03-10');`,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["cohort_week", "weeks_since_signup", "retained_users"],
+        rows: [
+          ["2026-09", 0, 3],
+          ["2026-09", 1, 2],
+          ["2026-10", 0, 2],
+          ["2026-10", 1, 1],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel5: SqlLevel = {
   id: 5,
   slug: "advanced-company-sql",
@@ -383,7 +543,7 @@ export const sqlLevel5: SqlLevel = {
       title: "Module 5.1: The Advanced SQL Power Round",
       description:
         "The live SQL screen an intern actually sits: gaps-and-islands, sessionization, cohort retention, funnels, and advanced window frames.",
-      lessons: [gapsAndIslands, sessionization],
+      lessons: [gapsAndIslands, sessionization, cohortRetention],
     },
   ],
 }
