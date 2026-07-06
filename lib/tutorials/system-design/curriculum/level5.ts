@@ -769,6 +769,69 @@ Debezium CDC) publish it at least once, with a consumer-side inbox/dedup table m
 result effectively-once.
 `.trim()
 
+const deliveryIdempotencyTeach = `
+## The most misunderstood phrase in distributed systems
+
+The correct mental model: **exactly-once delivery over an unreliable network is impossible;
+exactly-once *effect* is achievable by combining at-least-once delivery with idempotency.**
+
+The three delivery semantics:
+
+- **At-most-once:** send and forget. No duplicates, but possible loss. Fine for a metric sample,
+  fatal for a payment.
+- **At-least-once:** send and retry until acknowledged. No loss, but if the ack is lost the sender
+  retries and the receiver may process twice: **duplicates possible**.
+- **Exactly-once (delivery):** each message delivered and processed once, no loss, no duplicates.
+  Over a real network you cannot have this at the delivery layer.
+
+Why impossible? Because acknowledgements can be lost too. Sender sends, receiver processes,
+receiver's ack is dropped. The sender cannot distinguish "message lost" from "ack lost," so to avoid
+loss it must retry, and retrying risks a duplicate. A consequence of the two-generals problem: no
+finite exchange over a lossy channel makes both sides certain. So every real system that "cannot lose
+data" runs **at-least-once** and deduplicates.
+
+### The idempotency key
+
+The client attaches a unique key to a request (\`Idempotency-Key: a1b2...\`, as Stripe does). The
+server, on first receipt, does the work and **stores the result keyed by that idempotency key** (with
+a TTL). On any retry with the same key, the server returns the stored result instead of redoing the
+work. The effect happened exactly once even though the request arrived multiple times. The critical
+detail: recording the key and performing the side effect must be **atomic** (same transaction), or a
+crash between them reopens the double-execution window.
+
+Distinguish the operation types:
+
+- **Naturally idempotent:** \`SET balance = 5\`, \`PUT user.email = x\`, delete by id. Applying
+  twice yields the same state: safe to retry with no machinery.
+- **Non-idempotent:** \`balance = balance + 100\`, "charge $50," "append to list." Applying twice
+  doubles the effect. Make them safe with an idempotency key plus stored result, or convert to
+  conditional/versioned updates (compare-and-set, or a unique constraint on the operation id).
+
+### Kafka EOS and fencing tokens
+
+**Kafka's "exactly-once semantics" (EOS)** is real but narrowly scoped: exactly-once *within a
+Kafka-to-Kafka pipeline* (idempotent producers deduping by producer id + sequence number, plus
+transactions that atomically commit consumer offsets and output records). The guarantee stops at
+Kafka's boundary. If your consumer's side effect is an *external* action (charge a card, send an
+email), Kafka EOS does not cover it: those still need application-level idempotency.
+
+**Fencing tokens** protect against a different failure: a *stale* operation from a delayed or paused
+actor. A process pauses (long GC), is presumed dead, a new one takes over, then the old one wakes and
+issues a now-stale write. A monotonically increasing **fencing token** attached to each operation,
+rejected by the storage layer if lower than the highest seen, neutralizes the zombie write.
+Idempotency keys stop *duplicates of the same intent*; fencing tokens stop *stale operations from a
+superseded actor*. Different problems, both needed.
+
+**Interview nuance:** if you say "we use exactly-once delivery" you will get pushed. Say instead
+"at-least-once delivery plus idempotent processing gives exactly-once *effect*," and name where the
+dedup state lives and how it is made atomic with the side effect.
+
+Recap: networks force at-most-once (may lose) or at-least-once (may duplicate); build exactly-once
+*effect* with an idempotency key whose stored result is written atomically with the side effect;
+Kafka EOS covers only the pipeline, not external effects; and fencing tokens separately reject stale
+writes from superseded actors.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1438,6 +1501,56 @@ export const systemDesignLevel5: DesignLevel = {
               "**Correctness under at-least-once:** on restarts, events replay. Every consumer is idempotent: use the change's LSN/offset or a per-row version, applying an event only if newer than what was last applied for that key (upsert with a version guard). Replays and duplicates become harmless and per-product ordering is preserved.",
               "**Scale and lag:** scale Kafka partitions and consumer instances horizontally; CDC keeps DB overhead low (reads the WAL, not the tables). Monitor replication lag (WAL-to-consumer delay) as the key freshness SLO. Backfills use a Debezium snapshot then switch to streaming.",
               "Common wrong turn: the app writing to Postgres, then Elasticsearch, then Redis, then the warehouse in sequence, where any crash between writes silently desynchronizes the systems.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-delivery-idempotency",
+          title: "Delivery Semantics, Idempotency & Exactly-Once Reality",
+          summary:
+            "Exactly-once delivery is impossible; build exactly-once effect from at-least-once plus idempotency keys stored atomically with the side effect, with fencing tokens for stale actors.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["delivery-semantics", "idempotency", "exactly-once"],
+          teach: {
+            markdown: deliveryIdempotencyTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-delivery-idempotency-apply",
+            prompt:
+              "Make a payment-charge API safe to retry, so that a client which times out and retries the same charge never double-charges the customer.",
+            thinkAbout: [
+              "Why is true network exactly-once impossible?",
+              "How do idempotency keys with a stored result achieve effectively-once?",
+              "What do fencing tokens protect against?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a `POST /charges` API over HTTP, clients that time out and retry, and a hard requirement of at most one actual charge per intended payment.",
+              "**Why exactly-once delivery is off the table:** a timed-out client cannot tell whether the charge succeeded and the response was lost, or the request never landed. To avoid losing a legitimate charge it must retry, and retrying risks a duplicate: acks can be lost like requests, and no protocol makes both sides certain in finite messages. So: at-least-once transport, dedup at the application.",
+              "**Idempotency-key design:** the client generates a unique key per payment intent (a UUID reused across retries of the SAME charge). Server logic: (1) look up the key; (2) if present and completed, return the stored response verbatim: no second charge; (3) if present but in-flight (a concurrent retry), return 409/'processing' or block on a lock so two retries do not both execute; (4) if absent, insert the key in PENDING state (a unique constraint makes concurrent first-requests race-safe: exactly one wins), perform the charge, and store the result under the key in the same transaction that records completion.",
+              "**The crux is the atomicity in step 4:** recording the key and committing the charge must be one transaction, or a crash between them lets a retry re-charge. Also validate that a reused key carries the same request parameters, rejecting a key reused for a different amount (Stripe does this).",
+              "**TTL and storage:** keys live in a durable store with a TTL covering realistic client retry windows (24h).",
+              "**Fencing, a different risk:** idempotency keys stop duplicate submissions of the same intent, not a stale actor. A worker that pauses (GC), is presumed dead, is replaced, then wakes and tries to finalize is a zombie write: attach a monotonically increasing fencing token and have the ledger reject any token lower than the highest seen. Also idempotency-key the downstream processor call so the retry to *them* is deduped too.",
+              "Common wrong turn: claiming 'exactly-once delivery' as a network guarantee, or recording the idempotency key in a separate step from the charge so a crash in between still double-charges.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-delivery-idempotency-practice",
+            prompt:
+              "Design end-to-end effectively-once processing for a service like Uber's payment pipeline, where a trip-completed event flows through Kafka to a billing consumer that charges the rider's card and credits the driver, at high throughput, and neither the rider double-charge nor the driver double-credit is acceptable even under consumer restarts and Kafka rebalances. Lead with the guarantee you actually provide.",
+            thinkAbout: [
+              "Where exactly does Kafka EOS stop covering you in this pipeline?",
+              "What makes a redelivered event a no-op at the billing consumer?",
+              "How does the external processor call survive a consumer crash mid-charge?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: TripCompleted events in Kafka, a billing consumer performing *external* side effects (charge the rider via a payment processor, credit the driver's ledger), high volume, inevitable consumer crashes and rebalances causing redelivery.",
+              "**The guarantee provided:** not 'exactly-once delivery' but at-least-once delivery plus idempotent processing = exactly-once effect. Kafka EOS covers the pipeline (idempotent producer + transactional offset commits), but the moment the consumer charges an external processor, EOS no longer covers the side effect: application idempotency handles the money movements.",
+              "**Producer side:** the trip service produces TripCompleted with a stable event id = trip id and Kafka's idempotent producer, so producer retries do not duplicate records within Kafka. Partition by rider id (or trip id) for ordering.",
+              "**Consumer side (the real protection):** treat every event as possibly-redelivered (a rebalance can reprocess a handled-but-uncommitted offset). For each event, run an idempotent transaction against the billing DB: check an inbox/dedup table for trip_id; if already processed, skip and commit the offset; if not, perform the charge and driver credit and record trip_id as processed in the SAME database transaction. Redelivery after a crash finds the trip processed and does nothing.",
+              "**External call idempotency:** the processor charge carries idempotency key = trip_id, so a consumer crash after calling the processor but before recording completion is safe: the retry hits the processor with the same key and is deduped: the card is charged once. The driver credit is a ledger append guarded by a unique constraint on trip_id.",
+              "**The trade:** a dedup-table lookup and a durable idempotency store on the hot path, accepting that ordering plus idempotency, not magic delivery, makes it safe. Wrong turn: trusting Kafka 'exactly-once' to cover the external card charge and driver credit, which it does not, so a rebalance re-runs the side effects and someone gets double-charged.",
             ],
           },
         },
