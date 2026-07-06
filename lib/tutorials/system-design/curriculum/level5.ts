@@ -1004,6 +1004,60 @@ leaders, enforce fencing tokens (monotonic numbers the storage rejects if stale)
 majority stays writable (CP) or both sides reconcile (AP), and either way the minority is fenced.
 `.trim()
 
+const byzantineFaultToleranceTeach = `
+## When nodes can lie
+
+Most consensus you will design assumes the **crash-stop** failure model: a faulty node either follows
+the protocol correctly or halts. It never *lies*. Under that model, **Raft and Paxos** tolerate f
+failures with **2f+1** nodes, because any two majority quorums of f+1 overlap in at least one node
+carrying the committed truth forward.
+
+The **Byzantine** model drops the honesty assumption. A Byzantine node can send **wrong** values,
+**equivocate** (tell node A "the value is X" and node B "the value is Y" in the same round), forge or
+replay messages, selectively drop, or **collude** with other faulty nodes. The name comes from the
+Byzantine Generals Problem: generals agreeing to attack or retreat while traitors send contradictory
+orders. The crucial difference: a crash is *detectable-ish* (silence) whereas a lie is **actively
+deceptive**: the node participates, so you cannot wait it out.
+
+### Why 3f+1
+
+To make a decision you need a quorum that (a) still forms even if the f liars refuse to participate,
+and (b) is large enough that the honest members of any two quorums overlap despite the liars. With
+**3f+1** total, a quorum of **2f+1** always contains at least **f+1 honest** nodes, so any two
+quorums share at least one honest node, and honest nodes always **outvote** the f liars. Concretely:
+tolerating 1 Byzantine node needs **4** nodes, not 3; tolerating 2 needs **7**. You pay f extra nodes
+purely to survive lies rather than silence.
+
+The other cost is **messages**. Because a node cannot trust a single report, classic BFT makes
+everyone cross-check everyone: **O(n^2)** messages per decision, versus Raft's near-linear cost.
+Protocols to name:
+
+- **PBFT** (Castro-Liskov 1999): the classic. Three phases (pre-prepare, prepare, commit), a primary
+  that proposes, and a **view-change** protocol to depose a faulty primary. O(n^2) messages.
+- **Tendermint** (Cosmos): BFT with a rotating proposer, suited to proof-of-stake chains.
+- **HotStuff** (Meta's former Diem): reduces message complexity to **linear O(n)** via threshold
+  signatures and adds **pipelining**. The modern reference.
+
+### The threat-model decision
+
+BFT is justified when participants are **mutually distrusting or potentially compromised**: public
+blockchains, some cross-organization financial settlement, hardware fault domains with undetectable
+silent corruption. It is **over-engineering** when all nodes sit inside one trusted datacenter under
+one operator: there, the realistic failures are crashes, disk faults, and partitions, not malice.
+**Raft plus checksums (bit rot), TLS (tampering in transit), and authentication (unauthorized
+actors)** covers the plausible threats at a fraction of BFT's node count and latency.
+
+**Interview nuance:** the sophisticated answer is not "BFT is more robust so use it." It is a
+threat-model decision: state who the participants are and whether any could be adversarial. If yes,
+BFT (name HotStuff for scale). If one trusted operator, say so and pick Raft plus
+checksums/TLS/auth.
+
+Recap: crash-stop consensus (2f+1) assumes nodes may halt but never lie; the Byzantine model allows
+lying, equivocation, and collusion, forcing 3f+1 nodes and often O(n^2) messages (PBFT, or linear
+HotStuff); use BFT only across real trust boundaries and Raft plus checksums/TLS/auth inside one
+trusted operator.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1877,6 +1931,54 @@ export const systemDesignLevel5: DesignLevel = {
               "**Idempotent execution as the second net:** each job carries a stable idempotency key (job id + scheduled-time bucket); workers do a conditional insert on that key, so any residual duplicate assignment is deduplicated at execution and the job runs at most once per tick. Fencing prevents two schedulers competing; the idempotency key prevents any residual duplicate from executing.",
               "**Partition behavior:** etcd requires majority, so only the quorum side can hold the lease and schedule; the minority's schedulers cannot renew and go passive. On heal, stale claim attempts are rejected by the token CAS.",
               "**The trade:** a few seconds of no-scheduling during failover (lease timeout plus acquire) in exchange for never double-running a job. Common wrong turn: trusting the lease alone: a bare leader lock without fencing plus idempotent claims will double-schedule the instant the leader pauses past its lease.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-byzantine-fault-tolerance",
+          title: "Byzantine Fault Tolerance & BFT Consensus",
+          summary:
+            "Byzantine nodes lie and equivocate, forcing 3f+1 nodes and heavier messaging (PBFT, linear HotStuff); use BFT only across real trust boundaries, Raft plus checksums/TLS inside one.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["consensus", "distributed-systems", "fault-tolerance"],
+          teach: {
+            markdown: byzantineFaultToleranceTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l5-byzantine-fault-tolerance-apply",
+            prompt:
+              "Explain how you would decide whether a system needs Byzantine fault tolerance, contrast the crash-stop and Byzantine failure models, and describe how BFT consensus tolerates malicious nodes.",
+            thinkAbout: [
+              "What can a Byzantine node do that a crash-stopped node cannot?",
+              "Why does BFT need 3f+1 nodes where crash-tolerant consensus needs only 2f+1?",
+              "When is BFT justified, and when is it expensive over-engineering?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a replicated state machine agreeing on an ordered log of operations. The design question is entirely about who the participants are and whether any could be adversarial or compromised.",
+              "**The two models:** crash-stop means a node follows the protocol or halts, never lies: Raft/Paxos tolerate f failures with 2f+1 nodes because any two majority quorums overlap in a node carrying the committed value. Byzantine means a faulty node can lie, equivocate (different values to different peers in the same round), forge messages, or collude. The difference that matters: a crash is passive and detectable by absence; a Byzantine fault is active deception: the node keeps talking, so you cannot wait it out and cannot trust any single report.",
+              "**How BFT tolerates lies, the 3f+1 math:** honest nodes must cross-check and vote. To tolerate f liars you need 3f+1 total and quorums of 2f+1: every quorum contains at least f+1 honest nodes, so (a) a quorum still forms if the liars withhold votes, and (b) any two quorums overlap in at least one honest node, so honest nodes always outvote the liars and the system cannot split into two inconsistent decisions. Tolerating 1 Byzantine fault needs 4 nodes, not Raft's 3, and classically O(n^2) messages. PBFT implements this with pre-prepare/prepare/commit and a view-change to depose a faulty primary; HotStuff cuts messaging to linear with threshold signatures and pipelines decisions.",
+              "**The decision is a threat-model call:** participants spanning a trust boundary (mutually distrusting orgs, a public network, hardware domains with undetectable corruption) justify BFT (HotStuff for scale). All nodes inside one datacenter under one operator face crashes, disk faults, and partitions, not malice: Raft plus checksums (bit rot), TLS (tampering in transit), and authentication covers the actual threats far more cheaply.",
+              "Common wrong turn: reaching for BFT or a blockchain inside a single trusted org: paying f extra nodes and O(n^2) messaging to defend against malicious insiders the trust boundary already excludes.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-byzantine-fault-tolerance-practice",
+            prompt:
+              "Choose a consensus/fault-tolerance approach for a consortium payment network where 10 competing banks each run a node, must agree on a shared ledger, no single bank is trusted to be honest, and a compromised or cheating bank must not be able to forge or reorder settled transactions. Justify the node count and protocol, and contrast with what you would use if one bank operated all 10 nodes.",
+            thinkAbout: [
+              "How many Byzantine banks can 10 nodes tolerate, and what quorum size follows?",
+              "Why permissioned BFT over proof-of-work for settlement?",
+              "What changes the moment one operator owns every node?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 10 nodes, one per competing bank, mutually distrusting, agreeing on a shared settlement ledger; a cheating or compromised bank must not forge, double-spend, or reorder committed transactions; finality matters and throughput is modest.",
+              "**A genuine Byzantine setting:** the participants are adversarial by construction (competitors), so any node might lie or equivocate. Crash-tolerant consensus (Raft) is disqualified because it assumes honesty: a single cheating bank could equivocate and break agreement. Use permissioned BFT: HotStuff (as in Diem) or Tendermint, for linear message complexity, pipelining, and immediate finality (no probabilistic rollback).",
+              "**Node count:** BFT tolerates f faults with 3f+1. With 10 nodes, 3f+1 <= 10 gives f = 3: safe and live as long as at most 3 of the 10 banks are Byzantine. Quorums are 2f+1 = 7, so every commit requires 7 signatures, guaranteeing at least 4 honest nodes in any quorum and overlap across quorums. Transactions are signed and hash-chained, so no node can forge another's transaction or reorder a committed block without breaking signatures.",
+              "**Why not proof-of-work:** PoW gives only probabilistic finality and wastes energy; a permissioned consortium knows its 10 members, so identity-based BFT with signatures is faster, cheaper, and gives the instant finality settlement needs.",
+              "**The single-operator contrast:** if one bank owned all 10 nodes in its own datacenter, there is no adversarial trust boundary: the threat is crashes and hardware faults. Drop BFT entirely: Raft (or a 5-node etcd/Spanner-style group) plus checksums, TLS, and authentication, tolerating f crashes with 2f+1: dramatically cheaper in nodes, latency, and messaging.",
+              "Common wrong turn: running BFT or a blockchain for a single trusted operator: paying for Byzantine resilience against a threat that operator boundary already excludes.",
             ],
           },
         },
