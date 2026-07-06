@@ -120,6 +120,60 @@ subscriber; a log retains an ordered stream that many consumer groups read at th
 can replay.
 `.trim()
 
+const brokerSelectionTeach = `
+## "We'll use Kafka" is usually the wrong reflex
+
+The senior move is to name the decision drivers, then match the workload to the cheapest tool that
+satisfies them. Kafka is a superb distributed log, but it is also operationally heavy (partitions,
+consumer groups, rebalancing, retention tuning, and a ZooKeeper or KRaft quorum to run). If you do
+not need what it gives, you are paying its tax for nothing.
+
+The drivers to reason about out loud:
+
+- **Throughput.** Millions of messages/sec favors a partitioned log (Kafka, Kinesis, Pulsar).
+  Thousands/sec is comfortable for any queue.
+- **Ordering.** Need per-key ordering? A log gives per-partition order; SQS FIFO gives per-group
+  order; standard SQS gives none.
+- **Retention and replay.** Need to reprocess history or feed many independent consumers? You need a
+  log. Queues delete on consume.
+- **Delivery guarantee.** At-least-once is the default everywhere; per-message ack and redelivery are
+  a queue strength; exactly-once-ish processing needs extra machinery.
+- **Routing complexity.** Rich topic/header routing, priorities, per-message TTL, and DLQs are
+  RabbitMQ's home turf.
+- **Ops budget.** A small team with no streaming platform should lean on managed services (SQS, SNS,
+  Google Pub/Sub, Kinesis, MSK) before self-hosting Kafka.
+
+### The landscape
+
+\`\`\`
+Logs / streams:   Kafka, Pulsar, Kinesis   -> high throughput, ordering, retention, replay
+Queues:           RabbitMQ, SQS            -> per-message ack, routing, DLQ, work distribution
+Managed fan-out:  SNS, Google Pub/Sub      -> topic fan-out without running a broker
+Ordered managed:  SQS FIFO                 -> per-group ordering, exactly-once-ish, lower throughput
+Lightweight:      NATS, Redis Streams      -> low latency, simple ops, smaller durability guarantees
+\`\`\`
+
+RabbitMQ is a smart broker for complex routing and per-message workflows at moderate scale; SQS is a
+zero-ops managed queue for work distribution and decoupling on AWS; Kafka is a durable replayable log
+for high-throughput streaming and multi-consumer fan-out.
+
+**Pulsar** is the classic "why not Kafka" foil: it separates compute (brokers) from storage
+(BookKeeper), so you scale serving and storage independently, and it has first-class multi-tenancy,
+geo-replication, and tiered storage built in, supporting both queue and log semantics in one system.
+The cost is a more complex deployment. Choose it when multi-tenancy or independent compute/storage
+scaling is a real requirement, not by default. **NATS and Redis Streams** cover the low-latency,
+lightweight end when you want simple pub/sub or a small stream with minimal ops.
+
+**Interview nuance:** the strongest answer is sometimes "no broker at all." If the requirement is a
+strong-consistency CRUD read after write, a broker adds latency and a stale-read window for nothing;
+a direct synchronous call or a database is correct. Reaching for Kafka to decouple two services that
+make ten calls a second is over-engineering you should call out.
+
+Recap: match the broker to the drivers (throughput, ordering, retention/replay, delivery, routing,
+ops budget); use a log only when replay/throughput justify its ops, a queue for work distribution and
+routing, managed services when the team is small, and sometimes no broker at all.
+`.trim()
+
 export const systemDesignLevel6: DesignLevel = {
   id: 6,
   slug: "event-driven",
@@ -226,6 +280,53 @@ export const systemDesignLevel6: DesignLevel = {
               "**Each consumer is its own consumer group with an independent offset:** the real-time dispatch matcher tuned for low lag and horizontal scale; the restaurant notification service; fraud; warehouse ingest. A slow warehouse batch cannot slow dispatch because offsets are per-group and consumer-owned. When the ML team ships a feature, warehouse ingest resets its group offset to 7 days back and reprocesses, touching no other consumer.",
               "**Retention is set by the most demanding replay need (7 days) plus buffer, not by the fastest consumer.** For cheap long-term history later, tiered storage or a sink to S3 covers it without broker-disk prices. Fan-out per team is native to consumer groups, so no SNS layer is needed.",
               "Common wrong turn: SQS as the backbone: the first consumer to read consumes the message, breaking fan-out, and there is no 7-day history to replay. A queue is right only for downstream one-worker tasks (generating a single delivery label), fed from the log as a dedicated group.",
+            ],
+          },
+        },
+        {
+          id: "sd-l6-broker-selection",
+          title: "Broker Technology Selection",
+          summary:
+            "Match the broker to the drivers (throughput, ordering, retention/replay, delivery, routing, ops budget); a log only when replay/throughput justify its ops, and sometimes no broker at all.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["broker-selection", "kafka", "rabbitmq"],
+          teach: {
+            markdown: brokerSelectionTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l6-broker-selection-apply",
+            prompt:
+              "Recommend a specific broker for each of three workloads (a task queue for image resizing, a 30-day-replayable analytics stream, and simple decoupled microservice notifications) and defend the choices.",
+            thinkAbout: [
+              "What decision drivers separate a log from a queue?",
+              "When is a managed service (SQS/SNS/Pub/Sub) the right call?",
+              "What do Pulsar's compute/storage separation and tiered storage add?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a small team on AWS with limited platform-ops capacity, moderate scale (thousands of messages/sec, not millions), and a preference for managed services unless a driver forces otherwise.",
+              "**Image-resize task queue: SQS (standard).** A textbook competing-consumers workload: each upload produces one resize job that exactly one worker performs, then acks and deletes. The drivers are work distribution and simple retry/DLQ, not ordering or replay. SQS gives a visibility timeout (a crashed worker's job reappears), a native DLQ after N receives, and zero ops. Kafka would be overkill: no retention or fan-out needed, so I would be running a log to do a queue's job.",
+              "**30-day-replayable analytics stream: Kafka (or Kinesis/MSK).** The requirement literally names replay and implies multiple independent consumers over the same data. Only a log satisfies retention plus multi-consumer-group replay. Use Kafka with 30-day retention (as MSK, or Kinesis if fully serverless and the throughput fits its shard model). Each analytics job is its own consumer group and can rewind to reprocess. A queue is disqualified because it deletes on consume.",
+              "**Decoupled microservice notifications: SNS (with SNS-to-SQS fan-out).** Several services react to an event and I want fan-out without running a broker. SNS publishes a copy to each subscriber; wiring SNS-to-SQS gives each subscriber a durable queue so a down service does not miss messages: the lowest-ops fan-out on AWS. Reach for Kafka only if these notifications later needed replay or high-throughput streaming.",
+              "**The through-line:** match each workload to the cheapest tool that meets its drivers, and explicitly refuse to use Kafka for the two workloads that do not need a log. Common wrong turn: one Kafka cluster for all three, paying streaming ops for a simple resize queue and a fan-out notification.",
+            ],
+          },
+          practice: {
+            id: "sd-l6-broker-selection-practice",
+            prompt:
+              "Choose one messaging platform for a fintech SaaS (you are the platform architect) onboarding many customer tenants, one that serves (1) a high-throughput transaction event stream with 90-day replay, (2) strict per-tenant isolation and independent scaling, and (3) geo-replication across two regions for DR. Defend it against Kafka and against a managed queue, then note where you would still use a plain queue.",
+            thinkAbout: [
+              "Which requirement is a native Pulsar feature but an engineered-around Kafka one?",
+              "Why is a managed queue disqualified as the backbone?",
+              "Where does a plain queue still fit inside a Pulsar shop?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: many tenants sharing infrastructure, tens of thousands of events/sec aggregate, regulatory pressure for tenant isolation and cross-region durability, and a platform team large enough to run real infrastructure.",
+              "**Choose Apache Pulsar as the backbone.** The requirements line up with what Pulsar adds over Kafka. (1) Compute/storage separation (stateless brokers over BookKeeper) scales serving capacity and storage independently, so one noisy tenant spiking traffic does not force more retention. (2) Multi-tenancy is first-class: tenants, namespaces, and per-namespace policies (quotas, retention, isolation) make per-tenant isolation a configuration, not a fleet of clusters. (3) Geo-replication across regions is built in at the namespace level, satisfying DR without bolting on MirrorMaker. 90-day replay is native via retention plus tiered storage (cold segments to S3), so you avoid broker disk for three months of history.",
+              "**Why not Kafka:** it can hit the throughput and, with tiered storage plus MirrorMaker 2, approximate retention and geo-replication. But multi-tenant isolation and independent compute/storage scaling are things you engineer around in Kafka (separate clusters per tenant tier, careful quotas) rather than get natively. For a platform whose core requirement is per-tenant isolation, Pulsar's model is a better fit; acknowledge Kafka's larger ecosystem as the real tradeoff.",
+              "**Why not a managed queue:** SQS/SNS cannot do 90-day multi-consumer replay at all, so it is disqualified as the backbone.",
+              "**Where a plain queue still fits:** downstream one-worker tasks fed off the stream (generating a statement PDF, sending a single webhook) are simpler as an SQS-style queue or a single Pulsar subscription in shared mode than as a streaming consumer. Match the tool to the driver even inside a Pulsar shop.",
             ],
           },
         },
