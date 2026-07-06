@@ -711,6 +711,64 @@ outcome is all-or-nothing but exposes intermediate state, so you add semantic lo
 checks, and make compensations idempotent with retries, DLQ, and escalation.
 `.trim()
 
+const outboxMessagingTeach = `
+## The dual-write problem
+
+Sagas and event-driven systems depend on a step that looks trivial and is not: "update my database
+*and* publish an event." Doing both is the **dual-write problem**, and it has no atomic solution
+across two independent systems without a distributed transaction.
+
+Consider the naive code: write the order row to Postgres, then publish \`OrderCreated\` to Kafka. Two
+failure orderings break you. If the service crashes *after* the DB commit but *before* the Kafka
+publish, the order exists but no event was ever sent: downstream systems never hear about it, a
+**lost event**. Flip the order (publish first, then write the DB) and a failed DB write leaves an
+event for an order that does not exist: a **phantom event**. You cannot wrap a Postgres commit and a
+Kafka publish in one atomic transaction, because they are separate systems with separate logs.
+
+### The transactional outbox
+
+Make the event part of the *same local database transaction* as the business data:
+
+\`\`\`
+BEGIN;
+  INSERT INTO orders (...);                          -- business write
+  INSERT INTO outbox (event_type, payload, ...);     -- event, SAME txn
+COMMIT;                                              -- both or neither
+\`\`\`
+
+The order row and the "there is an event to publish" fact commit atomically, in one local transaction
+in one database. A separate **relay** process reads unpublished outbox rows and publishes them to
+Kafka, marking them sent after the broker acknowledges.
+
+Two ways to run the relay:
+
+- **Polling:** periodically \`SELECT ... FROM outbox WHERE published = false\` and publish. Simple,
+  works anywhere, but adds polling latency and query load, and needs \`FOR UPDATE SKIP LOCKED\` to
+  avoid double-scanning under concurrency.
+- **Change Data Capture (CDC):** **Debezium** tails the database's write-ahead log and streams
+  committed changes to Kafka directly. No polling, low latency, low DB load, more infrastructure.
+  The production default at scale.
+
+### At-least-once plus the inbox
+
+The relay guarantees the event is published **at least once**: if it crashes after publishing but
+before marking the row sent, it republishes on restart. So consumers can receive duplicates. The
+**inbox** pattern closes this: the consumer records each processed event id in an inbox/dedup table
+inside the same transaction as its side effect, and skips any id it has already seen. At-least-once
+delivery plus an idempotent (inbox-backed) consumer equals **effectively-once** end-to-end
+processing: the strongest realistic guarantee.
+
+**Interview nuance:** be precise that the outbox does *not* give exactly-once *delivery*. It converts
+"atomically write DB and publish" (impossible) into "atomically write DB and *record intent to
+publish*" (a single local transaction), then relies on at-least-once relay plus consumer idempotency.
+Interviewers love to hear the ordering-of-failures argument for why the naive dual write is broken.
+
+Recap: writing the DB then publishing to Kafka is not atomic and either loses or fabricates events,
+so write the event into an outbox table in the same local transaction and let a relay (polling or
+Debezium CDC) publish it at least once, with a consumer-side inbox/dedup table making the end-to-end
+result effectively-once.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1330,6 +1388,56 @@ export const systemDesignLevel5: DesignLevel = {
               "**Compensation:** if the car fails after flight and hotel are held, cancel the flight and hotel holds (idempotent, keyed on booking id). If a supplier only supports confirm (no hold) and the fare is non-refundable, place that step last; if an earlier reversible step later fails after this non-reversible confirm, compensate semantically (rebook the failed leg, offer credit, escalate to an agent) and never silently drop the customer's money.",
               "**Slow/uncertain suppliers:** timeouts are ambiguous (did the booking happen?), so every call carries an idempotency key, and on timeout QUERY the supplier for booking status rather than blindly retrying, avoiding a double-booking. Failed compensations retry with backoff, then DLQ and page ops.",
               "**The trade:** no isolation across suppliers means a customer can briefly see a partially-booked trip: contained with holds/TTLs and a PENDING trip status. Wrong turn: firing all three confirmations in parallel with no holds, so a single rejection leaves confirmed, non-refundable bookings you cannot cleanly undo.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-outbox-messaging",
+          title: "Transactional Messaging: Outbox, Inbox & CDC",
+          summary:
+            "The dual write either loses or fabricates events; write the event to an outbox in the same local transaction, relay it at-least-once, and dedupe with a consumer inbox.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["outbox", "cdc", "messaging"],
+          teach: {
+            markdown: outboxMessagingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-outbox-messaging-apply",
+            prompt:
+              "Guarantee that an OrderCreated event is published if and only if the order row commits, without using a distributed transaction between the database and the message broker.",
+            thinkAbout: [
+              "Why is writing to the DB then to Kafka not atomic?",
+              "How does the outbox table make it atomic?",
+              "Why is at-least-once + idempotent consumers the realistic end-to-end guarantee?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an Order service on Postgres publishing to Kafka, downstream consumers (fulfillment, email, analytics) that must react to every real order and never a phantom one, no XA/2PC between Postgres and Kafka.",
+              "**Why the naive dual write is broken:** commit the order then publish, and a crash in between commits the order but loses the event (fulfillment never runs). Publish first then commit, and a failed DB commit fabricates an event for a nonexistent order. Postgres and Kafka have separate logs: no atomic 'commit both.'",
+              "**The outbox design:** in the SAME Postgres transaction that inserts the order, insert a row into an `outbox` table with the event type, payload, aggregate id, and a unique event id. The transaction commits both or neither, so 'an event exists to be published iff the order committed' holds atomically in one local transaction.",
+              "**Publishing:** a relay ships outbox rows to Kafka. At scale, Debezium CDC tailing the Postgres WAL turns committed outbox inserts into Kafka records with low latency and no polling load; the simpler alternative is a polling relay using `SELECT ... FOR UPDATE SKIP LOCKED` to claim rows. Either way the relay is at-least-once: a crash after Kafka acks but before marking the row published means a republish on restart.",
+              "**Effectively-once end to end:** consumers can see duplicates, so each is idempotent. Every event has a stable event_id, and each consumer keeps an inbox/dedup table: within the same transaction as its side effect, it checks whether the event_id was already processed and skips if so.",
+              "**Tradeoffs:** an extra table, a relay to operate, a little publish latency. Partition Kafka by aggregate id (order id) so per-order events stay ordered. Prune published outbox rows.",
+              "Common wrong turn: publishing to Kafka and committing the DB as if that pair were atomic, or claiming the outbox gives exactly-once *delivery*: it gives an atomic local write plus at-least-once delivery, and idempotent consumers finish the job.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-outbox-messaging-practice",
+            prompt:
+              "Design the change-propagation pipeline for a service like Shopify or an e-commerce platform that must reliably fan out every product/inventory change from its OLTP database to a search index (Elasticsearch), a cache (Redis), and an analytics warehouse, at tens of thousands of writes per second, with no lost or fabricated updates. Lead with the deliverable.",
+            thinkAbout: [
+              "Why does tailing the WAL structurally eliminate both lost and fabricated updates?",
+              "How do three sinks of very different speeds stay independent?",
+              "What makes replays and duplicates harmless at every sink?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a Postgres/MySQL OLTP store as the source of truth, three async downstream consumers (search, cache, warehouse), 10k-50k writes/sec peak, and a hard requirement that every committed change reaches all three and no rolled-back change ever does.",
+              "**Deliverable: CDC-driven propagation with idempotent consumers.** Make the OLTP database's committed WAL the single source of change truth and stream it with Debezium, rather than asking application code to dual-write to four systems (four dual-write problems at once). Debezium emits exactly the committed changes in commit order: a rolled-back transaction never reaches the WAL, and a committed one always does: structurally eliminating both lost and fabricated updates.",
+              "**Topology:** Debezium publishes change events into Kafka, one topic per table (or an outbox topic for curated event shapes), partitioned by product id so all changes to one product stay ordered on one partition. Three independent consumer groups: an Elasticsearch sink (idempotent upserts), a Redis updater, and a warehouse loader (micro-batched sink). Independent consumers mean a slow warehouse never blocks search.",
+              "**Correctness under at-least-once:** on restarts, events replay. Every consumer is idempotent: use the change's LSN/offset or a per-row version, applying an event only if newer than what was last applied for that key (upsert with a version guard). Replays and duplicates become harmless and per-product ordering is preserved.",
+              "**Scale and lag:** scale Kafka partitions and consumer instances horizontally; CDC keeps DB overhead low (reads the WAL, not the tables). Monitor replication lag (WAL-to-consumer delay) as the key freshness SLO. Backfills use a Debezium snapshot then switch to streaming.",
+              "Common wrong turn: the app writing to Postgres, then Elasticsearch, then Redis, then the warehouse in sequence, where any crash between writes silently desynchronizes the systems.",
             ],
           },
         },
