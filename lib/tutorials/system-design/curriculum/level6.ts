@@ -232,6 +232,69 @@ the ISR (durable = acks=all + min.insync.replicas>=2 + RF3); retention, segments
 tiered storage govern cost and replay; and KRaft removed ZooKeeper by making metadata a Raft quorum.
 `.trim()
 
+const partitioningOrderingTeach = `
+## One ordering guarantee, and it burns candidates
+
+Kafka gives you exactly one ordering guarantee: **records are totally ordered within a partition, and
+there is no ordering across partitions.** A partition is a single append-only sequence, so offset
+order equals arrival order there. But a topic with 100 partitions is 100 independent sequences
+interleaved by wall-clock chance. If event X lands in partition 4 and event Y lands in partition 7,
+Kafka makes no promise about whether a consumer sees X or Y first. There is no global clock and no
+global sequence.
+
+This is not a limitation to work around; it is the direct cost of parallelism. The only reason Kafka
+scales horizontally is that partitions are independent, so anything needing global order would need a
+single partition, capping you at one broker's throughput and one consumer.
+
+### The key is correctness
+
+A producer computes the partition as \`hash(key) mod partition_count\` (default murmur2). So **all
+records with the same key go to the same partition and are totally ordered relative to each other.**
+Correctness reduces to one question: which events must be seen in order relative to each other?
+Whatever that set is, it must share a key.
+
+- Bank account: key by \`account_id\`, so deposit-then-withdraw for one account is never reordered
+  into overdraft.
+- Order lifecycle: key by \`order_id\`, so \`created -> paid -> shipped\` stays monotonic.
+- Chat: key by \`conversation_id\`, so a room's messages stay in order even though rooms interleave.
+
+**Interview nuance:** the deadliest trap is assuming global ordering. Candidates say "Kafka keeps
+events ordered" and design a ledger that reads events across partitions expecting chronological
+order. It will silently apply a withdrawal before its deposit under load. The senior framing: order
+is per-partition only, so causally related events must be co-keyed.
+
+A second trap: **changing partition count breaks key-to-partition stability.** Because the mapping is
+\`hash(key) mod N\`, changing N remaps most keys. New events for \`account_42\` land in a different
+partition than the old ones, so its historical order splits across two partitions for the migration
+window. That is why partition count is effectively immutable in practice; you over-provision up front.
+(Partitions can be added, never removed, and even adding reshuffles the hash.)
+
+### The hot key
+
+One \`account_id\` (a celebrity, an omnibus account, a viral post) can flood its partition while
+others idle. You cannot just split it, because splitting breaks the ordering you keyed for. Options,
+in order of preference:
+
+\`\`\`
+Hot key "acct_42" floods partition 3:
+ (a) Compound key: hash(account_id + sub_stream) -> spread across a few
+     partitions, but ordering now only holds within each sub-stream.
+ (b) Salting: key = account_id + (0..k) -> k partitions, then a downstream
+     merge/serializer re-establishes per-account order by sequence number.
+ (c) Accept it: if the hot key truly needs strict single-stream order,
+     one partition is the ceiling; scale vertically and isolate it.
+\`\`\`
+
+Every mitigation trades ordering scope for throughput. You either keep strict per-account order (one
+partition, capped throughput) or widen the key and downgrade to per-sub-stream order plus reassembly.
+
+Recap: Kafka orders within a partition only, the partition is chosen by hash(key) mod N so causally
+related events must share a key; there is no global order; changing partition count remaps keys and
+breaks ordering, so partition count is fixed up front; and a hot key forces a choice between strict
+order (one partition, limited throughput) and salting/compound keys (more throughput, weaker
+ordering plus reassembly).
+`.trim()
+
 export const systemDesignLevel6: DesignLevel = {
   id: 6,
   slug: "event-driven",
@@ -442,6 +505,53 @@ export const systemDesignLevel6: DesignLevel = {
               "**Replication: RF=3** within each datacenter, rack/AZ aware. Because a single lost page view is acceptable, producers use **acks=1** on the pageview topic to shave the replication round trip and sustain 2 GB/s cheaply; the engagement topic (clicks driving revenue/ranking signals) uses acks=all with min.insync.replicas=2. The key move: match durability to the value of each event class rather than paying acks=all everywhere.",
               "**Cross-datacenter:** do not stretch one cluster across DCs (WAN latency wrecks replication and ISR). Run an independent cluster per DC and use **MirrorMaker 2** (or Confluent Cluster Linking) for async replication into an aggregate cluster that feeds the central data lake, accepting some cross-DC lag. Local producers write to their local cluster, so a DC partition never blocks ingestion. Feed ranking consumes locally; the lake consumes from the aggregate.",
               "**Throughput** relies on heavy producer batching, zstd compression, and zero-copy reads; **tiered storage** (S3/HDFS) holds cold segments so 30-day lake retention does not bloat broker disk. KRaft keeps ~1000-partition metadata cheap. Never a SPOF: RF3 plus multi-broker plus per-DC clusters plus MM2 aggregation means no single broker, rack, or DC failure stops ingestion or loses a whole partition.",
+            ],
+          },
+        },
+        {
+          id: "sd-l6-partitioning-ordering",
+          title: "Partitioning, Ordering & Keys",
+          summary:
+            "Kafka orders within a partition only, chosen by hash(key) mod N, so causally related events share a key; partition count is fixed up front, and a hot key trades ordering scope for throughput.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["partitioning", "ordering", "keys"],
+          teach: {
+            markdown: partitioningOrderingTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l6-partitioning-ordering-apply",
+            prompt:
+              "Design partitioning for a payments ledger where all events for one account must be processed in order but the system must scale horizontally; pick the key and handle a celebrity/hot-key account.",
+            thinkAbout: [
+              "Why does ordering only hold within a partition?",
+              "Why does changing partition count break key->partition stability?",
+              "How do you handle a hot partition without losing ordering?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a ledger topic of monetary events (credit, debit, hold, release). The invariant: events for a single account apply in order so a debit never overtakes the credit that funds it, but total volume exceeds one partition. Cross-account order does not matter.",
+              "**Key by `account_id`, the whole design:** every event for one account hashes to one partition, so that account has a total order and consumers apply its events in offset order. Different accounts land on different partitions and process in parallel: the horizontal scaling we want. Provision partitions generously up front (say 200) because you cannot resize later without breaking key stability: hash(account_id) mod N changes for most accounts if N changes, splitting an account's history across two partitions during migration and violating the invariant.",
+              "**Ordering holds only within a partition** because a partition is a single append-only sequence with monotonic offsets, while the topic is many such sequences interleaved by chance. Co-keying is the correctness mechanism, not an optimization.",
+              "**Hot key (celebrity/omnibus account):** first question the requirement: does that account truly need one strict serial order, or is it internally partitionable? If it can be split by sub-ledger (per currency, per merchant, per day), use a **compound key** `account_id + sub_ledger` to spread across partitions while preserving order within each sub-ledger, and make the ledger math associative so sub-streams sum correctly. If it genuinely needs one serial stream, keep it on a single partition and scale that partition vertically (bigger broker, dedicated consumer), isolating it so its lag does not starve others (route hot accounts to a dedicated topic). As a last resort, **salt** the key (`account_id + [0..k]`), then have a single downstream serializer re-order by an account-level monotonic sequence number before applying, accepting extra latency for throughput.",
+              "Every option trades ordering scope for throughput; only widen the key when the ledger semantics genuinely tolerate sub-stream ordering. Common wrong turn: assuming Kafka gives global order and reading across partitions expecting chronological sequence, which silently applies debits before credits under load.",
+            ],
+          },
+          practice: {
+            id: "sd-l6-partitioning-ordering-practice",
+            prompt:
+              "Design the partitioning key for a Coinbase-style crypto matching engine feed where every order for a given trading pair (BTC-USD) must be sequenced in strict arrival order, but BTC-USD alone can be 100x the volume of a quiet pair like a new listing. Choose the key, set partition count, and handle the case where one pair's volume exceeds a single partition's ceiling.",
+            thinkAbout: [
+              "Why can you never salt the BTC-USD stream?",
+              "Where is the real bottleneck: the partition or the matcher?",
+              "How do you isolate the hot pairs from the long tail?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: an order-event stream (new, cancel, fill) feeding a per-pair matching engine. The hard invariant is price-time priority: within a pair, orders must be processed in exact arrival order or the matching is wrong and the exchange is liable. Cross-pair order is irrelevant. BTC-USD dominates volume.",
+              "**Key by `trading_pair`:** every event for BTC-USD lands on one partition and is strictly ordered, exactly what price-time priority requires; a single matching-engine worker consumes it and maintains the order book. Quiet pairs share partitions and process in parallel. Because one strict serial stream per pair is a genuine business requirement, do NOT salt or compound the key for a pair: that would destroy the arrival ordering the matcher depends on.",
+              "**The throughput tension is architectural, not a Kafka trick:** BTC-USD may exceed a single partition's ceiling. You cannot spread it without losing order. Keep events small (order id, side, price, qty, timestamp) in a compact binary format so one partition goes far (high-hundreds of MB/s). Recognize the **matching engine is single-threaded per pair by design** (LMAX-style), so the partition is not the bottleneck, the matcher is, and both scale by pair, not within a pair.",
+              "**Isolate the hot pairs:** route the top handful (BTC-USD, ETH-USD) each to their own dedicated single-partition topic with dedicated brokers and consumers, so their volume never contends with the long tail; long-tail pairs share a multi-partition topic keyed by pair.",
+              "**Partition count:** the shared long-tail topic provisions generously (say 100) since resizing breaks key stability; each hot pair gets exactly one partition with vertical scaling and an in-memory order book. Common wrong turn: salting BTC-USD to gain throughput, which reorders events and corrupts price-time priority: unacceptable for a matching engine.",
             ],
           },
         },
