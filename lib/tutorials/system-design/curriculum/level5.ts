@@ -886,6 +886,63 @@ idempotent, they cost metadata and tombstones and cannot enforce global invarian
 converge if paired with anti-entropy (gossip, Merkle trees, read repair, hinted handoff).
 `.trim()
 
+const failureDetectionTeach = `
+## "Is that node dead?" You can never know for sure
+
+A dead node and a node that is merely slow (GC pause, network blip, overloaded NIC) look identical
+from the outside: both go quiet. This is the **impossibility at the heart of failure detection**, and
+it forces a tradeoff you must be able to name.
+
+That tradeoff is **completeness vs accuracy**. Completeness means you eventually detect every real
+crash. Accuracy means you never wrongly declare a live node dead. You cannot maximize both. Set your
+timeout aggressively (500ms) and you detect crashes fast but you **flap**: a routine 800ms GC pause
+evicts a healthy node, triggering a needless failover or re-replication storm. Set it conservatively
+(30s) and you never false-positive but you carry dead nodes for half a minute, sending traffic into a
+black hole.
+
+The classic mechanism is a **fixed-timeout heartbeat**: node A pings B every second; three misses in
+a row and B is declared dead. Simple, but the fixed threshold is exactly the flapping problem: a
+threshold tuned for a quiet datacenter false-positives the moment latency rises under load, precisely
+when you least want spurious failovers.
+
+### Phi-accrual: adapt to the link
+
+**Phi-accrual failure detection** (the Cassandra/Akka lineage) outputs a continuous **suspicion level
+phi** instead of a boolean. It records the recent **inter-arrival times** of heartbeats and fits a
+distribution. When a heartbeat is overdue, phi is the negative log of the probability that a
+heartbeat this late is still normal for *this* link. A link that normally jitters by 50ms yields a
+huge phi at a 2-second gap; a normally-bursty link yields a modest one. You act at a threshold (phi >
+8 is roughly a 1-in-10^8 chance this is normal). The win: it adapts to each link's actual behavior
+with no hand-tuning.
+
+### SWIM: membership at scale
+
+All-to-all heartbeats are O(n^2): 500 nodes each pinging 499 others is ~250k messages per interval.
+**SWIM** makes per-node load **O(1)**. Each period, a node **directly probes one random peer**. If
+that peer does not ack, the node asks **k other random members to probe it indirectly** (the target
+might be fine but the direct path congested; indirect probes distinguish a path problem from a dead
+node). Only if both fail does it act. Crucially, SWIM adds a **suspicion sub-protocol**: a
+non-responsive node is marked **suspect**, not dead, gossiped as suspect, and given a window to
+refute ("I'm alive") before being confirmed dead: sharply cutting false positives from transient
+blips. Membership changes **piggyback on probe messages** and spread infection-style, so the whole
+cluster learns in O(log n) rounds. This is what HashiCorp memberlist (Consul, Serf) implements.
+
+\`\`\`
+  all-to-all heartbeat:  n=500 -> ~250,000 msgs/interval  (O(n^2))
+  SWIM per node/interval: 1 direct probe + k indirect on miss (O(1))
+  suspect -> (refute window) -> confirm dead, gossiped on probe traffic
+\`\`\`
+
+**Interview nuance:** the tell of a weak answer is tuning a single timeout as if slow and dead were
+distinguishable. The strong framing: pick an *adaptive* detector (phi-accrual), add a *suspicion*
+window to buy accuracy, and use *gossip-based* membership (SWIM) so detection load stays flat as the
+cluster grows.
+
+Recap: dead and slow are indistinguishable, so failure detection is a completeness-vs-accuracy
+tradeoff; use phi-accrual to adapt the threshold per link, a suspicion window to cut false positives,
+and SWIM's random direct/indirect probes plus infection-style gossip to keep per-node load O(1).
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1662,6 +1719,54 @@ export const systemDesignLevel5: DesignLevel = {
               "**Transport:** while online, clients send small op deltas over a WebSocket relay for sub-100ms echo; the server is a dumb fan-out and durability layer, not an arbiter, since the CRDT merge is associative and idempotent. Offline edits queue in IndexedDB and replay on reconnect. Anti-entropy on reconnect: client and server exchange state vectors (per-replica clocks) and ship only missing ops: the practical Merkle-diff for op logs.",
               "**Costs and mitigations:** tombstones and position metadata bloat long-lived docs, so compact periodically once history is causally stable across live replicas, and snapshot the materialized doc so new joiners do not replay the full op log. The trade: CRDT metadata makes on-wire and at-rest size larger than the visible text: the price of coordination-free offline merge.",
               "Common wrong turn: array-index operational transform with a central server: it breaks under long offline windows and is far harder to make correct than a sequence CRDT.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-failure-detection",
+          title: "Failure Detection: Heartbeats, Phi-Accrual & SWIM",
+          summary:
+            "Dead and slow are indistinguishable, so use phi-accrual's adaptive suspicion, a refutation window, and SWIM's O(1) probes with gossip instead of one fixed timeout.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["failure-detection", "swim", "gossip"],
+          teach: {
+            markdown: failureDetectionTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l5-failure-detection-apply",
+            prompt:
+              "Design failure detection for a 500-node cluster that detects real crashes within a few seconds without falsely evicting nodes during latency spikes.",
+            thinkAbout: [
+              "Why is the completeness-vs-accuracy tradeoff fundamental?",
+              "How does phi-accrual adapt to the inter-arrival distribution?",
+              "Why does SWIM scale where all-to-all heartbeats do not?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 500 nodes, occasional latency spikes (GC pauses, load bursts) up to ~1s, and a high cost for false eviction (re-replication and failover). Target: detect real crashes within a few seconds with near-zero false positives.",
+              "**Reject all-to-all heartbeats:** at 500 nodes that is ~250k messages per interval, growing quadratically. Use a SWIM-style gossip membership protocol (memberlist, as in Consul/Serf): per-node detection load is O(1), each period a node directly probes one random peer.",
+              "**Avoid evicting slow-but-alive nodes with two SWIM mechanisms:** (1) indirect probes: if a direct probe to X times out, ask k (say 3) other random members to probe X; if any succeeds, X is alive and the direct path was congested: kills most false positives from transient blips. (2) A suspicion window: a node failing direct and indirect probes is marked suspect, gossiped as suspect, and given a refutation window (a couple of probe periods) to broadcast 'I'm alive' before confirmation: absorbing a 1-second GC pause without eviction.",
+              "**The timeout itself is phi-accrual,** not fixed: the threshold adapts to each link's recent inter-arrival distribution (a jittery link gets a looser effective timeout than a steady one) with no hand-tuning. Act on suspicion at phi ~8.",
+              "**Membership state** (join, suspect, confirm, leave) piggybacks on probe messages and spreads infection-style, so with a ~1s probe period the cluster converges on a change in O(log 500): a handful of rounds, giving few-second detection.",
+              "**The trade:** the suspicion window and indirect probes add a second or two to confirming a real crash, in exchange for far fewer false evictions: right when a false positive triggers expensive re-replication. Common wrong turn: tuning one aggressive timeout, which flaps the instant latency rises under load.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-failure-detection-practice",
+            prompt:
+              "Design membership and failure detection for a 100,000-node edge fleet spread across 300 points of presence on flaky WAN links, where a false eviction re-shards traffic and a missed crash black-holes user requests. Keep control-plane traffic bounded and detection under ~10 seconds.",
+            thinkAbout: [
+              "Why does flat gossip over 100k nodes on WAN links fail, and what bounds it?",
+              "What distinguishes membership-driven re-sharding from data-path request routing?",
+              "How do you stop one bad WAN path from evicting a healthy remote node?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 100k nodes across 300 PoPs, high and variable WAN latency between PoPs, low latency within a PoP, and both false positives (needless re-shard) and false negatives (black-holed requests) costly.",
+              "**Hierarchical, locality-aware membership:** flat SWIM over 100k nodes would gossip cross-PoP too aggressively. Within each PoP, nodes run SWIM with a short probe period (sub-second LAN), so intra-PoP crashes are detected in 1-2 seconds. Across PoPs, a small set of gateway/seed nodes per PoP gossip PoP-level membership summaries at a slower cadence: cross-WAN traffic is O(PoPs), not O(nodes). Per-node load stays O(1); cross-PoP load scales with 300, not 100k.",
+              "**Phi-accrual is essential on flaky WAN links:** a fixed LAN-tuned timeout would false-positive constantly. Phi-accrual learns each cross-PoP link's inter-arrival distribution, so a normally-1s-jittery link is not evicted at 1.2s. Widen the suspicion window for cross-PoP suspicions specifically, and require both direct and indirect probes routed through a *different PoP* before confirming a remote node dead, so a single bad WAN path cannot evict a healthy remote node.",
+              "**Do not rely on membership alone at the data path:** because false negatives black-hole requests, the load balancer also runs active health checks and passive outlier detection (Envoy-style ejection after N consecutive 5xx/timeouts), draining traffic from a bad node in a couple of seconds even before membership confirms the crash. Membership drives placement/re-sharding; data-path health checks drive request routing: together, fast request-level protection with conservative membership changes.",
+              "**The trade:** hierarchy and wider cross-PoP suspicion windows add a second or two to confirming remote crashes, accepted because a WAN false positive re-shards 300 PoPs' worth of traffic. Common wrong turn: one flat gossip mesh with one global timeout: it floods the WAN and flaps endlessly on jittery links.",
             ],
           },
         },
