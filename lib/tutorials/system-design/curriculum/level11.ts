@@ -348,6 +348,148 @@ RAG index updates keep facts current continuously; fine-tuning requires periodic
 **Recap:** prompting for behavior, RAG for fresh/private knowledge, fine-tuning (via LoRA adapters, rarely full) for style/format/latency; they compose; drive continuous improvement with a data flywheel; and never fine-tune for knowledge that changes when RAG keeps it fresh.
 `.trim()
 
+const streamingRealtimeAnalyticsTeach = `
+## A fight against exact counting and late data
+
+A real-time analytics pipeline turns an unbounded stream of events into aggregates you can query within seconds: per-minute counts, unique visitors, top-K trending items. At billions of events per day (a few million per second at peak) the entire design is a fight against two things: the cost of exact counting, and the fact that events arrive late and out of order.
+
+## The backbone
+
+Producers write events to a partitioned, replayable log: Kafka or Kinesis. Partition by a key that both spreads load and preserves the ordering you need (for example, \`item_id\` so all events for one item land on one partition in order). The log gives you three things a queue does not: replay (reprocess from an offset after a bug), backpressure (consumers pull at their own rate), and durability (retain days of data). Size it: 2M events/sec times 200 bytes is 400 MB/sec, roughly 35 TB/day before replication, so retention and partition count are real capacity decisions.
+
+## The processing engine
+
+A stream processor (Flink, or Spark Structured Streaming) consumes partitions and maintains windowed state. Windows come in three shapes: tumbling (fixed, non-overlapping, for per-minute counts), sliding (overlapping, for a trailing 5-minute top-K refreshed every 30s), and session (gap-defined, for user activity). The hard part is time. Event time (when it happened) differs from processing time (when you saw it). A phone offline for 10 minutes floods you with old events. Windows are keyed on event time, and a **watermark** is the engine's assertion that no event older than time T will still arrive. When the watermark passes a window's end, the window closes and emits. Late events past the watermark go to a side output or a small allowed-lateness update, never silently dropped.
+
+**Delivery semantics.** At-least-once is cheap but double-counts on retry. Exactly-once needs the processor to checkpoint state and offsets atomically (Flink's distributed checkpoints) and sinks to be idempotent or transactional. For counts, exactly-once matters; for a fuzzy trending list, at-least-once with idempotent upserts is often enough.
+
+## Approximate structures, the core insight
+
+Exact distinct counts and exact top-K over a firehose need unbounded memory (a set of every id seen). You trade a bounded error for bounded memory:
+
+\`\`\`
+HyperLogLog  -> unique counts (cardinality) in ~12 KB per key, ~2% error
+Count-Min Sketch -> per-item frequency in fixed memory, over-counts only
+Top-K (heavy hitters, on top of CMS) -> trending items without a full sort
+t-digest / DDSketch -> p50/p95/p99 latency quantiles in a tiny footprint
+\`\`\`
+
+HyperLogLog also merges: per-partition sketches union into a global unique count, which is why it scales horizontally.
+
+## Serving, and Lambda vs Kappa
+
+Do not query Flink state directly. Land aggregates in a real-time OLAP store built for high-ingest, sub-second aggregation: Apache Druid, Pinot, or ClickHouse. They pre-aggregate on ingest and answer "counts per minute for the last hour" in tens of milliseconds under dashboard concurrency.
+
+Lambda runs a batch layer (exact, slow) alongside the speed layer (approximate, fast) and merges them, at the cost of two codebases. Kappa runs one streaming pipeline and reprocesses from the log by replaying when you need a correction. Kappa is the modern default because replay makes the batch layer redundant.
+
+**Interview nuance:** when asked for "exact" trending, name the cost explicitly. Exact top-K needs a global count per item, which is a shuffle-heavy full aggregation. State that approximate top-K is a deliberate accuracy-for-scale trade, not a shortcut you forgot to fix.
+
+**Recap:** Kafka backbone, Flink windows keyed on event time with watermarks for late data, exactly-once via checkpointing where counts must be right, HyperLogLog and Count-Min Sketch for bounded-memory counting, and a Druid/Pinot/ClickHouse serving layer for sub-second queries.
+`.trim()
+
+const globallyConsistentMultiregionTeach = `
+## Physics sets the rules
+
+Once your data lives on more than one continent, physics sets the rules. Light in fiber crosses the Atlantic in about 40ms one way, so a New York to Frankfurt round trip is ~80ms and a synchronous write that waits for a quorum spanning both regions costs 100+ ms before you add any processing. The whole design is about deciding, per piece of data, whether that latency is worth paying for correctness.
+
+## CAP and PACELC in practice
+
+CAP says under a network partition you choose consistency or availability. PACELC adds the part interviewers actually want: Else (no partition), you still trade Latency against Consistency. A globally strong-consistent write is slow because it must reach a cross-region quorum; a fast local write is only locally consistent. There is no configuration that gives strong consistency and low latency everywhere for free. State this out loud.
+
+## How you still get strong consistency
+
+Replicate each data shard across regions with a consensus protocol (Paxos or Raft): a write commits when a majority of replicas acknowledge. Place replicas so the quorum is reachable quickly. Google Spanner adds **TrueTime**, an API that returns time as an interval \`[earliest, latest]\` bounded by GPS and atomic clocks (uncertainty typically a few ms). To commit at timestamp T, Spanner waits out the uncertainty (commit-wait) so that no later reader can observe an earlier timestamp. This gives **external consistency**: if transaction A commits before B starts, A's timestamp is smaller, globally. Without special clocks you approximate ordering with Hybrid Logical Clocks (HLC), which combine physical time with a logical counter to preserve causality (CockroachDB, YugabyteDB use this).
+
+## Data placement is the real lever
+
+You do not need every row to be globally consistent. **Geo-partition**: pin each row to a home region near its owner. A European user's account lives with its leader in Frankfurt, so their reads and writes are local (single-region quorum, single-digit ms) and only rarely touch another continent. US users' rows are led from us-east. You pay cross-region latency only for genuinely cross-region operations. Add **follower reads** (read a nearby replica at a slightly stale timestamp) and **read leases** (a leader holds a lease so it can serve strongly consistent reads without a quorum round trip) to make local reads cheap.
+
+\`\`\`
+EU user  -> leader in Frankfurt   -> local quorum (EU replicas) ~ single-digit ms
+US user  -> leader in us-east     -> local quorum (US replicas) ~ single-digit ms
+cross-region txn (EU pays US) -> two-region coordination ~ 100+ ms  (rare by design)
+\`\`\`
+
+## Active-active, and the consistency spectrum
+
+Active-passive keeps one write region and fails over (simple, but the standby's capacity sits idle and failover has an RTO). Active-active accepts writes in multiple regions and must resolve conflicts: Last-Write-Wins (simple, silently loses data on concurrent writes), CRDTs (conflict-free types that merge deterministically, great for counters, sets, presence), or application merge. For money you generally avoid multi-writer conflict resolution entirely and route each account's writes to its single home leader.
+
+Pick a consistency level per workload: strong (balances, must be exact), bounded-staleness (read at most N seconds old, fine for a profile), causal (you always see your own writes and their causes), eventual (a like count). Track RTO and RPO for failover, and data residency (GDPR) which may force certain rows to physically stay in-region.
+
+**Interview nuance:** for a balance, the correctness requirement is no double-spend, which is a single-key serializable constraint. You get it cheaply by homing each account in one region so its writes serialize through one leader, then using Spanner-style TrueTime or a Raft leader for ordering. You do not need global multi-writer consensus for every action, only correct ordering per account.
+
+**Recap:** cross-region synchronous writes cost 100+ ms because of the speed of light, so use consensus plus TrueTime/HLC for correct ordering, geo-partition rows to their home region for local reads and writes, add follower reads and leases, and choose a consistency level per workload instead of paying for global strong consistency everywhere.
+`.trim()
+
+const iotEdgeIngestionTeach = `
+## A write-fan-in problem where you trust nothing
+
+An IoT platform is a write-fan-in problem: a huge fleet of small devices each dribbles telemetry toward the cloud, and the platform must never assume a device is online, well-behaved, or trustworthy. With 10M devices each emitting one reading every 10 seconds you are already at 1M messages/sec sustained, and fleets are bursty (whole regions reconnect at once after an outage), so the design must absorb spikes several times the average.
+
+## The edge-cloud split
+
+Push work to the edge when it cuts bandwidth or when latency matters for control. A smart thermostat should not stream raw 50Hz sensor data to the cloud; a **gateway** (a Raspberry Pi class device, or an on-prem box like AWS Greengrass / Azure IoT Edge) filters, aggregates ("send the 1-minute average, plus any reading outside a band"), and runs local inference so a safety cutoff fires in milliseconds without a cloud round trip. The cloud gets a compressed, pre-filtered stream instead of the firehose.
+
+## Protocols and offline buffering
+
+Devices talk over lightweight protocols, not HTTP-per-reading. **MQTT** (a pub/sub broker protocol over a persistent TCP connection) dominates: one long-lived connection, tiny headers, QoS levels (0 fire-and-forget, 1 at-least-once, 2 exactly-once), and a "last will" message the broker publishes when a device drops. **CoAP** (UDP, REST-like) is used on the most constrained/low-power links. Crucially, devices **buffer offline**: when connectivity drops, the edge does **store-and-forward**, persisting readings locally and replaying them on reconnect. That means the cloud must accept **late and out-of-order** data and dedupe on a device-supplied event id.
+
+\`\`\`
+devices --MQTT/CoAP--> edge gateway (filter, aggregate, buffer, local inference)
+                                     |
+                          MQTT broker cluster (auth, backpressure)
+                                     |
+                             ingest gateway --> Kafka (durable buffer)
+                                    /                        \\
+                        hot path: stream alerting        cold path: batch -> lake/TSDB
+\`\`\`
+
+## Ingestion, hot/cold split, and control
+
+The **ingestion gateway** sits behind the broker and does device provisioning and auth (each device gets its own X.509 certificate, never a shared key, so one compromised device can be revoked without re-keying the fleet), applies **backpressure** (reject or shed low-QoS traffic before the pipeline melts), and writes into a durable buffer like **Kafka** so a slow downstream consumer never blocks ingestion. From Kafka the stream **forks**: a **hot path** (Flink / Kafka Streams) evaluates alerting and anomaly rules in seconds, and a **cold path** lands raw data in S3 / a lake and a time-series DB for batch analytics and ML training.
+
+Control flows the other way via a **device shadow / digital twin**: a cloud-side JSON document of each device's desired and reported state. You write the desired state, and the device reconciles when it next connects, which is exactly how **OTA firmware rollouts** work: stage to 1% (canary), watch crash/health telemetry, then ramp, so a bad image cannot brick 10M devices at once.
+
+**Interview nuance:** the classic failure is assuming devices are always online. Without offline buffering you silently lose data during every outage; without dedupe you double-count the replay. And a thundering herd of reconnects after a regional outage can DDoS your own broker, so devices need randomized exponential backoff with jitter on reconnect, and the broker needs connection-rate limiting.
+
+**Recap:** filter and buffer at the edge, connect over MQTT with per-device certs, absorb bursts and reconnects with a Kafka buffer and backpressure, fork into a seconds-latency hot path and a durable cold path, and drive control and OTA through a device shadow with canary rollout.
+`.trim()
+
+const timeSeriesStorageTeach = `
+## A lopsided workload a general DB handles badly
+
+A time-series database (TSDB) is specialized because time-series workloads have a lopsided shape a general-purpose DB handles badly: writes are almost entirely **appends** at the current timestamp (you rarely update the past), the write rate is enormous (millions of points/sec), reads are **time-range scans over a filtered set of series** ("CPU for these hosts over the last 6 hours"), and old data is queried less and less over time. A B-tree row store like Postgres chokes here because random-position index maintenance under a pure-append firehose is wasted work.
+
+## Cardinality is the dominant failure mode
+
+A **series** is identified by a metric name plus a set of key/value **tags/labels**, for example \`cpu_usage{host="web-1", region="us-east", pod="abc"}\`. Each unique combination of tag values is a distinct series with its own timeline. This is the single most important concept in the whole topic: **cardinality is the number of distinct series**, and cardinality explosion is the dominant failure mode. Put a high-cardinality tag like \`user_id\`, \`request_id\`, \`pod_uuid\`, or \`email\` on a metric and you can go from thousands of series to tens of millions, blowing up the in-memory index, slowing every query, and OOM-killing the database. The rule: tags must be **bounded, low-cardinality dimensions** (region, host, status code), never unbounded identifiers.
+
+## Append-optimized, columnar, compressed storage
+
+TSDBs use **LSM-tree** style storage (buffer writes in memory, flush sorted immutable chunks to disk) and store data **columnar** per series so a range scan reads one contiguous block. Compression is where TSDBs win big, using two Gorilla/Facebook techniques:
+
+- **Delta-of-delta on timestamps:** samples arrive at near-regular intervals, so store the change in the interval, which is usually 0 and packs into a bit or two instead of a 64-bit timestamp.
+- **XOR compression on values:** consecutive float values are similar, so XOR them and store only the changed bits.
+
+Together these routinely get metrics down to around 1 to 2 bytes per sample versus 16 raw, which is what makes million-point-per-second ingestion economically possible.
+
+\`\`\`
+write path: memory buffer (recent, WAL-backed) --flush--> compressed columnar chunks
+partition by TIME (e.g. 2h blocks) and by SERIES/shard
+query: pick time chunks -> filter series by tags via inverted index -> scan + aggregate -> gap-fill
+\`\`\`
+
+## Keeping old data cheap
+
+**Downsampling / rollups (continuous aggregates):** you do not need per-second data from last year, so precompute 1m, 1h, 1d rollups and serve old queries from the coarse ones. **Tiering + retention:** recent raw data lives on fast SSD (hot), older rolled-up data on cheaper disk/object storage (warm/cold), and raw data past its retention window is dropped entirely. Partitioning **by time** makes this trivial: expiring old data is dropping whole chunks, not deleting rows.
+
+Query patterns you must support: time-range scans, tag filters (served by an inverted index from tag to series), aggregation across series (sum/avg/percentiles), and **gap-filling / interpolation** for missing samples. The ecosystem: **Prometheus** (pull-based monitoring, its own TSDB), **InfluxDB** and **TimescaleDB** (a Postgres extension, so you keep SQL and joins), and **ClickHouse** (a columnar OLAP DB people push into service as a huge-scale TSDB).
+
+**Interview nuance:** if asked "why not just use Postgres," answer with write pattern (append vs random-write index churn), compression (delta-of-delta/XOR vs generic), and lifecycle (drop-a-time-chunk vs DELETE-scan). If asked "what breaks first at scale," the answer is cardinality, every time.
+
+**Recap:** a TSDB exploits append-only, columnar, delta-of-delta + XOR compressed storage partitioned by time, keeps old data cheap with downsampling and hot/warm/cold tiering plus retention, serves time-range + tag-filtered aggregations, and lives or dies by controlling tag cardinality.
+`.trim()
+
 export const systemDesignLevel11: DesignLevel = {
   id: 11,
   slug: "specialized-systems",
@@ -873,6 +1015,204 @@ export const systemDesignLevel11: DesignLevel = {
               "**Correctness:** output goes through a hard schema/validity guardrail that rejects any code not in the current catalog (ungrounded codes are blocked), and low-confidence mappings escalate to a human coder.",
               "**Evolution:** human coder corrections feed the data flywheel, improving the next quarterly LoRA adapter, while the RAG index tracks the catalog continuously.",
               "Common wrong turn: fine-tuning the model on the code catalog itself. It goes stale every quarter and forces a retrain each cycle, and it risks emitting retired codes. Keep volatile codes in RAG; fine-tune only the durable format and style.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l11-m3",
+      title: "Real-Time Analytics & Global Data",
+      description:
+        "Design the two systems that show up whenever data has to be either fast at massive volume or correct across the planet: a streaming analytics pipeline that turns a firehose of billions of events per day into sub-second trending and per-minute counts, and a globally distributed database that serves low-latency local reads worldwide without letting two regions double-spend the same balance.",
+      lessons: [
+        {
+          id: "sd-l11-streaming-realtime-analytics",
+          title: "Streaming / Real-Time Analytics Pipelines",
+          summary:
+            "Kafka backbone, Flink windows keyed on event time with watermarks for late data, exactly-once via checkpointing where counts must be right, HyperLogLog and Count-Min Sketch for bounded-memory counting, and a Druid/Pinot/ClickHouse serving layer for sub-second queries.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["real-time-analytics", "streaming", "olap"],
+          teach: { markdown: streamingRealtimeAnalyticsTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-streaming-realtime-analytics-apply",
+            prompt:
+              "Design a real-time analytics system that shows near-real-time top-K trending items and per-minute event counts over a firehose of billions of events/day.",
+            thinkAbout: [
+              "What backbone and processing engine handle the firehose?",
+              "How do watermarks and windowing handle late/out-of-order events?",
+              "Which approximate algorithms scale counting and top-K?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 5B events/day, roughly 60K/sec average and ~2M/sec peak, each event ~200 bytes with an `item_id`, `user_id`, and `event_time`. Requirements: per-minute counts and a trailing 5-minute top-100 trending list, both fresh within a few seconds, dashboard reads sub-second. Events can arrive minutes late. Estimation: 2M/sec times 200 bytes is 400 MB/sec ingest, ~35 TB/day pre-replication, driving Kafka partition count (hundreds) and retention (3 days for replay).",
+              "**Ingestion:** producers write to Kafka, partitioned by `item_id` so per-item ordering holds and top-K aggregation stays partition-local. Kafka gives replay, backpressure, and durability.",
+              "**Processing:** Flink consumes partitions. Two window jobs: one tumbling 1-minute window per `item_id` for per-minute counts; one sliding 5-minute window advancing every 30s feeding a top-K. Windows key on `event_time`. A watermark set to (max seen event_time minus 2 minutes) lets late events land; events later than that go to a side output for correction rather than being dropped. For unique visitors per minute I maintain a HyperLogLog per key (~12 KB, ~2% error) that merges across partitions. For trending I run a Count-Min Sketch plus a heavy-hitters top-K rather than an exact global sort.",
+              "**Delivery:** exactly-once for counts via Flink checkpointing of state and offsets, with idempotent upserts into the sink so a replay does not double-count.",
+              "**Serving:** Flink writes minute-level rollups and the current top-K into Apache Druid (or Pinot/ClickHouse), which serves dashboard queries in tens of ms under concurrency. Clients never query Flink state directly. Architecture is Kappa: one streaming pipeline, corrections by replaying Kafka from an offset, no separate batch codebase.",
+              "Key tradeoffs: approximate top-K and HLL trade ~2% error for bounded memory, the only way to count billions of events without unbounded state. Common wrong turn: exact counting at firehose scale (a global set or GROUP BY over every event), which needs unbounded memory and a huge shuffle; or windowing on processing time, which silently miscounts whenever clients are late.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-streaming-realtime-analytics-practice",
+            prompt:
+              "Design the real-time metrics pipeline behind a video platform like YouTube that must show creators a live view count that ticks up during a premiere, while also preventing bots from inflating counts, at 500M view events/sec across a global audience.",
+            thinkAbout: [
+              "Why split into a fast approximate live counter and a slower validated official count?",
+              "How does regional pre-aggregation avoid one cluster seeing 500M/sec?",
+              "Why is trying to make one number both instant and fraud-proof the trap?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 500M view events/sec at peak, geographically spread, creators want a live counter fresh within a few seconds, and the public count must resist bot inflation. Two consumers of the same stream: a fast approximate live counter and a slower validated official count.",
+              "**Regional ingestion:** view events land in a Kafka cluster per region (US, EU, APAC) to keep producer latency low, partitioned by `video_id`. Regional Flink jobs pre-aggregate per-video counts locally, then a global aggregation tier sums regional partials so no single cluster sees 500M/sec.",
+              "**Two paths on the same log (a Lambda-style split justified by the fraud requirement).** The speed path maintains a per-video running counter with at-least-once and idempotent increments, giving the live ticking number. Because bots make raw counts untrustworthy, the batch/validation path replays the same events through fraud scoring (dedupe by device and session, watch-time thresholds, rate anomalies, HyperLogLog on `user_id` to sanity-check uniques against total views) and produces the official count reconciled periodically. The live counter is explicitly labeled approximate and can be revised down when validation lands, exactly how real platforms behave.",
+              "**Late and out-of-order events:** watermarks with generous allowed lateness because mobile clients buffer views offline; a phone syncing an hour later still counts, routed through the same fraud path.",
+              "**Serving:** per-video counters cached in Redis for the live read path (creators poll every few seconds); validated rollups in Druid for creator analytics dashboards (views by geo, by minute, retention curves).",
+              "Key tradeoff: the live number optimizes freshness over correctness, the official number optimizes correctness over freshness, and they are allowed to disagree transiently. Common wrong turn: trying to make one number both instant and fraud-proof; you cannot validate at 500M/sec inline without adding seconds of latency, so you split the paths and reconcile.",
+            ],
+          },
+        },
+        {
+          id: "sd-l11-globally-consistent-multiregion",
+          title: "Globally-Consistent Multi-Region Data",
+          summary:
+            "Cross-region synchronous writes cost 100+ ms because of the speed of light, so use consensus plus TrueTime/HLC for correct ordering, geo-partition rows to their home region for local reads and writes, add follower reads and leases, and choose a consistency level per workload instead of paying for global strong consistency everywhere.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["multi-region", "spanner", "geo-partitioning"],
+          teach: { markdown: globallyConsistentMultiregionTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-globally-consistent-multiregion-apply",
+            prompt:
+              "Design a globally distributed database for user accounts/balances that gives low-latency local reads worldwide while preventing double-spend.",
+            thinkAbout: [
+              "Why do cross-region synchronous writes cost 100+ ms?",
+              "How do TrueTime/HLC and geo-partitioning enable local reads?",
+              "What conflict-resolution and consistency choices fit per workload?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: hundreds of millions of user accounts each holding a balance, users concentrated by region, reads dominate (balance checks, profile loads) but writes (transfers, purchases) must never double-spend, low read latency worldwide, and GDPR residency for EU users. RPO near zero for balances.",
+              "**Why writes are expensive:** a strongly consistent write commits only when a cross-region majority acknowledges. A NY to Frankfurt round trip is ~80ms, so any quorum spanning continents costs 100+ ms. That is physics, not tuning.",
+              "**High-level design:** use a Spanner-class database (Spanner, CockroachDB, or YugabyteDB). Each account is a row geo-partitioned by a `home_region` column derived from the user. The row's Raft/Paxos replica group has its leader and majority in the user's home region, so that account's reads and writes complete with a single-region quorum in single-digit ms. Ordering and no-double-spend come from serializable transactions: a debit runs as a read-modify-write in one serializable transaction against the account's home leader, so concurrent debits serialize and cannot both succeed on an insufficient balance. TrueTime (or HLC in CockroachDB) provides external consistency so timestamps are globally correct without a global lock.",
+              "**Reads worldwide:** for the account owner, reads are local (their home region). For occasional foreign reads, use follower reads at a bounded-staleness timestamp against a nearby replica, avoiding the cross-region round trip when a few seconds of staleness is acceptable. Leaders hold read leases to serve strong reads locally.",
+              "**Cross-account transfers** (EU to US) are the genuinely cross-region case: a two-region distributed transaction (two-phase commit across the two leader groups) costing 100+ ms. Acceptable because transfers are rare relative to reads, and correctness dominates. Consistency per workload: balances strong/serializable; profile and settings bounded-staleness; activity feeds eventual. Residency is satisfied because EU rows are pinned to EU replicas.",
+              "Common wrong turn: claiming global strong consistency with low write latency everywhere, or using active-active multi-writer with Last-Write-Wins on balances, which silently drops a concurrent debit and enables double-spend. The fix is single-home each account so its writes serialize through one leader.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-globally-consistent-multiregion-practice",
+            prompt:
+              "Design the global inventory and cart system behind an event like a worldwide flash sale (think a limited PlayStation 5 drop across US, EU, and APAC) where 10,000 units must never oversell, buyers expect a cart response under 100ms locally, and demand spikes to millions of concurrent shoppers at the drop instant.",
+            thinkAbout: [
+              "How does partitioning the 10K units into regional allocations give local latency?",
+              "How does per-shard atomic compare-and-decrement guarantee no oversell?",
+              "Why is showing a globally exact live remaining count the trap?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a small, fixed inventory (10K units) that absolutely must not oversell, millions of concurrent buyers globally at t=0, local add-to-cart under 100ms, and it is acceptable that some buyers see 'sold out' a moment before the global count truly hits zero (better than overselling).",
+              "**The core tension:** inventory is a single strongly-consistent counter that must decrement correctly, but the counter is one hot key while buyers are global. Naive global synchronous decrement per request would serialize millions of requests through one leader with 100+ ms cross-region hops, collapsing under load.",
+              "**Design:** partition the 10K units into regional allocations up front, say 4K US, 4K EU, 2K APAC, each held as a separate strongly-consistent counter homed in that region (Spanner/CockroachDB row or a Redis counter backed by consensus). Buyers decrement their local region's allocation, so the common path is a local single-region quorum under 100ms with no cross-region hop. Within a region, shard the hot counter into sub-counters (for example 40 shards of 100) to spread contention, decrementing a random shard and rebalancing.",
+              "**Overselling prevention:** each decrement is a conditional atomic operation (compare-and-decrement, reject at zero). Because each unit lives in exactly one regional allocation and decrements are serialized per shard, the sum can never go below zero. When a region exhausts its allocation, a coordinator can rebalance leftover units from another region via a cross-region transaction (rare, correctness-first).",
+              "**Cart holds:** a successful decrement creates a time-boxed reservation (2-minute TTL) so an abandoned cart returns stock. Checkout converts a hold to a sale. Consistency choice: the inventory counter is strong; the 'X left' number shown to browsers is eventual and cached at the edge (it can lag).",
+              "Common wrong turn: one global counter with synchronous cross-region writes (latency collapse) or an eventually-consistent counter for the actual decrement (oversell). Trying to show a globally exact live remaining count to every shopper recreates the hot-key global read storm; show an approximate count, enforce exactness only at the decrement.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l11-m4",
+      title: "IoT, Edge & Time-Series",
+      description:
+        "Design the two halves of a large sensor platform: the ingestion path that pulls telemetry from millions of intermittently-connected devices and splits it into a hot alerting path and a cold analytics path, and the specialized time-series storage substrate underneath it that survives high write rates and controls the cardinality explosion that kills most metrics systems.",
+      lessons: [
+        {
+          id: "sd-l11-iot-edge-ingestion",
+          title: "IoT / Edge Ingestion Architecture",
+          summary:
+            "Filter and buffer at the edge, connect over MQTT with per-device certs, absorb bursts and reconnects with a Kafka buffer and backpressure, fork into a seconds-latency hot path and a durable cold path, and drive control and OTA through a device shadow with canary rollout.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["iot", "edge", "mqtt"],
+          teach: { markdown: iotEdgeIngestionTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-iot-edge-ingestion-apply",
+            prompt:
+              "Design a platform ingesting telemetry from 10M IoT devices, tolerating offline devices, doing edge filtering, and enabling both real-time alerts and historical analytics.",
+            thinkAbout: [
+              "What belongs at the edge vs the cloud?",
+              "How do you handle intermittent connectivity and high write fan-out?",
+              "How do the hot (alerting) and cold (analytics) paths split?",
+            ],
+            modelAnswerOutline: [
+              "Assume 10M devices, one reading every 10s average (about 1M msg/sec), bursts to 3x on regional reconnects, readings around 200 bytes, alert latency target under 5s, and analytics data retained for years.",
+              "**Edge vs cloud:** at the edge (gateway or on-device agent) I filter and aggregate to cut bandwidth: send rolling aggregates plus any out-of-band reading, run local inference for safety-critical cutoffs that cannot wait for a cloud round trip, and buffer to disk when offline (store-and-forward). The cloud owns durable storage, fleet-wide analytics, alerting correlation across devices, and control.",
+              "**Connectivity and fan-out:** devices hold one long-lived **MQTT** connection to a broker cluster (EMQX / HiveMQ or AWS IoT Core), authenticated with **per-device X.509 certs** so any device can be revoked individually. On disconnect the edge persists locally and replays on reconnect with a device-supplied event id so the cloud can **dedupe**, and I accept out-of-order/late data. Reconnects use exponential backoff with jitter to avoid a thundering herd, and the broker rate-limits new connections. Behind the broker an ingest gateway applies **backpressure** and writes to **Kafka**, partitioned by device id, which is the durable shock absorber so a slow consumer never blocks devices.",
+              "**Hot vs cold split:** Kafka forks. The **hot path** is a stream processor (Flink) evaluating threshold/anomaly rules with per-device state, emitting alerts within seconds to a notification service; it also feeds a short-retention store (Redis / a TSDB hot tier) for live dashboards. The **cold path** lands raw events in S3 (partitioned by date/device) for batch ETL and ML, and downsampled series into a time-series DB for historical queries.",
+              "**Control:** a **device shadow** holds desired vs reported state; **OTA** firmware ships as a canary (1% -> watch health telemetry -> ramp) so a bad build cannot brick the fleet.",
+              "Common wrong turn: assuming always-online devices with no buffering (silent data loss) and no dedupe (double-counted replays); or persisting every raw ping to a hot database instead of buffering in Kafka and filtering at the edge, which blows up cost and write load.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-iot-edge-ingestion-practice",
+            prompt:
+              "Design the ingestion and control plane for a Tesla-scale connected-vehicle fleet: 5M cars, each streaming ~50 signals at up to 10Hz over flaky cellular, where some telemetry drives safety alerts within 2s, video/Autopilot snapshots must be uploaded opportunistically, and OTA updates ship new firmware to the fleet weekly. Deliver the edge split, the connectivity/ingestion design, and how you stage OTA without bricking cars.",
+            thinkAbout: [
+              "Why is streaming raw 25M points/sec a non-starter, and what does the car do instead?",
+              "How do you separate a sub-2s safety path from opportunistic media upload?",
+              "How does A/B partitioning plus staged canary make OTA recoverable?",
+            ],
+            modelAnswerOutline: [
+              "Assume 5M cars, ~50 signals at up to 10Hz (a raw 2.5M x 10 = 25M points/sec if streamed naively, so streaming raw is a non-starter), cellular links that drop constantly, safety alert latency under 2s, and large opportunistic media uploads.",
+              "**Edge split:** the car is a real computer, so it does heavy edge work. It aggregates high-rate signals locally (send 1Hz summaries plus event-triggered high-rate bursts around anomalies, hard braking, or faults), runs on-vehicle models for safety, and **records to local storage** continuously. Only a filtered fraction reaches the cloud; full-rate data is uploaded on demand or when the car is on Wi-Fi and parked. This turns 25M points/sec of raw signal into a manageable cloud stream.",
+              "**Connectivity/ingestion:** cars hold an **MQTT** (or gRPC-over-QUIC) session with per-vehicle certs. Cellular flakiness makes **store-and-forward mandatory**: buffer to disk, replay with monotonic event ids, dedupe in the cloud, tolerate hours of offline gap. Split traffic by QoS: safety/health signals go over a small high-priority topic into a Kafka hot partition feeding a Flink alerting job (sub-2s), while bulk media (dashcam clips, Autopilot snapshots) uploads **opportunistically** to S3 via presigned URLs, prioritized to Wi-Fi to avoid burning cellular data, and is fully decoupled from the telemetry path. Kafka partitioned by VIN absorbs reconnect bursts; brokers rate-limit connects with jittered backoff.",
+              "**OTA without bricking:** desired firmware version lives in each car's **device shadow**. Rollout is a staged canary: 0.1% -> 1% -> 10% -> fleet, gated on health telemetry (boot success, crash rate, error signals) with automatic halt-and-rollback if the canary regresses. Updates are cryptographically signed and verified on-device, installed to an **A/B partition** so a failed flash boots the previous known-good image, and safety-critical installs only apply while parked.",
+              "This makes the blast radius of a bad build a fraction of a percent, recoverable by rollback, instead of a fleet-wide brick. Common wrong turn: streaming raw high-rate signals to the cloud, or a single-shot fleet-wide OTA with no A/B partition or canary, either of which is catastrophic at 5M vehicles.",
+            ],
+          },
+        },
+        {
+          id: "sd-l11-time-series-storage",
+          title: "Time-Series Databases & Storage Design",
+          summary:
+            "A TSDB exploits append-only, columnar, delta-of-delta + XOR compressed storage partitioned by time, keeps old data cheap with downsampling and hot/warm/cold tiering plus retention, serves time-range + tag-filtered aggregations, and lives or dies by controlling tag cardinality.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["time-series", "cardinality", "downsampling"],
+          teach: { markdown: timeSeriesStorageTeach, estimatedMinutes: 14 },
+          apply: {
+            id: "sd-l11-time-series-storage-apply",
+            prompt:
+              "Design a time-series store for high-frequency sensor metrics that ingests millions of points/sec and serves fast time-range + downsampled queries.",
+            thinkAbout: [
+              "Why is tag/label cardinality the dominant failure mode?",
+              "How do downsampling and tiering keep old data cheap?",
+              "Why is columnar + delta-of-delta compression a fit?",
+            ],
+            modelAnswerOutline: [
+              "Assume 2M points/sec sustained, each point being (series id, timestamp, float), series identified by a metric + bounded tags, dashboards querying the last few hours at second resolution and analysts querying months at coarse resolution, with multi-year retention on cheap storage.",
+              "**Storage engine:** an **LSM-tree** write path. Incoming samples buffer in memory (WAL-backed for durability) and flush as sorted, immutable, **columnar** chunks partitioned **by time** (e.g. 2-hour blocks) and sharded **by series** across nodes. Columnar-by-series means a range scan for one series reads one contiguous block instead of skipping across interleaved rows.",
+              "**Compression:** timestamps use **delta-of-delta** (regular intervals compress to near-zero bits) and values use **XOR** compression (Gorilla), getting roughly 1 to 2 bytes/sample versus 16 raw. This is what makes 2M points/sec affordable to store and fast to scan, because scan cost is dominated by bytes read.",
+              "**Cardinality control (the crux):** each unique tag-set is a series, so I keep tags **bounded and low cardinality** (sensor_type, region, unit) and forbid unbounded tags (device_uuid as a tag, request_id) which would explode series count and OOM the index. I enforce a per-metric series-count budget, reject/relabel offending writes, and monitor active-series as a first-class metric.",
+              "**Lifecycle:** **downsampling** rollups precompute 1m/1h/1d aggregates via continuous aggregation, so month-long queries hit coarse data cheaply. **Tiering:** raw on hot SSD for recent windows, rollups on warm/cold object storage for old data, and raw dropped past its retention window; because partitioning is by time, expiry is dropping whole chunks, not row deletes. **Query path:** select relevant time chunks, resolve tag filters through an inverted index (tag -> series ids), scan, aggregate, and gap-fill missing samples; the planner routes long ranges to the appropriate rollup automatically.",
+              "Tech and tradeoffs: Prometheus for pull-based monitoring, TimescaleDB if I want SQL/joins, ClickHouse for huge analytical scale. Common wrong turn: unbounded tag cardinality plus no downsampling/retention (works in a demo, dies in production); or reaching for a general row store like vanilla Postgres, which suffers index churn on append and lacks time-series compression and chunk-drop retention.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-time-series-storage-practice",
+            prompt:
+              "Design the metrics backend for a Datadog-scale observability product: 100M+ active time series across thousands of customers, ingesting 10M+ points/sec, serving p99 dashboard queries under 1s over the last hour and ad-hoc queries over 15 months, all multi-tenant. Deliver the storage layout, how you keep 100M series from melting the index, and the query/retention strategy.",
+            thinkAbout: [
+              "How does sharding by (tenant, series) isolate a noisy customer?",
+              "How do per-tenant active-series limits and label budgets bound index RAM?",
+              "How does the query path serve sub-1s recent-hour and 15-month queries differently?",
+            ],
+            modelAnswerOutline: [
+              "Assume 10M+ points/sec, 100M+ active series, thousands of tenants, hot dashboard queries (last hour, p99 < 1s) mixed with cold analytical queries (15 months), and per-customer isolation and quotas.",
+              "**Storage layout:** a horizontally sharded, LSM-based columnar TSDB (a Cortex/Mimir/Thanos-style long-term Prometheus system, or a ClickHouse cluster). Data partitions by **time** (2h blocks) and is sharded across nodes by a hash of **(tenant, series)**, which both spreads write load and hard-isolates tenants so one noisy customer cannot hot-shard everyone. Recent blocks live on local SSD (the ingesters), and sealed blocks ship to **object storage (S3)** as immutable, indexed chunk files; a query layer (queriers + a store-gateway) reads from both so hot and cold share one query API. Compression stays delta-of-delta + XOR.",
+              "**Keeping 100M series alive:** cardinality is the whole game at this scale. I enforce **per-tenant active-series limits** and per-metric label budgets, reject writes past quota (with a clear error, not silent drop), and run automatic label-cardinality detection to flag a customer who just shipped `user_id` as a label. The inverted index (postings lists from label -> series) is sharded per tenant and kept in memory only for the hot window; cold blocks carry their own on-disk index in S3. This bounds index RAM regardless of total historical series.",
+              "**Query and retention:** a query frontend **splits** long ranges by time, **caches** results, and enforces per-tenant concurrency/cost limits so one heavy query cannot starve dashboards. Recent-hour p99 < 1s is met from in-memory/SSD ingester data with the hot index; 15-month queries transparently route to **downsampled rollups** (5m/1h) in S3 rather than scanning raw. Retention is tiered per plan: raw for weeks, rollups for 15 months, then chunk-drop by time.",
+              "Multi-tenancy runs through every layer: quotas, isolation by shard key, and per-tenant retention, so cost and blast radius track each customer independently. Common wrong turn: a single shared index with global cardinality, where one customer shipping a high-cardinality label melts the index for all thousands of tenants.",
             ],
           },
         },
