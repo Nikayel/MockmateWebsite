@@ -832,6 +832,60 @@ Kafka EOS covers only the pipeline, not external effects; and fencing tokens sep
 writes from superseded actors.
 `.trim()
 
+const crdtsTeach = `
+## How diverged replicas come back together
+
+When you go AP you accept that replicas diverge, and you need a story for how they come back
+together. The naive story is last-write-wins with a timestamp, which silently discards concurrent
+edits. CRDTs (Conflict-free Replicated Data Types) are the disciplined answer: data structures whose
+merge function is defined so that any two replicas that have seen the same set of updates are
+byte-for-byte identical, with no conflict resolution and no coordination. That property is **Strong
+Eventual Consistency (SEC)**: eventual consistency plus a guarantee that convergence is
+deterministic.
+
+The property that makes it work: the merge operation must be **commutative, associative, and
+idempotent**. Order does not matter, grouping does not matter, and applying the same update twice is
+harmless. Together these mean you can deliver updates in any order, duplicated, across an unreliable
+network, and every replica lands in the same state. Merge is often a mathematical **join** on a
+lattice (for a counter, element-wise max; for a set, union).
+
+### The workhorse types
+
+- **G-Counter / PN-Counter**: a grow-only counter is a vector of per-replica counts; the value is the
+  sum, merge is element-wise max. A PN-Counter is two G-Counters (increments and decrements).
+- **OR-Set (Observed-Remove Set)**: tags each add with a unique id so a concurrent add and remove
+  resolve to "add wins" correctly. The set most people actually want.
+- **LWW-Register**: a single value with a timestamp; simple, but it still *loses* concurrent writes
+  by design.
+- **RGA / sequence CRDTs**: ordered lists for collaborative text (the basis of Yjs and Automerge).
+
+Costs are real and interviewers probe them. OR-Set elements carry add/remove tags, and removed
+elements leave **tombstones** so a late-arriving add does not resurrect deleted data. Metadata and
+tombstones grow, so you need **garbage collection**, which itself needs some coordination or a
+causal-stability threshold. And CRDTs **cannot enforce global invariants**: "this username is
+globally unique" or "the balance never goes negative" require agreement, and agreement is exactly
+what CRDTs avoid. For invariants you need consensus.
+
+### Anti-entropy: the part people forget
+
+Convergence does not happen by magic. Replicas must actually exchange the updates they missed.
+**Gossip**: each node periodically pushes/pulls state with a few random peers, so updates spread
+epidemically in O(log n) rounds. **Merkle trees**: to compare a huge key range cheaply, each replica
+hashes its data into a tree; two replicas swap root hashes and only descend into subtrees whose
+hashes differ, finding the diverged ranges in log time. Dynamo and Cassandra use exactly this. Two
+more mechanisms fill gaps: **read repair** (a read that sees stale replicas writes the fresh value
+back) and **hinted handoff** (a down node's writes are held by a neighbor and replayed on return).
+
+**Interview nuance:** the classic wrong turn is describing CRDTs and stopping. Without anti-entropy,
+a write that lands on replica A during a partition never reaches replica B, so they never converge.
+CRDTs give you a *safe merge*; gossip plus Merkle-tree reconciliation is what actually *delivers the
+updates to merge*.
+
+Recap: CRDTs give Strong Eventual Consistency because their merges are commutative, associative, and
+idempotent, they cost metadata and tombstones and cannot enforce global invariants, and they only
+converge if paired with anti-entropy (gossip, Merkle trees, read repair, hinted handoff).
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1551,6 +1605,63 @@ export const systemDesignLevel5: DesignLevel = {
               "**Consumer side (the real protection):** treat every event as possibly-redelivered (a rebalance can reprocess a handled-but-uncommitted offset). For each event, run an idempotent transaction against the billing DB: check an inbox/dedup table for trip_id; if already processed, skip and commit the offset; if not, perform the charge and driver credit and record trip_id as processed in the SAME database transaction. Redelivery after a crash finds the trip processed and does nothing.",
               "**External call idempotency:** the processor charge carries idempotency key = trip_id, so a consumer crash after calling the processor but before recording completion is safe: the retry hits the processor with the same key and is deduped: the card is charged once. The driver credit is a ledger append guarded by a unique constraint on trip_id.",
               "**The trade:** a dedup-table lookup and a durable idempotency store on the hot path, accepting that ordering plus idempotency, not magic delivery, makes it safe. Wrong turn: trusting Kafka 'exactly-once' to cover the external card charge and driver credit, which it does not, so a rebalance re-runs the side effects and someone gets double-charged.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l5-m5",
+      title: "Membership & Failure Handling",
+      description:
+        "Converge replicas without coordination via CRDTs and anti-entropy, detect crashes without falsely evicting slow nodes, prevent split-brain with leases and fencing tokens, and know when BFT is justified.",
+      lessons: [
+        {
+          id: "sd-l5-crdts",
+          title: "CRDTs, Strong Eventual Consistency & Anti-Entropy",
+          summary:
+            "Commutative, associative, idempotent merges give deterministic convergence, at the cost of tombstones and no global invariants, and only with anti-entropy delivering the missed writes.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["crdt", "anti-entropy", "gossip"],
+          teach: {
+            markdown: crdtsTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l5-crdts-apply",
+            prompt:
+              "Design the merge logic for a collaboratively-edited counter and set that converge with no coordination under concurrent offline edits, and the background mechanism that reconciles missed writes.",
+            thinkAbout: [
+              "What operation properties make CRDTs converge without conflict resolution?",
+              "What do CRDTs cost (metadata, tombstones), and where can they not help?",
+              "How do gossip and Merkle trees reconcile divergent replicas cheaply?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: N replicas (mobile clients plus servers), each editing offline, no central coordinator, deterministic convergence required on reconnect. Every replica has a stable id.",
+              "**Counter: a PN-Counter.** Two maps keyed by replica id, one for increments (P), one for decrements (N); the value is sum(P) - sum(N). Merge is element-wise max on both maps. Max is commutative, associative, and idempotent, so merges apply in any order, duplicated, from any peer, and always land on the same state. Each replica only increases its own slot, so concurrent increments on different devices both survive: no lost update, which LWW would not guarantee.",
+              "**Set: an OR-Set.** Each add(x) attaches a unique tag (replica id + monotonic counter); remove(x) records the tags it observed into a tombstone set. An element is present if it has at least one add-tag not in the removed set: add-wins semantics, so a concurrent add and remove resolves to present because the new add carries a tag the remover never saw. Merge is union of add-tags and union of removed-tags.",
+              "**The cost and its GC plan:** tags and tombstones accumulate, so GC tombstones once an update is causally stable (every replica has acknowledged it), tracked with a version vector.",
+              "**Anti-entropy (the part people forget):** each node gossips every second with a few random peers (push/pull), spreading updates epidemically. For large state, replicas build a Merkle tree over the keyspace, exchange root hashes, and recurse only into differing subtrees, finding divergent ranges in log time. Add read repair and hinted handoff so reads heal stale replicas and writes to a briefly-down node replay on return.",
+              "**The limitation stated:** CRDTs cannot enforce 'unique username' or 'balance >= 0': those need consensus. And the common wrong turn: defining the merge but omitting anti-entropy, leaving post-partition replicas permanently divergent.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-crdts-practice",
+            prompt:
+              "Design the sync and conflict model for a Notion-style collaborative document editor supporting real-time co-editing by up to 50 users plus fully offline edits that merge on reconnect, targeting sub-100ms local edit latency and no lost keystrokes.",
+            thinkAbout: [
+              "Why do array indices fail for concurrent inserts, and what replaces them?",
+              "What role does the server play when the CRDT merge is the arbiter?",
+              "What bounds metadata growth in a long-lived document?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: rich-text documents (nested blocks, formatting), 50 concurrent editors, offline clients reconnecting hours later, and correctness means every client converges with no dropped edits.",
+              "**Document body: a sequence CRDT** (RGA or Automerge/Yjs-style). Each character or block gets a globally unique, densely-orderable position id (a fractional index or tree-path id) rather than an array index, so concurrent inserts at 'position 5' on two clients do not collide: both ids are unique and totally ordered, so the merged order is deterministic. Deletes leave tombstones so a concurrent insert next to a deleted character still lands correctly. This is what lets an offline client type for an hour and merge cleanly, with no operational-transform server rewriting operations.",
+              "**Formatting:** an OR-Set of marks over character ranges, so concurrent formatting is add-wins and never flickers. **Block structure:** a move-aware tree CRDT to avoid cycles when two users reparent concurrently.",
+              "**Transport:** while online, clients send small op deltas over a WebSocket relay for sub-100ms echo; the server is a dumb fan-out and durability layer, not an arbiter, since the CRDT merge is associative and idempotent. Offline edits queue in IndexedDB and replay on reconnect. Anti-entropy on reconnect: client and server exchange state vectors (per-replica clocks) and ship only missing ops: the practical Merkle-diff for op logs.",
+              "**Costs and mitigations:** tombstones and position metadata bloat long-lived docs, so compact periodically once history is causally stable across live replicas, and snapshot the materialized doc so new joiners do not replay the full op log. The trade: CRDT metadata makes on-wire and at-rest size larger than the visible text: the price of coordination-free offline merge.",
+              "Common wrong turn: array-index operational transform with a central server: it breaks under long offline windows and is far harder to make correct than a sequence CRDT.",
             ],
           },
         },
