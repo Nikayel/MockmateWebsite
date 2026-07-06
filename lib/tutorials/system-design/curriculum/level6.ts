@@ -174,6 +174,64 @@ ops budget); use a log only when replay/throughput justify its ops, a queue for 
 routing, managed services when the team is small, and sometimes no broker at all.
 `.trim()
 
+const kafkaInternalsTeach = `
+## Not a fast queue: a replicated commit log
+
+Kafka is a distributed, replicated, append-only **commit log**, and almost every property people
+admire falls out of that one design choice. A **topic** is a named log split into **partitions**.
+Each partition is an ordered, immutable sequence of records, and every record gets a monotonically
+increasing **offset** (0, 1, 2, ...). That is the entire data model: no per-message delete, no random
+insert, no in-place update. Producers append to the tail; consumers read forward from an offset they
+control.
+
+### Why it is fast
+
+**Sequential disk writes:** appending to the end of a file is the one access pattern spinning disks
+and SSDs both love, so Kafka sustains hundreds of MB/s per broker. **Page cache:** Kafka writes to
+the OS page cache and lets the kernel flush, so recent data is served from RAM with no user-space
+copy. **Zero-copy:** on read, \`sendfile()\` moves bytes from page cache straight to the network
+socket without dragging them through the JVM heap. Add producer-side **batching and compression**
+(lz4/zstd, batches keyed by \`linger.ms\` and \`batch.size\`) and one cluster handles millions of
+events per second.
+
+### Durability from replication
+
+Each partition has one **leader** and N-1 **followers** (replication factor typically 3). Followers
+pull from the leader and, when caught up, sit in the **in-sync replica (ISR)** set. Two settings
+decide the trade:
+
+- **\`acks\`** on the producer: \`acks=0\` (fire and forget, can lose data), \`acks=1\` (leader
+  persisted, but a leader crash before replication loses acknowledged writes), \`acks=all\` (leader
+  waits for all ISR members).
+- **\`min.insync.replicas\`** on the broker: the minimum ISR size for an \`acks=all\` write to be
+  accepted. With RF=3 and \`min.insync.replicas=2\`, a write needs the leader plus one follower, so
+  you survive one broker loss with zero acknowledged-message loss and still accept writes.
+
+**Interview nuance:** \`acks=all\` alone is not durable. If \`min.insync.replicas=1\`, "all ISR" can
+mean "just the leader" after followers drop out, so a leader crash still loses acknowledged writes.
+The durable combination is \`acks=all\` **and** \`min.insync.replicas>=2\` **and** RF>=3.
+
+\`\`\`
+Topic "rides", partition 3:
+ offset:  0    1    2    3    4  <- append here (tail)
+ record: [r0] [r1] [r2] [r3] [r4]
+ Leader (broker 1) --replicate--> Follower (b2), Follower (b3)
+ ISR = {1,2,3}. acks=all + min.insync.replicas=2 -> survives 1 loss.
+\`\`\`
+
+**Log segments and retention:** a partition is stored as segment files that roll by size/time; old
+segments are deleted (time/size retention) or compacted. **Tiered storage** (KIP-405) offloads cold
+segments to S3-class object storage so retention cost decouples from broker disk. Finally, **KRaft**
+(GA, default in Kafka 4.0) replaced ZooKeeper: cluster metadata now lives in an internal Raft quorum
+of controllers, removing the external dependency, speeding failover, and scaling to far more
+partitions.
+
+Recap: Kafka is a partitioned append-only log; sequential writes, page cache, and zero-copy explain
+its throughput; durability is leader/follower replication tuned by acks plus min.insync.replicas over
+the ISR (durable = acks=all + min.insync.replicas>=2 + RF3); retention, segments, compaction, and
+tiered storage govern cost and replay; and KRaft removed ZooKeeper by making metadata a Raft quorum.
+`.trim()
+
 export const systemDesignLevel6: DesignLevel = {
   id: 6,
   slug: "event-driven",
@@ -327,6 +385,63 @@ export const systemDesignLevel6: DesignLevel = {
               "**Why not Kafka:** it can hit the throughput and, with tiered storage plus MirrorMaker 2, approximate retention and geo-replication. But multi-tenant isolation and independent compute/storage scaling are things you engineer around in Kafka (separate clusters per tenant tier, careful quotas) rather than get natively. For a platform whose core requirement is per-tenant isolation, Pulsar's model is a better fit; acknowledge Kafka's larger ecosystem as the real tradeoff.",
               "**Why not a managed queue:** SQS/SNS cannot do 90-day multi-consumer replay at all, so it is disqualified as the backbone.",
               "**Where a plain queue still fits:** downstream one-worker tasks fed off the stream (generating a statement PDF, sending a single webhook) are simpler as an SQS-style queue or a single Pulsar subscription in shared mode than as a streaming consumer. Match the tool to the driver even inside a Pulsar shop.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l6-m2",
+      title: "Kafka & the Log",
+      description:
+        "Reason about Kafka like a staff engineer: why the append-only log gives throughput, why partitions are the atom of ordering and parallelism, how a wrong key breaks correctness, how rebalancing becomes latency, and how retention decides stream vs table.",
+      lessons: [
+        {
+          id: "sd-l6-kafka-internals",
+          title: "Kafka Architecture Internals",
+          summary:
+            "Sequential writes, page cache, and zero-copy give throughput; durability is leader/follower ISR replication where durable means acks=all + min.insync.replicas>=2 + RF3.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["kafka", "isr", "durability"],
+          teach: {
+            markdown: kafkaInternalsTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l6-kafka-internals-apply",
+            prompt:
+              "Design a Kafka topic layout for a ride-hailing event stream at 500k events/sec: choose partition count, replication factor, and key, and explain the durability/latency tradeoffs of your acks and min.insync.replicas settings.",
+            thinkAbout: [
+              "What do acks and min.insync.replicas trade off?",
+              "Why do sequential writes, zero-copy, and page cache give Kafka its throughput?",
+              "What did KRaft change versus ZooKeeper?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 500k events/sec (requested, matched, started, location-ping, completed), average record 500 bytes so ~250 MB/s ingest, ordering required per ride, feeding matching, pricing, and analytics consumers, with no acknowledged-message loss.",
+              "**Partition count:** size from a conservative ~10 MB/s produce and ~10 MB/s consume per partition, so 250 MB/s needs ~25 partitions on throughput alone. But partition count caps consumer parallelism and you want growth headroom without repartitioning (which breaks key stability), so provision **120 partitions**: room for many workers per consumer group, modest per-partition load, 3-4x headroom. Do not go to thousands (more open files, replication traffic, longer rebalances, metadata pressure).",
+              "**Replication factor: RF=3** across 3 availability zones with rack-awareness so replicas land in different AZs, surviving a full broker or single-AZ loss.",
+              "**Key by `ride_id`:** all events for one ride hash to the same partition and stay totally ordered (matching and billing require it). `driver_id` or `city` would create hot partitions (a busy city dwarfs the rest); `ride_id` spreads load evenly because rides are numerous and short-lived.",
+              "**Durability: `acks=all` with `min.insync.replicas=2` and RF=3,** so every acknowledged write is on at least 2 replicas: tolerate one broker/AZ failure with zero loss and still accept writes. The cost is one extra replication round trip versus acks=1 (single-digit ms within a region): the right price for a payments-adjacent stream. Location pings, lossy-tolerant and huge, could go to a separate topic at acks=1. Producer linger.ms ~5-10ms plus lz4 batches to hit throughput.",
+              "**Throughput holds** because Kafka appends sequentially, serves reads from page cache via zero-copy sendfile, and batches on the producer. KRaft means no ZooKeeper, so 120 partitions x RF3 is well within a single cluster's metadata budget and controller failover is fast.",
+              "Common wrong turn: setting acks=all but leaving min.insync.replicas=1, which can silently degrade to leader-only and lose acknowledged writes on a leader crash.",
+            ],
+          },
+          practice: {
+            id: "sd-l6-kafka-internals-practice",
+            prompt:
+              "Design the Kafka topology for LinkedIn-scale clickstream ingestion at 7 million events/sec across 3 datacenters, feeding both a real-time feed-ranking pipeline and a batch data lake, where losing a page-view event is acceptable but the cluster must never be a single point of failure. Choose partition count, replication, acks, and cross-datacenter strategy.",
+            thinkAbout: [
+              "How do you match durability to the value of each event class?",
+              "Why not stretch one cluster across datacenters?",
+              "What holds throughput at 2 GB/s and keeps 30-day lake retention cheap?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 7M events/sec, average 300 bytes, so ~2.1 GB/s. Page views are individually lossy-tolerant, but the pipeline must stay available and must not lose whole partitions. Two consumer classes: low-latency feed ranking and high-throughput batch (Hadoop/Spark lake).",
+              "**Split by event family** (`pageview`, `impression`, `engagement`) so each scales and is retained independently. For 2.1 GB/s at ~10 MB/s per partition you need ~210 partitions minimum; with growth and consumer-parallelism headroom, provision **600-1000 partitions** across the family topics over dozens of brokers. Key `pageview` by `member_id` so a member's events are ordered (for sessionization) while spreading load across the member base.",
+              "**Replication: RF=3** within each datacenter, rack/AZ aware. Because a single lost page view is acceptable, producers use **acks=1** on the pageview topic to shave the replication round trip and sustain 2 GB/s cheaply; the engagement topic (clicks driving revenue/ranking signals) uses acks=all with min.insync.replicas=2. The key move: match durability to the value of each event class rather than paying acks=all everywhere.",
+              "**Cross-datacenter:** do not stretch one cluster across DCs (WAN latency wrecks replication and ISR). Run an independent cluster per DC and use **MirrorMaker 2** (or Confluent Cluster Linking) for async replication into an aggregate cluster that feeds the central data lake, accepting some cross-DC lag. Local producers write to their local cluster, so a DC partition never blocks ingestion. Feed ranking consumes locally; the lake consumes from the aggregate.",
+              "**Throughput** relies on heavy producer batching, zstd compression, and zero-copy reads; **tiered storage** (S3/HDFS) holds cold segments so 30-day lake retention does not bloat broker disk. KRaft keeps ~1000-partition metadata cheap. Never a SPOF: RF3 plus multi-broker plus per-DC clusters plus MM2 aggregation means no single broker, rack, or DC failure stops ingestion or loses a whole partition.",
             ],
           },
         },
