@@ -295,6 +295,69 @@ order (one partition, limited throughput) and salting/compound keys (more throug
 ordering plus reassembly).
 `.trim()
 
+const consumerGroupsTeach = `
+## How Kafka scales reads
+
+A **consumer group** is how Kafka scales reads. All consumers sharing a \`group.id\` cooperatively
+divide a topic's partitions, and Kafka guarantees **each partition is assigned to at most one
+consumer in the group.** A group with 4 consumers over a 12-partition topic gives each consumer 3
+partitions. Two different groups ("ranking" and "analytics") each get the full stream independently:
+that is how one topic fans out to many pipelines.
+
+The immediate ceiling: **group parallelism is capped by partition count.** With 12 partitions, a 13th
+consumer sits idle. This is the number one scaling mistake: adding consumers past the partition count
+does nothing. You scale reads by having enough partitions in the first place.
+
+### Offsets and delivery semantics
+
+Each consumer tracks its position per partition as a committed offset in the internal
+\`__consumer_offsets\` topic. When and how you commit decides your delivery guarantee:
+
+- **Auto-commit** (every 5s) commits on a timer regardless of whether processing finished, so a crash
+  after commit but before processing loses messages, and a crash before commit reprocesses.
+  Convenient and wrong for anything that matters.
+- **Manual commit after processing** (commit only once the side effect is durably done) gives
+  **at-least-once**: crash after processing but before committing and you reprocess a duplicate. The
+  sane default.
+- Committing **before** processing gives at-most-once and silently drops work on a crash.
+
+Because the safe choice is at-least-once, **your consumer handlers must be idempotent.** Duplicates
+are guaranteed around every crash and every rebalance.
+
+### Rebalancing, the sharp edge
+
+When a consumer joins, leaves, or is presumed dead (misses heartbeats), the group **rebalances**:
+partitions are reassigned. The classic "eager" protocol is **stop-the-world**: every consumer revokes
+all its partitions, then the group reassigns from scratch, so the entire group stops for the
+rebalance (hundreds of ms to seconds). A deploy that restarts 30 consumers one by one can trigger 30
+rebalances, each a latency and duplicate spike.
+
+\`\`\`
+Group "ranking", topic 6 partitions, 3 consumers:
+  C1 -> p0,p1   C2 -> p2,p3   C3 -> p4,p5
+C3 dies -> rebalance -> C1 -> p0,p1,p4   C2 -> p2,p3,p5
+ Eager: ALL stop, revoke everything, reassign. Cooperative: only p4,p5 move.
+\`\`\`
+
+**Cooperative (incremental) rebalancing** revokes only the partitions that must move, so consumers
+keep processing unaffected partitions. **Static group membership** (\`group.instance.id\`) lets a
+restarting consumer rejoin with its old assignment within \`session.timeout.ms\`, so a rolling deploy
+causes **no rebalance at all**. And **KIP-848** (the new consumer-group protocol, GA in Kafka 4.0)
+moves assignment computation to the broker-side coordinator and makes rebalances fully incremental,
+removing the stop-the-world join barrier. Tuning \`session.timeout.ms\`/\`heartbeat.interval.ms\`
+sensibly (e.g., 45s/3s) avoids spurious rebalances from a GC pause.
+
+**Interview nuance:** the health/scaling signal is **consumer lag** (latest offset minus committed
+offset). Rising lag means you are falling behind; autoscale consumers on lag, but only up to the
+partition count, and alert on it. Do not scale on CPU alone.
+
+Recap: a consumer group splits partitions one-per-consumer so group size is capped by partition
+count; offset-commit timing sets the delivery guarantee, and commit-after-process gives at-least-once
+so handlers must be idempotent; rebalancing is stop-the-world in the eager protocol but made
+incremental by cooperative rebalancing, static membership, and KIP-848; and consumer lag is the
+metric you scale and alert on.
+`.trim()
+
 export const systemDesignLevel6: DesignLevel = {
   id: 6,
   slug: "event-driven",
@@ -552,6 +615,55 @@ export const systemDesignLevel6: DesignLevel = {
               "**The throughput tension is architectural, not a Kafka trick:** BTC-USD may exceed a single partition's ceiling. You cannot spread it without losing order. Keep events small (order id, side, price, qty, timestamp) in a compact binary format so one partition goes far (high-hundreds of MB/s). Recognize the **matching engine is single-threaded per pair by design** (LMAX-style), so the partition is not the bottleneck, the matcher is, and both scale by pair, not within a pair.",
               "**Isolate the hot pairs:** route the top handful (BTC-USD, ETH-USD) each to their own dedicated single-partition topic with dedicated brokers and consumers, so their volume never contends with the long tail; long-tail pairs share a multi-partition topic keyed by pair.",
               "**Partition count:** the shared long-tail topic provisions generously (say 100) since resizing breaks key stability; each hot pair gets exactly one partition with vertical scaling and an in-memory order book. Common wrong turn: salting BTC-USD to gain throughput, which reorders events and corrupts price-time priority: unacceptable for a matching engine.",
+            ],
+          },
+        },
+        {
+          id: "sd-l6-consumer-groups",
+          title: "Consumer Groups, Rebalancing & Scaling",
+          summary:
+            "Group size is capped by partition count; commit-after-process gives at-least-once so handlers must be idempotent; cooperative rebalancing and static membership avoid stop-the-world, and you scale on lag.",
+          estimatedMinutes: 30,
+          difficulty: "hard",
+          skills: ["consumer-groups", "rebalancing", "lag"],
+          teach: {
+            markdown: consumerGroupsTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l6-consumer-groups-apply",
+            prompt:
+              "Design the consumer tier for a stream where you must scale workers from 3 to 30 during peak without stalling processing; explain rebalance behavior and how you avoid duplicate processing during handoff.",
+            thinkAbout: [
+              "Why is the group size capped by partition count?",
+              "How do offset-commit strategies create at-least-once behavior?",
+              "How do cooperative rebalancing and KIP-848 reduce stop-the-world?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a topic feeding a worker pool doing per-message work (enrichment, a DB write). Traffic is spiky, so scale 3 to 30 workers at peak and back down without stalling or corrupting state.",
+              "**Partition count first:** group parallelism is capped by partitions, so to run 30 workers you need at least 30 partitions; provision more (say 60) for headroom above 30 so each worker owns a couple of partitions (smoother during scaling). The load-bearing decision: no autoscaling helps past the partition count.",
+              "**Scaling mechanism:** autoscale the worker deployment on consumer lag, not CPU: when lag crosses a threshold, add workers up to the partition ceiling; when lag drains, scale down. Each scale event triggers a rebalance, so make rebalances cheap.",
+              "**Rebalance behavior:** use the cooperative (incremental) rebalancing assignor (or KIP-848 on Kafka 4.0). Adding 10 workers revokes only the partitions that must migrate; every other worker keeps processing, so no stop-the-world stall. KIP-848 removes the synchronization barrier by computing assignments broker-side. Set static group membership (`group.instance.id`) so a routine pod restart rejoins with the same assignment inside session.timeout.ms and causes no rebalance, and tune session.timeout.ms=45s / heartbeat.interval.ms=3s so a GC pause does not falsely eject a healthy worker.",
+              "**Avoiding duplicates at handoff:** commit offsets after processing (at-least-once), so when a partition moves mid-batch the new owner reprocesses uncommitted work. Duplicates are guaranteed at every handoff, and the only correct defense is idempotent handlers: dedup on an idempotency key or upsert by event id. Use ConsumerRebalanceListener.onPartitionsRevoked to commit final offsets before releasing a partition, which shrinks (but never eliminates) the duplicate window.",
+              "Common wrong turn: over-partitioning to thousands (rebalance overhead, weak ordering) or committing offsets before processing (silent data loss on a crash).",
+            ],
+          },
+          practice: {
+            id: "sd-l6-consumer-groups-practice",
+            prompt:
+              "Design the consumer tier for Uber's real-time driver-location pipeline consuming 1M events/sec, where you deploy new consumer code multiple times a day and each deploy currently causes a visible latency spike from rebalancing. Eliminate the deploy-time stall and explain how you keep processing exactly-once-effectively across the handoff.",
+            thinkAbout: [
+              "What makes a rolling deploy cause zero rebalances?",
+              "How does a reassigned pod rebuild local state without replaying the whole source?",
+              "What keeps a reprocessed location update from corrupting the geo-index?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a high-volume location topic feeding a stateful geo-index. Deploys happen many times a day via rolling restart, and today each restarted pod leaves and rejoins the group, causing an eager stop-the-world rebalance and a latency spike (stale driver positions).",
+              "**Root cause:** a rolling deploy churns group membership, and eager rebalancing stops the whole group on every churn. Three changes remove the stall.",
+              "**1. Static group membership:** assign each pod a stable `group.instance.id` (from the StatefulSet ordinal) and set session.timeout.ms comfortably above the pod restart time (say 5 minutes during deploys). Now a restarting pod gets its identical partitions back with NO rebalance, so a rolling deploy of 50 pods causes zero reassignments as long as each pod returns within the timeout.",
+              "**2. Adopt the KIP-848 consumer protocol** (Kafka 4.0) or at minimum the cooperative sticky assignor, so any rebalance from a genuine crash moves only the affected partitions incrementally. **3. Size partitions well above peak worker count** (e.g., 256) so the pool has parallelism headroom and each pod owns a small, stable slice.",
+              "**Correctness across handoff:** commit offsets after the geo-index update (at-least-once), and make the update idempotent by keying the index on `driver_id` with last-write-wins on event timestamp, so a reprocessed location update is a no-op or an in-order overwrite, not a corruption. Because state is local (RocksDB-backed), use a changelog topic so a reassigned pod rebuilds state from the changelog rather than replaying the whole source. Monitor consumer lag per partition as the SLA signal; a deploy should show a flat lag line.",
+              "Common wrong turn: bumping consumer count past 256 expecting more throughput, when the partition count is the real ceiling.",
             ],
           },
         },
