@@ -13,6 +13,7 @@ import { systemDesignLevel4 } from "./level4"
 import { systemDesignLevel5 } from "./level5"
 import { systemDesignLevel6 } from "./level6"
 import { systemDesignLevel7 } from "./level7"
+import { systemDesignLevel8 } from "./level8"
 
 export const SYSTEM_DESIGN_LEVELS: DesignLevel[] = [
   systemDesignLevel0,
@@ -23,4 +24,5 @@ export const SYSTEM_DESIGN_LEVELS: DesignLevel[] = [
   systemDesignLevel5,
   systemDesignLevel6,
   systemDesignLevel7,
+  systemDesignLevel8,
 ]
