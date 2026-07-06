@@ -358,6 +358,63 @@ incremental by cooperative rebalancing, static membership, and KIP-848; and cons
 metric you scale and alert on.
 `.trim()
 
+const compactionRetentionTeach = `
+## Retention decides what a topic *is*
+
+The same append-only log behaves as a replayable event stream or as a queryable table depending
+entirely on how you retain it, and getting this wrong is how teams either blow up storage cost or
+lose the ability to rebuild state.
+
+### Two fundamentally different retention policies
+
+**Delete retention (time or size):** keep records for a window, then delete whole old segments.
+\`retention.ms=604800000\` keeps 7 days; \`retention.bytes\` caps total size. This makes a topic a
+**stream**: an immutable, time-bounded history you can replay within the window. Audit logs,
+clickstream, and event-sourcing event stores use this. The replay window is the retention window.
+
+**Log compaction (\`cleanup.policy=compact\`):** instead of deleting by age, Kafka guarantees it
+retains **at least the latest value for every key**, garbage-collecting superseded older values in
+the background. This makes a topic a **table/changelog**: the log is the full edit history, but its
+compacted tail is the current state of every key. A "current user profile" topic keyed by
+\`user_id\` is the canonical case. A brand-new consumer reads the compacted topic from offset 0 and
+materializes the entire current state without a database: how Kafka Streams rebuilds a \`KTable\` and
+how CDC pipelines bootstrap read models.
+
+\`\`\`
+Compacted topic keyed by user_id, before compaction:
+  (u1,"A") (u2,"X") (u1,"B") (u3,"Q") (u1,"C") (u2,"Y")
+After compaction keeps latest per key:
+  (u3,"Q") (u1,"C") (u2,"Y")   <- current state of every user
+\`\`\`
+
+**Deletes in a compacted topic** use a **tombstone**: a record with the key and a \`null\` value.
+Compaction keeps the tombstone long enough for all consumers to observe the deletion, then removes
+both the tombstone and all prior values for that key.
+
+**Interview nuance:** GDPR/right-to-erasure collides with long retention. An immutable 7-year audit
+stream cannot literally delete one user's records without breaking immutability, so the standard
+pattern is **crypto-shredding**: encrypt per-subject data with a per-user key and delete the key to
+render the data unrecoverable, rather than mutating the log. On a compacted topic, a tombstone plus
+compaction does the erasure directly.
+
+**Tiered storage** (KIP-405, GA) decouples retention cost from broker disk: hot recent segments stay
+on local broker SSD; cold older segments offload to object storage (S3, GCS) transparently, and
+consumers reading old offsets fetch from object storage automatically. This makes cheap long or
+effectively infinite retention viable: 7 years of audit data at S3 prices instead of years of broker
+SSD, and brokers rebalance faster.
+
+The subtle correctness trap: your **dedup/idempotency window must be at least as long as the
+replay/retention window.** If you keep 7 days of events but your consumer only remembers processed
+ids for 24 hours, replaying day-6 events sails past the dedup memory and **double-applies** them.
+Retention and dedup must be sized together.
+
+Recap: delete-retention makes a topic a replayable stream bounded by its window; log compaction keeps
+the latest value per key and makes a topic a rebuildable table/changelog (with tombstones for
+deletes); tiered storage puts cold segments in object storage for cheap long retention; GDPR erasure
+on immutable logs uses crypto-shredding or tombstones; and the dedup window must be at least the
+replay window or replays double-apply.
+`.trim()
+
 export const systemDesignLevel6: DesignLevel = {
   id: 6,
   slug: "event-driven",
@@ -664,6 +721,53 @@ export const systemDesignLevel6: DesignLevel = {
               "**2. Adopt the KIP-848 consumer protocol** (Kafka 4.0) or at minimum the cooperative sticky assignor, so any rebalance from a genuine crash moves only the affected partitions incrementally. **3. Size partitions well above peak worker count** (e.g., 256) so the pool has parallelism headroom and each pod owns a small, stable slice.",
               "**Correctness across handoff:** commit offsets after the geo-index update (at-least-once), and make the update idempotent by keying the index on `driver_id` with last-write-wins on event timestamp, so a reprocessed location update is a no-op or an in-order overwrite, not a corruption. Because state is local (RocksDB-backed), use a changelog topic so a reassigned pod rebuilds state from the changelog rather than replaying the whole source. Monitor consumer lag per partition as the SLA signal; a deploy should show a flat lag line.",
               "Common wrong turn: bumping consumer count past 256 expecting more throughput, when the partition count is the real ceiling.",
+            ],
+          },
+        },
+        {
+          id: "sd-l6-compaction-retention",
+          title: "Log Compaction, Retention & Tiered Storage",
+          summary:
+            "Delete-retention makes a replayable stream, compaction makes a rebuildable table/changelog with tombstones, tiered storage makes long retention cheap, and dedup must cover the replay window.",
+          estimatedMinutes: 30,
+          difficulty: "medium",
+          skills: ["compaction", "retention", "tiered-storage"],
+          teach: {
+            markdown: compactionRetentionTeach,
+            estimatedMinutes: 12,
+          },
+          apply: {
+            id: "sd-l6-compaction-retention-apply",
+            prompt:
+              "Design storage for two topics: an immutable audit event stream kept 7 years cheaply, and a 'current user profile' changelog; choose retention/compaction and storage tier for each.",
+            thinkAbout: [
+              "When do you use time/size retention vs log compaction?",
+              "How does compaction give table/changelog semantics and enable state rebuild?",
+              "How does tiered storage decouple retention cost from broker disk?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: the audit stream is an append-only record compliance requires kept 7 years and must be replayable and immutable. The user-profile topic must let any service know the current profile of every user and rebuild that state from scratch.",
+              "**Audit stream: delete-retention + tiered storage.** A pure event stream, so `cleanup.policy=delete` with `retention.ms` set to 7 years. Never compact it, because every event matters individually (compaction would drop superseded records, destroying the audit trail). Seven years on broker SSD would be enormous, so enable tiered storage: hot recent segments (last 7-30 days, queried often) on local SSD, everything older offloaded to S3 at a few cents/GB/month. Replay of an old range fetches transparently from S3. Durability RF=3, acks=all, min.insync.replicas=2. For GDPR erasure without mutating the immutable log, crypto-shred: encrypt per-user fields with a per-user key and delete the key.",
+              "**User-profile changelog: log compaction.** A table, not a stream, so `cleanup.policy=compact`, keyed by `user_id`, each record the latest full profile (or a merged patch). Compaction keeps at least the latest value per key, so the compacted tail is the current profile of every user. A new service, or a rebuilt search index, reads from offset 0 and materializes the entire current-state table with no separate database: KTable/CDC bootstrap behavior.",
+              "**Deletes and lagging consumers:** a deleted user is a tombstone (key + null), retained long enough (`delete.retention.ms`) for all consumers to see the deletion before it is compacted away. Set `min.compaction.lag.ms` so very recent updates are not compacted before a lagging consumer reads them. Storage stays small because only the latest value per key survives, so tiered storage is optional here.",
+              "**The unifying idea:** retention policy is a semantic choice. Delete-retention = replayable history (stream); compaction = current-state table (changelog). Common wrong turn: setting a dedup window on the audit consumers shorter than the 7-year retention, so a replay after a fix double-applies old events. Size the dedup window to cover the replay window (or make handlers idempotent by construction).",
+            ],
+          },
+          practice: {
+            id: "sd-l6-compaction-retention-practice",
+            prompt:
+              "Design the retention and storage strategy for Netflix's viewing-history platform: an immutable 'play events' stream (billions/day) that data science replays for months, plus a 'current playback position per profile per title' changelog that the resume-watching feature reads with single-digit-ms latency. Choose policies, storage tiers, and handle a title being pulled from the catalog for legal reasons.",
+            thinkAbout: [
+              "Why is tiered storage mandatory rather than optional at billions/day?",
+              "Where do you actually serve the single-digit-ms resume reads from?",
+              "How do you remove a pulled title from each topic type without breaking immutability?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: play events are high-volume immutable facts (play, pause, seek, stop) that ML pipelines reprocess for up to 6 months to retrain models; the playback-position store must return 'where did profile P stop in title T' instantly.",
+              "**Play-events stream: delete-retention + tiered storage.** `cleanup.policy=delete`, `retention.ms` at 6 months to cover the ML replay horizon. At billions/day this is petabytes, so tiered storage is mandatory: keep ~the last 7 days hot on broker SSD for real-time consumers, offload the rest to S3 where 6-month retention costs S3 rates. ML backfills read old offsets straight from S3. Key by `profile_id` so a profile's events stay ordered for sessionization. Durability RF=3, acks=all, min.insync.replicas=2. Critically, size the ML pipeline's idempotency to cover the full 6-month replay window (or make its aggregations idempotent) so a reprocess does not double-count watch time.",
+              "**Playback-position changelog: log compaction.** `cleanup.policy=compact`, keyed by `(profile_id, title_id)`, each record the latest position. Compaction keeps the latest position per key. For single-digit-ms reads, do NOT serve from Kafka directly: materialize the compacted changelog into a fast key-value store (DynamoDB or Redis) via Kafka Streams or a consumer; the compacted topic is the durable source of truth that can rebuild that store from offset 0 after a wipe. Compaction keeps the changelog and its downstream store small regardless of how many pauses a user racks up.",
+              "**Title pulled for legal reasons:** for the compacted changelog, emit tombstones (`(profile_id, title_id)` -> null) for every position tied to that title; compaction propagates them and removes the resume entries, and downstream stores apply the tombstone as a delete. For the immutable play-events stream, do not rewrite history: either crypto-shred the title's records by dropping its encryption key, or add a suppression/filter list so consumers exclude the pulled title, preserving the log's immutability while making the content effectively unavailable.",
+              "Common wrong turn: trying to mutate the immutable stream in place, which breaks replayability and offsets.",
             ],
           },
         },
