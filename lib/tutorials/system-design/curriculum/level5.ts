@@ -943,6 +943,67 @@ tradeoff; use phi-accrual to adapt the threshold per link, a suspicion window to
 and SWIM's random direct/indirect probes plus infection-style gossip to keep per-node load O(1).
 `.trim()
 
+const leaderElectionFencingTeach = `
+## One leader, guaranteed, even when the network lies
+
+Many systems need a **single active primary**: one node that owns writes, holds a lock, or
+coordinates work. The hard part is not electing one, it is guaranteeing there is *never* a second one
+acting at the same time, because the asynchronous network gives you no reliable way to tell a dead
+primary from a slow one.
+
+**Electing** is the easy half. Run it through a consensus system: **etcd, ZooKeeper, or Consul**, or
+a Raft/Paxos group directly. The primary holds a **lease**: a time-bounded grant ("you are leader
+until T+10s") it must renew. If renewals stop, the lease expires and a new election runs. Leases need
+no per-request coordination, but they carry a hidden assumption: **bounded clocks and bounded
+pauses**.
+
+### The canonical failure
+
+Leader L holds a 10-second lease and is mid-write. L suffers a **stop-the-world GC pause** (or the VM
+is descheduled, or a disk stall) for 15 seconds. From everyone else's view, L went silent, its lease
+expired, and a new leader L2 was elected and started writing. Then L **wakes up**. L does not know
+time passed. It believes it still holds the lease and completes its in-flight write. Now **two
+leaders** have both written: split-brain, and the data is corrupted. No clock was "wrong" and no bug
+was hit; a legal pause alone produced two active leaders.
+
+### Fencing tokens: enforce at the resource
+
+Leases alone cannot fix this, because the paused leader's problem is that its own view of "do I still
+hold the lease" is stale. The fix lives at the **resource**. Every time leadership is granted, the
+coordinator hands out a **monotonically increasing number** (etcd revision, ZooKeeper zxid, a Raft
+term). The leader attaches that token to **every write**. The storage layer **remembers the highest
+token it has seen and rejects any write with a lower token**. When paused L wakes and writes with
+token 33, storage has already accepted L2's token-34 writes and rejects L. This is the piece a
+distributed lock *must* have: a lock that only tells the client "you have it" is unsafe, because the
+client can be paused between acquiring and using it. This is exactly Martin Kleppmann's **critique of
+Redlock**.
+
+\`\`\`
+  L holds lease, token=33 ----GC pause 15s---------------> writes(token=33) -> REJECTED
+                        lease expires, elect L2, token=34 -> writes(token=34) -> accepted
+  storage rule: accept iff token > highest_seen
+\`\`\`
+
+### Split-brain and partitions
+
+Take a 5-node cluster split **3-2**. Consensus-based leadership requires a **majority quorum (3 of
+5)**. The majority side can elect and keep a leader and stays **writable**; the minority side cannot
+reach quorum, steps down, and refuses writes. This is the **CP** choice (Raft/etcd/ZooKeeper). The
+**AP** alternative (Dynamo-style) lets both sides keep accepting writes and reconciles later with
+CRDTs/version vectors. Either way, **fence the minority**: the losing side must be provably unable to
+affect shared state. A 2-2 split of 4 nodes has no majority on either side, which is why consensus
+clusters use **odd numbers**.
+
+**Interview nuance:** the answer that gets you hired names *both* halves: consensus/lease for who
+leads, and a **fencing token enforced at the storage layer** for why a paused old leader cannot
+corrupt state. Stopping at "etcd elects a leader" fails the follow-up "what happens during a GC
+pause?"
+
+Recap: elect one leader via consensus and a lease, but because a GC pause can briefly create two
+leaders, enforce fencing tokens (monotonic numbers the storage rejects if stale); on a 3-2 split the
+majority stays writable (CP) or both sides reconcile (AP), and either way the minority is fenced.
+`.trim()
+
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
@@ -1767,6 +1828,55 @@ export const systemDesignLevel5: DesignLevel = {
               "**Phi-accrual is essential on flaky WAN links:** a fixed LAN-tuned timeout would false-positive constantly. Phi-accrual learns each cross-PoP link's inter-arrival distribution, so a normally-1s-jittery link is not evicted at 1.2s. Widen the suspicion window for cross-PoP suspicions specifically, and require both direct and indirect probes routed through a *different PoP* before confirming a remote node dead, so a single bad WAN path cannot evict a healthy remote node.",
               "**Do not rely on membership alone at the data path:** because false negatives black-hole requests, the load balancer also runs active health checks and passive outlier detection (Envoy-style ejection after N consecutive 5xx/timeouts), draining traffic from a bad node in a couple of seconds even before membership confirms the crash. Membership drives placement/re-sharding; data-path health checks drive request routing: together, fast request-level protection with conservative membership changes.",
               "**The trade:** hierarchy and wider cross-PoP suspicion windows add a second or two to confirming remote crashes, accepted because a WAN false positive re-shards 300 PoPs' worth of traffic. Common wrong turn: one flat gossip mesh with one global timeout: it floods the WAN and flaps endlessly on jittery links.",
+            ],
+          },
+        },
+        {
+          id: "sd-l5-leader-election-fencing",
+          title: "Leader Election, Leases, Fencing & Split-Brain",
+          summary:
+            "A GC pause can create two leaders despite a valid lease, so enforce monotonic fencing tokens at the storage layer; on a 3-2 split the majority leads and the minority is fenced.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["leader-election", "fencing", "split-brain"],
+          teach: {
+            markdown: leaderElectionFencingTeach,
+            estimatedMinutes: 14,
+          },
+          apply: {
+            id: "sd-l5-leader-election-fencing-apply",
+            prompt:
+              "Design a single-active-primary system so that when the primary is wrongly suspected and a new one is elected, the old primary cannot corrupt shared state, and specify behavior on a 3-2 partition.",
+            thinkAbout: [
+              "How can a GC pause make a live leader look dead and cause two leaders?",
+              "What do fencing tokens do that leases alone cannot?",
+              "How does a 5-node cluster behave when split 3-2?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a 5-node control group coordinating writes to shared storage, one active primary at a time, and correctness means shared state is never corrupted by two concurrent writers. Safety outranks brief unavailability.",
+              "**Election and lease:** elect the primary through etcd/ZooKeeper or a Raft group. The primary holds a ~10s lease it must renew (a session/lock key kept alive). If renewals stop, the lease expires and a new primary is elected. No per-write coordination: the hot path stays fast.",
+              "**Why leases are not enough:** a lease assumes bounded pauses, and that fails. A 15-second stop-the-world GC pause expires the lease, a new primary is elected, and then the old one wakes still believing it is leader and completes an in-flight write: two writers, split-brain, from a perfectly legal pause.",
+              "**Fencing, the core of the answer:** make the storage layer the enforcer. Each leadership grant carries a monotonically increasing fencing token (etcd revision, ZooKeeper zxid, Raft term). The primary stamps it on every write; storage tracks the highest token accepted and rejects anything lower. The paused old primary wakes, writes with token 33, and is rejected because token-34 writes already landed. Only the resource, remembering the newest token, can catch a leader whose own view is stale. A lock without this is unsafe: the Redlock trap.",
+              "**3-2 partition:** consensus needs a majority (3 of 5). The 3-node side keeps or elects a leader and stays writable; the 2-node side cannot reach quorum, steps down, refuses writes (the CP choice). On heal, the minority rejoins and catches up; any stale write attempts are rejected by the token rule. Odd cluster size guarantees a majority side exists.",
+              "**The trade:** the minority is unavailable during the partition, accepted to guarantee a single writer.",
+            ],
+          },
+          practice: {
+            id: "sd-l5-leader-election-fencing-practice",
+            prompt:
+              "Design leader election and fencing for a distributed job scheduler like a Kubernetes controller-manager or a cron system where exactly one active scheduler may assign jobs, running 5 replicas across 3 availability zones, so that a network partition or a 30-second scheduler pause can never cause a job to run twice.",
+            thinkAbout: [
+              "Where must fencing be enforced so a paused scheduler's stale claim fails?",
+              "What second net catches a duplicate even after fencing?",
+              "How does the AZ layout interact with etcd quorum?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 5 scheduler replicas across 3 AZs, jobs assigned by writing to a shared datastore (etcd or SQL), and 'runs twice' is the failure to prevent. Brief scheduling delay is acceptable.",
+              "**Leader lease:** leader election on etcd, literally how the Kubernetes controller-manager works: a Lease object renewed every few seconds with a leader-elect duration and renew deadline. One replica schedules; others idle and watch. If the leader stops renewing (crash, partition, pause), a standby acquires the lease. 5 replicas across 3 AZs means a single-AZ failure still leaves an etcd majority and a live standby.",
+              "**Fencing at the effect, not just the lock:** a 30-second pause can let a standby take over while the paused leader still thinks it is scheduling. Each leadership term carries a monotonic token (etcd lease revision / term counter), and job claims are written with a compare-and-set conditional write: assigning job J succeeds only if J is unclaimed AND the token is the highest seen. The woken old leader's stale-token CAS fails, so it cannot double-assign.",
+              "**Idempotent execution as the second net:** each job carries a stable idempotency key (job id + scheduled-time bucket); workers do a conditional insert on that key, so any residual duplicate assignment is deduplicated at execution and the job runs at most once per tick. Fencing prevents two schedulers competing; the idempotency key prevents any residual duplicate from executing.",
+              "**Partition behavior:** etcd requires majority, so only the quorum side can hold the lease and schedule; the minority's schedulers cannot renew and go passive. On heal, stale claim attempts are rejected by the token CAS.",
+              "**The trade:** a few seconds of no-scheduling during failover (lease timeout plus acquire) in exchange for never double-running a job. Common wrong turn: trusting the lease alone: a bare leader lock without fencing plus idempotent claims will double-schedule the instant the leader pauses past its lease.",
             ],
           },
         },
