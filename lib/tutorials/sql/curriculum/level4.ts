@@ -436,11 +436,11 @@ const windowOffset: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-window-offset",
   title: "LAG and LEAD: Period-over-Period",
   summary: "Compare each row to its neighbor without a self-join.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 21,
   difficulty: "medium",
   skills: ["LAG", "LEAD", "offset windows", "deltas", "growth rates"],
   teach: {
-    estimatedMinutes: 8,
+    estimatedMinutes: 9,
     markdown: `## Compare a row to its neighbor without a self-join
 
 "Month-over-month revenue change" and "days since a customer's previous order" are two of the most-requested analytics metrics, and the naive approach is a self-join: join the table to itself on \`month = month - 1\`. That works, but it is verbose, scans the table twice, and silently breaks when a period is missing. \`LAG\` and \`LEAD\` express the same idea in one line and one pass.
@@ -477,6 +477,18 @@ Notice the last row. March is missing, so April's \`LAG\` returns February (\`15
 To flag a customer's **most recent** month, check whether the row has no successor. \`LEAD(order_month) OVER (PARTITION BY customer_id ORDER BY order_month) IS NULL\` is true only on the last frame of each strip.
 
 **Interview nuance:** window functions are computed after \`WHERE\`, \`GROUP BY\`, and \`HAVING\` have run, as part of evaluating the \`SELECT\` list. You therefore cannot filter on \`LAG\`/\`LEAD\` (or reference their aliases) in a \`WHERE\` or \`HAVING\` clause at the same query level. Wrap the window query in a CTE or subquery, then filter or flag on its output. That evaluation order is the single most common thing interviewers probe about window functions.
+
+> **In the warehouse this differs.** Snowflake, Oracle, and BigQuery let \`LAG\` / \`LEAD\` / \`FIRST_VALUE\` skip nulls with \`IGNORE NULLS\`, the usual "carry the last non-null value forward" trick. SQLite and Postgres have no \`IGNORE NULLS\`; writing it is a bare \`syntax error near "NULLS"\`. Carry the value forward with a correlated subquery instead:
+
+\`\`\`sql
+-- Warehouses: LAG(status) IGNORE NULLS OVER (PARTITION BY id ORDER BY ts)
+-- Portable: the most recent non-null status at or before this row.
+SELECT id, ts, status,
+  (SELECT s2.status FROM events s2
+   WHERE s2.id = e.id AND s2.ts <= e.ts AND s2.status IS NOT NULL
+   ORDER BY s2.ts DESC LIMIT 1) AS status_filled
+FROM events e;
+\`\`\`
 
 This lesson runs a multi-statement script against a fresh in-memory SQLite database, then hidden queries check your offsets, deltas, and row count. Lead your load with \`DELETE FROM <target>;\` so a re-run does not stack duplicate rows.`,
   },
