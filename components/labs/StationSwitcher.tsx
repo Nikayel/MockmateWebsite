@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import type { MilestoneKind } from "@/lib/labs/types"
 import { MilestoneNav } from "./MilestoneNav"
+import { StationBriefing } from "./stations/StationBriefing"
 import { ClarifyStation } from "./stations/ClarifyStation"
 import { DecomposeStation } from "./stations/DecomposeStation"
 import { DesignStation } from "./stations/DesignStation"
@@ -31,7 +32,12 @@ export function StationSwitcher({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
-      <div className="min-h-0 flex-1 overflow-y-auto">{renderStation(current)}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+        {/* Per-round interviewer prompt + how-to, kept above every station so the
+            question the candidate works against never leaves the page. */}
+        <StationBriefing kind={current} className="shrink-0" />
+        <div className="min-h-0">{renderStation(current)}</div>
+      </div>
       <MilestoneNav className="shrink-0" />
     </div>
   )

@@ -45,11 +45,39 @@ export interface CaseLabBrief {
   task: string
 }
 
+/**
+ * Per-round instruction shown on the station itself (not just the intro).
+ *
+ * Each Case Lab round mirrors a distinct interview round. Without this, the
+ * station only carries a one-line label and the candidate never learns what the
+ * round actually tests, how to work it, or the classic trap. `interviewerPrompt`
+ * is the question the interviewer poses for THIS round — surfaced persistently on
+ * the practice surface so the candidate always has the prompt in front of them,
+ * not buried on the start screen.
+ */
+export interface MilestoneGuidance {
+  /**
+   * The interviewer's spoken prompt for this round — the question the candidate
+   * works against. Shown persistently at the top of the station.
+   */
+  interviewerPrompt: string
+  /** One line on what this round is really scoring at this company. */
+  whatItTests: string
+  /** Ordered "how to work this round" moves. */
+  howToApproach: string[]
+  /** Concrete markers of a strong answer — the bar to clear. */
+  whatGoodLooksLike: string[]
+  /** The single classic mistake that sinks candidates in this round. */
+  commonTrap: string
+}
+
 export interface CaseLabMilestone {
   kind: MilestoneKind
   title: string
   /** P3: the one-line "why this milestone matters" shown on the rail. */
   purpose: string
+  /** Per-round instruction shown on the station (interviewer prompt + how-to). */
+  guidance?: MilestoneGuidance
   /** P2: pre-filled example so the user never faces a blank wall. */
   ghostExample?: unknown
   /** P1: open by default — milestones are soft-gated unless explicitly required. */
