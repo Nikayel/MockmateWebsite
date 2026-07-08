@@ -43,23 +43,25 @@ export const palantir911Dispatch: CaseLab = {
       purpose: "Pin down what “best responder” means before you rank anything.",
       guidance: {
         interviewerPrompt:
-          "Dispatch wants software that recommends the best responder for each 911 call. Before you design anything, what do you need to know from me? Ask the questions that would change how you build this, and for each one tell me the assumption you'd run with if I couldn't answer.",
+          "Before I show you my scores, grade yourself on the same rubric I use: handling ambiguity, decomposition, design, code correctness, and communication. Commit to a real number from 1 to 5 on each. Then the part every Palantir hiring manager asks: this recommender decides who gets an ambulance first, so who does it help, who could it hurt if you got it wrong, and which one moment in this lab would you redo?",
         whatItTests:
-          "Whether you scope an open problem before solving it. Palantir hands FDSE candidates a deliberately underspecified operational problem and watches whether you pin down what 'best' means before touching a design.",
+          "Two things at once. First, whether you can score your own work honestly: the gap between your self-score and mine is itself signal, and calibrated self-awareness is what Palantir promotes people on. Second, how you handle the behavioral and mission framing a hiring manager folds into every loop. Palantir screens for missionaries over mercenaries, so for a life-critical dispatch tool 'it was an interesting problem' is not an answer that lands here.",
         howToApproach: [
-          "Attack the loaded word first. 'Best responder' is undefined; force it to mean something measurable (fastest to scene, highest survival odds, lowest cost) before anything else.",
-          "Walk the constraint dimensions out loud: business outcome, who is bottlenecked today, how fresh the location data is, what latency, safety, and legal limits bind you, and what scale you run at.",
-          "Pair every question with the assumption you'd proceed on if I stay silent. Real dispatch can't wait for perfect information, and neither can you.",
-          "Name the constraints that will actually bind the design: stale GPS, one unit getting assigned to two calls, and what happens when no unit is available.",
+          "Score each dimension with a committed number before you read my grade. Hedging defeats the exercise; a real number makes the comparison honest.",
+          "Tie each score to a moment, not a mood: 'I scoped what best means fast, but I froze on the stale-GPS curveball and trusted live coordinates too long.'",
+          "Answer the human question straight. This tool ranks who reaches a dying person first, so name who it serves and the specific failure that hurts someone (stale GPS sending the second-closest unit while the real nearest one sits idle). Owning the stakes reads as mission fit; dodging them reads as a mercenary.",
+          "Read the gap between your number and mine as information. Where you over-rated yourself is your blind spot; where you under-rated is a strength you are discounting. Do not argue your score back up.",
+          "Leave with one sharp, drillable next action, not 'communicate better.' Name the move: 'design the fallback path before the ranking math.'",
         ],
         whatGoodLooksLike: [
-          "You turn 'best' into a concrete objective and say which calls it applies to first (life-threatening before noise complaints).",
-          "You surface the freshness, safety, and concurrency constraints without being prompted.",
-          "Every open question carries a default assumption, so you are never blocked waiting on the interviewer.",
-          "You resist proposing a ranking formula this early.",
+          "Self-scores that track the transcript, not a flat row of high or low numbers.",
+          "You name a specific weak moment before I ask, and one concrete thing you would redo.",
+          "You speak to who the system helps and who it could hurt without treating it as a throwaway, because a life-critical dispatch tool carries real weight.",
+          "You read the self-versus-my-grade gap as data rather than defending your number.",
+          "You walk out with one drillable next action tied to a real moment in the lab.",
         ],
         commonTrap:
-          "Jumping straight to 'I'll rank by distance' before defining what you are optimizing. The interviewer reads that as solving the wrong problem quickly. Scope first, rank later.",
+          "Two ways to lose this round. Rating yourself a 5 across the board reads as low self-awareness, the exact thing this round is built to measure. And answering 'why this matters' with 'it is a fun technical challenge' reads as a mercenary, and Palantir hiring managers cut strong coders on that line. Name the human stakes and the one moment you would do over.",
       },
       ghostExample: {
         dimension: "business-outcome",

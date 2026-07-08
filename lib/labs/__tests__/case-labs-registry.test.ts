@@ -46,16 +46,15 @@ describe("case lab registry", () => {
 
 describe("case lab round guidance", () => {
   // The interviewer prompt + how-to shown on every station. Locks the fix for
-  // "each round barely has any instruction" so labs can't regress to a bare label.
-  it("gives every 911 Dispatch round authored guidance", () => {
-    const lab = getCaseLabById("palantir-911-dispatch")
-    expect(lab).toBeDefined()
-    for (const milestone of lab!.milestones) {
-      expect(milestone.guidance, `${milestone.kind} guidance`).toBeTruthy()
+  // "each round barely has any instruction" so labs can't regress to a bare label:
+  // every round of every lab must ship authored guidance.
+  it.each(listCaseLabs())("$id gives every round authored guidance", (lab) => {
+    for (const milestone of lab.milestones) {
+      expect(milestone.guidance, `${lab.id}/${milestone.kind} guidance`).toBeTruthy()
     }
   })
 
-  it.each(listCaseLabs())("$id guidance is well-formed where present", (lab) => {
+  it.each(listCaseLabs())("$id guidance is well-formed", (lab) => {
     for (const milestone of lab.milestones) {
       const g = milestone.guidance
       if (!g) continue
