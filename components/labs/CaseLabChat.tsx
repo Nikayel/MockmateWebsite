@@ -71,6 +71,7 @@ export function CaseLabChat({ className }: { className?: string }) {
       const token = await getCurrentUserToken()
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers.Authorization = `Bearer ${token}`
+      const guidance = lab?.milestones.find((m) => m.kind === milestone)?.guidance
       const res = await fetch("/api/labs/chat", {
         method: "POST",
         headers,
@@ -84,6 +85,9 @@ export function CaseLabChat({ className }: { className?: string }) {
                 role: lab.role,
                 whyThisCompany: lab.whyThisCompany,
               }
+            : undefined,
+          roundGuidance: guidance
+            ? { whatItTests: guidance.whatItTests, commonTrap: guidance.commonTrap }
             : undefined,
           context: run ? buildContext(run) : undefined,
         }),

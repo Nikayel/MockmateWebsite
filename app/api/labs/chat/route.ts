@@ -24,6 +24,12 @@ const bodySchema = z.object({
       whyThisCompany: z.string().optional(),
     })
     .optional(),
+  roundGuidance: z
+    .object({
+      whatItTests: z.string().max(600).optional(),
+      commonTrap: z.string().max(600).optional(),
+    })
+    .optional(),
   context: z.string().max(8000).optional(),
 })
 

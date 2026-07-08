@@ -14,7 +14,7 @@ describe("buildCaseLabChatSystemPrompt", () => {
     expect(prompt).toContain("palantir")
     expect(prompt).toContain("911 Dispatch")
     expect(prompt).toContain("DESIGN")
-    expect(prompt).toContain("why A over B")
+    expect(prompt).toContain("committing to a contract")
   })
 
   it("adapts coaching per milestone", () => {
@@ -23,6 +23,27 @@ describe("buildCaseLabChatSystemPrompt", () => {
     expect(clarify).toContain("clarifying questions")
     expect(build).toContain("real codebase")
     expect(clarify).not.toEqual(build)
+  })
+
+  it("keeps the fallback coaching free of any single lab's domain nouns", () => {
+    // The old fallback hardcoded 911 dispatch ("unit mid-task"), which misfired
+    // on other labs like the Stripe billing lab.
+    for (const milestone of ["clarify", "decompose", "design", "build", "review"] as const) {
+      const prompt = buildCaseLabChatSystemPrompt({ milestone })
+      expect(prompt).not.toMatch(/unit mid-task|responder|dispatch/i)
+    }
+  })
+
+  it("layers the round guidance on top when provided", () => {
+    const prompt = buildCaseLabChatSystemPrompt({
+      milestone: "clarify",
+      roundGuidance: {
+        whatItTests: "whether you scope an open problem before solving it",
+        commonTrap: "jumping straight to a ranking formula",
+      },
+    })
+    expect(prompt).toContain("whether you scope an open problem before solving it")
+    expect(prompt).toContain("jumping straight to a ranking formula")
   })
 
   it("includes grounding context when provided", () => {
