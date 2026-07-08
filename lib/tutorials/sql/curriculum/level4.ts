@@ -2886,7 +2886,7 @@ CREATE TEMP TABLE changed AS
 SELECT c.customer_code, c.city
 FROM clean_dump c
 JOIN dim_customer d ON d.customer_code = c.customer_code AND d.is_current = 1
-WHERE c.city <> d.city;
+WHERE c.city IS NOT d.city;   -- null-safe (Module 4.3): also catches NULL<->value city changes
 
 -- 3. expire the old versions, then 4. insert the new ones, both driven by 'changed'
 UPDATE dim_customer SET effective_to = '2026-03-01', is_current = 0
@@ -2982,7 +2982,7 @@ SELECT c.customer_code, c.city
 FROM clean_dump c
 JOIN dim_customer d
   ON d.customer_code = c.customer_code AND d.is_current = 1
-WHERE c.city <> d.city;
+WHERE c.city IS NOT d.city;   -- null-safe (Module 4.3): also catches NULL<->value city changes
 
 -- 2b. Expire the old current rows for changed codes.
 UPDATE dim_customer
@@ -3096,7 +3096,7 @@ DROP TABLE IF EXISTS new_codes;
 -- 6. EXPLAIN QUERY PLAN the fact->dim key join to confirm a seek ...`,
     hints: [
       "Dedup first into a temp table with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC, source_row_id DESC)` keeping `rn = 1`. Everything downstream reads the clean set, never `raw_customer_dump`.",
-      "**Snapshot the changed set into a temp table before mutating** `dim_customer`: compute `codes whose deduped city <> current dim city` once, then expire, then insert from that frozen set. This is what makes run #2 a no-op: on the second run the current city already equals the dump, so `changed` is empty. Brand-new customers = deduped codes with `customer_code NOT IN (SELECT customer_code FROM dim_customer)`.",
+      "**Snapshot the changed set into a temp table before mutating** `dim_customer`: compute `codes whose deduped city IS NOT the current dim city` (null-safe, per Module 4.3) once, then expire, then insert from that frozen set. This is what makes run #2 a no-op: on the second run the current city already equals the dump, so `changed` is empty. Brand-new customers = deduped codes with `customer_code NOT IN (SELECT customer_code FROM dim_customer)`.",
       "Resolve `fact_sales.customer_key` as an idempotent `UPDATE` with the as-of join, and make the DQ step `DELETE FROM dq_results;` then re-`INSERT` the three rows; a blind `INSERT` would double the DQ rows on run #2 and break idempotency.",
       "DQ shapes: `pk_natural_one_current` = `COUNT(*)` of `(SELECT customer_code FROM dim_customer WHERE is_current = 1 GROUP BY customer_code HAVING COUNT(*) > 1)`; `contiguous_windows` uses `LEAD(effective_from) OVER (PARTITION BY customer_code ORDER BY effective_from)` and counts codes where the next version's start doesn't equal this version's `effective_to`.",
     ],

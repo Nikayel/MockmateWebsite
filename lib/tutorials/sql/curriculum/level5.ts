@@ -395,7 +395,7 @@ Cohort retention answers "of the users who started in a given week, what fractio
 
 Work on \`events(user_id, event_date)\`.
 
-1. **Anchor each user's cohort on their first activity.** Use \`MIN(event_date)\` per user, not a \`signup_date\` column, which can be stale or backfilled. Bucket that first date into a cohort, here the ISO week with \`strftime('%Y-%W', first_date)\`.
+1. **Anchor each user's cohort on their first activity.** Use \`MIN(event_date)\` per user, not a \`signup_date\` column, which can be stale or backfilled. Bucket that first date into a cohort, here the week of year (Monday-starting) with \`strftime('%Y-%W', first_date)\`.
 2. **Define "retained" and pin it.** There are three common readings: active exactly on day N, active within N days, or active during the day-N window. They give different numbers, so commit to one out loud. We use **active exactly 7 days after the first event**: \`event_date = date(first_date, '+7 days')\`.
 3. **Keep the full cohort as the denominator.** LEFT JOIN the cohort to the day-7 activity, never INNER. \`COUNT(*)\` over the cohort is the denominator, \`COUNT(matched_user)\` is the numerator, and their ratio is the rate. Cast to a float first with \`1.0 * ...\` or SQLite does integer division and every rate collapses to 0.
 
@@ -429,7 +429,7 @@ LEFT JOIN day7_activity a ON a.user_id = c.user_id;`,
     executionMode: "single-file",
     prompt: `Write a query that returns the **Day-7 retention rate per weekly signup cohort** as \`(cohort_week, cohort_size, retained_day7, retention_rate)\`, over \`events(user_id, event_date)\`, keeping the full cohort in the denominator.
 
-Anchor each user's cohort on the ISO week of their first event (\`strftime('%Y-%W', MIN(event_date))\`). Count a user as retained if they have an event exactly 7 days after their first event. Keep every cohort member in \`cohort_size\` with a LEFT JOIN, and compute \`retention_rate\` as \`retained_day7 / cohort_size\` rounded to 4 places. Alias the columns exactly as named.`,
+Anchor each user's cohort on the week of year, Monday-starting, of their first event (\`strftime('%Y-%W', MIN(event_date))\`). Count a user as retained if they have an event exactly 7 days after their first event. Keep every cohort member in \`cohort_size\` with a LEFT JOIN, and compute \`retention_rate\` as \`retained_day7 / cohort_size\` rounded to 4 places. Alias the columns exactly as named.`,
     starterCode: `-- Day-7 retention per weekly cohort, full-cohort denominator.
 WITH firsts AS (
   SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
@@ -491,7 +491,7 @@ INSERT INTO events (user_id, event_date) VALUES
     executionMode: "single-file",
     prompt: `Write a query that returns a **cohort retention triangle** as \`(cohort_week, weeks_since_signup, retained_users)\` for weeks 0 through 4, over the same \`events(user_id, event_date)\` table.
 
-Bucket each user by the ISO week of their first event, compute how many whole weeks after that first event each of their events falls, and count the **distinct** retained users per \`(cohort_week, weeks_since_signup)\`. Keep only week offsets 0 through 4. Alias the columns exactly as named.`,
+Bucket each user by the week of year (Monday-starting) of their first event, compute how many whole weeks after that first event each of their events falls, and count the **distinct** retained users per \`(cohort_week, weeks_since_signup)\`. Keep only week offsets 0 through 4. Alias the columns exactly as named.`,
     starterCode: `-- Retention triangle: distinct users active N whole weeks after their cohort's signup week.
 WITH firsts AS (
   SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
@@ -731,7 +731,7 @@ Window functions are L4 material, but the *frame* underneath them is where the s
 
 ## Trap 1: LAST_VALUE returns the current row, not the last row
 
-\`LAST_VALUE(amount) OVER (PARTITION BY region ORDER BY sale_date)\` looks like it returns each region's final sale amount. It does not. The default frame, once you supply an \`ORDER BY\`, is \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`, so the window ends at the current row and "last value in the frame" is just the current row's own value. To get the true partition final, widen the frame:
+\`LAST_VALUE(amount) OVER (PARTITION BY region ORDER BY sale_date)\` looks like it returns each region's final sale amount. It does not. The default frame, once you supply an \`ORDER BY\`, is \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`, so the window ends at the current row and "last value in the frame" is the value of the current row's last **peer** on the \`ORDER BY\` key. That equals the current row's own value only when the key is unique; on a tie it is the last tied row's value. Either way it is not the partition's final value. To get that, widen the frame:
 
 \`\`\`sql
 LAST_VALUE(amount) OVER (
@@ -740,7 +740,7 @@ LAST_VALUE(amount) OVER (
 )
 \`\`\`
 
-\`FIRST_VALUE\` does not have this problem, because the default frame already starts at the partition beginning. \`LAST_VALUE\` is the one that bites.
+\`FIRST_VALUE\` does not have this problem, because the default frame already starts at the partition beginning. \`LAST_VALUE\` is the one that bites. In the demo below, the two \`2026-01-02\` rows both report \`last_value_wrong = 50\`: they are peers, so each sees the other as the frame's last row, and neither reads the partition's true final \`300\`.
 
 ## Trap 2: ROWS and RANGE differ on ties
 
@@ -767,7 +767,7 @@ INSERT INTO sales (region, sale_date, amount) VALUES
   ('east', '2026-01-02', 200),
   ('east', '2026-01-02', 50),    -- tied date with the row above
   ('east', '2026-01-03', 300);`,
-    demoCode: `-- last_value_wrong drifts row to row; last_value_right is the true partition final (300).
+    demoCode: `-- last_value_wrong follows the current row's last peer (watch the tied date), not the partition final; last_value_right is the true final (300).
 -- On the tied date, running_sum_range lumps both peers (350) while running_sum_rows does not.
 SELECT sale_date, amount,
   LAST_VALUE(amount) OVER (ORDER BY sale_date) AS last_value_wrong,

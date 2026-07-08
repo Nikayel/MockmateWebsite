@@ -1398,7 +1398,7 @@ const stringFns: SqlLevel["modules"][number]["lessons"][number] = {
 
 Joins and dedup only work when keys match *exactly*. \`'  Ana@Example.com '\` and \`'ana@example.com'\` are different strings: a join on them fails, a dedup keeps both. Before any join, a staging model normalizes the key: trim whitespace, lowercase, strip prefixes. Getting this right is the difference between a clean dimension and a duplicated one.
 
-> In the warehouse this differs: a staging model normalizes keys (trim, lowercase, strip prefixes) *before* any join or dedup, so a clean dimension does not silently fragment into duplicate rows.
+> **In the warehouse this differs.** SQLite's \`TRIM(s, chars)\` strips a set of characters; the ANSI form other engines use is \`TRIM(BOTH chars FROM s)\`. And Postgres, Snowflake, and BigQuery ship \`REGEXP_REPLACE\` for pattern-based cleanup, which SQLite does not, so heavier key normalization there is one function call instead of nested \`REPLACE\`s.
 
 ## The toolkit
 

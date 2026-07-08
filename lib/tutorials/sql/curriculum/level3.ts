@@ -2044,9 +2044,12 @@ exactly the ones queries **filter, join, and sort on**:
 - **\`WHERE\` predicate columns**: the selective filters.
 - **\`ORDER BY\` / \`GROUP BY\` columns**: an index can supply pre-sorted rows.
 
-**Two things are auto-indexed for free.** \`PRIMARY KEY\` and \`UNIQUE\` constraints each create an
-index automatically, so you rarely index a PK yourself. You index the *other* hot columns,
-especially FKs, which are **not** auto-indexed in SQLite.
+**What is auto-indexed for free.** A \`UNIQUE\` constraint and every \`PRIMARY KEY\` *except* a
+single-column \`INTEGER PRIMARY KEY\` create an index automatically, so you rarely index those
+yourself. The exception matters: a single-column \`INTEGER PRIMARY KEY\` **is** the table's \`rowid\`, so
+seeking by it is already fast and SQLite creates **no separate index object** for it (\`pragma_index_list\`
+shows nothing). Either way you index the *other* hot columns, especially FKs, which are **not**
+auto-indexed in SQLite.
 
 ### Worked example
 
@@ -2087,9 +2090,10 @@ zero read benefit. Before adding one, name the query it helps. The second pitfal
 aren't auto-indexed in SQLite. An unindexed FK makes every join scan. Leave a comment on
 non-obvious indexes explaining the query they serve.
 
-**Recap:** indexes turn scans into seeks on filter/join/sort columns; \`PRIMARY KEY\` and \`UNIQUE\` are
-auto-indexed but FKs are not: index those, index selectively because every index taxes writes, and
-remember warehouses use partitioning/clustering instead.
+**Recap:** indexes turn scans into seeks on filter/join/sort columns; \`UNIQUE\` and most \`PRIMARY KEY\`s
+are auto-indexed (a single-column \`INTEGER PRIMARY KEY\` needs none, it *is* the \`rowid\`) but FKs are
+not: index those, index selectively because every index taxes writes, and remember warehouses use
+partitioning/clustering instead.
 
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
 then hidden assertion queries inspect the indexes you created via \`pragma_index_list\` /
@@ -2122,7 +2126,7 @@ that an index exists on the right column of \`fact_sales\`.`,
     hints: [
       "`CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);`. One statement is all you need.",
       "Name it `idx_<table>_<col>` by convention.",
-      "`customer_sk` is a plain FK-style column, not the PK, so it isn't auto-indexed; the PK `sale_id` already is.",
+      "`customer_sk` is a plain FK-style column, not the PK, so it isn't auto-indexed; `sale_id` is the `INTEGER PRIMARY KEY` (the `rowid`), so PK lookups are already fast without a separate index.",
     ],
     referenceSolution: `CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);`,
     seedSql: `DROP TABLE IF EXISTS fact_sales;

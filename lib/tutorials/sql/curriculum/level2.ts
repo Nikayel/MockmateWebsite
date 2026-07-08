@@ -555,11 +555,12 @@ Three habits that make joins readable and correct:
 
 Before you join, know the *relationship* between the tables:
 
-- **1:1**: each order has exactly one customer *record*, but reversed a customer has many orders, so
-  order→customer is *many-to-one*.
-- **1:N**: one order has *many* \`order_items\`. Joining \`orders\` to \`order_items\` multiplies each
-  order row by its number of line items.
-- **M:N**: needs a bridge table (you'll model these in Level 3).
+- **N:1 (many-to-one)**: each order points at exactly one customer, but a customer has many orders, so
+  \`orders\` to \`customers\` is the canonical many-to-one join. (A true **1:1** is rarer: each row on one
+  side matches at most one on the other, like \`users\` to \`user_profiles\`.)
+- **1:N (one-to-many)**: one order has *many* \`order_items\`. Joining \`orders\` to \`order_items\`
+  multiplies each order row by its number of line items.
+- **M:N (many-to-many)**: needs a bridge table (you'll model these in Level 3).
 
 Why this matters: **a 1:N join fans out rows, and a fan-out inflates a \`SUM\`.** If you join \`orders\`
 to \`order_items\` and then \`SUM(orders.total_cents)\`, you sum each order's total *once per line item*.
