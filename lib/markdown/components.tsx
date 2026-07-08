@@ -52,19 +52,33 @@ export const markdownComponents: Components = {
   ul: ({ children }) => <ul className="mb-2 list-inside list-disc space-y-1">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 list-inside list-decimal space-y-1">{children}</ol>,
 
-  // Tables - for matrix/grid visualizations
+  // Tables — rendered from GFM markdown. Styled to match SqlResultGrid so prose
+  // comparison tables and live SQL result grids read as one system: a rounded
+  // bordered container, tinted sticky-feeling header, zebra body rows, and its
+  // own horizontal scroll so a wide table never makes the whole page scroll.
   table: ({ children }) => (
-    <div className="my-3 overflow-x-auto">
-      <table className="min-w-full border-collapse font-mono text-xs">{children}</table>
+    <div className="border-border my-3 overflow-hidden rounded-lg border">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left font-mono text-xs">{children}</table>
+      </div>
     </div>
   ),
-  thead: ({ children }) => <thead className="border-border bg-muted/50 border-b">{children}</thead>,
+  thead: ({ children }) => <thead>{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
-  tr: ({ children }) => <tr className="border-border/60 border-b">{children}</tr>,
+  tr: ({ children }) => <tr className="odd:bg-muted/20">{children}</tr>,
   th: ({ children }) => (
-    <th className="text-foreground px-3 py-2 text-left font-semibold">{children}</th>
+    <th
+      scope="col"
+      className="bg-muted/50 text-foreground border-border border-b px-3 py-2 font-semibold whitespace-nowrap"
+    >
+      {children}
+    </th>
   ),
-  td: ({ children }) => <td className="text-muted-foreground px-3 py-2">{children}</td>,
+  td: ({ children }) => (
+    <td className="text-muted-foreground border-border/60 border-b px-3 py-2 align-top">
+      {children}
+    </td>
+  ),
 
   // Blockquotes - for notes/hints
   blockquote: ({ children }) => (

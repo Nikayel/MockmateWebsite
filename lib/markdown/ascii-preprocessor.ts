@@ -16,6 +16,21 @@ const TREE_PATTERN = /^\s{2,}[\/\\|]|[\/\\]\s*$/
 const BOX_PATTERN = /^\s*[\+\-\|]+\s*$/
 const DIAGRAM_INDENT = /^\s{4,}\S/ // Lines with 4+ spaces of indent
 
+// A GFM table delimiter row: pipes, dashes, and optional alignment colons only,
+// e.g. `|---|---|`, `| --- | :--: |`, `col|---`. Must contain both a dash and a
+// pipe so a plain horizontal rule (`---`) and prose never match.
+const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/
+
+/**
+ * True for a GFM table delimiter row (the `|---|---|` line under a header).
+ * This is exactly the line that trips BOX_PATTERN — it is all `|` and `-`, so
+ * the ASCII fencer used to wrap it in a code block, which shattered the whole
+ * table (header fell back to prose, body collapsed into one soft-wrapped line).
+ */
+function isTableDelimiterRow(line: string): boolean {
+  return line.includes("|") && line.includes("-") && TABLE_DELIMITER.test(line)
+}
+
 /**
  * Check if a line looks like ASCII art
  */
@@ -87,6 +102,32 @@ export function preprocessAsciiArt(text: string): string {
         result.push(lines[j])
       }
       i = j
+      continue
+    }
+
+    // GFM table passthrough. A markdown table is a header row (contains `|`)
+    // immediately followed by a delimiter row (`|---|---|`). remark-gfm turns
+    // these into real tables, so the ASCII fencer must emit the whole block
+    // verbatim and never touch the delimiter. Without this, the delimiter trips
+    // BOX_PATTERN, gets fenced, and the table renders as unreadable raw text.
+    if (
+      line.includes("|") &&
+      line.trim() !== "" &&
+      i + 1 < lines.length &&
+      isTableDelimiterRow(lines[i + 1])
+    ) {
+      if (inAsciiBlock) {
+        flushAsciiBlock()
+      }
+      result.push(line) // header row
+      result.push(lines[i + 1]) // delimiter row
+      let j = i + 2
+      // Body rows run until a blank line or a line with no pipe ends the table.
+      while (j < lines.length && lines[j].trim() !== "" && lines[j].includes("|")) {
+        result.push(lines[j])
+        j++
+      }
+      i = j - 1
       continue
     }
 
