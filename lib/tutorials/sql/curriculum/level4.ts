@@ -638,7 +638,7 @@ const windowFrames: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-window-frames",
   title: "Frames: Running Totals & Moving Averages",
   summary: "Aggregate over a sliding window of rows with a frame clause.",
-  estimatedMinutes: 24,
+  estimatedMinutes: 27,
   difficulty: "hard",
   skills: [
     "ROWS BETWEEN",
@@ -648,7 +648,7 @@ const windowFrames: SqlLevel["modules"][number]["lessons"][number] = {
     "percent-of-total",
   ],
   teach: {
-    estimatedMinutes: 8,
+    estimatedMinutes: 11,
     markdown: `## Why frames earn their keep
 
 "Revenue to date," "7-day moving average," "each row's share of the total": three of the most common analytics asks, and all three are the same tool. A **frame** lets a window aggregate see a *range* of rows around the current one and collapse them into a single value per row, while keeping every original row intact. \`LAG\` peeks at one neighbor. A frame sums or averages a whole sliding stretch, with no self-join and no \`GROUP BY\` that would flatten your row-level detail away.
@@ -684,15 +684,64 @@ Three shapes, one clause:
 
 To make any of these per-customer, add \`PARTITION BY customer_id\` inside \`OVER\`.
 
+## RANGE vs ROWS: the default frame is a trap
+
+Every running total above spelled out \`ROWS BETWEEN ...\`. That was deliberate. When you put an \`ORDER BY\` on an aggregate window but **omit the frame**, SQL does not leave the window open, it fills in \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`, which is *not* the same as \`ROWS\`. \`ROWS\` counts physical rows; \`RANGE\` pulls in every row **tied** with the current one on the \`ORDER BY\` key. On a date that repeats, that difference is a wrong number hiding in plain sight.
+
+Run the demo below. It seeds a \`daily_sales\` table where two rows share \`2024-01-02\` and totals revenue both ways:
+
+- \`default_range\` is \`SUM(revenue) OVER (ORDER BY sale_date)\` with no frame, so it inherits the \`RANGE\` default.
+- \`explicit_rows\` spells out \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\` and adds \`revenue DESC\` as a tiebreaker so accumulation across the tied rows is deterministic.
+
+Watch the two tied rows: under \`RANGE\` they both jump to the same total (every peer is summed at once), while \`ROWS\` climbs one physical row at a time. For a deterministic row-by-row running total, always write \`ROWS BETWEEN\`.
+
+## LAST_VALUE reads the frame, not the partition
+
+A frame does not only feed \`SUM\` and \`AVG\`. The positional functions \`FIRST_VALUE\`, \`LAST_VALUE\`, and \`NTH_VALUE\` read a specific row *inside the frame*, and that is exactly where \`LAST_VALUE\` bites. With the default frame ending at the current row, \`LAST_VALUE\` returns the current row, not the partition's last value, so it looks like it just copies the column:
+
+\`\`\`sql
+SELECT order_date, revenue,
+  LAST_VALUE(revenue) OVER (ORDER BY order_date) AS wrong_last,
+  LAST_VALUE(revenue) OVER (
+    ORDER BY order_date
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+  ) AS right_last
+FROM daily_revenue;   -- rows 100 / 200 / 300 by date
+\`\`\`
+
+| order_date | revenue | wrong_last | right_last |
+|---|---|---|---|
+| 2024-01-01 | 100 | 100 | 300 |
+| 2024-01-02 | 200 | 200 | 300 |
+| 2024-01-03 | 300 | 300 | 300 |
+
+\`wrong_last\` tracks the current row; \`right_last\` is the true final only once the frame is widened to \`UNBOUNDED FOLLOWING\`. \`FIRST_VALUE\` is safe because the default frame already starts at the partition top, and \`NTH_VALUE(col, 2)\` needs the same widened frame to see past the current row.
+
 ## Pitfalls
 
 - **Integer division zeroes your percentages.** \`revenue / SUM(...)\` on integer columns floors to \`0\`. Multiply by \`100.0\` (a float) first, as above. \`AVG\` already returns a float, so moving averages are safe.
 - **\`OVER ()\` is not \`OVER (PARTITION BY customer_id)\`.** The empty version totals everyone. The practice wants each customer's own total, so partition it.
 - **You cannot filter a window result in \`WHERE\`.** Windows are computed after \`WHERE\` runs. Snowflake and BigQuery offer a \`QUALIFY\` clause for this shorthand. Postgres and SQLite have none, so wrap the window in a CTE and filter outside it.
 
-**Interview nuance:** if you write \`ORDER BY\` on an aggregate window but omit the frame, SQL fills in \`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\`, not \`ROWS\`. With duplicate \`ORDER BY\` values, \`RANGE\` pulls in *all* peer rows sharing that value, so two rows on the same date land on the identical "running" total. For deterministic row-by-row accumulation, always spell out \`ROWS BETWEEN\`.
-
 **Execution mode:** these exercises have you write a multi-statement script. Lead with \`DELETE FROM <target>;\` so a re-run stays idempotent, then a single \`INSERT ... SELECT\` carries the window expressions, and hidden assertions check both the frame math and the row count.`,
+    demoSeedSql: `CREATE TABLE daily_sales (sale_date TEXT, revenue INTEGER);
+INSERT INTO daily_sales VALUES
+  ('2024-01-01', 100),
+  ('2024-01-02', 200),
+  ('2024-01-02', 50),
+  ('2024-01-03', 30);`,
+    demoCode: `-- The SAME running total two ways. Watch the two 2024-01-02 rows.
+-- default_range has no frame, so it inherits the RANGE default and lumps the tied peers.
+-- explicit_rows spells out ROWS (with a revenue DESC tiebreaker) and accumulates one row at a time.
+SELECT sale_date, revenue,
+  SUM(revenue) OVER (ORDER BY sale_date) AS default_range,
+  SUM(revenue) OVER (
+    ORDER BY sale_date, revenue DESC
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ) AS explicit_rows
+FROM daily_sales
+ORDER BY sale_date, revenue DESC;`,
+    showDemoInput: true,
   },
   apply: scriptExercise({
     id: "sql-l4-window-frames-apply",
