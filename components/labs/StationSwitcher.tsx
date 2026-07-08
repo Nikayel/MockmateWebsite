@@ -32,12 +32,12 @@ export function StationSwitcher({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-        {/* Per-round interviewer prompt + how-to, kept above every station so the
-            question the candidate works against never leaves the page. */}
-        <StationBriefing kind={current} className="shrink-0" />
-        <div className="min-h-0">{renderStation(current)}</div>
-      </div>
+      {/* Per-round interviewer prompt + how-to. Kept ABOVE the station's own
+          fill/scroll region so the question the candidate works against stays
+          visible while a form scrolls, and so the Build station's editor still
+          gets its full height (it fills the flex-1 region below). */}
+      <StationBriefing kind={current} className="mb-4 shrink-0" />
+      <div className="min-h-0 flex-1 overflow-y-auto">{renderStation(current)}</div>
       <MilestoneNav className="shrink-0" />
     </div>
   )
