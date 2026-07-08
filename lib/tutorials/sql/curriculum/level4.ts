@@ -6,11 +6,11 @@ const windowRanking: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-window-ranking",
   title: "Ranking: ROW_NUMBER, RANK, DENSE_RANK",
   summary: "Rank rows within a partition without collapsing them.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 26,
   difficulty: "medium",
   skills: ["OVER", "PARTITION BY", "ORDER BY", "ROW_NUMBER", "RANK", "DENSE_RANK", "tie handling"],
   teach: {
-    estimatedMinutes: 9,
+    estimatedMinutes: 13,
     markdown: `## Window functions keep every row
 
 You just loaded a \`fact_sales\` table and product wants a "top 3 products per category" mart. Your
@@ -53,6 +53,43 @@ Read the tie row carefully. This **is** the exam question:
 - **DENSE_RANK** -> \`1, 1, 2, 3\`. Ties share a rank, then it **does not skip**. Use it for "distinct
   tiers" ("what is the 2nd-highest distinct revenue?").
 
+### PARTITION BY: slice, do not collapse
+
+\`PARTITION BY\` is what makes a window "per group," and it is the clause learners most often underuse. Put it next to \`GROUP BY\` on the *same* six-row \`product_revenue\` table and the difference is the whole reason window functions exist:
+
+| approach | rows returned | the Headphones row |
+|---|---|---|
+| \`GROUP BY category\` (one \`SUM\`) | 2 (audio 1400, video 1300) | folded into the audio total |
+| \`OVER (PARTITION BY category ...)\` | 6 (every product) | kept, tagged with its rank |
+
+\`GROUP BY\` folds each group down to one summary row. \`PARTITION BY\` slices the rows into groups, ranks *inside* each slice, and hands every original row back:
+
+\`\`\`
+PARTITION BY category slices the rows, then ranks inside each slice:
+
+  audio
+    Earbuds      500   ->  rn 1     the counter starts at 1
+    Headphones   500   ->  rn 2
+    Speaker      300   ->  rn 3
+    Cable        100   ->  rn 4
+  video
+    Monitor      900   ->  rn 1     the counter RESTARTS at 1
+    Webcam       400   ->  rn 2
+\`\`\`
+
+\`PARTITION BY\` is **optional**. Omit it and the whole result set is one window, so the same data ranks 1 through 6 straight through instead of restarting per category. Here it is both ways at once, which shows the partition is the only thing that re-scopes the counter:
+
+| product | revenue | global rn | per-category rn |
+|---|---|---|---|
+| Monitor | 900 | 1 | 1 (video) |
+| Earbuds | 500 | 2 | 1 (audio) |
+| Headphones | 500 | 3 | 2 (audio) |
+| Webcam | 400 | 4 | 2 (video) |
+| Speaker | 300 | 5 | 3 (audio) |
+| Cable | 100 | 6 | 4 (audio) |
+
+Webcam is number 4 globally but number 2 inside \`video\`. Only the \`PARTITION BY\` changed.
+
 ### Anatomy of the OVER clause
 
 \`\`\`
@@ -64,6 +101,26 @@ ROW_NUMBER() OVER ( PARTITION BY category   ORDER BY revenue DESC )
   it and the whole result set is one window.
 - **ORDER BY** inside \`OVER\` decides what "first" means, and it is **separate** from the query's outer
   \`ORDER BY\`, which only controls display order.
+
+The two \`ORDER BY\`s really are independent. Here the window is ordered by revenue but the rows print by product name, so the numbering looks scrambled until you read what it means:
+
+\`\`\`sql
+SELECT product, revenue,
+  ROW_NUMBER() OVER (ORDER BY revenue DESC, product) AS rn  -- window order: revenue
+FROM product_revenue
+ORDER BY product;                                            -- display order: name
+\`\`\`
+
+| product | revenue | rn |
+|---|---|---|
+| Cable | 100 | 6 |
+| Earbuds | 500 | 2 |
+| Headphones | 500 | 3 |
+| Monitor | 900 | 1 |
+| Speaker | 300 | 5 |
+| Webcam | 400 | 4 |
+
+\`rn\` is assigned by revenue; the rows just happen to print alphabetically. Change the outer \`ORDER BY\` and \`rn\` does not move, only the row order on screen does.
 
 ### Pick one row per key (the pattern you'll reuse all level)
 
@@ -96,6 +153,31 @@ in this level.
 > **In the warehouse:** Snowflake and BigQuery let you skip the subquery with
 > \`QUALIFY ROW_NUMBER() OVER (...) = 1\`. SQLite and Postgres have no \`QUALIFY\`, so you must wrap in a
 > subquery/CTE. The \`ROW_NUMBER\` / \`RANK\` / \`DENSE_RANK\` semantics are identical everywhere.
+
+### One boundary, three effects
+
+\`PARTITION BY\` does not just reset a rank counter. It resets the entire window universe, and the same boundary returns in every window feature this level:
+
+| feature | at each new partition |
+|---|---|
+| \`ROW_NUMBER\` / \`RANK\` / \`DENSE_RANK\` | the counter restarts at 1 |
+| \`LAG\` / \`LEAD\` | returns \`NULL\` (no neighbor exists across the boundary) |
+| \`SUM(...) OVER (... ROWS UNBOUNDED PRECEDING ...)\` | the running total restarts from 0 |
+
+\`GROUP BY\` and \`PARTITION BY\` are not rivals either; they compose. The apply exercise below aggregates first (a \`GROUP BY\` per product) and then ranks over that result (a \`PARTITION BY\`), a two-step you will reuse constantly.
+
+### Two shortcuts worth knowing
+
+- **\`NTILE(n)\` splits a partition into \`n\` as-equal-as-possible buckets**, ordered by the window's \`ORDER BY\`. \`NTILE(4) OVER (PARTITION BY category ORDER BY revenue DESC, product)\` cuts each category into revenue quartiles, bucket 1 being the top quarter. When the rows do not divide evenly the earlier buckets take the extra row. This is the tool for "top 25% of customers by spend."
+- **A named \`WINDOW\` clause removes repetition** when several functions share one spec. Define it once, reference it by name:
+
+\`\`\`sql
+SELECT category, product, revenue,
+  ROW_NUMBER() OVER w AS rn,
+  NTILE(4)     OVER w AS quartile
+FROM product_revenue
+WINDOW w AS (PARTITION BY category ORDER BY revenue DESC, product);
+\`\`\`
 
 **Recap:** \`ROW_NUMBER\` = unique \`1,2,3\` (pick one); \`RANK\` = \`1,1,3\` (ties skip);
 \`DENSE_RANK\` = \`1,1,2\` (ties don't skip). All keep every row, all reset per \`PARTITION BY\`.
