@@ -18,11 +18,11 @@ export const palantir911Dispatch: CaseLab = {
   estimatedMinutes: 60,
   brief: {
     situation:
-      "You've been dropped into a city's 911 dispatch center. When an emergency call comes in, a human dispatcher stares at a live map of responder units — ambulances, fire, police — and manually picks who to send. Under load they pick slowly and inconsistently, and the GPS positions they're trusting can be seconds to minutes stale. Leadership wants software that recommends the best responder for each incident — but \"best\" is exactly what nobody has pinned down.",
-    task: 'Across five milestones you\'ll scope what "best responder" actually means, decompose the dispatch workflow to find the real bottleneck, commit to a ranking contract that holds up under stale location data and concurrent assignment, then implement the recommender inside the existing dispatch codebase until the tests pass — and finally defend your choices and grade yourself.',
+      "You've been dropped into a city's 911 dispatch center. When an emergency call comes in, a human dispatcher stares at a live map of responder units (ambulances, fire, police) and manually picks who to send. Under load they pick slowly and inconsistently, and the GPS positions they're trusting can be seconds to minutes stale. Leadership wants software that recommends the best responder for each incident, but \"best\" is exactly what nobody has pinned down.",
+    task: "Across five milestones you'll scope what \"best responder\" actually means, decompose the dispatch workflow to find the real bottleneck, commit to a ranking contract that holds up under stale location data and concurrent assignment, then implement the recommender inside the existing dispatch codebase until the tests pass. Finally you'll defend your choices and grade yourself.",
   },
   whyThisCompany:
-    "Palantir FDSE interviews open with a vague, real-world operational problem and watch how you scope it. This lab mirrors that: a messy 911 dispatch system where the constraints — stale GPS, concurrent assignment, and a fail-safe fallback — matter far more than the ranking algorithm itself.",
+    "Palantir FDSE interviews open with a vague, real-world operational problem and watch how you scope it. This lab mirrors that: a messy 911 dispatch system where the constraints (stale GPS, concurrent assignment, and a fail-safe fallback) matter far more than the ranking algorithm itself.",
   skills: [
     "decomposition",
     "ranking under constraints",
@@ -34,7 +34,7 @@ export const palantir911Dispatch: CaseLab = {
   buildCurveball: {
     title: "Curveball: the GPS feed just went stale",
     prompt:
-      "Dispatch reports the responder GPS feed is now delayed by ~30 seconds during peak load. Your recommender still trusts live coordinates. How does your ranking hold up when the closest unit on paper may already be blocks away — and what would you change to stay safe?",
+      "Dispatch reports the responder GPS feed is now delayed by ~30 seconds during peak load. Your recommender still trusts live coordinates. How does your ranking hold up when the closest unit on paper may already be blocks away, and what would you change to stay safe?",
   },
   milestones: [
     {
