@@ -26,7 +26,7 @@ const MODES: { id: CaseLabMode; label: string; description: string }[] = [
   {
     id: "onsite",
     label: "Onsite",
-    description: "Interview conditions — expect a curveball during Build.",
+    description: "Interview conditions: a running clock and a curveball during Build.",
   },
 ]
 

@@ -19,6 +19,7 @@ import { useCaseLabRunSync } from "@/components/labs/useCaseLabRunSync"
 import { CaseLabShell } from "@/components/labs/CaseLabShell"
 import { CaseLabChat } from "@/components/labs/CaseLabChat"
 import { CaseLabIntro } from "@/components/labs/CaseLabIntro"
+import { OnsiteTimer } from "@/components/labs/OnsiteTimer"
 import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Header } from "@/components/header"
@@ -103,6 +104,9 @@ export default function CaseLabPlayPage() {
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            {activeRun?.mode === "onsite" && (
+              <OnsiteTimer startedAt={activeRun.startedAt} budgetMinutes={lab.estimatedMinutes} />
+            )}
             {confirmRestart ? (
               <span className="flex items-center gap-1.5 text-[12px]">
                 <span className="text-[var(--wb-muted)]">Start over?</span>
