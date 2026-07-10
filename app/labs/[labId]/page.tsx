@@ -8,7 +8,7 @@
  * lab fully playable through all five milestones.
  */
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
@@ -32,10 +32,15 @@ export default function CaseLabPlayPage() {
   const { user, initialized } = useAuth()
   const setActiveLab = useCaseLabStore((s) => s.setActiveLab)
   const startRun = useCaseLabStore((s) => s.startRun)
+  const reset = useCaseLabStore((s) => s.reset)
   const activeRun = useCaseLabStore((s) => s.activeRun)
   const isLoading = useCaseLabStore((s) => s.isLoading)
   const loadError = useCaseLabStore((s) => s.error)
   const setError = useCaseLabStore((s) => s.setError)
+
+  // PF-15: "Start over" returns to the intro (re-pick mode, fresh run) so a
+  // relaxed Practice pass can be cleanly re-run under Onsite before the interview.
+  const [confirmRestart, setConfirmRestart] = useState(false)
 
   useEffect(() => {
     if (lab) setActiveLab(lab)
@@ -98,6 +103,36 @@ export default function CaseLabPlayPage() {
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            {confirmRestart ? (
+              <span className="flex items-center gap-1.5 text-[12px]">
+                <span className="text-[var(--wb-muted)]">Start over?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    reset()
+                    setConfirmRestart(false)
+                  }}
+                  className="font-medium text-[var(--wb-accent-strong)] hover:underline"
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmRestart(false)}
+                  className="text-[var(--wb-muted)] hover:text-[var(--wb-text)]"
+                >
+                  No
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmRestart(true)}
+                className="text-[12px] text-[var(--wb-muted)] hover:text-[var(--wb-text)]"
+              >
+                Start over
+              </button>
+            )}
             <span className="text-[12px] text-[var(--wb-muted)]">
               Milestone {milestoneNumber} of {MILESTONE_ORDER.length}
             </span>
