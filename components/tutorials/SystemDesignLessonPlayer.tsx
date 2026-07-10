@@ -214,7 +214,8 @@ export function SystemDesignLessonPlayer({
     })
   }
 
-  const progress = computeLessonProgress(sections)
+  // Two-phase Read → Design loop: count only teach + apply so the header bar reads 50% → 100%.
+  const progress = computeLessonProgress(sections, ["teach", "apply"])
   const showDesign = active === "apply" || active === "practice"
   const lessonComplete = sections.practice === "completed"
 

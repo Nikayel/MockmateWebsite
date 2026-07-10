@@ -19,14 +19,21 @@ export function freshSections(): Record<LessonSection, SectionStatus> {
   return { teach: "not_started", apply: "not_started", practice: "not_started" }
 }
 
-/** % of sections completed, for the level/lesson progress overlay. */
-export function computeLessonProgress(sections: Record<LessonSection, SectionStatus>): {
+/**
+ * % of sections completed, for the level/lesson progress overlay. `order` defaults to the code-course
+ * Read → Apply → Practice loop; System Design passes its two phases (`["teach", "apply"]`) so the bar
+ * moves 50% → 100% rather than jumping 33% → 100% (its apply + practice complete together).
+ */
+export function computeLessonProgress(
+  sections: Record<LessonSection, SectionStatus>,
+  order: LessonSection[] = LESSON_SECTION_ORDER
+): {
   completed: number
   total: number
   percentage: number
 } {
-  const total = LESSON_SECTION_ORDER.length
-  const completed = LESSON_SECTION_ORDER.filter((s) => sections[s] === "completed").length
+  const total = order.length
+  const completed = order.filter((s) => sections[s] === "completed").length
   return { completed, total, percentage: Math.round((completed / total) * 100) }
 }
 
