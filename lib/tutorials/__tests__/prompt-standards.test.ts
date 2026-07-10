@@ -1,7 +1,9 @@
 /**
  * Prompt standard enforcement — the centralized guardrail behind docs/curriculum/PROMPT-STANDARD.md.
- * It walks EVERY Apply / Practice / Drill prompt across both the Python and SQL curricula and asserts
- * the mechanical rules of the standard, so a new question that regresses them fails `pnpm test`.
+ * It walks EVERY Apply / Practice / Drill prompt across the Python, SQL, and System Design curricula
+ * and asserts the mechanical rules of the standard, so a new question that regresses them fails
+ * `pnpm test`. (System Design never renders its Practice exercise, but the prompt still ships in the
+ * bundle and must meet the standard.)
  *
  * Only the mechanical rules live here (no em dash, no bidirectional arrow, no vague framing opener,
  * non-empty prompt, SQL drills tagged by difficulty). The judgment rule — "lead with the deliverable"
@@ -11,8 +13,9 @@
 import { describe, it, expect } from "vitest"
 import { listAllLessons } from "../registry"
 import { listAllSqlLessons } from "../sql/registry"
+import { listAllSystemDesignLessons } from "../system-design/registry"
 
-type Course = "python" | "sql"
+type Course = "python" | "sql" | "system-design"
 type Phase = "apply" | "practice" | "drill"
 interface PromptRef {
   course: Course
@@ -42,6 +45,10 @@ function collectPrompts(): PromptRef[] {
     add("sql", lesson.id, "practice", lesson.practice)
     for (const drill of lesson.extraPractice ?? []) add("sql", lesson.id, "drill", drill)
   }
+  for (const lesson of listAllSystemDesignLessons()) {
+    add("system-design", lesson.id, "apply", lesson.apply)
+    add("system-design", lesson.id, "practice", lesson.practice)
+  }
   return refs
 }
 
@@ -62,6 +69,7 @@ describe("exercise prompt standard (docs/curriculum/PROMPT-STANDARD.md)", () => 
     expect(PROMPTS.length).toBeGreaterThan(100)
     expect(PROMPTS.some((r) => r.course === "python")).toBe(true)
     expect(PROMPTS.some((r) => r.course === "sql")).toBe(true)
+    expect(PROMPTS.some((r) => r.course === "system-design")).toBe(true)
   })
 
   it("no prompt is empty or trivially short", () => {
