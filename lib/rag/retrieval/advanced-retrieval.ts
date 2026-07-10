@@ -141,12 +141,21 @@ export class AdvancedRetriever {
     // Step 2: Retrieve candidates for each query
     const allCandidates: Map<string, RetrievalCandidate> = new Map()
 
+    let semanticDegraded = false
     if (strategy === "semantic" || strategy === "hybrid") {
-      const semanticCount = await this.retrieveSemanticCandidates(queries, options, allCandidates)
-      analytics.semanticCandidateCount = semanticCount
+      const semantic = await this.retrieveSemanticCandidates(queries, options, allCandidates)
+      analytics.semanticCandidateCount = semantic.count
+      semanticDegraded = semantic.degraded
     }
 
-    if (strategy === "bm25" || strategy === "hybrid") {
+    // Run lexical BM25 for hybrid/bm25 strategies, and also as a safety net when
+    // a pure-semantic request degraded (embedding provider or vector index
+    // unavailable) so callers still get results instead of an empty set.
+    if (
+      strategy === "bm25" ||
+      strategy === "hybrid" ||
+      (strategy === "semantic" && semanticDegraded)
+    ) {
       const bm25Count = await this.retrieveBM25Candidates(queries, options, allCandidates)
       analytics.bm25CandidateCount = bm25Count
     }
@@ -305,33 +314,59 @@ export class AdvancedRetriever {
     queries: string[],
     options: AdvancedRetrievalOptions,
     allCandidates: Map<string, RetrievalCandidate>
-  ): Promise<number> {
+  ): Promise<{ count: number; degraded: boolean }> {
     let count = 0
 
     for (const query of queries) {
-      const embedding = await this.embeddingProvider.generateEmbedding(query)
+      let embedding: number[]
+      try {
+        embedding = await this.embeddingProvider.generateEmbedding(query)
+      } catch (error) {
+        // Semantic search is best-effort. When the embedding provider is
+        // unavailable, or its output cannot be queried against the configured
+        // vector index (e.g. Gemini is down and the 256D TF-IDF fallback does
+        // not match a 768D Pinecone index), degrade to lexical (BM25) search
+        // instead of failing the whole retrieval. Every query shares the same
+        // provider, so one embedding failure means the rest fail identically.
+        console.warn(
+          "[AdvancedRetrieval] Semantic retrieval unavailable, falling back to lexical search:",
+          error instanceof Error ? error.message : error
+        )
+        return { count, degraded: true }
+      }
+
       const typesToQuery = options.types?.length ? options.types : [undefined]
 
       for (const type of typesToQuery) {
-        const results = await vectorDB.query(embedding, {
-          topK: this.getSemanticTopK(options),
-          filter: {
-            type,
-            userId: options.userId,
-            minSimilarity: options.minSimilarity || RETRIEVAL_CONFIG.defaults.minSimilarity,
-            excludeIds: options.excludeIds,
-          },
-          includeMetadata: true,
-        })
+        try {
+          const results = await vectorDB.query(embedding, {
+            topK: this.getSemanticTopK(options),
+            filter: {
+              type,
+              userId: options.userId,
+              minSimilarity: options.minSimilarity || RETRIEVAL_CONFIG.defaults.minSimilarity,
+              excludeIds: options.excludeIds,
+            },
+            includeMetadata: true,
+          })
 
-        count += results.length
-        for (const result of results) {
-          this.mergeCandidate(allCandidates, result, query, "semantic")
+          count += results.length
+          for (const result of results) {
+            this.mergeCandidate(allCandidates, result, query, "semantic")
+          }
+        } catch (error) {
+          // A vector-store query failure (e.g. index dimension mismatch or a
+          // transient Pinecone error) should not abort the whole request.
+          console.warn(
+            "[AdvancedRetrieval] Vector query failed, skipping semantic candidates for this query:",
+            error instanceof Error ? error.message : error
+          )
+          return { count, degraded: true }
         }
       }
     }
 
-    return count
+    return { count, degraded: false }
   }
 
   private async retrieveBM25Candidates(
