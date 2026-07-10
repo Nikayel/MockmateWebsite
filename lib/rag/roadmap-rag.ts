@@ -117,7 +117,7 @@ export class RAGRoadmapGenerator {
    * Generate RAG-enhanced personalized roadmap
    */
   async generateEnhancedRoadmap(options: RAGRoadmapOptions): Promise<RAGEnhancedRoadmap | null> {
-    const { userId, assessment, scenarios, enableRAG = true, enableAIInsights = true } = options
+    const { userId, assessment, scenarios, enableRAG = true } = options
 
     // Step 1: Generate base roadmap using existing algorithm
     const baseRoadmap = generatePersonalizedRoadmap(scenarios, assessment, userId)
@@ -127,21 +127,53 @@ export class RAGRoadmapGenerator {
 
     // If RAG is disabled, return base roadmap with empty enhancements
     if (!enableRAG) {
-      return {
-        ...baseRoadmap,
-        ragEnhancements: {
-          enabled: false,
-          patternInsights: [],
-          companyTips: [],
-          personalizedAdvice: [],
-          adaptiveAdjustments: [],
-          studyStrategies: [],
-          mustKnowQuestions: [],
-          companyQuestionProfile: undefined,
-        },
-      }
+      return this.toBaseEnhancedRoadmap(baseRoadmap)
     }
 
+    // RAG enrichment is best-effort: it depends on external services (embedding
+    // provider, vector index, Firestore). If any step fails, still return a
+    // usable roadmap built from the deterministic base algorithm rather than
+    // failing the whole request.
+    try {
+      return await this.buildRAGEnhancements(baseRoadmap, userId, assessment)
+    } catch (error) {
+      console.error(
+        "[RAGRoadmap] Enhancement failed, returning base roadmap without RAG:",
+        error instanceof Error ? error.message : error
+      )
+      return this.toBaseEnhancedRoadmap(baseRoadmap)
+    }
+  }
+
+  /**
+   * Wrap a base roadmap with empty (disabled) RAG enhancements. Used when RAG is
+   * turned off or when enrichment fails and we degrade to the base roadmap.
+   */
+  private toBaseEnhancedRoadmap(baseRoadmap: PersonalizedRoadmap): RAGEnhancedRoadmap {
+    return {
+      ...baseRoadmap,
+      ragEnhancements: {
+        enabled: false,
+        patternInsights: [],
+        companyTips: [],
+        personalizedAdvice: [],
+        adaptiveAdjustments: [],
+        studyStrategies: [],
+        mustKnowQuestions: [],
+        companyQuestionProfile: undefined,
+      },
+    }
+  }
+
+  /**
+   * Run the RAG enrichment pipeline on top of a base roadmap. May throw if an
+   * external dependency is unavailable; callers should treat it as best-effort.
+   */
+  private async buildRAGEnhancements(
+    baseRoadmap: PersonalizedRoadmap,
+    userId: string,
+    assessment: UserRoadmapAssessment
+  ): Promise<RAGEnhancedRoadmap> {
     // Step 2: Build RAG context for personalization
     const ragContext = await buildRoadmapContext({
       targetCompany: assessment.targetCompany,
