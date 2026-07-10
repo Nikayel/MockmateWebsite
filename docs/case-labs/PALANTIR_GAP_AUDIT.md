@@ -8,6 +8,34 @@
 > This is the source-of-truth punch list for the "they ask a lot more" coverage work.
 > Fixes are tracked as `PF-NN`; check them off as they ship.
 
+## Shipped (2026-07-09)
+
+All 5 platform P0s, the Phase-1 content-accuracy + honesty fixes, both UX-flow fixes, and the
+first big coverage add (a second Palantir lab) shipped and were re-audited (9-agent adversarial
+pass: 0 confirmed residual issues). typecheck + 55 labs/scenario tests green.
+
+- **Safety P0s:** PF-01 (meter chat+feedback LLM routes), PF-02 (ground chat AI in real answers),
+  PF-03 (nudge before empty completion), PF-04 (stop mastery polluting arrays-hashing), PF-18
+  (Zod/Firestore trust-boundary validation).
+- **Content accuracy:** PF-07 (whyThisCompany), PF-08 (Decompose reframe + access-control),
+  PF-17a (concurrency curveball), PF-17b (wire authored ghostExamples; fix Stripe-shows-911 bug).
+- **UX/flow:** PF-09 (milestone -> named round labels), PF-10 (scope/coverage panel + cross-links),
+  PF-15 (Start-over control), PF-16 (Onsite countdown timer).
+- **Coverage:** PF-11 (Palantir Re-engineering / bug-hunt lab #2, `palantir-usage-rollup` +
+  verified `bugfix-foundry-usage-rollup` scenario).
+
+### Deferred (larger builds, next)
+- **PF-05** Palantir OA timed 3-part mode (Python + SQL + REST/pagination) — the #1 remaining
+  coverage hole, but an L build (needs the first SQL workspace scenario + a timed/hidden-test mode
+  that does not fit the 5-milestone arc).
+- **PF-06** Learning round (no-REPL SQL variant).
+- **PF-12** Behavioral / mission HM round — largely already served by `/interview-prep/palantir`
+  (`palantirData`), which the new scope panel links to; the code-centric Case Labs engine (Build
+  requires a codebase scenario) is a poor host for a pure behavioral round.
+- **PF-13** recruiter drill + Gotham/Foundry/AIP primer + `palantir.ts` RAG file.
+- **PF-14** type `CaseLab.role` with the RoleTag union + a Foundry SWE-track lab.
+- **PF-19** station/hook/store render tests. **PF-20** Palantir prep hub (after the catalog grows).
+
 ## Verdict
 
 Case Labs is a strong onsite dress rehearsal for Palantir's single most important round
