@@ -18,25 +18,8 @@ import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
-import type { CaseLabRun } from "@/lib/labs/types"
+import { buildCaseLabAnswerContext } from "@/lib/labs/chat-answer-context"
 import type { CaseLabChatMessage } from "@/lib/labs/case-lab-chat"
-
-/** A compact summary of the run's answers, to ground the interviewer. */
-function buildContext(run: CaseLabRun): string {
-  const a = run.answers
-  const lines: string[] = []
-  if (a.clarify?.length) lines.push(`Clarify: ${a.clarify.length} question(s)`)
-  if (a.decompose)
-    lines.push(
-      `Decompose: ${a.decompose.workflow.length} step(s), ${a.decompose.entities.length} entit(ies)`
-    )
-  if (a.design?.api.name) lines.push(`Design API: ${a.design.api.name}`)
-  if (a.build) {
-    const passed = a.build.testResults.filter((t) => t.passed).length
-    lines.push(`Build: ${passed}/${a.build.testResults.length} tests passing`)
-  }
-  return lines.join("\n")
-}
 
 export function CaseLabChat({ className }: { className?: string }) {
   const lab = useCaseLabStore((s) => s.activeLab)
@@ -89,7 +72,10 @@ export function CaseLabChat({ className }: { className?: string }) {
           roundGuidance: guidance
             ? { whatItTests: guidance.whatItTests, commonTrap: guidance.commonTrap }
             : undefined,
-          context: run ? buildContext(run) : undefined,
+          context:
+            run && milestone
+              ? buildCaseLabAnswerContext(run.answers, milestone) || undefined
+              : undefined,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
