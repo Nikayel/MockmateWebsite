@@ -493,7 +493,7 @@ Query patterns you must support: time-range scans, tag filters (served by an inv
 export const systemDesignLevel11: DesignLevel = {
   id: 11,
   slug: "specialized-systems",
-  title: "Level 11 — Modern & Specialized Systems",
+  title: "Level 11: Modern & Specialized Systems",
   tagline:
     "The frontier: ML systems, LLM and GenAI infrastructure, real-time analytics and globally consistent data, and IoT, edge, and time-series.",
   estimatedHours: 8,

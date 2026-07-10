@@ -801,7 +801,7 @@ and harder cross-cell operations.
 export const systemDesignLevel4: DesignLevel = {
   id: 4,
   slug: "scaling-compute",
-  title: "Level 4 — Scaling Compute & Traffic",
+  title: "Level 4: Scaling Compute & Traffic",
   tagline:
     "Stateless scale-out, load balancing, gateways, rate limiting, autoscaling, and overload protection.",
   estimatedHours: 7,

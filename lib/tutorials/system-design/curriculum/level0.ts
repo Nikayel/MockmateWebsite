@@ -905,7 +905,7 @@ proposing and checking rather than steamrolling.
 export const systemDesignLevel0: DesignLevel = {
   id: 0,
   slug: "interview-method",
-  title: "Level 0 — Interview & Communication Method",
+  title: "Level 0: Interview & Communication Method",
   tagline:
     "Run a system-design round like a senior: scope, estimate, structure the walkthrough, and drive tradeoffs.",
   estimatedHours: 6,

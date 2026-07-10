@@ -1061,7 +1061,7 @@ trusted operator.
 export const systemDesignLevel5: DesignLevel = {
   id: 5,
   slug: "distributed-core",
-  title: "Level 5 — Distributed Systems Core",
+  title: "Level 5: Distributed Systems Core",
   tagline:
     "CAP/PACELC, consistency, clocks, consensus, distributed transactions, and failure handling.",
   estimatedHours: 9,

@@ -535,7 +535,7 @@ The instant you suspect a breach, evidence preservation starts: snapshot affecte
 export const systemDesignLevel8: DesignLevel = {
   id: 8,
   slug: "security-privacy",
-  title: "Level 8 — Security, Privacy & Multi-tenancy",
+  title: "Level 8: Security, Privacy & Multi-tenancy",
   tagline:
     "Authentication and identity, authorization and tenancy, encryption and secrets, abuse and perimeter defense, and privacy, compliance, and audit.",
   estimatedHours: 8,

@@ -926,7 +926,7 @@ Market-data fan-out must not slow matching: publish trades and book deltas onto 
 export const systemDesignLevel10: DesignLevel = {
   id: 10,
   slug: "case-studies",
-  title: "Level 10 — Applied Case Studies",
+  title: "Level 10: Applied Case Studies",
   tagline:
     "The full-length 'design X' interviews: foundational building blocks, social and feed, geo and media, storage and infra systems, and commerce, money, and analytics.",
   estimatedHours: 16,

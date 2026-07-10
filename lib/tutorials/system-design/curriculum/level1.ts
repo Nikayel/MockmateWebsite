@@ -1224,7 +1224,7 @@ and avoid the per-thread memory wall.
 export const systemDesignLevel1: DesignLevel = {
   id: 1,
   slug: "foundations",
-  title: "Level 1 — Foundations & Mental Models",
+  title: "Level 1: Foundations & Mental Models",
   tagline: "The networking, API-contract, and performance fundamentals every later design assumes.",
   estimatedHours: 9,
   modules: [

@@ -1045,7 +1045,7 @@ stores, not a collection.
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
-  title: "Level 2 — Data Storage & Modeling",
+  title: "Level 2: Data Storage & Modeling",
   tagline: "Relational vs NoSQL, storage engines, indexing, and modeling for access patterns.",
   estimatedHours: 8,
   modules: [

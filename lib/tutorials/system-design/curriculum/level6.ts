@@ -674,7 +674,7 @@ Two formulas earn the offer. Partitions come from throughput: \`partitions ~= ta
 export const systemDesignLevel6: DesignLevel = {
   id: 6,
   slug: "event-driven",
-  title: "Level 6 — Asynchronous & Event-Driven Systems",
+  title: "Level 6: Asynchronous & Event-Driven Systems",
   tagline:
     "Messaging models, Kafka and the log, delivery guarantees, stream processing, and schema governance.",
   estimatedHours: 7,

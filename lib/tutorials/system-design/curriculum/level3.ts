@@ -967,7 +967,7 @@ supporting snapshot backfills.
 export const systemDesignLevel3: DesignLevel = {
   id: 3,
   slug: "scaling-data",
-  title: "Level 3 — Scaling the Data Tier",
+  title: "Level 3: Scaling the Data Tier",
   tagline: "Replication, sharding, caching, CDN/search, and keeping derived data in sync at scale.",
   estimatedHours: 8,
   modules: [

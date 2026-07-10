@@ -540,7 +540,7 @@ The modern move that makes Kappa practical for reporting too: **Flink writes the
 export const systemDesignLevel9: DesignLevel = {
   id: 9,
   slug: "modern-architecture",
-  title: "Level 9 — Modern Architecture & Delivery",
+  title: "Level 9: Modern Architecture & Delivery",
   tagline:
     "Service architecture, containers and orchestration, serverless and edge, delivery and FinOps, and data-intensive analytics.",
   estimatedHours: 8,

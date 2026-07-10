@@ -559,7 +559,7 @@ The blameless postmortem is the compounding step. Blameless means it assumes eve
 export const systemDesignLevel7: DesignLevel = {
   id: 7,
   slug: "reliability-ops",
-  title: "Level 7 — Reliability, Resilience & Operations",
+  title: "Level 7: Reliability, Resilience & Operations",
   tagline:
     "SLOs and error budgets, observability, resilience patterns, redundancy and multi-region DR, and safe deploys and chaos.",
   estimatedHours: 8,
