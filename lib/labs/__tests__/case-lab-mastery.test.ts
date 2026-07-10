@@ -61,6 +61,13 @@ describe("buildCaseLabMasterySession", () => {
     expect(session.completedAt).toBe("2026-06-25T12:45:00.000Z")
   })
 
+  it("records under the non-DSA case-lab bucket, never a real DSA pattern (no mastery pollution)", () => {
+    const session = buildCaseLabMasterySession(lab, baseRun)
+    // Regression guard for PF-04: labs must not inflate arrays-hashing (or any DSA) stats.
+    expect(session.pattern).toBe("case-lab")
+    expect(session.pattern).not.toBe("arrays-hashing")
+  })
+
   it("derives mastery from the build test pass rate", () => {
     const allPass = buildCaseLabMasterySession(lab, {
       ...baseRun,

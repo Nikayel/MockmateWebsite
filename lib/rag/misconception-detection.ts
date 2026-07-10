@@ -86,6 +86,8 @@ interface ErrorSignature {
 // ============================================================================
 
 const ERROR_SIGNATURES: Record<DSAPattern | "general", ErrorSignature[]> = {
+  // Case Labs are systems/decomposition work, not DSA — no DSA error signatures apply.
+  "case-lab": [],
   general: [
     {
       type: "off-by-one",

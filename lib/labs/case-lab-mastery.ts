@@ -4,10 +4,12 @@ import { calculateMasteryScore } from "@/lib/spaced-repetition"
 import { logger } from "@/lib/logger"
 
 // Case Lab builds are multi-file codebase drops (add-functionality / system-design),
-// not DSA problems, so they have no natural DSA pattern. We mirror the fallback the
-// interview feedback pipeline uses for non-DSA scenarios (see app/api/generate-feedback)
-// so the completed Build still lands in the same problem-level mastery store (§7.5).
-const CASE_LAB_FALLBACK_PATTERN: DSAPattern = "arrays-hashing"
+// not DSA problems, so they have no natural DSA pattern. Record them under the
+// dedicated non-DSA `case-lab` bucket (see DSA_PATTERNS.CASE_LAB) so the completed
+// Build still lands in the problem-level mastery store (§7.5) WITHOUT inflating a
+// real DSA pattern's stats. Previously this fell back to "arrays-hashing", which
+// conflated systems/decomposition work with array problems the user never did.
+const CASE_LAB_MASTERY_PATTERN: DSAPattern = "case-lab"
 
 export interface CaseLabMasterySession {
   scenarioId: string
@@ -44,7 +46,7 @@ export function buildCaseLabMasterySession(lab: CaseLab, run: CaseLabRun): CaseL
   return {
     scenarioId: lab.buildScenarioId,
     title: lab.title,
-    pattern: CASE_LAB_FALLBACK_PATTERN,
+    pattern: CASE_LAB_MASTERY_PATTERN,
     difficulty: lab.difficulty,
     performanceScore: mastery.masteryScore,
     masteryScore: mastery.masteryScore,
