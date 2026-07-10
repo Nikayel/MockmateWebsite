@@ -1210,7 +1210,7 @@ export const systemDesignLevel0: DesignLevel = {
           practice: {
             id: "sd-l0-qps-read-write-practice",
             prompt:
-              "Model send QPS vs delivery QPS for WhatsApp-scale group messaging assuming 2B users, 40 messages sent per user per day, and an average group size of 8. Decide whether the delivery path or the send path is the scaling bottleneck and justify the fan-out strategy.",
+              "Estimate send QPS vs delivery QPS for WhatsApp-scale group messaging assuming 2B users, 40 messages sent per user per day, and an average group size of 8. Decide whether the delivery path or the send path is the scaling bottleneck and justify the fan-out strategy.",
             thinkAbout: [
               "How does group size turn one send into many deliveries, and what multiplier does that put on QPS?",
               "Is messaging read-heavy like a feed, or delivery/write-heavy, and what does that flip in your design?",
