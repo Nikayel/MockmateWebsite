@@ -27,6 +27,8 @@ export function LessonOutline({
   upNext,
   basePath,
   onCollapse,
+  sectionOrder = LESSON_SECTION_ORDER,
+  sectionLabels,
 }: {
   sections: Record<LessonSection, SectionStatus>
   active: LessonSection
@@ -36,7 +38,13 @@ export function LessonOutline({
   basePath: string
   /** When set, renders a control by the heading that folds the rail to its slim strip. */
   onCollapse?: () => void
+  /** Which phases to show, in order. Defaults to the code-course Read → Apply → Practice loop; System
+   * Design overrides it to just Read → Design (it has no standalone Practice phase). */
+  sectionOrder?: LessonSection[]
+  /** Per-phase label overrides merged over the shared defaults (e.g. apply -> "Design"). */
+  sectionLabels?: Partial<Record<LessonSection, string>>
 }) {
+  const labelFor = (section: LessonSection) => sectionLabels?.[section] ?? SECTION_LABEL[section]
   return (
     <div className="flex flex-col gap-8">
       <nav aria-label="Lesson sections">
@@ -58,10 +66,10 @@ export function LessonOutline({
           )}
         </div>
         <ol className="relative">
-          {LESSON_SECTION_ORDER.map((section, i) => {
+          {sectionOrder.map((section, i) => {
             const isActive = active === section
             const isDone = sections[section] === "completed"
-            const isLast = i === LESSON_SECTION_ORDER.length - 1
+            const isLast = i === sectionOrder.length - 1
             const Icon = PHASE_ICON[section]
             return (
               <li key={section} className="relative flex gap-3">
@@ -108,7 +116,7 @@ export function LessonOutline({
                       isActive ? "text-foreground" : "text-muted-foreground",
                     ].join(" ")}
                   >
-                    {SECTION_LABEL[section]}
+                    {labelFor(section)}
                   </span>
                   <span className="text-muted-foreground/80 block text-xs">
                     {SECTION_HINT[section]}

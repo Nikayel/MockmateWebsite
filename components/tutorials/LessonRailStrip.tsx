@@ -18,11 +18,18 @@ export function LessonRailStrip({
   active,
   onSelect,
   onExpand,
+  sectionOrder = LESSON_SECTION_ORDER,
+  sectionLabels,
 }: {
   sections: Record<LessonSection, SectionStatus>
   active: LessonSection
   onSelect: (section: LessonSection) => void
   onExpand: () => void
+  /** Which phases to show, in order. Defaults to Read → Apply → Practice; System Design passes just
+   * Read → Design so no phantom Practice dot appears. */
+  sectionOrder?: LessonSection[]
+  /** Per-phase label overrides merged over the shared defaults (e.g. apply -> "Design"). */
+  sectionLabels?: Partial<Record<LessonSection, string>>
 }) {
   return (
     <div className="flex flex-col items-center gap-3 py-4">
@@ -40,11 +47,11 @@ export function LessonRailStrip({
       <span className="bg-border h-px w-6" aria-hidden="true" />
 
       <nav aria-label="Lesson sections" className="flex flex-col items-center gap-2">
-        {LESSON_SECTION_ORDER.map((section) => {
+        {sectionOrder.map((section) => {
           const isActive = active === section
           const isDone = sections[section] === "completed"
           const Icon = PHASE_ICON[section]
-          const label = SECTION_LABEL[section]
+          const label = sectionLabels?.[section] ?? SECTION_LABEL[section]
           const status = isDone ? "completed" : isActive ? "current" : "upcoming"
           return (
             <button

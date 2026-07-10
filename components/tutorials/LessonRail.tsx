@@ -19,6 +19,8 @@ export function LessonRail({
   onSelect,
   upNext,
   basePath,
+  sectionOrder,
+  sectionLabels,
 }: {
   collapsed: boolean
   /** Toggles between the slim strip and the full outline; the caller persists + drives `--railw`. */
@@ -29,6 +31,11 @@ export function LessonRail({
   upNext: UpNextLesson[]
   /** Route prefix for "Up next" links, e.g. "/learn/python" or "/learn/sql". */
   basePath: string
+  /** Phases to show, in order. Omit for the code-course Read → Apply → Practice loop; System Design
+   * passes just Read → Design (it has no standalone Practice phase). */
+  sectionOrder?: LessonSection[]
+  /** Per-phase label overrides, e.g. `{ apply: "Design" }`, merged over the shared defaults. */
+  sectionLabels?: Partial<Record<LessonSection, string>>
 }) {
   return (
     <div className="border-border overflow-y-auto border-r">
@@ -38,6 +45,8 @@ export function LessonRail({
           active={active}
           onSelect={onSelect}
           onExpand={onToggle}
+          sectionOrder={sectionOrder}
+          sectionLabels={sectionLabels}
         />
       ) : (
         <div className="px-4 py-6">
@@ -48,6 +57,8 @@ export function LessonRail({
             upNext={upNext}
             basePath={basePath}
             onCollapse={onToggle}
+            sectionOrder={sectionOrder}
+            sectionLabels={sectionLabels}
           />
         </div>
       )}
