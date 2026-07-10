@@ -142,6 +142,13 @@ export function MilestoneRail({ className }: { className?: string }) {
                     <span className="text-[11px] leading-[1.4] text-[var(--wb-faint)]">
                       {isNext ? `Next: ${m.purpose}` : m.purpose}
                     </span>
+                    {/* PF-09: name the real interview round, on the active row
+                        only, so the rail stays calm. */}
+                    {isCurrent && m.mapsToRound && (
+                      <span className="mt-0.5 text-[10px] font-medium text-[var(--wb-accent-strong)]">
+                        {m.mapsToRound}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>

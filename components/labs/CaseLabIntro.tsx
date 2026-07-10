@@ -79,8 +79,15 @@ export function CaseLabIntro({
               <span className="border-border text-muted-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs">
                 {i + 1}
               </span>
-              <span className="flex flex-col">
-                <span className="text-foreground text-sm font-medium">{milestone.title}</span>
+              <span className="flex min-w-0 flex-col">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="text-foreground text-sm font-medium">{milestone.title}</span>
+                  {milestone.mapsToRound && (
+                    <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] font-medium">
+                      {milestone.mapsToRound}
+                    </span>
+                  )}
+                </span>
                 <span className="text-muted-foreground text-xs">{milestone.purpose}</span>
               </span>
             </li>

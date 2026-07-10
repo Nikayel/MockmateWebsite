@@ -41,6 +41,7 @@ export const palantir911Dispatch: CaseLab = {
       kind: "clarify",
       title: "Clarify",
       purpose: "Pin down what “best responder” means before you rank anything.",
+      mapsToRound: "Decomposition round",
       guidance: {
         interviewerPrompt:
           "You're building a system to dispatch emergency units (police, fire, EMT) to 911 calls. There are 100+ units across the city, and today dispatchers pick who to send by hand, with sticky notes and a radio. Your job is to recommend which unit to send to each call. Before you design anything, what do you need to ask me, and what would you assume if I stayed quiet?",
@@ -71,7 +72,8 @@ export const palantir911Dispatch: CaseLab = {
     {
       kind: "decompose",
       title: "Decompose",
-      purpose: "Map the dispatch workflow and name the single bottleneck.",
+      purpose: "Map the workflow, entities, and permissions, and the pieces most likely to break.",
+      mapsToRound: "Decomposition round",
       guidance: {
         interviewerPrompt:
           "Break this system into parts before we design. Give me clean, non-overlapping pieces, the core entities and how a unit moves between states, and who is allowed to see a caller's or unit's location. Be ready for me to change the ask mid-stream. Which two or three pieces does the software most have to get right?",
@@ -107,6 +109,7 @@ export const palantir911Dispatch: CaseLab = {
       kind: "design",
       title: "Design",
       purpose: "Commit to a ranking contract and defend it under stale data and concurrency.",
+      mapsToRound: "Decomposition round",
       guidance: {
         interviewerPrompt:
           "Lock the contract for the recommender. Give me the signature, what goes in and out, who reads the output, and what it does when GPS is stale or two calls want the same unit. When I push on a choice, do you defend it or revise it?",
@@ -131,6 +134,7 @@ export const palantir911Dispatch: CaseLab = {
       kind: "build",
       title: "Build",
       purpose: "Implement the recommender inside the real codebase and get the tests green.",
+      mapsToRound: "Learning / Re-engineering round (adjacent)",
       guidance: {
         interviewerPrompt:
           "Here's the real dispatch codebase, which you didn't write. Get the pre-written tests green. Before you edit, trace how a call flows through the code. Which line do you want to start with?",
@@ -155,6 +159,7 @@ export const palantir911Dispatch: CaseLab = {
       kind: "review",
       title: "Review",
       purpose: "Defend your choices against the curveballs, then grade yourself.",
+      mapsToRound: "Self-review + mission reflection",
       guidance: {
         interviewerPrompt:
           "Grade yourself 1 to 5 on the rubric I use: handling ambiguity, decomposition, design, code correctness, communication. Then the part every hiring manager asks: who does this tool help, who could it hurt if you got it wrong, and which one moment would you redo?",

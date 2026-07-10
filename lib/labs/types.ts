@@ -76,6 +76,13 @@ export interface CaseLabMilestone {
   title: string
   /** P3: the one-line "why this milestone matters" shown on the rail. */
   purpose: string
+  /**
+   * The real, named company interview round this milestone maps to (PF-09), so
+   * a candidate who read "prep the Decomposition round" can connect it. Several
+   * milestones may share one round (Clarify + Decompose + Design all serve the
+   * Decomposition round). Optional; omit for a generic lab.
+   */
+  mapsToRound?: string
   /** Per-round instruction shown on the station (interviewer prompt + how-to). */
   guidance?: MilestoneGuidance
   /** P2: pre-filled example so the user never faces a blank wall. */
