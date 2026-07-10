@@ -49,6 +49,12 @@ const CLARIFY_DIMENSIONS: ClarifyDimension[] = [
     prompt: "What latency, safety, or legal constraints bind the design?",
   },
   {
+    id: "access-permissions",
+    label: "Access & permissions",
+    prompt:
+      "Who is allowed to see or change what, and what has to be audited? On sensitive data this is a first-class constraint, not a detail.",
+  },
+  {
     id: "scale",
     label: "Scale",
     prompt: "What volume and growth must this handle?",

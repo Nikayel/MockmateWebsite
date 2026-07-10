@@ -49,12 +49,14 @@ export const palantir911Dispatch: CaseLab = {
         howToApproach: [
           "Nail down 'best' first: fastest to scene, best survival odds, or lowest cost? It can't stay undefined.",
           "Ask who acts on it: does a dispatcher confirm or override, or does it auto-dispatch? For a life-or-death call that reshapes everything.",
+          "Ask who is allowed to see what: a caller's location and a unit's position are sensitive, so who can read them, and whether each dispatch is logged, is part of the problem on this data.",
           "Pair every question with the assumption you'd run with if I stay silent.",
           "Flag the constraints that bind the design: stale GPS, one unit grabbed by two calls, no unit available.",
         ],
         whatGoodLooksLike: [
           "You turn 'best' into a measurable goal and say which calls come first.",
           "You ask who the user is before assuming full autonomy.",
+          "You treat who-can-see-what and what-gets-audited as real constraints on sensitive location data, not a footnote.",
           "Every open question carries a default assumption.",
         ],
         commonTrap:
@@ -72,22 +74,22 @@ export const palantir911Dispatch: CaseLab = {
       purpose: "Map the dispatch workflow and name the single bottleneck.",
       guidance: {
         interviewerPrompt:
-          "Break this system into parts before we design. Split it into clean, non-overlapping pieces, name the core entities, and show how a unit moves between states. Which one piece is the software actually here to fix?",
+          "Break this system into parts before we design. Give me clean, non-overlapping pieces, the core entities and how a unit moves between states, and who is allowed to see a caller's or unit's location. Be ready for me to change the ask mid-stream. Which two or three pieces does the software most have to get right?",
         whatItTests:
-          "Whether you carve an ambiguous system into clean, non-overlapping parts (MECE) and find the real bottleneck, instead of listing everything.",
+          "Whether you carve an ambiguous system into clean, non-overlapping parts (MECE), model the entities, their permissions, and the failure modes, and adapt when I move the requirements, instead of listing everything or hunting for one magic answer.",
         howToApproach: [
           "Split along inputs, logic, and outputs: calls and GPS coming in, ranking in the middle, a recommendation out. Clean seams keep it MECE.",
-          "Name the entities (Incident, Responder, Assignment) with a one-line role each.",
-          "Model the risky state machine: a unit goes available to assigned to en route to on scene. Ask what breaks a transition, like a call cancelled mid-route.",
-          "Point at the one bottleneck: the manual human choice of who to send.",
+          "Name the entities (Incident, Responder, Assignment) with a one-line role each, and say who may read each. On 911 data, who sees a caller's location and who audits a dispatch is part of the model, not an afterthought.",
+          "Model the risky state machine: a unit goes available to assigned to en route to on scene. Ask what breaks a transition, like a call cancelled mid-route or a unit that goes dark.",
+          "Expect the ask to shift ('now two calls want the same unit') and show how your split absorbs it instead of starting over.",
         ],
         whatGoodLooksLike: [
           "Parts don't overlap and leave no gap.",
-          "You model one entity's states and probe the messy transition.",
-          "You name exactly one bottleneck and defend it.",
+          "You model the entities, their permissions and audit, and one entity's state transitions, and probe the messy ones.",
+          "You name the two or three pieces that carry the most risk and say why, and you bend gracefully when I change a requirement.",
         ],
         commonTrap:
-          "Dumping ten overlapping subproblems, or jumping to databases and queues. They grade clean seams and the one bottleneck, not infra.",
+          "Dumping ten overlapping subproblems, jumping straight to databases and queues, or ignoring who is allowed to see sensitive location data. They grade clean seams, entities and permissions, and how you adapt, not infra trivia or one clever bottleneck.",
       },
       ghostExample: {
         workflow: [
