@@ -24,3 +24,21 @@ export function trackCaseLabMilestoneCompleted(params: {
 export function trackCaseLabCompleted(params: { labId: string; company: string }): void {
   trackEvent("case_lab_completed", params)
 }
+
+/**
+ * Fired when a candidate is nudged for completing with little/no work (PF-03):
+ * lets us see how often runs are finished empty (which corrupts the mastery
+ * signal) without hard-blocking the open flow (P1).
+ */
+export function trackCaseLabSkippedCompletion(params: {
+  labId: string
+  company: string
+  emptyMilestones: MilestoneKind[]
+}): void {
+  trackEvent("case_lab_skipped_completion", {
+    labId: params.labId,
+    company: params.company,
+    emptyMilestones: params.emptyMilestones.join(","),
+    emptyCount: params.emptyMilestones.length,
+  })
+}

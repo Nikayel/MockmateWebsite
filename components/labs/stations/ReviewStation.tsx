@@ -19,7 +19,9 @@ import { useAuth } from "@/lib/auth-context"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { StationHeader } from "./station-kit"
 import { requestCaseLabFeedback, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
-import { trackCaseLabCompleted } from "@/lib/labs/case-lab-analytics"
+import { trackCaseLabCompleted, trackCaseLabSkippedCompletion } from "@/lib/labs/case-lab-analytics"
+import { assessCaseLabWork } from "@/lib/labs/work-assessment"
+import { DEFAULT_MILESTONE_META } from "@/lib/labs/milestones"
 import type { CaseLabRubricDimension } from "@/lib/labs/types"
 
 const RUBRIC: { key: CaseLabRubricDimension; label: string }[] = [
@@ -52,6 +54,8 @@ export function ReviewStation() {
 
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  // PF-03: after the first attempt on an empty run, require a confirming click.
+  const [confirmSkip, setConfirmSkip] = useState(false)
 
   const handleComplete = async () => {
     if (!run) return
@@ -59,6 +63,20 @@ export function ReviewStation() {
       setGenError("Sign in to generate interviewer feedback.")
       return
     }
+
+    // Nudge (don't hard-block — P1) before completing a run with little/no work,
+    // which would run feedback over 0/0 and record a hollow mastery signal.
+    const work = assessCaseLabWork(run.answers)
+    if (!work.isSubstantive && !confirmSkip) {
+      setConfirmSkip(true)
+      trackCaseLabSkippedCompletion({
+        labId: run.caseLabId,
+        company: lab?.company ?? "",
+        emptyMilestones: work.emptyMilestones,
+      })
+      return
+    }
+
     setGenerating(true)
     setGenError(null)
     trackCaseLabCompleted({ labId: run.caseLabId, company: lab?.company ?? "" })
@@ -88,6 +106,9 @@ export function ReviewStation() {
 
   const build = answers?.build
   const buildPassing = build?.testResults.filter((t) => t.passed).length ?? 0
+  const emptyMilestoneLabels = confirmSkip
+    ? assessCaseLabWork(answers).emptyMilestones.map((m) => DEFAULT_MILESTONE_META[m].title)
+    : []
 
   const recap: { label: string; value: string }[] = [
     {
@@ -218,15 +239,30 @@ export function ReviewStation() {
             </Link>
           </div>
         ) : (
-          <Button
-            type="button"
-            onClick={handleComplete}
-            disabled={generating}
-            className="self-start"
-          >
-            {generating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {generating ? "Completing…" : "Complete lab"}
-          </Button>
+          <div className="flex flex-col gap-2">
+            {confirmSkip && (
+              <div
+                className="border-border bg-muted/40 text-muted-foreground rounded-lg border px-3 py-2.5 text-xs"
+                role="alert"
+              >
+                You&apos;re about to finish with little work done
+                {emptyMilestoneLabels.length
+                  ? ` — ${emptyMilestoneLabels.join(", ")} still empty`
+                  : ""}
+                . Real reps here are what build the interview signal. Go back and try a station, or
+                complete anyway.
+              </div>
+            )}
+            <Button
+              type="button"
+              onClick={handleComplete}
+              disabled={generating}
+              className="self-start"
+            >
+              {generating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {generating ? "Completing…" : confirmSkip ? "Complete anyway" : "Complete lab"}
+            </Button>
+          </div>
         ))}
     </section>
   )
