@@ -12,6 +12,7 @@ import {
   Map,
   GraduationCap,
   Database,
+  Network,
   FlaskConical,
   ChevronDown,
   type LucideIcon,
@@ -84,9 +85,10 @@ const APP_NAV: AppNavItem[] = [
   },
 ]
 
-// "Learn" is a two-track hub (Python + SQL) rather than a single destination, so it
-// renders as a labelled group: a dropdown on desktop, an inline sub-list on mobile.
-// Both tracks live under /learn/*, so the parent's active state covers either child.
+// "Learn" is a three-track hub (Python + SQL + System Design) rather than a single
+// destination, so it renders as a labelled group: a dropdown on desktop, an inline
+// sub-list on mobile. All tracks live under /learn/*, so the parent's active state
+// covers every child.
 type LearnNavChild = { label: string; href: string; icon: LucideIcon }
 
 const LEARN_NAV: {
@@ -101,6 +103,7 @@ const LEARN_NAV: {
   children: [
     { label: "Python", href: "/learn/python", icon: GraduationCap },
     { label: "SQL", href: "/learn/sql", icon: Database },
+    { label: "System Design", href: "/learn/system-design", icon: Network },
   ],
 }
 
