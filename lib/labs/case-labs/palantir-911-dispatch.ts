@@ -125,7 +125,18 @@ export const palantir911Dispatch: CaseLab = {
         entities: [
           { name: "Incident", role: "an emergency that needs a responder" },
           { name: "Responder", role: "a unit that can be dispatched" },
+          { name: "Assignment", role: "a responder committed to one incident" },
         ],
+        stateMachine: {
+          entity: "Responder",
+          states: ["available", "assigned", "en route", "on scene"],
+          transitions: [
+            { from: "available", on: "dispatched", to: "assigned" },
+            { from: "assigned", on: "call cancelled", to: "available" },
+            { from: "assigned", on: "departs", to: "en route" },
+            { from: "en route", on: "arrives", to: "on scene" },
+          ],
+        },
       },
     },
     {

@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
-import type { ClarifyAnswer } from "@/lib/labs/types"
+import type { ClarifyAnswer, ClarifyGhostExample } from "@/lib/labs/types"
 import { StationHeader } from "./station-kit"
 
 interface ClarifyDimension {
@@ -61,12 +61,6 @@ const CLARIFY_DIMENSIONS: ClarifyDimension[] = [
   },
 ]
 
-/** Ghost example for the first dimension (shown as placeholder, not saved). */
-const GHOST_EXAMPLE = {
-  question: "What are we optimizing — faster dispatch, fewer dropped calls, or lower cost?",
-  assumption: "Assume we optimize time-to-dispatch for life-threatening calls first.",
-}
-
 const RECOMMENDED_DIMENSIONS = 3
 
 type RowState = Record<string, { question: string; assumption: string }>
@@ -92,7 +86,19 @@ function deriveAnswers(rows: RowState): ClarifyAnswer[] {
 
 export function ClarifyStation() {
   const run = useCaseLabStore((s) => s.activeRun)
+  const lab = useCaseLabStore((s) => s.activeLab)
   const setClarify = useCaseLabStore((s) => s.setClarify)
+
+  // Show THIS lab's authored ghost, not another lab's hardcoded example. Pinned
+  // to the dimension the ghost names (falling back to the first dimension).
+  const ghost = lab?.milestones.find((m) => m.kind === "clarify")?.ghostExample as
+    | ClarifyGhostExample
+    | undefined
+  const ghostDimId = ghost
+    ? CLARIFY_DIMENSIONS.some((d) => d.id === ghost.dimension)
+      ? ghost.dimension
+      : CLARIFY_DIMENSIONS[0].id
+    : undefined
 
   const [rows, setRows] = useState<RowState>(() => buildInitialRows(run?.answers.clarify))
   const [openId, setOpenId] = useState<string>(CLARIFY_DIMENSIONS[0].id)
@@ -115,9 +121,9 @@ export function ClarifyStation() {
       />
 
       <ol className="flex flex-col gap-2">
-        {CLARIFY_DIMENSIONS.map((d, i) => {
+        {CLARIFY_DIMENSIONS.map((d) => {
           const isOpen = openId === d.id
-          const isGhost = i === 0
+          const isGhost = Boolean(ghost) && d.id === ghostDimId
           const row = rows[d.id]
           const answered = Boolean(row.question.trim() || row.assumption.trim())
           return (
@@ -156,7 +162,7 @@ export function ClarifyStation() {
                       id={`${d.id}-question`}
                       value={row.question}
                       onChange={(e) => update(d.id, "question", e.target.value)}
-                      placeholder={isGhost ? GHOST_EXAMPLE.question : undefined}
+                      placeholder={isGhost ? ghost?.question : undefined}
                       rows={2}
                     />
                   </div>
@@ -168,7 +174,7 @@ export function ClarifyStation() {
                       id={`${d.id}-assumption`}
                       value={row.assumption}
                       onChange={(e) => update(d.id, "assumption", e.target.value)}
-                      placeholder={isGhost ? GHOST_EXAMPLE.assumption : undefined}
+                      placeholder={isGhost ? ghost?.assumption : undefined}
                       rows={2}
                     />
                   </div>

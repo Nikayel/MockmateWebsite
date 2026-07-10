@@ -16,7 +16,12 @@ import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
-import type { DecomposeAnswer, DecomposeEntity, StateTransition } from "@/lib/labs/types"
+import type {
+  DecomposeAnswer,
+  DecomposeEntity,
+  DecomposeGhostExample,
+  StateTransition,
+} from "@/lib/labs/types"
 import { CollapsiblePanel, RemoveRowButton, StationHeader } from "./station-kit"
 
 type PanelId = "workflow" | "entities" | "state"
@@ -55,7 +60,14 @@ function deriveAnswer(form: DecomposeForm): DecomposeAnswer {
 
 export function DecomposeStation() {
   const run = useCaseLabStore((s) => s.activeRun)
+  const lab = useCaseLabStore((s) => s.activeLab)
   const setDecompose = useCaseLabStore((s) => s.setDecompose)
+
+  // This lab's authored example drives the placeholders, so a billing lab never
+  // shows dispatch hints (and vice versa).
+  const ghost = lab?.milestones.find((m) => m.kind === "decompose")?.ghostExample as
+    | DecomposeGhostExample
+    | undefined
 
   const [form, setForm] = useState<DecomposeForm>(() => buildInitialForm(run?.answers.decompose))
   const [openPanel, setOpenPanel] = useState<PanelId | "">("workflow")
@@ -96,7 +108,7 @@ export function DecomposeStation() {
                   workflow[i] = e.target.value
                   apply({ ...form, workflow })
                 }}
-                placeholder="e.g. Call received and triaged"
+                placeholder={ghost?.workflow?.[i] ?? "e.g. the first step in the flow"}
               />
               {form.workflow.length > 1 && (
                 <RemoveRowButton
@@ -141,7 +153,9 @@ export function DecomposeStation() {
                   entities[i] = { ...entities[i], name: e.target.value }
                   apply({ ...form, entities })
                 }}
-                placeholder="Name (e.g. Responder)"
+                placeholder={
+                  ghost?.entities?.[i]?.name ? `Name (e.g. ${ghost.entities[i].name})` : "Name"
+                }
                 className="max-w-[40%]"
               />
               <Input
@@ -151,7 +165,7 @@ export function DecomposeStation() {
                   entities[i] = { ...entities[i], role: e.target.value }
                   apply({ ...form, entities })
                 }}
-                placeholder="Role (e.g. a unit that can be dispatched)"
+                placeholder={ghost?.entities?.[i]?.role ?? "One-line role"}
               />
               {form.entities.length > 1 && (
                 <RemoveRowButton
@@ -190,7 +204,9 @@ export function DecomposeStation() {
           <Input
             value={form.smEntity}
             onChange={(e) => apply({ ...form, smEntity: e.target.value })}
-            placeholder="Entity (e.g. Dispatch)"
+            placeholder={
+              ghost?.stateMachine?.entity ? `Entity (e.g. ${ghost.stateMachine.entity})` : "Entity"
+            }
           />
         </div>
 
@@ -205,7 +221,7 @@ export function DecomposeStation() {
                   smStates[i] = e.target.value
                   apply({ ...form, smStates })
                 }}
-                placeholder="e.g. pending"
+                placeholder={ghost?.stateMachine?.states?.[i] ?? "e.g. a state"}
               />
               {form.smStates.length > 1 && (
                 <RemoveRowButton

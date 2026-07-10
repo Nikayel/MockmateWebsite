@@ -71,6 +71,24 @@ export interface MilestoneGuidance {
   commonTrap: string
 }
 
+/**
+ * Ghost-example shapes (P2): a lab authors these per milestone and the station
+ * renders them as placeholders so the candidate never faces a blank wall. Kept
+ * per-milestone because each station takes a different answer shape. Wiring
+ * these makes a lab's OWN example show up instead of another lab's hardcoded one.
+ */
+export interface ClarifyGhostExample {
+  dimension?: string
+  question: string
+  assumption: string
+}
+
+export interface DecomposeGhostExample {
+  workflow?: string[]
+  entities?: DecomposeEntity[]
+  stateMachine?: StateMachine
+}
+
 export interface CaseLabMilestone {
   kind: MilestoneKind
   title: string
