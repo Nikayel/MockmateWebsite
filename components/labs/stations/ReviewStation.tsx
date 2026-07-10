@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { StationHeader } from "./station-kit"
+import { CaseLabScopePanel } from "@/components/labs/CaseLabScopePanel"
 import { requestCaseLabFeedback, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
 import { trackCaseLabCompleted, trackCaseLabSkippedCompletion } from "@/lib/labs/case-lab-analytics"
 import { assessCaseLabWork } from "@/lib/labs/work-assessment"
@@ -226,6 +227,8 @@ export function ReviewStation() {
           {genError}
         </p>
       )}
+
+      {isCompleted && lab?.coverage && <CaseLabScopePanel coverage={lab.coverage} />}
 
       {!isCompleted &&
         (signedOut ? (

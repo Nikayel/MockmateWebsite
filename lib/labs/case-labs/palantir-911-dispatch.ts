@@ -23,6 +23,29 @@ export const palantir911Dispatch: CaseLab = {
   },
   whyThisCompany:
     "The signature Palantir FDSE onsite round drops you into a vague, real-world operational problem and watches how you scope it. This lab mirrors that round: a messy 911 dispatch system where the constraints (stale GPS, concurrent assignment, who is allowed to see a caller's location, and a fail-safe fallback) matter far more than the ranking algorithm itself. It is one round of a longer loop. The real process also gates on a timed HackerRank assessment (a Python problem, a multi-table SQL query, and a REST endpoint you page through and aggregate) and a Learning round where you model an unfamiliar API cold, so treat this as onsite prep, not the whole bar.",
+  coverage: {
+    covers: [
+      "Decomposition round (the signature Palantir FDSE onsite round)",
+      "Learning / Re-engineering round (partial: you orient inside a real codebase)",
+    ],
+    prepElsewhere: [
+      {
+        round: "Online Assessment + live coding (Python / DSA)",
+        cta: "Daily practice",
+        href: "/practice",
+      },
+      {
+        round: "SQL (Online Assessment + the SQL-heavy Learning round)",
+        cta: "Learn SQL",
+        href: "/learn/sql",
+      },
+      {
+        round: "Behavioral, “why Palantir,” and mission fit",
+        cta: "Palantir prep",
+        href: "/interview-prep/palantir",
+      },
+    ],
+  },
   skills: [
     "decomposition",
     "ranking under constraints",

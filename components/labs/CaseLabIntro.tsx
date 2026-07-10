@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { CaseLabBrief } from "@/components/labs/CaseLabBrief"
+import { CaseLabScopePanel } from "@/components/labs/CaseLabScopePanel"
 import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import type { CaseLab, CaseLabMode } from "@/lib/labs/types"
 
@@ -94,6 +95,8 @@ export function CaseLabIntro({
           ))}
         </ol>
       </section>
+
+      {lab.coverage && <CaseLabScopePanel coverage={lab.coverage} />}
 
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">

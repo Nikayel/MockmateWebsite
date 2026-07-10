@@ -91,6 +91,28 @@ export interface CaseLabMilestone {
   required?: boolean
 }
 
+/** A link to prep a round this lab does not itself cover (PF-10). */
+export interface CaseLabPrepLink {
+  /** The real interview round this points at. */
+  round: string
+  /** Short call to action, e.g. "Learn SQL". */
+  cta: string
+  /** In-app route to that prep surface. */
+  href: string
+}
+
+/**
+ * Honest scope for a lab (PF-10): which real interview rounds it rehearses and
+ * which it does NOT, so a candidate can't finish ~2 of ~5 rounds believing they
+ * are fully company-ready. Rendered on the intro and the completed Review.
+ */
+export interface CaseLabCoverage {
+  /** Rounds this lab meaningfully rehearses. */
+  covers: string[]
+  /** Real rounds this lab does not cover, each with where to prep it. */
+  prepElsewhere: CaseLabPrepLink[]
+}
+
 export interface CaseLab {
   id: string
   title: string
@@ -104,6 +126,8 @@ export interface CaseLab {
   brief: CaseLabBrief
   /** P6: copy explaining why this maps to the company's real interview bar. */
   whyThisCompany: string
+  /** PF-10: honest scope — rounds covered here vs where to prep the rest. */
+  coverage?: CaseLabCoverage
   /** Skills surfaced for browse filtering. */
   skills: string[]
   milestones: CaseLabMilestone[]
