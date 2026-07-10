@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { feedbackRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
 import {
@@ -53,12 +54,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as { runId?: string }
-    if (!body.runId) {
+    const parsed = z.object({ runId: z.string().min(1) }).safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json({ error: "runId is required" }, { status: 400 })
     }
 
-    const run = await getCaseLabRun(userId, body.runId)
+    const run = await getCaseLabRun(userId, parsed.data.runId)
     if (!run) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 })
     }

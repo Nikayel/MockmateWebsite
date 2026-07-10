@@ -9,6 +9,7 @@
 
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
+import { logger } from "@/lib/logger"
 import type {
   CaseLabAnswers,
   CaseLabRun,
@@ -42,6 +43,59 @@ export const caseLabRunInputSchema = z.object({
 })
 
 export type CaseLabRunInput = z.infer<typeof caseLabRunInputSchema>
+
+/**
+ * The shape a persisted `caseLabRuns` doc must satisfy before it may flow into
+ * the app as a trusted `CaseLabRun`. Validates the structural contract fields
+ * the UI/logic depend on; `answers` stays loose (user content).
+ */
+const storedCaseLabRunSchema = z.object({
+  userId: z.string().min(1),
+  caseLabId: z.string().min(1),
+  mode: z.enum(["practice", "onsite"]),
+  status: z.enum(["in_progress", "completed", "abandoned"]),
+  currentMilestone: milestoneKindSchema,
+  startedAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  completedAt: z.string().optional(),
+  answers: z.record(z.string(), z.unknown()).optional(),
+  milestoneStatus: z.record(milestoneKindSchema, milestoneStatusSchema).optional(),
+})
+
+/**
+ * Validate a Firestore doc at the trust boundary. Malformed / legacy docs
+ * (missing owner, bad status enum) parse to `null` so they read as "no run"
+ * instead of a raw `as CaseLabRun` cast flowing a bad shape into a station.
+ */
+function parseStoredRun(raw: unknown, id: string): CaseLabRun | null {
+  const parsed = storedCaseLabRunSchema.safeParse(raw)
+  if (!parsed.success) {
+    logger.warn("Discarding malformed caseLabRuns doc", {
+      id,
+      issues: parsed.error.errors.map((e) => e.message),
+    })
+    return null
+  }
+  const d = parsed.data
+  return {
+    id,
+    userId: d.userId,
+    caseLabId: d.caseLabId,
+    mode: d.mode,
+    status: d.status,
+    currentMilestone: d.currentMilestone,
+    startedAt: d.startedAt,
+    updatedAt: d.updatedAt,
+    ...(d.completedAt ? { completedAt: d.completedAt } : {}),
+    answers: (d.answers ?? {}) as CaseLabAnswers,
+    // Rebuild the full status map so a doc missing a milestone key can't produce
+    // an undefined status downstream.
+    milestoneStatus: buildMilestoneStatus(
+      d.milestoneStatus as Partial<Record<MilestoneKind, MilestoneStatus>> | undefined,
+      d.currentMilestone
+    ),
+  }
+}
 
 function buildMilestoneStatus(
   partial: Partial<Record<MilestoneKind, MilestoneStatus>> | undefined,
@@ -88,9 +142,9 @@ function composeRun(
 export async function getCaseLabRun(userId: string, runId: string): Promise<CaseLabRun | null> {
   const snap = await adminDb.collection(COLLECTION).doc(runId).get()
   if (!snap.exists) return null
-  const data = snap.data() as CaseLabRun | undefined
-  if (!data || data.userId !== userId) return null
-  return { ...data, id: snap.id }
+  const run = parseStoredRun(snap.data(), snap.id)
+  if (!run || run.userId !== userId) return null
+  return run
 }
 
 /**
@@ -110,11 +164,11 @@ export async function getActiveCaseLabRun(
 ): Promise<CaseLabRun | null> {
   const query = await adminDb.collection(COLLECTION).where("userId", "==", userId).get()
   const runs = query.docs
-    .map((doc) => ({ ...(doc.data() as CaseLabRun), id: doc.id }))
+    .map((doc) => parseStoredRun(doc.data(), doc.id))
+    .filter((run): run is CaseLabRun => run !== null)
     .filter(
       (run) =>
-        run.caseLabId === caseLabId &&
-        (run.status === "in_progress" || run.status === "completed")
+        run.caseLabId === caseLabId && (run.status === "in_progress" || run.status === "completed")
     )
     .sort((a, b) => {
       // In-progress first, then newest within the same status.

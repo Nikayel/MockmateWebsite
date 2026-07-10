@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const parsed = bodySchema.safeParse(await request.json())
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.flatten() },
+        { error: "Invalid request", details: parsed.error.errors.map((e) => e.message) },
         { status: 400 }
       )
     }

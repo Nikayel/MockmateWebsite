@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest) {
     const parsed = caseLabRunInputSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid run", details: parsed.error.flatten() },
+        { error: "Invalid run", details: parsed.error.errors.map((e) => e.message) },
         { status: 400 }
       )
     }
