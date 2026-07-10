@@ -22,7 +22,7 @@ export const palantir911Dispatch: CaseLab = {
     task: "Across five milestones you'll scope what \"best responder\" actually means, decompose the dispatch workflow to find the real bottleneck, commit to a ranking contract that holds up under stale location data and concurrent assignment, then implement the recommender inside the existing dispatch codebase until the tests pass. Finally you'll defend your choices and grade yourself.",
   },
   whyThisCompany:
-    "Palantir FDSE interviews open with a vague, real-world operational problem and watch how you scope it. This lab mirrors that: a messy 911 dispatch system where the constraints (stale GPS, concurrent assignment, and a fail-safe fallback) matter far more than the ranking algorithm itself.",
+    "The signature Palantir FDSE onsite round drops you into a vague, real-world operational problem and watches how you scope it. This lab mirrors that round: a messy 911 dispatch system where the constraints (stale GPS, concurrent assignment, who is allowed to see a caller's location, and a fail-safe fallback) matter far more than the ranking algorithm itself. It is one round of a longer loop. The real process also gates on a timed HackerRank assessment (a Python problem, a multi-table SQL query, and a REST endpoint you page through and aggregate) and a Learning round where you model an unfamiliar API cold, so treat this as onsite prep, not the whole bar.",
   skills: [
     "decomposition",
     "ranking under constraints",
