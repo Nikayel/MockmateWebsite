@@ -12,6 +12,7 @@ import { bugfixBookclubReadingStreakWorkspaceScenario } from "./bugfix-bookclub-
 import { bugfixCommentThreadMergeScenario } from "./bugfix-comment-thread-merge"
 import { bugfixEventAggregationRetriesScenario } from "./bugfix-event-aggregation-retries"
 import { bugfixFeaturePipelineNanWorkspaceScenario } from "./bugfix-feature-pipeline-nan-workspace"
+import { bugfixFoundryUsageRollupScenario } from "./bugfix-foundry-usage-rollup"
 import { bugfixSearchRaceScenario } from "./bugfix-search-race"
 import { bugfixOnboardingScenario } from "./bugfix-onboarding"
 import { bugfixTemperatureAlertRegressionScenario } from "./bugfix-temperature-alert-regression"
@@ -26,6 +27,7 @@ export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixTemperatureAlertRegressionScenario,
   bugfixOnboardingScenario,
   bugfixBookclubReadingStreakWorkspaceScenario,
+  bugfixFoundryUsageRollupScenario,
 ].map(withBugfixIncidentDefaults)
 
 export default realWorldBugFixScenarios

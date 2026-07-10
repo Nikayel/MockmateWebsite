@@ -21,6 +21,7 @@ describe("real-world scenario modules", () => {
     "bugfix-temperature-alert-regression",
     "bugfix-onboarding",
     "bugfix-bookclub-reading-streak-workspace",
+    "bugfix-foundry-usage-rollup",
   ]
 
   it("keeps the legacy export order and IDs", () => {
