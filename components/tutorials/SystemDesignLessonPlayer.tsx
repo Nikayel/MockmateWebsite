@@ -291,6 +291,10 @@ export function SystemDesignLessonPlayer({
             onSelect={goToSection}
             upNext={upNext}
             basePath="/learn/system-design"
+            // System Design is a two-phase Read -> Design loop: show only those two dots (no phantom
+            // Practice step) and label the design write "Design" to match the landing + center panel.
+            sectionOrder={["teach", "apply"]}
+            sectionLabels={{ apply: "Design" }}
           />
 
           <main
