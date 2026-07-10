@@ -55,9 +55,9 @@ export const palantir911Dispatch: CaseLab = {
   buildScenarioId: "palantir-911-dispatch-build",
   buildScenarioType: "add-functionality",
   buildCurveball: {
-    title: "Curveball: the GPS feed just went stale",
+    title: "Curveball: two calls just grabbed the same unit",
     prompt:
-      "Dispatch reports the responder GPS feed is now delayed by ~30 seconds during peak load. Your recommender still trusts live coordinates. How does your ranking hold up when the closest unit on paper may already be blocks away, and what would you change to stay safe?",
+      "Two incidents come in seconds apart, and your recommender, run once per call, ranks the same idle ambulance first for both. Nothing in your code knows that unit was just promised to the other call, so you double-book it. This is the concurrency you flagged back in Clarify, and the current code does not handle it. Where does your recommender double-book under concurrent dispatch, and what is the smallest change that makes an assignment hold so the second call ranks the next-best unit instead?",
   },
   milestones: [
     {
