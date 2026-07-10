@@ -173,4 +173,74 @@ describe("AdvancedRetriever hybrid retrieval", () => {
     expect(results.map((result) => result.id)).toEqual(["problem-match", "hint-match"])
     expect(analytics.semanticCandidateCount).toBe(2)
   })
+
+  it("degrades to lexical results when the embedding provider throws (hybrid)", async () => {
+    // Simulates Gemini being unavailable with a 768D Pinecone index: the hybrid
+    // provider throws instead of returning a queryable embedding.
+    mocks.generateEmbedding.mockRejectedValue(
+      new Error(
+        "[HybridProvider] Gemini embedding failed and TF-IDF fallback (256D) cannot be used with your Pinecone index (768D)."
+      )
+    )
+
+    const { AdvancedRetriever } = await import("../retrieval/advanced-retrieval")
+    const retriever = new AdvancedRetriever()
+
+    const { results, analytics } = await retriever.retrieve({
+      query: "binary search sorted array",
+      types: ["problem"],
+      limit: 3,
+      strategy: "hybrid",
+    })
+
+    // No throw; semantic contributes nothing but BM25 still returns candidates.
+    expect(mocks.vectorQuery).not.toHaveBeenCalled()
+    expect(results.map((result) => result.id)).toEqual(
+      expect.arrayContaining(["overlap", "bm25-only"])
+    )
+    expect(analytics.semanticCandidateCount).toBe(0)
+    expect(analytics.bm25CandidateCount).toBe(2)
+    expect(analytics.emptyResult).toBe(false)
+  })
+
+  it("falls back to BM25 when a pure-semantic request loses its embedding provider", async () => {
+    mocks.generateEmbedding.mockRejectedValue(new Error("embedding provider down"))
+
+    const { AdvancedRetriever } = await import("../retrieval/advanced-retrieval")
+    const retriever = new AdvancedRetriever()
+
+    const { results, analytics } = await retriever.retrieve({
+      query: "binary search sorted array",
+      types: ["problem"],
+      limit: 3,
+      strategy: "semantic",
+    })
+
+    // Even though the caller asked for semantic-only, the safety net runs BM25
+    // so the request returns results instead of an empty set.
+    expect(mocks.fetchLexicalCorpus).toHaveBeenCalled()
+    expect(results.length).toBeGreaterThan(0)
+    expect(analytics.semanticCandidateCount).toBe(0)
+    expect(analytics.bm25CandidateCount).toBeGreaterThan(0)
+  })
+
+  it("survives a vector-store query failure without aborting retrieval", async () => {
+    mocks.vectorQuery.mockRejectedValue(new Error("Pinecone index dimension mismatch"))
+
+    const { AdvancedRetriever } = await import("../retrieval/advanced-retrieval")
+    const retriever = new AdvancedRetriever()
+
+    const { results, analytics } = await retriever.retrieve({
+      query: "binary search sorted array",
+      types: ["problem"],
+      limit: 3,
+      strategy: "hybrid",
+    })
+
+    expect(results.map((result) => result.id)).toEqual(
+      expect.arrayContaining(["overlap", "bm25-only"])
+    )
+    expect(analytics.semanticCandidateCount).toBe(0)
+    expect(analytics.bm25CandidateCount).toBe(2)
+  })
 })
