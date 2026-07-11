@@ -43,6 +43,8 @@ export function JoinDiagram({ spec }: { spec: JoinSpec }) {
       label={`${spec.left.name} · ${KIND_LABEL[spec.kind]} · ${spec.right.name}  ON ${spec.on[0]} = ${spec.on[1]}`}
       controls={<StepControls player={player} />}
       caption={spec.caption}
+      containerProps={player.containerProps}
+      groupLabel={`${KIND_LABEL[spec.kind]} of ${spec.left.name} and ${spec.right.name}, step-through`}
     >
       <div className="flex flex-wrap gap-4">
         <MiniTable
@@ -52,6 +54,7 @@ export function JoinDiagram({ spec }: { spec: JoinSpec }) {
           keyCol={spec.on[0]}
           currentIndex={leftCurrent}
           matchedIndices={[]}
+          reducedMotion={player.reducedMotion}
         />
         <MiniTable
           name={spec.right.name}
@@ -60,6 +63,7 @@ export function JoinDiagram({ spec }: { spec: JoinSpec }) {
           keyCol={spec.on[1]}
           currentIndex={rightCurrent}
           matchedIndices={rightMatched}
+          reducedMotion={player.reducedMotion}
         />
       </div>
 
@@ -132,6 +136,7 @@ function MiniTable({
   keyCol,
   currentIndex,
   matchedIndices,
+  reducedMotion,
 }: {
   name: string
   columns: string[]
@@ -139,6 +144,7 @@ function MiniTable({
   keyCol: string
   currentIndex: number | null
   matchedIndices: number[]
+  reducedMotion: boolean
 }) {
   const keyIdx = columns.indexOf(keyCol)
   const matched = new Set(matchedIndices)
@@ -173,13 +179,16 @@ function MiniTable({
               <tr
                 key={r}
                 className={cn(
-                  "transition-colors duration-300",
+                  !reducedMotion && "transition-colors duration-300",
+                  // Non-color cues alongside the tint: current row = inset ring, matched
+                  // row = a left edge bar, so scan/match state survives loss of color (WCAG 1.4.1).
                   isCurrent && "bg-accent/15 ring-accent/50 ring-1 ring-inset",
-                  !isCurrent && isMatch && "bg-emerald-500/10"
+                  !isCurrent && isMatch && "border-l-2 border-l-emerald-500 bg-emerald-500/10"
                 )}
               >
                 {row.map((cell, c) => (
                   <td key={c} className="border-border/50 border-b px-2 py-1">
+                    {c === keyIdx && isMatch && <span className="sr-only">matched: </span>}
                     {fmt(cell)}
                   </td>
                 ))}

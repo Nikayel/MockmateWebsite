@@ -12,10 +12,10 @@ const OBJ_COLORS = [
   {
     dot: "bg-emerald-500",
     ring: "ring-emerald-500/50",
-    text: "text-emerald-600 dark:text-emerald-300",
+    text: "text-emerald-700 dark:text-emerald-300",
   },
   { dot: "bg-blue-500", ring: "ring-blue-500/50", text: "text-blue-600 dark:text-blue-300" },
-  { dot: "bg-amber-500", ring: "ring-amber-500/50", text: "text-amber-600 dark:text-amber-300" },
+  { dot: "bg-amber-500", ring: "ring-amber-500/50", text: "text-amber-700 dark:text-amber-300" },
   {
     dot: "bg-violet-500",
     ring: "ring-violet-500/50",
@@ -37,7 +37,8 @@ export function PythonMemoryDiagram({ spec }: { spec: PythonMemorySpec }) {
   const objIds: string[] = []
   for (const s of spec.steps)
     for (const id of Object.keys(s.objects)) if (!objIds.includes(id)) objIds.push(id)
-  const colorOf = (id: string) => OBJ_COLORS[objIds.indexOf(id) % OBJ_COLORS.length]
+  // Math.max guards an id that only appears in `names` (never `objects`) so indexOf(-1) can't wrap.
+  const colorOf = (id: string) => OBJ_COLORS[Math.max(0, objIds.indexOf(id)) % OBJ_COLORS.length]
 
   const names = Object.entries(step.names)
   const objects = Object.entries(step.objects)
@@ -48,6 +49,8 @@ export function PythonMemoryDiagram({ spec }: { spec: PythonMemorySpec }) {
       label="Names point at objects"
       controls={<StepControls player={player} />}
       caption={spec.caption}
+      containerProps={player.containerProps}
+      groupLabel="Python names and heap objects, step-through"
     >
       <pre className="border-border bg-muted/30 mb-3 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed">
         {spec.steps.map((s, i) => (
@@ -94,7 +97,8 @@ export function PythonMemoryDiagram({ spec }: { spec: PythonMemorySpec }) {
                 <li
                   key={id}
                   className={cn(
-                    "border-border bg-card rounded-md border px-3 py-2 font-mono text-xs transition-all duration-300",
+                    "border-border bg-card rounded-md border px-3 py-2 font-mono text-xs",
+                    !player.reducedMotion && "transition-all duration-300",
                     mutated && cn("ring-2", c.ring)
                   )}
                 >

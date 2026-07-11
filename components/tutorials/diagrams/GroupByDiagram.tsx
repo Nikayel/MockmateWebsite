@@ -38,6 +38,8 @@ export function GroupByDiagram({ spec }: { spec: GroupBySpec }) {
       label={`${spec.agg}(value) GROUP BY ${spec.by} — ${PHASES[phase]}`}
       controls={<StepControls player={player} />}
       caption={spec.caption}
+      containerProps={player.containerProps}
+      groupLabel={`GROUP BY ${spec.by} bucketing, step-through`}
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <figure>
@@ -52,7 +54,8 @@ export function GroupByDiagram({ spec }: { spec: GroupBySpec }) {
                   <li
                     key={rowIdx}
                     className={cn(
-                      "flex justify-between rounded-sm border-l-2 px-2 py-1 font-mono text-xs transition-colors duration-300",
+                      "flex justify-between rounded-sm border-l-2 px-2 py-1 font-mono text-xs",
+                      !player.reducedMotion && "transition-colors duration-300",
                       phase >= 1 ? tintFor(row.group) : "bg-muted/30 border-l-transparent"
                     )}
                   >

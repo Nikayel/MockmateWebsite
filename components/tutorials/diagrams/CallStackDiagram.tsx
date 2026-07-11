@@ -22,6 +22,10 @@ export function CallStackDiagram({ spec }: { spec: CallStackSpec }) {
       label={spec.title ? `Call stack — ${spec.title}` : "Call stack"}
       controls={<StepControls player={player} />}
       caption={spec.caption}
+      containerProps={player.containerProps}
+      groupLabel={
+        spec.title ? `Call stack for ${spec.title}, step-through` : "Call stack, step-through"
+      }
     >
       <div
         className="flex flex-col-reverse justify-end gap-1"
@@ -35,7 +39,8 @@ export function CallStackDiagram({ spec }: { spec: CallStackSpec }) {
             <div
               key={depth}
               className={cn(
-                "rounded-md border px-3 py-1.5 font-mono text-xs transition-colors duration-300",
+                "rounded-md border px-3 py-1.5 font-mono text-xs",
+                !player.reducedMotion && "transition-colors duration-300",
                 isReturning
                   ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                   : isTop

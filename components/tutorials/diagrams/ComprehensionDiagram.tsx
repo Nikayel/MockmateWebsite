@@ -5,7 +5,7 @@ import type { ComprehensionSpec } from "@/lib/tutorials/diagrams/schema"
 const PART_STYLE: Record<string, string> = {
   output: "border-accent/50 bg-accent/10 text-accent",
   iterate: "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-300",
-  filter: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+  filter: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 }
 
 /**

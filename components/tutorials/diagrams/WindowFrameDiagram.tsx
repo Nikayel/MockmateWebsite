@@ -34,6 +34,8 @@ export function WindowFrameDiagram({ spec }: { spec: WindowFrameSpec }) {
       label={`${spec.fn}() OVER (${frameLabel(spec.frame)})`}
       controls={<StepControls player={player} />}
       caption={spec.caption}
+      containerProps={player.containerProps}
+      groupLabel={`${spec.fn} window frame over ${spec.rows.length} rows, step-through`}
     >
       <table className="w-full border-collapse text-left font-mono text-xs">
         <thead>
@@ -58,13 +60,18 @@ export function WindowFrameDiagram({ spec }: { spec: WindowFrameSpec }) {
               <tr
                 key={r}
                 className={cn(
-                  "transition-colors duration-300",
-                  inFrame && !isCurrent && "bg-accent/10",
-                  isCurrent && "bg-accent/20 ring-accent/50 ring-1 ring-inset"
+                  !player.reducedMotion && "transition-colors duration-300",
+                  // Left edge bar marks frame membership so it doesn't rely on tint alone (WCAG 1.4.1).
+                  inFrame && !isCurrent && "border-l-accent/60 bg-accent/10 border-l-2",
+                  isCurrent &&
+                    "border-l-accent bg-accent/20 ring-accent/50 border-l-2 ring-1 ring-inset"
                 )}
                 aria-current={isCurrent ? "true" : undefined}
               >
-                <td className="border-border/50 border-b px-3 py-1.5">{row.label}</td>
+                <td className="border-border/50 border-b px-3 py-1.5">
+                  {inFrame && <span className="sr-only">in frame: </span>}
+                  {row.label}
+                </td>
                 <td className="border-border/50 border-b px-3 py-1.5 text-right tabular-nums">
                   {pretty(row.value)}
                 </td>
