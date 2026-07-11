@@ -380,13 +380,13 @@ You know how to compute revenue per category. Now the analyst says: "only show m
 
 The pipeline order is the whole lesson:
 
-\`\`\`
-FROM      → read rows
-WHERE     → filter individual rows            (before grouping)
-GROUP BY  → collapse rows into groups
-HAVING    → filter whole groups by aggregate  (after grouping)
-SELECT    → project columns
-ORDER BY  → sort the surviving groups
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "preset": "sql-select",
+  "highlight": ["WHERE", "HAVING"],
+  "caption": "WHERE filters raw rows before grouping; HAVING filters whole groups by their aggregate after grouping. Same pipeline, two different phases."
+}
 \`\`\`
 
 Worked example, categories whose total revenue clears a threshold:
@@ -401,18 +401,6 @@ HAVING SUM(line_revenue_cents) > 100000;   -- filters GROUPS, not rows
 \`\`\`
 
 ## Anatomy: WHERE vs HAVING
-
-\`\`\`csdiagram
-{
-  "type": "pipeline",
-  "preset": "sql-select",
-  "highlight": [
-    "WHERE",
-    "HAVING"
-  ],
-  "caption": "WHERE filters raw rows before grouping; HAVING filters whole groups by their aggregate after grouping. Same pipeline, two different phases."
-}
-\`\`\`
 
 \`\`\`
 WHERE  status = 'paid'                 → keeps rows where a raw column matches

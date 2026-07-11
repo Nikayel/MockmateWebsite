@@ -1795,7 +1795,7 @@ Before you can write a single \`JOIN\`, someone decided which table holds which 
       "label": "UNIQUE FK = one profile per user"
     }
   ],
-  "caption": "1:N puts the FK on the many side (orders.customer_id); 1:1 is the same FK plus UNIQUE on it (profiles.user_id)."
+  "caption": "1:N puts the FK on the many side (orders.customer_id); 1:1 is the same FK plus UNIQUE on it (profiles.user_id). The third shape, M:N, needs a junction table (next lesson)."
 }
 \`\`\`
 
