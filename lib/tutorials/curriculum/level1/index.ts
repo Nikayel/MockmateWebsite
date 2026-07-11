@@ -2094,6 +2094,50 @@ print(factorial(5))   # 120
 
 ### The call stack
 
+\`\`\`csdiagram
+{
+  "type": "call-stack",
+  "title": "factorial(3)",
+  "steps": [
+    {
+      "stack": [
+        "factorial(3)"
+      ],
+      "note": "3 > 1, recurse on 2"
+    },
+    {
+      "stack": [
+        "factorial(3)",
+        "factorial(2)"
+      ],
+      "note": "2 > 1, recurse on 1"
+    },
+    {
+      "stack": [
+        "factorial(3)",
+        "factorial(2)",
+        "factorial(1)"
+      ],
+      "note": "n <= 1 base case, returns 1"
+    },
+    {
+      "stack": [
+        "factorial(3)",
+        "factorial(2)"
+      ],
+      "returning": "2 * 1 = 2"
+    },
+    {
+      "stack": [
+        "factorial(3)"
+      ],
+      "returning": "3 * 2 = 6"
+    }
+  ],
+  "caption": "Frames stack up until the base case returns 1, then unwind one at a time applying each pending multiply: 3 * 2 * 1 = 6."
+}
+\`\`\`
+
 Each call pauses and waits for the call it made. Python stacks these paused frames until the base case returns, then unwinds them one at a time, applying each pending multiply. If the base case is never reached, the stack keeps growing and Python raises \`RecursionError\` after roughly 1000 nested calls (the default \`sys.getrecursionlimit()\`).
 
 ### Pitfalls
