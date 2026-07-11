@@ -184,8 +184,10 @@ export const comprehensionSpecSchema = z.object({
 
 export const tableSpecSchema = z.object({
   type: z.literal("table"),
-  columns: z.array(z.string().min(1)).min(1),
-  rows: z.array(z.array(cellSchema)),
+  columns: z.array(z.string().min(1)).min(1).max(16),
+  // Capped like every other diagram so a paste error can't render tens of thousands of
+  // cells synchronously and block the main thread.
+  rows: z.array(z.array(cellSchema)).max(60),
   /** Column names to emphasize (e.g. the aggregated column). */
   highlightCols: z.array(z.string()).optional(),
   caption: captionField,
@@ -193,7 +195,10 @@ export const tableSpecSchema = z.object({
 
 // ---- discriminated union ----
 
-export const diagramSpecSchema = z.discriminatedUnion("type", [
+// The raw union. Members MUST stay pure z.object schemas — attaching .superRefine to a
+// member turns it into a ZodEffects, which z.discriminatedUnion rejects at module load.
+// So all cross-field checks live on the union wrapper below instead.
+const diagramSpecUnion = z.discriminatedUnion("type", [
   pipelineSpecSchema,
   joinSpecSchema,
   windowFrameSpecSchema,
@@ -204,6 +209,68 @@ export const diagramSpecSchema = z.discriminatedUnion("type", [
   comprehensionSpecSchema,
   tableSpecSchema,
 ])
+
+/**
+ * The union PLUS cross-field integrity checks that Zod field rules can't express — the
+ * things that would otherwise throw uncaught in a renderer (a join key that isn't a
+ * column, a name pointing at an undefined object) or misalign a data-critical table.
+ */
+export const diagramSpecSchema = diagramSpecUnion.superRefine((spec, ctx) => {
+  const custom = z.ZodIssueCode.custom
+  if (spec.type === "join") {
+    if (!spec.left.columns.includes(spec.on[0]))
+      ctx.addIssue({
+        code: custom,
+        path: ["on", 0],
+        message: `join key "${spec.on[0]}" is not a column of ${spec.left.name}`,
+      })
+    if (!spec.right.columns.includes(spec.on[1]))
+      ctx.addIssue({
+        code: custom,
+        path: ["on", 1],
+        message: `join key "${spec.on[1]}" is not a column of ${spec.right.name}`,
+      })
+    for (const side of ["left", "right"] as const) {
+      const t = spec[side]
+      t.rows.forEach((row, i) => {
+        if (row.length !== t.columns.length)
+          ctx.addIssue({
+            code: custom,
+            path: [side, "rows", i],
+            message: `${t.name} row ${i} has ${row.length} cells but ${t.columns.length} columns`,
+          })
+      })
+    }
+  }
+  if (spec.type === "table") {
+    spec.rows.forEach((row, i) => {
+      if (row.length !== spec.columns.length)
+        ctx.addIssue({
+          code: custom,
+          path: ["rows", i],
+          message: `row ${i} has ${row.length} cells but ${spec.columns.length} columns`,
+        })
+    })
+  }
+  if (spec.type === "python-memory") {
+    spec.steps.forEach((step, i) => {
+      const objKeys = new Set(Object.keys(step.objects))
+      for (const [name, oid] of Object.entries(step.names))
+        if (!objKeys.has(oid))
+          ctx.addIssue({
+            code: custom,
+            path: ["steps", i, "names", name],
+            message: `name "${name}" points at object "${oid}" which this step does not define`,
+          })
+      if (step.mutated && !objKeys.has(step.mutated))
+        ctx.addIssue({
+          code: custom,
+          path: ["steps", i, "mutated"],
+          message: `mutated object "${step.mutated}" is not defined in this step`,
+        })
+    })
+  }
+})
 
 export type DiagramSpec = z.infer<typeof diagramSpecSchema>
 export type PipelineSpec = z.infer<typeof pipelineSpecSchema>

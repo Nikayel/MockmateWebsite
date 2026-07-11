@@ -111,3 +111,53 @@ describe("parseDiagramSpec", () => {
     expect(result.ok).toBe(false)
   })
 })
+
+describe("parseDiagramSpec cross-field integrity", () => {
+  it("rejects a join whose ON key is not a column (would throw in render)", () => {
+    const result = parseDiagramSpec(
+      JSON.stringify({
+        type: "join",
+        kind: "inner",
+        left: { name: "a", columns: ["id"], rows: [[1]] },
+        right: { name: "b", columns: ["a_id"], rows: [[1]] },
+        on: ["id", "missing"],
+      })
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toMatch(/not a column/i)
+  })
+
+  it("rejects a join row whose width does not match its columns", () => {
+    const result = parseDiagramSpec(
+      JSON.stringify({
+        type: "join",
+        kind: "inner",
+        left: { name: "a", columns: ["id", "name"], rows: [[1]] },
+        right: { name: "b", columns: ["id"], rows: [[1]] },
+        on: ["id", "id"],
+      })
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toMatch(/cells but/i)
+  })
+
+  it("rejects python-memory where a name points at an undefined object", () => {
+    const result = parseDiagramSpec(
+      JSON.stringify({
+        type: "python-memory",
+        steps: [
+          { code: "a = b", names: { a: "L9" }, objects: { L1: { kind: "list", value: "[]" } } },
+        ],
+      })
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toMatch(/does not define|unknown/i)
+  })
+
+  it("rejects a table row whose width does not match its columns", () => {
+    const result = parseDiagramSpec(
+      JSON.stringify({ type: "table", columns: ["a", "b"], rows: [[1]] })
+    )
+    expect(result.ok).toBe(false)
+  })
+})
