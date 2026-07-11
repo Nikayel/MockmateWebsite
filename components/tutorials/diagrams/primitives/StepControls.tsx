@@ -36,10 +36,9 @@ export function StepControls({ player, className }: { player: StepPlayer; classN
         <ChevronRight className="size-4" />
       </IconButton>
 
-      <span
-        className="text-muted-foreground ml-1 font-mono text-[11px] tabular-nums"
-        aria-live="polite"
-      >
+      {/* Visible position only — NOT a live region. Each diagram owns one aria-live
+          description sentence, so announcing the counter too would double-speak on every step. */}
+      <span className="text-muted-foreground ml-1 font-mono text-[11px] tabular-nums">
         Step {index + 1} / {stepCount}
       </span>
     </div>
