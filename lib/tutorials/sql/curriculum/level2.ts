@@ -43,6 +43,60 @@ The demo below runs this health check against six seed orders. It returns one ro
 
 ## The NULL rule that trips everyone
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "order_id",
+    "customer_id",
+    "total_cents",
+    "status"
+  ],
+  "rows": [
+    [
+      100,
+      1,
+      2500,
+      "paid"
+    ],
+    [
+      101,
+      1,
+      5000,
+      "paid"
+    ],
+    [
+      102,
+      2,
+      9900,
+      "shipped"
+    ],
+    [
+      103,
+      null,
+      1500,
+      "paid"
+    ],
+    [
+      104,
+      3,
+      null,
+      "abandoned"
+    ],
+    [
+      105,
+      null,
+      null,
+      "abandoned"
+    ]
+  ],
+  "highlightCols": [
+    "total_cents"
+  ],
+  "caption": "AVG(total_cents) sums the four non-NULL totals (18900) and divides by 4, not 6: 4725, never 3150. The two NULL totals (orders 104 and 105) are skipped, not counted as zero."
+}
+\`\`\`
+
 \`AVG\` **ignores NULLs entirely**. It does not treat them as zero. Two of the six orders have a \`NULL\` total, so \`AVG(total_cents)\` divides by 4 (the non-\`NULL\` count), not 6: \`18900 / 4 = 4725\`, never \`18900 / 6 = 3150\`. Put precisely, \`AVG(col)\` equals \`SUM(col) / COUNT(col)\`, never \`SUM(col) / COUNT(*)\`.
 
 If the business wants NULLs counted as zero, push the default inside the function: \`AVG(COALESCE(total_cents, 0))\` returns \`3150.0\`. The two queries give different answers, and knowing which one the business meant is your job. Likewise, \`COUNT(*)\` and \`COUNT(col)\` diverge the instant \`col\` has a \`NULL\`, so when someone asks "how many orders have a customer?", answer with \`COUNT(customer_id)\`, not \`COUNT(*)\`. Say what you count.
@@ -1977,6 +2031,48 @@ bucketing a numeric measure into labels, mapping codes to names, or (the DE powe
 into columns via **conditional aggregation**.
 
 ## Searched CASE: the general form
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "order_id",
+    "total_cents",
+    "size_bucket"
+  ],
+  "rows": [
+    [
+      100,
+      500,
+      "small"
+    ],
+    [
+      101,
+      2000,
+      "medium"
+    ],
+    [
+      102,
+      9900,
+      "medium"
+    ],
+    [
+      103,
+      10000,
+      "large"
+    ],
+    [
+      104,
+      15000,
+      "large"
+    ]
+  ],
+  "highlightCols": [
+    "size_bucket"
+  ],
+  "caption": "Each total_cents falls through the WHEN branches top-to-bottom; the first true branch sets size_bucket. 9900 is not >= 10000 so it lands in 'medium', while 10000 crosses the threshold into 'large'."
+}
+\`\`\`
 
 Conditions can be anything:
 
