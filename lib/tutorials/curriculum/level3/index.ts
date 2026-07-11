@@ -2580,6 +2580,47 @@ User(**raw)   # "1" becomes 1, 1 becomes True, a missing field raises Validation
 
 ### This sandbox: a dataclass plus explicit coercion
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "field",
+    "raw",
+    "raw type",
+    "coerced",
+    "coerced type"
+  ],
+  "rows": [
+    [
+      "id",
+      "'1'",
+      "str",
+      "1",
+      "int"
+    ],
+    [
+      "name",
+      "'Ada'",
+      "str",
+      "'Ada'",
+      "str"
+    ],
+    [
+      "active",
+      "1",
+      "int",
+      "True",
+      "bool"
+    ]
+  ],
+  "highlightCols": [
+    "coerced",
+    "coerced type"
+  ],
+  "caption": "The raw dict from the API is coerced field-by-field into the typed User at the boundary: '1' becomes 1, 1 becomes True."
+}
+\`\`\`
+
 There is no network and no \`pydantic\` here, so you do the same job by hand with a \`@dataclass\`. That difference matters: a \`@dataclass\` gives you the shape, but its type annotations are not enforced at runtime. Building a plain dataclass with \`id="1"\` stores the string \`"1"\` with no error at all. So you coerce each field yourself, exactly like the demo below:
 
 \`\`\`python
