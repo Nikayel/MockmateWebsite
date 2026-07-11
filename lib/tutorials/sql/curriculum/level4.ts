@@ -690,8 +690,54 @@ FROM daily_revenue;
 
 Three shapes, one clause:
 
-- **Running total:** \`ORDER BY\` plus \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\` accumulates the first row through the current one.
-- **Moving average:** \`ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\` is the current row plus the 2 before it (3 rows). Early rows average over fewer rows, and that is correct.
+- **Running total:** \`ORDER BY\` plus \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\` accumulates the first row through the current one
+
+\`\`\`csdiagram
+{
+  "type": "window-frame",
+  "fn": "SUM",
+  "frame": "running",
+  "rows": [
+    {
+      "label": "Jan 1",
+      "value": 100
+    },
+    {
+      "label": "Jan 2",
+      "value": 200
+    },
+    {
+      "label": "Jan 3",
+      "value": 300
+    }
+  ],
+  "caption": "Running total: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW accumulates 100 -> 300 -> 600, one row wider each step."
+}
+\`\`\`.
+- **Moving average:** \`ROWS BETWEEN 2 PRECEDING AND CURRENT ROW\` is the current row plus the 2 before it (3 rows). Early rows average over fewer rows, and that is correct
+
+\`\`\`csdiagram
+{
+  "type": "window-frame",
+  "fn": "AVG",
+  "frame": "moving-3",
+  "rows": [
+    {
+      "label": "Jan 1",
+      "value": 100
+    },
+    {
+      "label": "Jan 2",
+      "value": 200
+    },
+    {
+      "label": "Jan 3",
+      "value": 300
+    }
+  ],
+  "caption": "3-row moving average: ROWS BETWEEN 2 PRECEDING AND CURRENT ROW gives 100, 150, 200; early rows average over fewer than 3 rows."
+}
+\`\`\`.
 - **Per-group or grand total:** with **no \`ORDER BY\` and no frame**, the aggregate spans the entire partition. \`SUM(revenue) OVER ()\` totals the whole result set, while \`SUM(revenue) OVER (PARTITION BY customer_id)\` totals just that customer. Divide by it for percent-of-total. Add an \`ORDER BY\` and it silently turns into a running total instead.
 
 To make any of these per-customer, add \`PARTITION BY customer_id\` inside \`OVER\`.
@@ -733,7 +779,18 @@ FROM daily_revenue;   -- rows 100 / 200 / 300 by date
 
 - **Integer division zeroes your percentages.** \`revenue / SUM(...)\` on integer columns floors to \`0\`. Multiply by \`100.0\` (a float) first, as above. \`AVG\` already returns a float, so moving averages are safe.
 - **\`OVER ()\` is not \`OVER (PARTITION BY customer_id)\`.** The empty version totals everyone. The practice wants each customer's own total, so partition it.
-- **You cannot filter a window result in \`WHERE\`.** Windows are computed after \`WHERE\` runs. Snowflake and BigQuery offer a \`QUALIFY\` clause for this shorthand. Postgres and SQLite have none, so wrap the window in a CTE and filter outside it.
+- **You cannot filter a window result in \`WHERE\`.** Windows are computed after
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "preset": "sql-select",
+  "highlight": [
+    "SELECT"
+  ],
+  "caption": "Window functions are evaluated in SELECT, after WHERE and GROUP BY have run, which is why you cannot filter a window result in WHERE."
+}
+\`\`\` \`WHERE\` runs. Snowflake and BigQuery offer a \`QUALIFY\` clause for this shorthand. Postgres and SQLite have none, so wrap the window in a CTE and filter outside it.
 
 **Execution mode:** these exercises have you write a multi-statement script. Lead with \`DELETE FROM <target>;\` so a re-run stays idempotent, then a single \`INSERT ... SELECT\` carries the window expressions, and hidden assertions check both the frame math and the row count.`,
     demoSeedSql: `CREATE TABLE daily_sales (sale_date TEXT, revenue INTEGER);
