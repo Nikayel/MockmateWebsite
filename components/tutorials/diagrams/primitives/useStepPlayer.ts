@@ -38,9 +38,16 @@ export interface StepPlayer {
 }
 
 export function useStepPlayer(stepCount: number, intervalMs = 1400): StepPlayer {
-  const reduced = useReducedMotion() ?? false
+  const reducedPref = useReducedMotion() ?? false
   const [index, setIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  // useReducedMotion reads matchMedia, which is false during SSR and on the client's
+  // FIRST render, then flips post-mount. Gating on `mounted` keeps server and first
+  // client render identical (reduced=false), so the Play button never causes a
+  // hydration mismatch / layout flash for reduced-motion viewers.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const reduced = mounted && reducedPref
   const safeCount = Math.max(1, stepCount)
 
   const atStart = index <= 0
@@ -109,12 +116,14 @@ export function useStepPlayer(stepCount: number, intervalMs = 1400): StepPlayer 
     [next, prev, reset, goTo, togglePlay, safeCount]
   )
 
-  // Guard against a spec change shrinking the step list under a stale index.
+  // Guard against a spec change shrinking the step list under a stale index — and
+  // stop any in-flight autoplay so a reused instance never lands mid-sequence.
   const prevCount = useRef(safeCount)
   useEffect(() => {
     if (prevCount.current !== safeCount) {
       prevCount.current = safeCount
       setIndex((i) => Math.min(i, safeCount - 1))
+      setIsPlaying(false)
     }
   }, [safeCount])
 

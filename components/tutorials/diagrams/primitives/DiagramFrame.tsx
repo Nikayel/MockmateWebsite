@@ -14,6 +14,8 @@ export function DiagramFrame({
   children,
   className,
   bodyClassName,
+  containerProps,
+  groupLabel,
 }: {
   label?: string
   /** Right-aligned slot in the header — typically <StepControls/>. */
@@ -22,6 +24,10 @@ export function DiagramFrame({
   children: React.ReactNode
   className?: string
   bodyClassName?: string
+  /** For triggered diagrams: spread `player.containerProps` to make the body a focusable, arrow-key-steppable region. */
+  containerProps?: React.HTMLAttributes<HTMLDivElement> & { tabIndex?: number }
+  /** Accessible name for the focusable region (what the diagram shows). */
+  groupLabel?: string
 }) {
   return (
     <figure
@@ -39,7 +45,18 @@ export function DiagramFrame({
           {controls}
         </div>
       )}
-      <div className={cn("overflow-x-auto p-4", bodyClassName)}>{children}</div>
+      <div
+        {...containerProps}
+        aria-label={groupLabel}
+        className={cn(
+          "overflow-x-auto p-4",
+          containerProps &&
+            "focus-visible:ring-accent/50 rounded-sm outline-none focus-visible:ring-2",
+          bodyClassName
+        )}
+      >
+        {children}
+      </div>
       {caption && (
         <figcaption className="text-muted-foreground border-border/60 border-t px-4 py-2 text-xs">
           {caption}
