@@ -1,12 +1,7 @@
 import { cn } from "@/lib/utils"
 import { DiagramFrame } from "./primitives/DiagramFrame"
-import type { DiagramCell, TableSpec } from "@/lib/tutorials/diagrams/schema"
-
-function formatCell(v: DiagramCell): string {
-  if (v === null) return "NULL"
-  if (typeof v === "boolean") return v ? "true" : "false"
-  return String(v)
-}
+import { formatCell } from "@/lib/tutorials/diagrams/format"
+import type { TableSpec } from "@/lib/tutorials/diagrams/schema"
 
 /**
  * A polished static table with column emphasis (static). For authored example tables

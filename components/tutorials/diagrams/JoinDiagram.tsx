@@ -5,6 +5,7 @@ import { DiagramFrame } from "./primitives/DiagramFrame"
 import { StepControls } from "./primitives/StepControls"
 import { useStepPlayer } from "./primitives/useStepPlayer"
 import { computeJoinSteps, type JoinOutputRow } from "@/lib/tutorials/diagrams/logic"
+import { formatCell } from "@/lib/tutorials/diagrams/format"
 import type { DiagramCell, JoinSpec } from "@/lib/tutorials/diagrams/schema"
 
 const KIND_LABEL: Record<JoinSpec["kind"], string> = {
@@ -13,12 +14,6 @@ const KIND_LABEL: Record<JoinSpec["kind"], string> = {
   right: "RIGHT JOIN",
   full: "FULL JOIN",
   anti: "ANTI JOIN",
-}
-
-function fmt(v: DiagramCell): string {
-  if (v === null) return "NULL"
-  if (typeof v === "boolean") return v ? "true" : "false"
-  return String(v)
 }
 
 /**
@@ -189,7 +184,7 @@ function MiniTable({
                 {row.map((cell, c) => (
                   <td key={c} className="border-border/50 border-b px-2 py-1">
                     {c === keyIdx && isMatch && <span className="sr-only">matched: </span>}
-                    {fmt(cell)}
+                    {formatCell(cell)}
                   </td>
                 ))}
               </tr>
@@ -221,7 +216,7 @@ function ResultTd({ value, filled }: { value: DiagramCell; filled: boolean }) {
         (isNull || filled) && "text-muted-foreground/60 italic"
       )}
     >
-      {fmt(value)}
+      {formatCell(value)}
     </td>
   )
 }
@@ -235,10 +230,10 @@ function describeStep(
   const keyIdxR = spec.right.columns.indexOf(spec.on[1])
 
   if (step.side === "right-only") {
-    const key = fmt(spec.right.rows[step.rowIndex][keyIdxR])
+    const key = formatCell(spec.right.rows[step.rowIndex][keyIdxR])
     return `${spec.right.name} ${spec.on[1]}=${key} had no match → kept with NULLs on the left.`
   }
-  const key = fmt(spec.left.rows[step.rowIndex][keyIdxL])
+  const key = formatCell(spec.left.rows[step.rowIndex][keyIdxL])
   if (step.matches.length > 0) {
     if (spec.kind === "anti")
       return `${spec.on[0]}=${key} matches → dropped (ANTI JOIN keeps only non-matches).`

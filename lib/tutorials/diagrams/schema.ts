@@ -67,8 +67,8 @@ export const windowFrameSpecSchema = z.object({
   type: z.literal("window-frame"),
   /** Aggregate applied over the frame, display-only (e.g. "SUM", "AVG"). */
   fn: z.string().min(1).default("SUM"),
-  /** running = unbounded preceding→current; moving-N = N preceding→current. */
-  frame: z.union([z.literal("running"), z.string().regex(/^moving-\d+$/)]),
+  /** running = unbounded preceding→current; moving-N (N>=1) = N-1 preceding + current. */
+  frame: z.union([z.literal("running"), z.string().regex(/^moving-[1-9]\d*$/)]),
   rows: z
     .array(z.object({ label: z.string().min(1), value: z.number() }))
     .min(2)
