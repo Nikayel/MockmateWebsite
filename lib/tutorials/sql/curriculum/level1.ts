@@ -236,7 +236,20 @@ Every column is \`expression AS output_name\`: \`qty * unit_price_cents\` is the
 
 **Always alias a computed column.** An un-aliased expression gets an unstable auto-name like \`qty * unit_price_cents\` that downstream code cannot rely on.
 
-**Interview nuance:** aliases are minted in the \`SELECT\` step, which the engine logically evaluates *after* \`WHERE\` and \`GROUP BY\` but *before* \`ORDER BY\`. So in standard SQL (Postgres included) you cannot filter on \`line_revenue_cents\` by its alias in the same query's \`WHERE\`; you repeat the expression or wrap it in a subquery. \`ORDER BY line_revenue_cents\` works because ordering happens last. SQLite is lenient and will accept the alias in \`WHERE\`, but do not lean on that when portability matters.`,
+**Interview nuance:** aliases are minted in the \`SELECT\` step, which the engine logically evaluates *after* \`WHERE\` and \`GROUP BY\` but *before* \`ORDER BY\`. So in standard SQL (Postgres included) you cannot filter on \`line_revenue_cents\` by its alias in the same query's \`WHERE\`; you repeat the expression or wrap it in a subquery. \`ORDER BY line_revenue_cents\` works because ordering happens last. SQLite is lenient and will accept the alias in \`WHERE\`, but do not lean on that when portability matters.
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "preset": "sql-select",
+  "highlight": [
+    "WHERE",
+    "SELECT",
+    "ORDER BY"
+  ],
+  "caption": "Logical execution order: WHERE runs before SELECT, so an alias like line_revenue_cents does not exist yet when WHERE is evaluated. ORDER BY runs after SELECT, which is why it can use the alias."
+}
+\`\`\``,
     demoCode: `SELECT
   product_id,
   qty * unit_price_cents      AS line_revenue_cents,
