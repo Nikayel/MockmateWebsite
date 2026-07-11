@@ -53,6 +53,48 @@ Work on \`daily_logins(user_id, login_date)\`. The whole trick is to build a key
 
 The demo below (turn on the input panel) materializes the anchor next to each date so you can watch it hold steady inside a run and jump right after the gap.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "login_date",
+    "rn",
+    "island_anchor"
+  ],
+  "rows": [
+    [
+      "2026-03-01",
+      1,
+      "2026-02-28"
+    ],
+    [
+      "2026-03-02",
+      2,
+      "2026-02-28"
+    ],
+    [
+      "2026-03-03",
+      3,
+      "2026-02-28"
+    ],
+    [
+      "2026-03-05",
+      4,
+      "2026-03-01"
+    ],
+    [
+      "2026-03-06",
+      5,
+      "2026-02-29"
+    ]
+  ],
+  "highlightCols": [
+    "island_anchor"
+  ],
+  "caption": "date minus row_number lands on the same anchor for every row in a run, then shifts when the gap breaks it."
+}
+\`\`\`
+
 ## The LAG variant
 
 The same islands fall out of \`LAG\`: a new island starts wherever the previous row is **not** the day before. Flag a boundary with \`prev_date IS NULL OR prev_date < date(login_date, '-1 day')\`, then take a running \`SUM\` of that flag as the island id. Both forms are correct. The row-number-difference form is shorter to write under pressure; the LAG form reads more obviously to a reviewer.
@@ -215,6 +257,49 @@ Work on \`events(user_id, event_ts)\`. The spirit is the same as gaps-and-island
 3. **Running-sum the flag into a session number.** \`SUM(new_session) OVER (PARTITION BY user_id ORDER BY event_ts)\` counts how many sessions have started up to and including this event, so every event inside one session shares the same number. Concatenate it with the user id for a stable id: \`user_id || '-' || session_seq\`.
 
 The demo below shows every intermediate column (the previous timestamp, the gap in minutes, the new-session flag, and the running session number) so you can watch the 80-minute gap flip the flag and bump the number.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "event_ts",
+    "gap_min",
+    "new_session",
+    "session_seq"
+  ],
+  "rows": [
+    [
+      "09:00",
+      null,
+      1,
+      1
+    ],
+    [
+      "09:10",
+      10,
+      0,
+      1
+    ],
+    [
+      "10:30",
+      80,
+      1,
+      2
+    ],
+    [
+      "10:45",
+      15,
+      0,
+      2
+    ]
+  ],
+  "highlightCols": [
+    "new_session",
+    "session_seq"
+  ],
+  "caption": "The 80-minute gap trips new_session to 1, and the running sum of that flag bumps session_seq from 1 to 2."
+}
+\`\`\`
 
 ## The ambiguity interviewers probe
 
@@ -560,6 +645,42 @@ Work on \`events(user_id, step, event_ts)\`.
 3. **Count the flags and divide.** \`SUM(reached_step)\` is the users at each step, and the conversion from the prior step is this step's count over the previous step's count.
 
 The base population matters: everyone who entered the funnel stays in the denominator, so a drop-off lowers the rate instead of vanishing. The demo shows three users (one in order, one who stops early, one whose cart precedes the view) and the reached flags each one earns.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "user_id",
+    "t_view",
+    "t_cart",
+    "reached_cart"
+  ],
+  "rows": [
+    [
+      1,
+      "10:00",
+      "10:05",
+      1
+    ],
+    [
+      2,
+      "11:00",
+      "11:05",
+      1
+    ],
+    [
+      4,
+      "09:05",
+      "09:00",
+      0
+    ]
+  ],
+  "highlightCols": [
+    "reached_cart"
+  ],
+  "caption": "User 4 added to cart at 09:00 before viewing at 09:05, so t_cart is earlier than t_view and reached_cart is 0 even though both events exist."
+}
+\`\`\`
 
 **Interview nuance:** the ordering guard is the whole difference between a naive funnel and a correct one. Without it, any user with both a cart event and a view event counts as converted even if they added to cart first and viewed later, which quietly inflates every downstream rate.
 
