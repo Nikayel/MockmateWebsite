@@ -1713,6 +1713,96 @@ print(a is b)    # True, one list with two names
 
 \`a is b\` asks "same object?" (identity), while \`a == b\` asks "same value?" (equality). The demo below shows this exactly: mutating through \`b\` is visible through \`a\` because there is only one list.
 
+\`\`\`csdiagram
+{
+  "type": "python-memory",
+  "steps": [
+    {
+      "code": "a = [1, 2, 3]",
+      "names": {
+        "a": "L1"
+      },
+      "objects": {
+        "L1": {
+          "kind": "list",
+          "value": "[1, 2, 3]"
+        }
+      },
+      "note": "one list, named a"
+    },
+    {
+      "code": "b = a",
+      "names": {
+        "a": "L1",
+        "b": "L1"
+      },
+      "objects": {
+        "L1": {
+          "kind": "list",
+          "value": "[1, 2, 3]"
+        }
+      },
+      "note": "b binds to the SAME list, no copy"
+    },
+    {
+      "code": "b.append(4)",
+      "names": {
+        "a": "L1",
+        "b": "L1"
+      },
+      "objects": {
+        "L1": {
+          "kind": "list",
+          "value": "[1, 2, 3, 4]"
+        }
+      },
+      "mutated": "L1",
+      "note": "a sees it too: a is [1, 2, 3, 4]"
+    },
+    {
+      "code": "c = a[:]",
+      "names": {
+        "a": "L1",
+        "b": "L1",
+        "c": "L2"
+      },
+      "objects": {
+        "L1": {
+          "kind": "list",
+          "value": "[1, 2, 3, 4]"
+        },
+        "L2": {
+          "kind": "list",
+          "value": "[1, 2, 3, 4]"
+        }
+      },
+      "note": "a[:] makes a NEW outer list"
+    },
+    {
+      "code": "c.append(99)",
+      "names": {
+        "a": "L1",
+        "b": "L1",
+        "c": "L2"
+      },
+      "objects": {
+        "L1": {
+          "kind": "list",
+          "value": "[1, 2, 3, 4]"
+        },
+        "L2": {
+          "kind": "list",
+          "value": "[1, 2, 3, 4, 99]"
+        }
+      },
+      "mutated": "L2",
+      "note": "only c changes; a is untouched"
+    }
+  ],
+  "caption": "Two names on one object alias it (b changes a); a[:] makes a separate object c cannot reach back through."
+}
+\`\`\`
+
 ### Build new instead of mutating
 
 When a function should return a changed version, build a fresh list and leave the input alone. This is what the Apply exercise wants:
