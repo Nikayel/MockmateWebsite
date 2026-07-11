@@ -2256,6 +2256,8 @@ print(factorial(5))   # 120
 
 ### The call stack
 
+Here is \`factorial(3)\` traced frame by frame, the same shape as \`factorial(5)\` but shorter: each call pushes a frame down to the base case, then the frames pop and the paused multiplications finish on the way back up.
+
 \`\`\`csdiagram
 {
   "type": "call-stack",

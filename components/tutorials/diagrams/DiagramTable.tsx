@@ -14,6 +14,7 @@ export function DiagramTable({ spec }: { spec: TableSpec }) {
   return (
     <DiagramFrame label="Table" caption={spec.caption} bodyClassName="p-0">
       <table className="w-full border-collapse text-left font-mono text-xs">
+        <caption className="sr-only">{spec.caption ?? "Data table"}</caption>
         <thead>
           <tr>
             {spec.columns.map((col, i) => (

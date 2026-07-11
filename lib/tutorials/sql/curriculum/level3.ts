@@ -607,7 +607,7 @@ const foreignKeys: SqlLevel["modules"][number]["lessons"][number] = {
       "from": "orders",
       "to": "customers",
       "kind": "n-1",
-      "label": "REFERENCES \u2026 ON DELETE RESTRICT"
+      "label": "each order references one real customer"
     }
   ],
   "caption": "The FK orders.customer_id must point at a real customers row: referential integrity blocks orphan orders."
