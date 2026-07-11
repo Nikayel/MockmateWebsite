@@ -49,7 +49,9 @@ A list comprehension is a loop-and-collect fused into a single expression.
   ],
   "caption": "The same loop-and-collect, fused into one expression: the output expression comes first, the loop reads left to right."
 }
-\`\`\` Python still runs the loop; it just builds the list for you. Read it left to right as *"this expression, for each item in the source."*
+\`\`\`
+
+Python still runs the loop; it just builds the list for you. Read it left to right as *"this expression, for each item in the source."*
 
 \`\`\`python
 nums = [1, 2, 3, 4, 5]

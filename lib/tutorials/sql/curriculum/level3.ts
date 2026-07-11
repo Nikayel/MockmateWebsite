@@ -2419,7 +2419,7 @@ Full 3NF is great for safe writes but painful for analytics: a "revenue by categ
 - **Fact table**: *narrow and tall*. Holds the **measures** (numeric, additive things you sum: revenue, quantity) plus **foreign keys** to dimensions. One fact table, millions of rows, few columns. \`fact_sales(customer_sk, product_sk, date_sk, quantity, revenue_cents)\`.
 - **Dimension tables**: *wide and short*. Hold the **descriptive context** you filter and group by: \`dim_customer(customer_sk, name, country, segment)\`, \`dim_product(product_sk, name, category, brand)\`, \`dim_date(date_sk, date, month, year, weekday)\`.
 
-Drawn out, the fact sits in the center with dimensions radiating around it, hence
+Drawn out, the fact sits in the center with dimensions radiating around it, hence the name **star schema**:
 
 \`\`\`csdiagram
 {
@@ -2511,7 +2511,7 @@ Drawn out, the fact sits in the center with dimensions radiating around it, henc
   ],
   "caption": "Star schema: a narrow fact_sales (measures + *_sk FKs at one declared grain) surrounded by wide surrogate-keyed dimensions."
 }
-\`\`\` **star**.
+\`\`\`
 
 ## Grain: declare it first, always
 
