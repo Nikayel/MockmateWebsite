@@ -569,6 +569,51 @@ const foreignKeys: SqlLevel["modules"][number]["lessons"][number] = {
     estimatedMinutes: 10,
     markdown: `## Foreign keys keep every child pointing at a real parent
 
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "customers",
+      "columns": [
+        {
+          "name": "customer_id",
+          "key": "pk"
+        },
+        {
+          "name": "email"
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "key": "pk"
+        },
+        {
+          "name": "customer_id",
+          "key": "fk"
+        },
+        {
+          "name": "total_cents"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "orders",
+      "to": "customers",
+      "kind": "n-1",
+      "label": "REFERENCES \u2026 ON DELETE RESTRICT"
+    }
+  ],
+  "caption": "The FK orders.customer_id must point at a real customers row: referential integrity blocks orphan orders."
+}
+\`\`\`
+
 A **foreign key (FK)** says: "the value in *this* column must exist as a key in *that* table." An
 \`orders.customer_id\` FK to \`customers.customer_id\` makes it **impossible** to insert an order for a
 customer who doesn't exist. That guarantee is **referential integrity**: the backbone of a
@@ -1681,6 +1726,79 @@ Before you can write a single \`JOIN\`, someone decided which table holds which 
 
 ### The three shapes
 
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "customers",
+      "columns": [
+        {
+          "name": "customer_id",
+          "key": "pk"
+        },
+        {
+          "name": "name"
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "key": "pk"
+        },
+        {
+          "name": "customer_id",
+          "key": "fk"
+        },
+        {
+          "name": "total"
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "user_id",
+          "key": "pk"
+        }
+      ]
+    },
+    {
+      "name": "profiles",
+      "columns": [
+        {
+          "name": "profile_id",
+          "key": "pk"
+        },
+        {
+          "name": "user_id",
+          "key": "fk"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "orders",
+      "to": "customers",
+      "kind": "n-1",
+      "label": "placed by (FK on the many side)"
+    },
+    {
+      "from": "profiles",
+      "to": "users",
+      "kind": "1-1",
+      "label": "UNIQUE FK = one profile per user"
+    }
+  ],
+  "caption": "1:N puts the FK on the many side (orders.customer_id); 1:1 is the same FK plus UNIQUE on it (profiles.user_id)."
+}
+\`\`\`
+
 An **entity** is a thing you store (a \`customer\`, an \`order\`, a \`product\`). A **relationship** links entities. **Cardinality** says how many rows on one side can link to how many on the other:
 
 - **1:N (one-to-many)**: one \`customer\` has many \`orders\`; each \`order\` belongs to one \`customer\`. By far the most common shape.
@@ -1862,6 +1980,69 @@ const junctionTables: SqlLevel["modules"][number]["lessons"][number] = {
 Every real schema hits this. One student takes many courses, and each course holds many students. One song belongs to many playlists, and each playlist holds many songs. You cannot store that with a foreign key, because an FK is a single column holding a single value: it points one child row at one parent, so it models one-to-many and nothing more. To let *both* sides be "many," you add a third table whose entire job is to hold the pairs.
 
 ### The mental model: two one-to-many relationships pointing into a bridge
+
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "students",
+      "columns": [
+        {
+          "name": "student_id",
+          "key": "pk"
+        },
+        {
+          "name": "name"
+        }
+      ]
+    },
+    {
+      "name": "enrollments",
+      "columns": [
+        {
+          "name": "student_id",
+          "key": "fk"
+        },
+        {
+          "name": "course_id",
+          "key": "fk"
+        },
+        {
+          "name": "enrolled_at"
+        }
+      ]
+    },
+    {
+      "name": "courses",
+      "columns": [
+        {
+          "name": "course_id",
+          "key": "pk"
+        },
+        {
+          "name": "title"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "enrollments",
+      "to": "students",
+      "kind": "n-1",
+      "label": "one row per (student, \u2026)"
+    },
+    {
+      "from": "enrollments",
+      "to": "courses",
+      "kind": "n-1",
+      "label": "\u2026 course) pair"
+    }
+  ],
+  "caption": "The junction resolves M:N as two 1:N relationships aimed inward; its composite PK (student_id, course_id) is one row per pair."
+}
+\`\`\`
 
 A junction table (also called an associative or bridge table) has one row per related \`(A, B)\` pair. Read it as two one-to-many relationships aimed inward: each parent owns many junction rows, and each junction row points at exactly one row in each parent. Its shape is stereotyped:
 
@@ -2238,7 +2419,99 @@ Full 3NF is great for safe writes but painful for analytics: a "revenue by categ
 - **Fact table**: *narrow and tall*. Holds the **measures** (numeric, additive things you sum: revenue, quantity) plus **foreign keys** to dimensions. One fact table, millions of rows, few columns. \`fact_sales(customer_sk, product_sk, date_sk, quantity, revenue_cents)\`.
 - **Dimension tables**: *wide and short*. Hold the **descriptive context** you filter and group by: \`dim_customer(customer_sk, name, country, segment)\`, \`dim_product(product_sk, name, category, brand)\`, \`dim_date(date_sk, date, month, year, weekday)\`.
 
-Drawn out, the fact sits in the center with dimensions radiating around it, hence **star**.
+Drawn out, the fact sits in the center with dimensions radiating around it, hence
+
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "dim_customer",
+      "columns": [
+        {
+          "name": "customer_sk",
+          "key": "pk"
+        },
+        {
+          "name": "name"
+        },
+        {
+          "name": "country"
+        }
+      ]
+    },
+    {
+      "name": "dim_date",
+      "columns": [
+        {
+          "name": "date_sk",
+          "key": "pk"
+        },
+        {
+          "name": "year_month"
+        }
+      ]
+    },
+    {
+      "name": "fact_sales",
+      "columns": [
+        {
+          "name": "sale_sk",
+          "key": "pk"
+        },
+        {
+          "name": "customer_sk",
+          "key": "fk"
+        },
+        {
+          "name": "date_sk",
+          "key": "fk"
+        },
+        {
+          "name": "product_sk",
+          "key": "fk"
+        },
+        {
+          "name": "revenue_cents"
+        }
+      ]
+    },
+    {
+      "name": "dim_product",
+      "columns": [
+        {
+          "name": "product_sk",
+          "key": "pk"
+        },
+        {
+          "name": "category"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "fact_sales",
+      "to": "dim_customer",
+      "kind": "n-1",
+      "label": "customer_sk"
+    },
+    {
+      "from": "fact_sales",
+      "to": "dim_date",
+      "kind": "n-1",
+      "label": "date_sk"
+    },
+    {
+      "from": "fact_sales",
+      "to": "dim_product",
+      "kind": "n-1",
+      "label": "product_sk"
+    }
+  ],
+  "caption": "Star schema: a narrow fact_sales (measures + *_sk FKs at one declared grain) surrounded by wide surrogate-keyed dimensions."
+}
+\`\`\` **star**.
 
 ## Grain: declare it first, always
 
