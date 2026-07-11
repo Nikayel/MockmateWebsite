@@ -1,4 +1,22 @@
+import { isValidElement } from "react"
 import { Components } from "react-markdown"
+import { CsDiagram } from "@/components/tutorials/diagrams/CsDiagram"
+
+/** Flatten react-markdown code-fence children (string | string[]) to the raw fence text. */
+function fenceText(children: React.ReactNode): string {
+  if (typeof children === "string") return children
+  if (Array.isArray(children)) return children.map(fenceText).join("")
+  return ""
+}
+
+/** True when a <pre>'s child is our ```csdiagram fence (so we skip the code-box shell). */
+function isCsDiagramChild(children: React.ReactNode): boolean {
+  return (
+    isValidElement(children) &&
+    typeof (children.props as { className?: string })?.className === "string" &&
+    (children.props as { className?: string }).className!.includes("language-csdiagram")
+  )
+}
 
 /**
  * Custom React Markdown components for consistent styling across the app.
@@ -10,15 +28,25 @@ export const markdownComponents: Components = {
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   em: ({ children }) => <em className="italic">{children}</em>,
 
-  // Code blocks (``` code ```) - for ASCII art diagrams
-  pre: ({ children }) => (
-    <pre className="my-3 overflow-x-auto rounded-lg border border-gray-700/50 bg-gray-900/80 p-3 font-mono text-xs leading-relaxed text-gray-200">
-      {children}
-    </pre>
-  ),
+  // Code blocks (``` code ```) - for ASCII art diagrams. A ```csdiagram fence is a
+  // rendered diagram, not code, so it skips the monospace box entirely (the `code`
+  // handler below returns the diagram component as this child).
+  pre: ({ children }) =>
+    isCsDiagramChild(children) ? (
+      <>{children}</>
+    ) : (
+      <pre className="my-3 overflow-x-auto rounded-lg border border-gray-700/50 bg-gray-900/80 p-3 font-mono text-xs leading-relaxed text-gray-200">
+        {children}
+      </pre>
+    ),
 
   // Inline code and code inside pre blocks
   code: ({ className, children, ...props }) => {
+    // A ```csdiagram fence is authored diagram data — parse + render it, never a code box.
+    if (className?.includes("language-csdiagram")) {
+      return <CsDiagram source={fenceText(children)} />
+    }
+
     // Check if this is a code block (inside pre) vs inline code
     const isCodeBlock =
       className?.includes("language-") ||
