@@ -1852,7 +1852,79 @@ def append_new(value, bucket=None):   # the safe pattern
 
 \`append_new\` is the Practice exercise: use \`None\` as the sentinel and create the list inside.
 
-**Interview nuance:** default arguments are evaluated exactly once at function-definition time and stored on the function object (you can inspect \`bad.__defaults__\`, a tuple holding that one shared list). That is why \`bucket=[]\` accumulates across calls and \`bucket=None\` plus an inside-the-body \`[]\` does not. Interviewers use this to check whether you understand *when* Python evaluates expressions, not just what the syntax looks like.`,
+**Interview nuance:** default arguments are evaluated exactly once at function-definition time and stored on the function object (you can inspect \`bad.__defaults__\`, a tuple holding that one shared list). That is why \`bucket=[]\` accumulates across calls and \`bucket=None\` plus an inside-the-body \`[]\` does not. Interviewers use this to check whether you understand *when* Python evaluates expressions, not just what the syntax looks like.
+
+Step through both versions and watch the one shared default list accumulate, then the None pattern build a fresh list per call:
+
+\`\`\`csdiagram
+{
+  "type": "python-memory",
+  "steps": [
+    {
+      "code": "def bad(item, bucket=[]):",
+      "names": {
+        "bad.__defaults__[0]": "D1"
+      },
+      "objects": {
+        "D1": {
+          "kind": "list",
+          "value": "[]"
+        }
+      },
+      "note": "The default list is created ONCE, when def runs, and stored on the function object."
+    },
+    {
+      "code": "bad('a')",
+      "names": {
+        "bad.__defaults__[0]": "D1",
+        "bucket": "D1"
+      },
+      "objects": {
+        "D1": {
+          "kind": "list",
+          "value": "['a']"
+        }
+      },
+      "mutated": "D1",
+      "note": "bucket binds to that same default list, and append mutates it."
+    },
+    {
+      "code": "bad('b')",
+      "names": {
+        "bad.__defaults__[0]": "D1",
+        "bucket": "D1"
+      },
+      "objects": {
+        "D1": {
+          "kind": "list",
+          "value": "['a', 'b']"
+        }
+      },
+      "mutated": "D1",
+      "note": "Still the SAME list, so the previous call leaked in. That is the bug."
+    },
+    {
+      "code": "append_new('a', bucket=None)  # bucket = [] inside",
+      "names": {
+        "bad.__defaults__[0]": "D1",
+        "bucket": "D2"
+      },
+      "objects": {
+        "D1": {
+          "kind": "list",
+          "value": "['a', 'b']"
+        },
+        "D2": {
+          "kind": "list",
+          "value": "['a']"
+        }
+      },
+      "note": "The None pattern builds a FRESH list inside the body: a new object every call."
+    }
+  ],
+  "caption": "bucket=[] shares one list across every call (bad accumulates); bucket=None builds a new list per call. Default arguments evaluate once, at def time."
+}
+\`\`\``,
     demoCode: `a = [1, 2, 3]
 b = a
 b.append(4)
