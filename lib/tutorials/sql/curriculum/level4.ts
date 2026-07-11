@@ -449,6 +449,43 @@ const windowOffset: SqlLevel["modules"][number]["lessons"][number] = {
 
 Think of a window as one ordered filmstrip per group. \`PARTITION BY customer_id\` splits rows into a separate strip per customer, and \`ORDER BY order_month\` decides which frame comes "before" and "after." \`LAG(col, n)\` reads \`col\` from the frame \`n\` positions back (default \`n = 1\`); \`LEAD(col, n)\` reads \`n\` positions forward. Nothing is joined. Each row just peeks at a neighbor inside its own ordered strip.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "order_month",
+    "revenue",
+    "prev (LAG)",
+    "next (LEAD)"
+  ],
+  "rows": [
+    [
+      "2024-01",
+      100,
+      null,
+      150
+    ],
+    [
+      "2024-02",
+      150,
+      100,
+      90
+    ],
+    [
+      "2024-04",
+      90,
+      150,
+      null
+    ]
+  ],
+  "highlightCols": [
+    "prev (LAG)",
+    "next (LEAD)"
+  ],
+  "caption": "Customer 1's ordered strip. LAG reads one row back, LEAD one row forward. Note March is missing: April's LAG is February (150), because LAG is positional in the result, never calendar-aware."
+}
+\`\`\`
+
 \`\`\`sql
 SELECT
   customer_id,
@@ -1239,6 +1276,54 @@ That design dictates a strict **load order**. Surrogate keys are born in the dim
 
 Reverse that and step 2 has nothing to point at. The lookup join is the whole game: it swaps a source \`email\` for a warehouse \`customer_key\`. You never type a surrogate key literally in the fact insert. You always fetch one.
 
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "dim_customer",
+      "columns": [
+        {
+          "name": "customer_key",
+          "key": "pk"
+        },
+        {
+          "name": "email"
+        },
+        {
+          "name": "name"
+        }
+      ]
+    },
+    {
+      "name": "fact_sales",
+      "columns": [
+        {
+          "name": "sale_id",
+          "key": "pk"
+        },
+        {
+          "name": "customer_key",
+          "key": "fk"
+        },
+        {
+          "name": "amount"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "fact_sales",
+      "to": "dim_customer",
+      "kind": "n-1",
+      "label": "lookup join on email -> customer_key"
+    }
+  ],
+  "caption": "The surrogate key is minted in dim_customer (the pk), then the fact stores it as a fk. Many fact rows point at one dimension row, which is why the dimension must load first."
+}
+\`\`\`
+
 ### How the surrogate key gets minted
 
 In SQLite, a column declared \`INTEGER PRIMARY KEY\` is an alias for the row's \`rowid\`, so it auto-assigns a sequential integer whenever you omit it from the insert.
@@ -1683,6 +1768,41 @@ Type 1 overwrites and forgets. But finance often needs to attribute a sale to th
 order must stay attributed to London. That requires keeping **history**, and that's **SCD Type 2**:
 instead of overwriting, you **expire the old row and insert a new version** with a fresh surrogate key.
 The dimension grows one row per change, and each row carries a **validity window**.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "email",
+    "city",
+    "effective_from",
+    "effective_to",
+    "is_current"
+  ],
+  "rows": [
+    [
+      "a@x.com",
+      "London",
+      "2026-01-01",
+      "2026-03-01",
+      0
+    ],
+    [
+      "a@x.com",
+      "Berlin",
+      "2026-03-01",
+      "9999-12-31",
+      1
+    ]
+  ],
+  "highlightCols": [
+    "effective_from",
+    "effective_to",
+    "is_current"
+  ],
+  "caption": "Ada after the London -> Berlin change. The old row is expired (effective_to set to the change date, is_current 0); the new version opens with a fresh window and is_current 1. Exactly one current row per key, and the windows abut so an as-of join matches exactly one version."
+}
+\`\`\`
 
 Three columns make Type 2 work:
 
