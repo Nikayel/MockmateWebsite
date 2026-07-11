@@ -532,6 +532,27 @@ Read it as: for each \`orders\` row, find the \`customers\` row whose \`customer
 \`customer_id\`, and glue their columns side by side. An order with no matching customer, or a customer
 with no orders, does **not** appear. That's the "inner" part.
 
+Press play to watch each order find its customer, and see exactly why order 103 and Alan drop out:
+
+\`\`\`csdiagram
+{
+  "type": "join",
+  "kind": "inner",
+  "left": {
+    "name": "orders",
+    "columns": ["order_id", "customer_id", "total_cents"],
+    "rows": [[100, 1, 2500], [101, 2, 5000], [102, 1, 9900], [103, 9, 1500]]
+  },
+  "right": {
+    "name": "customers",
+    "columns": ["customer_id", "customer_name"],
+    "rows": [[1, "Ada Lovelace"], [2, "Grace Hopper"], [3, "Alan Turing"]]
+  },
+  "on": ["customer_id", "customer_id"],
+  "caption": "Each order matches its customer on customer_id. Order 103 (customer 9) has no match, so INNER JOIN drops it; Alan (customer 3) has no orders, so he never appears."
+}
+\`\`\`
+
 ## Anatomy of a join
 
 \`\`\`
