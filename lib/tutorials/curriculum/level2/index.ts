@@ -26,7 +26,30 @@ Reach for a comprehension whenever you are building a new collection out of an e
 
 ### The mental model
 
-A list comprehension is a loop-and-collect fused into a single expression. Python still runs the loop; it just builds the list for you. Read it left to right as *"this expression, for each item in the source."*
+A list comprehension is a loop-and-collect fused into a single expression.
+
+\`\`\`csdiagram
+{
+  "type": "comprehension",
+  "loop": [
+    "squares = []",
+    "for n in nums:",
+    "    squares.append(n * n)"
+  ],
+  "comp": "squares = [n * n for n in nums]",
+  "parts": [
+    {
+      "label": "output",
+      "code": "n * n"
+    },
+    {
+      "label": "iterate",
+      "code": "for n in nums"
+    }
+  ],
+  "caption": "The same loop-and-collect, fused into one expression: the output expression comes first, the loop reads left to right."
+}
+\`\`\` Python still runs the loop; it just builds the list for you. Read it left to right as *"this expression, for each item in the source."*
 
 \`\`\`python
 nums = [1, 2, 3, 4, 5]
@@ -39,6 +62,34 @@ That is the exact shape the Apply exercise wants: take each \`n\`, square it, co
 ### Filter with a trailing \`if\`
 
 Add \`if <condition>\` after the loop to keep only the items that pass:
+
+\`\`\`csdiagram
+{
+  "type": "comprehension",
+  "loop": [
+    "evens = []",
+    "for n in nums:",
+    "    if n % 2 == 0:",
+    "        evens.append(n)"
+  ],
+  "comp": "evens = [n for n in nums if n % 2 == 0]",
+  "parts": [
+    {
+      "label": "output",
+      "code": "n"
+    },
+    {
+      "label": "iterate",
+      "code": "for n in nums"
+    },
+    {
+      "label": "filter",
+      "code": "if n % 2 == 0"
+    }
+  ],
+  "caption": "A trailing if maps to the nested if in the loop: it skips items instead of transforming them, so the result gets shorter."
+}
+\`\`\`
 
 \`\`\`python
 evens = [n for n in nums if n % 2 == 0]
