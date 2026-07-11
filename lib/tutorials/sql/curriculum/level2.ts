@@ -187,6 +187,37 @@ GROUP BY category;
 
 Input of 20 product rows across 4 categories → output of exactly 4 rows, one per category, each carrying that category's count and average.
 
+\`\`\`csdiagram
+{
+  "type": "group-by",
+  "agg": "AVG",
+  "by": "category",
+  "rows": [
+    {
+      "group": "audio",
+      "value": 1500
+    },
+    {
+      "group": "audio",
+      "value": 3000
+    },
+    {
+      "group": "audio",
+      "value": 4500
+    },
+    {
+      "group": "cables",
+      "value": 500
+    },
+    {
+      "group": "cables",
+      "value": 1000
+    }
+  ],
+  "caption": "GROUP BY category slices rows into piles, then runs AVG(price_cents) once per pile: audio \u2192 3000, cables \u2192 750."
+}
+\`\`\`
+
 **Anatomy of a grouped query:**
 
 \`\`\`
@@ -370,6 +401,18 @@ HAVING SUM(line_revenue_cents) > 100000;   -- filters GROUPS, not rows
 \`\`\`
 
 ## Anatomy: WHERE vs HAVING
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "preset": "sql-select",
+  "highlight": [
+    "WHERE",
+    "HAVING"
+  ],
+  "caption": "WHERE filters raw rows before grouping; HAVING filters whole groups by their aggregate after grouping. Same pipeline, two different phases."
+}
+\`\`\`
 
 \`\`\`
 WHERE  status = 'paid'                 → keeps rows where a raw column matches
