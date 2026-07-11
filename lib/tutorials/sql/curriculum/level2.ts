@@ -834,6 +834,60 @@ GROUP BY c.customer_id, c.customer_name;
 
 A customer with no orders still appears; their \`o.order_id\` is NULL, and \`COUNT(o.order_id)\` (which skips NULLs) correctly returns \`0\` for them.
 
+\`\`\`csdiagram
+{
+  "type": "join",
+  "kind": "left",
+  "left": {
+    "name": "customers",
+    "columns": [
+      "customer_id",
+      "customer_name"
+    ],
+    "rows": [
+      [
+        1,
+        "Ada"
+      ],
+      [
+        2,
+        "Grace"
+      ],
+      [
+        3,
+        "Alan"
+      ]
+    ]
+  },
+  "right": {
+    "name": "orders",
+    "columns": [
+      "order_id",
+      "customer_id"
+    ],
+    "rows": [
+      [
+        100,
+        1
+      ],
+      [
+        101,
+        1
+      ],
+      [
+        102,
+        2
+      ]
+    ]
+  },
+  "on": [
+    "customer_id",
+    "customer_id"
+  ],
+  "caption": "LEFT JOIN keeps every customer. Alan (customer 3) has no order, so his orders columns are NULL-padded instead of dropped."
+}
+\`\`\`
+
 **Anatomy (the NULL is the whole point):**
 
 \`\`\`
@@ -1008,6 +1062,60 @@ WHERE c.customer_id IS NULL;   -- keep ONLY the rows that failed to match
 
 The \`LEFT JOIN\` keeps every order and NULL-pads the customer columns for unmatched orders. The \`WHERE c.customer_id IS NULL\` then keeps *only* those NULL-padded rows: the orphans. Every matched order is discarded because its \`c.customer_id\` is non-NULL.
 
+\`\`\`csdiagram
+{
+  "type": "join",
+  "kind": "anti",
+  "left": {
+    "name": "orders",
+    "columns": [
+      "order_id",
+      "customer_id"
+    ],
+    "rows": [
+      [
+        100,
+        1
+      ],
+      [
+        101,
+        9
+      ],
+      [
+        102,
+        2
+      ],
+      [
+        103,
+        7
+      ]
+    ]
+  },
+  "right": {
+    "name": "customers",
+    "columns": [
+      "customer_id"
+    ],
+    "rows": [
+      [
+        1
+      ],
+      [
+        2
+      ],
+      [
+        3
+      ]
+    ]
+  },
+  "on": [
+    "customer_id",
+    "customer_id"
+  ],
+  "caption": "Anti-join keeps only orders with NO matching customer: orders 101 (customer 9) and 103 (customer 7) are the orphans; matched orders 100 and 102 drop out."
+}
+\`\`\`
+
 **Anatomy:**
 
 \`\`\`
@@ -1173,6 +1281,68 @@ Add \`ORDER BY e.employee_name\` when output order matters. Row order is not gua
 ## Outer joins for reconciling two sources
 
 Now the two inputs are different tables: yesterday's snapshot and today's. To see what was *added*, *dropped*, or *changed*, you need every key from *both* sides. That is a \`FULL OUTER JOIN\`: keep all left rows, all right rows, and \`NULL\`-pad wherever a match is missing. A \`RIGHT JOIN\` is simply a \`LEFT JOIN\` with the operands swapped (keep every right-side row).
+
+\`\`\`csdiagram
+{
+  "type": "join",
+  "kind": "full",
+  "left": {
+    "name": "yesterday",
+    "columns": [
+      "customer_id",
+      "tier"
+    ],
+    "rows": [
+      [
+        1,
+        "gold"
+      ],
+      [
+        2,
+        "silver"
+      ],
+      [
+        3,
+        "bronze"
+      ],
+      [
+        4,
+        "silver"
+      ]
+    ]
+  },
+  "right": {
+    "name": "today",
+    "columns": [
+      "customer_id",
+      "tier"
+    ],
+    "rows": [
+      [
+        1,
+        "gold"
+      ],
+      [
+        2,
+        "gold"
+      ],
+      [
+        4,
+        "silver"
+      ],
+      [
+        5,
+        "bronze"
+      ]
+    ]
+  },
+  "on": [
+    "customer_id",
+    "customer_id"
+  ],
+  "caption": "FULL OUTER JOIN keeps keys from both snapshots. Customer 3 (only yesterday) was dropped; customer 5 (only today) was added; both surface with a NULL on the missing side."
+}
+\`\`\`
 
 Because an unmatched key is \`NULL\` on the missing side, recover one clean key with \`COALESCE(y.customer_id, t.customer_id)\`, then put yesterday's and today's values side by side and let the \`NULL\`s tell the story:
 
