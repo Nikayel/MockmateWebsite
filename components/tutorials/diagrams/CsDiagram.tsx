@@ -1,7 +1,8 @@
 "use client"
 
-import { parseDiagramSpec } from "@/lib/tutorials/diagrams/schema"
+import { parseDiagramSpec, type DiagramSpec } from "@/lib/tutorials/diagrams/schema"
 import { DiagramError } from "./primitives/DiagramFrame"
+import { DiagramErrorBoundary } from "./primitives/DiagramErrorBoundary"
 import { PipelineDiagram } from "./PipelineDiagram"
 import { JoinDiagram } from "./JoinDiagram"
 import { WindowFrameDiagram } from "./WindowFrameDiagram"
@@ -22,8 +23,11 @@ import { DiagramTable } from "./DiagramTable"
 export function CsDiagram({ source }: { source: string }) {
   const result = parseDiagramSpec(source)
   if (!result.ok) return <DiagramError message={result.error} />
+  // A render throw on a schema edge stays contained to this box, never the app root.
+  return <DiagramErrorBoundary>{renderSpec(result.spec)}</DiagramErrorBoundary>
+}
 
-  const { spec } = result
+function renderSpec(spec: DiagramSpec) {
   switch (spec.type) {
     case "pipeline":
       return <PipelineDiagram spec={spec} />
@@ -44,8 +48,10 @@ export function CsDiagram({ source }: { source: string }) {
     case "table":
       return <DiagramTable spec={spec} />
     default: {
+      // Exhaustiveness guard: adding a spec type without a case is a compile error here.
       const _exhaustive: never = spec
-      return _exhaustive
+      void _exhaustive
+      return null
     }
   }
 }
