@@ -200,6 +200,48 @@ When you scan a 10 GB log file to count errors, you do not want the whole file s
 
 ### A generator is a paused function
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "pull",
+    "body runs to",
+    "yields",
+    "n now"
+  ],
+  "rows": [
+    [
+      "next() #1",
+      "yield n",
+      3,
+      3
+    ],
+    [
+      "next() #2",
+      "n -= 1; yield n",
+      2,
+      2
+    ],
+    [
+      "next() #3",
+      "n -= 1; yield n",
+      1,
+      1
+    ],
+    [
+      "next() #4",
+      "loop ends, StopIteration",
+      null,
+      0
+    ]
+  ],
+  "highlightCols": [
+    "yields"
+  ],
+  "caption": "list(countdown(3)) drives the generator: each pull runs the body to the next yield, hands back one value, then freezes with n intact until the next pull. The 4th pull finds no more yields and raises StopIteration."
+}
+\`\`\`
+
 A generator function uses \`yield\` instead of \`return\`. Calling it does not run the body. It hands you a generator object. Each time you ask for a value (via \`for\`, \`next\`, \`sum\`, and friends), the body runs until it hits a \`yield\`, hands back that value, and freezes right there with every local variable intact. The next request resumes on the line after the \`yield\`.
 
 \`\`\`python
@@ -361,6 +403,43 @@ values = {"name": "Ada", "age": 30}
 \`format(**values)\` is exactly \`format(name="Ada", age=30)\`. One pair of symbols, two mirror roles: \`*\` and \`**\` collect inside a \`def\`, and spread inside a call.
 
 ### Pitfall: passing a container where you meant to unpack it
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "call",
+    "nums binds to",
+    "sum(nums)"
+  ],
+  "rows": [
+    [
+      "total(1, 2, 3)",
+      "(1, 2, 3)",
+      6
+    ],
+    [
+      "total()",
+      "()",
+      0
+    ],
+    [
+      "total(nums)",
+      "([1, 2, 3],)",
+      "TypeError"
+    ],
+    [
+      "total(*nums)",
+      "(1, 2, 3)",
+      6
+    ]
+  ],
+  "highlightCols": [
+    "nums binds to"
+  ],
+  "caption": "*nums collects loose positional arguments into a tuple. With nums = [1, 2, 3], passing the list itself binds it as ONE element, so sum() sees a list inside a tuple and raises TypeError; spreading with *nums restores the three separate arguments."
+}
+\`\`\`
 
 \`total(*nums)\` collects loose numbers, not a list. If you already hold a list, you must spread it, or it arrives as a single argument:
 
@@ -606,6 +685,48 @@ print(c(), c(), c())           # 1 2 3
 \`\`\`
 
 ## Decorators wrap a function
+
+\`\`\`csdiagram
+{
+  "type": "call-stack",
+  "title": "identity(5) with @double",
+  "steps": [
+    {
+      "stack": [
+        "wrapper(5)"
+      ],
+      "note": "@double replaced identity with wrapper; the call lands here"
+    },
+    {
+      "stack": [
+        "wrapper(5)",
+        "fn(5)"
+      ],
+      "note": "wrapper calls the original fn (the real identity)"
+    },
+    {
+      "stack": [
+        "wrapper(5)",
+        "fn(5)"
+      ],
+      "returning": "5"
+    },
+    {
+      "stack": [
+        "wrapper(5)"
+      ],
+      "note": "back in wrapper: take fn(5) and multiply by 2"
+    },
+    {
+      "stack": [
+        "wrapper(5)"
+      ],
+      "returning": "10"
+    }
+  ],
+  "caption": "Writing @double makes the name identity point at wrapper. Calling identity(5) runs wrapper, which calls the original fn (returns 5), then doubles it to return 10."
+}
+\`\`\`
 
 A decorator is a higher-order function: it takes a function and returns a replacement. The demo below defines \`double\`, whose inner \`wrapper\` calls the original \`fn\` and doubles the result. Writing \`@double\` above \`identity\` is exactly \`identity = double(identity)\`, so the name \`identity\` now points at \`wrapper\`, and \`identity(5)\` returns \`10\`.
 
