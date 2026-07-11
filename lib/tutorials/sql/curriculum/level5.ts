@@ -1367,6 +1367,27 @@ const joinFanOutAndSkew: SqlLesson = {
 
 Revenue per region should be a fixed number. But the moment you join \`orders\` to \`order_items\` and then \`SUM(orders.amount)\`, every order's amount is counted once per line item. A three-item order contributes its amount three times. The join fanned the fact out to the item grain, and your total is now wrong by a factor that varies per order. This is the most common silent bug in analytics SQL, and interviewers plant it on purpose.
 
+Step through the join and watch the fan-out happen: each order's \`amount\` reappears once per matching item.
+
+\`\`\`csdiagram
+{
+  "type": "join",
+  "kind": "inner",
+  "left": {
+    "name": "orders",
+    "columns": ["order_id", "amount"],
+    "rows": [[1, 100], [2, 200], [3, 50]]
+  },
+  "right": {
+    "name": "order_items",
+    "columns": ["order_id", "sku"],
+    "rows": [[1, "A"], [1, "B"], [2, "A"], [3, "C"], [3, "A"], [3, "B"]]
+  },
+  "on": ["order_id", "order_id"],
+  "caption": "Order 1 matches 2 items and order 3 matches 3, so each amount repeats once per item. SUM(amount) over these 6 result rows is 550, not the true 350 — that is the fan-out."
+}
+\`\`\`
+
 ## Fix: aggregate to the fact's own grain first
 
 The rule is simple: know the grain of every table in your join, and never sum a measure at a finer grain than the one it lives on. \`amount\` lives at the order grain, so compute revenue at the order grain, in a CTE (or with \`COUNT(DISTINCT order_id)\`), BEFORE joining anything that multiplies rows. Then join the dimension you actually need (region, category) to the pre-aggregated fact, not to the raw fan-out.
