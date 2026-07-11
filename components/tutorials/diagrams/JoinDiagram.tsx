@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { DiagramFrame } from "./primitives/DiagramFrame"
 import { StepControls } from "./primitives/StepControls"
@@ -23,7 +24,7 @@ const KIND_LABEL: Record<JoinSpec["kind"], string> = {
  * Motion is the stepping itself (color only), so it stays calm under reduced motion.
  */
 export function JoinDiagram({ spec }: { spec: JoinSpec }) {
-  const { steps } = computeJoinSteps(spec)
+  const { steps } = useMemo(() => computeJoinSteps(spec), [spec])
   const player = useStepPlayer(steps.length)
   const step = steps[player.index]
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { DiagramFrame } from "./primitives/DiagramFrame"
 import { StepControls } from "./primitives/StepControls"
@@ -24,7 +25,7 @@ const PHASES = ["Rows", "Grouped", "Aggregated"] as const
  * confusion (why you can't SELECT a non-grouped column) by making the collapse visible.
  */
 export function GroupByDiagram({ spec }: { spec: GroupBySpec }) {
-  const buckets = computeGroupBuckets(spec)
+  const buckets = useMemo(() => computeGroupBuckets(spec), [spec])
   const player = useStepPlayer(PHASES.length)
   const phase = player.index // 0 rows, 1 grouped, 2 aggregated
 

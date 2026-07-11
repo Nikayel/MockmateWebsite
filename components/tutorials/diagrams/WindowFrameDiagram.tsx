@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { DiagramFrame } from "./primitives/DiagramFrame"
 import { StepControls } from "./primitives/StepControls"
@@ -24,7 +25,7 @@ function pretty(n: number): string {
  * cannot — and the value column reveals the running total / moving average step by step.
  */
 export function WindowFrameDiagram({ spec }: { spec: WindowFrameSpec }) {
-  const frames = computeWindowFrame(spec)
+  const frames = useMemo(() => computeWindowFrame(spec), [spec])
   const player = useStepPlayer(spec.rows.length)
   const cur = player.index
   const frame = frames[cur]
