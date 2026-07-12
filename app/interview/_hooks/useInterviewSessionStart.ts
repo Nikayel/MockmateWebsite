@@ -1,3 +1,4 @@
+import { useRef, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
@@ -94,7 +95,14 @@ export interface UseInterviewSessionStartOptions {
 }
 
 export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) {
-  const startInterview = async (
+  // Re-entrancy guard. A ref updates synchronously, so a rapid second call (for
+  // example a double-click on "Start practice") is rejected before it can create a
+  // second session and consume quota twice. `isStarting` mirrors it for the UI so
+  // the button can show a loading and disabled state while the start is in flight.
+  const startingRef = useRef(false)
+  const [isStarting, setIsStarting] = useState(false)
+
+  const runStartSequence = async (
     scenarioOverride?: Scenario,
     companyOverride?: InterviewTargetCompany
   ) => {
@@ -453,5 +461,23 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
     // Hints will be fetched when user has written meaningful code (see useEffect below)
   }
 
-  return { startInterview }
+  const startInterview = async (
+    scenarioOverride?: Scenario,
+    companyOverride?: InterviewTargetCompany
+  ) => {
+    // Reject a duplicate invocation while a start is already in flight.
+    if (startingRef.current) return
+    startingRef.current = true
+    setIsStarting(true)
+    try {
+      await runStartSequence(scenarioOverride, companyOverride)
+    } finally {
+      // Release on every exit path: session created, an error, or an early return
+      // that hands off to the company picker. The guard must never stay stuck.
+      startingRef.current = false
+      setIsStarting(false)
+    }
+  }
+
+  return { startInterview, isStarting }
 }

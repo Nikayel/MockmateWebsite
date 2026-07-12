@@ -13,6 +13,9 @@ interface ScenarioListRowProps {
   isSelected: boolean
   isCompleted: boolean
   usageLimit: UsageLimit | null
+  // True while a session start is in flight; keeps the Start button loading and
+  // disabled so a second click cannot open a duplicate session.
+  isStarting?: boolean
   onSelect: (scenario: Scenario) => void
   onStart: (scenario: Scenario) => void
 }
@@ -24,6 +27,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
   isSelected,
   isCompleted,
   usageLimit,
+  isStarting = false,
   onSelect,
   onStart,
 }: ScenarioListRowProps) {
@@ -122,10 +126,11 @@ export const ScenarioListRow = memo(function ScenarioListRow({
               e.stopPropagation()
               onStart(scenario)
             }}
+            loading={isStarting}
             className="h-8 rounded-full bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted"
           >
-            <Play className="mr-1 h-3 w-3" />
-            Start
+            {!isStarting && <Play className="mr-1 h-3 w-3" />}
+            {isStarting ? "Starting..." : "Start"}
           </Button>
         ) : (
           <Button

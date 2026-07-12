@@ -14,6 +14,9 @@ interface ScenarioCardProps {
   isSelected: boolean
   isCompleted: boolean
   usageLimit: UsageLimit | null
+  // True while a session start is in flight; keeps the Start button loading and
+  // disabled so a second click cannot open a duplicate session.
+  isStarting?: boolean
   onSelect: (scenario: Scenario) => void
   onStart: (scenario: Scenario) => void
 }
@@ -32,6 +35,7 @@ export const ScenarioCard = memo(function ScenarioCard({
   isSelected,
   isCompleted,
   usageLimit,
+  isStarting = false,
   onSelect,
   onStart,
 }: ScenarioCardProps) {
@@ -131,10 +135,11 @@ export const ScenarioCard = memo(function ScenarioCard({
               onStart(scenario)
             }}
             disabled={isLocked}
+            loading={isStarting}
             className="w-full bg-card font-semibold text-foreground hover:bg-muted disabled:opacity-50"
           >
-            <Play className="mr-2 h-4 w-4" />
-            Start practice
+            {!isStarting && <Play className="mr-2 h-4 w-4" />}
+            {isStarting ? "Starting..." : "Start practice"}
           </Button>
         ) : (
           <Button

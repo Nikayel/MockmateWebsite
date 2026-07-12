@@ -1053,7 +1053,7 @@ function InterviewPageContent() {
     getCachedUserProfile,
   })
 
-  const { startInterview } = useInterviewSessionStart({
+  const { startInterview, isStarting } = useInterviewSessionStart({
     router,
     user,
     firebaseUser,
@@ -1920,6 +1920,7 @@ function InterviewPageContent() {
             // Pass scenario directly to avoid race condition with state update
             await startInterview(scenario)
           }}
+          isStarting={isStarting}
           usageLimit={usageLimit}
           completedProblems={completedProblems}
           hasGuestBanner={isGuestMode && !showFeedback}
@@ -2068,6 +2069,7 @@ function InterviewPageContent() {
                   setShowCodeInDiscussion={setShowCodeInDiscussion}
                   setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
                   proceedToFinalFeedback={proceedToFinalFeedback}
+                  isGeneratingFeedback={isGeneratingFeedback}
                   feedbackStats={{
                     testsPassed: testSummary.passed,
                     totalTests: testSummary.total,

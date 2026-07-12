@@ -14,6 +14,9 @@ import { ScenarioFilters } from "./ScenarioFilters"
 
 interface ScenarioBrowserProps {
   onStartInterview: (scenario: Scenario) => void
+  // True while a start is in flight; keeps the selected scenario's Start button in a
+  // loading/disabled state so a double-click cannot kick off a second session.
+  isStarting?: boolean
   usageLimit: UsageLimit | null
   completedProblems: string[]
   hasGuestBanner?: boolean
@@ -43,6 +46,7 @@ const LOAD_MORE_STEP = 18
 
 export const ScenarioBrowser = memo(function ScenarioBrowser({
   onStartInterview,
+  isStarting = false,
   usageLimit,
   completedProblems,
   hasGuestBanner = false,
@@ -171,6 +175,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                     isSelected={selectedScenario?.id === scenario.id}
                     isCompleted={completedProblems.includes(scenario.id)}
                     usageLimit={usageLimit}
+                    isStarting={isStarting}
                     onSelect={setSelectedScenario}
                     onStart={onStartInterview}
                   />
@@ -185,6 +190,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                     isSelected={selectedScenario?.id === scenario.id}
                     isCompleted={completedProblems.includes(scenario.id)}
                     usageLimit={usageLimit}
+                    isStarting={isStarting}
                     onSelect={setSelectedScenario}
                     onStart={onStartInterview}
                   />
