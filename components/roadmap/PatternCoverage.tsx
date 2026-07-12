@@ -47,9 +47,12 @@ export function PatternCoverage({ roadmap, companyTopPatterns = [] }: PatternCov
 
   const masteredCount = roadmap.patternCoverage.filter((p) => p.percentage === 100).length
   const totalPatterns = roadmap.patternCoverage.length
-  const overallProgress = Math.round(
-    roadmap.patternCoverage.reduce((sum, p) => sum + p.percentage, 0) / totalPatterns
-  )
+  const overallProgress =
+    totalPatterns > 0
+      ? Math.round(
+          roadmap.patternCoverage.reduce((sum, p) => sum + p.percentage, 0) / totalPatterns
+        )
+      : 0
 
   // Group coverage data by category
   const coverageByCategory = Object.entries(PATTERN_CATEGORIES)

@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { Calendar, Clock, Target, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react'
 import { PersonalizedRoadmap } from '@/lib/data/company-questions/types'
+import { roadmapProgressPercent } from '@/lib/roadmap/progress'
 import { cn } from '@/lib/utils'
 
 interface RoadmapHeaderProps {
@@ -10,7 +11,7 @@ interface RoadmapHeaderProps {
 }
 
 export function RoadmapHeader({ roadmap }: RoadmapHeaderProps) {
-  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const progress = roadmapProgressPercent(roadmap.questionsCompleted, roadmap.totalQuestions)
 
   const interviewDate = new Date(roadmap.interviewDate)
   const now = new Date()
@@ -54,7 +55,7 @@ export function RoadmapHeader({ roadmap }: RoadmapHeaderProps) {
           />
           <CompactStat
             icon={Clock}
-            value={`${Math.round(roadmap.actualHoursSpent)}h`}
+            value={`${Math.round(roadmap.actualHoursSpent || 0)}h`}
             label="studied"
           />
           {/* Progress circle */}

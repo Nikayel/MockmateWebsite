@@ -49,6 +49,7 @@ import { useRoadmapStore, useActiveRoadmap } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
 import type { DailyPlan, Milestone, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
 import { getStudyRecommendations } from "@/lib/roadmap/prioritization-algorithm"
+import { roadmapProgressPercent } from "@/lib/roadmap/progress"
 import { generatePersonalizedGuide } from "@/lib/roadmap/personalized-guide-generator"
 import { cn, getStoredDateComponents, getLocalDateComponents } from "@/lib/utils"
 import { selectDeferTargetIndex } from "@/lib/roadmap/defer-question"
@@ -645,7 +646,7 @@ export default function RoadmapPage() {
   const isCompleted =
     roadmap.questionsCompleted === roadmap.totalQuestions && roadmap.totalQuestions > 0
   const isIntern = roadmap.assessment?.experienceLevel === "intern"
-  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const progress = roadmapProgressPercent(roadmap.questionsCompleted, roadmap.totalQuestions)
 
   // Determine the status type for banner display
   const getStatusType = (): "expired" | "completed" | "archived" | "abandoned" | null => {

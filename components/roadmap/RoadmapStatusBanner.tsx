@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import { roadmapProgressPercent } from "@/lib/roadmap/progress"
 
 export type RoadmapStatusType = "expired" | "archived" | "completed" | "abandoned"
 
@@ -95,7 +96,7 @@ export function RoadmapStatusBanner({
   const config = statusConfig[type]
   const Icon = config.icon
 
-  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const progress = roadmapProgressPercent(roadmap.questionsCompleted, roadmap.totalQuestions)
   const interviewDate = new Date(roadmap.interviewDate)
   const now = new Date()
   const daysUntil = Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -380,7 +381,7 @@ export function ArchivedRoadmapItem({
   isReactivating = false,
 }: ArchivedRoadmapItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const progress = roadmapProgressPercent(roadmap.questionsCompleted, roadmap.totalQuestions)
   const interviewDate = new Date(roadmap.interviewDate)
   const isExpired = interviewDate < new Date()
   const canReactivate = !isExpired && roadmap.status !== "completed"

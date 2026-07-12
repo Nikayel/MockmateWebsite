@@ -6,6 +6,7 @@ import { Archive, BookOpen, CheckCircle2, Plus, RefreshCw, Target, XCircle } fro
 
 import { Header } from "@/components/header"
 import { useAuth } from "@/lib/auth-context"
+import { roadmapProgressPercent } from "@/lib/roadmap/progress"
 import { cn } from "@/lib/utils"
 
 export interface RoadmapSummary {
@@ -222,7 +223,7 @@ function RoadmapCard({
   isReactivating?: boolean
 }) {
   const interviewDate = new Date(roadmap.interviewDate)
-  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const progress = roadmapProgressPercent(roadmap.questionsCompleted, roadmap.totalQuestions)
   const companyName = roadmap.companyName || roadmap.targetCompany
   const status = roadmap.status
   const isExpired = interviewDate < new Date()
