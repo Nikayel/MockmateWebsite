@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
-import { CodeMirrorEditor, type CodeMirrorEditorRef } from "@/components/editor"
+import { type CodeMirrorEditorRef } from "@/components/editor"
 import {
   type ConsoleOutput,
   type TestResult,
@@ -37,6 +37,7 @@ import {
   isWorkspaceScenario,
 } from "../_utils/workspace"
 import { FileTreeSidebar } from "./FileTreeSidebar"
+import { LazyCodeMirrorEditor } from "./LazyCodeMirrorEditor"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
 
@@ -186,7 +187,7 @@ export const EditorColumn = memo(function EditorColumn({
   const editorSurface = (
     <>
       <ErrorBoundary>
-        <CodeMirrorEditor
+        <LazyCodeMirrorEditor
           ref={editorRef}
           height="100%"
           language={editorLanguage}
