@@ -20,10 +20,9 @@ type OrbVariant = "hero" | "knot" | "geo"
  * a single static frame). The canvas is pointer-events:none so it never blocks
  * clicks, and the renderer is disposed on unmount.
  *
- * Note: the rest of the app uses react-three-fiber (SubtleParticles,
- * NeuralNetwork). This component is intentionally vanilla three to match the
- * design handoff spec verbatim; it owns its own WebGL context and does not
- * interfere with R3F canvases on other routes.
+ * Note: this component is intentionally vanilla three.js (no react-three-fiber)
+ * to match the design handoff spec verbatim; it owns its own WebGL context and
+ * manages its own render loop.
  */
 export function ThreeOrb({ variant = "hero" }: { variant?: OrbVariant }) {
   const ref = useRef<HTMLDivElement>(null)

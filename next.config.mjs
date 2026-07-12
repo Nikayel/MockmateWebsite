@@ -35,8 +35,6 @@ const nextConfig = {
   },
   // Mark firebase-admin as a server-only package (Next.js 15+)
   serverExternalPackages: ['firebase-admin'],
-  // Handle nested dependencies
-  transpilePackages: ['tunnel-rat'],
   // Security headers
   async headers() {
     return [
