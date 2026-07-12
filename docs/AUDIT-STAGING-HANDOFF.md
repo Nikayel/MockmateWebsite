@@ -1,0 +1,143 @@
+# Platform Audit — Staging & Finish Handoff
+
+**For:** the next agent taking over the tail of the 2026-07-12 platform audit.
+**Source of truth:** `docs/PLATFORM-AUDIT-FIX-PLAN.md` (checkboxes + Progress Log).
+
+## STATUS UPDATE (2026-07-12, later the same day) — 4 of 5 items closed or resolved
+
+- **Item 1 (Stripe webhook replay): DONE.** 8/8 asserted checks pass against the real
+  route + Firestore emulator (signed events via Stripe's `generateTestHeaderString`;
+  the CLI's cached keys expired 2026-03-13 so `stripe listen/trigger/resend` needs an
+  interactive `stripe login` — the signed harness covers the same paths with
+  programmatic assertions). EDGE-WEBHOOK / DUP-3 / PERF-S10 flipped to STAGED in the
+  plan doc; full details in its Progress Log.
+- **Item 2 (composite index): DONE.** `profile_quota (user_id ASC, period_start DESC)`
+  deployed (`firebase deploy --only firestore:indexes`, no --force) and confirmed live
+  via `firebase firestore:indexes`.
+- **Item 3 (API-1 Deepgram): STILL BLOCKED — needs the account owner.** Smoke test of
+  the exact production mint path: the key has keys:read but LACKS keys:write
+  (403 INSUFFICIENT_PERMISSIONS), so minting ALWAYS fails today and prod hands the raw
+  account key to browsers. Do NOT flip line 43 to 503 until the scope is granted in the
+  Deepgram dashboard and the smoke test passes.
+- **Item 4 (PERF-C12 part A): KEEP-DEFERRED, now evidence-backed.** features-section
+  uses a domMax-only `layoutId`; shared `lib/motion.tsx` fans a strict-m contract onto
+  login/careers/why-codesparring/pricing (inert `m.*` = invisible copy). Safe
+  sequencing recorded in the plan doc's Progress Log.
+- **Item 5 (DEAD-2): left blocked** on NOTIF-WELCOME-1, as instructed.
+
+## Current state (already done — do NOT redo)
+
+The full audit plan is **shipped to `main` and pushed to origin** (~70 commits,
+`ae532f85..7a763e3e`). Gate is green on the pushed HEAD:
+
+- `pnpm typecheck` — clean
+- `pnpm test` — **979 passed / 44 todo** (127 files)
+- `pnpm build` — compiles
+
+Plan status: **68 findings done `[x]`, 2 partial `[~]`, 1 blocked `[ ]`.**
+Regression tests were added throughout (score weights, quota, anniversary dates,
+streak, chat schema, guest-session, EDGE-16, etc.).
+
+## Your job: close the 5 remaining items below. Nothing else is outstanding.
+
+Everything is code-complete; these are verification / finish steps. Work on
+`main` (repo already on it). After any code change, run the full gate
+(`pnpm typecheck && pnpm test && pnpm build`) before committing.
+
+---
+
+### 1. Stripe webhook replay — validate EDGE-WEBHOOK, DUP-3, EDGE-13, EDGE-17, PERF-S10 (NEEDS-STAGING)
+
+These billing fixes are unit-tested but never emulator-replayed. Route:
+`app/api/webhook/stripe/route.ts`; canonical quota writer:
+`lib/stripe-helpers.ts` (`updateQuotaForSubscriptionTierAdmin`).
+
+```bash
+# Terminal A: run the app against the Firebase emulator (test-mode Stripe keys).
+# Terminal B:
+stripe login
+stripe listen --forward-to localhost:3000/api/webhook/stripe
+#   -> copy the printed whsec_...; set STRIPE_WEBHOOK_SECRET_LOCAL to it (dev only)
+# Terminal C:
+stripe trigger checkout.session.completed
+stripe trigger invoice.paid
+stripe events resend <the invoice.paid evt_id>   # RETRY — the key test
+```
+
+**Verify in the Firestore emulator:**
+- `payment_history`: the retried `checkout.session.completed` / `invoice.paid`
+  produced **no duplicate row** (EDGE-13: subscription-mode row is keyed on
+  `${session.id}_${status}`; monthly invoices stay distinct on invoice id).
+- `profile_quota`: the **retried** `invoice.paid` did **NOT** re-zero
+  `sessions_used` mid-period (DUP-3 idempotency via `last_reset_period_start`).
+- `webhook_failures`: empty on success. To exercise the dead-letter paths,
+  force a handler to throw (EDGE-WEBHOOK) and confirm a row is written and the
+  handler still returns 200. For EDGE-17, drive a real checkout with **no
+  `metadata.userId`** and confirm a `checkout.session.completed:no-user` row.
+- PERF-S10: handler stays well under a couple seconds; only one quota-doc mutation.
+
+If any check fails, the fix is localized to that finding's spec in the plan doc.
+
+### 2. Firestore composite index for PERF-S10
+
+PERF-S10 bounded the quota query with `.orderBy("period_start","desc").limit(12)`
+(in `lib/stripe-helpers.ts`). It needs a `profile_quota` composite index on
+`(user_id ASC, period_start DESC)` — the same shape `getUserQuota` already uses,
+so it's very likely already deployed.
+
+```bash
+grep -A10 profile_quota firestore.indexes.json   # confirm (user_id, period_start desc) exists
+firebase deploy --only firestore:indexes         # deploy if missing/undeployed
+```
+If the query throws `FAILED_PRECONDITION` at runtime, the index isn't deployed.
+
+### 3. API-1 — finish the Deepgram ephemeral key (partial `[~]`)
+
+`app/api/voice/token/route.ts` mints an ephemeral `usage:write` key via
+`lib/voice/deepgram-management.ts`, but **falls back to the raw account key**
+when minting fails (line ~43), so the hole isn't fully closed yet.
+
+1. Confirm `DEEPGRAM_API_KEY` has the **`keys:write`** scope (Deepgram dashboard),
+   or set `DEEPGRAM_PROJECT_ID` + a management-capable key.
+2. Smoke-test: `GET /api/voice/token` should return a key **different** from
+   `DEEPGRAM_API_KEY`, and a voice interview should still connect.
+3. Once confirmed, **flip the fallback to fail-closed** — replace the line-43
+   `return NextResponse.json({ apiKey: accountKey })` with a 503:
+   ```ts
+   return NextResponse.json({ error: "Voice transcription temporarily unavailable" }, { status: 503 })
+   ```
+   Keep the warning `logger.warn` above it. Then `pnpm typecheck && pnpm build`,
+   commit, and flip API-1's checkbox from `[~]` to `[x]` in the plan doc.
+
+### 4. PERF-C12 part A (optional, partial `[~]`)
+
+Part B (dynamic `BugfixOnboardingTour`) is done. Part A — wrap the landing
+sections in `<LazyMotion features={domAnimation} strict>` and switch their
+`motion.*` to `m.*` (~15-20KB gz win) — was deferred as risky under strict mode.
+Files: `components/{hero-section,problem-teaser,features-section,comparison-section,metrics-marketing-section,ai-assisted-section,company-roadmap-section}.tsx`,
+`components/providers/LenisProvider.tsx`, `components/ui/magnetic-button.tsx`.
+With `strict`, EVERY `motion.*` under the scope must become `m.*` or it throws at
+runtime — convert carefully and `pnpm build` + visually check both themes.
+
+### 5. DEAD-2 — leave blocked
+
+`lib/notification-helpers.ts` deletion is **correctly blocked** on
+NOTIF-WELCOME-1 (tracked in `PRE-LAUNCH-FIXES.md`). Do it only after that ships.
+
+---
+
+## Deploy
+
+Deploy however this project normally does (Vercel). Before prod, make sure the
+Deepgram env (item 3) is set and the Firestore index (item 2) is deployed.
+
+## Repo conventions (must follow)
+
+- **Commit signing hangs on this volume.** Commit with:
+  `git -c commit.gpgsign=false -c gc.auto=0 commit --no-verify -F <msgfile>`
+  (run `pnpm typecheck` manually first). Commit **as the user, no AI co-author.**
+- A concurrent process sometimes commits to `main` — run `git log --oneline -3`
+  + `git status` before staging, stage only your files, commit right after.
+- **Ignore the `graphify` hook nags** — graphify is disconnected in this repo.
+- Standard commands: `pnpm dev | lint | typecheck | test | build`.
+- Do not re-run the whole audit; only the 5 items above remain.
