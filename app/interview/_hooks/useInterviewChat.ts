@@ -8,6 +8,13 @@ import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import type { ChatMessage } from "../_types"
 
+/**
+ * Fixed id shared by both "session complete" toasts so they never stack (a
+ * later toast with the same id replaces the earlier one) and can be dismissed
+ * the moment feedback generation starts.
+ */
+const SESSION_COMPLETE_TOAST_ID = "interview-session-complete"
+
 /** Minimal structural shape of the voice controller used by the send flow. */
 interface VoiceController {
   isRecording: boolean
@@ -296,10 +303,14 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             data.endMessage ||
               "Session complete! Click 'See Full Interview Score' to see your results.",
             {
+              id: SESSION_COMPLETE_TOAST_ID,
               duration: 5000,
               action: {
                 label: "See Full Interview Score",
-                onClick: proceedToFinalFeedback,
+                onClick: () => {
+                  toast.dismiss(SESSION_COMPLETE_TOAST_ID)
+                  proceedToFinalFeedback()
+                },
               },
             }
           )
@@ -346,10 +357,14 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               toast.info(
                 "Click 'See Full Interview Score' to see your score breakdown and analysis.",
                 {
+                  id: SESSION_COMPLETE_TOAST_ID,
                   duration: 8000,
                   action: {
                     label: "See Full Interview Score",
-                    onClick: proceedToFinalFeedback,
+                    onClick: () => {
+                      toast.dismiss(SESSION_COMPLETE_TOAST_ID)
+                      proceedToFinalFeedback()
+                    },
                   },
                 }
               )

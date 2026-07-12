@@ -45,6 +45,7 @@ interface InterviewFeedbackViewProps {
   setShowCodeInDiscussion: PostInterviewViewProps["setShowCodeInDiscussion"]
   setShowPostInterviewDiscussion: PostInterviewViewProps["setShowPostInterviewDiscussion"]
   proceedToFinalFeedback: PostInterviewViewProps["proceedToFinalFeedback"]
+  isGeneratingFeedback: PostInterviewViewProps["isGeneratingFeedback"]
   // FeedbackLoadingState
   feedbackStats: FeedbackLoadingStateProps["interviewStats"]
   streamingPhase: FeedbackLoadingStateProps["streamingPhase"]
@@ -101,6 +102,7 @@ export function InterviewFeedbackView({
   setShowCodeInDiscussion,
   setShowPostInterviewDiscussion,
   proceedToFinalFeedback,
+  isGeneratingFeedback,
   feedbackStats,
   streamingPhase,
   phaseMessage,
@@ -144,6 +146,7 @@ export function InterviewFeedbackView({
       setShowCodeInDiscussion={setShowCodeInDiscussion}
       setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
       proceedToFinalFeedback={proceedToFinalFeedback}
+      isGeneratingFeedback={isGeneratingFeedback}
       onClose={onGoToDashboard}
     />
   ) : isFeedbackLoading ? (

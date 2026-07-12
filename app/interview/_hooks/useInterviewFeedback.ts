@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
@@ -112,9 +113,22 @@ export interface UseInterviewFeedbackResult {
 export function useInterviewFeedback(
   opts: UseInterviewFeedbackOptions
 ): UseInterviewFeedbackResult {
+  // Guards proceedToFinalFeedback against re-entrant invocations (a double-click
+  // on "See Full Interview Score" or a click through a stacked session-complete
+  // toast) so the one-time completion writes fire exactly once. Reset in the
+  // finally below so a retry after a genuine failure still works.
+  const isGeneratingFeedbackRef = useRef(false)
+
   const proceedToFinalFeedback = async () => {
     const bugfixEvidencePayload = opts.buildBugfixEvidencePayload()
     const bugfixExpectedTouchedFiles = opts.getBugfixExpectedTouchedFiles()
+
+    // Re-entrancy guard: bail if a submission is already in flight so
+    // markSessionEvaluating / updateInterviewSession / trackSessionCompletion /
+    // addActualTime never run twice (double completion write + double-counted
+    // roadmap time). Set before the first await; cleared in the finally.
+    if (isGeneratingFeedbackRef.current) return
+    isGeneratingFeedbackRef.current = true
 
     opts.setShowPostInterviewDiscussion(false)
     opts.setIsGeneratingFeedback(true)
@@ -478,6 +492,7 @@ export function useInterviewFeedback(
       console.error("Error generating final feedback:", error)
       toast.error("Failed to generate feedback")
     } finally {
+      isGeneratingFeedbackRef.current = false
       opts.setIsGeneratingFeedback(false)
     }
   }

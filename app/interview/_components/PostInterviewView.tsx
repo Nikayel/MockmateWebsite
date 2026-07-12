@@ -155,6 +155,7 @@ export interface PostInterviewViewProps {
   setShowCodeInDiscussion: (show: boolean) => void
   setShowPostInterviewDiscussion: (show: boolean) => void
   proceedToFinalFeedback: () => void
+  isGeneratingFeedback: boolean
   onClose?: () => void
 }
 
@@ -176,6 +177,7 @@ export function PostInterviewView({
   setShowCodeInDiscussion,
   setShowPostInterviewDiscussion,
   proceedToFinalFeedback,
+  isGeneratingFeedback,
   onClose,
 }: PostInterviewViewProps) {
   // Smart scroll for chat panel
@@ -236,6 +238,8 @@ export function PostInterviewView({
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
               onClick={proceedToFinalFeedback}
+              loading={isGeneratingFeedback}
+              disabled={isGeneratingFeedback}
               size="sm"
               className="h-10 min-h-[44px] flex-1 rounded-full bg-card px-4 text-xs font-semibold text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:shadow-md active:scale-[0.98] sm:h-11 sm:flex-none sm:px-5 sm:text-sm lg:px-6"
             >
