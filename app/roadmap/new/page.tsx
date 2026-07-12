@@ -15,9 +15,7 @@ import {
 } from "@/components/roadmap"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
-import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { UserRoadmapAssessment } from "@/lib/data/company-questions/types"
-import { scenarios } from "@/lib/scenarios"
 import { useAuth } from "@/lib/auth-context"
 
 type Step = "company" | "date" | "assessment" | "generating"
