@@ -21,6 +21,36 @@ interface RadialOrbitalTimelineProps {
   timelineData: TimelineItem[]
 }
 
+interface NodePosition {
+  x: number
+  y: number
+  angle: number
+  zIndex: number
+  opacity: number
+}
+
+const ORBIT_RADIUS = 160
+// 0.3 degrees every 50ms in the old interval loop equals 6 degrees per second.
+const DEGREES_PER_SECOND = 6
+
+function getNodePosition(
+  index: number,
+  total: number,
+  rotationAngle: number,
+  centerOffset: { x: number; y: number }
+): NodePosition {
+  const angle = ((index / total) * 360 + rotationAngle) % 360
+  const radian = (angle * Math.PI) / 180
+
+  const x = Math.round((ORBIT_RADIUS * Math.cos(radian) + centerOffset.x) * 100) / 100
+  const y = Math.round((ORBIT_RADIUS * Math.sin(radian) + centerOffset.y) * 100) / 100
+
+  const zIndex = Math.round(100 + 50 * Math.cos(radian))
+  const opacity = Math.max(0.4, Math.min(1, 0.4 + 0.6 * ((1 + Math.sin(radian)) / 2)))
+
+  return { x, y, angle, zIndex, opacity }
+}
+
 export default function RadialOrbitalTimeline({ timelineData }: RadialOrbitalTimelineProps) {
   const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({})
   const [rotationAngle, setRotationAngle] = useState<number>(0)
@@ -31,11 +61,14 @@ export default function RadialOrbitalTimeline({ timelineData }: RadialOrbitalTim
     y: 0,
   })
   const [activeNodeId, setActiveNodeId] = useState<number | null>(null)
+  const [isInView, setIsInView] = useState<boolean>(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const orbitRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<Record<number, HTMLDivElement | null>>(
     {} as Record<number, HTMLDivElement | null>
   )
+  const rotationRef = useRef<number>(0)
 
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === containerRef.current || e.target === orbitRef.current) {
@@ -79,24 +112,77 @@ export default function RadialOrbitalTimeline({ timelineData }: RadialOrbitalTim
     })
   }
 
+  // Pause the orbit whenever the section scrolls off screen.
   useEffect(() => {
-    let rotationTimer: ReturnType<typeof setInterval>
+    const node = containerRef.current
+    if (!node) return
 
-    if (autoRotate) {
-      rotationTimer = setInterval(() => {
-        setRotationAngle((prev) => {
-          const newAngle = (prev + 0.3) % 360
-          return Number(newAngle.toFixed(3))
-        })
-      }, 50)
-    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting)
+      },
+      { threshold: 0 }
+    )
 
+    observer.observe(node)
     return () => {
-      if (rotationTimer) {
-        clearInterval(rotationTimer)
-      }
+      observer.disconnect()
     }
-  }, [autoRotate])
+  }, [])
+
+  // Respect the user's reduced-motion preference and react to live changes.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return
+
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)")
+    setPrefersReducedMotion(query.matches)
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setPrefersReducedMotion(event.matches)
+    }
+
+    query.addEventListener("change", handleChange)
+    return () => {
+      query.removeEventListener("change", handleChange)
+    }
+  }, [])
+
+  // Drive the idle orbit with requestAnimationFrame writing transforms straight to
+  // the node refs. React state is reserved for click-to-focus (centerViewOnNode) so
+  // the animation never triggers a re-render. The loop only runs while the section is
+  // on screen, auto-rotation is enabled, and reduced motion is not requested.
+  useEffect(() => {
+    if (!autoRotate || !isInView || prefersReducedMotion) return
+
+    let frameId = 0
+    let lastTimestamp: number | null = null
+    const total = timelineData.length
+
+    const step = (timestamp: number) => {
+      if (lastTimestamp === null) {
+        lastTimestamp = timestamp
+      }
+      const deltaSeconds = (timestamp - lastTimestamp) / 1000
+      lastTimestamp = timestamp
+      rotationRef.current = (rotationRef.current + DEGREES_PER_SECOND * deltaSeconds) % 360
+
+      timelineData.forEach((item, index) => {
+        const node = nodeRefs.current[item.id]
+        if (!node) return
+        const position = getNodePosition(index, total, rotationRef.current, centerOffset)
+        node.style.transform = `translate(${position.x}px, ${position.y}px)`
+        node.style.zIndex = String(position.zIndex)
+        node.style.opacity = String(position.opacity)
+      })
+
+      frameId = requestAnimationFrame(step)
+    }
+
+    frameId = requestAnimationFrame(step)
+    return () => {
+      cancelAnimationFrame(frameId)
+    }
+  }, [autoRotate, isInView, prefersReducedMotion, timelineData, centerOffset])
 
   const centerViewOnNode = (nodeId: number) => {
     if (!nodeRefs.current[nodeId]) return
@@ -104,23 +190,15 @@ export default function RadialOrbitalTimeline({ timelineData }: RadialOrbitalTim
     const nodeIndex = timelineData.findIndex((item) => item.id === nodeId)
     const totalNodes = timelineData.length
     const targetAngle = (nodeIndex / totalNodes) * 360
+    const focusedAngle = 270 - targetAngle
 
-    setRotationAngle(270 - targetAngle)
+    // Keep the rAF seed in sync so resuming after focus continues from here.
+    rotationRef.current = focusedAngle
+    setRotationAngle(focusedAngle)
   }
 
-  const calculateNodePosition = (index: number, total: number) => {
-    const angle = ((index / total) * 360 + rotationAngle) % 360
-    const radius = 160
-    const radian = (angle * Math.PI) / 180
-
-    const x = Math.round((radius * Math.cos(radian) + centerOffset.x) * 100) / 100
-    const y = Math.round((radius * Math.sin(radian) + centerOffset.y) * 100) / 100
-
-    const zIndex = Math.round(100 + 50 * Math.cos(radian))
-    const opacity = Math.max(0.4, Math.min(1, 0.4 + 0.6 * ((1 + Math.sin(radian)) / 2)))
-
-    return { x, y, angle, zIndex, opacity }
-  }
+  const calculateNodePosition = (index: number, total: number): NodePosition =>
+    getNodePosition(index, total, rotationAngle, centerOffset)
 
   const getRelatedItems = (itemId: number): number[] => {
     const currentItem = timelineData.find((item) => item.id === itemId)
