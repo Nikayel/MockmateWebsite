@@ -187,7 +187,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** visual check of /limit-reached; `grep -rn "Unlimited Sessions" app components`
   returns nothing outside config-driven copy.
 
-### [ ] DUP-1 — instant-score weights diverge from final-score weights for ALL 3 interview types — P1
+### [x] DUP-1 — instant-score weights diverge from final-score weights for ALL 3 interview types — P1
 - **Where:** `lib/feedback/score-accumulator.ts:206-220,338` (hardcoded literals; consumed
   by `app/api/feedback/instant/route.ts:143`, `app/api/feedback/stream/route.ts:28`) vs
   `lib/constants.ts:119-176` (`SCORING.PERFORMANCE_WEIGHTS` / `SYSTEM_DESIGN_WEIGHTS` /
@@ -1097,3 +1097,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — EDGE-2 — apiErrorOccurred flag set in all 3 Stripe-lookup catches; monthly downgrade branch guarded (yearly local-date branch untouched). New lib/__tests__/stripe-helpers-edge2.test.ts (throw→no downgrade; canceled→downgrade) green; typecheck clean.
 2026-07-12 — DEAD-12 — added /coverage/ to .gitignore; git check-ignore coverage/base.css exits 0.
 2026-07-12 — DEAD-11 — git rm --cached graphify-out (254 files) + scratch.ts/patch_runners.py/eslint-results.json; added them to .gitignore. settings.json graphify hook left untouched (needs user approval). Files stay on disk, just untracked.
+2026-07-12 — DUP-1 — score-accumulator now imports SCORING.{PERFORMANCE,BUG_FIX,SYSTEM_DESIGN}_WEIGHTS from lib/constants for calculateInstantScores + calculateSystemDesignScores; inline literals deleted; signalsUsed labels/return shape/hard-easy adj preserved. New guard test asserts each type's overall == canonical-weighted sum. typecheck clean, 10 new tests green.

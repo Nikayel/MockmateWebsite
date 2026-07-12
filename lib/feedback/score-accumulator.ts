@@ -5,7 +5,14 @@
  * instantly during the interview, enabling two-phase feedback:
  * 1. Instant: Algorithmic scores (this module)
  * 2. Background: AI-enhanced narrative feedback
+ *
+ * The instant overall score uses the SAME canonical weights as the final
+ * AI-validated score (SCORING.*_WEIGHTS in lib/constants). This keeps a
+ * single source of truth so the instant number a user sees cannot silently
+ * drift from the final number computed from the same subscores.
  */
+
+import { SCORING } from "@/lib/constants"
 
 export interface ScoreSignals {
   // Test results
@@ -201,22 +208,38 @@ export function calculateInstantScores(signals: ScoreSignals): AccumulatedScores
 
   // ============================================
   // OVERALL SCORE
-  // Weighted average with scenario adjustments
+  // Weighted average with scenario adjustments.
+  // Weights come from the canonical SCORING.*_WEIGHTS so the instant score
+  // matches the final AI-validated score computed from the same subscores.
   // ============================================
   let overall: number
 
   if (signals.scenarioType === "system-design") {
-    // System design: Communication is king
-    overall = understanding * 0.2 + problemSolving * 0.2 + codeQuality * 0.1 + communication * 0.5
+    // System design: communication and architecture carry the most weight.
+    const w = SCORING.SYSTEM_DESIGN_WEIGHTS
+    overall =
+      understanding * w.UNDERSTANDING +
+      problemSolving * w.PROBLEM_SOLVING +
+      codeQuality * w.CODE_QUALITY +
+      communication * w.COMMUNICATION
     signalsUsed.push("weights:sysdesign")
   } else if (signals.scenarioType === "bugfix") {
-    // Bugfix: Problem-solving matters most
+    // Bugfix: finding and explaining the root cause matters most.
+    const w = SCORING.BUG_FIX_WEIGHTS
     overall =
-      understanding * 0.25 + problemSolving * 0.35 + codeQuality * 0.25 + communication * 0.15
+      understanding * w.UNDERSTANDING +
+      problemSolving * w.PROBLEM_SOLVING +
+      codeQuality * w.CODE_QUALITY +
+      communication * w.COMMUNICATION
     signalsUsed.push("weights:bugfix")
   } else {
-    // DSA: Balanced with slight code emphasis
-    overall = understanding * 0.25 + problemSolving * 0.25 + codeQuality * 0.3 + communication * 0.2
+    // DSA: full interview simulation weights (communication emphasis).
+    const w = SCORING.PERFORMANCE_WEIGHTS
+    overall =
+      understanding * w.UNDERSTANDING +
+      problemSolving * w.PROBLEM_SOLVING +
+      codeQuality * w.CODE_QUALITY +
+      communication * w.COMMUNICATION
     signalsUsed.push("weights:dsa")
   }
 
@@ -334,8 +357,15 @@ export function calculateSystemDesignScores(signals: {
   if (signals.approachExplained) communication += 20
   if (signals.candidateMessageCount >= 10) communication += 20
 
-  // Overall for system design emphasizes communication
-  const overall = requirements * 0.2 + architecture * 0.2 + scalability * 0.1 + communication * 0.5
+  // Overall for system design uses the canonical system-design weights so the
+  // instant score matches the final AI-validated score. requirements maps to
+  // understanding, architecture to problem-solving, scalability to code quality.
+  const w = SCORING.SYSTEM_DESIGN_WEIGHTS
+  const overall =
+    requirements * w.UNDERSTANDING +
+    architecture * w.PROBLEM_SOLVING +
+    scalability * w.CODE_QUALITY +
+    communication * w.COMMUNICATION
 
   return {
     understanding: clamp(Math.round(requirements)),
