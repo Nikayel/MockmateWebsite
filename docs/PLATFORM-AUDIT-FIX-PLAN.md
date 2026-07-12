@@ -667,7 +667,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Fix:** replace both blocks with `reconcileStreak(...)` imports.
 - **Verify:** `pnpm typecheck` + existing spaced-repetition tests.
 
-### [ ] DUP-6 — `lib/prompts/**` is a dead "single source of truth"; forbidden-phrases rule exists in 3 drifted places — P1 severity, Wave 3 (touches live prompt text — go carefully)
+### [x] DUP-6 — `lib/prompts/**` is a dead "single source of truth"; forbidden-phrases rule exists in 3 drifted places — P1 severity, Wave 3 (touches live prompt text — go carefully)
 - **Where:** orphaned: `lib/prompts/principles.ts:17-98` (INTERVIEWER_PERSONALITY),
   `lib/prompts/templates.ts:28-183` (rubric), `:192-274` (constitutional), `:283-328`,
   `principles.ts:352-373` (hints). The only runtime import of `@/lib/prompts` is
@@ -690,7 +690,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** `pnpm typecheck`; snapshot-test `buildInterviewerPrompt` output unchanged;
   grep proves zero remaining `@/lib/prompts` imports.
 
-### [ ] DUP-7 — spoken-complexity normalization rule in 3 live prompts (+1 orphan), all worded differently — P2
+### [x] DUP-7 — spoken-complexity normalization rule in 3 live prompts (+1 orphan), all worded differently — P2
 - **Where:** `lib/interview/conversation-extraction/prompt.ts:1-33`;
   `lib/feedback/structured-extraction.ts:430-524`;
   `lib/feedback/conversation-validation.ts:90-92`; orphan `lib/prompts/templates.ts:283-328`
@@ -750,7 +750,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   initialize".
 - **Verify:** existing tests + one asserting exactly 1 read of the problems subcollection.
 
-### [ ] PERF-S4 — chat/feedback path reads the profile doc twice and rate-limit state up to 3× — P2
+### [x] PERF-S4 — chat/feedback path reads the profile doc twice and rate-limit state up to 3× — P2
 - **Where:** `lib/quota-enforcement.ts:438` + `:263-277` (checkQuota reads `profiles` then
   `getUserQuota` reads it again); `app/api/chat/route.ts:157-163` route-level
   `checkRateLimit` + `lib/ai-providers.ts:456-461` re-checks inside `generateAIResponse`.
@@ -929,7 +929,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** Performance profile of `/` idle — ~0 render activity when the section is
   off-screen; node click still centers.
 
-### [ ] PERF-C12 — full `framer-motion` import across landing sections; BugfixOnboardingTour eager on /interview — P2
+### [~] PERF-C12 — full `framer-motion` import across landing sections; BugfixOnboardingTour eager on /interview — P2
 - **Where:** `components/hero-section.tsx:5`, `problem-teaser.tsx:3`,
   `features-section.tsx`, `comparison-section.tsx`, `metrics-marketing-section.tsx`,
   `ai-assisted-section.tsx`, `company-roadmap-section.tsx`,
@@ -1117,3 +1117,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — DEAD-10 — pnpm remove of 31 unused packages (grep-verified zero source/config references; the lone vaul 'hit' was the word 'vault' in a lesson): 14 Radix, lottie-react, react-katex(+@types), @stripe/stripe-js, embla-carousel-react, cmdk, input-otp, react-day-picker, @next/mdx, tailwindcss-animate, autoprefixer, react-hook-form, @hookform/resolvers, vaul, plus DEAD-3's @react-three/fiber+@react-three/drei+tunnel-rat. Kept the do-not-break live deps (sql.js, geist, dotenv, three, @types/three, katex/rehype-katex, etc.). Production build green.
 2026-07-12 — PERF-S7/S9/S11, PERF-C10, EDGE-12+DUP-12 (wave-3 batch B) — S7: /api/roadmap reuses the active snapshot (no duplicate query) + gates the legacy full scan; S9: getSmartRecommendations parallelized + id-only mastery projection; S11: session start no longer double-inits quota + direct quota doc get; C10: roadmap wizard uses scenario metadata not the eager array; EDGE-12: retry UI instead of a false 0/8 wall on usage-check failure; DUP-12: free-limit fallback from PRICING_CONFIG. All typecheck-clean (batch-B files), eslint clean, relevant spaced-repetition/anniversary tests green.
 2026-07-12 — wave-3 batch A (11 items, parallel workflow, typecheck+production-build green): EDGE-4 double-click Start guard (startingRef + isStarting threading); EDGE-5 double-invoke feedback guard; EDGE-6 billing-portal failure toasts; EDGE-10 shared roadmapProgressPercent kills NaN%/NaNh; DUP-10 ScoreDisplay canonical technical-score; DUP-11 canonical design mastery weights; PERF-C7 lazy katex/remark-math; PERF-C8 dynamic CodeMirror (forwardRef-preserving); PERF-C9 /sessions scenario metadata; PERF-C11 gated rAF orbital animation; PERF-S12 wired per-request cost-anomaly (fire-and-forget). New: lib/roadmap/progress.ts, components/ui/katex-css.ts, app/interview/_components/LazyCodeMirrorEditor.tsx, design-mastery-score.test.ts.
+2026-07-12 — DUP-6/DUP-7, PERF-S4, PERF-C12 (wave-3 batch C) — DUP-6: single FORBIDDEN_VALIDATION_PHRASES list (prompt byte-identical, snapshot-tested); deleted orphaned lib/prompts (5 files); guardrail regexes restored to exact original tuned anchoring by the orchestrator (agent's mechanical derivation had broadened them to over-flag 'Right,'/'Nice-looking'). DUP-7: single SPOKEN_COMPLEXITY_RULES fragment across 3 prompts. PERF-S4: one profile read on the chat path + skipRateLimit on the route's own calls. PERF-C12: PARTIAL — part B (dynamic BugfixOnboardingTour, ~271KB off /interview) done; part A (landing LazyMotion) deferred as risky under strict mode. typecheck-clean, 26 tests green.
