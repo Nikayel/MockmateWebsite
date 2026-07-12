@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { checkUsageLimit } from "@/lib/firestore-helpers"
+import { PRICING_CONFIG } from "@/lib/config"
 import { User as UserType } from "@/lib/types"
 import { AlertCircle, Crown, CheckCircle, ArrowRight, Clock } from "lucide-react"
 
@@ -103,38 +104,20 @@ export default function LimitReachedPage() {
                   <h2 className="text-2xl font-bold text-foreground">Upgrade to Pro</h2>
                 </div>
                 <p className="mb-6 text-muted-foreground">
-                  Get unlimited interview sessions and unlock advanced features!
+                  Get {PRICING_CONFIG.pro.sessionsDisplay} and unlock advanced features to land your
+                  dream job.
                 </p>
 
                 <div className="mb-6 grid grid-cols-1 gap-4 text-left md:grid-cols-2">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-400" />
-                    <div>
-                      <p className="font-semibold text-foreground">Unlimited Sessions</p>
-                      <p className="text-sm text-muted-foreground">Practice as much as you want</p>
+                  {PRICING_CONFIG.pro.valueProps.map((valueProp) => (
+                    <div key={valueProp.title} className="flex items-start space-x-3">
+                      <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-400" />
+                      <div>
+                        <p className="font-semibold text-foreground">{valueProp.title}</p>
+                        <p className="text-sm text-muted-foreground">{valueProp.description}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-400" />
-                    <div>
-                      <p className="font-semibold text-foreground">500+ Problems</p>
-                      <p className="text-sm text-muted-foreground">Access to extensive problem library</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-400" />
-                    <div>
-                      <p className="font-semibold text-foreground">Advanced Challenges</p>
-                      <p className="text-sm text-muted-foreground">Hard problems and system design</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-400" />
-                    <div>
-                      <p className="font-semibold text-foreground">Analytics & Insights</p>
-                      <p className="text-sm text-muted-foreground">Track your progress and performance</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 <Link href="/upgrade">

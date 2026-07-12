@@ -174,7 +174,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** `pnpm vitest run lib/__tests__/quota-enforcement.test.ts` + a new
   enterprise-tier test asserting `getUserQuota` and `initializeUserQuota` agree.
 
-### [ ] DUP-8 — /limit-reached promises "Unlimited Sessions" and "500+ Problems"; Pro is 35/month — P1
+### [x] DUP-8 — /limit-reached promises "Unlimited Sessions" and "500+ Problems"; Pro is 35/month — P1
 - **Where:** `app/limit-reached/page.tsx:106,113-118` vs canonical `lib/config.ts:65-66`
   (`sessionsPerMonth: 35`, `sessionsDisplay: "350+ problems per month"`;
   `app/upgrade/page.tsx:290` is consistent with config).
@@ -1098,3 +1098,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — DEAD-12 — added /coverage/ to .gitignore; git check-ignore coverage/base.css exits 0.
 2026-07-12 — DEAD-11 — git rm --cached graphify-out (254 files) + scratch.ts/patch_runners.py/eslint-results.json; added them to .gitignore. settings.json graphify hook left untouched (needs user approval). Files stay on disk, just untracked.
 2026-07-12 — DUP-1 — score-accumulator now imports SCORING.{PERFORMANCE,BUG_FIX,SYSTEM_DESIGN}_WEIGHTS from lib/constants for calculateInstantScores + calculateSystemDesignScores; inline literals deleted; signalsUsed labels/return shape/hard-easy adj preserved. New guard test asserts each type's overall == canonical-weighted sum. typecheck clean, 10 new tests green.
+2026-07-12 — DUP-8 — /limit-reached Pro pitch now rendered from PRICING_CONFIG.pro (sessionsDisplay + valueProps map), mirroring app/upgrade; hardcoded "Unlimited Sessions"/"500+ Problems" strings deleted. grep for "Unlimited Sessions" now empty; redirect-if-allowed untouched. typecheck+eslint clean. (Note: config valueProps still contain em dashes that now surface here; out of scope for this finding.)
