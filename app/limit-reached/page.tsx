@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Header } from "@/components/header"
@@ -23,39 +23,81 @@ export default function LimitReachedPage() {
     allowed: boolean
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [checkFailed, setCheckFailed] = useState(false)
+
+  const runUsageCheck = useCallback(async () => {
+    setLoading(true)
+    setCheckFailed(false)
+
+    try {
+      if (!firebaseUser) {
+        router.push("/login?redirect=limit-reached")
+        return
+      }
+
+      // Check usage limit
+      const usage = await checkUsageLimit(firebaseUser.uid)
+      setUsageLimit(usage)
+
+      // If they have sessions available, redirect to interview
+      if (usage.allowed) {
+        router.push("/interview")
+      }
+    } catch (error) {
+      console.error("Error loading limit page:", error)
+      setUsageLimit(null)
+      setCheckFailed(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [firebaseUser, router])
 
   useEffect(() => {
     if (authLoading || !initialized) return
-
-    const checkAuth = async () => {
-      try {
-        if (!firebaseUser) {
-          router.push("/login?redirect=limit-reached")
-          return
-        }
-
-        // Check usage limit
-        const usage = await checkUsageLimit(firebaseUser.uid)
-        setUsageLimit(usage)
-
-        // If they have sessions available, redirect to interview
-        if (usage.allowed) {
-          router.push("/interview")
-        }
-      } catch (error) {
-        console.error("Error loading limit page:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    checkAuth()
-  }, [authLoading, firebaseUser, router, initialized])
+    runUsageCheck()
+  }, [authLoading, initialized, runUsageCheck])
 
   if (loading || authLoading || !initialized) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
+      </main>
+    )
+  }
+
+  // Never render the limit wall from a failed or missing usage check: a null
+  // usageLimit here means the lookup errored, so show a retry instead of a
+  // false "0 sessions left" wall.
+  if (checkFailed || !usageLimit) {
+    return (
+      <main className="min-h-screen bg-background">
+        <Header />
+
+        <div className="pt-24 pb-16">
+          <div className="container mx-auto max-w-4xl px-4">
+            <Card className="glass-effect border-border bg-card/50">
+              <CardContent className="p-12 text-center">
+                <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-yellow-500/20">
+                  <AlertCircle className="h-10 w-10 text-yellow-400" />
+                </div>
+                <h1 className="font-heading mb-4 text-3xl font-bold text-foreground">
+                  Couldn't check your usage
+                </h1>
+                <p className="mb-8 text-lg text-muted-foreground">
+                  We couldn't load your session usage right now. Please try again in a moment.
+                </p>
+                <Button
+                  onClick={runUsageCheck}
+                  className="bg-[#c4703f] px-8 py-6 text-lg text-foreground hover:bg-[#b3632f]"
+                >
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <Footer />
       </main>
     )
   }
@@ -76,7 +118,8 @@ export default function LimitReachedPage() {
                   Monthly Limit Reached
                 </h1>
                 <p className="mb-2 text-xl text-muted-foreground">
-                  You've used all {usageLimit?.limit || 8} free sessions this month
+                  You've used all {usageLimit?.limit ?? PRICING_CONFIG.free.sessionsPerMonth} free
+                  sessions this month
                 </p>
                 <div className="mt-4 flex items-center justify-center space-x-2 text-muted-foreground">
                   <Clock className="h-4 w-4" />
@@ -89,7 +132,8 @@ export default function LimitReachedPage() {
                   <div>
                     <p className="mb-1 text-sm text-muted-foreground">Sessions Used</p>
                     <p className="text-3xl font-bold text-foreground">
-                      {usageLimit?.used || 0} / {usageLimit?.limit || 8}
+                      {usageLimit?.used ?? 0} /{" "}
+                      {usageLimit?.limit ?? PRICING_CONFIG.free.sessionsPerMonth}
                     </p>
                   </div>
                   <Badge className="border-red-500/30 bg-red-500/20 px-4 py-2 text-lg text-red-400">
