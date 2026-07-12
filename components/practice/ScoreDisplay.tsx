@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
 
 interface ScoreDisplayProps {
@@ -196,14 +197,15 @@ export function ScoreDisplay({
     }
   }
 
-  // Use stored technical score if available, otherwise calculate from breakdown
-  // Technical score weights from lib/scoring/types.ts:
-  // codeQuality: 60%, problemSolving: 25%, understanding: 15%
+  // Use stored technical score if available, otherwise derive it from the
+  // breakdown using the canonical weights in lib/constants.
   const technicalScore =
     technicalScoreProp ??
-    Math.round(
-      scores.codeQuality * 0.6 + scores.problemSolving * 0.25 + scores.understanding * 0.15
-    )
+    calculateTechnicalScoreFromBreakdown({
+      codeQualityScore: scores.codeQuality,
+      problemSolvingScore: scores.problemSolving,
+      understandingScore: scores.understanding,
+    })
 
   // Use technical or overall score based on toggle
   const displayScore = showTechnicalOnly ? technicalScore : overallScore
