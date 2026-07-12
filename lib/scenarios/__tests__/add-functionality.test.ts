@@ -9,6 +9,7 @@ describe("add functionality scenarios", () => {
     "add-feature-support-ticket-search",
     "add-feature-digest-scheduler",
     "palantir-911-dispatch-build",
+    "palantir-ontology-org-build",
   ]
 
   it("publishes the curated workspace feature scenarios", () => {

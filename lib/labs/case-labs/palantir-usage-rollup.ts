@@ -17,7 +17,7 @@ export const palantirUsageRollup: CaseLab = {
   title: "Usage Rollup Double-Count",
   company: "palantir",
   role: "FDSE",
-  difficulty: "medium",
+  difficulty: "hard",
   estimatedMinutes: 50,
   brief: {
     situation:
@@ -25,7 +25,7 @@ export const palantirUsageRollup: CaseLab = {
     task: "Across five milestones you'll turn the over-billing report into a precise invariant, trace the rollup to localize where a duplicate slips through (past a plausible-looking red herring), commit to the smallest fix that restores the invariant, make the change inside the real codebase until the tests pass, then defend it and grade yourself.",
   },
   whyThisCompany:
-    "Palantir's Re-engineering round drops you into 200 to 1000 lines of code you did not write, with a subtle logical bug and a planted red herring, and watches how fast you build an accurate mental model and localize the defect. It scores comprehension and disciplined debugging over authoring. This lab mirrors that round: the fix is a couple of lines, but the signal is whether you find the real cause instead of the thing that merely looks wrong. It is one round of a longer loop, so treat it as onsite prep, not the whole bar.",
+    "Palantir's Re-engineering round drops you into 200 to 1000 lines of code you did not write, with a subtle logical bug and a planted red herring, and watches how fast you build an accurate mental model and localize the defect. It scores comprehension and disciplined debugging over authoring. This lab mirrors that round: the fix is a couple of lines, but the signal is whether you find the real cause instead of the thing that merely looks wrong. This is the stretch end of the Palantir track. The distributed-systems framing (at-least-once delivery, cross-shard replay, idempotency) leans toward the full-time FDSE bar, so if you're interviewing as an intern, warm up on the Ontology Learning lab and the 911 Dispatch decomposition lab first and treat this as a reach. It is one round of a longer loop, so treat it as onsite prep, not the whole bar.",
   coverage: {
     covers: [
       "Re-engineering / debugging round (orient in unfamiliar code, find a subtle logical bug)",
@@ -36,6 +36,11 @@ export const palantirUsageRollup: CaseLab = {
         round: "Decomposition round (scope an open-ended system)",
         cta: "911 Dispatch lab",
         href: "/labs/palantir-911-dispatch",
+      },
+      {
+        round: "Learning round (model an unfamiliar API cold)",
+        cta: "Ontology Learning lab",
+        href: "/labs/palantir-ontology-learning",
       },
       {
         round: "Online Assessment + live coding (Python / DSA)",

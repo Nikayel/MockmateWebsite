@@ -30,6 +30,16 @@ export const palantir911Dispatch: CaseLab = {
     ],
     prepElsewhere: [
       {
+        round: "Learning round (model an unfamiliar API cold)",
+        cta: "Ontology Learning lab",
+        href: "/labs/palantir-ontology-learning",
+      },
+      {
+        round: "Re-engineering / debugging round (find a subtle bug in unfamiliar code)",
+        cta: "Usage Rollup lab",
+        href: "/labs/palantir-usage-rollup",
+      },
+      {
         round: "Online Assessment + live coding (Python / DSA)",
         cta: "Daily practice",
         href: "/practice",
