@@ -6,7 +6,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { db } from "@/lib/firebase"
+import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import {
   Clock,
@@ -48,6 +48,7 @@ export default function SessionsPage() {
         }
 
         try {
+          const db = await getDbLazy()
           const sessionsQuery = query(
             collection(db, "interview_sessions"),
             where("user_id", "==", firebaseUser.uid)

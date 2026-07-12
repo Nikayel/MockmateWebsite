@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/lib/auth-context"
 import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
-import { db } from "@/lib/firebase"
+import { getDbLazy } from "@/lib/firebase-lazy"
 import {
   collection,
   query,
@@ -211,6 +211,7 @@ export default function AccountPage() {
           }),
           (async () => {
             try {
+              const db = await getDbLazy()
               const usageQuery = query(
                 collection(db, "profile_quota"),
                 where("user_id", "==", firebaseUser.uid)
@@ -222,6 +223,7 @@ export default function AccountPage() {
           })(),
           (async () => {
             try {
+              const db = await getDbLazy()
               const paymentsQuery = query(
                 collection(db, "payment_history"),
                 where("user_id", "==", firebaseUser.uid)
@@ -233,6 +235,7 @@ export default function AccountPage() {
           })(),
           (async () => {
             try {
+              const db = await getDbLazy()
               const notifPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
               return await getDoc(notifPrefsRef)
             } catch {
@@ -385,6 +388,7 @@ export default function AccountPage() {
         sessions: [],
       }
 
+      const db = await getDbLazy()
       const sessionsQuery = query(
         collection(db, "interview_sessions"),
         where("user_id", "==", firebaseUser.uid)
@@ -457,6 +461,7 @@ export default function AccountPage() {
     setIsSavingPrefs(true)
 
     try {
+      const db = await getDbLazy()
       const profileRef = doc(db, "profiles", firebaseUser.uid)
       const smartPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
       const smartPrefsSnap = await getDoc(smartPrefsRef)
@@ -494,6 +499,7 @@ export default function AccountPage() {
     setIsSavingPrefs(true)
 
     try {
+      const db = await getDbLazy()
       const notifPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
       const notifPrefsSnap = await getDoc(notifPrefsRef)
 

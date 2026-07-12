@@ -7,9 +7,9 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   User as FirebaseUser,
-  AuthError
+  AuthError,
+  Auth
 } from "firebase/auth"
-import { auth } from "./firebase"
 import { trackLogin, trackSignup } from "./analytics"
 
 // Development mode check - logs only appear in development
@@ -109,7 +109,7 @@ function getAuthErrorMessage(error: any): string {
 }
 
 // Validate Firebase auth is initialized
-function validateAuth() {
+function validateAuth(auth: Auth) {
   if (!auth) {
     if (isDev) console.error("Firebase Auth is not initialized")
     throw new Error("Firebase Auth is not initialized. Please check your Firebase configuration.")
@@ -160,8 +160,11 @@ function validateAuth() {
 }
 
 export async function signInWithGitHub(redirect?: string) {
+  const { getAuthLazy } = await import("./firebase-lazy")
+  const auth = await getAuthLazy()
+
   // Validate auth is initialized
-  validateAuth()
+  validateAuth(auth)
 
   // Store redirect in localStorage to retrieve after auth (with validation)
   storeRedirectPath(redirect)
@@ -258,8 +261,11 @@ export async function signInWithGitHub(redirect?: string) {
 }
 
 export async function signInWithGoogle(redirect?: string) {
+  const { getAuthLazy } = await import("./firebase-lazy")
+  const auth = await getAuthLazy()
+
   // Validate auth is initialized
-  validateAuth()
+  validateAuth(auth)
 
   // Store redirect in localStorage to retrieve after auth (with validation)
   storeRedirectPath(redirect)
@@ -358,6 +364,8 @@ export async function signInWithGoogle(redirect?: string) {
 
 export async function signOut() {
   try {
+    const { getAuthLazy } = await import("./firebase-lazy")
+    const auth = await getAuthLazy()
     await firebaseSignOut(auth)
   } catch (error) {
     if (isDev) console.error("Error signing out:", error)
@@ -366,6 +374,8 @@ export async function signOut() {
 }
 
 export async function getCurrentUser(): Promise<FirebaseUser | null> {
+  const { getAuthLazy } = await import("./firebase-lazy")
+  const auth = await getAuthLazy()
   return new Promise((resolve) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       unsubscribe()
@@ -383,7 +393,9 @@ export function generateVSCodeDeepLink(token: string) {
 // Helper to convert Firebase user to our User type
 // Redirect-based sign-in functions (fallback for when popup fails)
 export async function signInWithGitHubRedirect(redirect?: string) {
-  validateAuth()
+  const { getAuthLazy } = await import("./firebase-lazy")
+  const auth = await getAuthLazy()
+  validateAuth(auth)
 
   // Store redirect in localStorage to retrieve after auth (with validation)
   storeRedirectPath(redirect)
@@ -396,7 +408,9 @@ export async function signInWithGitHubRedirect(redirect?: string) {
 }
 
 export async function signInWithGoogleRedirect(redirect?: string) {
-  validateAuth()
+  const { getAuthLazy } = await import("./firebase-lazy")
+  const auth = await getAuthLazy()
+  validateAuth(auth)
 
   // Store redirect in localStorage to retrieve after auth (with validation)
   storeRedirectPath(redirect)
@@ -412,6 +426,8 @@ export async function signInWithGoogleRedirect(redirect?: string) {
 // Handle redirect result (call this on the auth callback page)
 export async function handleAuthRedirect() {
   try {
+    const { getAuthLazy } = await import("./firebase-lazy")
+    const auth = await getAuthLazy()
     const result = await getRedirectResult(auth)
     if (result) {
       const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime

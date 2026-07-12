@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import PracticeFeedback from "@/components/PracticeFeedback"
-import { db } from "@/lib/firebase"
+import { getDbLazy } from "@/lib/firebase-lazy"
 import { doc, getDoc } from "firebase/firestore"
 import { ArrowLeft, Clock, Calendar, Terminal, Loader2 } from "lucide-react"
 import { InterviewSession } from "@/lib/types"
@@ -38,6 +38,7 @@ export default function SessionDetailPage() {
         return null
       }
 
+      const db = await getDbLazy()
       const sessionRef = doc(db, "interview_sessions", sessionId)
       const sessionSnap = await getDoc(sessionRef)
 

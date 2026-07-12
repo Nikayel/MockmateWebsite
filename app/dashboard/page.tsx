@@ -12,7 +12,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
 import { Profile, InterviewSession } from "@/lib/types"
-import { db } from "@/lib/firebase"
+import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import {
   Crown,
@@ -119,6 +119,7 @@ export default function DashboardPage() {
           checkUsageLimit(firebaseUser.uid),
           (async () => {
             try {
+              const db = await getDbLazy()
               const sessionsQuery = query(
                 collection(db, "interview_sessions"),
                 where("user_id", "==", firebaseUser.uid)
