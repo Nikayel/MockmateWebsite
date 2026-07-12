@@ -64,6 +64,33 @@ export function getPriceDisplay(tier: SubscriptionTier, period: 'monthly' | 'yea
 }
 
 /**
+ * Effective monthly session limit for a tier. Enterprise is effectively
+ * unlimited (999 sentinel). This is the single source of truth so the server
+ * quota gate (enforceQuota) and the client gate (checkUsageLimit) never
+ * disagree, and so enterprise never silently falls through to the free limit
+ * via a `pro ? pro : free` ternary (DUP-2).
+ */
+export function getSessionsLimitForTier(tier: SubscriptionTier): number {
+  switch (tier) {
+    case 'enterprise':
+      return 999 // Effectively unlimited
+    case 'pro':
+      return PRICING_CONFIG.pro.sessionsPerMonth
+    case 'free':
+    default:
+      return PRICING_CONFIG.free.sessionsPerMonth
+  }
+}
+
+/**
+ * Whether a tier is a paid tier (pro or enterprise). Use instead of
+ * `tier === 'pro'` so enterprise is never treated as unpaid (DUP-2).
+ */
+export function isPaidTier(tier: SubscriptionTier): boolean {
+  return tier === 'pro' || tier === 'enterprise'
+}
+
+/**
  * AI Budget Caps per tier (monthly)
  * These control how much AI API cost a user can consume
  */

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
-import { PRICING_CONFIG } from "@/lib/config"
+import { getSessionsLimitForTier } from "@/lib/pricing"
 import { calculateBillingPeriod } from "@/lib/firestore-helpers"
 import {
   sendPaymentFailedEmail,
@@ -84,10 +84,7 @@ async function updateQuotaForSubscriptionTierAdmin(
     referenceDate: now,
   })
 
-  const sessionsLimit =
-    subscriptionTier === "pro"
-      ? PRICING_CONFIG.pro.sessionsPerMonth
-      : PRICING_CONFIG.free.sessionsPerMonth
+  const sessionsLimit = getSessionsLimitForTier(subscriptionTier)
 
   // Query for existing quota
   const quotaSnapshot = await adminDb

@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
-import { PRICING_CONFIG } from "./config"
+import { getSessionsLimitForTier } from "./pricing"
 import { CIRCUIT_BREAKER } from "./constants"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
 
@@ -315,13 +315,8 @@ async function getUserQuota(userId: string): Promise<UserQuota | null> {
     const usageSummary = usageSummaryDoc.data()
     const budgetUsed = usageSummary?.totalCost || 0
 
-    // Get session limits based on tier
-    const sessionsLimit =
-      tier === "pro"
-        ? PRICING_CONFIG.pro.sessionsPerMonth
-        : tier === "enterprise"
-          ? 999 // Effectively unlimited
-          : PRICING_CONFIG.free.sessionsPerMonth
+    // Get session limits based on tier (single source of truth — DUP-2)
+    const sessionsLimit = getSessionsLimitForTier(tier)
 
     return {
       sessionsUsed: quota?.sessions_used || 0,

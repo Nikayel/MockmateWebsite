@@ -51,7 +51,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES as DEFAULT_SMART_NOTIFICATION_PREFERENCES,
   type NotificationPreferences as SmartNotificationPreferences,
 } from "@/lib/types/notifications"
-import { PRICING_CONFIG } from "@/lib/config"
+import { getSessionsLimitForTier, isPaidTier } from "@/lib/pricing"
 import { toast } from "sonner"
 import Link from "next/link"
 import {
@@ -599,11 +599,10 @@ export default function AccountPage() {
     )
   }
 
-  const isPro = profile?.subscription_tier === "pro"
+  // isPaidTier so enterprise (a paid tier) is not treated as Free (DUP-2)
+  const isPro = isPaidTier(profile?.subscription_tier ?? "free")
   const usedSessions = usage?.sessions_used || 0
-  const maxSessions = isPro
-    ? PRICING_CONFIG.pro.sessionsPerMonth
-    : PRICING_CONFIG.free.sessionsPerMonth
+  const maxSessions = getSessionsLimitForTier(profile?.subscription_tier ?? "free")
   const usagePercentage = (usedSessions / maxSessions) * 100
 
   return (
