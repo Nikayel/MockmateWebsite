@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { adminDb } from "@/lib/firebase-admin"
 import { Profile } from "@/lib/types"
 import Stripe from "stripe"
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Get user ID from Firebase ID token in Authorization header
-    const userId = await getUserIdFromRequest(request)
+    const { userId } = await verifyAuth(request)
 
     if (!userId) {
       logger.warn("Customer portal: Unauthorized - no valid user ID", {

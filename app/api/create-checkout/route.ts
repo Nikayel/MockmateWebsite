@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Verify authentication - userId must come from verified token
-    const authenticatedUserId = await getUserIdFromRequest(request)
+    const { userId: authenticatedUserId } = await verifyAuth(request)
     if (!authenticatedUserId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }

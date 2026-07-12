@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 import {
   handleGetHints,
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     ]
 
     if (authRequiredActions.includes(action)) {
-      const verifiedUserId = await getUserIdFromRequest(request)
+      const { userId: verifiedUserId } = await verifyAuth(request)
       if (!verifiedUserId) {
         return NextResponse.json({ error: "Authentication required" }, { status: 401 })
       }

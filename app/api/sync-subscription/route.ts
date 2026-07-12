@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
 import { logger } from "@/lib/logger"
 
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic"
 export async function POST(request: NextRequest) {
   try {
     // Get user ID from Firebase ID token in Authorization header
-    const userId = await getUserIdFromRequest(request)
+    const { userId } = await verifyAuth(request)
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

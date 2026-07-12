@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { updateQuotaForSubscriptionTierAdmin } from "@/lib/stripe-helpers"
 import { promoCodeRateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Verify authentication
-    const userId = await getUserIdFromRequest(request)
+    const { userId } = await verifyAuth(request)
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }

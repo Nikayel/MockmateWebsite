@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { scenarios } from "@/lib/scenarios"
 import { generateTextEmbedding, storeTextEmbedding, type TextEmbedding } from "@/lib/rag"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 import { adminDb } from "@/lib/firebase-admin"
 
@@ -41,7 +41,7 @@ async function isAdmin(userId: string): Promise<boolean> {
 export async function POST(request: NextRequest) {
   try {
     // Require authentication
-    const userId = await getUserIdFromRequest(request)
+    const { userId } = await verifyAuth(request)
     if (!userId) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }

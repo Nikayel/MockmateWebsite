@@ -6,7 +6,7 @@ import {
 } from "@/lib/rag/problem-vectorization"
 import { getScenarioById } from "@/lib/scenarios/index"
 import type { DSAScenario } from "@/lib/scenarios/types"
-import { getUserIdFromRequest } from "@/lib/auth-server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 
 /**
@@ -55,7 +55,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     // Require Firebase authentication
-    const userId = await getUserIdFromRequest(request)
+    const { userId } = await verifyAuth(request)
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required. Please log in." },
