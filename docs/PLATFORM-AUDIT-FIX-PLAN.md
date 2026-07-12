@@ -799,7 +799,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** route test — default GET performs exactly 1 roadmap query when an active
   roadmap exists.
 
-### [ ] PERF-S8 — buildEnhancedProfile: dead expensive fetch + sequential reads; admin route triggers 3 concurrent duplicate builds — P2
+### [x] PERF-S8 — buildEnhancedProfile: dead expensive fetch + sequential reads; admin route triggers 3 concurrent duplicate builds — P2
 - **Where:** `lib/rag/enhanced-user-profile.ts:942-965` (`baseProfile` fetched — up to 100
   session reads + a write — then never used; sessions+misconceptions reads sequential);
   `app/api/admin/user-profile/route.ts:121-128` (`Promise.all` of three functions that
@@ -1000,7 +1000,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   change.
 - **Verify:** `pnpm typecheck`.
 
-### [ ] PERF-S14 — verifyAuth + requireTier verify the same ID token twice on every Pro route — P3
+### [x] PERF-S14 — verifyAuth + requireTier verify the same ID token twice on every Pro route — P3
 - **Where:** e.g. `app/api/spaced-repetition/due/route.ts:23-32` (same pattern in stats,
   recommendations, roadmap GET/PATCH); `lib/quota-enforcement.ts:731` (`requireTier` →
   `verifyIdToken` #2 + profile read).
@@ -1120,3 +1120,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — DUP-6/DUP-7, PERF-S4, PERF-C12 (wave-3 batch C) — DUP-6: single FORBIDDEN_VALIDATION_PHRASES list (prompt byte-identical, snapshot-tested); deleted orphaned lib/prompts (5 files); guardrail regexes restored to exact original tuned anchoring by the orchestrator (agent's mechanical derivation had broadened them to over-flag 'Right,'/'Nice-looking'). DUP-7: single SPOKEN_COMPLEXITY_RULES fragment across 3 prompts. PERF-S4: one profile read on the chat path + skipRateLimit on the route's own calls. PERF-C12: PARTIAL — part B (dynamic BugfixOnboardingTour, ~271KB off /interview) done; part A (landing LazyMotion) deferred as risky under strict mode. typecheck-clean, 26 tests green.
 2026-07-12 — wave-4 batch (8 items, parallel workflow, typecheck-clean + 22 tests): EDGE-14 dashboard sessions-fetch-error sentinel + retry card; EDGE-15 0s session no longer 30min; EDGE-16 word-boundary conclusion detection (+6-case test); PERF-S15 bounded chat context array (+61-msg 400 test); PERF-C13 dynamic MemoryBrain off /why-codesparring; PERF-C14 lib/hooks barrel no longer re-exports scenario-heavy hooks; API-3 guest-session Zod score validation (+test); API-4 vectorize-problems generic error.
 2026-07-12 — learning-state cluster (DUP-9/4/5, PERF-S3/S5/S6, EDGE-11, serial agent, +14 tests, 33 spaced-rep green, typecheck+build clean) and webhook cluster (EDGE-13/17, PERF-S10, NEEDS-STAGING): DUP-9 canonical UserLearningState + tolerant read + shared writer (also fixed a latent cron user_id-undefined bug); DUP-4 single advanceStreak; DUP-5 reconcileStreak reuse; PERF-S3 single-doc mastery read; PERF-S6 parallel stats (5 reads -> 2); PERF-S5 chunked batch-defer + knownToExist skip-read; EDGE-11 timezone-correct Due Today + local-hour streak_at_risk; EDGE-13 session-id-keyed idempotent subscription payment row; EDGE-17 no-user checkout dead-letter; PERF-S10 .limit(1) x11 + bounded quota query + Promise.allSettled post-commit side effects + dropped verify read. STAGING for PERF-S10: Stripe CLI emulator replay + confirm (user_id, period_start desc) composite index.
+2026-07-12 — PERF-S8 (removed dead baseProfile fetch + parallelized reads in buildEnhancedProfile; admin route builds the enhanced profile once, deriving insights/interviewReadiness from it) and PERF-S14 (requireTierForUser eliminates the second verifyIdToken on 11 Pro routes; requireTier delegates to it). typecheck clean, eslint clean.
