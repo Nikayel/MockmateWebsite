@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { AuthenticatedDashboard } from "./AuthenticatedDashboard"
 
 interface HomePageClientProps {
   header: React.ReactNode
