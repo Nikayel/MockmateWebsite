@@ -22,7 +22,7 @@
  */
 
 import type { InteractionMetrics } from "../scoring"
-import { SCORING } from "../constants"
+import { SCORING, calculateTechnicalScoreFromBreakdown } from "../constants"
 
 // =============================================================================
 // TYPES
@@ -469,4 +469,39 @@ export function quickMasteryScore(params: {
   }
 
   return Math.max(0, Math.min(100, Math.round(masteryScore)))
+}
+
+// =============================================================================
+// DISCUSSION-BASED MASTERY (system design)
+// =============================================================================
+
+/**
+ * AI-evaluated score breakdown for a discussion interview (system design).
+ * These are the only mastery signals available: there is no executable test pass
+ * rate, hint count, or comparable solve time to feed calculateMasteryScore.
+ */
+export interface DesignMasteryBreakdown {
+  understanding?: number
+  problemSolving?: number
+  codeQuality?: number
+  communication?: number
+}
+
+/**
+ * Calculate the spaced-repetition mastery score for a system-design interview from
+ * its AI-evaluated score breakdown.
+ *
+ * System design has no test pass rate, hint dependency, or comparable solve time, so
+ * the objective calculateMasteryScore pipeline does not apply. Instead this reuses the
+ * single canonical breakdown-to-mastery formula (calculateTechnicalScoreFromBreakdown
+ * in lib/constants: code quality 60%, problem solving 25%, understanding 15%),
+ * deliberately excluding communication so mastery stays design-correctness focused.
+ * Missing dimensions default to 0, matching the prior inline behavior in the hook.
+ */
+export function calculateDesignMasteryScore(breakdown: DesignMasteryBreakdown): number {
+  return calculateTechnicalScoreFromBreakdown({
+    codeQualityScore: breakdown.codeQuality ?? 0,
+    problemSolvingScore: breakdown.problemSolving ?? 0,
+    understandingScore: breakdown.understanding ?? 0,
+  })
 }

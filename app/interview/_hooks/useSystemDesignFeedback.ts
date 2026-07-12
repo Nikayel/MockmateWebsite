@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react"
 import type { User } from "@/lib/types"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { markSessionEvaluating, updateInterviewSession } from "@/lib/firestore-helpers"
+import { calculateDesignMasteryScore } from "@/lib/spaced-repetition/mastery-score"
 import type { Scenario } from "@/lib/scenarios"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import type { InterviewTargetCompany } from "@/lib/stores"
@@ -323,11 +324,7 @@ export function useSystemDesignFeedback(
                 problemId: opts.selectedScenario.id,
                 performanceScore: calculatedPerformanceScore,
                 masteryScore: systemDesignScoreBreakdown
-                  ? Math.round(
-                      (systemDesignScoreBreakdown.understanding || 0) * 0.3 +
-                        (systemDesignScoreBreakdown.problemSolving || 0) * 0.4 +
-                        (systemDesignScoreBreakdown.codeQuality || 0) * 0.3
-                    )
+                  ? calculateDesignMasteryScore(systemDesignScoreBreakdown)
                   : undefined,
                 timeSpentMinutes: Math.round(opts.elapsedTime / 60),
                 hintsUsed: hintsUsedCount,
