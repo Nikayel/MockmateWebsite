@@ -18,9 +18,17 @@ import {
   sortRoadmapsByCreatedAt,
   toDateValue,
   type FirestoreRoadmapData,
+  type RoadmapDocumentSnapshot,
 } from "@/lib/roadmap/roadmap-serialization"
 
 const COLLECTION = "user_roadmaps"
+
+// Legacy roadmap docs created before the status field existed need a one-time status
+// backfill. That backfill requires a full-collection scan on every empty GET, which is
+// expensive because roadmap docs are routinely 100KB+. Once those old docs are migrated,
+// set ROADMAP_LEGACY_STATUS_BACKFILL=false to skip the scan. Enabled by default so the
+// legacy-fix path stays reachable until an operator turns it off.
+const LEGACY_STATUS_BACKFILL_ENABLED = process.env.ROADMAP_LEGACY_STATUS_BACKFILL !== "false"
 
 type RoadmapStatus = PersonalizedRoadmap["status"]
 
@@ -99,117 +107,124 @@ export async function GET(request: NextRequest) {
     logger.info("[Roadmap API] Found active roadmaps", { count: activeSnapshot.docs.length })
 
     const batch = adminDb.batch()
-    let hasExpired = false
+    const expiredDocIds = new Set<string>()
 
     activeSnapshot.docs.forEach((doc) => {
       const data = doc.data() as FirestoreRoadmapData
       const interviewDate = toDateValue(data.interviewDate)
       if (interviewDate < now) {
         batch.update(doc.ref, { status: "archived", updatedAt: new Date() })
-        hasExpired = true
+        expiredDocIds.add(doc.id)
       }
     })
 
-    if (hasExpired) {
+    if (expiredDocIds.size > 0) {
       await batch.commit()
     }
 
-    // Get roadmaps based on query params
+    // Resolve the docs to return based on query params.
     // Note: Avoid composite index requirement by not using orderBy - we sort client-side
-    let snapshot
+    let snapshotDocs: RoadmapDocumentSnapshot[]
     if (getAll) {
       // Get all roadmaps
-      snapshot = await adminDb.collection(COLLECTION).where("userId", "==", userId).get()
+      const allSnapshot = await adminDb.collection(COLLECTION).where("userId", "==", userId).get()
+      snapshotDocs = allSnapshot.docs
     } else if (statusFilter) {
       // Get roadmaps by status
-      snapshot = await adminDb
+      const filteredSnapshot = await adminDb
         .collection(COLLECTION)
         .where("userId", "==", userId)
         .where("status", "==", statusFilter)
         .get()
+      snapshotDocs = filteredSnapshot.docs
     } else {
-      // Get active roadmap only (default behavior)
-      snapshot = await adminDb
-        .collection(COLLECTION)
-        .where("userId", "==", userId)
-        .where("status", "==", "active")
-        .get()
+      // Default path: reuse the active roadmaps already fetched above instead of running
+      // the identical status=="active" query a second time. Drop any docs the expiry batch
+      // just archived so they are not returned as active.
+      snapshotDocs = activeSnapshot.docs.filter((doc) => !expiredDocIds.has(doc.id))
     }
 
-    if (snapshot.empty) {
+    if (snapshotDocs.length === 0) {
       logger.info("[Roadmap API] No roadmaps found matching query")
 
-      // Check if there are any roadmaps without proper status field (legacy data fix)
-      const allDocsSnapshot = await adminDb
-        .collection(COLLECTION)
-        .where("userId", "==", userId)
-        .get()
+      // Legacy status-field backfill (one-time migration path). Skipped for getAll because
+      // that query already scanned every user doc (the same scan would return the same empty
+      // result), and skippable entirely via env flag once old docs are migrated.
+      if (LEGACY_STATUS_BACKFILL_ENABLED && !getAll) {
+        // Check if there are any roadmaps without proper status field (legacy data fix)
+        const allDocsSnapshot = await adminDb
+          .collection(COLLECTION)
+          .where("userId", "==", userId)
+          .get()
 
-      logger.info("[Roadmap API] Total documents for user:", { count: allDocsSnapshot.docs.length })
-
-      // Find roadmaps that need status field fix
-      const docsNeedingFix = allDocsSnapshot.docs.filter((doc) => {
-        const data = doc.data() as FirestoreRoadmapData
-        const hasNoStatus = !data.status
-        const interviewDate = toDateValue(data.interviewDate)
-        const isNotExpired = interviewDate >= new Date()
-        logger.debug("[Roadmap API] Doc status check", {
-          docId: doc.id,
-          status: data.status,
-          company: data.targetCompany || data.companyName,
-          needsFix: hasNoStatus && isNotExpired,
-        })
-        return hasNoStatus && isNotExpired
-      })
-
-      // Fix legacy roadmaps missing status field
-      if (docsNeedingFix.length > 0 && !getAll) {
-        logger.info("[Roadmap API] Fixing legacy roadmaps missing status field", {
-          count: docsNeedingFix.length,
-        })
-        const batch = adminDb.batch()
-
-        // Set the most recent one as active, others as abandoned
-        const sortedDocs = docsNeedingFix.sort((a, b) => {
-          const aCreated = toDateValue((a.data() as FirestoreRoadmapData).createdAt, new Date(0))
-          const bCreated = toDateValue((b.data() as FirestoreRoadmapData).createdAt, new Date(0))
-          return bCreated.getTime() - aCreated.getTime()
+        logger.info("[Roadmap API] Total documents for user:", {
+          count: allDocsSnapshot.docs.length,
         })
 
-        sortedDocs.forEach((doc, index) => {
-          batch.update(doc.ref, {
-            status: index === 0 ? "active" : "abandoned",
-            updatedAt: new Date(),
+        // Find roadmaps that need status field fix
+        const docsNeedingFix = allDocsSnapshot.docs.filter((doc) => {
+          const data = doc.data() as FirestoreRoadmapData
+          const hasNoStatus = !data.status
+          const interviewDate = toDateValue(data.interviewDate)
+          const isNotExpired = interviewDate >= new Date()
+          logger.debug("[Roadmap API] Doc status check", {
+            docId: doc.id,
+            status: data.status,
+            company: data.targetCompany || data.companyName,
+            needsFix: hasNoStatus && isNotExpired,
           })
+          return hasNoStatus && isNotExpired
         })
 
-        await batch.commit()
+        // Fix legacy roadmaps missing status field
+        if (docsNeedingFix.length > 0) {
+          logger.info("[Roadmap API] Fixing legacy roadmaps missing status field", {
+            count: docsNeedingFix.length,
+          })
+          const backfillBatch = adminDb.batch()
 
-        // Return the now-active roadmap
-        const fixedDoc = sortedDocs[0]
-        const convertedRoadmap = serializeRoadmapDocument(fixedDoc, {
-          status: "active",
-          updatedAt: new Date().toISOString(),
-        })
+          // Set the most recent one as active, others as abandoned
+          const sortedDocs = docsNeedingFix.sort((a, b) => {
+            const aCreated = toDateValue((a.data() as FirestoreRoadmapData).createdAt, new Date(0))
+            const bCreated = toDateValue((b.data() as FirestoreRoadmapData).createdAt, new Date(0))
+            return bCreated.getTime() - aCreated.getTime()
+          })
 
-        logger.info("[Roadmap API] Returning fixed roadmap", { roadmapId: convertedRoadmap.id })
-        return NextResponse.json({ roadmap: convertedRoadmap })
+          sortedDocs.forEach((doc, index) => {
+            backfillBatch.update(doc.ref, {
+              status: index === 0 ? "active" : "abandoned",
+              updatedAt: new Date(),
+            })
+          })
+
+          await backfillBatch.commit()
+
+          // Return the now-active roadmap
+          const fixedDoc = sortedDocs[0]
+          const convertedRoadmap = serializeRoadmapDocument(fixedDoc, {
+            status: "active",
+            updatedAt: new Date().toISOString(),
+          })
+
+          logger.info("[Roadmap API] Returning fixed roadmap", { roadmapId: convertedRoadmap.id })
+          return NextResponse.json({ roadmap: convertedRoadmap })
+        }
       }
 
       return NextResponse.json(getAll ? { roadmaps: [] } : { roadmap: null })
     }
 
-    logger.info("[Roadmap API] Found roadmaps matching query", { count: snapshot.docs.length })
+    logger.info("[Roadmap API] Found roadmaps matching query", { count: snapshotDocs.length })
 
     if (getAll || statusFilter) {
       // Sort by createdAt descending (client-side to avoid index requirement)
-      const roadmaps = snapshot.docs
+      const roadmaps = snapshotDocs
         .map((doc) => serializeRoadmapDocument(doc))
         .sort(sortRoadmapsByCreatedAt)
       return NextResponse.json({ roadmaps })
     } else {
       // Get the most recent active roadmap (sort client-side)
-      const sortedDocs = snapshot.docs.sort((a, b) => {
+      const sortedDocs = snapshotDocs.sort((a, b) => {
         const aCreated = toDateValue((a.data() as FirestoreRoadmapData).createdAt, new Date(0))
         const bCreated = toDateValue((b.data() as FirestoreRoadmapData).createdAt, new Date(0))
         return bCreated.getTime() - aCreated.getTime()
