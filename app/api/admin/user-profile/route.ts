@@ -15,8 +15,6 @@ import {
 import { logAdminAction } from "@/lib/admin/audit"
 import {
   getEnhancedUserProfile,
-  getUserInsights,
-  getInterviewReadiness,
   getAccurateBehavioralProfile,
   getUserDataQuality,
 } from "@/lib/rag/enhanced-user-profile"
@@ -111,22 +109,21 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all enhanced profile data in parallel (user has profile)
-    const [
-      enhancedProfile,
-      insights,
-      interviewReadiness,
-      misconceptionData,
-      accurateBehavior,
-      dataQuality,
-    ] = await Promise.all([
-      getEnhancedUserProfile(userId),
-      getUserInsights(userId),
-      getInterviewReadiness(userId),
-      getMisconceptionsSummary(userId),
-      getAccurateBehavioralProfile(userId), // NEW: Production-grade behavioral analysis
-      getUserDataQuality(userId), // NEW: Data quality assessment
-    ])
+    // Fetch enhanced profile data in parallel (user has profile).
+    // Build the enhanced profile ONCE and derive insights / interviewReadiness
+    // from it; they are plain fields on the returned object, so calling
+    // getUserInsights / getInterviewReadiness separately would trigger two more
+    // full profile builds for the same user.
+    const [enhancedProfile, misconceptionData, accurateBehavior, dataQuality] =
+      await Promise.all([
+        getEnhancedUserProfile(userId),
+        getMisconceptionsSummary(userId),
+        getAccurateBehavioralProfile(userId), // NEW: Production-grade behavioral analysis
+        getUserDataQuality(userId), // NEW: Data quality assessment
+      ])
+
+    const insights = enhancedProfile.insights
+    const interviewReadiness = enhancedProfile.interviewReadiness
 
     // Get recent session activity
     const recentSessions = await getRecentSessionsForUser(userId)

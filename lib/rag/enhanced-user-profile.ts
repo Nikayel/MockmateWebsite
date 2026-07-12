@@ -15,11 +15,7 @@ import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { adminDb } from "@/lib/firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
-import {
-  getUserPerformanceRAG,
-  type UserPerformanceProfile,
-  type SessionAnalysis,
-} from "./user-performance-rag"
+import { type SessionAnalysis } from "./user-performance-rag"
 // NEW: Import production-grade behavioral analysis
 import {
   generateAccurateBehavioralProfile,
@@ -939,30 +935,27 @@ export class EnhancedProfileService {
    */
   async buildEnhancedProfile(userId: string): Promise<EnhancedUserProfile> {
     try {
-      // Get base performance data
-      const performanceRAG = getUserPerformanceRAG()
-      const baseProfile = await performanceRAG.getPerformanceProfile(userId)
-
-      // Get raw session data for deeper analysis from session_summaries subcollection
-      const sessionsSnapshot = await adminDb
-        .collection("users")
-        .doc(userId)
-        .collection("session_summaries")
-        .orderBy("completedAt", "desc")
-        .limit(100)
-        .get()
+      // Fetch raw sessions (session_summaries subcollection) and existing
+      // misconceptions concurrently; neither read depends on the other.
+      const [sessionsSnapshot, misconceptionsSnapshot] = await Promise.all([
+        adminDb
+          .collection("users")
+          .doc(userId)
+          .collection("session_summaries")
+          .orderBy("completedAt", "desc")
+          .limit(100)
+          .get(),
+        adminDb
+          .collection("user_misconceptions")
+          .where("userId", "==", userId)
+          .where("status", "==", "active")
+          .get(),
+      ])
 
       const sessions = sessionsSnapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
         .filter((s: Record<string, unknown>) => s.performanceScore !== undefined)
         .map((s: Record<string, unknown>) => this.sessionToAnalysis(s))
-
-      // Load existing misconceptions
-      const misconceptionsSnapshot = await adminDb
-        .collection("user_misconceptions")
-        .where("userId", "==", userId)
-        .where("status", "==", "active")
-        .get()
 
       const existingMisconceptions = misconceptionsSnapshot.docs.map((doc) => ({
         id: doc.id,
