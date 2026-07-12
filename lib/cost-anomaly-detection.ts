@@ -31,6 +31,11 @@ const COST_AVERAGES_STALE_MS = 2 * 60 * 60 * 1000 // 2 hours
 let cachedAverageHourlyCost: { value: number; expiresAt: number } | null = null
 const AVERAGE_COST_CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
+// In-memory cache for anomaly config so the per-request check does not read
+// Firestore on every LLM call. Invalidated by updateAnomalyConfig.
+let cachedAnomalyConfig: { value: CostAnomalyConfig; expiresAt: number } | null = null
+const ANOMALY_CONFIG_CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
+
 export interface CostAnomaly {
   id?: string
   type:
@@ -87,7 +92,7 @@ const DEFAULT_CONFIG: CostAnomalyConfig = {
  */
 export async function checkRequestCostAnomaly(params: {
   cost: number
-  userId: string
+  userId?: string
   sessionId?: string
   provider: string
   model?: string
@@ -99,13 +104,20 @@ export async function checkRequestCostAnomaly(params: {
 
   // Check 1: Single request cost too high
   if (cost > config.singleRequestThreshold) {
+    // Omit undefined fields: Firestore rejects undefined values on write.
+    const context: CostAnomaly["context"] = { provider, tokens }
+    if (userId !== undefined) context.userId = userId
+    if (sessionId !== undefined) context.sessionId = sessionId
+    if (model !== undefined) context.model = model
+    if (endpoint !== undefined) context.endpoint = endpoint
+
     const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
       type: "high_single_request",
       severity: cost > config.singleRequestThreshold * 5 ? "critical" : "warning",
       description: `Single request cost $${cost.toFixed(4)} exceeds threshold of $${config.singleRequestThreshold.toFixed(2)}`,
       cost,
       threshold: config.singleRequestThreshold,
-      context: { userId, sessionId, provider, model, tokens, endpoint },
+      context,
       acknowledged: false,
     }
 
@@ -385,17 +397,27 @@ export async function getAverageHourlyCost(): Promise<number> {
  * Get anomaly config (can be stored in Firestore for runtime updates)
  */
 async function getAnomalyConfig(): Promise<CostAnomalyConfig> {
+  // Check cache first (keeps the per-request check off Firestore's hot path)
+  if (cachedAnomalyConfig && Date.now() < cachedAnomalyConfig.expiresAt) {
+    return cachedAnomalyConfig.value
+  }
+
+  let config = DEFAULT_CONFIG
   try {
     const configDoc = await adminDb.collection("config").doc("cost_anomaly").get()
 
     if (configDoc.exists) {
-      return { ...DEFAULT_CONFIG, ...configDoc.data() } as CostAnomalyConfig
+      config = { ...DEFAULT_CONFIG, ...configDoc.data() } as CostAnomalyConfig
     }
   } catch (error) {
     logger.error("Failed to get anomaly config, using defaults", { error })
   }
 
-  return DEFAULT_CONFIG
+  cachedAnomalyConfig = {
+    value: config,
+    expiresAt: Date.now() + ANOMALY_CONFIG_CACHE_TTL_MS,
+  }
+  return config
 }
 
 /**
@@ -406,6 +428,9 @@ export async function updateAnomalyConfig(config: Partial<CostAnomalyConfig>): P
     .collection("config")
     .doc("cost_anomaly")
     .set({ ...config, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+
+  // Invalidate the cache so the new thresholds take effect immediately
+  cachedAnomalyConfig = null
 }
 
 /**

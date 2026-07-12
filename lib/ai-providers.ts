@@ -21,6 +21,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
 import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
 import { recordGlobalSpend } from "./global-spend-guard"
+import { checkRequestCostAnomaly } from "./cost-anomaly-detection"
 import {
   checkRateLimit,
   recordRequestStart,
@@ -586,6 +587,22 @@ export async function generateAIResponse(
         // attributed to a user — this is the aggregate cost kill-switch and
         // must see every dollar of LLM spend. Fire-and-forget (never throws).
         void recordGlobalSpend(cost)
+
+        // Flag single-request cost anomalies (runaway calls, abuse) without
+        // blocking the response. Strictly fire-and-forget: never awaited, so it
+        // adds zero latency and can never fail the request path. recordAnomaly
+        // dedups within 5 minutes to bound Firestore writes.
+        void checkRequestCostAnomaly({
+          cost,
+          userId,
+          sessionId,
+          provider,
+          model: PROVIDERS[provider].model,
+          tokens: totalTokens,
+          endpoint: eventType,
+        }).catch(() => {
+          // Cost anomaly detection is best-effort - never block the request path
+        })
 
         // 4. Track usage
         if (userId) {
