@@ -74,6 +74,10 @@ const ReferralWidget = dynamic(
   }
 )
 
+// Sentinel returned by the sessions query when it throws, so a failed fetch is
+// distinguishable from a genuinely empty (first-time user) result.
+const SESSIONS_FETCH_ERROR = "sessions-fetch-error" as const
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -95,6 +99,8 @@ export default function DashboardPage() {
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showTour, setShowTour] = useState(false)
+  const [sessionsError, setSessionsError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!initialized || authLoading) return
@@ -126,7 +132,7 @@ export default function DashboardPage() {
               )
               return await getDocs(sessionsQuery)
             } catch {
-              return null
+              return SESSIONS_FETCH_ERROR
             }
           })(),
           (async () => {
@@ -174,29 +180,36 @@ export default function DashboardPage() {
           setShowOnboarding(true)
         }
 
-        if (sessionsSnap && !sessionsSnap.empty) {
-          const sessionsData = sessionsSnap.docs.map(
-            (doc) =>
-              ({
-                id: doc.id,
-                ...doc.data(),
-              }) as InterviewSession
-          )
+        if (sessionsSnap === SESSIONS_FETCH_ERROR) {
+          // Query failed: surface the error state instead of the friendly
+          // first-time-user empty state.
+          setSessionsError(true)
+        } else {
+          setSessionsError(false)
+          if (!sessionsSnap.empty) {
+            const sessionsData = sessionsSnap.docs.map(
+              (doc) =>
+                ({
+                  id: doc.id,
+                  ...doc.data(),
+                }) as InterviewSession
+            )
 
-          sessionsData.sort((a, b) => {
-            const dateA = new Date(a.started_at).getTime()
-            const dateB = new Date(b.started_at).getTime()
-            return dateB - dateA
-          })
+            sessionsData.sort((a, b) => {
+              const dateA = new Date(a.started_at).getTime()
+              const dateB = new Date(b.started_at).getTime()
+              return dateB - dateA
+            })
 
-          // For Recent Activity: show up to 5 most recent (any status)
-          setSessions(sessionsData.slice(0, 5))
+            // For Recent Activity: show up to 5 most recent (any status)
+            setSessions(sessionsData.slice(0, 5))
 
-          // For Recent Avg: only use completed sessions with scores
-          const completed = sessionsData.filter(
-            (s) => s.performance_score !== undefined && s.performance_score !== null
-          )
-          setCompletedSessions(completed.slice(0, 5))
+            // For Recent Avg: only use completed sessions with scores
+            const completed = sessionsData.filter(
+              (s) => s.performance_score !== undefined && s.performance_score !== null
+            )
+            setCompletedSessions(completed.slice(0, 5))
+          }
         }
 
         if (
@@ -254,7 +267,7 @@ export default function DashboardPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [router, firebaseUser, authLoading, initialized, authCheckComplete])
+  }, [router, firebaseUser, authLoading, initialized, authCheckComplete, reloadKey])
 
   if (authLoading || !initialized || !authCheckComplete || dataLoading) {
     return (
@@ -561,7 +574,26 @@ export default function DashboardPage() {
                   </Link>
                 </div>
 
-                {sessions.length === 0 ? (
+                {sessionsError ? (
+                  <div className="p-8 text-center sm:p-12">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10">
+                      <RefreshCw className="h-6 w-6 text-red-400" />
+                    </div>
+                    <p className="mb-1 text-sm text-red-400">Couldn&apos;t load your sessions</p>
+                    <p className="text-muted-foreground mb-4 text-xs">
+                      Something went wrong while loading your recent activity.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setReloadKey((key) => key + 1)}
+                      className="border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    >
+                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                      Retry
+                    </Button>
+                  </div>
+                ) : sessions.length === 0 ? (
                   <div className="p-8 text-center sm:p-12">
                     <div className="bg-muted mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl">
                       <Calendar className="text-muted-foreground h-6 w-6" />
