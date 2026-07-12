@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
-import { getScenarioById } from "@/lib/scenarios"
+import { getScenarioById } from "@/lib/scenarios/index"
 
 export default function SessionsPage() {
   const router = useRouter()
@@ -28,6 +28,10 @@ export default function SessionsPage() {
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
+  // Scenario ids that resolve to a real scenario, so the "Continue" affordance
+  // only enables for sessions that can actually be reopened. Resolved lazily
+  // (see effect below) instead of eagerly importing the full scenario dataset.
+  const [existingScenarioIds, setExistingScenarioIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!initialized || authLoading) return
@@ -84,6 +88,44 @@ export default function SessionsPage() {
 
     loadSessions()
   }, [authLoading, firebaseUser, router, initialized, authCheckComplete])
+
+  // Resolve which in-progress sessions still point at a real scenario. Only
+  // in-progress sessions expose the "Continue" reopen affordance, so we lazily
+  // check just those ids via the same on-demand resolver the reopen flow uses,
+  // keeping the full scenario dataset out of this page's bundle.
+  useEffect(() => {
+    const scenarioIds = Array.from(
+      new Set(
+        sessions
+          .filter((session) => !session.completed_at && session.scenario_id)
+          .map((session) => session.scenario_id as string)
+      )
+    )
+    if (scenarioIds.length === 0) return
+
+    let cancelled = false
+    const resolveExistingScenarios = async () => {
+      const resolved = await Promise.all(
+        scenarioIds.map(async (id) => ({
+          id,
+          exists: Boolean(await getScenarioById(id)),
+        }))
+      )
+      if (cancelled) return
+      setExistingScenarioIds((previous) => {
+        const next = new Set(previous)
+        for (const { id, exists } of resolved) {
+          if (exists) next.add(id)
+        }
+        return next
+      })
+    }
+
+    resolveExistingScenarios()
+    return () => {
+      cancelled = true
+    }
+  }, [sessions])
 
   if (loading || authLoading || !initialized) {
     return (
@@ -159,7 +201,7 @@ export default function SessionsPage() {
                 {sessions.map((session) => {
                   const isInProgress = !session.completed_at
                   const scenarioExists = session.scenario_id
-                    ? !!getScenarioById(session.scenario_id)
+                    ? existingScenarioIds.has(session.scenario_id)
                     : false
                   // Check if session is in post-interview discussion phase
                   // (submitted code but user hasn't clicked "View Detailed Feedback" yet)
