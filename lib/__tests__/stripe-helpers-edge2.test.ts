@@ -17,6 +17,8 @@ function buildAdminDb() {
   const profileRef = { get: profileGet, set: profileSet }
   const quotaQuery: Record<string, unknown> = {}
   quotaQuery.where = vi.fn(() => quotaQuery)
+  quotaQuery.orderBy = vi.fn(() => quotaQuery)
+  quotaQuery.limit = vi.fn(() => quotaQuery)
   quotaQuery.get = quotaGet
   quotaQuery.add = quotaAdd
   return {
