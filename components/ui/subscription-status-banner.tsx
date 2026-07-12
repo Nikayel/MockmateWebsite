@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { AlertTriangle, CreditCard, Clock, XCircle } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import type { Profile } from "@/lib/types"
 
@@ -54,6 +56,12 @@ const DEGRADED_STATUSES: Record<
   },
 }
 
+function notifyPortalError() {
+  toast.error("Couldn't open the billing portal", {
+    description: "Try again from your Account page.",
+  })
+}
+
 function formatDate(isoDate: string | undefined): string {
   if (!isoDate) return ""
   try {
@@ -68,6 +76,8 @@ function formatDate(isoDate: string | undefined): string {
 }
 
 export function SubscriptionStatusBanner({ profile }: SubscriptionStatusBannerProps) {
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false)
+
   if (!profile) return null
 
   const status = profile.subscription_status
@@ -89,11 +99,16 @@ export function SubscriptionStatusBanner({ profile }: SubscriptionStatusBannerPr
     status === "past_due" || status === "requires_action" || status === "unpaid"
 
   async function handleManageSubscription() {
+    setIsOpeningPortal(true)
     try {
       const { getAuth } = await import("firebase/auth")
       const auth = getAuth()
       const idToken = await auth.currentUser?.getIdToken()
-      if (!idToken) return
+      if (!idToken) {
+        notifyPortalError()
+        setIsOpeningPortal(false)
+        return
+      }
 
       const response = await fetch("/api/customer-portal", {
         method: "POST",
@@ -104,11 +119,16 @@ export function SubscriptionStatusBanner({ profile }: SubscriptionStatusBannerPr
       })
 
       const data = await response.json()
-      if (data.url) {
-        window.location.href = data.url
+      if (!response.ok || !data.url) {
+        notifyPortalError()
+        setIsOpeningPortal(false)
+        return
       }
+
+      window.location.href = data.url
     } catch {
-      // Silently fail - user can navigate to account page manually
+      notifyPortalError()
+      setIsOpeningPortal(false)
     }
   }
 
@@ -131,9 +151,10 @@ export function SubscriptionStatusBanner({ profile }: SubscriptionStatusBannerPr
             size="sm"
             variant="outline"
             onClick={handleManageSubscription}
+            loading={isOpeningPortal}
             className="w-full border-zinc-700 sm:w-auto"
           >
-            <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+            {!isOpeningPortal && <CreditCard className="mr-1.5 h-3.5 w-3.5" />}
             Update payment
           </Button>
         )}
