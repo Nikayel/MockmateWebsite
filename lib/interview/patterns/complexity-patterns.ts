@@ -91,6 +91,27 @@ export const VOICE_COMPLEXITY_PATTERNS = [
 ]
 
 /**
+ * Shared prompt fragment describing how spoken/voice-transcribed complexity
+ * phrasings normalize to standard Big-O notation.
+ *
+ * This is the single source of truth for the spoken-complexity normalization
+ * rule used across LLM prompts (conversation extraction, structured feedback
+ * extraction, conversation validation). It mirrors the deterministic mapping
+ * in VOICE_COMPLEXITY_PATTERNS above so prompt guidance and code stay aligned.
+ *
+ * Interpolate this fragment into a prompt in place of any bespoke wording; do
+ * not restate these mappings inline.
+ */
+export const SPOKEN_COMPLEXITY_RULES = `Voice transcription often produces non-standard spellings of Big-O notation. Interpret these charitably and normalize to standard O() notation:
+- "o 1", "o one", "constant" = O(1)
+- "o log in", "log in", "o log n", "log n", "logarithmic" = O(log n)
+- "o n", "on", "oh n", "o en", "linear" = O(n)
+- "o n log n", "n log n", "linearithmic" = O(n log n)
+- "o n 2", "on2", "o n squared", "o n square", "n squared", "quadratic" = O(n²)
+- "o n 3", "n cubed", "cubic" = O(n³)
+If it sounds like a complexity, interpret it charitably.`
+
+/**
  * Extract complexity from text, including voice transcriptions
  */
 export function extractComplexityFromText(text: string): string | null {

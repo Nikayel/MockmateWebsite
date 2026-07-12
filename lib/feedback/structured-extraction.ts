@@ -15,6 +15,7 @@ import {
   findCodingPhaseStart,
   isCodeExplanation,
   fuzzyExtractComplexity,
+  SPOKEN_COMPLEXITY_RULES,
 } from "@/lib/interview/shared-patterns"
 
 // =============================================================================
@@ -451,15 +452,7 @@ EXTRACT THE FOLLOWING (use EXACT quotes from transcript):
    Example of what to IGNORE: "Brute force is O(n²)" when they implemented O(n)
 
    VOICE TRANSCRIPTION HANDLING (IMPORTANT):
-   Voice transcription often produces non-standard formats. Interpret these charitably:
-   - "o log in" or "log in" = O(log n)
-   - "o log n" or "log n" = O(log n)
-   - "o n" or "oh n" or "o en" = O(n)
-   - "o 1" or "o one" = O(1)
-   - "n squared" or "n square" = O(n²)
-   - "constant" = O(1), "linear" = O(n), "logarithmic" = O(log n)
-
-   BE GENEROUS with voice transcription - if it sounds like a complexity, interpret it charitably.
+${SPOKEN_COMPLEXITY_RULES}
    Example: "Time is o log in. And space is constant." should extract:
    - timeComplexity.claimedForSolution: "O(log n)"
    - spaceComplexity.claimedForSolution: "O(1)"

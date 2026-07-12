@@ -8,6 +8,7 @@
 
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
+import { SPOKEN_COMPLEXITY_RULES } from "@/lib/interview/shared-patterns"
 import type { ConversationValidation } from "./types"
 import { detectApproachHeuristically } from "./conversation-heuristics"
 import { getDefaultValidation } from "./validation-defaults"
@@ -87,9 +88,7 @@ Analyze and return this exact JSON structure (no markdown, no explanation):
 
 IMPORTANT for statedComplexity:
 - Extract the EXACT complexity value the candidate stated (e.g., "O(n)", "O(n²)", "O(n log n)")
-- Voice transcription may produce: "o n square" = O(n²), "o n 2" = O(n²), "o n squared" = O(n²)
-- "quadratic" or "n squared" = O(n²)
-- "linear" = O(n), "constant" = O(1)
+${SPOKEN_COMPLEXITY_RULES}
 - If they said multiple complexities, use the LAST one they settled on
 
 VALIDATION RULES:

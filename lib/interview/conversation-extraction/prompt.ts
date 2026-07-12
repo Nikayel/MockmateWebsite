@@ -1,3 +1,5 @@
+import { SPOKEN_COMPLEXITY_RULES } from "@/lib/interview/shared-patterns"
+
 export const EXTRACTION_PROMPT = `You are analyzing a technical interview conversation to extract what the candidate has discussed.
 Your job is to accurately detect signals from the conversation - be thorough but accurate.
 
@@ -27,7 +29,6 @@ Given the messages, extract:
 
 IMPORTANT RULES:
 - Be LIBERAL in detection - if they said something that implies complexity, count it
-- "On2" or "o n squared" or "n squared" = O(n²)
-- "On" or "o n" or "linear" = O(n)
+${SPOKEN_COMPLEXITY_RULES}
 - "two pointer" or "sort first then" = usually O(n²) or O(n log n) overall
 - When multiple complexities mentioned, the DOMINANT (worst) is the overall complexity`
