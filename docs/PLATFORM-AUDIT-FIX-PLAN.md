@@ -96,7 +96,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 
 # Wave 0 — Revenue + data-loss correctness
 
-### [ ] EDGE-1 — Interview autosave NEVER fires (interval destroyed every second) — P1
+### [x] EDGE-1 — Interview autosave NEVER fires (interval destroyed every second) — P1
 - **Where:** `app/interview/_hooks/useInterviewAutosave.ts:61,149,155-177` (interval effect
   with `opts.elapsedTime` in the dep array at :165); `app/interview/_hooks/useInterviewTimer.ts:31-33`;
   `app/interview/page.tsx:304-306`.
@@ -1093,3 +1093,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 ## Progress Log
 
 <!-- One line per completed item: 2026-07-DD — ID — commit <hash> — note -->
+2026-07-12 — EDGE-1 — autosave interval now keyed on session identity only; payload read from optsRef.current (byte-identical literals); typecheck+lint clean. No React renderer in repo (jsdom/RTL absent) so verified via static analysis + review, not renderHook.

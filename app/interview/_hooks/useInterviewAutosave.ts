@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { Scenario } from "@/lib/scenarios"
 import { saveSessionState } from "@/lib/firestore-helpers"
@@ -50,15 +50,25 @@ export interface UseInterviewAutosaveOptions {
  * contract literals are kept inline so the payload-contract scanner sees them.
  */
 export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
+  // Keep the latest options in a ref so the 30s interval reads fresh values
+  // without the effect being torn down on every render. The interview clock
+  // ticks `elapsedTime` every second; the deps array used to include it (and
+  // every other payload field), so the 30s timer was cleared and recreated each
+  // tick and never fired — no autosave ever ran (EDGE-1). The effect now keys
+  // only on session identity and the callback reads `optsRef.current`.
+  const optsRef = useRef(opts)
+  optsRef.current = opts
+
   // Auto-save session data every 30 seconds (localStorage + Firestore/API)
   useEffect(() => {
     // Allow auto-save for both authenticated users and guests
     if (!opts.isInterviewStarted || !opts.selectedScenario) return
     if (!opts.firebaseUser && !opts.isGuestMode) return
 
-    const selectedScenario = opts.selectedScenario
-
     const autoSaveInterval = setInterval(async () => {
+      const opts = optsRef.current
+      const selectedScenario = opts.selectedScenario
+      if (!selectedScenario) return
       try {
         const sessionData = {
           scenarioId: selectedScenario.id,
@@ -152,27 +162,16 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
     return () => {
       clearInterval(autoSaveInterval)
     }
+    // Interval keyed ONLY on session identity — payload fields are read from
+    // optsRef.current inside the callback so a value change (e.g. the 1s clock)
+    // never tears down the 30s timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     opts.isInterviewStarted,
-    opts.selectedScenario,
-    opts.firebaseUser,
+    opts.selectedScenario?.id,
+    opts.currentSessionId,
+    opts.firebaseUser?.uid,
     opts.isGuestMode,
     opts.guestId,
-    opts.code,
-    opts.chatMessages,
-    opts.interviewerMessages,
-    opts.selectedLanguage,
-    opts.elapsedTime,
-    opts.testResults,
-    opts.testSummary,
-    opts.workspaceContext,
-    opts.activeWorkspacePath,
-    opts.consoleLogs,
-    opts.bugfixEvidenceEvents,
-    opts.bugfixHypothesis,
-    opts.bugfixRootCause,
-    opts.bugfixPrevention,
-    opts.currentSessionId,
-    opts.showPostInterviewDiscussion,
   ])
 }
