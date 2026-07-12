@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
-import { MemoryBrain } from "@/components/three/MemoryBrain"
+import { DynamicMemoryBrain } from "@/components/three/DynamicMemoryBrain"
 
 /**
  * why-codesparring hero — the DSA retention / forgetting-curve story, led by a
@@ -83,7 +83,7 @@ export function HeroSection() {
           >
             {/* Canvas, masked so it fades into the panel edges. */}
             <div className="absolute inset-0 [mask-image:radial-gradient(circle_at_center,black_55%,transparent_82%)] [-webkit-mask-image:radial-gradient(circle_at_center,black_55%,transparent_82%)]">
-              <MemoryBrain />
+              <DynamicMemoryBrain />
             </div>
 
             {/* Caption */}
