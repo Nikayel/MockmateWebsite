@@ -196,6 +196,11 @@ export async function POST(request: NextRequest) {
     const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
     const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
 
+    // Analyze code completeness ONCE (fast, no AI) and reuse everywhere:
+    // critique input, DSA prompt, Constitutional AI tracking, and response flags.
+    // Undefined when no code was submitted (call sites treat that as their own default).
+    const codeCompleteness = code ? analyzeCodeCompleteness(code, language || "python") : undefined
+
     // Determine if AI validation is needed
     const shouldValidateWithAI =
       scenarioType === "system-design"
@@ -251,11 +256,67 @@ export async function POST(request: NextRequest) {
           })
         : Promise.resolve(undefined)
 
-    // Run both in parallel with timeout
-    const [aiValidation, extractedEvidence] = await Promise.all([
-      aiValidationPromise,
-      extractionPromise,
-    ])
+    // Create promise for the clarifying-questions check (Real Interview Mode only).
+    // Its inputs depend ONLY on the raw request, so it runs concurrently with the
+    // validation/extraction join instead of serially afterward. The bonus/penalty it
+    // produces is still applied after the join (see Step 3.6 below), so ordering of the
+    // score mutation is unchanged. checkClarifyingQuestions never rejects (it returns a
+    // default result on error); the .catch here is defensive, mirroring the prior try/catch.
+    const clarifyingQuestionsPromise: Promise<ClarifyingQuestionsCheckResult | undefined> =
+      realInterviewMode &&
+      scenarioClarifyingQuestions &&
+      Array.isArray(scenarioClarifyingQuestions) &&
+      scenarioClarifyingQuestions.length > 0 &&
+      conversationTranscript &&
+      Array.isArray(conversationTranscript)
+        ? checkClarifyingQuestions(
+            scenarioClarifyingQuestions,
+            // Convert conversation to ChatMessage format expected by the checker
+            conversationTranscript.map((msg: any) => ({
+              type: (msg.type === "user" || msg.role === "user" || msg.role === "candidate"
+                ? "user"
+                : "ai") as "user" | "ai",
+              message: (msg.message || msg.content || "") as string,
+            })),
+            { userId, sessionId, scenarioId }
+          ).catch((error) => {
+            logger.warn("[Feedback API] Clarifying questions check failed", { error, sessionId })
+            return undefined
+          })
+        : Promise.resolve(undefined)
+
+    // Maps scenario type to ScenarioType for the RAG context builder.
+    const ragScenarioType =
+      scenarioType === "bugfix"
+        ? "bugfix"
+        : scenarioType === "system-design"
+          ? "system-design"
+          : "dsa"
+
+    // Create promise for the RAG-enhanced feedback context. Its inputs depend ONLY on the
+    // raw request (and pre-join test metrics), so it runs concurrently with the join instead
+    // of serially later. Resolves to "" on failure, matching the prior try/catch fallback.
+    const ragFeedbackContextPromise: Promise<string> = buildRAGFeedbackContext({
+      problemText: scenarioTitle || "",
+      userCode: code || "",
+      testResults: { passed: testsPassed, total: testsTotal },
+      scenarioPattern: efficiencyMetrics?.problemPattern, // Pattern from efficiency analysis
+      scenarioType: ragScenarioType, // Use knowledge base specific to scenario type
+      difficulty: efficiencyMetrics?.difficulty as "easy" | "medium" | "hard",
+      userId,
+    }).catch((error) => {
+      logger.warn("[Feedback API] RAG context failed, continuing without", { error })
+      return ""
+    })
+
+    // Run all independent AI/RAG operations in parallel with timeout
+    const [aiValidation, extractedEvidence, clarifyingQuestionsResult, ragFeedbackContext] =
+      await Promise.all([
+        aiValidationPromise,
+        extractionPromise,
+        clarifyingQuestionsPromise,
+        ragFeedbackContextPromise,
+      ])
 
     const parallelDuration = Date.now() - parallelStartTime
     logger.info("[Feedback API] Parallel AI operations completed", {
@@ -460,62 +521,39 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3.6: Clarifying Questions Check (Real Interview Mode only)
-    let clarifyingQuestionsResult: ClarifyingQuestionsCheckResult | undefined
-    if (
-      realInterviewMode &&
-      scenarioClarifyingQuestions &&
-      Array.isArray(scenarioClarifyingQuestions) &&
-      scenarioClarifyingQuestions.length > 0 &&
-      conversationTranscript &&
-      Array.isArray(conversationTranscript)
-    ) {
-      try {
-        // Convert conversation to ChatMessage format expected by the checker
-        const chatMessages = conversationTranscript.map((msg: any) => ({
-          type: (msg.type === "user" || msg.role === "user" || msg.role === "candidate"
-            ? "user"
-            : "ai") as "user" | "ai",
-          message: (msg.message || msg.content || "") as string,
-        }))
+    // The check itself ran concurrently in the parallel AI join above. Here we apply its
+    // bonus/penalty to the (already computed) communication score, keeping the score
+    // mutation in the same place in the pipeline as before.
+    if (clarifyingQuestionsResult) {
+      logger.info("[Feedback API] Clarifying questions check completed", {
+        sessionId,
+        score: clarifyingQuestionsResult.score,
+        requiredAsked: clarifyingQuestionsResult.requiredAsked,
+        requiredTotal: clarifyingQuestionsResult.requiredTotal,
+        provider: clarifyingQuestionsResult.provider,
+        latencyMs: clarifyingQuestionsResult.latencyMs,
+      })
 
-        clarifyingQuestionsResult = await checkClarifyingQuestions(
-          scenarioClarifyingQuestions,
-          chatMessages,
-          { userId, sessionId, scenarioId }
-        )
-
-        logger.info("[Feedback API] Clarifying questions check completed", {
+      // Apply clarifying questions bonus/penalty to communication score
+      const cqScore = clarifyingQuestionsResult.score
+      if (cqScore >= 70) {
+        // Good clarifying questions = bonus to communication
+        validatedScores.communication = Math.min(100, validatedScores.communication + 10)
+        logger.info("[Feedback API] Clarifying questions bonus applied", {
           sessionId,
-          score: clarifyingQuestionsResult.score,
-          requiredAsked: clarifyingQuestionsResult.requiredAsked,
-          requiredTotal: clarifyingQuestionsResult.requiredTotal,
-          provider: clarifyingQuestionsResult.provider,
-          latencyMs: clarifyingQuestionsResult.latencyMs,
+          cqScore,
+          bonus: 10,
         })
-
-        // Apply clarifying questions bonus/penalty to communication score
-        const cqScore = clarifyingQuestionsResult.score
-        if (cqScore >= 70) {
-          // Good clarifying questions = bonus to communication
-          validatedScores.communication = Math.min(100, validatedScores.communication + 10)
-          logger.info("[Feedback API] Clarifying questions bonus applied", {
-            sessionId,
-            cqScore,
-            bonus: 10,
-          })
-        } else if (cqScore < 30 && clarifyingQuestionsResult.requiredTotal > 0) {
-          // Missed required clarifying questions = penalty
-          validatedScores.communication = Math.max(30, validatedScores.communication - 10)
-          logger.info("[Feedback API] Clarifying questions penalty applied", {
-            sessionId,
-            cqScore,
-            penalty: -10,
-            missedRequired:
-              clarifyingQuestionsResult.requiredTotal - clarifyingQuestionsResult.requiredAsked,
-          })
-        }
-      } catch (error) {
-        logger.warn("[Feedback API] Clarifying questions check failed", { error, sessionId })
+      } else if (cqScore < 30 && clarifyingQuestionsResult.requiredTotal > 0) {
+        // Missed required clarifying questions = penalty
+        validatedScores.communication = Math.max(30, validatedScores.communication - 10)
+        logger.info("[Feedback API] Clarifying questions penalty applied", {
+          sessionId,
+          cqScore,
+          penalty: -10,
+          missedRequired:
+            clarifyingQuestionsResult.requiredTotal - clarifyingQuestionsResult.requiredAsked,
+        })
       }
     }
 
@@ -554,7 +592,7 @@ export async function POST(request: NextRequest) {
         passRate,
         scenarioType: scenarioType || "dsa",
         aiValidation,
-        codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
+        codeCompleteness,
         hasBlindCopying,
         extractedEvidence,
         problemContext: {
@@ -797,16 +835,14 @@ IMPORTANT:
 - Focus on: bug identification, root cause analysis, fix quality, communication`
       }
 
-      // Default DSA prompt - analyze code completeness first
-      const codeAnalysis = code
-        ? analyzeCodeCompleteness(code, language || "python")
-        : {
-            isIncomplete: true,
-            reason: "No code submitted",
-            hasBaseCase: false,
-            hasActualLogic: false,
-            stubPatterns: ["empty"],
-          }
+      // Default DSA prompt - reuse the code completeness computed once above
+      const codeAnalysis = codeCompleteness ?? {
+        isIncomplete: true,
+        reason: "No code submitted",
+        hasBaseCase: false,
+        hasActualLogic: false,
+        stubPatterns: ["empty"],
+      }
 
       // Build completeness context for AI
       let completenessContext = ""
@@ -875,31 +911,8 @@ CRITICAL INSTRUCTIONS:
 
     const prompt = buildPrompt()
 
-    // Build RAG-enhanced context for better feedback (non-blocking)
-    // Maps scenario type to ScenarioType for context builder
-    const ragScenarioType =
-      scenarioType === "bugfix"
-        ? "bugfix"
-        : scenarioType === "system-design"
-          ? "system-design"
-          : "dsa"
-
-    let ragFeedbackContext = ""
-    try {
-      ragFeedbackContext = await buildRAGFeedbackContext({
-        problemText: scenarioTitle || "",
-        userCode: code || "",
-        testResults: { passed: testsPassed, total: testsTotal },
-        scenarioPattern: efficiencyMetrics?.problemPattern, // Pattern from efficiency analysis
-        scenarioType: ragScenarioType, // Use knowledge base specific to scenario type
-        difficulty: efficiencyMetrics?.difficulty as "easy" | "medium" | "hard",
-        userId,
-      })
-    } catch (error) {
-      logger.warn("[Feedback API] RAG context failed, continuing without", { error })
-    }
-
-    // Combine system instruction with RAG context
+    // Combine system instruction with the RAG context that was built concurrently
+    // during the parallel AI join above (ragFeedbackContext is "" if that failed).
     const enhancedSystemInstruction = ragFeedbackContext
       ? systemInstruction + "\n\n" + ragFeedbackContext
       : systemInstruction
@@ -961,9 +974,7 @@ CRITICAL INSTRUCTIONS:
         feedbackCritique: null, // Removed - no longer using feedback text critique
         context: {
           testPassRate: passRate,
-          codeIncomplete: code
-            ? analyzeCodeCompleteness(code, language || "python").isIncomplete
-            : false,
+          codeIncomplete: codeCompleteness?.isIncomplete ?? false,
           silentSolution: algorithmicScores.silentSolution || false,
           hasBlindCopying,
           extractedEvidence,
@@ -1075,7 +1086,10 @@ CRITICAL INSTRUCTIONS:
     // Use extracted evidence for more accurate hint count if available
     const hintsUsedActual =
       extractedEvidence?.hints.totalGiven ?? interactionMetrics?.hintsUsed ?? 0
-    let masteryScoreForResponse = calculateMasteryScore({
+    // Compute the mastery score ONCE with these inputs; it is reused both for the
+    // response (below, where it may be boosted) and for the background learning-state
+    // update further down (identical inputs). masteryScore stays the raw, unboosted value.
+    const masteryScore = calculateMasteryScore({
       testCasesPassed: testsPassed,
       testCasesTotal: testsTotal,
       timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
@@ -1087,6 +1101,7 @@ CRITICAL INSTRUCTIONS:
         extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
       interviewerMessagesCount: aiValidation.questionsAsked || 0,
     })
+    let masteryScoreForResponse = masteryScore
 
     // CRITICAL: When tests all pass, mastery should be >= overall
     // Philosophy: If you solved the problem correctly, your "code knowledge" (mastery)
@@ -1120,19 +1135,9 @@ CRITICAL INSTRUCTIONS:
         | "medium"
         | "hard"
 
-      const masteryScoreResult = calculateMasteryScore({
-        testCasesPassed: testsPassed,
-        testCasesTotal: testsTotal,
-        timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
-        hintsUsed: hintsUsedActual,
-        hintsTotal: 5,
-        problemDifficulty: difficulty as Difficulty,
-        approachExplained: extractedEvidence?.approach.explained ?? aiValidation.approachExplained,
-        complexityDiscussed:
-          extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
-        interviewerMessagesCount: aiValidation.questionsAsked || 0,
-      })
-
+      // Reuse the mastery score computed once above (identical inputs). Use the raw,
+      // unboosted value here to preserve prior behavior (this site never applied the
+      // 100%-pass-rate boost that only affects the response payload).
       // Fire-and-forget: don't await
       completeSessionWithMastery(userId, {
         scenarioId: scenarioId,
@@ -1140,7 +1145,7 @@ CRITICAL INSTRUCTIONS:
         pattern,
         difficulty,
         performanceScore: scores.overall,
-        masteryScore: masteryScoreResult.masteryScore,
+        masteryScore: masteryScore.masteryScore,
         timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : undefined,
         hintsUsed: interactionMetrics?.hintsUsed || 0,
         completedAt: new Date().toISOString(),
@@ -1200,9 +1205,7 @@ CRITICAL INSTRUCTIONS:
       structured: structuredFeedback, // Full structured data
       // Flags for frontend warnings
       silentSolution: algorithmicScores.silentSolution || false, // True if solved correctly but didn't explain approach
-      incompleteSolution: code
-        ? analyzeCodeCompleteness(code, language || "python").isIncomplete
-        : false,
+      incompleteSolution: codeCompleteness?.isIncomplete ?? false,
       aiCopyingDetected: hasBlindCopying, // True if >70% code copied from AI Partner
       aiOverlapPercentage: aiCodeOverlap.overlapPercentage, // How much code matches AI suggestions
       // Phase-aware scoring flags
