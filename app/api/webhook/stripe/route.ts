@@ -71,6 +71,7 @@ async function recordPaymentHistory(
     stripe_payment_intent_id?: string
     stripe_invoice_id?: string
     stripe_subscription_id?: string
+    stripe_checkout_session_id?: string
     description?: string
     period_start?: string
     period_end?: string
@@ -79,9 +80,12 @@ async function recordPaymentHistory(
   try {
     // Idempotent doc id from the payment's UNIQUE natural key + status, so a webhook RETRY upserts the
     // same row instead of creating a duplicate (which would inflate admin revenue stats). The
-    // subscription id is intentionally NOT used as a key (it repeats across monthly invoices); we fall
-    // back to an auto id when no unique payment id is present, preserving prior behavior. (hardening)
-    const naturalKey = data.stripe_invoice_id || data.stripe_payment_intent_id
+    // subscription id is intentionally NOT used as a key (it repeats across monthly invoices). A
+    // subscription-mode checkout carries neither an invoice nor a payment-intent id, so we key it on the
+    // checkout session id, which is stable across Stripe retries; we fall back to an auto id only when
+    // none of these unique ids is present, preserving prior behavior. (hardening, EDGE-13)
+    const naturalKey =
+      data.stripe_invoice_id || data.stripe_payment_intent_id || data.stripe_checkout_session_id
     const paymentRef = naturalKey
       ? adminDb
           .collection("payment_history")
@@ -342,27 +346,75 @@ export async function POST(request: NextRequest) {
             }
           })
 
-          // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
-            resetUsage: true,
-            profileData: {
-              created_at: profile?.created_at as string | undefined,
-              subscription_type: "monthly",
-              subscription_current_period_end: currentPeriodEnd,
-            },
-          })
-
-          // Record payment in history
-          await recordPaymentHistory(userId, {
-            type: "subscription",
-            amount: session.amount_total || 0,
-            currency: session.currency || "usd",
-            status: "succeeded",
-            stripe_subscription_id: session.subscription as string,
-            description: "Pro subscription (monthly)",
-            period_start: subscriptionStartDate,
-            period_end: currentPeriodEnd,
-          })
+          // PERF-S10: the profile transaction above has COMMITTED, so the user is already Pro. The
+          // remaining side effects are independent of one another — each reads only the transaction's
+          // `profile` result, `session`, or values computed before this point, and none reads another's
+          // writes — so run them concurrently instead of serially (the serial path had blocked the ACK
+          // behind a synchronous email). Ordering rule preserved: the transaction fully committed BEFORE
+          // any quota work begins.
+          const userEmail = (profile?.email as string) || session.customer_email
+          const [quotaResult] = await Promise.allSettled([
+            // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
+            updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+              resetUsage: true,
+              profileData: {
+                created_at: profile?.created_at as string | undefined,
+                subscription_type: "monthly",
+                subscription_current_period_end: currentPeriodEnd,
+              },
+            }),
+            // Record payment in history (keyed on session.id, so a Stripe retry upserts the same row)
+            recordPaymentHistory(userId, {
+              type: "subscription",
+              amount: session.amount_total || 0,
+              currency: session.currency || "usd",
+              status: "succeeded",
+              stripe_subscription_id: session.subscription as string,
+              stripe_checkout_session_id: session.id,
+              description: "Pro subscription (monthly)",
+              period_start: subscriptionStartDate,
+              period_end: currentPeriodEnd,
+            }),
+            // Mark referral as converted (free month credit for the referrer) - non-critical, never fatal
+            markReferralConverted(userId).catch((referralError) => {
+              paymentLogger.error("Failed to process referral conversion", {
+                userId,
+                error: referralError,
+              })
+            }),
+            // Track purchase for analytics and attribution - non-critical, never fatal
+            trackEventServer("purchase", {
+              userId,
+              plan: "pro_monthly",
+              amount: (session.amount_total || 0) / 100,
+              currency: session.currency || "usd",
+              promoCode: session.metadata?.promoCode || null,
+              source: session.metadata?.source || "direct",
+              subscriptionId: session.subscription,
+              customerId: session.customer,
+            }).catch((analyticsError) => {
+              paymentLogger.error("Failed to track purchase analytics", {
+                userId,
+                error: analyticsError,
+              })
+            }),
+            // Send subscription confirmation email - non-critical, never fatal
+            userEmail
+              ? sendSubscriptionConfirmationEmail(userEmail, {
+                  userName: (profile?.full_name as string) || "",
+                  userEmail,
+                  planName: "Pro (Monthly)",
+                  amount: (session.amount_total || 0) / 100,
+                  currency: session.currency?.toUpperCase() || "USD",
+                  nextBillingDate: currentPeriodEnd,
+                }).catch((emailError) => {
+                  paymentLogger.error("Failed to send subscription confirmation email", {
+                    userId,
+                    error: emailError,
+                  })
+                })
+              : Promise.resolve(),
+          ])
 
           logger.payment("User upgraded to Pro", {
             userId,
@@ -370,61 +422,16 @@ export async function POST(request: NextRequest) {
             customerId: session.customer,
           })
 
-          // Mark referral as converted (if user was referred)
-          // This triggers the free month credit for the referrer
-          try {
-            await markReferralConverted(userId)
-          } catch (referralError) {
-            paymentLogger.error("Failed to process referral conversion", {
-              userId,
-              error: referralError,
-            })
-            // Don't fail the webhook - referral processing is non-critical
-          }
-
-          // Track purchase for analytics and attribution
-          await trackEventServer("purchase", {
-            userId,
-            plan: "pro_monthly",
-            amount: (session.amount_total || 0) / 100,
-            currency: session.currency || "usd",
-            promoCode: session.metadata?.promoCode || null,
-            source: session.metadata?.source || "direct",
-            subscriptionId: session.subscription,
-            customerId: session.customer,
-          })
-
-          // Send subscription confirmation email
-          const userEmail = (profile?.email as string) || session.customer_email
-          if (userEmail) {
-            try {
-              await sendSubscriptionConfirmationEmail(userEmail, {
-                userName: (profile?.full_name as string) || "",
-                userEmail,
-                planName: "Pro (Monthly)",
-                amount: (session.amount_total || 0) / 100,
-                currency: session.currency?.toUpperCase() || "USD",
-                nextBillingDate: currentPeriodEnd,
-              })
-            } catch (emailError) {
-              paymentLogger.error("Failed to send subscription confirmation email", {
-                userId,
-                error: emailError,
-              })
-            }
-          }
-
-          // Verify the update worked
-          const verifySnap = await profileRef.get()
-          if (verifySnap.exists) {
-            const verifyData = verifySnap.data()
-            if (verifyData?.subscription_tier !== "pro") {
-              paymentLogger.error("Profile update verification failed", {
-                userId,
-                expectedTier: "pro",
-                actualTier: verifyData?.subscription_tier,
-              })
-            }
+          // The quota reset is the only entitlement-critical side effect here. The profile is already
+          // Pro (transaction committed), but if the reset rejected the user would hit their stale limit,
+          // so dead-letter it for the reconciliation cron. Keep the 200 (matches this file's
+          // dead-letter convention); the reset is idempotent per period via last_reset_period_start.
+          if (quotaResult.status === "rejected") {
+            await recordWebhookFailure(
+              event,
+              "checkout.session.completed:subscription:quota",
+              quotaResult.reason
+            )
           }
         } catch (error) {
           paymentLogger.error("Error updating user profile", { userId, error })
@@ -438,6 +445,17 @@ export async function POST(request: NextRequest) {
           metadata: session.metadata,
           clientReferenceId: session.client_reference_id,
         })
+        // EDGE-17: a PAID subscription checkout with no userId can never be upgraded from the event
+        // alone, so dead-letter it for admin reconciliation instead of ACKing it into the void. Keep
+        // the 200 (falls through to the final response): the full session is captured in
+        // webhook_failures and a Stripe retry would not add the missing userId.
+        await recordWebhookFailure(
+          event,
+          "checkout.session.completed:no-user",
+          new Error(
+            `Paid subscription checkout is missing userId (session ${session.id}); cannot upgrade`
+          )
+        )
       }
     }
 
@@ -722,6 +740,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -787,6 +806,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -828,6 +848,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -875,6 +896,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -958,6 +980,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -1069,6 +1092,7 @@ export async function POST(request: NextRequest) {
       const profilesQuery = await adminDb
         .collection("profiles")
         .where("stripe_subscription_id", "==", subscription.id)
+        .limit(1)
         .get()
 
       if (!profilesQuery.empty) {
@@ -1104,6 +1128,7 @@ export async function POST(request: NextRequest) {
       const profilesQuery = await adminDb
         .collection("profiles")
         .where("stripe_subscription_id", "==", subscription.id)
+        .limit(1)
         .get()
 
       if (!profilesQuery.empty) {
@@ -1143,6 +1168,7 @@ export async function POST(request: NextRequest) {
       const profilesQuery = await adminDb
         .collection("profiles")
         .where("stripe_subscription_id", "==", subscription.id)
+        .limit(1)
         .get()
 
       if (!profilesQuery.empty) {
@@ -1349,6 +1375,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -1419,6 +1446,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {
@@ -1473,6 +1501,7 @@ export async function POST(request: NextRequest) {
         const profilesQuery = await adminDb
           .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
+          .limit(1)
           .get()
 
         if (!profilesQuery.empty) {

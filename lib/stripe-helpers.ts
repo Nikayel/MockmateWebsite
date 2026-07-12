@@ -67,10 +67,15 @@ export async function updateQuotaForSubscriptionTierAdmin(
 
   const sessionsLimit = getSessionsLimitForTier(subscriptionTier)
 
-  // Query for existing quota
+  // Query for existing quota. PERF-S10: bound to the 12 most-recent periods (mirrors getUserQuota in
+  // lib/quota-enforcement.ts) so this scan does not grow unbounded as monthly quota docs accrue. The
+  // current-period doc is always the newest, so it stays within this window and the find() below still
+  // resolves it. Relies on the (user_id ==, period_start desc) composite index getUserQuota already uses.
   const quotaSnapshot = await adminDb
     .collection("profile_quota")
     .where("user_id", "==", userId)
+    .orderBy("period_start", "desc")
+    .limit(12)
     .get()
 
   // Find current period quota by checking if stored period_start falls within calculated period
