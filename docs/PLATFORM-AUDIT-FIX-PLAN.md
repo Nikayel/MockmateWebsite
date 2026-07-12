@@ -223,7 +223,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** fetched key ≠ `process.env.DEEPGRAM_API_KEY`; reuse after TTL fails;
   exercise a voice interview end-to-end.
 
-### [ ] API-2 — voice cost accounting is client-self-reported, unclamped, un-rate-limited — P2 (couple with API-1)
+### [x] API-2 — voice cost accounting is client-self-reported, unclamped, un-rate-limited — P2 (couple with API-1)
 - **Where:** `app/api/usage/voice/route.ts:27-47`; `durationSeconds` flows into
   `trackVoiceUsage` → `usage_summaries.totalCost` via `FieldValue.increment`
   (`lib/usage-tracking.ts:170,192`) — exactly what `BUDGET_CAPS` enforcement reads
@@ -1100,3 +1100,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — DUP-1 — score-accumulator now imports SCORING.{PERFORMANCE,BUG_FIX,SYSTEM_DESIGN}_WEIGHTS from lib/constants for calculateInstantScores + calculateSystemDesignScores; inline literals deleted; signalsUsed labels/return shape/hard-easy adj preserved. New guard test asserts each type's overall == canonical-weighted sum. typecheck clean, 10 new tests green.
 2026-07-12 — DUP-8 — /limit-reached Pro pitch now rendered from PRICING_CONFIG.pro (sessionsDisplay + valueProps map), mirroring app/upgrade; hardcoded "Unlimited Sessions"/"500+ Problems" strings deleted. grep for "Unlimited Sessions" now empty; redirect-if-allowed untouched. typecheck+eslint clean. (Note: config valueProps still contain em dashes that now surface here; out of scope for this finding.)
 2026-07-12 — EDGE-WEBHOOK — invoice.payment_failed / charge.refunded / invoice.paid catches now call recordWebhookFailure(event, type, error) (mirrors the dispute sibling); kept 200 after dead-lettering (consistent, and invoice.paid reset is idempotent per period). typecheck clean. STAGING-TODO: Stripe CLI replay on emulator before production deploy (throwing-Firestore-mock unit test also still recommended).
+2026-07-12 — API-2 — /api/usage/voice now runs apiRateLimit first + validates body with Zod (durationSeconds positive().max(3600), transcriptLength bounded, model kept whitelisted against DEEPGRAM_COSTS). New route.test.ts: 5 tests (out-of-range/non-positive/bad-model rejected, valid tracked, rate-limit short-circuit) green; typecheck clean.
