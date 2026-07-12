@@ -5,7 +5,7 @@ import Link from "next/link"
 import { motion, useReducedMotion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import { trackEvent } from "@/lib/analytics"
-import { ThreeOrb } from "@/components/three/ThreeOrb"
+import { DynamicThreeOrb } from "@/components/three/DynamicThreeOrb"
 
 /**
  * Hero Section — theme-aware, premium minimal.
@@ -24,8 +24,9 @@ export function HeroSection() {
 
   return (
     <section className="bg-background text-foreground font-ui relative flex min-h-[100svh] flex-col items-center overflow-hidden px-4 pt-[clamp(8rem,18vh,13rem)] pb-16 text-center md:px-16">
-      {/* Cursor-sensitive orb — sits behind everything, recolors with the theme. */}
-      <ThreeOrb variant="hero" />
+      {/* Cursor-sensitive orb — sits behind everything, recolors with the theme.
+          three.js is code-split out of the initial bundle (decorative background). */}
+      <DynamicThreeOrb variant="hero" />
 
       {/* Barely-there dot texture (theme hairline) for depth. */}
       <div

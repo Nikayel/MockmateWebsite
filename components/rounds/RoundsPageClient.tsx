@@ -2,7 +2,7 @@
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { ThreeOrb } from "@/components/three/ThreeOrb"
+import { DynamicThreeOrb } from "@/components/three/DynamicThreeOrb"
 import { Bug, Bot, Layers, CheckCircle2, Building2 } from "lucide-react"
 import { motion } from "framer-motion"
 
@@ -30,7 +30,7 @@ export function RoundsPageClient() {
       {/* Sticky scroll-reactive orb hero */}
       <section data-orb-section className="relative" style={{ height: "160vh" }}>
         <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden">
-          <ThreeOrb variant="knot" />
+          <DynamicThreeOrb variant="knot" />
           {/* Soft scrim — lifts heading contrast without hiding the orb. */}
           <div
             className="pointer-events-none absolute inset-0 z-[1]"
