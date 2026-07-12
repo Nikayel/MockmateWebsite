@@ -10,6 +10,25 @@ import {
   VAGUE_ANSWER_PATTERNS,
 } from "../shared-patterns"
 
+/**
+ * Runtime matchers for validation phrases that force interviewer-response
+ * regeneration. These correspond to FORBIDDEN_VALIDATION_PHRASES (the shared
+ * list the interviewer prompt renders, lib/interview/forbidden-phrases.ts) but
+ * keep tuned anchoring: single-word acknowledgments require trailing
+ * punctuation/whitespace so normal prose ("Nice-looking recursion") and the
+ * discourse marker "Right, so ..." are not over-flagged. Keep this in sync with
+ * forbidden-phrases.ts when adding a phrase.
+ */
+const VALIDATION_PHRASE_PATTERNS: RegExp[] = [
+  /\b(?:Nice|Good|Perfect|Exactly|Correct)\b[.!,]?(?:\s|$)/i,
+  /\bThat's (?:right|correct|exactly)\b/i,
+  /\bYou've got (?:it|the (?:right |)idea|the logic)\b/i,
+  /\bThat checks out\b/i,
+  /\bThat's the (?:key )?insight\b/i,
+  /\bYou nailed it\b/i,
+  /\bSpot on\b/i,
+]
+
 export interface ResponseGuardrail {
   name: string
   severity: "critical" | "warning"
@@ -164,17 +183,7 @@ export const RESPONSE_GUARDRAILS: ResponseGuardrail[] = [
     name: "no-validation-phrases",
     severity: "critical",
     check: (ctx) => {
-      const validationPatterns = [
-        /\b(?:Nice|Good|Perfect|Exactly|Correct)\b[.!,]?(?:\s|$)/i,
-        /\bThat's (?:right|correct|exactly)\b/i,
-        /\bYou've got (?:it|the (?:right |)idea|the logic)\b/i,
-        /\bThat checks out\b/i,
-        /\bThat's the (?:key )?insight\b/i,
-        /\bYou nailed it\b/i,
-        /\bSpot on\b/i,
-      ]
-
-      for (const pattern of validationPatterns) {
+      for (const pattern of VALIDATION_PHRASE_PATTERNS) {
         const match = ctx.response.match(pattern)
         if (match) {
           return { violated: true, evidence: `Validation phrase: "${match[0]}"` }

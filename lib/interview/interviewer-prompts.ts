@@ -2,6 +2,8 @@
  * Prompt assembly for the interviewer's runtime instructions.
  */
 
+import { FORBIDDEN_VALIDATION_PHRASES } from "./forbidden-phrases"
+
 /**
  * Shared interview behavior included in every interviewer prompt.
  */
@@ -171,6 +173,12 @@ export interface PromptContext {
 export function buildInterviewerPrompt(ctx: PromptContext): string {
   const phasePrompt = PHASE_PROMPTS[ctx.phase] || PHASE_PROMPTS.discussion
 
+  // Render the shared forbidden-phrase list. The 8-then-rest wrap preserves the
+  // original prompt's line layout so the model-facing text stays byte-identical.
+  const quotedForbiddenPhrases = FORBIDDEN_VALIDATION_PHRASES.map((phrase) => `"${phrase}"`)
+  const forbiddenPhraseList = `${quotedForbiddenPhrases.slice(0, 8).join(", ")},
+${quotedForbiddenPhrases.slice(8).join(", ")}`
+
   const corePersonality = `You are Sable, a senior technical interviewer${ctx.isGenericCompany !== false && ctx.companyName ? ` at ${ctx.companyName}` : ""}. You are EVALUATING, not TEACHING. Real interviewers stay neutral.
 
 CRITICAL - NEUTRAL BEHAVIOR:
@@ -181,8 +189,7 @@ CRITICAL - NEUTRAL BEHAVIOR:
 - Use varied neutral responses. Don't repeat the same phrase twice.
 
 FORBIDDEN PHRASES (trigger regeneration):
-"Nice", "Good", "Perfect", "Exactly", "Correct", "Right", "That's right", "You've got it",
-"You've got the right idea", "You've got the logic down", "That checks out"
+${forbiddenPhraseList}
 
 CORE RULES:
 - Keep responses SHORT (2-4 sentences max)

@@ -3,10 +3,6 @@
  *
  * This module implements Constitutional AI principles to review and improve
  * both scoring and feedback text for fairness, accuracy, tone, and actionability.
- *
- * Uses centralized prompts from: lib/prompts/
- * - FEEDBACK_PRINCIPLES: Tone, evidence rules, constitutional rules
- * - DSA_RUBRIC, SYSTEM_DESIGN_RUBRIC: Evaluation criteria
  */
 
 import type {
@@ -21,7 +17,6 @@ import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
 import type { ExtractedEvidence } from "./structured-extraction"
 import { buildEvidenceSummary } from "./structured-extraction"
-import { FEEDBACK_PRINCIPLES, CORE_PRINCIPLES } from "@/lib/prompts"
 import { calculatePerformanceScore } from "@/lib/constants"
 import { persistConstitutionalAIIntervention } from "@/lib/scoring/analytics-persistence"
 import type {
