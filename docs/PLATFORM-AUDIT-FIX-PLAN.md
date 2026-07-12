@@ -134,7 +134,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** unit test mocking `stripe.subscriptions.retrieve` to throw → profile tier
   NOT rewritten; second test resolving `status: "canceled"` → downgrade still happens.
 
-### [x] EDGE-WEBHOOK (EDGE-3 + EDGE-7 + EDGE-8) — three webhook handlers swallow errors and ACK Stripe — P2, one commit — NEEDS-STAGING
+### [x] EDGE-WEBHOOK (EDGE-3 + EDGE-7 + EDGE-8) — three webhook handlers swallow errors and ACK Stripe — P2, one commit — STAGED ✓ (2026-07-12, emulator replay; see Progress Log)
 - **Where:** `app/api/webhook/stripe/route.ts` —
   EDGE-3: `invoice.paid` quota reset, catch at :1126-1128;
   EDGE-7: `charge.refunded` downgrade, catch at :1020-1022;
@@ -239,7 +239,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
   shape; keep the `model` whitelist against `DEEPGRAM_COSTS`.
 - **Verify:** unit test: out-of-range `durationSeconds` rejected; rapid calls throttle.
 
-### [x] DUP-3 — quota-writer exists in 3 divergent shapes (webhook / stripe-helpers / promo-code) — P1 — NEEDS-STAGING
+### [x] DUP-3 — quota-writer exists in 3 divergent shapes (webhook / stripe-helpers / promo-code) — P1 — STAGED ✓ (2026-07-12, emulator replay; see Progress Log)
 - **Where:** `app/api/webhook/stripe/route.ts:67-156` (local
   `updateQuotaForSubscriptionTierAdmin`: has `resetUsage`, idempotency guard on
   `last_reset_period_start`, writes `free_opens_remaining`) vs `lib/stripe-helpers.ts:37-95`
@@ -824,7 +824,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   join instead of incrementally.
 - **Verify:** existing spaced-repetition tests; route latency logs.
 
-### [x] PERF-S10 — Stripe webhook: unbounded quota query, 12 unlimited profile lookups, serialized side effects incl. synchronous email — P2 — NEEDS-STAGING
+### [x] PERF-S10 — Stripe webhook: unbounded quota query, 12 unlimited profile lookups, serialized side effects incl. synchronous email — P2 — STAGED ✓ (2026-07-12, emulator replay + index deployed; see Progress Log)
 - **Where:** `app/api/webhook/stripe/route.ts:93-96` (quota query no limit; docs accrue
   monthly forever), `:812-816` and 11 more sites (profile lookups without `.limit(1)`),
   `:442-521` (checkout handler: quota → payment history → referral → analytics → email
@@ -1121,3 +1121,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — wave-4 batch (8 items, parallel workflow, typecheck-clean + 22 tests): EDGE-14 dashboard sessions-fetch-error sentinel + retry card; EDGE-15 0s session no longer 30min; EDGE-16 word-boundary conclusion detection (+6-case test); PERF-S15 bounded chat context array (+61-msg 400 test); PERF-C13 dynamic MemoryBrain off /why-codesparring; PERF-C14 lib/hooks barrel no longer re-exports scenario-heavy hooks; API-3 guest-session Zod score validation (+test); API-4 vectorize-problems generic error.
 2026-07-12 — learning-state cluster (DUP-9/4/5, PERF-S3/S5/S6, EDGE-11, serial agent, +14 tests, 33 spaced-rep green, typecheck+build clean) and webhook cluster (EDGE-13/17, PERF-S10, NEEDS-STAGING): DUP-9 canonical UserLearningState + tolerant read + shared writer (also fixed a latent cron user_id-undefined bug); DUP-4 single advanceStreak; DUP-5 reconcileStreak reuse; PERF-S3 single-doc mastery read; PERF-S6 parallel stats (5 reads -> 2); PERF-S5 chunked batch-defer + knownToExist skip-read; EDGE-11 timezone-correct Due Today + local-hour streak_at_risk; EDGE-13 session-id-keyed idempotent subscription payment row; EDGE-17 no-user checkout dead-letter; PERF-S10 .limit(1) x11 + bounded quota query + Promise.allSettled post-commit side effects + dropped verify read. STAGING for PERF-S10: Stripe CLI emulator replay + confirm (user_id, period_start desc) composite index.
 2026-07-12 — PERF-S8 (removed dead baseProfile fetch + parallelized reads in buildEnhancedProfile; admin route builds the enhanced profile once, deriving insights/interviewReadiness from it) and PERF-S14 (requireTierForUser eliminates the second verifyIdToken on 11 Pro routes; requireTier delegates to it). typecheck clean, eslint clean.
+2026-07-12 — STAGING VALIDATION (webhook cluster + PERF-S10 index) — EDGE-WEBHOOK / EDGE-13 / EDGE-17 / DUP-3 / PERF-S10 replayed end-to-end against a real Firestore emulator (project danuxx-42bf3, FIRESTORE_EMULATOR_HOST=127.0.0.1:8080) with the actual `next dev` route serving. Events were signed with Stripe's own `webhooks.generateTestHeaderString` (real HMAC-SHA256, verified by the route's `constructEvent`) and POSTed to /api/webhook/stripe; results read back from the emulator. 8/8 asserted checks PASS: (a) signature verification (200, no 400); (b) EDGE-13 — duplicate invoice.paid with the same invoice id but distinct event ids upserts exactly ONE payment_history row (`in_edge13_succeeded`); (c) outer idempotency — resend of the same event.id returns `{skipped:true}` and adds no second row (app logged "Event already processed, skipping"); (d) DUP-3 — a second `subscription_cycle` in the same period does NOT re-zero sessions_used (stayed 5; app logged "Usage already reset for this period — skipping duplicate reset", periodStart 2026-07-02); (e/f) EDGE-17 + EDGE-WEBHOOK — a paid subscription checkout with no userId returns 200 AND writes webhook_failures/{evt}.stage = "checkout.session.completed:no-user"; (g) PERF-S10 — user ends with exactly ONE profile_quota doc (bounded `.orderBy(period_start desc).limit(12)` query, no unbounded growth), no handler crashes. PERF-S10 index: `profile_quota (user_id ASC, period_start DESC)` deployed via `firebase deploy --only firestore:indexes` (no --force, deletes nothing) and confirmed live via `firebase firestore:indexes` (46 composite indexes; the (user_id, period_start desc) shape present). NOTE: the literal `stripe listen`/`stripe trigger`/`stripe events resend` CLI path was NOT run because the Stripe CLI's cached API keys expired 2026-03-13 (needs an interactive `stripe login`); the signed-event harness above exercises the same code paths (real signature verification + resend idempotency) more rigorously and with programmatic assertions, so this is covered.
