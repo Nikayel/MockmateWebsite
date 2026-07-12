@@ -303,18 +303,42 @@ Interviews are conversations, not just coding exercises.`
     }
   }
 
-  // LIVE silence-detection effect (lifted verbatim from page.tsx)
-  useEffect(() => {
-    // DISABLED: Silence detection prompts felt patronizing
-    // The scoring system handles communication separately
-    // Users can choose to communicate when they want to
+  // Keep the latest values the 30s silence poll reads in a ref, updated each
+  // render, so the interval effect below can key ONLY on the stable gate flags.
+  // The interview clock ticks `elapsedTime` every second; the old effect listed
+  // it (and `interviewerMessages`/`isLoadingInterviewer`) in its deps, so the 30s
+  // interval was torn down and recreated every tick (the EDGE-1 bug). Same ref
+  // pattern as useInterviewAutosave.
+  const proactiveLatestRef = useRef({
+    interviewerMessages,
+    elapsedTime,
+    isLoadingInterviewer,
+    triggerProactiveInterviewerWithContext,
+  })
+  proactiveLatestRef.current = {
+    interviewerMessages,
+    elapsedTime,
+    isLoadingInterviewer,
+    triggerProactiveInterviewerWithContext,
+  }
 
+  // Reset the silence clock whenever the candidate sends a message. Keyed on the
+  // message list only; it creates no interval, so a new message never tears down
+  // the 30s poll below.
+  useEffect(() => {
     const lastMsg = interviewerMessages[interviewerMessages.length - 1]
     if (lastMsg?.type === "user") {
       lastInterviewerMessageRef.current = Date.now()
       hasTriggeredSilenceRef.current = false
     }
+  }, [interviewerMessages])
 
+  // LIVE silence-detection poll (lifted from page.tsx). Keyed ONLY on the stable
+  // gate flags; the frequently-changing values it reads come from
+  // proactiveLatestRef.current, so the 1s interview clock no longer recreates the
+  // 30s interval every tick. Threshold (120s), cooldown (3m), context selection,
+  // and the trigger payload are preserved exactly.
+  useEffect(() => {
     if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) {
       return () => {
         if (silenceTimerRef.current) {
@@ -328,22 +352,29 @@ Interviews are conversations, not just coding exercises.`
     const COOLDOWN_MS = 3 * 60 * 1000
 
     const checkAndTrigger = () => {
-      if (hasTriggeredSilenceRef.current || isLoadingInterviewer) return
+      const {
+        interviewerMessages: latestMessages,
+        elapsedTime: latestElapsed,
+        isLoadingInterviewer: latestLoading,
+        triggerProactiveInterviewerWithContext: latestTrigger,
+      } = proactiveLatestRef.current
 
-      const userMessages = interviewerMessages.filter((m) => m.type === "user")
+      if (hasTriggeredSilenceRef.current || latestLoading) return
+
+      const userMessages = latestMessages.filter((m) => m.type === "user")
       const hasEverMessaged = userMessages.length > 0
 
       let timeSilentSec: number
       if (hasEverMessaged) {
         timeSilentSec = (Date.now() - lastInterviewerMessageRef.current) / 1000
       } else {
-        timeSilentSec = elapsedTime
+        timeSilentSec = latestElapsed
       }
 
       if (timeSilentSec >= SILENCE_THRESHOLD_SEC) {
         hasTriggeredSilenceRef.current = true
         const contextType = hasEverMessaged ? "silence_stopped" : "silence_no_communication"
-        triggerProactiveInterviewerWithContext(contextType, Math.floor(timeSilentSec))
+        latestTrigger(contextType, Math.floor(timeSilentSec))
         setTimeout(() => {
           hasTriggeredSilenceRef.current = false
         }, COOLDOWN_MS)
@@ -359,14 +390,7 @@ Interviews are conversations, not just coding exercises.`
         silenceTimerRef.current = null
       }
     }
-  }, [
-    isInterviewStarted,
-    showFeedback,
-    showPostInterviewDiscussion,
-    interviewerMessages,
-    elapsedTime,
-    isLoadingInterviewer,
-  ])
+  }, [isInterviewStarted, showFeedback, showPostInterviewDiscussion])
 
   // Cleanup the silence timer on unmount
   useEffect(() => {

@@ -272,7 +272,13 @@ function InterviewPageContent() {
       return firebaseUser.getIdToken()
     },
   })
-  const ragHints = hintAgent.hints.map((h) => ({ level: h.level, hint: h.content, id: h.id }))
+  // Memoized so the 1s interview clock re-render does not hand a fresh array to
+  // useInterviewMetrics / the ProblemColumn ctx every tick. hintAgent.hints is
+  // useState-backed and only changes when hints are (re)generated.
+  const ragHints = useMemo(
+    () => hintAgent.hints.map((h) => ({ level: h.level, hint: h.content, id: h.id })),
+    [hintAgent.hints]
+  )
   const isLoadingHints = hintAgent.isLoading
   const hintFetchStatus: "idle" | "loading" | "success" | "error" = isLoadingHints
     ? "loading"
@@ -880,7 +886,13 @@ function InterviewPageContent() {
     hintAgent.updateCode(code)
     await hintAgent.regenerateHints("initial")
     setRevealedAIHintIndices(new Set())
-  }, [selectedScenario, user?.id, firebaseUser, hintAgent, code])
+    // Depend on the specific stable hintAgent methods (both are useCallback([])
+    // inside useHintAgent) rather than the whole hintAgent object, which
+    // useHintAgent returns fresh every render and would make fetchRAGHints, and
+    // anything memoized on it, churn on every 1s clock tick. exhaustive-deps only
+    // recognizes the whole-object form, so its warning is suppressed here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScenario, user?.id, firebaseUser, hintAgent.updateCode, hintAgent.regenerateHints, code])
 
   const syncHintAgentWithTestOutcome = useCallback(
     (
@@ -1373,7 +1385,10 @@ function InterviewPageContent() {
     triggerSystemDesignFeedback,
   })
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // useCallback so this stays referentially stable across the 1s clock re-render
+  // (it feeds the memoized ProblemColumn ctx). Only touches the stable
+  // setWorkspaceContext setter and the module-level toast helper.
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files || files.length === 0) return
 
@@ -1403,7 +1418,7 @@ function InterviewPageContent() {
       setWorkspaceContext((prev) => [...prev, ...newFiles])
       toast.success(`Added ${newFiles.length} file(s) to workspace context`)
     }
-  }
+  }, [])
 
   // AI Usage Tips content
   const aiUsageTips = [
@@ -1746,6 +1761,84 @@ function InterviewPageContent() {
     ]
   )
 
+  // ProblemColumn context (memoized). The interview clock re-renders this page
+  // every second; without memoization this object was recreated each tick, which
+  // busted ProblemColumn's React.memo and forced MarkdownRenderer to re-parse the
+  // problem markdown every second (PERF-C6). elapsedTime is deliberately excluded
+  // from the deps: it is only read by the pre-interview "Next hint in Xm" label
+  // (rendered when !isInterviewStarted, where the timer is not running), so a
+  // stale value has no visible effect, and including it would defeat the memo on
+  // every tick. Only hintAgent.revealHint is passed (the sole method ProblemColumn
+  // uses) because useHintAgent returns a fresh object each render.
+  // Declared before the early returns below so the hook runs unconditionally.
+  const problemCtx = useMemo<ProblemColumnCtx>(() => {
+    return {
+      activePanel,
+      bugfixReflection: {
+        hypothesis: bugfixHypothesis,
+        rootCause: bugfixRootCause,
+        prevention: bugfixPrevention,
+      },
+      elapsedTime,
+      fetchRAGHints,
+      fileInputRef,
+      focusMode,
+      handleFileUpload,
+      hintAgent: { revealHint: hintAgent.revealHint },
+      hintFeedback,
+      hintFetchStatus,
+      isInterviewStarted,
+      ragHints,
+      realInterviewMode,
+      revealedAIHintIndices,
+      revealedHintIndices,
+      revealedHints,
+      selectedScenario,
+      setIsCodeViewerOpen,
+      onBugfixReflectionChange: handleBugfixReflectionChange,
+      onBugfixReflectionCommit: handleBugfixReflectionCommit,
+      setRevealedAIHintIndices,
+      setRevealedHintIndices,
+      setSelectedFile,
+      setShowOptimalApproach,
+      showOptimalApproach,
+      submitHintFeedback,
+      workspaceContext,
+    }
+    // elapsedTime is intentionally omitted (see comment above). Every other value
+    // the object reads is listed so a real change re-derives the ctx.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activePanel,
+    bugfixHypothesis,
+    bugfixRootCause,
+    bugfixPrevention,
+    fetchRAGHints,
+    fileInputRef,
+    focusMode,
+    handleFileUpload,
+    hintAgent.revealHint,
+    hintFeedback,
+    hintFetchStatus,
+    isInterviewStarted,
+    ragHints,
+    realInterviewMode,
+    revealedAIHintIndices,
+    revealedHintIndices,
+    revealedHints,
+    selectedScenario,
+    setIsCodeViewerOpen,
+    handleBugfixReflectionChange,
+    handleBugfixReflectionCommit,
+    setRevealedAIHintIndices,
+    setRevealedHintIndices,
+    setSelectedFile,
+    setShowOptimalApproach,
+    showOptimalApproach,
+    submitHintFeedback,
+    workspaceContext,
+  ])
+
   if (isLoading) {
     return (
       <main className="bg-background flex min-h-screen items-center justify-center">
@@ -1782,41 +1875,6 @@ function InterviewPageContent() {
     workspaceContext.length > 0 &&
     !showFeedback &&
     !showPostInterviewDiscussion
-
-  // ProblemColumn context literal (verbatim from the previous inline literal).
-  const problemCtx: ProblemColumnCtx = {
-    activePanel,
-    bugfixReflection: {
-      hypothesis: bugfixHypothesis,
-      rootCause: bugfixRootCause,
-      prevention: bugfixPrevention,
-    },
-    elapsedTime,
-    fetchRAGHints,
-    fileInputRef,
-    focusMode,
-    handleFileUpload,
-    hintAgent,
-    hintFeedback,
-    hintFetchStatus,
-    isInterviewStarted,
-    ragHints,
-    realInterviewMode,
-    revealedAIHintIndices,
-    revealedHintIndices,
-    revealedHints,
-    selectedScenario,
-    setIsCodeViewerOpen,
-    onBugfixReflectionChange: handleBugfixReflectionChange,
-    onBugfixReflectionCommit: handleBugfixReflectionCommit,
-    setRevealedAIHintIndices,
-    setRevealedHintIndices,
-    setSelectedFile,
-    setShowOptimalApproach,
-    showOptimalApproach,
-    submitHintFeedback,
-    workspaceContext,
-  }
 
   // Inline closures pre-built in page (recreated each render today — preserved
   // verbatim; intentionally NOT wrapped in useCallback).
