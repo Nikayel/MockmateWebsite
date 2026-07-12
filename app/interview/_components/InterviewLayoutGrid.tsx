@@ -1,13 +1,25 @@
 "use client"
 
 import { useRef, type ComponentProps, type CSSProperties } from "react"
+import dynamic from "next/dynamic"
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react"
 import { useWorkspaceRails } from "../_hooks/useWorkspaceRails"
 import { FocusProblemPeek } from "./FocusProblemPeek"
 import { ProblemColumn, type ProblemColumnCtx } from "./ProblemColumn"
 import { EditorColumn } from "./EditorColumn"
 import { ChatColumn } from "./ChatColumn"
-import { BugfixOnboardingTour } from "./BugfixOnboardingTour"
+import type { BugfixOnboardingTour } from "./BugfixOnboardingTour"
+
+/**
+ * The bugfix onboarding tour pulls in framer-motion (a ~271KB chunk) but only
+ * ever renders for bugfix scenarios once the interview has started. Load it
+ * lazily (client-only) and gate the render on `bugfixTourEnabled` so that chunk
+ * never enters the initial /interview bundle for other scenario types.
+ */
+const BugfixOnboardingTourLazy = dynamic(
+  () => import("./BugfixOnboardingTour").then((mod) => mod.BugfixOnboardingTour),
+  { ssr: false }
+)
 
 type FocusProblemPeekProps = ComponentProps<typeof FocusProblemPeek>
 type EditorColumnProps = ComponentProps<typeof EditorColumn>
@@ -304,18 +316,20 @@ export function InterviewLayoutGrid({
         collapsed={intCollapsed}
         onToggleCollapse={toggleInt}
       />
-      <BugfixOnboardingTour
-        activePanel={activePanel}
-        enabled={bugfixTourEnabled}
-        hypothesis={bugfixHypothesis}
-        isAIPartnerExpanded={isAIPartnerExpanded}
-        onAIPartnerExpandedChange={onAIPartnerExpandedChange}
-        onActivePanelChange={onActivePanelChange}
-        scenarioId={bugfixScenarioId}
-        testResultsCount={testResultsCount}
-        userId={userId}
-        userProfile={userProfile}
-      />
+      {bugfixTourEnabled && (
+        <BugfixOnboardingTourLazy
+          activePanel={activePanel}
+          enabled={bugfixTourEnabled}
+          hypothesis={bugfixHypothesis}
+          isAIPartnerExpanded={isAIPartnerExpanded}
+          onAIPartnerExpandedChange={onAIPartnerExpandedChange}
+          onActivePanelChange={onActivePanelChange}
+          scenarioId={bugfixScenarioId}
+          testResultsCount={testResultsCount}
+          userId={userId}
+          userProfile={userProfile}
+        />
+      )}
     </div>
   )
 }
