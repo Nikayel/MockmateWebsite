@@ -688,6 +688,9 @@ GROUNDING RULES (prevent hallucination):
       userId,
       sessionId,
       eventType: "chat_message",
+      // PERF-S4: this route already ran checkRateLimit + startRequestTracking
+      // above, so skip the redundant per-user rate-limit read inside the provider.
+      skipRateLimit: true,
     })
 
     // Validate response relevance
@@ -762,6 +765,8 @@ Generate a compliant response NOW:`
             sessionId,
             eventType: "chat_message",
             skipCache: true, // Regeneration must bypass the response cache
+            // PERF-S4: same already-throttled request as the primary call above.
+            skipRateLimit: true,
           }
         )
 

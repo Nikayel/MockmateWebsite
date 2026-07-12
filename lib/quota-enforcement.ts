@@ -252,32 +252,54 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
  * The actual usage increment happens in firestore-helpers.ts with proper transactions.
  * Small race windows here are acceptable since this is a soft limit check.
  */
-async function getUserQuota(userId: string): Promise<UserQuota | null> {
+async function getUserQuota(
+  userId: string,
+  // PERF-S4: callers that already fetched the profile (e.g. checkQuota, which
+  // reads it for the degraded-subscription gate) pass the resolved tier so we
+  // skip a second profile read here. Omitted callers still read it below.
+  knownTier?: "free" | "pro" | "enterprise"
+): Promise<UserQuota | null> {
   try {
     const now = new Date()
     const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
     const currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-    // Batch fetch profile and quota in parallel for better performance
-    const [profileDoc, quotaQuery, usageSummaryDoc] = await Promise.all([
-      // Get user profile for tier
-      adminDb.collection("profiles").doc(userId).get(),
+    // Get quota documents - limit to recent entries only (max 12 months of history)
+    const quotaQueryPromise = adminDb
+      .collection("profile_quota")
+      .where("user_id", "==", userId)
+      .orderBy("period_start", "desc")
+      .limit(12)
+      .get()
 
-      // Get quota documents - limit to recent entries only (max 12 months of history)
-      adminDb
-        .collection("profile_quota")
-        .where("user_id", "==", userId)
-        .orderBy("period_start", "desc")
-        .limit(12)
-        .get(),
+    // Get usage summary for budget tracking
+    const usageSummaryPromise = adminDb
+      .collection("users")
+      .doc(userId)
+      .collection("usage_summaries")
+      .doc(periodKey)
+      .get()
 
-      // Get usage summary for budget tracking
-      adminDb.collection("users").doc(userId).collection("usage_summaries").doc(periodKey).get(),
-    ])
-
-    const profile = profileDoc.data()
-    const tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
+    // Batch fetch in parallel for better performance. Only read the profile when
+    // the caller did not already resolve the tier.
+    let tier: "free" | "pro" | "enterprise"
+    let quotaQuery: FirebaseFirestore.QuerySnapshot
+    let usageSummaryDoc: FirebaseFirestore.DocumentSnapshot
+    if (knownTier) {
+      ;[quotaQuery, usageSummaryDoc] = await Promise.all([quotaQueryPromise, usageSummaryPromise])
+      tier = knownTier
+    } else {
+      const [profileDoc, quotaResult, usageResult] = await Promise.all([
+        adminDb.collection("profiles").doc(userId).get(),
+        quotaQueryPromise,
+        usageSummaryPromise,
+      ])
+      quotaQuery = quotaResult
+      usageSummaryDoc = usageResult
+      const profile = profileDoc.data()
+      tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
+    }
 
     // Find current period quota from limited results.
     //
@@ -483,8 +505,9 @@ export async function checkQuota(
       }
     }
 
-    // Get user quota
-    const quota = await getUserQuota(userId)
+    // Get user quota. PERF-S4: reuse the tier from the profile we just read for
+    // the degraded-subscription gate so getUserQuota does not read it again.
+    const quota = await getUserQuota(userId, tier)
     if (!quota) {
       // If we can't get quota, allow but log warning
       logger.warn("Could not retrieve user quota, allowing request", { userId })
