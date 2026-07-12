@@ -185,7 +185,10 @@ export function useStreamingFeedback() {
             bugfixPostSessionReport: feedback.bugfixPostSessionReport,
             testsPassed: request.testsPassed,
             testsTotal: request.testsTotal,
-            timeSpentMinutes: Math.round((request.elapsedTimeSeconds || 1800) / 60),
+            // Use the real elapsed time; a 0-second session must persist as 0
+            // minutes, not a 30-minute default (EDGE-15). Only genuinely-missing
+            // data (undefined) falls back to 0, matching useFeedbackStreaming.
+            timeSpentMinutes: Math.round((request.elapsedTimeSeconds ?? 0) / 60),
             hintsUsed: request.hintsUsed || 0,
             difficulty: request.scenarioDifficulty || "medium",
             scenarioType: request.scenarioType || "dsa",
