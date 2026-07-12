@@ -617,7 +617,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** component test rendering with
   `{ totalQuestions: 0, patternCoverage: [], actualHoursSpent: undefined }` → no "NaN".
 
-### [ ] EDGE-11 — "Due Today" bucketed in UTC, not user timezone; `streak_at_risk` uses server hour — P2
+### [x] EDGE-11 — "Due Today" bucketed in UTC, not user timezone; `streak_at_risk` uses server hour — P2
 - **Where:** `lib/spaced-repetition/scheduler.ts:169-170`
   (`todayEnd.setUTCHours(23,59,59,999)`), `:213-219` (server-local `setHours(0,0,0,0)`),
   `:311` (bucketing), `:347-351` (`now.getHours() >= 12` = server UTC hour); consumed by
@@ -646,7 +646,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 
 ## Duplicated business logic
 
-### [ ] DUP-4 — streak increment/reset implemented twice with different reset semantics — P2 (P1-adjacent: both live, same doc)
+### [x] DUP-4 — streak increment/reset implemented twice with different reset semantics — P2 (P1-adjacent: both live, same doc)
 - **Where:** `lib/learning-state.ts:171-193` (`updateLearningStateAfterSession`; final
   `else` resets to 1 for ANY non-0/1 diff incl. negative) vs
   `lib/session-metrics.ts:1019-1038` (`updateUserLearningState`; negative/0 leaves value
@@ -660,7 +660,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** unit tests for gaps of -1/0/1/2 days across a timezone boundary;
   `pnpm vitest run lib/spaced-repetition`.
 
-### [ ] DUP-5 — read-side "stale streak → 0" hand-rolled in 2 places despite a dedicated helper — P2
+### [x] DUP-5 — read-side "stale streak → 0" hand-rolled in 2 places despite a dedicated helper — P2
 - **Where:** canonical `lib/spaced-repetition/streak.ts:14-23` (`reconcileStreak`) vs
   hand-rolled `lib/spaced-repetition/mastery-calculator.ts:291-309` and
   `app/api/admin/user-profile/route.ts:470-480`.
@@ -701,7 +701,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Do-not-break:** each prompt's surrounding JSON-output contract.
 - **Verify:** `pnpm vitest run lib/interview lib/feedback`.
 
-### [ ] DUP-9 — three writers, three doc shapes for `user_learning_state` — P2
+### [x] DUP-9 — three writers, three doc shapes for `user_learning_state` — P2
 - **Where:** `lib/learning-state.ts:153-159` (`user_id`, `created_at` ISO string) vs
   `lib/session-metrics.ts:993-1011` (`userId`, `createdAt` serverTimestamp, extra fields)
   vs `lib/spaced-repetition/mastery-calculator.ts:376-386` (merge with `user_id`,
@@ -737,7 +737,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 
 ## Server performance
 
-### [ ] PERF-S3 — session completion reads the user's ENTIRE problem_mastery collection to find one doc — P2
+### [x] PERF-S3 — session completion reads the user's ENTIRE problem_mastery collection to find one doc — P2
 - **Where:** `lib/learning-state.ts:368-370` (`getAllUserProblems(userId)` then `.find()`);
   `lib/spaced-repetition/scheduler.ts:596-602` (unbounded read). Doc ID IS the scenario ID
   everywhere else in scheduler.ts.
@@ -763,7 +763,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** unit test counting profile reads in checkQuota (expect 1); chat route test
   asserting `checkRateLimit` called once.
 
-### [ ] PERF-S5 — batch-defer: 2 sequential round trips per deferred problem — P2
+### [x] PERF-S5 — batch-defer: 2 sequential round trips per deferred problem — P2
 - **Where:** `lib/spaced-repetition/scheduler.ts:793-822` (loop), `:852-908`
   (`deferSingleProblem` get+update), `:781` (repeat `getUserAlgorithm`).
 - **Problem:** deferring 40 items = 80 sequential round trips ≈ 4-8s while the user waits.
@@ -776,7 +776,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** test deferring 30 items asserting per-item results; wall-time before/after
   on emulator.
 
-### [ ] PERF-S6 — /api/spaced-repetition/stats: 3 profile reads, 2 learning_state reads, all sequential, unbounded problems scan — P2
+### [x] PERF-S6 — /api/spaced-repetition/stats: 3 profile reads, 2 learning_state reads, all sequential, unbounded problems scan — P2
 - **Where:** `app/api/spaced-repetition/stats/route.ts:25-34`;
   `lib/spaced-repetition/mastery-calculator.ts:260-282,396-420`.
 - **Fix:** `Promise.all([getUserMasteryStats, getDailyGoalProgress])`; refactor both
@@ -824,7 +824,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   join instead of incrementally.
 - **Verify:** existing spaced-repetition tests; route latency logs.
 
-### [ ] PERF-S10 — Stripe webhook: unbounded quota query, 12 unlimited profile lookups, serialized side effects incl. synchronous email — P2 — NEEDS-STAGING
+### [x] PERF-S10 — Stripe webhook: unbounded quota query, 12 unlimited profile lookups, serialized side effects incl. synchronous email — P2 — NEEDS-STAGING
 - **Where:** `app/api/webhook/stripe/route.ts:93-96` (quota query no limit; docs accrue
   monthly forever), `:812-816` and 11 more sites (profile lookups without `.limit(1)`),
   `:442-521` (checkout handler: quota → payment history → referral → analytics → email
@@ -949,7 +949,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 
 # Wave 4 — P3 cleanup
 
-### [ ] EDGE-13 — subscription-mode checkout payment row not idempotent under Stripe retry — P3
+### [x] EDGE-13 — subscription-mode checkout payment row not idempotent under Stripe retry — P3
 - **Where:** `app/api/webhook/stripe/route.ts:180-185` (naturalKey falls back to auto-id
   when invoice + payment_intent both absent), `:449` (subscription-mode passes neither),
   `:511` (un-guarded read after the record → throw → 500 → retry → duplicate row).
@@ -986,7 +986,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   trimmed whole message for short signals like "done").
 - **Verify:** unit test: "I could have done better" does NOT trigger; "done" alone does.
 
-### [ ] EDGE-17 — paid checkout with missing userId metadata is ACKed with no dead-letter — P3
+### [x] EDGE-17 — paid checkout with missing userId metadata is ACKed with no dead-letter — P3
 - **Where:** `app/api/webhook/stripe/route.ts:528-534` (warn-log + 200; paid-but-never-
   upgraded is unrecoverable).
 - **Fix:** add `recordWebhookFailure(event, "checkout.session.completed:no-user", …)` so
@@ -1119,3 +1119,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — wave-3 batch A (11 items, parallel workflow, typecheck+production-build green): EDGE-4 double-click Start guard (startingRef + isStarting threading); EDGE-5 double-invoke feedback guard; EDGE-6 billing-portal failure toasts; EDGE-10 shared roadmapProgressPercent kills NaN%/NaNh; DUP-10 ScoreDisplay canonical technical-score; DUP-11 canonical design mastery weights; PERF-C7 lazy katex/remark-math; PERF-C8 dynamic CodeMirror (forwardRef-preserving); PERF-C9 /sessions scenario metadata; PERF-C11 gated rAF orbital animation; PERF-S12 wired per-request cost-anomaly (fire-and-forget). New: lib/roadmap/progress.ts, components/ui/katex-css.ts, app/interview/_components/LazyCodeMirrorEditor.tsx, design-mastery-score.test.ts.
 2026-07-12 — DUP-6/DUP-7, PERF-S4, PERF-C12 (wave-3 batch C) — DUP-6: single FORBIDDEN_VALIDATION_PHRASES list (prompt byte-identical, snapshot-tested); deleted orphaned lib/prompts (5 files); guardrail regexes restored to exact original tuned anchoring by the orchestrator (agent's mechanical derivation had broadened them to over-flag 'Right,'/'Nice-looking'). DUP-7: single SPOKEN_COMPLEXITY_RULES fragment across 3 prompts. PERF-S4: one profile read on the chat path + skipRateLimit on the route's own calls. PERF-C12: PARTIAL — part B (dynamic BugfixOnboardingTour, ~271KB off /interview) done; part A (landing LazyMotion) deferred as risky under strict mode. typecheck-clean, 26 tests green.
 2026-07-12 — wave-4 batch (8 items, parallel workflow, typecheck-clean + 22 tests): EDGE-14 dashboard sessions-fetch-error sentinel + retry card; EDGE-15 0s session no longer 30min; EDGE-16 word-boundary conclusion detection (+6-case test); PERF-S15 bounded chat context array (+61-msg 400 test); PERF-C13 dynamic MemoryBrain off /why-codesparring; PERF-C14 lib/hooks barrel no longer re-exports scenario-heavy hooks; API-3 guest-session Zod score validation (+test); API-4 vectorize-problems generic error.
+2026-07-12 — learning-state cluster (DUP-9/4/5, PERF-S3/S5/S6, EDGE-11, serial agent, +14 tests, 33 spaced-rep green, typecheck+build clean) and webhook cluster (EDGE-13/17, PERF-S10, NEEDS-STAGING): DUP-9 canonical UserLearningState + tolerant read + shared writer (also fixed a latent cron user_id-undefined bug); DUP-4 single advanceStreak; DUP-5 reconcileStreak reuse; PERF-S3 single-doc mastery read; PERF-S6 parallel stats (5 reads -> 2); PERF-S5 chunked batch-defer + knownToExist skip-read; EDGE-11 timezone-correct Due Today + local-hour streak_at_risk; EDGE-13 session-id-keyed idempotent subscription payment row; EDGE-17 no-user checkout dead-letter; PERF-S10 .limit(1) x11 + bounded quota query + Promise.allSettled post-commit side effects + dropped verify read. STAGING for PERF-S10: Stripe CLI emulator replay + confirm (user_id, period_start desc) composite index.
