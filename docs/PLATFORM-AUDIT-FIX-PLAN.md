@@ -960,7 +960,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** invoke the handler twice with the same event fixture → one
   `payment_history` doc.
 
-### [ ] EDGE-14 — dashboard silently renders the first-time-user empty state when the sessions query fails — P3
+### [x] EDGE-14 — dashboard silently renders the first-time-user empty state when the sessions query fails — P3
 - **Where:** `app/dashboard/page.tsx:120-130` (`catch { return null }` inside
   `Promise.all`), `:176` (null falls through as "no sessions").
 - **Fix:** distinguish empty from failed: inner IIFE returns a sentinel / sets
@@ -969,7 +969,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Do-not-break:** genuine zero-session users keep the friendly empty state.
 - **Verify:** mock `getDocs` rejection → error/retry card, not "no sessions yet".
 
-### [ ] EDGE-15 — a 0-second session is persisted as 30 minutes — P3
+### [x] EDGE-15 — a 0-second session is persisted as 30 minutes — P3
 - **Where:** `lib/hooks/use-streaming-feedback.ts:188`
   (`Math.round((request.elapsedTimeSeconds || 1800) / 60)`); inconsistent with
   `useFeedbackStreaming.ts:105` (`|| 0`).
@@ -978,7 +978,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Do-not-break:** persist-endpoint mastery calc assumes minutes ≥ 0 — keep non-negative.
 - **Verify:** unit test with `elapsedTimeSeconds: 0` → `timeSpentMinutes: 0`.
 
-### [ ] EDGE-16 — conclusion detection substring-matches "done"/"all good", prematurely ending debriefs — P3
+### [x] EDGE-16 — conclusion detection substring-matches "done"/"all good", prematurely ending debriefs — P3
 - **Where:** `app/interview/_hooks/useInterviewChat.ts:182-202`
   (`conclusionSignals.some(s => msg.includes(s))` — "I could have **done** better on edge
   cases" sets `isEndingSession` and injects the "conclude now" directive).
@@ -1008,7 +1008,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   the standalone `requireTier` for routes that call it without prior `verifyAuth`).
 - **Verify:** route tests; grep confirms single `verifyIdToken` per request path.
 
-### [ ] PERF-S15 — chat request schema puts no bound on the `context` array — P3
+### [x] PERF-S15 — chat request schema puts no bound on the `context` array — P3
 - **Where:** `lib/interview/chat-request-schema.ts:8-15` (no `.max()` on the array or on
   `context[].message`; `message` itself IS capped at 10KB). LLM-side growth is already
   truncated by `manageContextWindow` (lib/interview/context-window.ts:24-55) — this is
@@ -1020,7 +1020,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   separate schema field — verify precedence if the client ever sends a window.
 - **Verify:** chat route test with 61-message context → 400; normal flows unaffected.
 
-### [ ] PERF-C13 — /why-codesparring eagerly bundles three.js via MemoryBrain — P3
+### [x] PERF-C13 — /why-codesparring eagerly bundles three.js via MemoryBrain — P3
 - **Where:** `components/why-codesparring/HeroSection.tsx:7,86`.
   **Correction (orchestrator-verified):** MemoryBrain uses VANILLA `three` only (no
   R3F/drei, contrary to the original agent claim) — the win is the ~513 KB three chunk,
@@ -1029,7 +1029,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   as PERF-C1.
 - **Verify:** rebuild; route drops the three chunk from its HTML script tags.
 
-### [ ] PERF-C14 — `lib/hooks` barrel is a scenario-bundle tripwire — P3
+### [x] PERF-C14 — `lib/hooks` barrel is a scenario-bundle tripwire — P3
 - **Where:** `lib/hooks/index.ts` re-exports `useInterviewSession` and
   `useScenarioFilters`, both importing the full legacy `scenarios` — ANY barrel import
   (e.g. `OnboardingModal.tsx:5` for `useFocusTrap`) drags the scenario dataset into that
@@ -1041,7 +1041,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** rebuild; grep build chunks for "Two Sum" — only the intentionally-lazy
   ScenarioBrowser chunk carries it.
 
-### [ ] API-3 — guest-session PUT accepts unvalidated completion scores — P3
+### [x] API-3 — guest-session PUT accepts unvalidated completion scores — P3
 - **Where:** `app/api/guest-session/route.ts:182-261` (`performanceScore`,
   `efficiencyScore`, `testResults`, `feedback`, `finalCode` written with no range/type
   validation; ownership via guestId+sessionId IS enforced — self-cheating only).
@@ -1051,7 +1051,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   field optional.
 - **Verify:** POST then PUT with out-of-range scores → rejected.
 
-### [ ] API-4 — vectorize-problems echoes raw error internals to any caller — P3
+### [x] API-4 — vectorize-problems echoes raw error internals to any caller — P3
 - **Where:** `app/api/vectorize-problems/route.ts:49,98` (raw `error.message` to public
   GET). (The `health`/`rag/health` and `sync-subscription`/`debug-promo-code` leaks are
   already tracked as API-LEAK-1/2 in PRE-LAUNCH-FIXES.md — fold there, don't duplicate.)
@@ -1118,3 +1118,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — PERF-S7/S9/S11, PERF-C10, EDGE-12+DUP-12 (wave-3 batch B) — S7: /api/roadmap reuses the active snapshot (no duplicate query) + gates the legacy full scan; S9: getSmartRecommendations parallelized + id-only mastery projection; S11: session start no longer double-inits quota + direct quota doc get; C10: roadmap wizard uses scenario metadata not the eager array; EDGE-12: retry UI instead of a false 0/8 wall on usage-check failure; DUP-12: free-limit fallback from PRICING_CONFIG. All typecheck-clean (batch-B files), eslint clean, relevant spaced-repetition/anniversary tests green.
 2026-07-12 — wave-3 batch A (11 items, parallel workflow, typecheck+production-build green): EDGE-4 double-click Start guard (startingRef + isStarting threading); EDGE-5 double-invoke feedback guard; EDGE-6 billing-portal failure toasts; EDGE-10 shared roadmapProgressPercent kills NaN%/NaNh; DUP-10 ScoreDisplay canonical technical-score; DUP-11 canonical design mastery weights; PERF-C7 lazy katex/remark-math; PERF-C8 dynamic CodeMirror (forwardRef-preserving); PERF-C9 /sessions scenario metadata; PERF-C11 gated rAF orbital animation; PERF-S12 wired per-request cost-anomaly (fire-and-forget). New: lib/roadmap/progress.ts, components/ui/katex-css.ts, app/interview/_components/LazyCodeMirrorEditor.tsx, design-mastery-score.test.ts.
 2026-07-12 — DUP-6/DUP-7, PERF-S4, PERF-C12 (wave-3 batch C) — DUP-6: single FORBIDDEN_VALIDATION_PHRASES list (prompt byte-identical, snapshot-tested); deleted orphaned lib/prompts (5 files); guardrail regexes restored to exact original tuned anchoring by the orchestrator (agent's mechanical derivation had broadened them to over-flag 'Right,'/'Nice-looking'). DUP-7: single SPOKEN_COMPLEXITY_RULES fragment across 3 prompts. PERF-S4: one profile read on the chat path + skipRateLimit on the route's own calls. PERF-C12: PARTIAL — part B (dynamic BugfixOnboardingTour, ~271KB off /interview) done; part A (landing LazyMotion) deferred as risky under strict mode. typecheck-clean, 26 tests green.
+2026-07-12 — wave-4 batch (8 items, parallel workflow, typecheck-clean + 22 tests): EDGE-14 dashboard sessions-fetch-error sentinel + retry card; EDGE-15 0s session no longer 30min; EDGE-16 word-boundary conclusion detection (+6-case test); PERF-S15 bounded chat context array (+61-msg 400 test); PERF-C13 dynamic MemoryBrain off /why-codesparring; PERF-C14 lib/hooks barrel no longer re-exports scenario-heavy hooks; API-3 guest-session Zod score validation (+test); API-4 vectorize-problems generic error.
