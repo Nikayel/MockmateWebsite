@@ -117,7 +117,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
   `saveSessionState` called ≥1 (currently 0). Manual: start interview, type code, wait
   35s, hard-refresh → "Session restored" toast appears.
 
-### [ ] EDGE-2 — Transient Stripe error auto-downgrades an active Pro user to Free — P1
+### [x] EDGE-2 — Transient Stripe error auto-downgrades an active Pro user to Free — P1
 - **Where:** `lib/stripe-helpers.ts:248-260,264-283` (every Stripe lookup catch leaves
   `subscription = null`) → downgrade branch at `lib/stripe-helpers.ts:502-518`; triggered
   from `app/account/page.tsx:250-272` on page load and by the `/upgrade` post-checkout poll.
@@ -1094,3 +1094,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 
 <!-- One line per completed item: 2026-07-DD — ID — commit <hash> — note -->
 2026-07-12 — EDGE-1 — autosave interval now keyed on session identity only; payload read from optsRef.current (byte-identical literals); typecheck+lint clean. No React renderer in repo (jsdom/RTL absent) so verified via static analysis + review, not renderHook.
+2026-07-12 — EDGE-2 — apiErrorOccurred flag set in all 3 Stripe-lookup catches; monthly downgrade branch guarded (yearly local-date branch untouched). New lib/__tests__/stripe-helpers-edge2.test.ts (throw→no downgrade; canceled→downgrade) green; typecheck clean.

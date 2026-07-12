@@ -243,6 +243,11 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     // MONTHLY PLANS - Search for Stripe subscription
     let subscription: Stripe.Subscription | null = null
     let customerId: string | null = stripeCustomerId || null
+    // EDGE-2: track whether any Stripe lookup below failed (timeout/429/etc.).
+    // A transient error leaves `subscription` null, which previously looked
+    // identical to "genuinely no subscription" and auto-downgraded an active Pro
+    // user. We only downgrade when every lookup completed successfully.
+    let apiErrorOccurred = false
 
     // Step 1: Try to get subscription by existing subscription ID
     if (stripeSubscriptionId) {
@@ -253,6 +258,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           subscriptionId: stripeSubscriptionId,
         })
       } catch (error) {
+        apiErrorOccurred = true
         subscriptionLogger.error("Error retrieving subscription", {
           subscriptionId: stripeSubscriptionId,
           error,
@@ -276,6 +282,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           })
         }
       } catch (error) {
+        apiErrorOccurred = true
         subscriptionLogger.error("Error listing subscriptions for customer", {
           customerId: stripeCustomerId,
           error,
@@ -381,6 +388,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           )
         }
       } catch (error) {
+        apiErrorOccurred = true
         subscriptionLogger.error("Error searching customers by email", { email: userEmail, error })
       }
     }
@@ -499,6 +507,15 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
           subscriptionLogger.warn("Yearly plan missing period end - downgraded to Free", { userId })
         }
+      } else if (profile.subscription_tier === "pro" && apiErrorOccurred) {
+        // EDGE-2: a Stripe lookup failed, so "no subscription found" is
+        // unreliable. Do NOT downgrade — leave the profile unchanged so a
+        // transient network blip can't lock an active Pro user out mid-period.
+        // The next sync (page load / cron reconcile) retries.
+        subscriptionLogger.warn(
+          "Stripe lookup failed during sync - skipping downgrade to protect an active Pro user",
+          { userId }
+        )
       } else if (profile.subscription_tier === "pro") {
         // Pro user with no subscription and not yearly - downgrade
         await profileRef.set(
