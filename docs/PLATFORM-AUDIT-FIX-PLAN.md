@@ -134,7 +134,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** unit test mocking `stripe.subscriptions.retrieve` to throw → profile tier
   NOT rewritten; second test resolving `status: "canceled"` → downgrade still happens.
 
-### [ ] EDGE-WEBHOOK (EDGE-3 + EDGE-7 + EDGE-8) — three webhook handlers swallow errors and ACK Stripe — P2, one commit — NEEDS-STAGING
+### [x] EDGE-WEBHOOK (EDGE-3 + EDGE-7 + EDGE-8) — three webhook handlers swallow errors and ACK Stripe — P2, one commit — NEEDS-STAGING
 - **Where:** `app/api/webhook/stripe/route.ts` —
   EDGE-3: `invoice.paid` quota reset, catch at :1126-1128;
   EDGE-7: `charge.refunded` downgrade, catch at :1020-1022;
@@ -1099,3 +1099,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — DEAD-11 — git rm --cached graphify-out (254 files) + scratch.ts/patch_runners.py/eslint-results.json; added them to .gitignore. settings.json graphify hook left untouched (needs user approval). Files stay on disk, just untracked.
 2026-07-12 — DUP-1 — score-accumulator now imports SCORING.{PERFORMANCE,BUG_FIX,SYSTEM_DESIGN}_WEIGHTS from lib/constants for calculateInstantScores + calculateSystemDesignScores; inline literals deleted; signalsUsed labels/return shape/hard-easy adj preserved. New guard test asserts each type's overall == canonical-weighted sum. typecheck clean, 10 new tests green.
 2026-07-12 — DUP-8 — /limit-reached Pro pitch now rendered from PRICING_CONFIG.pro (sessionsDisplay + valueProps map), mirroring app/upgrade; hardcoded "Unlimited Sessions"/"500+ Problems" strings deleted. grep for "Unlimited Sessions" now empty; redirect-if-allowed untouched. typecheck+eslint clean. (Note: config valueProps still contain em dashes that now surface here; out of scope for this finding.)
+2026-07-12 — EDGE-WEBHOOK — invoice.payment_failed / charge.refunded / invoice.paid catches now call recordWebhookFailure(event, type, error) (mirrors the dispute sibling); kept 200 after dead-lettering (consistent, and invoice.paid reset is idempotent per period). typecheck clean. STAGING-TODO: Stripe CLI replay on emulator before production deploy (throwing-Firestore-mock unit test also still recommended).

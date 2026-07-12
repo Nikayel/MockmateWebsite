@@ -853,7 +853,11 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (error) {
+      // EDGE-8: dead-letter so a failed past_due update is durable + retryable
+      // (banner + dunning email depend on it). Keep 200 (consistent with the
+      // dispute/uncollectible siblings) so Stripe doesn't hammer-retry.
       paymentLogger.error("Error handling payment failure", { error })
+      await recordWebhookFailure(event, "invoice.payment_failed", error)
     }
   }
 
@@ -1018,7 +1022,10 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (error) {
+      // EDGE-7: dead-letter so a failed refund downgrade is durable + retryable
+      // (otherwise a fully-refunded user keeps Pro forever). Keep 200.
       paymentLogger.error("Error handling refund", { error })
+      await recordWebhookFailure(event, "charge.refunded", error)
     }
   }
 
@@ -1125,7 +1132,11 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (error) {
+      // EDGE-3: dead-letter so a failed renewal quota-reset is durable + retryable
+      // (otherwise a paying user hits "limit reached" on day 1 of a paid month).
+      // Keep 200; the reset is idempotent per period via last_reset_period_start.
       paymentLogger.error("Error handling invoice.paid", { error })
+      await recordWebhookFailure(event, "invoice.paid", error)
     }
   }
 
