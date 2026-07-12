@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { getUserIdFromRequest } from "@/lib/auth-server"
-import { PRICING_CONFIG } from "@/lib/config"
+import { updateQuotaForSubscriptionTierAdmin } from "@/lib/stripe-helpers"
 import { promoCodeRateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { csrfProtection } from "@/lib/csrf"
@@ -66,6 +66,10 @@ export async function POST(request: NextRequest) {
         .collection("promo_code_usage")
         .doc(`${userId}_${normalizedCode}`)
 
+      // Captured from the profile inside the transaction so the shared quota writer can
+      // compute the anniversary billing period after the transaction commits.
+      let profileCreatedAt: string | undefined
+
       // Use a transaction to atomically check usage, update profile, and record usage
       // This prevents race conditions where two requests could both pass the check
       try {
@@ -85,6 +89,8 @@ export async function POST(request: NextRequest) {
           if (!profileSnap.exists) {
             throw new Error("PROFILE_NOT_FOUND")
           }
+
+          profileCreatedAt = (profileSnap.data() as { created_at?: string } | undefined)?.created_at
 
           // Update profile to Pro
           transaction.update(profileRef, {
@@ -130,34 +136,20 @@ export async function POST(request: NextRequest) {
         throw error // Re-throw other errors
       }
 
-      // Update quota to Pro limits
-      const quotaQuery = await adminDb
-        .collection("profile_quota")
-        .where("user_id", "==", userId)
-        .get()
-
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-
-      if (!quotaQuery.empty) {
-        // Update existing quota
-        const quotaDoc = quotaQuery.docs[0]
-        await quotaDoc.ref.update({
-          sessions_limit: PRICING_CONFIG.pro.sessionsPerMonth,
-          updated_at: now.toISOString(),
-        })
-      } else {
-        // Create new quota
-        await adminDb.collection("profile_quota").add({
-          user_id: userId,
-          sessions_used: 0,
-          sessions_limit: PRICING_CONFIG.pro.sessionsPerMonth,
-          period_start: periodStart.toISOString(),
-          period_end: periodEnd.toISOString(),
-          created_at: now.toISOString(),
-          updated_at: now.toISOString(),
-        })
-      }
+      // Update quota to Pro limits using the shared canonical quota writer. This gives us
+      // anniversary-based billing (from created_at), current-period doc selection, and the
+      // once-per-period idempotency guard, replacing the old calendar-month + "first matching
+      // doc" logic. getSessionsLimitForTier("pro") lands sessions_limit at the Pro limit.
+      // We intentionally do NOT pass subscription_current_period_end: for this 1-year Pro grant
+      // it is a year out, so using it as a monthly boundary would push the quota window a year
+      // ahead. created_at drives the correct monthly anniversary window instead.
+      await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+        resetUsage: true,
+        profileData: {
+          created_at: profileCreatedAt,
+          subscription_type: "promo",
+        },
+      })
 
       return NextResponse.json({
         valid: true,

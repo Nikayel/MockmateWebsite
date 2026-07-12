@@ -7,8 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
-import { getSessionsLimitForTier } from "@/lib/pricing"
-import { calculateBillingPeriod } from "@/lib/firestore-helpers"
+import { updateQuotaForSubscriptionTierAdmin } from "@/lib/stripe-helpers"
 import {
   sendPaymentFailedEmail,
   sendSubscriptionConfirmationEmail,
@@ -58,98 +57,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 // Create a child logger for payment events
 const paymentLogger = logger.child({ service: "stripe-webhook" })
-
-/**
- * Update user quota for subscription tier using Admin SDK
- * @param resetUsage - If true, reset sessions_used to 0 (for new billing periods or tier changes)
- * @param profileData - User profile data for correct period calculation
- */
-async function updateQuotaForSubscriptionTierAdmin(
-  userId: string,
-  subscriptionTier: "free" | "pro" | "enterprise",
-  resetUsage: boolean = false,
-  profileData?: {
-    created_at?: string
-    subscription_type?: string
-    subscription_current_period_end?: string
-  }
-): Promise<void> {
-  const now = new Date()
-
-  const { periodStart, periodEnd } = calculateBillingPeriod({
-    subscriptionTier,
-    subscriptionType: profileData?.subscription_type,
-    signupDate: profileData?.created_at,
-    stripeCurrentPeriodEnd: profileData?.subscription_current_period_end,
-    referenceDate: now,
-  })
-
-  const sessionsLimit = getSessionsLimitForTier(subscriptionTier)
-
-  // Query for existing quota
-  const quotaSnapshot = await adminDb
-    .collection("profile_quota")
-    .where("user_id", "==", userId)
-    .get()
-
-  // Find current period quota by checking if stored period_start falls within calculated period
-  const currentQuotaDoc = quotaSnapshot.docs.find((doc) => {
-    const data = doc.data()
-    const quotaStart = new Date(data.period_start)
-    return quotaStart >= periodStart && quotaStart <= periodEnd
-  })
-
-  if (currentQuotaDoc) {
-    const currentData = currentQuotaDoc.data()
-    const updateData: Record<string, unknown> = {
-      sessions_limit: sessionsLimit,
-      period_start: periodStart.toISOString(),
-      period_end: periodEnd.toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    // Reset usage if explicitly requested (new billing period) or if downgrading and usage exceeds new limit
-    if (resetUsage) {
-      // Idempotency guard: zero usage at most ONCE per billing period, so a RETRIED invoice.paid
-      // webhook cannot re-zero a user's sessions mid-period and hand them unpaid usage. (hardening)
-      if (currentData.last_reset_period_start === periodStart.toISOString()) {
-        paymentLogger.info("Usage already reset for this period — skipping duplicate reset", {
-          userId,
-          periodStart: periodStart.toISOString(),
-        })
-      } else {
-        updateData.sessions_used = 0
-        updateData.free_opens_remaining = 0
-        updateData.last_reset_period_start = periodStart.toISOString()
-        paymentLogger.info("Resetting usage for new billing period", { userId, sessionsLimit })
-      }
-    } else if ((currentData.sessions_used as number) > sessionsLimit) {
-      // If user has used more than new limit (e.g., downgrade from pro to free), cap it
-      updateData.sessions_used = sessionsLimit
-      paymentLogger.info("Capping sessions_used due to downgrade", {
-        userId,
-        sessionsLimit,
-        previousUsed: currentData.sessions_used,
-      })
-    }
-
-    await currentQuotaDoc.ref.update(updateData)
-  } else {
-    // Create new quota for this period. Stamp last_reset_period_start so a retried webhook that then
-    // finds this doc skips the usage reset (the period already starts at 0 here). (hardening)
-    await adminDb.collection("profile_quota").add({
-      user_id: userId,
-      sessions_used: 0,
-      sessions_limit: sessionsLimit,
-      free_opens_remaining: 0,
-      period_start: periodStart.toISOString(),
-      period_end: periodEnd.toISOString(),
-      last_reset_period_start: periodStart.toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-  }
-}
 
 /**
  * Record payment to payment_history collection
@@ -436,10 +343,13 @@ export async function POST(request: NextRequest) {
           })
 
           // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true, {
-            created_at: profile?.created_at as string | undefined,
-            subscription_type: "monthly",
-            subscription_current_period_end: currentPeriodEnd,
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+            resetUsage: true,
+            profileData: {
+              created_at: profile?.created_at as string | undefined,
+              subscription_type: "monthly",
+              subscription_current_period_end: currentPeriodEnd,
+            },
           })
 
           // Record payment in history
@@ -715,9 +625,12 @@ export async function POST(request: NextRequest) {
           )
 
           // Update quota to Pro limit - reset usage for new subscription
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true, {
-            created_at: (profile?.created_at as string | undefined) ?? new Date().toISOString(),
-            subscription_type: "yearly",
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+            resetUsage: true,
+            profileData: {
+              created_at: (profile?.created_at as string | undefined) ?? new Date().toISOString(),
+              subscription_type: "yearly",
+            },
           })
 
           // Record payment in history
@@ -1010,9 +923,12 @@ export async function POST(request: NextRequest) {
             )
 
             const refundProfile = profileDoc.data()
-            await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
-              created_at: refundProfile?.created_at,
-              subscription_type: refundProfile?.subscription_type,
+            await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+              resetUsage: false,
+              profileData: {
+                created_at: refundProfile?.created_at,
+                subscription_type: refundProfile?.subscription_type,
+              },
             })
             paymentLogger.info("User downgraded due to full refund", { userId })
           }
@@ -1095,10 +1011,13 @@ export async function POST(request: NextRequest) {
             const newPeriodEnd = invoice.period_end
               ? new Date(invoice.period_end * 1000).toISOString()
               : undefined
-            await updateQuotaForSubscriptionTierAdmin(userId, "pro", true, {
-              created_at: profile?.created_at,
-              subscription_type: profile?.subscription_type ?? "monthly",
-              subscription_current_period_end: newPeriodEnd,
+            await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+              resetUsage: true,
+              profileData: {
+                created_at: profile?.created_at,
+                subscription_type: profile?.subscription_type ?? "monthly",
+                subscription_current_period_end: newPeriodEnd,
+              },
             })
 
             logger.payment("Subscription renewed", { userId })
@@ -1118,10 +1037,13 @@ export async function POST(request: NextRequest) {
             )
 
             // Restore Pro quota (don't reset usage - they're catching up)
-            await updateQuotaForSubscriptionTierAdmin(userId, "pro", false, {
-              created_at: profile?.created_at,
-              subscription_type: profile?.subscription_type ?? "monthly",
-              subscription_current_period_end: profile?.subscription_current_period_end,
+            await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
+              resetUsage: false,
+              profileData: {
+                created_at: profile?.created_at,
+                subscription_type: profile?.subscription_type ?? "monthly",
+                subscription_current_period_end: profile?.subscription_current_period_end,
+              },
             })
 
             logger.payment("Subscription recovered", { userId })
@@ -1287,9 +1209,12 @@ export async function POST(request: NextRequest) {
             { merge: true }
           )
 
-          await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
-            created_at: profile?.created_at,
-            subscription_type: profile?.subscription_type,
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+            resetUsage: false,
+            profileData: {
+              created_at: profile?.created_at,
+              subscription_type: profile?.subscription_type,
+            },
           })
 
           logger.payment("User downgraded to Free", {
@@ -1444,9 +1369,12 @@ export async function POST(request: NextRequest) {
           )
 
           const profile = profileDoc.data()
-          await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
-            created_at: profile?.created_at,
-            subscription_type: profile?.subscription_type,
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+            resetUsage: false,
+            profileData: {
+              created_at: profile?.created_at,
+              subscription_type: profile?.subscription_type,
+            },
           })
 
           // Void referral rewards (same as refund)
@@ -1507,9 +1435,12 @@ export async function POST(request: NextRequest) {
           )
 
           const profile = profileDoc.data()
-          await updateQuotaForSubscriptionTierAdmin(userId, "free", false, {
-            created_at: profile?.created_at,
-            subscription_type: profile?.subscription_type,
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+            resetUsage: false,
+            profileData: {
+              created_at: profile?.created_at,
+              subscription_type: profile?.subscription_type,
+            },
           })
 
           paymentLogger.warn("User downgraded due to uncollectible invoice", { userId })

@@ -31,17 +31,30 @@ try {
 }
 
 /**
- * Update user quota for subscription tier using Admin SDK
+ * Update user quota for subscription tier using Admin SDK.
+ *
+ * Canonical quota writer shared by the Stripe webhook, subscription sync, and promo-code flows.
+ *
+ * @param options.resetUsage - If true, reset sessions_used to 0 (for new billing periods or tier
+ *   changes). The reset is idempotent per billing period via last_reset_period_start, so a RETRIED
+ *   invoice.paid webhook cannot re-zero a user's sessions mid-period and hand them unpaid usage.
+ * @param options.profileData - User profile data for correct billing-period calculation.
  */
-async function updateQuotaForSubscriptionTierAdmin(
+export async function updateQuotaForSubscriptionTierAdmin(
   userId: string,
   subscriptionTier: "free" | "pro" | "enterprise",
-  profileData?: {
-    created_at?: string
-    subscription_type?: string
-    subscription_current_period_end?: string
+  options?: {
+    resetUsage?: boolean
+    profileData?: {
+      created_at?: string
+      subscription_type?: string
+      subscription_current_period_end?: string
+    }
   }
 ): Promise<void> {
+  const resetUsage = options?.resetUsage ?? false
+  const profileData = options?.profileData
+
   const now = new Date()
 
   const { periodStart, periodEnd } = calculateBillingPeriod({
@@ -68,26 +81,54 @@ async function updateQuotaForSubscriptionTierAdmin(
   })
 
   if (currentQuotaDoc) {
-    // Update existing quota
-    await currentQuotaDoc.ref.update({
+    const currentData = currentQuotaDoc.data()
+    const updateData: Record<string, unknown> = {
       sessions_limit: sessionsLimit,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
       updated_at: new Date().toISOString(),
-    })
-    subscriptionLogger.info("Updated quota", { userId, sessionsLimit })
+    }
+
+    // Reset usage if explicitly requested (new billing period) or if downgrading and usage exceeds new limit
+    if (resetUsage) {
+      // Idempotency guard: zero usage at most ONCE per billing period, so a RETRIED invoice.paid
+      // webhook cannot re-zero a user's sessions mid-period and hand them unpaid usage. (hardening)
+      if (currentData.last_reset_period_start === periodStart.toISOString()) {
+        subscriptionLogger.info("Usage already reset for this period — skipping duplicate reset", {
+          userId,
+          periodStart: periodStart.toISOString(),
+        })
+      } else {
+        updateData.sessions_used = 0
+        updateData.free_opens_remaining = 0
+        updateData.last_reset_period_start = periodStart.toISOString()
+        subscriptionLogger.info("Resetting usage for new billing period", { userId, sessionsLimit })
+      }
+    } else if ((currentData.sessions_used as number) > sessionsLimit) {
+      // If user has used more than new limit (e.g., downgrade from pro to free), cap it
+      updateData.sessions_used = sessionsLimit
+      subscriptionLogger.info("Capping sessions_used due to downgrade", {
+        userId,
+        sessionsLimit,
+        previousUsed: currentData.sessions_used,
+      })
+    }
+
+    await currentQuotaDoc.ref.update(updateData)
   } else {
-    // Create new quota
+    // Create new quota for this period. Stamp last_reset_period_start so a retried webhook that then
+    // finds this doc skips the usage reset (the period already starts at 0 here). (hardening)
     await adminDb.collection("profile_quota").add({
       user_id: userId,
       sessions_used: 0,
       sessions_limit: sessionsLimit,
+      free_opens_remaining: 0,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
+      last_reset_period_start: periodStart.toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    subscriptionLogger.info("Created quota", { userId, sessionsLimit })
   }
 }
 
@@ -156,8 +197,10 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           )
 
           await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-            created_at: profile.created_at,
-            subscription_type: profile.subscription_type,
+            profileData: {
+              created_at: profile.created_at,
+              subscription_type: profile.subscription_type,
+            },
           })
 
           subscriptionLogger.info("Yearly plan expired - downgraded to Free", {
@@ -422,9 +465,11 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         // Update quota to Pro limit
         await updateQuotaForSubscriptionTierAdmin(userId, "pro", {
-          created_at: profile.created_at,
-          subscription_type: profile.subscription_type ?? "monthly",
-          subscription_current_period_end: currentPeriodEnd,
+          profileData: {
+            created_at: profile.created_at,
+            subscription_type: profile.subscription_type ?? "monthly",
+            subscription_current_period_end: currentPeriodEnd,
+          },
         })
 
         logger.payment("Synced user to Pro", { userId, subscriptionId: subscription.id })
@@ -443,8 +488,10 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         // Update quota to free limit
         await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-          created_at: profile.created_at,
-          subscription_type: profile.subscription_type,
+          profileData: {
+            created_at: profile.created_at,
+            subscription_type: profile.subscription_type,
+          },
         })
 
         subscriptionLogger.info("Synced user to Free", { userId, status: subscription.status })
@@ -471,8 +518,10 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
             )
 
             await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-              created_at: profile.created_at,
-              subscription_type: profile.subscription_type,
+              profileData: {
+                created_at: profile.created_at,
+                subscription_type: profile.subscription_type,
+              },
             })
 
             subscriptionLogger.info("Yearly plan expired - downgraded to Free", {
@@ -498,8 +547,10 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           )
 
           await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-            created_at: profile.created_at,
-            subscription_type: profile.subscription_type,
+            profileData: {
+              created_at: profile.created_at,
+              subscription_type: profile.subscription_type,
+            },
           })
 
           subscriptionLogger.warn("Yearly plan missing period end - downgraded to Free", { userId })
@@ -525,8 +576,10 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         )
 
         await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-          created_at: profile.created_at,
-          subscription_type: profile.subscription_type,
+          profileData: {
+            created_at: profile.created_at,
+            subscription_type: profile.subscription_type,
+          },
         })
 
         subscriptionLogger.info("No active subscription - downgraded to Free", { userId })
