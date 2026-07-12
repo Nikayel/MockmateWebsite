@@ -14,6 +14,11 @@ import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { guestSessionRateLimit } from "@/lib/rate-limit"
 import { SESSION } from "@/lib/constants"
+import {
+  GuestSessionUpdateSchema,
+  validateRequest,
+  validationErrorResponse,
+} from "@/lib/validations/api-schemas"
 
 // Mark route as dynamic
 export const dynamic = "force-dynamic"
@@ -187,7 +192,11 @@ export async function PUT(request: NextRequest) {
       return rateLimitResponse
     }
 
-    const body = await request.json()
+    const rawBody = await request.json()
+    const validation = validateRequest(GuestSessionUpdateSchema, rawBody)
+    if (!validation.success) {
+      return validationErrorResponse(validation.error)
+    }
     const {
       sessionId,
       guestId,
@@ -200,7 +209,7 @@ export async function PUT(request: NextRequest) {
       timeComplexity,
       spaceComplexity,
       efficiencyScore,
-    } = body
+    } = validation.data
 
     if (!sessionId || !guestId) {
       return NextResponse.json({ error: "sessionId and guestId are required" }, { status: 400 })
@@ -251,7 +260,7 @@ export async function PUT(request: NextRequest) {
     if (language) updateData.language = language
     if (testResults) {
       updateData.test_results = testResults
-      updateData.tests_passed = testResults.filter((t: any) => t.passed).length
+      updateData.tests_passed = testResults.filter((t) => t.passed).length
       updateData.tests_total = testResults.length
     }
     if (timeComplexity) updateData.time_complexity = timeComplexity

@@ -128,6 +128,47 @@ export const GenerateFeedbackSchema = z.object({
 })
 
 // ============================================
+// Guest Session Schemas
+// ============================================
+
+/**
+ * PUT /api/guest-session update/completion body.
+ *
+ * SECURITY (API-3): performance/efficiency scores are bounded to 0-100 and the
+ * code and test-result payloads are length-bounded, so a guest cannot write
+ * arbitrary values through the Admin-SDK write path (ownership is still checked
+ * separately via guestId + sessionId).
+ *
+ * Every field is OPTIONAL by design: guest resume writes `sessionState`, guest
+ * completion writes the scores and results, and both rely on partial-field
+ * merges, so we only validate fields that are actually present. Unknown keys on
+ * a test result are preserved (passthrough) because the full result object,
+ * including `input` and `error`, is stored and re-rendered on review.
+ */
+export const GuestSessionUpdateSchema = z.object({
+  sessionId: z.string().min(1).optional(),
+  guestId: z.string().min(1).optional(),
+  sessionState: z
+    .object({
+      code: z.string().optional(),
+      language: z.string().optional(),
+      elapsedTime: z.number().optional(),
+      chatMessages: z.array(z.unknown()).optional(),
+      interviewerMessages: z.array(z.unknown()).optional(),
+      testResults: z.array(z.unknown()).optional(),
+    })
+    .optional(),
+  performanceScore: z.number().min(0, "Score must be 0-100").max(100, "Score must be 0-100").optional(),
+  efficiencyScore: z.number().min(0, "Score must be 0-100").max(100, "Score must be 0-100").optional(),
+  feedback: z.unknown().optional(),
+  finalCode: z.string().max(50000, "Code too long").optional(),
+  language: z.string().max(50).optional(),
+  testResults: z.array(TestResultSchema.passthrough()).max(100, "Too many test results").optional(),
+  timeComplexity: z.string().max(100).optional(),
+  spaceComplexity: z.string().max(100).optional(),
+})
+
+// ============================================
 // Promo Code Schemas
 // ============================================
 
