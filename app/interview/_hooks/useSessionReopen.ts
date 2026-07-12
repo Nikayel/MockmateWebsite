@@ -5,7 +5,8 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
-import { getScenarioById, type Scenario } from "@/lib/scenarios"
+import { getScenarioById } from "@/lib/scenarios/index"
+import type { Scenario } from "@/lib/scenarios/types"
 import { getSessionState, findLatestSubmittedSession } from "@/lib/firestore-helpers"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
 import { getBugfixScenarioLanguage, type EditorLanguage } from "../_utils/language"
@@ -123,7 +124,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
       // Case 1: Reopening an existing session
       if (sessionId && scenarioId) {
         // Load the scenario and reopen the session
-        const scenario = getScenarioById(scenarioId)
+        const scenario = await getScenarioById(scenarioId)
         if (scenario) {
           opts.setSelectedScenario(scenario)
           opts.setShowOptimalApproach(false) // Reset optimal approach visibility
@@ -375,7 +376,7 @@ Let's continue!`
       }
       // Case 2: Starting fresh from roadmap or practice (scenario only, no session)
       else if (scenarioId && !sessionId && (fromRoadmap || fromPractice)) {
-        const scenario = getScenarioById(scenarioId)
+        const scenario = await getScenarioById(scenarioId)
         if (scenario) {
           // Check if there's already an evaluating session for this scenario
           // Only redirect if evaluating - otherwise let user start a new session

@@ -226,28 +226,45 @@ async function loadSystemDesignScenarios(): Promise<SystemDesignScenario[]> {
  */
 export async function getScenarioById(id: string): Promise<Scenario | undefined> {
   const meta = scenarioRegistry.get(id)
-  if (!meta) return undefined
 
-  let scenarios: Scenario[] = []
+  // Fast path: when the metadata registry is populated it tells us exactly which
+  // lazy module to load, so we only fetch that one pattern/type.
+  if (meta) {
+    let scenarios: Scenario[] = []
 
-  switch (meta.type) {
-    case "dsa":
-      if (meta.pattern) {
-        scenarios = await loadDSAByPattern(meta.pattern)
-      }
-      break
-    case "bugfix":
-      scenarios = await loadBugFixScenarios()
-      break
-    case "system-design":
-      scenarios = await loadSystemDesignScenarios()
-      break
-    default:
-      const addFunctionality = await import("./add-functionality")
-      scenarios = addFunctionality.addFunctionalityScenarios as unknown as Scenario[]
+    switch (meta.type) {
+      case "dsa":
+        if (meta.pattern) {
+          scenarios = await loadDSAByPattern(meta.pattern)
+        }
+        break
+      case "bugfix":
+        scenarios = await loadBugFixScenarios()
+        break
+      case "system-design":
+        scenarios = await loadSystemDesignScenarios()
+        break
+      default:
+        const addFunctionality = await import("./add-functionality")
+        scenarios = addFunctionality.addFunctionalityScenarios as unknown as Scenario[]
+    }
+
+    const fromMeta = scenarios.find((s) => s.id === id)
+    if (fromMeta) return fromMeta
   }
 
-  return scenarios.find((s) => s.id === id)
+  // Fallback: the metadata registry is only populated when initializeScenarioRegistry
+  // runs, which does not happen on every entry point. Resolve the id by lazily
+  // scanning each scenario type. Every load below is a dynamic import, so this stays
+  // out of the initial bundle and each module is cached after its first load.
+  const scenarioTypes: ScenarioType[] = ["dsa", "bugfix", "system-design", "add-functionality"]
+  for (const scenarioType of scenarioTypes) {
+    const scenarios = await getScenariosByType(scenarioType)
+    const found = scenarios.find((s) => s.id === id)
+    if (found) return found
+  }
+
+  return undefined
 }
 
 /**
