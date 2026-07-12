@@ -12,53 +12,91 @@ import { adminDb, FieldValue } from "./firebase-admin"
 import type { UserLearningState, TopicLearningState, Profile } from "./types"
 import type { DSAPattern } from "./types/dsa-patterns"
 import type { Difficulty } from "./spaced-repetition/sm2-algorithm"
+import type { ProblemMastery } from "./spaced-repetition/scheduler"
 import { logger } from "./logger"
 import { DEFAULT_TIMEZONE } from "./email/timezone"
+import { advanceStreak } from "./spaced-repetition/streak"
 import { invalidateBehavioralProfileCache } from "./rag/behavioral-analysis"
 
 /**
- * Get the start of a calendar day in a specific timezone
- * This ensures streak calculations work correctly regardless of server timezone
+ * Firestore may store a timestamp as an ISO string (our canonical form) or as a
+ * Firestore Timestamp (legacy writes used FieldValue.serverTimestamp). Coalesce
+ * either into an ISO string so readers see one shape.
  */
-function getStartOfDayInTimezone(date: Date, timezone: string): Date {
-  try {
-    // Format the date in the user's timezone to get the local date parts
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-    const parts = formatter.formatToParts(date)
-    const year = parseInt(parts.find((p) => p.type === "year")?.value || "0", 10)
-    const month = parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1
-    const day = parseInt(parts.find((p) => p.type === "day")?.value || "0", 10)
-
-    // Create a date representing midnight in that timezone
-    // We use a formatter to get the offset, then adjust
-    const midnightLocal = new Date(year, month, day, 0, 0, 0, 0)
-
-    // Get the timezone offset for this specific date (handles DST)
-    const offsetFormatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      timeZoneName: "shortOffset",
-    })
-    const offsetString = offsetFormatter.format(midnightLocal)
-    const offsetMatch = offsetString.match(/GMT([+-]\d+)?/)
-    const offsetHours = offsetMatch?.[1] ? parseInt(offsetMatch[1], 10) : 0
-
-    // Return a UTC date that represents midnight in the user's timezone
-    return new Date(Date.UTC(year, month, day, -offsetHours, 0, 0, 0))
-  } catch (error) {
-    // Fallback to local time if timezone is invalid
-    logger.warn("Invalid timezone for streak calculation, falling back to local", {
-      timezone,
-      error: error instanceof Error ? error.message : "Unknown error",
-    })
-    const result = new Date(date)
-    result.setHours(0, 0, 0, 0)
-    return result
+function toIsoTimestamp(value: unknown): string | undefined {
+  if (typeof value === "string") return value
+  if (value && typeof (value as { toDate?: unknown }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toISOString()
   }
+  return undefined
+}
+
+/**
+ * Tolerant read for a `user_learning_state` document.
+ *
+ * Historically three separate writers persisted this document with mixed field
+ * spellings: the identity/timestamp fields were written as snake_case by two
+ * writers (`user_id`, `created_at`, `updated_at`) and as camelCase by the
+ * session-metrics writer (`userId`, `createdAt`, `updatedAt`). This coalesces
+ * both spellings into the canonical snake_case contract so no reader depends on
+ * which writer last touched the document. Prefer this (or `getUserLearningState`)
+ * over reading raw document data.
+ */
+export function normalizeLearningStateDoc(
+  raw: FirebaseFirestore.DocumentData | undefined | null
+): UserLearningState | null {
+  if (!raw) return null
+
+  const createdAt = toIsoTimestamp(raw.created_at ?? raw.createdAt)
+  const updatedAt = toIsoTimestamp(raw.updated_at ?? raw.updatedAt)
+
+  return {
+    ...(raw as UserLearningState),
+    user_id: (raw.user_id ?? raw.userId) as string,
+    ...(createdAt ? { created_at: createdAt } : {}),
+    ...(updatedAt ? { updated_at: updatedAt } : {}),
+  }
+}
+
+/**
+ * Build the canonical identity + timestamp fields for a `user_learning_state`
+ * document. Every writer funnels these fields through here so the document never
+ * accumulates the legacy camelCase spellings (`userId` / `createdAt` /
+ * `updatedAt`) alongside the canonical ones. `created_at` is only emitted for a
+ * brand-new document; `updated_at` is always refreshed.
+ */
+export function learningStateMeta(
+  userId: string,
+  options: { isNew: boolean; now?: Date }
+): { user_id: string; updated_at: string; created_at?: string } {
+  const iso = (options.now ?? new Date()).toISOString()
+  const meta: { user_id: string; updated_at: string; created_at?: string } = {
+    user_id: userId,
+    updated_at: iso,
+  }
+  if (options.isNew) meta.created_at = iso
+  return meta
+}
+
+/**
+ * Single canonical writer for `user_learning_state` documents.
+ *
+ * Merges the caller's domain fields with canonical snake_case identity/timestamp
+ * meta (see {@link learningStateMeta}). Used by non-transactional callers such as
+ * the mastery-summary rollup. Transactional writers instead spread
+ * {@link learningStateMeta} into their own transaction payloads so they can keep
+ * atomic increments and dot-path topic updates.
+ */
+export async function writeUserLearningState(
+  userId: string,
+  fields: Partial<UserLearningState> & Record<string, unknown>,
+  options: { isNew?: boolean; now?: Date } = {}
+): Promise<void> {
+  const learningStateRef = adminDb.collection("user_learning_state").doc(userId)
+  await learningStateRef.set(
+    { ...fields, ...learningStateMeta(userId, { isNew: options.isNew ?? false, now: options.now }) },
+    { merge: true }
+  )
 }
 
 /**
@@ -146,51 +184,28 @@ export async function updateLearningStateAfterSession(
     let existingTopic: TopicLearningState | undefined
 
     if (doc.exists) {
-      learningState = doc.data() as UserLearningState
+      // Tolerant read: coalesce any legacy camelCase identity/timestamp fields.
+      learningState = normalizeLearningStateDoc(doc.data())!
       existingTopic = learningState.topics?.[topicId]
     } else {
       // Create new learning state
       learningState = {
-        user_id: userId,
         topics: {},
         streak_days: 0,
-        created_at: now.toISOString(),
-        updated_at: now.toISOString(),
-      }
+        ...learningStateMeta(userId, { isNew: true, now }),
+      } as UserLearningState
     }
 
-    // Calculate streak using calendar days in the USER'S TIMEZONE
-    // This ensures practicing at 11 PM then 1 AM counts as consecutive days
-    // regardless of server timezone
-    const lastSessionAt = learningState.last_session_at
-      ? new Date(learningState.last_session_at)
-      : null
-
-    let newStreakDays = learningState.streak_days || 0
-
-    if (lastSessionAt) {
-      // Compare calendar dates in the user's timezone to properly track streaks
-      const lastSessionDayStart = getStartOfDayInTimezone(lastSessionAt, userTimezone)
-      const todayDayStart = getStartOfDayInTimezone(now, userTimezone)
-
-      // Calculate difference in calendar days
-      const daysSinceLastSession = Math.round(
-        (todayDayStart.getTime() - lastSessionDayStart.getTime()) / (1000 * 60 * 60 * 24)
-      )
-
-      if (daysSinceLastSession === 0) {
-        // Same calendar day in user's timezone, no change to streak
-      } else if (daysSinceLastSession === 1) {
-        // Consecutive calendar day, increment streak
-        newStreakDays++
-      } else {
-        // Streak broken (missed a day), reset to 1
-        newStreakDays = 1
-      }
-    } else {
-      // First session ever
-      newStreakDays = 1
-    }
+    // Advance the streak via the shared write-side helper (single source of
+    // truth in spaced-repetition/streak.ts). It compares calendar days in the
+    // user's timezone (so 11 PM then 1 AM counts as consecutive days) and is
+    // idempotent for same-day / repeat writes.
+    const newStreakDays = advanceStreak(
+      learningState.streak_days,
+      learningState.last_session_at,
+      userTimezone,
+      now
+    )
 
     // Calculate next review using SM-2
     const previousInterval = existingTopic?.interval_days || 0
@@ -218,13 +233,15 @@ export async function updateLearningStateAfterSession(
       ease_factor: newEaseFactor,
     }
 
-    // Prepare update
-    const updateData: Partial<UserLearningState> = {
+    // Prepare update (canonical snake_case meta via learningStateMeta).
+    // Uses a Firestore dot-path key for the topic, so the object is typed as a
+    // field-path map rather than a strict UserLearningState.
+    const updateData: Record<string, unknown> = {
       [`topics.${topicId}`]: updatedTopic,
       last_session_at: sessionData.completedAt,
       streak_days: newStreakDays,
-      updated_at: now.toISOString(),
-    } as any
+      ...learningStateMeta(userId, { isNew: false, now }),
+    }
 
     if (doc.exists) {
       transaction.update(learningStateRef, updateData)
@@ -247,7 +264,8 @@ export async function getUserLearningState(userId: string): Promise<UserLearning
     return null
   }
 
-  return doc.data() as UserLearningState
+  // Tolerant read: coalesce legacy camelCase identity/timestamp fields.
+  return normalizeLearningStateDoc(doc.data())
 }
 
 /**
@@ -358,16 +376,25 @@ export async function completeSessionWithMastery(
   })
 
   // Update problem-level mastery
-  const { initializeProblemMasteryFromSession, updateProblemMastery, getAllUserProblems } =
+  const { initializeProblemMasteryFromSession, updateProblemMastery } =
     await import("./spaced-repetition/scheduler")
   const { calculateNextInterval, mapScoreToQuality } =
     await import("./spaced-repetition/sm2-algorithm")
   const { recordReviewEvent, getUserAlgorithm, estimateRetention } =
     await import("./spaced-repetition")
 
-  // Check if problem mastery exists
-  const problems = await getAllUserProblems(userId)
-  const existingMastery = problems.find((p) => p.problem_id === sessionData.scenarioId)
+  // Check if problem mastery exists. The document ID is the scenario ID (see the
+  // scheduler writers), so read that one document directly instead of scanning
+  // the user's entire problem_mastery collection just to find it.
+  const masteryDoc = await adminDb
+    .collection("problem_mastery")
+    .doc(userId)
+    .collection("problems")
+    .doc(sessionData.scenarioId)
+    .get()
+  const existingMastery = masteryDoc.exists
+    ? (masteryDoc.data() as ProblemMastery)
+    : undefined
 
   let masteryResult
   const now = new Date()

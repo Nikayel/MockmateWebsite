@@ -7,7 +7,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { requireTier } from "@/lib/quota-enforcement"
-import { getUserMasteryStats, getDailyGoalProgress } from "@/lib/spaced-repetition"
+import {
+  getUserMasteryStats,
+  getDailyGoalProgress,
+  buildLearningStatsContext,
+} from "@/lib/spaced-repetition"
 import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {
@@ -27,11 +31,13 @@ export async function GET(request: NextRequest) {
 
     const userId = authResult.userId
 
-    // Get mastery statistics
-    const stats = await getUserMasteryStats(userId)
-
-    // Get daily goal progress
-    const dailyProgress = await getDailyGoalProgress(userId)
+    // Read the shared learning-state doc + timezone ONCE, then run the two
+    // aggregate reads in parallel (each still reads problem_mastery on its own).
+    const context = await buildLearningStatsContext(userId)
+    const [stats, dailyProgress] = await Promise.all([
+      getUserMasteryStats(userId, context),
+      getDailyGoalProgress(userId, context),
+    ])
 
     return NextResponse.json({
       ...stats,

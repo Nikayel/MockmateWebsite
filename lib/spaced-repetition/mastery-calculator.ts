@@ -12,13 +12,51 @@ import { adminDb } from "../firebase-admin"
 import type { DSAPattern } from "../types/dsa-patterns"
 import type { ProblemMastery } from "./scheduler"
 import type { Difficulty } from "./sm2-algorithm"
-import type { Profile } from "../types"
-import {
-  DEFAULT_TIMEZONE,
-  getTodayInTimezone,
-  getDateInTimezone,
-  getDaysDifference,
-} from "../email/timezone"
+import type { Profile, UserLearningState } from "../types"
+import { DEFAULT_TIMEZONE, getTodayInTimezone, getDateInTimezone } from "../email/timezone"
+import { writeUserLearningState, getUserLearningState } from "../learning-state"
+import { reconcileStreak } from "./streak"
+
+/**
+ * Pre-fetched per-request context so a caller (the stats route) can read the
+ * learning-state document and the user's timezone ONCE and hand them to both
+ * getUserMasteryStats and getDailyGoalProgress, instead of each helper
+ * independently re-reading the same two documents.
+ */
+export interface LearningStatsContext {
+  learningState: UserLearningState | null
+  timezone: string
+}
+
+/**
+ * Resolve a user's IANA timezone from their profile, falling back to the default.
+ * Shared so the timezone lookup is not duplicated across the stats helpers.
+ */
+async function resolveUserTimezone(userId: string): Promise<string> {
+  try {
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+    if (profileDoc.exists) {
+      const profile = profileDoc.data() as Profile
+      return profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+    }
+  } catch {
+    // Use default timezone if profile fetch fails
+  }
+  return DEFAULT_TIMEZONE
+}
+
+/**
+ * Read the learning-state document and the user's timezone once, in parallel,
+ * so both stats helpers can share them. Callers that only need one helper can
+ * skip this and let the helper read on its own.
+ */
+export async function buildLearningStatsContext(userId: string): Promise<LearningStatsContext> {
+  const [learningState, timezone] = await Promise.all([
+    getUserLearningState(userId),
+    resolveUserTimezone(userId),
+  ])
+  return { learningState, timezone }
+}
 
 export interface PatternMasteryStats {
   pattern: DSAPattern
@@ -257,57 +295,43 @@ export function calculateOverallStats(
  * in multiple days. The streak is only stored/updated when a session
  * is completed, but we need to show 0 if the streak is broken.
  */
-export async function getUserMasteryStats(userId: string): Promise<UserMasteryStats> {
+export async function getUserMasteryStats(
+  userId: string,
+  context?: LearningStatsContext
+): Promise<UserMasteryStats> {
   // Get all problem mastery records
   const masteryRef = adminDb.collection("problem_mastery").doc(userId).collection("problems")
 
   const snapshot = await masteryRef.get()
   const problems = snapshot.docs.map((doc) => doc.data() as ProblemMastery)
 
-  // Get streak information from learning state
-  const learningStateRef = adminDb.collection("user_learning_state").doc(userId)
-  const learningStateDoc = await learningStateRef.get()
-  const learningState = learningStateDoc.data()
-
-  // Get user's timezone for accurate streak validation
-  let userTimezone = DEFAULT_TIMEZONE
-  try {
-    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    if (profileDoc.exists) {
-      const profile = profileDoc.data() as Profile
-      userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
-    }
-  } catch {
-    // Use default timezone if profile fetch fails
+  // Use the pre-fetched learning state + timezone when supplied (stats route),
+  // otherwise read both here (in parallel) for standalone callers.
+  let learningState: UserLearningState | null
+  let userTimezone: string
+  if (context) {
+    learningState = context.learningState
+    userTimezone = context.timezone
+  } else {
+    ;[learningState, userTimezone] = await Promise.all([
+      getUserLearningState(userId),
+      resolveUserTimezone(userId),
+    ])
   }
 
-  // Validate streak: check if it's still valid based on last_session_at
-  // The stored streak_days is only updated when a session is completed,
-  // so we need to check if the streak is broken (missed a day)
-  let streakDays = learningState?.streak_days || 0
-  const longestStreak = learningState?.longest_streak_days || streakDays
-  const lastSessionAt = learningState?.last_session_at
-
-  if (streakDays > 0 && lastSessionAt) {
-    const today = getTodayInTimezone(userTimezone)
-    const lastSessionDate = getDateInTimezone(lastSessionAt, userTimezone)
-
-    // If last session was today, streak is valid
-    if (lastSessionDate === today) {
-      // Streak is current, no change needed
-    } else {
-      // Calculate days since last session
-      const daysSinceLastSession = getDaysDifference(lastSessionAt, new Date(), userTimezone)
-
-      if (daysSinceLastSession > 1) {
-        // Missed more than 1 day - streak is broken
-        // Return 0 to show accurate data on dashboard
-        // Note: We don't update the database here - that happens on next session
-        streakDays = 0
-      }
-      // If daysSinceLastSession === 1, streak is at risk but not broken yet
-    }
-  }
+  // Validate streak at read time: the stored streak_days is only updated when a
+  // session completes, so a broken streak (missed > 1 calendar day in the user's
+  // timezone) still shows the stale count until the next session. reconcileStreak
+  // is the single source of truth for this read-side reconciliation.
+  // Note: longest_streak_days falls back to the RAW stored streak so a broken
+  // current streak does not erase the recorded longest streak.
+  const storedStreak = learningState?.streak_days || 0
+  const longestStreak = learningState?.longest_streak_days || storedStreak
+  const streakDays = reconcileStreak(
+    learningState?.streak_days,
+    learningState?.last_session_at,
+    userTimezone
+  )
 
   return {
     overall: calculateOverallStats(problems, streakDays, longestStreak),
@@ -351,8 +375,6 @@ export async function getPatternsReadyForAdvancement(
 export async function updateUserLearningStateSummary(userId: string): Promise<void> {
   const stats = await getUserMasteryStats(userId)
 
-  const learningStateRef = adminDb.collection("user_learning_state").doc(userId)
-
   // Build pattern mastery summary
   const patternMastery: Record<
     string,
@@ -373,17 +395,14 @@ export async function updateUserLearningStateSummary(userId: string): Promise<vo
     }
   })
 
-  await learningStateRef.set(
-    {
-      user_id: userId,
-      total_problems_seen: stats.overall.total_problems_seen,
-      problems_mastered: stats.overall.problems_mastered,
-      problems_learning: stats.overall.problems_learning + stats.overall.problems_reviewing,
-      pattern_mastery: patternMastery,
-      updated_at: new Date().toISOString(),
-    },
-    { merge: true }
-  )
+  // Route through the single canonical writer so identity/timestamp meta stays
+  // snake_case (user_id / updated_at) across every writer of this document.
+  await writeUserLearningState(userId, {
+    total_problems_seen: stats.overall.total_problems_seen,
+    problems_mastered: stats.overall.problems_mastered,
+    problems_learning: stats.overall.problems_learning + stats.overall.problems_reviewing,
+    pattern_mastery: patternMastery,
+  })
 }
 
 /**
@@ -393,28 +412,29 @@ export async function updateUserLearningStateSummary(userId: string): Promise<vo
  * "today" in the user's local timezone. A user practicing at 11 PM PST
  * should see that counted as "today" even if it's already tomorrow in UTC.
  */
-export async function getDailyGoalProgress(userId: string): Promise<{
+export async function getDailyGoalProgress(
+  userId: string,
+  context?: LearningStatsContext
+): Promise<{
   daily_goal: number
   daily_progress: number
   problems_today: string[]
 }> {
-  const learningStateRef = adminDb.collection("user_learning_state").doc(userId)
-  const doc = await learningStateRef.get()
-  const data = doc.data()
-
-  const dailyGoal = data?.daily_goal || 5 // Default 5 problems per day
-
-  // Get user's timezone for accurate "today" calculation
-  let userTimezone = DEFAULT_TIMEZONE
-  try {
-    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    if (profileDoc.exists) {
-      const profile = profileDoc.data() as Profile
-      userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
-    }
-  } catch {
-    // Use default timezone if profile fetch fails
+  // Use the pre-fetched learning state + timezone when supplied (stats route),
+  // otherwise read both here (in parallel) for standalone callers.
+  let learningState: UserLearningState | null
+  let userTimezone: string
+  if (context) {
+    learningState = context.learningState
+    userTimezone = context.timezone
+  } else {
+    ;[learningState, userTimezone] = await Promise.all([
+      getUserLearningState(userId),
+      resolveUserTimezone(userId),
+    ])
   }
+
+  const dailyGoal = learningState?.daily_goal || 5 // Default 5 problems per day
 
   // Get today's date string in user's timezone (YYYY-MM-DD)
   const todayStr = getTodayInTimezone(userTimezone)

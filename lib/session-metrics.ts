@@ -20,12 +20,9 @@ import {
   type MasteryScoreResult,
 } from "./spaced-repetition/mastery-score"
 import { analyzeMessage } from "./scoring/keyword-detection"
-import {
-  getTodayInTimezone,
-  getDateInTimezone,
-  getDaysDifference,
-  DEFAULT_TIMEZONE,
-} from "./email/timezone"
+import { getTodayInTimezone, DEFAULT_TIMEZONE } from "./email/timezone"
+import { learningStateMeta } from "./learning-state"
+import { advanceStreak } from "./spaced-repetition/streak"
 import type { Profile } from "./types"
 import {
   calculateInstantScores,
@@ -990,9 +987,11 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
       const today = getTodayInTimezone(userTimezone)
 
       if (!doc.exists) {
-        // Create new learning state document
+        // Create new learning state document.
+        // Identity/timestamp fields go through learningStateMeta so this writer
+        // emits the canonical snake_case shape (user_id/created_at/updated_at)
+        // instead of the legacy camelCase spellings.
         transaction.set(learningStateRef, {
-          userId: summary.userId,
           streak_days: 1,
           last_session_at: summary.completedAt,
           last_session_date: today,
@@ -1006,36 +1005,22 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
             },
           },
           total_sessions: 1,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
+          ...learningStateMeta(summary.userId, { isNew: true, now }),
         })
       } else {
         const data = doc.data()!
-        const lastSessionAt = data.last_session_at
-        let streakDays = data.streak_days || 0
 
-        // Calculate streak using timezone-aware calendar day comparison
-        // This ensures practicing at 11 PM then 1 AM counts correctly
-        if (lastSessionAt) {
-          const lastSessionDate = getDateInTimezone(lastSessionAt, userTimezone)
-
-          if (lastSessionDate !== today) {
-            // Use timezone-aware day difference calculation
-            const daysDiff = getDaysDifference(lastSessionAt, now, userTimezone)
-
-            if (daysDiff === 1) {
-              // Consecutive day - increment streak
-              streakDays++
-            } else if (daysDiff > 1) {
-              // Streak broken - reset to 1
-              streakDays = 1
-            }
-            // If daysDiff === 0, same day - don't change streak
-          }
-        } else {
-          // First session ever
-          streakDays = 1
-        }
+        // Advance the streak via the shared write-side helper (single source of
+        // truth in spaced-repetition/streak.ts). It compares calendar days in
+        // the user's timezone and is idempotent for same-day / repeat writes, so
+        // this writer and the topic-level writer can both fire for one session
+        // without double-incrementing.
+        const streakDays = advanceStreak(
+          data.streak_days,
+          data.last_session_at,
+          userTimezone,
+          now
+        )
 
         // Update topics
         const topics = data.topics || {}
@@ -1053,7 +1038,8 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
           last_session_date: today,
           topics,
           total_sessions: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
+          // Canonical snake_case meta; also backfills user_id on legacy docs.
+          ...learningStateMeta(summary.userId, { isNew: false, now }),
         })
       }
     })

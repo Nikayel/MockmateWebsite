@@ -90,6 +90,7 @@ export {
   getPatternsReadyForAdvancement,
   updateUserLearningStateSummary,
   getDailyGoalProgress,
+  buildLearningStatsContext,
   setDailyGoal,
   getMaxDailyReviews,
   setMaxDailyReviews,
@@ -99,6 +100,7 @@ export {
   type TrendStats,
   type OverallStats,
   type UserMasteryStats,
+  type LearningStatsContext,
 } from "./mastery-calculator"
 
 // RAG Integration

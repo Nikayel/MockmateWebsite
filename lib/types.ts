@@ -323,7 +323,14 @@ export interface PaymentHistory {
 
 /**
  * User Learning State for Spaced Repetition
- * Tracks per-topic progress for email reminders
+ *
+ * This is the single canonical contract for the `user_learning_state/{userId}`
+ * document. Field names are snake_case (the majority spelling historically used
+ * by the writers). Legacy documents may still carry the camelCase identity /
+ * timestamp variants (`userId`, `createdAt`, `updatedAt`); those are coalesced
+ * into these canonical fields by `normalizeLearningStateDoc` in
+ * `lib/learning-state.ts`, so readers should always go through that helper (or
+ * `getUserLearningState`) instead of reading raw document data.
  */
 export interface UserLearningState {
   user_id: string
@@ -332,6 +339,22 @@ export interface UserLearningState {
   }
   last_session_at?: string
   streak_days: number
+  // Session activity tracking (written by the session-metrics writer)
+  last_session_date?: string // YYYY-MM-DD in the user's timezone
+  total_sessions?: number
+  longest_streak_days?: number
+  // Aggregate rollup (written by updateUserLearningStateSummary)
+  total_problems_seen?: number
+  problems_mastered?: number
+  problems_learning?: number
+  pattern_mastery?: {
+    [pattern: string]: {
+      total: number
+      mastered: number
+      average_score: number
+      weakest_problem_id?: string
+    }
+  }
   // Daily review settings
   daily_goal?: number // Target problems per day (1-20, default 5)
   max_daily_reviews?: number // Max reviews shown per day (5-30, default 10)

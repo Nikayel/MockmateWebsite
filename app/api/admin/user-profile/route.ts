@@ -22,7 +22,8 @@ import {
 } from "@/lib/rag/enhanced-user-profile"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
-import { getDaysDifference, DEFAULT_TIMEZONE } from "@/lib/email/timezone"
+import { DEFAULT_TIMEZONE } from "@/lib/email/timezone"
+import { reconcileStreak } from "@/lib/spaced-repetition/streak"
 import type { Profile } from "@/lib/types"
 
 export async function GET(request: NextRequest) {
@@ -465,19 +466,14 @@ async function getLearningStateForUser(userId: string) {
       averagePerformance = Math.round(statsData.averageScore)
     }
 
-    // Calculate streak - check if it should be reset due to inactivity
-    // IMPORTANT: Uses timezone-aware calendar day comparison
-    let studyStreak = learningData?.streak_days || 0
-    const lastSessionAt = learningData?.last_session_at
-    if (lastSessionAt) {
-      // Use timezone-aware day difference calculation
-      const daysDiff = getDaysDifference(lastSessionAt, new Date(), userTimezone)
-
-      // If more than 1 day since last session, streak is effectively 0 (needs new session to restart)
-      if (daysDiff > 1) {
-        studyStreak = 0
-      }
-    }
+    // Calculate streak - reset at read time if it is stale due to inactivity.
+    // reconcileStreak is the single source of truth for this timezone-aware
+    // read-side reconciliation (a gap of more than one calendar day -> 0).
+    const studyStreak = reconcileStreak(
+      learningData?.streak_days,
+      learningData?.last_session_at,
+      userTimezone
+    )
 
     return {
       currentPattern,
