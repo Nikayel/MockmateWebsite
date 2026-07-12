@@ -11,7 +11,7 @@ import { getScenarioById, scenarios } from '../scenarios';
 import type { DSAPattern } from '../types/dsa-patterns';
 import type { Difficulty } from './sm2-algorithm';
 import { getWeakPatterns, getUserMasteryStats } from './mastery-calculator';
-import { getAllUserProblems, type ProblemMastery } from './scheduler';
+import { getAllUserProblems, getCompletedProblemIds, type ProblemMastery } from './scheduler';
 
 /**
  * Get canonical difficulty from scenario definition
@@ -285,54 +285,66 @@ export async function getSmartRecommendations(
   userId: string,
   limit: number = 5
 ): Promise<SmartRecommendation[]> {
+  // Get user's completed/seen problem IDs. Uses an id-only Firestore projection
+  // instead of pulling every full mastery document just to read problem_id.
+  const completedIds = await getCompletedProblemIds(userId);
+
+  // Stage 1: the four lookups that only depend on completedIds are independent
+  // of each other, so run them in parallel instead of sequentially.
+  const [nextRoadmap, failedProblems, weakPatterns, roadmap] = await Promise.all([
+    getNextInRoadmap(userId, completedIds),
+    getRecentlyFailedProblems(userId),
+    getWeakPatterns(userId, 3),
+    getActiveRoadmap(userId),
+  ]);
+
+  // Exclude everything the user has already seen, plus the roadmap pick that is
+  // already resolved. Overlaps between the stage-2 generators themselves are
+  // removed by the de-dup pass after the join below, so the generators do not
+  // need to observe each other's output.
+  const baseExcludeIds = nextRoadmap
+    ? [...completedIds, nextRoadmap.scenario_id]
+    : completedIds;
+
+  // Stage 2: generators that depend on stage 1 also run in parallel, including
+  // the per-failed-problem similarity lookups (previously an awaited loop).
+  const [similarGroups, patternProblems, companyProblems] = await Promise.all([
+    Promise.all(
+      failedProblems
+        .slice(0, 2)
+        .map((failed) => getSimilarProblems(failed, baseExcludeIds, 2))
+    ),
+    getPatternStrengtheningProblems(
+      weakPatterns.map((p) => ({
+        pattern: p.pattern,
+        average_score: p.average_score,
+      })),
+      baseExcludeIds,
+      3
+    ),
+    roadmap?.targetCompany
+      ? getCompanyRelevantProblems(
+          roadmap.targetCompany,
+          weakPatterns.map((p) => p.pattern),
+          baseExcludeIds,
+          2
+        )
+      : Promise.resolve<SmartRecommendation[]>([]),
+  ]);
+
+  // Assemble in the same priority-type order as before: roadmap, similar,
+  // pattern, then company.
   const recommendations: SmartRecommendation[] = [];
-
-  // Get user's completed/seen problem IDs
-  const problems = await getAllUserProblems(userId);
-  const completedIds = problems.map((p) => p.problem_id);
-
-  // 1. Get next problem in roadmap
-  const nextRoadmap = await getNextInRoadmap(userId, completedIds);
   if (nextRoadmap) {
     recommendations.push(nextRoadmap);
   }
-
-  // 2. Find problems similar to recently failed ones
-  const failedProblems = await getRecentlyFailedProblems(userId);
-  for (const failed of failedProblems.slice(0, 2)) {
-    const similar = await getSimilarProblems(
-      failed,
-      [...completedIds, ...recommendations.map((r) => r.scenario_id)],
-      2
-    );
-    recommendations.push(...similar);
-  }
-
-  // 3. Get weak patterns for focused practice
-  const weakPatterns = await getWeakPatterns(userId, 3);
-  const patternProblems = await getPatternStrengtheningProblems(
-    weakPatterns.map((p) => ({
-      pattern: p.pattern,
-      average_score: p.average_score,
-    })),
-    [...completedIds, ...recommendations.map((r) => r.scenario_id)],
-    3
-  );
+  recommendations.push(...similarGroups.flat());
   recommendations.push(...patternProblems);
+  recommendations.push(...companyProblems);
 
-  // 4. Get company-relevant problems
-  const roadmap = await getActiveRoadmap(userId);
-  if (roadmap?.targetCompany) {
-    const companyProblems = await getCompanyRelevantProblems(
-      roadmap.targetCompany,
-      weakPatterns.map((p) => p.pattern),
-      [...completedIds, ...recommendations.map((r) => r.scenario_id)],
-      2
-    );
-    recommendations.push(...companyProblems);
-  }
-
-  // Sort by priority and deduplicate
+  // Sort by priority and deduplicate. The exclusion of already-recommended
+  // scenario IDs is applied here, AFTER the parallel join, so a problem that
+  // more than one generator surfaced still appears at most once.
   const seen = new Set<string>();
   const unique = recommendations.filter((r) => {
     if (seen.has(r.scenario_id)) return false;

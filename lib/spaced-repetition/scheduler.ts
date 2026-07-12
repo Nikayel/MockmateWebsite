@@ -602,6 +602,25 @@ export async function getAllUserProblems(userId: string): Promise<ProblemMastery
 }
 
 /**
+ * Get just the problem IDs a user has already seen.
+ *
+ * Uses a Firestore projection so only the id field is transferred instead of
+ * every full mastery document. Callers that only need the completed/seen set
+ * (for example recommendation exclusion) should prefer this over
+ * getAllUserProblems, which pulls the entire document for each problem.
+ */
+export async function getCompletedProblemIds(userId: string): Promise<string[]> {
+  const masteryRef = adminDb.collection("problem_mastery").doc(userId).collection("problems")
+
+  const snapshot = await masteryRef.select("problem_id").get()
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data() as { problem_id?: string }
+    return data.problem_id ?? doc.id
+  })
+}
+
+/**
  * Get problems by pattern
  */
 export async function getProblemsByPattern(
