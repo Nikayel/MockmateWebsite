@@ -81,6 +81,57 @@ export interface UseInterviewChatReturn {
 }
 
 /**
+ * Short or ambiguous signals that only conclude the session when they are the
+ * entire message. A substring match misfires on ordinary debrief prose: "I could
+ * have done better on edge cases" or "all good on the loop, but recursion tripped
+ * me up" must NOT end the session.
+ */
+const WHOLE_MESSAGE_CONCLUSION_SIGNALS = ["done", "all good", "i'm good", "im good"]
+
+/**
+ * Single-word signals matched on word boundaries so a real request ("let's
+ * conclude") ends the session while "concluded" / "conclusion" inside reflective
+ * prose does not.
+ */
+const WORD_CONCLUSION_SIGNALS = ["conclude"]
+
+/**
+ * Unambiguous multi-word phrases that conclude the session wherever they appear
+ * in the message.
+ */
+const PHRASE_CONCLUSION_SIGNALS = [
+  "no thanks",
+  "no thank",
+  "no, thanks",
+  "i'm done",
+  "im done",
+  "end session",
+  "that's all",
+  "thats all",
+  "nothing else",
+  "no questions",
+  "let's wrap",
+  "lets wrap",
+]
+
+/**
+ * True when the candidate's message asks to end the session. Short or ambiguous
+ * signals require a whole-message or word-boundary match so a passing mention in
+ * a debrief does not prematurely conclude it; unambiguous multi-word phrases
+ * still match anywhere (EDGE-16).
+ */
+export function isSessionConclusionMessage(message: string): boolean {
+  const normalized = message.toLowerCase().trim()
+  // Strip surrounding punctuation so "Done." and "all good!" still count as exact.
+  const core = normalized.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")
+  if (WHOLE_MESSAGE_CONCLUSION_SIGNALS.includes(core)) return true
+  if (WORD_CONCLUSION_SIGNALS.some((signal) => new RegExp(`\\b${signal}\\b`).test(normalized))) {
+    return true
+  }
+  return PHRASE_CONCLUSION_SIGNALS.some((signal) => normalized.includes(signal))
+}
+
+/**
  * Owns the interview chat-send flow: `handleSendMessage` (interviewer + partner
  * chat, POST /api/chat) and the voice `handleAutoSend`. Lifted verbatim from the
  * inline implementation in `app/interview/page.tsx`; behavior — request body
@@ -186,28 +237,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       }
 
       // Check if user wants to end the session
-      const conclusionSignals = [
-        "no thanks",
-        "no thank",
-        "no, thanks",
-        "i'm done",
-        "im done",
-        "done",
-        "conclude",
-        "end session",
-        "that's all",
-        "thats all",
-        "nothing else",
-        "no questions",
-        "i'm good",
-        "im good",
-        "all good",
-        "let's wrap",
-        "lets wrap",
-      ]
-      const isEndingSession = conclusionSignals.some((signal) =>
-        userMessage.toLowerCase().includes(signal)
-      )
+      const isEndingSession = isSessionConclusionMessage(userMessage)
 
       try {
         // Get user profile for context
