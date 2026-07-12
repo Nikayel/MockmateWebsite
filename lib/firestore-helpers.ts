@@ -204,8 +204,32 @@ export async function getUserProfile(
 }
 
 /**
- * Calculate billing period based on anniversary date
- * Returns the current period start/end based on the signup date anniversary
+ * Number of days in a month. monthIndex is 0-11 and may be out of range
+ * (e.g. -1 or 12) — JS Date normalizes it. Day 0 of the next month is the last
+ * day of this month.
+ */
+function daysInMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate()
+}
+
+/**
+ * The signup-day anniversary in a given month, with the day CLAMPED to the
+ * month's length so a day of 29/30/31 never overflows into the next month.
+ */
+function clampedAnniversary(year: number, monthIndex: number, signupDay: number): Date {
+  const day = Math.min(signupDay, daysInMonth(year, monthIndex))
+  return new Date(year, monthIndex, day)
+}
+
+/**
+ * Calculate the current billing period from a signup-date anniversary.
+ *
+ * EDGE-9: the day is clamped BEFORE the Date is constructed. The previous
+ * version built `new Date(y, m, 31)`, which overflowed (Jan 31 signup, Feb
+ * reference -> Feb 31 -> Mar 3), then clamped, sometimes yielding a "current"
+ * period that started in the FUTURE and did not contain the reference date. The
+ * quota lookup then failed to match and a fresh `sessions_used: 0` doc was
+ * created, resetting the monthly cap ~4 weeks early every short month.
  */
 function calculateAnniversaryPeriod(
   signupDate: Date,
@@ -214,25 +238,21 @@ function calculateAnniversaryPeriod(
   const signupDay = signupDate.getDate()
   const now = referenceDate
 
-  // Find the most recent anniversary of the signup day
-  let periodStart = new Date(now.getFullYear(), now.getMonth(), signupDay)
-
-  // If today is before the signup day this month, go back one month
-  if (now.getDate() < signupDay) {
-    periodStart.setMonth(periodStart.getMonth() - 1)
+  // Current month's clamped anniversary. If it is still in the future relative
+  // to `now`, the current period actually started at last month's anniversary.
+  let periodStart = clampedAnniversary(now.getFullYear(), now.getMonth(), signupDay)
+  if (periodStart > now) {
+    periodStart = clampedAnniversary(now.getFullYear(), now.getMonth() - 1, signupDay)
   }
 
-  // Handle edge case: if signup day doesn't exist in this month (e.g., 31st in Feb)
-  // Use the last day of the previous month
-  if (periodStart.getDate() !== signupDay) {
-    periodStart = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0) // Last day of month
-  }
-
-  // Period end is one month from period start, minus one day (at 23:59:59)
-  const periodEnd = new Date(periodStart)
-  periodEnd.setMonth(periodEnd.getMonth() + 1)
-  periodEnd.setDate(periodEnd.getDate() - 1)
-  periodEnd.setHours(23, 59, 59, 999)
+  // Period end is the next clamped anniversary minus 1ms (end of the day before
+  // the next period starts).
+  const nextAnniversary = clampedAnniversary(
+    periodStart.getFullYear(),
+    periodStart.getMonth() + 1,
+    signupDay
+  )
+  const periodEnd = new Date(nextAnniversary.getTime() - 1)
 
   return { periodStart, periodEnd }
 }
