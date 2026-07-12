@@ -421,7 +421,7 @@ All zero-importer claims below were verified by multiple grep patterns (alias, r
 plain-string, dynamic-import, barrel, tests, configs, e2e, scripts) plus a knip run used
 only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING not listed.
 
-### [ ] DEAD-1 — `lib/auth-server.ts` duplicates `verifyAuth` across 8 routes — P2
+### [x] DEAD-1 — `lib/auth-server.ts` duplicates `verifyAuth` across 8 routes — P2
 - **Where:** `lib/auth-server.ts:18-72` (`getUserIdFromRequest`) vs
   `lib/auth-helpers.ts:22-50` (`verifyAuth`, 31 importing files). The 8 importers:
   `app/api/{create-checkout,customer-portal,debug-promo-code,promo-code,rag,seed-vectors,sync-subscription,vectorize-problems}/route.ts`.
@@ -444,7 +444,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** `grep -rn "lib/notification-helpers\"" app components lib hooks` empty;
   `pnpm typecheck`.
 
-### [ ] DEAD-3 — dead three.js chain: 2 components + 3 deps + a next.config entry — P2
+### [x] DEAD-3 — dead three.js chain: 2 components + 3 deps + a next.config entry — P2
 - **Where:** `components/NeuralNetwork.tsx` (245 lines), `components/SubtleParticles.tsx`
   (138 lines) — zero importers; they are the ONLY users of `@react-three/fiber` and
   `@react-three/drei` (package.json:74-75); `tunnel-rat` (package.json:147) exists solely
@@ -457,7 +457,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Do-not-break:** KEEP `three` (package.json:118) and `@types/three` (:134).
 - **Verify:** `pnpm build`; load `/` (ThreeOrb) and `/why-codesparring` (MemoryBrain).
 
-### [ ] DEAD-4 — zero-importer top-level components (8 files, ~2,100 lines) — P3
+### [x] DEAD-4 — zero-importer top-level components (8 files, ~2,100 lines) — P3
 - **Where:** `components/CodeViewerDialog.tsx` (92), `components/nps-survey-modal.tsx`
   (161), `components/pricing-section.tsx` (345), `components/SessionFeedbackCard.tsx`
   (779), `components/interview/InterviewHeader.tsx` (158),
@@ -470,7 +470,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   LIVE (dashboard page; docs + careers pages) — do not delete.
 - **Verify:** `pnpm build` + `pnpm typecheck`.
 
-### [ ] DEAD-5 — abandoned dashboard component set: 9 of 11 files in `components/dashboard/` — P3
+### [x] DEAD-5 — abandoned dashboard component set: 9 of 11 files in `components/dashboard/` — P3
 - **Where:** `components/dashboard/{CircularProgress,CognitiveProfile,LoadingSkeleton,PatternMasteryBar,SkillInsights,SkillInsightsAlerts,SkillInsightsCards,SmartRecommendations,usage-widget}.tsx`
   (~1,164 lines) — zero importers each (the `SkillInsights` grep hits are
   `lib/hooks/useSkillInsights`, a different module; `SmartRecommendations` hits are the
@@ -478,7 +478,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Fix:** delete the 9 files. KEEP `MetricsOverview.tsx` and `ReferralWidget.tsx` (live).
 - **Verify:** `pnpm build`; load `/dashboard`.
 
-### [ ] DEAD-6 — dead `lib/` service modules (9 files, ~1,920 lines) — P3
+### [x] DEAD-6 — dead `lib/` service modules (9 files, ~1,920 lines) — P3
 - **Where:** `lib/promo-codes.ts` (297; superseded — live rule is inline in
   `app/api/promo-code/route.ts`, which does NOT import it), `lib/subscription-sync.ts`
   (144), `lib/scenario-loader.ts` (258), `lib/scenarios-add-functionality.ts` (legacy
@@ -489,13 +489,13 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Fix:** delete all nine files.
 - **Verify:** `pnpm typecheck && pnpm test && pnpm build`.
 
-### [ ] DEAD-7 — dead hooks (3 files, 722 lines) — P3
+### [x] DEAD-7 — dead hooks (3 files, 722 lines) — P3
 - **Where:** `hooks/useMultiTabConflict.ts` (256), `lib/hooks/use-chat-tracking.ts` (101),
   `lib/hooks/use-two-phase-feedback.ts` (365). Zero references to paths or exported hook
   names; `lib/hooks/index.ts` barrel does not re-export them.
 - **Fix:** delete the 3 files. **Verify:** `pnpm typecheck`.
 
-### [ ] DEAD-8 — retired legacy scenarios explicitly marked removed (16 files) — P3
+### [x] DEAD-8 — retired legacy scenarios explicitly marked removed (16 files) — P3
 - **Where:** `lib/scenarios/real-world/bugfix/{bugfix-closure-loop,bugfix-deepcopy,bugfix-feature-engineering-nan,bugfix-floating-point,bugfix-infinite-loop,bugfix-null-check,bugfix-off-by-one-array,bugfix-python-two-sum,bugfix-rate-limiter,bugfix-type-coercion}.ts`
   and `lib/scenarios/add-functionality/{add-feature-autocomplete-trie,add-feature-cache-system,add-feature-event-aggregator,add-feature-rate-limiter,add-feature-state-history,add-feature-text-search}.ts`.
   Not imported by their registries; the only textual references are the
@@ -504,7 +504,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   stale vectors). Do not touch scenarios that ARE imported by the two `index.ts` registries.
 - **Verify:** `pnpm typecheck && pnpm test` (registry tests) + `pnpm build`.
 
-### [ ] DEAD-9 — dead roadmap/RAG/interview support modules (12 files, ~2,300 lines) — P3
+### [x] DEAD-9 — dead roadmap/RAG/interview support modules (12 files, ~2,300 lines) — P3
 - **Where:** `lib/roadmap/diagnostic-quiz.ts` (488), `lib/roadmap/notification-strategy.ts`
   (638), `lib/roadmap/index.ts` (barrel only), `lib/interview/company-interviewer-styles.ts`
   (376), `lib/rag/retrieval/reranker.ts` (69), `lib/rag/embeddings/chunker.ts` (189),
@@ -1111,3 +1111,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — EDGE-9 — calculateAnniversaryPeriod now clamps the day BEFORE constructing the Date (new daysInMonth + clampedAnniversary helpers); periodEnd = next clamped anniversary - 1ms. Day 1-28 behavior identical to before; 29/30/31 signups no longer get a future-dated period + early quota reset. New anniversary-period-edge9.test.ts (10 table-driven cases incl. leap-Feb, 30-day months, year rollover) green; typecheck clean.
 2026-07-12 — DUP-3 — canonical updateQuotaForSubscriptionTierAdmin(userId, tier, {resetUsage, profileData}) now lives once (exported from lib/stripe-helpers.ts) with the webhook copy's behavior (idempotency guard on last_reset_period_start verbatim, free_opens_remaining, downgrade cap, getSessionsLimitForTier). Webhook imports it (8 call sites remapped: renewal/checkout/yearly=resetUsage true, past_due-recovery/downgrades=false); 6 stripe-helpers internal callers switched to options form; promo-code switched to the shared writer (anniversary via created_at, current-period doc, idempotency) still landing the Pro limit. cron/subscription-expiry INTENTIONALLY left (its helpers return a load-bearing boolean + deliberately do not create on downgrade). New quota-writer-idempotency.test.ts (2) green; typecheck clean; eslint 0 errors; 21 billing tests pass. STAGING-TODO: Stripe CLI replay of checkout.session.completed + invoice.paid (incl. a retried invoice.paid) on the emulator before production deploy.
 2026-07-12 — API-1 — PARTIAL. New lib/voice/deepgram-management.ts mints a short-lived usage:write-only key via the Deepgram Management REST API (project id from DEEPGRAM_PROJECT_ID or /projects, cached); token route returns it and preserves the {apiKey} contract + verifyAuth + apiRateLimit. Falls back to the raw account key + warn log when minting is unavailable (no live creds to verify keys:write scope in-sandbox), so voice never breaks but the raw-key hole is only fully closed once minting succeeds. STAGING follow-up: (1) grant DEEPGRAM_API_KEY keys:write (or set DEEPGRAM_PROJECT_ID + a management-capable key); (2) smoke-test GET /api/voice/token returns a key != account key and streaming still connects; (3) then flip the fallback to fail-closed (503).
+2026-07-12 — DEAD-1,3,4,5,6,7,8,9 — dead-code sweep (8-agent workflow, grep-verified zero importers each): DEAD-1 migrated 8 routes to verifyAuth + deleted auth-server; DEAD-3 deleted 2 R3F components + tunnel-rat transpile entry; DEAD-4/5 deleted 18 dead components; DEAD-6 deleted 9 lib modules; DEAD-7 deleted 3 hooks; DEAD-8 deleted 16 legacy scenarios (kept REMOVED_LEGACY arrays); DEAD-9 deleted 12 modules/barrels. 61 files removed. Filtered typecheck confirms no missing-import breakage. Package removal (incl. R3F trio) deferred to DEAD-10.
