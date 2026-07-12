@@ -1,19 +1,25 @@
-"use client"
-
 import Link from "next/link"
-import { useParams } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
-import { getSystemDesignLessonLocation } from "@/lib/tutorials/system-design/registry"
+import {
+  getFirstLessonOfNextSystemDesignLevel,
+  getNextSystemDesignLessonInLevel,
+  getSystemDesignLessonLocation,
+  listSystemDesignLessonsInLevel,
+} from "@/lib/tutorials/system-design/registry"
+import { buildLessonNav, toLeanLevel } from "@/lib/tutorials/level-path"
 import { SystemDesignLessonPlayer } from "@/components/tutorials/SystemDesignLessonPlayer"
 
+type Props = { params: Promise<{ levelSlug: string; lessonId: string }> }
+
 /**
- * The System-Design Lesson Player route (client) — resolves the lesson from the URL and runs the
- * Read → Design loop. Auth is hard-gated by `proxy.ts` (PROTECTED_ROUTES → "/learn/system-design")
- * plus the in-page `LearnAuthGuard` in the layout.
+ * The System-Design Lesson Player route (Server Component) — resolves the single lesson from the URL
+ * and computes next-lesson / level-boundary navigation server-side, then hands the client player only
+ * a lean level + the resolved nav (no other lesson's model answers ship to the client). Auth is
+ * hard-gated by `proxy.ts` (PROTECTED_ROUTES → "/learn/system-design") plus the in-page
+ * `LearnAuthGuard` in the layout, and the Read → Design loop runs entirely in the client player.
  */
-export default function SystemDesignLessonPage() {
-  const params = useParams<{ levelSlug: string; lessonId: string }>()
-  const lessonId = params?.lessonId ?? ""
+export default async function SystemDesignLessonPage({ params }: Props) {
+  const { lessonId } = await params
   const location = getSystemDesignLessonLocation(lessonId)
 
   if (!location) {
@@ -36,7 +42,24 @@ export default function SystemDesignLessonPage() {
 
   const { level, lesson } = location
 
+  // Resolve navigation server-side via the registry so its exact in-level ordering + the deliberate
+  // level-boundary hand-off are preserved; the client player only renders what we compute here.
+  const nav = buildLessonNav({
+    level,
+    lessonId: lesson.id,
+    lessonsInLevel: listSystemDesignLessonsInLevel(level),
+    nextInLevel: getNextSystemDesignLessonInLevel(lesson.id),
+    firstOfNextLevel: getFirstLessonOfNextSystemDesignLevel(lesson.id),
+  })
+
   // `key={lesson.id}` forces a fresh player instance per lesson so navigating between lessons never
   // carries over the previous lesson's open phase, resume flag, or answer text (local component state).
-  return <SystemDesignLessonPlayer key={lesson.id} lesson={lesson} level={level} />
+  return (
+    <SystemDesignLessonPlayer
+      key={lesson.id}
+      lesson={lesson}
+      level={toLeanLevel(level)}
+      nav={nav}
+    />
+  )
 }

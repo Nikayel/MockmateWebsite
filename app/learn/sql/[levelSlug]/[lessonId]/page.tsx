@@ -1,19 +1,26 @@
-"use client"
-
 import Link from "next/link"
-import { useParams } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
-import { getSqlLessonLocation } from "@/lib/tutorials/sql/registry"
+import {
+  getFirstLessonOfNextSqlLevel,
+  getNextSqlLessonInLevel,
+  getSqlLessonLocation,
+  listSqlLessonsInLevel,
+} from "@/lib/tutorials/sql/registry"
+import { buildLessonNav, toLeanLevel } from "@/lib/tutorials/level-path"
 import { SqlLessonPlayer } from "@/components/tutorials/SqlLessonPlayer"
 
+type Props = { params: Promise<{ levelSlug: string; lessonId: string }> }
+
 /**
- * The SQL Lesson Player route (client) — resolves the lesson from the URL and runs the
- * Read → Apply → Practice loop. Auth is hard-gated by `proxy.ts` (PROTECTED_ROUTES → "/learn/sql")
- * plus the in-page `LearnAuthGuard` in the layout.
+ * The SQL Lesson Player route (Server Component) — resolves the single lesson from the URL and
+ * computes next-lesson / level-boundary navigation server-side (preserving the "Level N complete"
+ * hand-off), then hands the client player only a lean level + the resolved nav so no other lesson's
+ * exercise payloads ship to the client. Auth is hard-gated by `proxy.ts` (PROTECTED_ROUTES →
+ * "/learn/sql") plus the in-page `LearnAuthGuard` in the layout, and the Read → Apply → Practice loop
+ * runs entirely in the client player.
  */
-export default function SqlLessonPage() {
-  const params = useParams<{ levelSlug: string; lessonId: string }>()
-  const lessonId = params?.lessonId ?? ""
+export default async function SqlLessonPage({ params }: Props) {
+  const { lessonId } = await params
   const location = getSqlLessonLocation(lessonId)
 
   if (!location) {
@@ -36,8 +43,18 @@ export default function SqlLessonPage() {
 
   const { level, lesson } = location
 
+  // Resolve navigation server-side via the registry so its exact in-level ordering + the deliberate
+  // level-boundary hand-off (`getFirstLessonOfNextSqlLevel`) are preserved unchanged.
+  const nav = buildLessonNav({
+    level,
+    lessonId: lesson.id,
+    lessonsInLevel: listSqlLessonsInLevel(level),
+    nextInLevel: getNextSqlLessonInLevel(lesson.id),
+    firstOfNextLevel: getFirstLessonOfNextSqlLevel(lesson.id),
+  })
+
   // `key={lesson.id}` forces a fresh player instance per lesson so navigating between lessons never
   // carries over the previous lesson's open phase, resume flag, or runner results (local component
   // state, not in the store).
-  return <SqlLessonPlayer key={lesson.id} lesson={lesson} level={level} />
+  return <SqlLessonPlayer key={lesson.id} lesson={lesson} level={toLeanLevel(level)} nav={nav} />
 }

@@ -10,11 +10,7 @@ import {
   LESSON_SECTION_ORDER,
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
-import {
-  getNextSystemDesignLessonInLevel,
-  getFirstLessonOfNextSystemDesignLevel,
-  listSystemDesignLessonsInLevel,
-} from "@/lib/tutorials/system-design/registry"
+import type { LeanTutorialLevel, LessonNavModel } from "@/lib/tutorials/level-path"
 import { fetchDesignAnswer, saveDesignAnswer } from "@/lib/tutorials/design-answers-client"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { TeachPanel } from "./TeachPanel"
@@ -28,7 +24,7 @@ import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
 import { VerticalRail } from "./VerticalRail"
 import { usePersistentState } from "./usePersistentState"
-import type { DesignLesson, DesignLevel, LessonSection } from "@/lib/tutorials/types"
+import type { DesignLesson, LessonSection } from "@/lib/tutorials/types"
 
 /**
  * System-Design Lesson Player — a thin fork of `SqlLessonPlayer`. The graded core is REUSED:
@@ -43,30 +39,19 @@ import type { DesignLesson, DesignLevel, LessonSection } from "@/lib/tutorials/t
  *    which keys `lessonStatus` off the `practice` section — flips the lesson to completed. (Deviation
  *    noted vs a separate Practice phase.)
  */
-const UP_NEXT_COUNT = 5
-
 export interface SystemDesignLessonPlayerProps {
   lesson: DesignLesson
-  level: DesignLevel
+  /** Lean level (id/slug/title) resolved server-side — no modules / model answers reach the client. */
+  level: LeanTutorialLevel
+  /** Position + next-step navigation resolved server-side from the registry. */
+  nav: LessonNavModel
   onSectionComplete?: (section: LessonSection) => void
 }
-
-/** What the post-Design CTA offers, kept level-aware so a boundary is a deliberate hand-off. */
-type NextStep =
-  | { kind: "lesson"; id: string; title: string; slug: string }
-  | {
-      kind: "level-complete"
-      id: string
-      title: string
-      slug: string
-      levelId: DesignLevel["id"]
-      levelTitle: string
-    }
-  | { kind: "finished" }
 
 export function SystemDesignLessonPlayer({
   lesson,
   level,
+  nav,
   onSectionComplete,
 }: SystemDesignLessonPlayerProps) {
   const { reload } = useTutorialProgressSync(lesson.id, level.id)
@@ -123,7 +108,7 @@ export function SystemDesignLessonPlayer({
     }
   }, [designExercise.id])
 
-  // This route is a Client Component (no generateMetadata), so set the tab title from the lesson.
+  // The player is a Client Component and the route sets no metadata, so set the tab title here.
   useEffect(() => {
     const previous = document.title
     document.title = `${lesson.title} — Learn System Design`
@@ -134,36 +119,13 @@ export function SystemDesignLessonPlayer({
 
   const completedIds = useCompletedLessons()
 
-  const { lessonNumber, totalInLevel, upNext } = useMemo(() => {
-    const inLevel = listSystemDesignLessonsInLevel(level)
-    const idx = inLevel.findIndex((l) => l.id === lesson.id)
-    const next: UpNextLesson[] = inLevel.slice(idx + 1, idx + 1 + UP_NEXT_COUNT).map((l) => ({
-      id: l.id,
-      title: l.title,
-      levelSlug: level.slug,
-      isCompleted: completedIds.has(l.id),
-    }))
-    return { lessonNumber: idx + 1, totalInLevel: inLevel.length, upNext: next }
-  }, [level, lesson.id, completedIds])
-
-  const nextStep = useMemo((): NextStep => {
-    const withinLevel = getNextSystemDesignLessonInLevel(lesson.id)
-    if (withinLevel) {
-      return { kind: "lesson", id: withinLevel.id, title: withinLevel.title, slug: level.slug }
-    }
-    const nextLevel = getFirstLessonOfNextSystemDesignLevel(lesson.id)
-    if (nextLevel) {
-      return {
-        kind: "level-complete",
-        id: nextLevel.lesson.id,
-        title: nextLevel.lesson.title,
-        slug: nextLevel.level.slug,
-        levelId: nextLevel.level.id,
-        levelTitle: nextLevel.level.title,
-      }
-    }
-    return { kind: "finished" }
-  }, [lesson.id, level.slug])
+  // Navigation (position + next-step) is resolved server-side; the client only overlays the user's
+  // completion set onto the "Up next" refs so it never re-imports the whole curriculum registry.
+  const { lessonNumber, totalInLevel, nextStep } = nav
+  const upNext: UpNextLesson[] = useMemo(
+    () => nav.upNext.map((l) => ({ ...l, isCompleted: completedIds.has(l.id) })),
+    [nav.upNext, completedIds]
+  )
 
   // Resume: once saved progress loads, open the first not-completed section (once).
   const didResume = useRef(false)

@@ -10,11 +10,7 @@ import {
   LESSON_SECTION_ORDER,
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
-import {
-  getFirstLessonOfNextLevel,
-  getNextLessonInLevel,
-  listLessonsInLevel,
-} from "@/lib/tutorials/registry"
+import type { LeanTutorialLevel, LessonNavModel } from "@/lib/tutorials/level-path"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
@@ -35,7 +31,7 @@ import type {
   LessonSection,
   PythonExercise,
   PythonLesson,
-  PythonLevel,
+  PythonLevelId,
 } from "@/lib/tutorials/types"
 
 /**
@@ -45,28 +41,16 @@ import type {
  * lives in `useTutorialStore` (persisted by `useTutorialProgressSync`); per-exercise editor text is
  * local UI state so it survives phase switches. Below 1080px the workspace scrolls as one unit.
  */
-const UP_NEXT_COUNT = 5
-
 export interface LessonPlayerProps {
   lesson: PythonLesson
-  level: PythonLevel
+  /** Lean level (id/slug/title) resolved server-side — no modules / exercise payloads reach the client. */
+  level: LeanTutorialLevel<PythonLevelId>
+  /** Position + next-step navigation resolved server-side from the registry. */
+  nav: LessonNavModel<PythonLevelId>
   onSectionComplete?: (section: LessonSection) => void
 }
 
-/** What the post-Practice CTA offers, kept level-aware so a boundary is a deliberate hand-off. */
-type NextStep =
-  | { kind: "lesson"; id: string; title: string; slug: string }
-  | {
-      kind: "level-complete"
-      id: string
-      title: string
-      slug: string
-      levelId: PythonLevel["id"]
-      levelTitle: string
-    }
-  | { kind: "finished" }
-
-export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerProps) {
+export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPlayerProps) {
   const { reload } = useTutorialProgressSync(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
@@ -101,7 +85,7 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
     rememberLevel(level.id)
   }, [level.id])
 
-  // This route is a Client Component (no generateMetadata), so set the tab title from the lesson.
+  // The player is a Client Component and the route sets no metadata, so set the tab title here.
   useEffect(() => {
     const previous = document.title
     document.title = `${lesson.title} — Learn Python`
@@ -113,40 +97,14 @@ export function LessonPlayer({ lesson, level, onSectionComplete }: LessonPlayerP
   // Position within the level + the cross-curriculum "Up next" list (completion hydrated best-effort).
   const completedIds = useCompletedLessons()
 
-  const { lessonNumber, totalInLevel, upNext } = useMemo(() => {
-    // "Up next" is scoped to the current level: it must never bleed into another level. At the
-    // level's last lesson this is empty, and the deliberate level hand-off (`nextStep`) takes over.
-    const inLevel = listLessonsInLevel(level)
-    const idx = inLevel.findIndex((l) => l.id === lesson.id)
-    const next: UpNextLesson[] = inLevel.slice(idx + 1, idx + 1 + UP_NEXT_COUNT).map((l) => ({
-      id: l.id,
-      title: l.title,
-      levelSlug: level.slug,
-      isCompleted: completedIds.has(l.id),
-    }))
-    return { lessonNumber: idx + 1, totalInLevel: inLevel.length, upNext: next }
-  }, [level, lesson.id, completedIds])
-
-  // Where the "Next lesson" CTA points after Practice: the next in-level lesson, a deliberate
-  // level-complete hand-off at a boundary, or the end of the path. Crossing a level is never silent.
-  const nextStep = useMemo((): NextStep => {
-    const withinLevel = getNextLessonInLevel(lesson.id)
-    if (withinLevel) {
-      return { kind: "lesson", id: withinLevel.id, title: withinLevel.title, slug: level.slug }
-    }
-    const nextLevel = getFirstLessonOfNextLevel(lesson.id)
-    if (nextLevel) {
-      return {
-        kind: "level-complete",
-        id: nextLevel.lesson.id,
-        title: nextLevel.lesson.title,
-        slug: nextLevel.level.slug,
-        levelId: nextLevel.level.id,
-        levelTitle: nextLevel.level.title,
-      }
-    }
-    return { kind: "finished" }
-  }, [lesson.id, level.slug])
+  // Navigation (position + next-step) is resolved server-side; "Up next" is scoped to the current
+  // level and the level hand-off (`nextStep`) is deliberate. The client only overlays the user's
+  // completion set onto the "Up next" refs so it never re-imports the whole curriculum registry.
+  const { lessonNumber, totalInLevel, nextStep } = nav
+  const upNext: UpNextLesson[] = useMemo(
+    () => nav.upNext.map((l) => ({ ...l, isCompleted: completedIds.has(l.id) })),
+    [nav.upNext, completedIds]
+  )
 
   // Resume: once saved progress loads, open the first not-completed section (once).
   const didResume = useRef(false)

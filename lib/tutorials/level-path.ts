@@ -14,7 +14,7 @@
  * reused by the Python and SQL level pages — only `basePath` / `courseLabel` differ.
  */
 import type { DifficultyLevel } from "@/lib/scenarios/types"
-import type { TutorialLevel } from "./types"
+import type { TutorialLesson, TutorialLevel, TutorialLevelId } from "./types"
 
 // ---- slim, serializable list model (projected from authored content) ----
 
@@ -184,5 +184,112 @@ export function computeLevelPath(
     continueTarget,
     isComplete: total > 0 && done === total,
     isEmpty: total === 0,
+  }
+}
+
+// ---- lean lesson-player model (projected + resolved server-side) ----
+
+/**
+ * The minimal level fields a lesson player renders: id (the LEVEL badge + progress collection key),
+ * slug (route links), and title (the level-complete card). Deliberately drops `modules` so no
+ * exercise payloads / model answers ship to the client — the whole point of resolving the single
+ * lesson server-side.
+ */
+export interface LeanTutorialLevel<Id extends TutorialLevelId = TutorialLevelId> {
+  id: Id
+  slug: string
+  title: string
+}
+
+/** Project an authored level onto the lean fields a lesson player needs (drops modules/exercises). */
+export function toLeanLevel<Id extends TutorialLevelId = TutorialLevelId>(
+  level: TutorialLevel<unknown, Id>
+): LeanTutorialLevel<Id> {
+  return { id: level.id, slug: level.slug, title: level.title }
+}
+
+/**
+ * A following lesson within the same level, for the workspace "Up next" list. Completion is NOT
+ * carried here: it is overlaid client-side from the user's progress (`useCompletedLessons`), so this
+ * ref stays a pure, serializable content projection.
+ */
+export interface UpNextLessonRef {
+  id: string
+  title: string
+  levelSlug: string
+}
+
+/**
+ * Where the post-Practice CTA points: the next in-level lesson, a deliberate level-complete hand-off
+ * at a boundary, or the end of the path. Crossing a level is never a silent linear continuation.
+ */
+export type LessonNextStep<Id extends TutorialLevelId = TutorialLevelId> =
+  | { kind: "lesson"; id: string; title: string; slug: string }
+  | {
+      kind: "level-complete"
+      id: string
+      title: string
+      slug: string
+      levelId: Id
+      levelTitle: string
+    }
+  | { kind: "finished" }
+
+/** Serializable per-lesson navigation, computed server-side from a course registry's resolved reads. */
+export interface LessonNavModel<Id extends TutorialLevelId = TutorialLevelId> {
+  lessonNumber: number
+  totalInLevel: number
+  upNext: UpNextLessonRef[]
+  nextStep: LessonNextStep<Id>
+}
+
+/** How many following lessons the workspace "Up next" list shows. */
+export const UP_NEXT_COUNT = 5
+
+/**
+ * Build the lean navigation model a lesson player needs from registry-resolved pieces. Kept pure and
+ * course-agnostic: each route passes its own registry results (the in-level lesson list, the next
+ * in-level lesson, and the first lesson of the next level) so the exact in-level ordering and the
+ * deliberate level-boundary hand-off are preserved unchanged — this helper only projects, it never
+ * recomputes the "next" logic the registries own.
+ */
+export function buildLessonNav<E, Id extends TutorialLevelId>(args: {
+  level: TutorialLevel<E, Id>
+  lessonId: string
+  lessonsInLevel: TutorialLesson<E>[]
+  nextInLevel: TutorialLesson<E> | undefined
+  firstOfNextLevel: { level: TutorialLevel<E, Id>; lesson: TutorialLesson<E> } | undefined
+}): LessonNavModel<Id> {
+  const idx = args.lessonsInLevel.findIndex((lesson) => lesson.id === args.lessonId)
+  const upNext: UpNextLessonRef[] = args.lessonsInLevel
+    .slice(idx + 1, idx + 1 + UP_NEXT_COUNT)
+    .map((lesson) => ({ id: lesson.id, title: lesson.title, levelSlug: args.level.slug }))
+
+  let nextStep: LessonNextStep<Id>
+  if (args.nextInLevel) {
+    nextStep = {
+      kind: "lesson",
+      id: args.nextInLevel.id,
+      title: args.nextInLevel.title,
+      slug: args.level.slug,
+    }
+  } else if (args.firstOfNextLevel) {
+    nextStep = {
+      kind: "level-complete",
+      id: args.firstOfNextLevel.lesson.id,
+      title: args.firstOfNextLevel.lesson.title,
+      slug: args.firstOfNextLevel.level.slug,
+      levelId: args.firstOfNextLevel.level.id,
+      levelTitle: args.firstOfNextLevel.level.title,
+    }
+  } else {
+    nextStep = { kind: "finished" }
+  }
+
+  return {
+    lessonNumber: idx + 1,
+    totalInLevel: args.lessonsInLevel.length,
+    upNext,
+    nextStep,
   }
 }
