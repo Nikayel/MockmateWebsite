@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { requireTier } from "@/lib/quota-enforcement"
+import { requireTierForUser } from "@/lib/quota-enforcement"
 import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
 import { scenarios } from "@/lib/scenarios"
@@ -82,11 +82,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Server-side tier gate: roadmap is a Pro feature
-    const tierCheck = await requireTier(request, "pro")
-    if (tierCheck.response) return tierCheck.response
-
     const userId = authResult.userId
+
+    // Server-side tier gate: roadmap is a Pro feature
+    // (token already verified by verifyAuth above)
+    const tierCheck = await requireTierForUser(userId, "pro")
+    if (tierCheck.response) return tierCheck.response
     logger.info("[Roadmap API] GET request for user:", { userId })
 
     const { searchParams } = new URL(request.url)
@@ -422,11 +423,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Server-side tier gate: roadmap is a Pro feature
-    const tierCheck = await requireTier(request, "pro")
-    if (tierCheck.response) return tierCheck.response
-
     const userId = authResult.userId
+
+    // Server-side tier gate: roadmap is a Pro feature
+    // (token already verified by verifyAuth above)
+    const tierCheck = await requireTierForUser(userId, "pro")
+    if (tierCheck.response) return tierCheck.response
     const body = (await request.json()) as UpdateRoadmapRequestBody
     const { roadmapId, status } = body
 

@@ -758,6 +758,25 @@ export async function requireTier(
     }
   }
 
+  return requireTierForUser(userId, requiredTier)
+}
+
+/**
+ * Tier gate for routes that have ALREADY verified the caller's identity
+ * (e.g. via verifyAuth). Skips the redundant ID-token verification that
+ * requireTier performs and runs only the Firestore tier/subscription check.
+ *
+ * Returns the same contract as requireTier, so a route can swap
+ *   requireTier(request, "pro")  ->  requireTierForUser(authResult.userId, "pro")
+ * without changing how it handles the result.
+ *
+ * Use requireTier (not this) when the route has no prior verifyAuth and needs
+ * the token verified.
+ */
+export async function requireTierForUser(
+  userId: string,
+  requiredTier: "pro" | "enterprise"
+): Promise<{ allowed: boolean; response?: NextResponse; userId?: string; tier?: string }> {
   try {
     const profileDoc = await adminDb.collection("profiles").doc(userId).get()
     const profile = profileDoc.data()

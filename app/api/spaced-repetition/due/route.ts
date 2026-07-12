@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { requireTier } from "@/lib/quota-enforcement"
+import { requireTierForUser } from "@/lib/quota-enforcement"
 import { getDueProblems, getMaxDailyReviews } from "@/lib/spaced-repetition"
 import { logger } from "@/lib/logger"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
@@ -28,11 +28,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Server-side tier gate: spaced repetition is a Pro feature
-    const tierCheck = await requireTier(request, "pro")
-    if (tierCheck.response) return tierCheck.response
-
     const userId = authResult.userId
+
+    // Server-side tier gate: spaced repetition is a Pro feature
+    // (token already verified by verifyAuth above)
+    const tierCheck = await requireTierForUser(userId, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     // Parse query parameters
     const { searchParams } = new URL(request.url)

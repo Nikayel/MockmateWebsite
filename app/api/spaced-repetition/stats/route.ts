@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { requireTier } from "@/lib/quota-enforcement"
+import { requireTierForUser } from "@/lib/quota-enforcement"
 import {
   getUserMasteryStats,
   getDailyGoalProgress,
@@ -25,11 +25,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Server-side tier gate: spaced repetition is a Pro feature
-    const tierCheck = await requireTier(request, "pro")
-    if (tierCheck.response) return tierCheck.response
-
     const userId = authResult.userId
+
+    // Server-side tier gate: spaced repetition is a Pro feature
+    // (token already verified by verifyAuth above)
+    const tierCheck = await requireTierForUser(userId, "pro")
+    if (tierCheck.response) return tierCheck.response
 
     // Read the shared learning-state doc + timezone ONCE, then run the two
     // aggregate reads in parallel (each still reads problem_mastery on its own).
@@ -73,11 +74,12 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Server-side tier gate: spaced repetition is a Pro feature
-    const tierCheck = await requireTier(request, "pro")
-    if (tierCheck.response) return tierCheck.response
-
     const userId = authResult.userId
+
+    // Server-side tier gate: spaced repetition is a Pro feature
+    // (token already verified by verifyAuth above)
+    const tierCheck = await requireTierForUser(userId, "pro")
+    if (tierCheck.response) return tierCheck.response
     const body = await request.json()
 
     if (body.daily_goal !== undefined) {

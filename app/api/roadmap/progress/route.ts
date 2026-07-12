@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { requireTier } from "@/lib/quota-enforcement"
+import { requireTierForUser } from "@/lib/quota-enforcement"
 import { logger } from "@/lib/logger"
 import {
   isRoadmapQuestionStatus,
@@ -31,7 +31,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Server-side tier gate: roadmap is a Pro feature
-    const tierCheck = await requireTier(request, "pro")
+    const tierCheck = await requireTierForUser(authResult.userId, "pro")
     if (tierCheck.response) return tierCheck.response
 
     const userId = authResult.userId
