@@ -45,10 +45,7 @@ export async function GET() {
     })
   } catch (error) {
     logger.error("[Vectorize Problems API] Status check error", { error })
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to check status" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
   }
 }
 
@@ -94,10 +91,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     logger.error("[Vectorize Problems API] Error", { error })
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Vectorization failed" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
   }
 }
 
