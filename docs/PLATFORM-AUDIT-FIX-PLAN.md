@@ -634,7 +634,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** unit test with fixed `now` + `America/Los_Angeles`, item due
   tomorrow-local-but-today-UTC → asserted into `due_this_week`, not `due_today`.
 
-### [ ] EDGE-12 — /limit-reached shows a false "0 / 8 used" wall when the usage check fails — P2
+### [x] EDGE-12 — /limit-reached shows a false "0 / 8 used" wall when the usage check fails — P2
 - **Where:** `app/limit-reached/page.tsx:44-49` (catch logs only; `usageLimit` stays null),
   `:78,:91` (`usageLimit?.limit || 8`, `usageLimit?.used || 0`).
 - **Fix:** on catch, set an error state and render a retry UI ("Couldn't check your usage
@@ -788,7 +788,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** unit test counting reads (expect 1 profile, 1 learning_state, 1 problems
   query).
 
-### [ ] PERF-S7 — /api/roadmap GET runs the identical query twice + full-scan fallback — P2
+### [x] PERF-S7 — /api/roadmap GET runs the identical query twice + full-scan fallback — P2
 - **Where:** `app/api/roadmap/route.ts:93-97` (query #1), `:130-137` (identical query #2),
   `:143-146` (empty → full scan of ALL user roadmaps). Roadmap docs are routinely 100KB+.
 - **Fix:** reuse `activeSnapshot` for the default path (filtering docs just archived by
@@ -814,7 +814,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** unit test that a build performs no `user_performance_profiles` read; admin
   route test asserting one build per request.
 
-### [ ] PERF-S9 — getSmartRecommendations: full problems scan + ~6 sequential stages + per-failure loop — P2
+### [x] PERF-S9 — getSmartRecommendations: full problems scan + ~6 sequential stages + per-failure loop — P2
 - **Where:** `lib/spaced-repetition/rag-integration.ts:284-324`.
 - **Fix:** select only IDs (Admin `select()` projection or a completed-IDs array on the
   learning-state doc); `Promise.all` the independent lookups (`getNextInRoadmap`,
@@ -840,7 +840,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** Stripe CLI replay of `checkout.session.completed` + `invoice.paid` on
   emulator; handler <2s; single quota doc mutation.
 
-### [ ] PERF-S11 — session start initializes quota twice + redundant id-query — P2
+### [x] PERF-S11 — session start initializes quota twice + redundant id-query — P2
 - **Where:** `lib/hooks/useInterviewSession.ts:152-162` (`checkSessionCost` then
   `recordSessionStart`, each doing `getUserProfile` + `initializeUserQuota`);
   `lib/firestore-helpers.ts:1095-1116` (re-finds the quota doc via
@@ -905,7 +905,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   four scenario types.
 - **Verify:** rebuild; `/sessions` no longer references a "Two Sum"-bearing chunk.
 
-### [ ] PERF-C10 — roadmap wizard imports the full `scenarios` array client-side — P2
+### [x] PERF-C10 — roadmap wizard imports the full `scenarios` array client-side — P2
 - **Where:** `app/roadmap/new/page.tsx:20` (`import { scenarios } from "@/lib/scenarios"`,
   client page); `lib/roadmap/{prioritization-algorithm.ts:19,category-mix.ts:16}` keep the
   tree reachable.
@@ -993,7 +993,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   admins can reconcile.
 - **Verify:** handler unit test with a metadata-less fixture → `webhook_failures` doc.
 
-### [ ] DUP-12 — free-tier limit "8" hardcoded as UI fallbacks on /limit-reached — P3
+### [x] DUP-12 — free-tier limit "8" hardcoded as UI fallbacks on /limit-reached — P3
 - **Where:** `app/limit-reached/page.tsx:78,:91` vs `lib/config.ts:13`.
 - **Fix:** `usageLimit?.limit ?? PRICING_CONFIG.free.sessionsPerMonth` (config is already
   imported client-side elsewhere, e.g. account page). Combine with EDGE-12's retry-state
@@ -1115,3 +1115,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — PERF-C6 (safe subset) — wrapped the interview problemCtx in useMemo (deps provably complete; only elapsedTime intentionally omitted since it renders only pre-interview) and stabilized its inputs (ragHints/handleFileUpload/fetchRAGHints/narrowed hintAgent to {revealHint}) so the memoized ProblemColumn stops re-parsing MarkdownRenderer every clock tick; applied the EDGE-1 ref pattern to useInterviewProactiveAI so the 30s silence interval is no longer recreated every second. Did NOT touch elapsedTime state/useInterviewTimer/autosave/EDGE-1 contract (clock relocation deliberately deferred). InterviewLayoutGrid left un-memoized (takes always-new handlers). typecheck+build green.
 2026-07-12 — PERF-C5 — all three /learn lesson routes (system-design, sql, python) converted from client to Server Components: the route resolves the single lesson + computes nav server-side (reusing the existing registry helpers, so SQL level-boundary + Python nav quirk are preserved verbatim) and passes { lesson, lean level, nav } as RSC props; the 3 client players no longer import their curriculum registry, so the whole-curriculum chunks (SD ~1.8MB incl. 208 model answers, SQL ~2x990KB, Python ~0.45MB) stop bundling client-side. Shared toLeanLevel/buildLessonNav added to lib/tutorials/level-path.ts. Progress sync, LearnAuthGuard, document.title behavior untouched. typecheck + production build green (RSC serialization confirmed).
 2026-07-12 — DEAD-10 — pnpm remove of 31 unused packages (grep-verified zero source/config references; the lone vaul 'hit' was the word 'vault' in a lesson): 14 Radix, lottie-react, react-katex(+@types), @stripe/stripe-js, embla-carousel-react, cmdk, input-otp, react-day-picker, @next/mdx, tailwindcss-animate, autoprefixer, react-hook-form, @hookform/resolvers, vaul, plus DEAD-3's @react-three/fiber+@react-three/drei+tunnel-rat. Kept the do-not-break live deps (sql.js, geist, dotenv, three, @types/three, katex/rehype-katex, etc.). Production build green.
+2026-07-12 — PERF-S7/S9/S11, PERF-C10, EDGE-12+DUP-12 (wave-3 batch B) — S7: /api/roadmap reuses the active snapshot (no duplicate query) + gates the legacy full scan; S9: getSmartRecommendations parallelized + id-only mastery projection; S11: session start no longer double-inits quota + direct quota doc get; C10: roadmap wizard uses scenario metadata not the eager array; EDGE-12: retry UI instead of a false 0/8 wall on usage-check failure; DUP-12: free-limit fallback from PRICING_CONFIG. All typecheck-clean (batch-B files), eslint clean, relevant spaced-repetition/anniversary tests green.
