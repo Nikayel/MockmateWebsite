@@ -537,7 +537,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** `pnpm install && pnpm lint && pnpm build`; run one SQL lesson and one Python
   lesson locally.
 
-### [ ] DEAD-11 — git-tracked junk at repo root (41 MB graphify cache + scratch files) — P3
+### [x] DEAD-11 — git-tracked junk at repo root (41 MB graphify cache + scratch files) — P3
 - **Where:** tracked in git per `git ls-files`: `scratch.ts`, `patch_runners.py`,
   `eslint-results.json`, and `graphify-out/` (254 tracked files, 41 MB, churning the
   working tree every session).
@@ -1096,3 +1096,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — EDGE-1 — autosave interval now keyed on session identity only; payload read from optsRef.current (byte-identical literals); typecheck+lint clean. No React renderer in repo (jsdom/RTL absent) so verified via static analysis + review, not renderHook.
 2026-07-12 — EDGE-2 — apiErrorOccurred flag set in all 3 Stripe-lookup catches; monthly downgrade branch guarded (yearly local-date branch untouched). New lib/__tests__/stripe-helpers-edge2.test.ts (throw→no downgrade; canceled→downgrade) green; typecheck clean.
 2026-07-12 — DEAD-12 — added /coverage/ to .gitignore; git check-ignore coverage/base.css exits 0.
+2026-07-12 — DEAD-11 — git rm --cached graphify-out (254 files) + scratch.ts/patch_runners.py/eslint-results.json; added them to .gitignore. settings.json graphify hook left untouched (needs user approval). Files stay on disk, just untracked.

@@ -73,3 +73,9 @@ docs/._*
 
 # Future Sprints
 /future-sprints/
+
+# Graphify cache (41 MB, regenerated every session — untracked in DEAD-11) + local scratch
+/graphify-out/
+scratch.ts
+patch_runners.py
+eslint-results.json
