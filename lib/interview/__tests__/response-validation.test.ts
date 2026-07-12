@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
+import {
+  validateWithRegexRetry,
+  validateWithRetry,
+  type ValidationContext,
+} from "@/lib/interview/response-validation"
 import { createEmptyTracker } from "@/lib/interview/interview-phases"
 
 describe("validateWithRetry", () => {
@@ -41,5 +45,33 @@ describe("validateWithRetry", () => {
     expect(result.response).toBe("Take your time reading. Any questions about the problem?")
     expect(result.retries).toBe(2)
     expect(result.violations).toEqual([])
+  })
+})
+
+describe("validateWithRegexRetry (PERF-S1: no LLM on the blocking path)", () => {
+  it("accepts a clean response without regenerating and without any LLM call", async () => {
+    const ctx: ValidationContext = {
+      response: "Take your time reading. Any questions about the problem?",
+      phase: "clarification",
+      tracker: createEmptyTracker(),
+      hasSubmitted: false,
+      lastUserMessage: "I am reading the prompt.",
+    }
+
+    let regenerateCalls = 0
+    const result = await validateWithRegexRetry(
+      ctx,
+      async () => {
+        regenerateCalls++
+        return "regenerated"
+      },
+      2
+    )
+
+    expect(result.response).toBe(ctx.response)
+    expect(result.retries).toBe(0)
+    expect(regenerateCalls).toBe(0)
+    // The function has no generateAI parameter, so it structurally cannot make a
+    // semantic LLM call on the blocking path — the PERF-S1 guarantee.
   })
 })

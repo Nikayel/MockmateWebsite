@@ -32,7 +32,16 @@ import {
 import { extractionService } from "@/lib/services/extraction-service"
 import { phaseService } from "@/lib/services/phase-service"
 import { getFlag } from "@/lib/feature-flags"
-import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
+import {
+  validateSemanticRules,
+  validateWithRegexRetry,
+  type ValidationContext,
+} from "@/lib/interview/response-validation"
+
+// PERF-S1: run the fire-and-forget semantic (LLM) validator only for the first
+// few messages of a session, where interviewer tone-setting has the most signal.
+// history grows ~2 entries per turn, so 6 covers roughly the first three turns.
+const SEMANTIC_VALIDATION_MAX_HISTORY = 6
 import {
   executeTool,
   formatToolResultsForPrompt,
@@ -752,7 +761,7 @@ Generate a compliant response NOW:`
             userId,
             sessionId,
             eventType: "chat_message",
-            skipCache: true, // Must skip cache for regeneration - cache key only uses first 500 chars of system prompt
+            skipCache: true, // Regeneration must bypass the response cache
           }
         )
 
@@ -769,21 +778,12 @@ Generate a compliant response NOW:`
         return regeneratedResponse.text
       }
 
-      // Run validation with up to 2 retries for critical violations
-      const gateResult = await validateWithRetry(
-        validationContext,
-        regenerate,
-        async (system, user) => {
-          const result = await generateAIResponse(system, user, [], {
-            complexity: "simple",
-            userId,
-            sessionId,
-            eventType: "chat_message",
-          })
-          return { text: result.text }
-        },
-        2
-      )
+      // Run REGEX-ONLY validation with up to 2 retries for critical violations.
+      // PERF-S1: the semantic LLM check used to run here on the blocking path (a
+      // second provider call per message, multiplied across retries — up to 5+
+      // calls for a flagged message). Regex hard gates stay synchronous; semantic
+      // validation now runs fire-and-forget below.
+      const gateResult = await validateWithRegexRetry(validationContext, regenerate, 2)
 
       // Update response if regenerated
       if (gateResult.retries > 0) {
@@ -804,6 +804,33 @@ Generate a compliant response NOW:`
             severity: v.severity,
           })),
         })
+      }
+
+      // PERF-S1: semantic (LLM) validation runs OFF the critical path and only
+      // for early messages, so it adds neither latency nor a per-message provider
+      // call on the happy path. Log-only: it never regenerates or blocks.
+      if (history.length <= SEMANTIC_VALIDATION_MAX_HISTORY) {
+        void validateSemanticRules(aiResponse.text, async (system, user) => {
+          const result = await generateAIResponse(system, user, [], {
+            complexity: "simple",
+            userId,
+            sessionId,
+            eventType: "chat_message",
+          })
+          return { text: result.text }
+        })
+          .then((semantic) => {
+            if (semantic.violated) {
+              logger.warn("[Hard Gates] Semantic violation observed (post-hoc, not regenerated)", {
+                sessionId,
+                rule: semantic.rule,
+                evidence: semantic.evidence,
+              })
+            }
+          })
+          .catch((error) => {
+            logger.warn("[Hard Gates] Post-hoc semantic validation failed", { error, sessionId })
+          })
       }
     }
 

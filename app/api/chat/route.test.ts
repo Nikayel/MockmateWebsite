@@ -47,7 +47,8 @@ vi.mock("@/lib/interview/chat-rag-context", () => ({
 }))
 
 vi.mock("@/lib/interview/response-validation", () => ({
-  validateWithRetry: vi.fn(),
+  validateWithRegexRetry: vi.fn(),
+  validateSemanticRules: vi.fn(),
 }))
 
 vi.mock("@/lib/interview/conversation-extraction", () => ({
@@ -73,7 +74,9 @@ async function setupMocks() {
   const { trackAIChatServer } = await import("@/lib/analytics-server")
   const { getFlag } = await import("@/lib/feature-flags")
   const { buildRAGContext } = await import("@/lib/interview/chat-rag-context")
-  const { validateWithRetry } = await import("@/lib/interview/response-validation")
+  const { validateWithRegexRetry, validateSemanticRules } = await import(
+    "@/lib/interview/response-validation"
+  )
 
   vi.mocked(chatRateLimit).mockResolvedValue(null)
   vi.mocked(enforceQuota).mockResolvedValue({
@@ -99,11 +102,17 @@ async function setupMocks() {
   vi.mocked(trackAIChatServer).mockResolvedValue(undefined)
   vi.mocked(getFlag).mockReturnValue(false)
   vi.mocked(buildRAGContext).mockResolvedValue("")
-  vi.mocked(validateWithRetry).mockImplementation(async (context) => ({
+  vi.mocked(validateWithRegexRetry).mockImplementation(async (context) => ({
     response: context.response,
     violations: [],
     retries: 0,
   }))
+  vi.mocked(validateSemanticRules).mockResolvedValue({
+    violated: false,
+    rule: null,
+    evidence: null,
+    suggestion: null,
+  })
 
   return {
     generateAIResponse,

@@ -224,3 +224,53 @@ export async function validateWithRetry(
 
   return { response: currentResponse, violations: totalViolations, retries }
 }
+
+/**
+ * Regex-only retry loop (NO LLM call). Use for the BLOCKING request path so the
+ * happy path costs exactly one provider call (the main generation) instead of
+ * two, and a flagged message never multiplies the semantic LLM call across
+ * retries. Semantic validation, when wanted, should run fire-and-forget AFTER
+ * the response is sent (see validateSemanticRules) rather than block the
+ * request. (PERF-S1)
+ *
+ * Behaviour mirrors validateWithRetry for the regex gates: critical regex
+ * violations trigger regeneration up to maxRetries; warnings pass through.
+ */
+export async function validateWithRegexRetry(
+  ctx: ValidationContext,
+  regenerate: (hint: string) => Promise<string>,
+  maxRetries: number = 2
+): Promise<{ response: string; violations: ResponseViolation[]; retries: number }> {
+  let currentResponse = ctx.response
+  let totalViolations: ResponseViolation[] = []
+  let retries = 0
+
+  for (let i = 0; i <= maxRetries; i++) {
+    const validation = validateInterviewerResponse({ ...ctx, response: currentResponse })
+
+    if (validation.isValid) {
+      return { response: currentResponse, violations: [], retries }
+    }
+
+    logger.info("[Hard Gates] Violations detected", {
+      attempt: i + 1,
+      violations: validation.violations.map((v) => v.rule),
+      hint: validation.regenerationHint,
+    })
+
+    if (!validation.shouldRegenerate || i === maxRetries) {
+      return { response: currentResponse, violations: validation.violations, retries }
+    }
+
+    try {
+      currentResponse = await regenerate(validation.regenerationHint || "Follow interviewer rules")
+      retries++
+      totalViolations = validation.violations
+    } catch (error) {
+      logger.error("[Hard Gates] Regeneration failed", { error })
+      return { response: currentResponse, violations: validation.violations, retries }
+    }
+  }
+
+  return { response: currentResponse, violations: totalViolations, retries }
+}
