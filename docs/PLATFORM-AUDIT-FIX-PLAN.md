@@ -205,7 +205,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** `pnpm vitest run lib/feedback/__tests__` + manually diff instant vs final
   overall for one fixed set of subscores.
 
-### [ ] API-1 — /api/voice/token hands the raw account-level Deepgram API key to every signed-in client — P1
+### [~] API-1 — /api/voice/token hands the raw account-level Deepgram API key to every signed-in client — P1 (PARTIAL — see progress log)
 - **Where:** `app/api/voice/token/route.ts:21-26` (returns
   `{ apiKey: process.env.DEEPGRAM_API_KEY }`); consumed at
   `lib/voice/deepgram-service.ts:122-131`, used in a browser WebSocket at :251.
@@ -1101,3 +1101,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — DUP-8 — /limit-reached Pro pitch now rendered from PRICING_CONFIG.pro (sessionsDisplay + valueProps map), mirroring app/upgrade; hardcoded "Unlimited Sessions"/"500+ Problems" strings deleted. grep for "Unlimited Sessions" now empty; redirect-if-allowed untouched. typecheck+eslint clean. (Note: config valueProps still contain em dashes that now surface here; out of scope for this finding.)
 2026-07-12 — EDGE-WEBHOOK — invoice.payment_failed / charge.refunded / invoice.paid catches now call recordWebhookFailure(event, type, error) (mirrors the dispute sibling); kept 200 after dead-lettering (consistent, and invoice.paid reset is idempotent per period). typecheck clean. STAGING-TODO: Stripe CLI replay on emulator before production deploy (throwing-Firestore-mock unit test also still recommended).
 2026-07-12 — API-2 — /api/usage/voice now runs apiRateLimit first + validates body with Zod (durationSeconds positive().max(3600), transcriptLength bounded, model kept whitelisted against DEEPGRAM_COSTS). New route.test.ts: 5 tests (out-of-range/non-positive/bad-model rejected, valid tracked, rate-limit short-circuit) green; typecheck clean.
+2026-07-12 — API-1 — PARTIAL. New lib/voice/deepgram-management.ts mints a short-lived usage:write-only key via the Deepgram Management REST API (project id from DEEPGRAM_PROJECT_ID or /projects, cached); token route returns it and preserves the {apiKey} contract + verifyAuth + apiRateLimit. Falls back to the raw account key + warn log when minting is unavailable (no live creds to verify keys:write scope in-sandbox), so voice never breaks but the raw-key hole is only fully closed once minting succeeds. STAGING follow-up: (1) grant DEEPGRAM_API_KEY keys:write (or set DEEPGRAM_PROJECT_ID + a management-capable key); (2) smoke-test GET /api/voice/token returns a key != account key and streaming still connects; (3) then flip the fallback to fail-closed (503).
