@@ -143,6 +143,33 @@ describe("/api/chat route", () => {
     expect(endRequestTracking).toHaveBeenCalledWith("user-1")
   })
 
+  it("returns 400 when the context array exceeds the maximum length", async () => {
+    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { POST } = await import("./route")
+
+    const oversizedContext = Array.from({ length: 61 }, (_, index) => ({
+      type: "user",
+      message: `message ${index}`,
+    }))
+
+    const response = await POST(
+      createRequest({
+        role: "partner",
+        message: "hello",
+        context: oversizedContext,
+      })
+    )
+
+    expect(response.status).toBe(400)
+    expect(response.data).toEqual(
+      expect.objectContaining({
+        error: "Invalid request body",
+      })
+    )
+    expect(generateAIResponse).not.toHaveBeenCalled()
+    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+  })
+
   it("requires a message unless the request is proactive", async () => {
     const { generateAIResponse, endRequestTracking } = await setupMocks()
     const { POST } = await import("./route")

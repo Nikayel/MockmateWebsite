@@ -8,10 +8,11 @@ export const chatRequestSchema = z
     context: z
       .array(
         z.object({
-          type: z.string(),
-          message: z.string(),
+          type: z.string().max(20),
+          message: z.string().max(8000),
         })
       )
+      .max(60)
       .optional(),
     role: z.enum(["interviewer", "partner"]).optional(),
     userContext: z.record(z.unknown()).optional(),
