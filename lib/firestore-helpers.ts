@@ -475,6 +475,7 @@ export async function checkSessionCost(userId: string): Promise<{
   freeOpensRemaining: number
   allowed: boolean
   reason: string
+  quota: ProfileQuota
 }> {
   const profile = await getUserProfile(userId)
   const quota = await initializeUserQuota(
@@ -496,6 +497,7 @@ export async function checkSessionCost(userId: string): Promise<{
       freeOpensRemaining: freeOpens,
       allowed: true,
       reason: `${freeOpens} free opens remaining`,
+      quota,
     }
   }
 
@@ -506,6 +508,7 @@ export async function checkSessionCost(userId: string): Promise<{
       freeOpensRemaining: 0,
       allowed: true,
       reason: `Will use 1 session (${used + 1}/${limit}), then get 10 free opens`,
+      quota,
     }
   }
 
@@ -515,6 +518,7 @@ export async function checkSessionCost(userId: string): Promise<{
     freeOpensRemaining: 0,
     allowed: false,
     reason: `Session limit reached (${used}/${limit})`,
+    quota,
   }
 }
 
@@ -1101,33 +1105,43 @@ export async function findLatestSubmittedSession(
  * - If user has free opens, decrement free_opens_remaining
  * - If no free opens, increment sessions_used and grant 10 free opens
  */
-export async function recordSessionStart(userId: string): Promise<{
+export async function recordSessionStart(
+  userId: string,
+  precomputedQuota?: ProfileQuota
+): Promise<{
   success: boolean
   usedPaidSession: boolean
   freeOpensRemaining: number
 }> {
-  const profile = await getUserProfile(userId)
-  const quota = await initializeUserQuota(
-    userId,
-    profile?.subscription_tier || "free",
-    profile?.created_at,
-    profile?.subscription_current_period_end,
-    profile?.subscription_type
-  )
+  // Reuse the quota a preceding checkSessionCost already resolved when the
+  // caller threads it through, so a session start does not repeat the profile
+  // read plus quota initialization that check just performed (PERF-S11).
+  let quota = precomputedQuota
+  if (!quota) {
+    const profile = await getUserProfile(userId)
+    quota = await initializeUserQuota(
+      userId,
+      profile?.subscription_tier || "free",
+      profile?.created_at,
+      profile?.subscription_current_period_end,
+      profile?.subscription_type
+    )
+  }
 
-  const quotaQuery = query(
-    collection(db, "profile_quota"),
-    where("user_id", "==", userId),
-    where("id", "==", quota.id)
-  )
-
-  const quotaSnap = await getDocs(quotaQuery)
-
-  if (quotaSnap.empty) {
+  // quota.id is the profile_quota document id, so read that document directly
+  // rather than running an equality query against the id field. When the id is
+  // missing or empty we surface the same "Quota not found" error the previous
+  // query produced (its result set was empty in that case).
+  if (!quota.id) {
     throw new Error("Quota not found")
   }
 
-  const quotaRef = quotaSnap.docs[0].ref
+  const quotaRef = doc(db, "profile_quota", quota.id)
+  const quotaSnap = await getDoc(quotaRef)
+
+  if (!quotaSnap.exists()) {
+    throw new Error("Quota not found")
+  }
   let usedPaidSession = false
   let newFreeOpens = 0
 

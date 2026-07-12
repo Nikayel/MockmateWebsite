@@ -158,8 +158,9 @@ export function useInterviewSession({
         return false
       }
 
-      // Record session start
-      await recordSessionStart(userId)
+      // Record session start, reusing the quota checkSessionCost already
+      // resolved so we skip a duplicate profile + quota read (PERF-S11).
+      await recordSessionStart(userId, costCheck.quota)
 
       // Create session in Firestore
       // Include pattern for stats aggregation (used by dashboard Performance Insights)
