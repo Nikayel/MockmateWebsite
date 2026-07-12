@@ -558,7 +558,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 
 ## Edge cases
 
-### [ ] EDGE-4 — double-click "Start practice" creates two sessions and burns quota twice — P2
+### [x] EDGE-4 — double-click "Start practice" creates two sessions and burns quota twice — P2
 - **Where:** `components/interview/ScenarioCard.tsx:128-138` (`disabled={isLocked}` only;
   same in `ScenarioListRow.tsx:123`); `app/interview/_hooks/useInterviewSessionStart.ts:97,164-217`
   (no re-entrancy guard; `setShowScenarioBrowser(false)` only at :275 after the awaits).
@@ -572,7 +572,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   `createInterviewSession` called once. Manual double-click on a free account →
   one session doc, `sessions_used` +1.
 
-### [ ] EDGE-5 — "See Full Interview Score" double-invoke double-writes completion + double-counts roadmap time — P2
+### [x] EDGE-5 — "See Full Interview Score" double-invoke double-writes completion + double-counts roadmap time — P2
 - **Where:** `app/interview/_components/PostInterviewView.tsx:237-245` (button lacks
   `loading`/`disabled` despite `isGeneratingFeedback` existing);
   `app/interview/_hooks/useInterviewFeedback.ts:115` (no guard); also reachable from two
@@ -589,7 +589,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** unit test invoking it twice concurrently → `markSessionEvaluating` once,
   `addActualTime` once.
 
-### [ ] EDGE-6 — past_due "Update payment" button silently does nothing on failure — P2
+### [x] EDGE-6 — past_due "Update payment" button silently does nothing on failure — P2
 - **Where:** `components/ui/subscription-status-banner.tsx:91-113,129-139` — no
   `response.ok` check; `if (data.url)` with no else; `catch { /* Silently fail */ }`;
   the `if (!idToken) return` is also silent.
@@ -599,7 +599,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** mock `/api/customer-portal` → 400 → click → error toast; component test
   asserting toast on non-ok response.
 
-### [ ] EDGE-10 — roadmap progress renders NaN% (0/0) on four surfaces; NaNh on legacy docs — P2
+### [x] EDGE-10 — roadmap progress renders NaN% (0/0) on four surfaces; NaNh on legacy docs — P2
 - **Where:** `app/roadmap/page.tsx:648` (rendered :807);
   `components/roadmap/RoadmapStatusBanner.tsx:98,383` (rendered :131,:241,:480);
   `app/roadmap/_components/RoadmapPageParts.tsx:225` (rendered :309, width style :362);
@@ -714,7 +714,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** `pnpm typecheck`; emulator round-trip via all three paths yields one
   consistent doc.
 
-### [ ] DUP-10 — ScoreDisplay re-implements `calculateTechnicalScoreFromBreakdown` inline, citing the wrong source — P2
+### [x] DUP-10 — ScoreDisplay re-implements `calculateTechnicalScoreFromBreakdown` inline, citing the wrong source — P2
 - **Where:** `components/practice/ScoreDisplay.tsx:199-206` (inline 0.6/0.25/0.15 + a
   comment citing `lib/scoring/types.ts`, which actually documents different inputs) vs
   `lib/constants.ts:424-450` (identical weights + input clamping the copy lacks).
@@ -722,7 +722,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   `technicalScoreProp ??` fallback; delete the inline math and stale comment.
 - **Verify:** `pnpm typecheck`; existing ScoreDisplay render tests.
 
-### [ ] DUP-11 — system-design mastery score computed client-side with a third, unsourced formula, fed into spaced repetition — P2
+### [x] DUP-11 — system-design mastery score computed client-side with a third, unsourced formula, fed into spaced repetition — P2
 - **Where:** `app/interview/_hooks/useSystemDesignFeedback.ts:325-332`
   (0.3/0.4/0.3 over understanding/problemSolving/codeQuality → `updateSpacedRepetition` →
   `/api/spaced-repetition/complete`, which takes `mastery_score` as-is per API-VALID-1)
@@ -853,7 +853,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** existing usage-model tests; time from "Start session" click to session
   creation.
 
-### [ ] PERF-S12 — per-request and per-user cost-anomaly checks are dead code (never wired) — P2
+### [x] PERF-S12 — per-request and per-user cost-anomaly checks are dead code (never wired) — P2
 - **Where:** `lib/cost-anomaly-detection.ts:88-117,183-223`
   (`checkRequestCostAnomaly`/`checkUserCostAnomaly` — zero call sites outside the file);
   only `checkHourlyCostAnomaly` runs, and only when an admin opens the dashboard
@@ -871,7 +871,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 
 ## Client performance
 
-### [ ] PERF-C7 — katex + react-markdown (366 KB chunk) eager in `/interview` first load — P2
+### [x] PERF-C7 — katex + react-markdown (366 KB chunk) eager in `/interview` first load — P2
 - **Where:** `components/ui/MarkdownRenderer.tsx:3-7` (ReactMarkdown, remark-gfm,
   remark-math, rehype-katex, katex CSS), reachable via `ProblemColumn.tsx:17` and
   `EditorColumn.tsx:18`.
@@ -884,7 +884,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** rebuild; katex out of `/interview` first-load chunks; render a math lesson
   AND a table lesson.
 
-### [ ] PERF-C8 — CodeMirror (312 KB) in `/interview` first load while the initial view is the scenario browser — P2
+### [x] PERF-C8 — CodeMirror (312 KB) in `/interview` first load while the initial view is the scenario browser — P2
 - **Where:** `app/interview/_components/EditorColumn.tsx:19`; the split is inverted — the
   page dynamic-imports `ScenarioBrowser` (page.tsx:76-87, the INITIAL view) while the
   editor (needed only after selection) is eager.
@@ -896,7 +896,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 - **Verify:** rebuild (~300 KB raw drop); select a scenario and type immediately — no lost
   keystrokes (loading state until ready).
 
-### [ ] PERF-C9 — /sessions ships the full scenario dataset for a boolean existence check — P2
+### [x] PERF-C9 — /sessions ships the full scenario dataset for a boolean existence check — P2
 - **Where:** `app/sessions/page.tsx:23` + `:161` (`!!getScenarioById(session.scenario_id)`
   from legacy `"@/lib/scenarios"`) → 674 KB scenario chunk in first load.
 - **Fix:** use the metadata registry — `getScenarioMeta(id)` from `"@/lib/scenarios/index"`
@@ -916,7 +916,7 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
   counts.
 - **Verify:** rebuild + create a roadmap end-to-end; compare `/roadmap/new` first-load.
 
-### [ ] PERF-C11 — landing page runs a 20 fps setState animation loop with no visibility gating — P2
+### [x] PERF-C11 — landing page runs a 20 fps setState animation loop with no visibility gating — P2
 - **Where:** `components/ui/radial-orbital-timeline.tsx:82-99` (`setInterval(…, 50)`
   updating React state; `autoRotate` defaults true :27); rendered on `/` by
   `components/features-section.tsx:222`.
@@ -1116,3 +1116,4 @@ only as leads. See "Verified NOT dead" at the bottom before deleting ANYTHING no
 2026-07-12 — PERF-C5 — all three /learn lesson routes (system-design, sql, python) converted from client to Server Components: the route resolves the single lesson + computes nav server-side (reusing the existing registry helpers, so SQL level-boundary + Python nav quirk are preserved verbatim) and passes { lesson, lean level, nav } as RSC props; the 3 client players no longer import their curriculum registry, so the whole-curriculum chunks (SD ~1.8MB incl. 208 model answers, SQL ~2x990KB, Python ~0.45MB) stop bundling client-side. Shared toLeanLevel/buildLessonNav added to lib/tutorials/level-path.ts. Progress sync, LearnAuthGuard, document.title behavior untouched. typecheck + production build green (RSC serialization confirmed).
 2026-07-12 — DEAD-10 — pnpm remove of 31 unused packages (grep-verified zero source/config references; the lone vaul 'hit' was the word 'vault' in a lesson): 14 Radix, lottie-react, react-katex(+@types), @stripe/stripe-js, embla-carousel-react, cmdk, input-otp, react-day-picker, @next/mdx, tailwindcss-animate, autoprefixer, react-hook-form, @hookform/resolvers, vaul, plus DEAD-3's @react-three/fiber+@react-three/drei+tunnel-rat. Kept the do-not-break live deps (sql.js, geist, dotenv, three, @types/three, katex/rehype-katex, etc.). Production build green.
 2026-07-12 — PERF-S7/S9/S11, PERF-C10, EDGE-12+DUP-12 (wave-3 batch B) — S7: /api/roadmap reuses the active snapshot (no duplicate query) + gates the legacy full scan; S9: getSmartRecommendations parallelized + id-only mastery projection; S11: session start no longer double-inits quota + direct quota doc get; C10: roadmap wizard uses scenario metadata not the eager array; EDGE-12: retry UI instead of a false 0/8 wall on usage-check failure; DUP-12: free-limit fallback from PRICING_CONFIG. All typecheck-clean (batch-B files), eslint clean, relevant spaced-repetition/anniversary tests green.
+2026-07-12 — wave-3 batch A (11 items, parallel workflow, typecheck+production-build green): EDGE-4 double-click Start guard (startingRef + isStarting threading); EDGE-5 double-invoke feedback guard; EDGE-6 billing-portal failure toasts; EDGE-10 shared roadmapProgressPercent kills NaN%/NaNh; DUP-10 ScoreDisplay canonical technical-score; DUP-11 canonical design mastery weights; PERF-C7 lazy katex/remark-math; PERF-C8 dynamic CodeMirror (forwardRef-preserving); PERF-C9 /sessions scenario metadata; PERF-C11 gated rAF orbital animation; PERF-S12 wired per-request cost-anomaly (fire-and-forget). New: lib/roadmap/progress.ts, components/ui/katex-css.ts, app/interview/_components/LazyCodeMirrorEditor.tsx, design-mastery-score.test.ts.
