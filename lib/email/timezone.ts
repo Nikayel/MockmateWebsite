@@ -222,3 +222,66 @@ export function getDaysDifference(
     return Math.round((laterDateUtc - earlierDateUtc) / (1000 * 60 * 60 * 24))
   }
 }
+
+/**
+ * Minutes that `timezone` is offset from UTC at the given instant (local minus
+ * UTC). Example: America/Los_Angeles in winter -> -480.
+ *
+ * Works by formatting the instant in the target timezone, then reinterpreting
+ * that wall-clock reading as if it were UTC and comparing to the true instant.
+ */
+function getTimezoneOffsetMinutes(date: Date, timezone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+  const map: Record<string, number> = {}
+  for (const part of dtf.formatToParts(date)) {
+    if (part.type !== "literal") map[part.type] = parseInt(part.value, 10)
+  }
+  // hourCycle can yield "24" for midnight; normalize to 0.
+  const hour = map.hour === 24 ? 0 : map.hour
+  const localAsUtc = Date.UTC(map.year, map.month - 1, map.day, hour, map.minute, map.second)
+  return Math.round((localAsUtc - date.getTime()) / 60000)
+}
+
+/**
+ * Get the UTC instant corresponding to 23:59:59.999 local time on the calendar
+ * day that is `daysAhead` days after `now` in the given timezone.
+ *
+ * Use this to bucket "due today / due this week" by the user's local calendar
+ * day instead of the server's UTC day. Handles DST because the zone offset is
+ * sampled at the target instant.
+ */
+export function getEndOfDayInTimezone(
+  now: Date,
+  timezone: string | undefined | null,
+  daysAhead: number = 0
+): Date {
+  const userTimezone = timezone || DEFAULT_TIMEZONE
+  try {
+    // Local calendar date (YYYY-MM-DD) for `now` in the user's timezone.
+    const localDate = getDateInTimezone(now.toISOString(), userTimezone)
+    const [year, month, day] = localDate.split("-").map((part) => parseInt(part, 10))
+
+    // Desired wall-clock: end of (localDate + daysAhead) at 23:59:59.999 local.
+    // Interpret that wall-clock first as if it were UTC...
+    const wallClockAsUtc = Date.UTC(year, month - 1, day + daysAhead, 23, 59, 59, 999)
+
+    // ...then correct by the zone's offset so it reads as local end-of-day.
+    const offsetMinutes = getTimezoneOffsetMinutes(new Date(wallClockAsUtc), userTimezone)
+    return new Date(wallClockAsUtc - offsetMinutes * 60 * 1000)
+  } catch {
+    // Fallback: server UTC end-of-day.
+    const fallback = new Date(now)
+    fallback.setUTCDate(fallback.getUTCDate() + daysAhead)
+    fallback.setUTCHours(23, 59, 59, 999)
+    return fallback
+  }
+}

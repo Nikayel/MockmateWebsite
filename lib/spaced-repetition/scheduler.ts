@@ -8,8 +8,9 @@
 import { adminDb } from "../firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
 import type { DSAPattern } from "../types/dsa-patterns"
-import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from "../types"
+import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel, Profile } from "../types"
 import { getScenarioById, scenarios } from "../scenarios"
+import { DEFAULT_TIMEZONE, getDaysDifference, getEndOfDayInTimezone } from "../email/timezone"
 import { calculateReviewPriority, type Difficulty, type MasteryLevel } from "./sm2-algorithm"
 import {
   getUserAlgorithm,
@@ -56,6 +57,24 @@ function getCanonicalDifficulty(
 function getScenarioIdByTitle(title: string): string | undefined {
   const scenario = scenarios.find((s) => s.title === title)
   return scenario?.id
+}
+
+/**
+ * Resolve a user's IANA timezone from their profile, falling back to the
+ * default. Used so the due-queue windows are bucketed by the user's local
+ * calendar day instead of the server's UTC day.
+ */
+async function resolveUserTimezone(userId: string): Promise<string> {
+  try {
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+    if (profileDoc.exists) {
+      const profile = profileDoc.data() as Profile
+      return profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+    }
+  } catch {
+    // Use default timezone if profile fetch fails
+  }
+  return DEFAULT_TIMEZONE
 }
 
 // Types
@@ -136,6 +155,9 @@ export interface SchedulerOptions {
   difficulty?: Difficulty
   includeUpcoming?: boolean
   upcomingDays?: number
+  // The user's IANA timezone. When omitted it is resolved from their profile.
+  // Used to bucket "due today / this week" by the user's local calendar day.
+  timezone?: string
 }
 
 // Estimated time based on difficulty (minutes)
@@ -160,18 +182,25 @@ export async function getDueProblems(
   userId: string,
   options: SchedulerOptions = {}
 ): Promise<DueQueueResult> {
-  const { limit = 20, pattern, difficulty, includeUpcoming = true, upcomingDays = 7 } = options
+  const {
+    limit = 20,
+    pattern,
+    difficulty,
+    includeUpcoming = true,
+    upcomingDays = 7,
+    timezone,
+  } = options
 
   const now = new Date()
   const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
 
-  // Use UTC to ensure consistent behavior across all environments (localhost vs production)
-  const todayEnd = new Date(now)
-  todayEnd.setUTCHours(23, 59, 59, 999)
-
-  const upcomingEnd = new Date(now)
-  upcomingEnd.setUTCDate(upcomingEnd.getUTCDate() + upcomingDays)
-  upcomingEnd.setUTCHours(23, 59, 59, 999)
+  // Bucket by the USER'S local calendar day, not the server's UTC day, so an
+  // item due tomorrow in the user's timezone (but still "today" in UTC) is not
+  // mislabeled as due today. getEndOfDayInTimezone returns the UTC instant of
+  // 23:59:59.999 local time on the target local calendar day.
+  const userTimezone = timezone || (await resolveUserTimezone(userId))
+  const todayEnd = getEndOfDayInTimezone(now, userTimezone, 0)
+  const upcomingEnd = getEndOfDayInTimezone(now, userTimezone, upcomingDays)
 
   // Get user's algorithm for transparency
   const userAlgorithm = await getUserAlgorithm(userId)
@@ -209,15 +238,6 @@ export async function getDueProblems(
   const dueToday: DueItem[] = []
   const upcoming: DueItem[] = []
 
-  // Helper to calculate calendar days difference (for "Tomorrow" to show as 1 day, not 0)
-  const getCalendarDaysDiff = (fromDate: Date, toDate: Date): number => {
-    const fromStart = new Date(fromDate)
-    fromStart.setHours(0, 0, 0, 0)
-    const toStart = new Date(toDate)
-    toStart.setHours(0, 0, 0, 0)
-    return Math.round((toStart.getTime() - fromStart.getTime()) / (1000 * 60 * 60 * 24))
-  }
-
   snapshot.docs.forEach((doc) => {
     const data = doc.data() as ProblemMastery
     const nextReviewAt = new Date(data.next_review_at)
@@ -225,8 +245,9 @@ export async function getDueProblems(
     // Calculate time differences
     const millisDiff = nextReviewAt.getTime() - now.getTime()
     const minutesDiff = Math.floor(millisDiff / (1000 * 60))
-    // Use calendar days for days_until_review so "Tomorrow" shows as 1 day, not 0
-    const daysDiff = getCalendarDaysDiff(now, nextReviewAt)
+    // Calendar days until review, computed in the USER'S timezone so "Tomorrow"
+    // shows as 1 day (not 0) regardless of server timezone.
+    const daysDiff = getDaysDifference(now.toISOString(), nextReviewAt, userTimezone)
 
     const daysOverdue = Math.max(0, -daysDiff)
     const priorityScore = calculateReviewPriority(
@@ -345,8 +366,21 @@ export async function getDueProblems(
       : null
     if (lastSession) {
       const hoursSinceLastSession = (now.getTime() - lastSession.getTime()) / (1000 * 60 * 60)
-      // Streak at risk if no practice today and it's past noon
-      if (hoursSinceLastSession > 12 && now.getHours() >= 12) {
+      // Streak at risk if no practice today and it's past noon in the USER'S
+      // local timezone (not the server clock). Mirrors the local-hour resolution
+      // used by lib/services/session-notifications.ts.
+      let localHour: number
+      try {
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: userTimezone,
+          hour: "numeric",
+          hour12: false,
+        })
+        localHour = parseInt(formatter.format(now), 10)
+      } catch {
+        localHour = now.getUTCHours()
+      }
+      if (hoursSinceLastSession > 12 && localHour >= 12) {
         streakAtRisk = true
       }
     }
@@ -796,8 +830,9 @@ export async function batchDeferProblems(
   // Keep the top N items, defer the rest
   const toDefer = sorted.slice(targetLimit)
 
-  // Get user's algorithm for proper deferral
-  const userAlgorithm = await getUserAlgorithm(userId)
+  // Reuse the algorithm getDueProblems already resolved above instead of
+  // re-fetching it; both refer to the same per-user assignment.
+  const userAlgorithm = dueQueue.user_algorithm ?? "sm2"
 
   // Calculate spread distribution
   const totalToDefer = toDefer.length
@@ -805,14 +840,9 @@ export async function batchDeferProblems(
   const day2Count = Math.ceil(totalToDefer * 0.3) // 30% day 2
   // remaining 20% spread across days 3-7
 
-  // Assign each deferred item to a day
-  const deferredProblemIds: string[] = []
-  let maxDayUsed = 1
-
-  for (let i = 0; i < toDefer.length; i++) {
-    const item = toDefer[i]
+  // Assign each deferred item to a target day (pure spread math, no I/O).
+  const assignments = toDefer.map((item, i) => {
     let daysToAdd: number
-
     if (i < day1Count) {
       daysToAdd = 1 // Tomorrow
     } else if (i < day1Count + day2Count) {
@@ -823,20 +853,32 @@ export async function batchDeferProblems(
       const daysAvailable = Math.min(maxDaysToSpread - 2, 5) // Days 3-7
       daysToAdd = 3 + (remainingIndex % daysAvailable)
     }
+    return { item, daysToAdd }
+  })
 
-    // Defer this item using algorithm-appropriate method. Only count it as
-    // deferred if a mastery record actually existed and was rescheduled, so
-    // deferred_count never overstates what happened.
-    const wasDeferred = await deferSingleProblem(
-      userId,
-      item.problem_id,
-      item.difficulty,
-      daysToAdd,
-      userAlgorithm
+  // Defer with bounded concurrency (chunks of 10) instead of one round trip at a
+  // time. Every item came from the due-query snapshot, so it is known to exist
+  // and the SM-2 fast path can skip its per-item existence read. Only count an
+  // item as deferred if it was actually rescheduled, so deferred_count never
+  // overstates what happened.
+  const deferredProblemIds: string[] = []
+  let maxDayUsed = 1
+  const DEFER_CHUNK_SIZE = 10
+
+  for (let start = 0; start < assignments.length; start += DEFER_CHUNK_SIZE) {
+    const chunk = assignments.slice(start, start + DEFER_CHUNK_SIZE)
+    const results = await Promise.all(
+      chunk.map(({ item, daysToAdd }) =>
+        deferSingleProblem(userId, item.problem_id, item.difficulty, daysToAdd, userAlgorithm, {
+          knownToExist: true,
+        }).then((wasDeferred) => ({ item, daysToAdd, wasDeferred }))
+      )
     )
-    if (wasDeferred) {
-      deferredProblemIds.push(item.problem_id)
-      maxDayUsed = Math.max(maxDayUsed, daysToAdd)
+    for (const { item, daysToAdd, wasDeferred } of results) {
+      if (wasDeferred) {
+        deferredProblemIds.push(item.problem_id)
+        maxDayUsed = Math.max(maxDayUsed, daysToAdd)
+      }
     }
   }
 
@@ -860,24 +902,25 @@ export async function batchDeferProblems(
  *
  * Returns true if the problem was rescheduled, or false if no mastery record
  * exists (so the caller can avoid over-counting deferrals).
+ *
+ * `options.knownToExist` lets a caller that has already established the document
+ * exists (e.g. batchDeferProblems, whose items come straight from the due-query
+ * snapshot) skip the redundant per-item existence read on the SM-2 path. The
+ * FSRS path always reads the document because it must sync the embedded card.
  */
 export async function deferSingleProblem(
   userId: string,
   problemId: string,
   _difficulty: Difficulty,
   daysToDefer: number,
-  algorithm: "sm2" | "fsrs"
+  algorithm: "sm2" | "fsrs",
+  options: { knownToExist?: boolean } = {}
 ): Promise<boolean> {
   const masteryRef = adminDb
     .collection("problem_mastery")
     .doc(userId)
     .collection("problems")
     .doc(problemId)
-
-  const doc = await masteryRef.get()
-  if (!doc.exists) return false
-
-  const current = doc.data() as ProblemMastery
 
   // Compute the new review date in UTC so a +N-day defer lands strictly after
   // today's UTC day window (getDueProblems bounds "today" with
@@ -895,6 +938,24 @@ export async function deferSingleProblem(
     // ease_factor / fsrs_difficulty / fsrs_stability / fsrs_lapses /
     // mastery_level / confidence / review_count are intentionally preserved.
   }
+
+  // SM-2 deferral is a pure timestamp postponement with no memory-state read.
+  // When the caller already knows the document exists, skip the redundant read
+  // and write directly. update() still rejects if the doc was concurrently
+  // deleted, so deferred_count never counts a document that no longer exists.
+  if (algorithm === "sm2" && options.knownToExist) {
+    try {
+      await masteryRef.update(update)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const doc = await masteryRef.get()
+  if (!doc.exists) return false
+
+  const current = doc.data() as ProblemMastery
 
   // Keep the embedded FSRS card in sync with the new date so the top-level
   // next_review_at and the card's own schedule do not diverge.

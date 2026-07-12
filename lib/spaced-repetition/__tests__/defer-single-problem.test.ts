@@ -14,6 +14,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 
 const h = vi.hoisted(() => ({
   updateSpy: vi.fn(() => Promise.resolve()),
+  getSpy: vi.fn(() =>
+    Promise.resolve({ exists: h.state.exists, data: () => h.state.data })
+  ),
   state: { data: null as Record<string, unknown> | null, exists: true },
 }))
 
@@ -23,7 +26,7 @@ vi.mock("@/lib/firebase-admin", () => ({
       doc: () => ({
         collection: () => ({
           doc: () => ({
-            get: () => Promise.resolve({ exists: h.state.exists, data: () => h.state.data }),
+            get: h.getSpy,
             update: h.updateSpy,
           }),
         }),
@@ -43,6 +46,8 @@ const utcTodayWindowEnd = () => {
 describe("deferSingleProblem", () => {
   beforeEach(() => {
     h.updateSpy.mockClear()
+    h.updateSpy.mockImplementation(() => Promise.resolve())
+    h.getSpy.mockClear()
     h.state.exists = true
     h.state.data = {
       interval_days: 4,
@@ -111,5 +116,61 @@ describe("deferSingleProblem", () => {
     const ok = await deferSingleProblem("u1", "missing-problem", "hard", 1, "fsrs")
     expect(ok).toBe(false)
     expect(h.updateSpy).not.toHaveBeenCalled()
+  })
+
+  // PERF-S5: the batch-defer path passes knownToExist for items that came from
+  // the due-query snapshot, so the SM-2 fast path can skip the per-item read.
+  it("SM-2 with knownToExist writes directly WITHOUT reading the doc first", async () => {
+    const ok = await deferSingleProblem("u1", "dsa-two-sum", "medium", 1, "sm2", {
+      knownToExist: true,
+    })
+    expect(ok).toBe(true)
+    expect(h.getSpy).not.toHaveBeenCalled()
+    expect(h.updateSpy).toHaveBeenCalledTimes(1)
+
+    const update = h.updateSpy.mock.calls[0][0] as Record<string, unknown>
+    expect(update.interval_days).toBe(1)
+    expect(update.last_deferred_at).toBeTypeOf("string")
+    // Still a pure postponement: no memory-state penalty.
+    expect(update).not.toHaveProperty("ease_factor")
+  })
+
+  it("SM-2 knownToExist returns false when the write rejects (concurrent delete)", async () => {
+    // No preceding read means a doc deleted between the due query and the write
+    // surfaces as an update rejection, which must NOT be counted as deferred.
+    h.updateSpy.mockRejectedValueOnce(new Error("NOT_FOUND"))
+    const ok = await deferSingleProblem("u1", "dsa-two-sum", "medium", 1, "sm2", {
+      knownToExist: true,
+    })
+    expect(ok).toBe(false)
+  })
+
+  it("FSRS still reads the doc even with knownToExist (needs the card to sync)", async () => {
+    h.state.data = {
+      ...(h.state.data as Record<string, unknown>),
+      fsrs_difficulty: 6,
+      fsrs_stability: 12,
+      fsrs_lapses: 1,
+      fsrs_state: JSON.stringify({
+        difficulty: 6,
+        stability: 12,
+        state: "Review",
+        reps: 3,
+        lapses: 1,
+        scheduledDays: 4,
+        elapsedDays: 5,
+      }),
+    }
+
+    const ok = await deferSingleProblem("u1", "dsa-two-sum", "medium", 2, "fsrs", {
+      knownToExist: true,
+    })
+    expect(ok).toBe(true)
+    expect(h.getSpy).toHaveBeenCalledTimes(1)
+
+    const update = h.updateSpy.mock.calls[0][0] as Record<string, unknown>
+    const card = JSON.parse(update.fsrs_state as string)
+    expect(new Date(card.nextReview).toISOString()).toBe(update.next_review_at)
+    expect(card.scheduledDays).toBe(2)
   })
 })
