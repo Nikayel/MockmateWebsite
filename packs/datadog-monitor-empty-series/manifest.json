@@ -1,0 +1,25 @@
+{
+  "id": "datadog-monitor-empty-series",
+  "title": "Monitor board reads OK for a series whose exporter went silent",
+  "summary": "The monitor status board on-call watches during an incident reports OK for a series that sent no samples all window, so a blind monitor is indistinguishable from a healthy one and on-call stopped trusting the board.",
+  "company": {
+    "tag": "datadog-debugging",
+    "round_name": "Debugging pairing round",
+    "confidence": "styled",
+    "notes": "Observability-shaped monitor evaluation over a fixed window; a mishandled empty-series case defaults the average instead of reporting NO DATA, no syntax fault."
+  },
+  "companies": ["Generic"],
+  "domain": "observability",
+  "language": "python",
+  "difficulty": 1,
+  "est_minutes": 40,
+  "run_cmd": "python3 src/monitor_eval.py fixtures/input.txt",
+  "expected_output": "=== Monitor status ===\ncache.evictions: OK\ndb.connections: ALERT\nweb.error_rate: NO DATA\nweb.latency_ms: OK\n",
+  "buggy_output": "=== Monitor status ===\ncache.evictions: OK\ndb.connections: ALERT\nweb.error_rate: OK\nweb.latency_ms: OK\n",
+  "bug_class": "silent-boundary",
+  "phase2": {
+    "spec_patch": "Ops now wants a WARN status band. Each monitor line already carries a warning threshold; when a series' window average is at or above its warning threshold but below its critical threshold, report WARN instead of OK. NO DATA and ALERT stay as they are.",
+    "fixture_patch": "sample,web.latency_ms,l3,2026-05-01T12:03:00Z,340\n",
+    "expected_output_v2": "=== Monitor status ===\ncache.evictions: OK\ndb.connections: ALERT\nweb.error_rate: NO DATA\nweb.latency_ms: WARN\n"
+  }
+}

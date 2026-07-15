@@ -15,6 +15,10 @@ import {
   datadogMetricWindowRollupScenario,
 } from "./datadog-metric-window-rollup"
 import {
+  datadogMonitorEmptySeriesPack,
+  datadogMonitorEmptySeriesScenario,
+} from "./datadog-monitor-empty-series"
+import {
   genericLogErrorRollupPack,
   genericLogErrorRollupScenario,
 } from "./generic-log-error-rollup"
@@ -42,6 +46,7 @@ import {
 export const bugfixPackScenarios: BugFixScenario[] = [
   datadogEndpointLatencyPeakScenario,
   datadogMetricWindowRollupScenario,
+  datadogMonitorEmptySeriesScenario,
   genericLogErrorRollupScenario,
   palantirEntityResolutionMergeScenario,
   palantirFoundryUsageRollupScenario,
@@ -54,6 +59,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
 export const bugfixPacks: BugfixPack[] = [
   datadogEndpointLatencyPeakPack,
   datadogMetricWindowRollupPack,
+  datadogMonitorEmptySeriesPack,
   genericLogErrorRollupPack,
   palantirEntityResolutionMergePack,
   palantirFoundryUsageRollupPack,

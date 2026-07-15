@@ -1,0 +1,17 @@
+# monitor evaluation feed for the 12:00:00-12:05:00 window
+# fields: monitor,series,critical,warning  and  sample,series,sample_id,timestamp,value
+monitor,cache.evictions,50,30
+monitor,db.connections,100,80
+monitor,web.error_rate,5,2
+monitor,web.latency_ms,300,200
+sample,cache.evictions,c1,2026-05-01T12:01:00Z,20
+sample,db.connections,d1,2026-05-01T12:00:30Z,90
+sample,db.connections,d2,2026-05-01T12:03:30Z,110
+sample,web.latency_ms,l1,2026-05-01T12:01:15Z,150
+sample,web.latency_ms,l2,2026-05-01T12:02:45Z,170
+# same sample redelivered by the at-least-once collector
+sample,db.connections,d1,2026-05-01T12:00:30Z,90
+# arrived after the window closed; excluded from this evaluation
+sample,web.latency_ms,l9,2026-05-01T12:06:00Z,900
+# truncated line flushed mid-write; skipped
+sample,db.connections,d7,2026-05-01T12:04:00Z

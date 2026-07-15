@@ -1,0 +1,26 @@
+{
+  "bugLocation": "src/monitor_eval.py — evaluate(): `average = sum(values) / len(values) if values else 0`",
+  "bugSummary": "an empty series is defaulted to a zero average instead of being reported as NO DATA, so a monitor whose exporter sent nothing in the window silently reads OK",
+  "minimalFix": "Handle the empty case as its own status before averaging: `if not values: return \"NO DATA\"`, then compute `sum(values) / len(values)` only for non-empty series.",
+  "survivalStory": "Guarding a division against an empty list is such a common reflex that `sum(values) / len(values) if values else 0` reads as defensive rather than buggy; it only misclassifies a series with zero in-window samples, and on the happy-path fixtures every series had data, so a zero-average-means-OK slipped through review because an empty series looks calm instead of blind.",
+  "redHerrings": [
+    {
+      "location": "src/monitor_eval.py — evaluate(): `average >= monitor[\"crit\"]`",
+      "looksWrongBecause": "using `>=` invites the suspicion that a series whose average exactly equals its critical threshold is alerted when it should be treated as still under the limit",
+      "provablyInnocentBecause": "the contract says a series alerts when its average is at or above its critical threshold, and db.connections averages exactly 100 against a critical threshold of 100, so `>=` correctly reports ALERT; flipping it to `>` would change that line, which is how the candidate can test it"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n + m log m) for n samples and m monitored series",
+    "space": "O(n)",
+    "dominantCost": "parse, dedup, group, and evaluate are each O(n); the only super-linear step is `sorted(monitors)` for output ordering at O(m log m)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the wrong line to web.error_rate and named the empty series being defaulted to a zero average (and so read as OK) instead of NO DATA as the cause, in one sentence.",
+    "Shipped a minimal fix (return NO DATA for an empty series) rather than rewriting evaluate().",
+    "Complexity: identified evaluation and grouping as O(n) and the monitor sort as the only O(m log m) cost, rather than pattern-matching the division as the cost.",
+    "Phase-2: adapted by adding one WARN band after the critical check using the warning threshold already parsed onto each monitor, instead of rewriting; recognized the warning field was parsed and discarded.",
+    "Recommend exactly one drill: for a weak scoping pass, an empty/first/last boundary drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}
