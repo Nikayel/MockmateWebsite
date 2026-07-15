@@ -1,11 +1,14 @@
 {
   "id": "palantir-foundry-usage-rollup",
+  "title": "Foundry usage rollup bills one account too much",
+  "summary": "The nightly Foundry usage rollup reports higher compute-seconds than the dashboard for one account, and billing is paused until it is trusted.",
   "company": {
     "tag": "palantir-fdse",
     "round_name": "Re-engineering / debugging round",
     "confidence": "styled",
     "notes": "Foundry-shaped data-pipeline dedup problem; subtle logic flaw, no syntax error."
   },
+  "companies": ["Palantir"],
   "domain": "data-pipeline",
   "language": "python",
   "difficulty": 2,
@@ -15,7 +18,7 @@
   "buggy_output": "=== Compute-seconds by account ===\nacme: 82\nglobex: 22\ninitech: 30\numbrella: 12\n",
   "bug_class": "double-count",
   "phase2": {
-    "spec_patch": "Ops added a third replica stream, 'audit'. Its events must be folded into each account's compute-seconds, deduplicated by event_id the same way.",
+    "spec_patch": "Ops added a third replica stream, 'audit'. Its events must be folded into each account's compute-seconds, deduplicated by event_id the same way — an event on audit that also arrived on primary or backup is still one event.",
     "fixture_patch": "audit,acme,evt-1,40\naudit,globex,evt-7,8\n",
     "expected_output_v2": "=== Compute-seconds by account ===\nacme: 42\nglobex: 30\ninitech: 30\numbrella: 12\n"
   }

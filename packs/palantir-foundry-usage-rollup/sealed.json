@@ -1,0 +1,31 @@
+{
+  "bugLocation": "src/rollup.py — rollup(): `for event in primary + backup`",
+  "bugSummary": "dedupe is scoped per stream, so an event delivered on both primary and backup is counted twice for any account present in both streams",
+  "minimalFix": "Deduplicate the combined streams before summing: `for event in dedupe(primary + backup):`",
+  "survivalStory": "Each stream is correctly deduplicated in isolation, so reading rollup() on its own looks right; it only doubles for the rare account whose event lands on BOTH replicas, which the happy-path fixtures (one stream per account) never exercised.",
+  "redHerrings": [
+    {
+      "location": "src/rollup.py — parse_events(): account_id.lower()",
+      "looksWrongBecause": "normalizing case could merge two different accounts",
+      "provablyInnocentBecause": "the data contract declares account ids case-insensitive, so Umbrella and umbrella are the same account by design"
+    },
+    {
+      "location": "src/rollup.py — parse_events(): len(parts) != 4 and the int() guard",
+      "looksWrongBecause": "silently skipping lines looks like data loss",
+      "provablyInnocentBecause": "the contract says malformed lines are skipped, and the only skipped fixture rows are genuinely truncated/blank"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() over the account totals for output ordering; parse and dedupe are O(n)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the wrong value to the acme row and named the cross-stream duplicate (evt-1 on primary and backup) as the cause, in one sentence.",
+    "Shipped a minimal fix (dedupe the combined streams) rather than rewriting rollup().",
+    "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the nested-looking loops.",
+    "Phase-2: adapted the existing dedupe to include the audit stream instead of rewriting; recognized the audit data was already parsed and thrown away.",
+    "Recommend exactly one drill: for a weak scoping pass, a dedup-key drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}
