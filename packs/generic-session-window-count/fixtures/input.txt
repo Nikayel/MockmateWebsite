@@ -1,0 +1,17 @@
+# click event feed  fields: timestamp,user_id,event_id,platform  (UTC ISO-8601)
+# analytics flagged one user reading as more sessions than the product dashboard
+2026-03-02T10:45:00Z,alice,ea4,web
+2026-03-02T08:50:00Z,bob,eb3,web
+2026-03-02T14:10:00Z,dan,ed2,web
+2026-03-02T09:00:00Z,alice,ea1,web
+2026-03-02T08:00:00Z,bob,eb1,web
+2026-03-02T11:00:00Z,carol,ec1,web
+2026-03-02T16:00:00Z,dan,ed3,web
+2026-03-02T08:30:00Z,bob,eb2,web
+2026-03-02T09:20:00Z,alice,ea2,web
+# redelivered by the at-least-once bus
+2026-03-02T14:10:00Z,dan,ed2,web
+2026-03-02T14:00:00Z,dan,ed1,web
+# truncated line, missing the platform column
+2026-03-02T15:30:00Z,dan,ed9
+2026-03-02T10:30:00Z,alice,ea3,web

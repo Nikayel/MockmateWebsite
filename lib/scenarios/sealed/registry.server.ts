@@ -17,6 +17,7 @@ const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackCont
   "datadog-monitor-empty-series": () => import("./datadog-monitor-empty-series.server"),
   "generic-cache-eviction-mutation": () => import("./generic-cache-eviction-mutation.server"),
   "generic-log-error-rollup": () => import("./generic-log-error-rollup.server"),
+  "generic-session-window-count": () => import("./generic-session-window-count.server"),
   "palantir-entity-resolution-merge": () => import("./palantir-entity-resolution-merge.server"),
   "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),
   "palantir-ontology-link-rollup": () => import("./palantir-ontology-link-rollup.server"),

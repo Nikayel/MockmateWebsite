@@ -27,6 +27,10 @@ import {
   genericLogErrorRollupScenario,
 } from "./generic-log-error-rollup"
 import {
+  genericSessionWindowCountPack,
+  genericSessionWindowCountScenario,
+} from "./generic-session-window-count"
+import {
   palantirEntityResolutionMergePack,
   palantirEntityResolutionMergeScenario,
 } from "./palantir-entity-resolution-merge"
@@ -61,6 +65,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
   datadogMonitorEmptySeriesScenario,
   genericCacheEvictionMutationScenario,
   genericLogErrorRollupScenario,
+  genericSessionWindowCountScenario,
   palantirEntityResolutionMergeScenario,
   palantirFoundryUsageRollupScenario,
   palantirOntologyLinkRollupScenario,
@@ -77,6 +82,7 @@ export const bugfixPacks: BugfixPack[] = [
   datadogMonitorEmptySeriesPack,
   genericCacheEvictionMutationPack,
   genericLogErrorRollupPack,
+  genericSessionWindowCountPack,
   palantirEntityResolutionMergePack,
   palantirFoundryUsageRollupPack,
   palantirOntologyLinkRollupPack,

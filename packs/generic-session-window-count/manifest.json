@@ -1,0 +1,25 @@
+{
+  "id": "generic-session-window-count",
+  "title": "Session rollup over-counts one user's visits",
+  "summary": "The per-user session count Growth reads each morning reports one user with more sessions than the product analytics dashboard, a single boundary click away from misreading a returning user as a power user.",
+  "company": {
+    "tag": "generic-fdse",
+    "round_name": "Debugging round",
+    "confidence": "styled",
+    "notes": "Sessionization over an inactivity gap; an order-dependent boundary comparison error, no syntax fault and no crash."
+  },
+  "companies": ["Generic"],
+  "domain": "sessionization",
+  "language": "python",
+  "difficulty": 3,
+  "est_minutes": 60,
+  "run_cmd": "python3 src/session_rollup.py fixtures/input.txt",
+  "expected_output": "=== sessions per user (gap 1800s) ===\nalice: 2\nbob: 1\ncarol: 1\ndan: 2\n",
+  "buggy_output": "=== sessions per user (gap 1800s) ===\nalice: 2\nbob: 2\ncarol: 1\ndan: 2\n",
+  "bug_class": "off-by-one-window",
+  "phase2": {
+    "spec_patch": "Ops now wants the session counts split by platform, because a user active on web and on mobile in the same minutes is really two concurrent sessions, not one. Print each row as `user/platform: <sessions>` and keep the rows sorted. The platform column is already in the feed today.",
+    "fixture_patch": "2026-03-02T09:05:00Z,alice,ea5,mobile\n2026-03-02T10:35:00Z,alice,ea6,mobile\n",
+    "expected_output_v2": "=== sessions per user and platform (gap 1800s) ===\nalice/mobile: 2\nalice/web: 2\nbob/web: 1\ncarol/web: 1\ndan/web: 2\n"
+  }
+}

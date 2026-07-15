@@ -1,0 +1,32 @@
+{
+  "bugLocation": "src/session_rollup.py — count_sessions(): `elif event[\"epoch\"] - previous_epoch >= GAP_SECONDS:`",
+  "bugSummary": "The inactivity-gap test starts a new session when the gap reaches the window instead of only when it strictly exceeds it, so a user whose events are exactly one window apart has a single session split into two.",
+  "minimalFix": "Make the comparison strict so a gap equal to the window stays in the same session: `elif event[\"epoch\"] - previous_epoch > GAP_SECONDS:`",
+  "survivalStory": "The `>=` reads like a plausible English rule ('a gap of thirty minutes or more starts a new session') and is correct for every gap that is comfortably inside or outside the window, so the happy-path data (gaps of a few minutes or over an hour) never exposed it; it only splits a session when two consecutive events land exactly GAP_SECONDS apart, an alignment the reviewers' examples never hit.",
+  "redHerrings": [
+    {
+      "location": "src/session_rollup.py — count_sessions(): sorted(user_events, key=lambda event: event[\"ts_text\"])",
+      "looksWrongBecause": "it sorts by the raw ISO-8601 string rather than the parsed epoch, and that order drives every gap in the session count, so a lexical sort looks like it could misorder timestamps and fabricate or hide a gap",
+      "provablyInnocentBecause": "the contract fixes the timestamps as fixed-width UTC strings with a constant Z offset, so lexical order equals chronological order; it is reachable because the fixture delivers alice, bob, and dan out of order, so the sort actually reorders their rows"
+    },
+    {
+      "location": "src/session_rollup.py — dedupe(): keying only on event_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified and like it could drop a legitimate repeated event",
+      "provablyInnocentBecause": "the contract says the bus is at-least-once and an event_id identifies exactly one event, so the repeated ed2 line is a genuine redelivery with identical fields; it is count-neutral because a duplicate lands at the same timestamp inside the same session, so it cannot inflate a total"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the per-user timestamp sort dominates at O(n log n); parsing, dedup, grouping, and the linear session scan are each O(n), and output order is an explicit sorted() over the keys with no set or hash iteration"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the inflated value to the bob row and named the exact-boundary gap (08:00:00 to 08:30:00, 1800s apart) being split into two sessions as the cause, in one sentence.",
+    "Shipped a minimal fix (make the gap comparison strictly greater than the window) rather than rewriting count_sessions.",
+    "Tested the ts_text string sort against the fixed-width-timestamp contract and cleared it instead of chasing it.",
+    "Complexity: identified the per-user sort as the O(n log n) dominant cost and noted the output uses an explicit sort rather than hash order.",
+    "Phase-2: adapted by keying the grouping on (user_id, platform), recognizing the platform field was already parsed and thrown away, instead of rewriting.",
+    "Recommend exactly one drill: for a weak scoping pass, an at-most-vs-strictly boundary drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}
