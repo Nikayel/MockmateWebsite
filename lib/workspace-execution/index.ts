@@ -9,10 +9,15 @@ export {
   buildPythonWrapper,
   executePythonClientSide,
   executeWorkspaceScenarioPythonClientSide,
+  executePackOracleClientSide,
+  parseRunCmd,
+  buildPackOracleEntrypoint,
+  decodePackStdout,
   runPythonInWorker,
   isPythonRuntimeWarm,
   markPythonRuntimeWarm,
 } from "./python-sandbox"
+export type { PackOracleRunResult } from "./python-sandbox"
 export {
   executeSqlClientSide,
   executeWorkspaceScenarioSqlClientSide,
