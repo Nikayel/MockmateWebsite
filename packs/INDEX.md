@@ -5,6 +5,13 @@ Coverage = company tags x domains x bug_classes (enumerated in
 every company tag has >= 1 pack per difficulty level (1,2,3) AND every bug_class
 appears >= 2 times.
 
+**STATUS: coverage complete (2026-07-15).** 14 validated packs. Every company tag
+(palantir-fdse, stripe-bug-squash, datadog-debugging, generic-fdse) has a pack at
+difficulty 1, 2, and 3, and every bug_class (accumulator-wrong-scope, double-count,
+mutation-during-iteration, off-by-one-window, order-dependence, silent-boundary,
+wrong-dedup-key) appears >= 2 times. The generate-pack.md stop condition is met;
+further packs add depth beyond the matrix.
+
 | pack-id | company | domain | bug_class | difficulty | status | date |
 |---------|---------|--------|-----------|------------|--------|------|
 | palantir-foundry-usage-rollup | palantir-fdse | data-pipeline | double-count | 2 | validated | 2026-07-15 |
