@@ -221,9 +221,31 @@ export interface DSAScenario extends BaseScenario {
   correctPatternNotes?: string[]
 }
 
+/**
+ * Runtime marker present only on stdout-oracle bugfix PACKS (see
+ * `lib/bugfix/packs/`). Its presence tells the interview engine to run the pack
+ * state machine + character-exact stdout runner instead of the assert-test path.
+ * Client-safe: carries only the PUBLIC oracle and run command, never sealed content.
+ */
+export interface BugfixPackRuntime {
+  packId: string
+  /** e.g. "python3 src/main.py fixtures/input.txt". */
+  runCmd: string
+  /** The exact correct stdout — PUBLIC oracle, also embedded in the task doc. */
+  expectedOutput: string
+  /** The editable source the candidate runs, e.g. "src/main.py". */
+  primaryFilePath: string
+  language: "python"
+}
+
 export interface BugFixScenario extends BaseScenario {
   type: "bugfix"
   problemStatement: string
+  /**
+   * Present only on stdout-oracle packs. Legacy assert-based scenarios leave this
+   * undefined and continue to run the workspace test suite.
+   */
+  pack?: BugfixPackRuntime
   userReport?: string
   observedSymptoms?: string[]
   reproductionSteps?: string[]

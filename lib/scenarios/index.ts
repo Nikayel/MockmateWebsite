@@ -202,7 +202,10 @@ async function loadBugFixScenarios(): Promise<BugFixScenario[]> {
   }
 
   const bugfixModule = await import("../scenarios-realworld")
-  const scenarios = bugfixModule.realWorldBugFixScenarios
+  // Stdout-oracle packs resolve by id through the same lazy path but are kept out of
+  // the locked legacy-10 bank (see real-world/bugfix/packs/index.ts).
+  const packModule = await import("./real-world/bugfix/packs")
+  const scenarios = [...bugfixModule.realWorldBugFixScenarios, ...packModule.bugfixPackScenarios]
   loadedModules.set("bugfix", scenarios)
   return scenarios
 }
