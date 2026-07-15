@@ -11,6 +11,8 @@ import type {
   UserContext,
 } from "@/lib/interview/chat-request-schema"
 import type { InterviewLevel } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
+import { buildPackStatePrompt } from "@/lib/bugfix/packs/prompt"
+import type { PackState } from "@/lib/bugfix/packs/machine"
 
 export interface CompanyPromptContext {
   companyStyle: ReturnType<typeof getCompanyStyle>
@@ -354,9 +356,16 @@ export interface GuidedChatState {
   aiRestraint?: boolean
 }
 
+/** Present only for stdout-oracle pack sessions (INTERVIEWER_SPEC.md state machine). */
+export interface PackChatContext {
+  state: PackState
+  hintLevel?: number
+}
+
 export function buildBugFixContext(
   scenarioType: string | undefined,
-  guided?: GuidedChatState
+  guided?: GuidedChatState,
+  pack?: PackChatContext
 ): {
   isBugFix: boolean
   bugFixContext: string
@@ -414,6 +423,12 @@ GUIDED LAB STATE:
         : ""
     }
 `
+  }
+
+  // Stdout-oracle pack sessions run the 10-state machine, not the generic phase model.
+  // The state-scoped block carries only the current state goal + persona + hint level.
+  if (isBugFix && pack) {
+    bugFixContext += `\n${buildPackStatePrompt(pack.state, pack.hintLevel ?? 0)}\n`
   }
 
   return { isBugFix, bugFixContext }

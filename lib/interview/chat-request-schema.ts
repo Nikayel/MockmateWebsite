@@ -71,6 +71,24 @@ export const chatRequestSchema = z
         aiRestraint: z.boolean().optional(),
       })
       .optional(),
+    // Stdout-oracle pack sessions: current 10-state-machine state + hint level.
+    pack: z
+      .object({
+        state: z.enum([
+          "OPENING",
+          "REPRODUCE",
+          "SYMPTOM",
+          "SCOPE",
+          "LOCALIZE",
+          "FIX",
+          "COMPLEXITY",
+          "PHASE2",
+          "SCALE",
+          "DEBRIEF",
+        ]),
+        hintLevel: z.number().int().min(0).max(3).optional(),
+      })
+      .optional(),
   })
   .passthrough()
 
