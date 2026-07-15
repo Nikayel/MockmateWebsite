@@ -1,0 +1,27 @@
+{
+  "bugLocation": "src/report.py — build_report(): `error_count = 0` sits above `for service in grouped`",
+  "bugSummary": "The accumulator is initialized one scope too high, so it is never reset between services and each service is credited with the ERROR lines of every service processed before it.",
+  "minimalFix": "Move `error_count = 0` inside the `for service in grouped` loop so each service starts its count at zero.",
+  "survivalStory": "build_report reads correctly for the first service that has errors and for every service with no earlier errors, so the happy-path fixtures (leading services with zero errors) never exposed it; it only inflates a service that is processed after another service already logged errors, and the count is a running total that still looks like a plausible per-service number.",
+  "redHerrings": [
+    {
+      "location": "src/report.py — parse_line(): level.strip().upper()",
+      "looksWrongBecause": "normalizing the level string could fold levels together or drop the count for oddly-cased lines",
+      "provablyInnocentBecause": "the data contract declares levels case-insensitive, so error/Error/ERROR are the same level by design and WARN/INFO never normalize to ERROR; it is load-bearing (the lowercase `error` line is only counted because of it) and removing it would under-count, the opposite of the observed inflation"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n)",
+    "space": "O(n)",
+    "dominantCost": "a single linear pass to parse and group the n log lines, then a linear pass over the grouped levels; output is in dict insertion order with no sort"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the inflated value to the notifications row and named the un-reset accumulator (error_count carried from payments) as the cause, in one sentence.",
+    "Shipped a minimal fix (reset error_count inside the per-service loop) rather than rewriting build_report.",
+    "Tested the level.strip().upper() normalization against the contract and cleared it instead of chasing it.",
+    "Complexity: identified the two linear passes as O(n) and noted there is no sort in the output path.",
+    "Phase-2: adapted the loop to also count WARN using a second correctly-scoped accumulator, recognizing the WARN levels were already grouped and thrown away, instead of rewriting.",
+    "Recommend exactly one drill: for a weak scoping pass, an accumulator-scoping drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}

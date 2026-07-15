@@ -1,0 +1,25 @@
+{
+  "id": "generic-log-error-rollup",
+  "title": "Reliability rollup over-reports one service's ERROR count",
+  "summary": "The nightly per-service ERROR-line rollup reports more errors for one service than the metering dashboard, so the on-call engineer cannot trust it.",
+  "company": {
+    "tag": "generic-fdse",
+    "round_name": "Debugging round",
+    "confidence": "styled",
+    "notes": "Log-ingestion reliability report; subtle logic flaw, no syntax error, no crash."
+  },
+  "companies": ["Generic"],
+  "domain": "log-ingestion",
+  "language": "python",
+  "difficulty": 1,
+  "est_minutes": 30,
+  "run_cmd": "python3 src/report.py fixtures/input.txt",
+  "expected_output": "=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 2\n",
+  "buggy_output": "=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 5\n",
+  "bug_class": "accumulator-wrong-scope",
+  "phase2": {
+    "spec_patch": "Ops also wants each service's WARN count, because a rise in warnings tends to precede incidents. Keep the same header line, but print each row as `service: errors=<e> warns=<w>`. The WARN lines are already in the feed today.",
+    "fixture_patch": "2026-07-14T10:05:01Z gateway WARN upstream latency 903ms\n2026-07-14T10:05:04Z payments WARN retrying charge in 4s\n2026-07-14T10:05:06Z payments WARN retrying charge in 8s\n",
+    "expected_output_v2": "=== ERROR lines by service ===\ngateway: errors=0 warns=2\ncatalog: errors=0 warns=1\npayments: errors=3 warns=3\nnotifications: errors=2 warns=1\n"
+  }
+}
