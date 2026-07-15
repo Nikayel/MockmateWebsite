@@ -12,6 +12,7 @@ if (typeof window !== "undefined") {
 }
 
 const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackContent }>> = {
+  "datadog-endpoint-latency-peak": () => import("./datadog-endpoint-latency-peak.server"),
   "datadog-metric-window-rollup": () => import("./datadog-metric-window-rollup.server"),
   "generic-log-error-rollup": () => import("./generic-log-error-rollup.server"),
   "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),

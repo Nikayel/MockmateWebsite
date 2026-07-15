@@ -1,0 +1,25 @@
+{
+  "id": "datadog-endpoint-latency-peak",
+  "title": "Peak latency report overstates one endpoint",
+  "summary": "The per-endpoint peak latency report shows one endpoint far slower than its own traces support, and a latency regression review is stuck on the discrepancy.",
+  "company": {
+    "tag": "datadog-debugging",
+    "round_name": "Debugging pairing round",
+    "confidence": "styled",
+    "notes": "Observability latency rollup; subtle accumulator-scope flaw, no syntax error."
+  },
+  "companies": ["Generic"],
+  "domain": "observability",
+  "language": "python",
+  "difficulty": 1,
+  "est_minutes": 40,
+  "run_cmd": "python3 src/latency_rollup.py fixtures/input.txt",
+  "expected_output": "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=60ms over 3\n/checkout: peak=900ms over 2\n",
+  "buggy_output": "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=200ms over 3\n/checkout: peak=900ms over 2\n",
+  "bug_class": "accumulator-wrong-scope",
+  "phase2": {
+    "spec_patch": "Ops now also meters 'internal' service-to-service calls, not just external requests. Fold internal calls into each endpoint's peak latency and request count the same way.",
+    "fixture_patch": "internal,/search,r20,500\ninternal,/checkout,r21,120\n",
+    "expected_output_v2": "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=500ms over 4\n/checkout: peak=900ms over 3\n"
+  }
+}

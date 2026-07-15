@@ -1,0 +1,10 @@
+# kind,endpoint,request_id,latency_ms
+request,/login,r1,100
+request,/login,r2,200
+request,/search,r3,60
+request,/search,r4,60
+request,/search,r5,60
+health,/ping,r6,5
+request,/checkout,r7,300
+request,/checkout,r8,900
+request,/search,r9

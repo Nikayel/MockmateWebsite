@@ -12,3 +12,4 @@ appears >= 2 times.
 | stripe-webhook-idempotency | stripe-bug-squash | payments | wrong-dedup-key | 1 | validated | 2026-07-15 |
 | datadog-metric-window-rollup | datadog-debugging | observability | off-by-one-window | 2 | validated | 2026-07-15 |
 | generic-log-error-rollup | generic-fdse | log-ingestion | accumulator-wrong-scope | 1 | validated | 2026-07-15 |
+| datadog-endpoint-latency-peak | datadog-debugging | observability | accumulator-wrong-scope | 1 | validated | 2026-07-15 |
