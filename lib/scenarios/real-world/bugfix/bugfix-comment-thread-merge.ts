@@ -30,134 +30,76 @@ const reference = `def merge_threads(existing_threads, incoming_threads):
     return merged
 `
 
-export const bugfixCommentThreadMergeScenario: BugFixScenario = {
-  id: "bugfix-comment-thread-merge",
-  title: "Document Comment Thread Duplication",
-  type: "bugfix",
-  executionMode: "workspace",
-  difficulty: "medium",
-  companies: ["Google", "Notion", "Dropbox", "Microsoft"],
-  description: "Fix a document-comment sync bug that duplicates the first thread",
-  userReport:
-    "Users report the first comment thread appears twice in the editor after a page refresh. Later threads sync correctly. Reproducible on any document with at least one existing root thread.",
-  tags: ["python", "backend", "sync", "off-by-one", "real-codebase"],
-  estimatedTime: 40,
-  problemStatement: `A collaborative editor syncs comment threads from the server into local state. Users report that the first root thread sometimes appears twice after refresh, while later threads merge correctly.
-
-Find and fix the merge bug without changing the public function signature.`,
-  buggyCode: { python: starter },
-  codebaseFiles: {
-    python: [
-      {
-        fileName: "src/thread_projection.py",
-        content: "Builds UI summaries from merged threads.",
-        description: "Read-only projection helper",
-      },
-      {
-        fileName: "tests/test_comment_threads.py",
-        content: "Visible sync regression tests.",
-        description: "Visible tests",
-      },
-    ],
-  },
-  expectedBehavior:
-    "Incoming threads with existing IDs should update the existing thread, including when the thread is at index 0.",
-  bugDescription:
-    "The merge treats index 0 as not found, so the first existing thread is appended again instead of updated.",
-  hints: [
-    "Look closely at the meaning of a found index.",
-    "Index 0 is a valid location.",
-    "Avoid using truthiness for lookup results that may be 0.",
-  ],
-  testCases: [
-    {
-      input: { incoming: "thread-1" },
-      expected: "merged without duplication",
-      description: "Workspace tests cover index zero thread updates",
-    },
-  ],
-  expectedTouchedFiles: ["src/comment_threads.py"],
-  workspace: {
-    language: "python",
-    primaryFilePath: "src/comment_threads.py",
-    editableFilePaths: ["src/comment_threads.py"],
-    visibleTestPaths: ["tests/test_comment_threads.py"],
-    hiddenTestPaths: ["tests/test_comment_threads_hidden.py"],
-    testRunnerPath: "tests/run_workspace_tests.py",
-    files: [
-      { path: "src/__init__.py", role: "readonly", language: "python", content: "" },
-      { path: "tests/__init__.py", role: "test", language: "python", content: "", hidden: true },
-      {
-        path: "README.md",
-        role: "docs",
-        language: "markdown",
-        content:
-          "Thread sync receives partial updates from the server. Existing threads must be updated in place by ID to preserve UI ordering.",
-      },
-      {
-        path: "src/thread_projection.py",
-        role: "readonly",
-        language: "python",
-        content: `def summarize_threads(threads):
+const projection = `def summarize_threads(threads):
     return [f"{thread['id']}:{thread.get('status', 'open')}" for thread in threads]
-`,
-        description: "Read-only UI projection helper",
-      },
-      {
-        path: "src/comment_threads.py",
-        role: "editable",
-        language: "python",
-        content: starter,
-        description: "Thread merge function used by the sync worker",
-      },
-      {
-        path: "tests/test_comment_threads.py",
-        role: "test",
-        language: "python",
-        content: `from src.comment_threads import merge_threads
-from src.thread_projection import summarize_threads
+
+
+def count_unresolved(threads):
+    return sum(1 for thread in threads if thread.get("status", "open") != "resolved")
+`
+
+const visibleTests = `from src.comment_threads import merge_threads
+from src.thread_projection import summarize_threads, count_unresolved
 
 def run_tests(record):
-    def first_thread_updates_without_duplicate():
+    def resolving_root_thread_does_not_duplicate_it():
         existing = [{"id": "t1", "status": "open"}, {"id": "t2", "status": "open"}]
         incoming = [{"id": "t1", "status": "resolved"}]
         merged = merge_threads(existing, incoming)
-        assert len(merged) == 2
         assert summarize_threads(merged) == ["t1:resolved", "t2:open"]
+        # sidebar badge: only t2 is still open
+        assert count_unresolved(merged) == 1
 
-    def new_thread_appends():
+    def new_thread_appends_after_existing():
         merged = merge_threads([{"id": "t1", "status": "open"}], [{"id": "t2", "status": "open"}])
         assert [thread["id"] for thread in merged] == ["t1", "t2"]
+        assert count_unresolved(merged) == 2
 
-    record("first thread updates without duplicate", first_thread_updates_without_duplicate)
-    record("new thread appends", new_thread_appends)
-`,
-        description: "Visible comment-thread tests",
-      },
-      {
-        path: "tests/test_comment_threads_hidden.py",
-        role: "test",
-        language: "python",
-        hidden: true,
-        content: `from src.comment_threads import merge_threads
+    record("resolving the root thread does not duplicate it", resolving_root_thread_does_not_duplicate_it)
+    record("a brand-new thread appends after the existing ones", new_thread_appends_after_existing)
+`
+
+const hiddenTests = `from src.comment_threads import merge_threads
+from src.thread_projection import summarize_threads, count_unresolved
 
 def run_tests(record):
-    def later_thread_still_updates():
+    def later_thread_updates_in_place():
         existing = [{"id": "t1", "body": "a"}, {"id": "t2", "body": "b"}]
         merged = merge_threads(existing, [{"id": "t2", "body": "updated"}])
         assert len(merged) == 2
         assert merged[1]["body"] == "updated"
 
-    record("later thread still updates", later_thread_still_updates)
-`,
-        description: "Hidden regression for non-zero indexes",
-      },
-      {
-        path: "tests/run_workspace_tests.py",
-        role: "test",
-        language: "python",
-        hidden: true,
-        content: `import json
+    def create_then_resolve_in_one_batch_keeps_one_thread():
+        # the server pushes a brand-new thread and resolves it in the same sync
+        merged = merge_threads([], [{"id": "t9", "status": "open"}, {"id": "t9", "status": "resolved"}])
+        assert summarize_threads(merged) == ["t9:resolved"]
+        assert count_unresolved(merged) == 0
+
+    def repeated_incoming_id_applies_last_write():
+        existing = [{"id": "t1"}, {"id": "t2", "body": "x"}, {"id": "t3"}]
+        merged = merge_threads(existing, [{"id": "t2", "body": "y"}, {"id": "t2", "body": "z"}])
+        assert len(merged) == 3
+        assert merged[1]["body"] == "z"
+
+    def update_for_unknown_id_is_appended():
+        existing = [{"id": "t1", "status": "open"}]
+        merged = merge_threads(existing, [{"id": "t404", "status": "open"}])
+        assert [thread["id"] for thread in merged] == ["t1", "t404"]
+
+    def resolved_thread_is_kept_through_merge():
+        existing = [{"id": "t1", "status": "resolved"}, {"id": "t2", "status": "open"}]
+        merged = merge_threads(existing, [{"id": "t2", "status": "resolved"}])
+        assert summarize_threads(merged) == ["t1:resolved", "t2:resolved"]
+        assert count_unresolved(merged) == 0
+
+    record("a later thread updates in place", later_thread_updates_in_place)
+    record("create then resolve in one batch keeps one thread", create_then_resolve_in_one_batch_keeps_one_thread)
+    record("a repeated incoming id applies the last write", repeated_incoming_id_applies_last_write)
+    record("an update for an unknown id is appended", update_for_unknown_id_is_appended)
+    record("a resolved thread is kept through a merge", resolved_thread_is_kept_through_merge)
+`
+
+const runner = `import json
 import os
 import sys
 import traceback
@@ -178,7 +120,150 @@ def record_factory(suite):
 test_comment_threads.run_tests(record_factory("visible comment threads"))
 test_comment_threads_hidden.run_tests(record_factory("hidden comment threads"))
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
-`,
+`
+
+export const bugfixCommentThreadMergeScenario: BugFixScenario = {
+  id: "bugfix-comment-thread-merge",
+  title: "Editor Comments: Sidebar Over-Counts Unresolved Threads",
+  type: "bugfix",
+  executionMode: "workspace",
+  difficulty: "medium",
+  companies: ["Google", "Notion", "Dropbox", "Microsoft"],
+  description:
+    "A collaborative editor's comment sidebar sometimes reports one more unresolved thread than the document actually has, and a reviewer held a doc open believing a comment was still unresolved.",
+  userReport:
+    "Reviewer here. Our comment sidebar shows an unresolved badge so we know when a doc still has open comments. On some docs the badge sits one higher than the open comments actually visible, and the very first comment shows up twice in the margin. It seems to follow a server sync that touches the top comment; edits to later comments look fine. I kept a doc open thinking a comment was still unresolved when it was not.",
+  tags: ["python", "backend", "sync", "collaboration", "real-codebase"],
+  estimatedTime: 40,
+  problemStatement: `A collaborative editor syncs comment threads from the server into local state. A sidebar badge shows how many threads are still unresolved so reviewers know when a document needs attention.
+
+**Incident Report**
+On some documents the unresolved badge sits one higher than the open comments a reviewer can see, and the first comment renders twice in the margin. It follows a sync that updates the top comment; updates to later comments merge cleanly. A reviewer held a document open believing an unresolved comment remained when it did not.
+
+Read the codebase files, run the tests, and make the smallest fix in the merge function without changing its public signature.`,
+  buggyCode: { python: starter },
+  codebaseFiles: {
+    python: [
+      {
+        fileName: "src/thread_projection.py",
+        content: projection,
+        description: "Read-only UI projection: sidebar summary and unresolved badge count",
+      },
+      {
+        fileName: "tests/test_comment_threads.py",
+        content: visibleTests,
+        description: "Visible sync regression tests",
+      },
+    ],
+  },
+  expectedBehavior:
+    "An incoming thread that matches an existing id updates that thread in place and keeps its position. No thread is ever duplicated or dropped, regardless of where it sits in the list, so the unresolved badge always reflects the real open-comment count.",
+  bugDescription:
+    "The merge treats a found position of zero as 'not found', so a thread stored at the front of the list is appended a second time instead of updated in place. Every other position updates correctly, and the duplicate leaves the unresolved badge one too high whenever the front thread was still open.",
+  groundTruth:
+    "Root cause: the presence check rejects a stored position of zero, so the thread at the front of the list is treated as new and duplicated; every other position updates correctly, which is why review and most syncs looked fine. Fix: test presence explicitly instead of by the position's sign, so a stored position of zero counts as found. Survival story: `existing_index > 0` reads as a plausible bounds check and holds for every thread except the one at the front, so it passed review and only the top thread duplicates. Red herrings, all reachable and provably innocent: (1) the merge never removes threads, so an existing resolved thread is preserved by design, not dropped; (2) a batch that repeats an id applies each update in order (last write wins) without creating duplicates; (3) an update for an id not yet local is appended as a new thread, the intended source-of-truth behavior. count_unresolved only excludes resolved threads and is not part of the duplication.",
+  hints: [
+    "The badge sits one higher than the true open-comment count, and only on some docs. Reproduce that case and compare the merged threads against what the sidebar should show.",
+    "Every thread merges cleanly except one. Look at what is different about the thread that gets duplicated versus the ones that update in place.",
+  ],
+  testCases: [
+    {
+      input: { incoming: "t1", position: "front" },
+      expected: "updated in place, badge stays correct",
+      description: "Workspace tests cover a synced update to the thread at the front of the list",
+    },
+  ],
+  expectedTouchedFiles: ["src/comment_threads.py"],
+  observedSymptoms: [
+    "After a sync that touches the top comment, the sidebar badge counts one more unresolved thread than the document has, and the first comment appears twice.",
+    "Updates to later comments merge in place with no duplication.",
+  ],
+  reproductionSteps: [
+    "Read README.md for the sync contract and how the unresolved badge is computed.",
+    "Inspect tests/test_comment_threads.py to see which sync case fails.",
+    "Run the workspace tests before editing.",
+  ],
+  successCriteria: [
+    "A synced update to a thread already present updates it in place, wherever it sits in the list.",
+    "No thread is duplicated or dropped, so the unresolved badge matches the real open-comment count.",
+    "Repeated incoming ids, unknown ids, and existing resolved threads behave exactly as before.",
+    "Only src/comment_threads.py changes.",
+  ],
+  debuggingSkills: [
+    "reproduction",
+    "reading the data contract",
+    "hypothesis",
+    "minimal patch",
+    "verification",
+  ],
+  rootCauseRubric: [
+    "Identifies that the presence check rejects a valid stored position at the front of the list.",
+    "Connects the duplicated thread to the badge over-count a reviewer believed, not just to a failing test.",
+    "Rules out thread removal, repeated ids, and unknown ids as innocent with evidence.",
+    "Names a regression guard such as a front-of-list update test.",
+  ],
+  workspace: {
+    language: "python",
+    primaryFilePath: "src/comment_threads.py",
+    editableFilePaths: ["src/comment_threads.py"],
+    visibleTestPaths: ["tests/test_comment_threads.py"],
+    hiddenTestPaths: ["tests/test_comment_threads_hidden.py"],
+    testRunnerPath: "tests/run_workspace_tests.py",
+    files: [
+      { path: "src/__init__.py", role: "readonly", language: "python", content: "" },
+      { path: "tests/__init__.py", role: "test", language: "python", content: "", hidden: true },
+      {
+        path: "README.md",
+        role: "docs",
+        language: "markdown",
+        content: `# Comment Thread Sync
+
+The editor syncs comment threads from the server into local state. A sidebar badge shows the number of unresolved threads (threads whose status is not "resolved") so reviewers know when a document still needs attention.
+
+## Merge contract
+
+- Match incoming threads to local threads by id and update them in place, preserving their existing order.
+- A thread is never duplicated and never dropped by a merge.
+- A sync batch may repeat an id; apply each update in order (last write wins).
+- A sync batch may reference an id that is not local yet; treat it as a new thread and append it.
+- Existing resolved threads stay in the list; the badge simply excludes them from its count.`,
+        description: "Product and sync-contract notes",
+      },
+      {
+        path: "src/thread_projection.py",
+        role: "readonly",
+        language: "python",
+        content: projection,
+        description: "Read-only UI projection helper (summary + unresolved badge count)",
+      },
+      {
+        path: "src/comment_threads.py",
+        role: "editable",
+        language: "python",
+        content: starter,
+        description: "Thread merge function used by the sync worker",
+      },
+      {
+        path: "tests/test_comment_threads.py",
+        role: "test",
+        language: "python",
+        content: visibleTests,
+        description: "Visible comment-thread tests",
+      },
+      {
+        path: "tests/test_comment_threads_hidden.py",
+        role: "test",
+        language: "python",
+        hidden: true,
+        content: hiddenTests,
+        description: "Hidden regression + terrain tests",
+      },
+      {
+        path: "tests/run_workspace_tests.py",
+        role: "test",
+        language: "python",
+        hidden: true,
+        content: runner,
         description: "Hidden workspace runner",
       },
     ],
