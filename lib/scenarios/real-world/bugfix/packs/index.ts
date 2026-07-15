@@ -5,8 +5,15 @@
  * loader in lib/scenarios/index.ts.
  */
 import type { BugFixScenario } from "../../../types"
-import { palantirFoundryUsageRollupScenario } from "./palantir-foundry-usage-rollup"
+import type { BugfixPack } from "@/lib/bugfix/packs/types"
+import {
+  palantirFoundryUsageRollupPack,
+  palantirFoundryUsageRollupScenario,
+} from "./palantir-foundry-usage-rollup"
 
 export const bugfixPackScenarios: BugFixScenario[] = [palantirFoundryUsageRollupScenario]
+
+/** Raw client-safe pack contracts (parallel to bugfixPackScenarios), for validation. */
+export const bugfixPacks: BugfixPack[] = [palantirFoundryUsageRollupPack]
 
 export default bugfixPackScenarios

@@ -138,9 +138,10 @@ export const sealed: SealedPackContent = ${JSON.stringify(obj, null, 2)}
 
 function packIndexModule(ids) {
   const imports = ids
-    .map((id) => `import { ${camel(id)}Scenario } from "./${id}"`)
+    .map((id) => `import { ${camel(id)}Pack, ${camel(id)}Scenario } from "./${id}"`)
     .join("\n")
-  const list = ids.map((id) => `  ${camel(id)}Scenario,`).join("\n")
+  const scenarioList = ids.map((id) => `  ${camel(id)}Scenario,`).join("\n")
+  const packList = ids.map((id) => `  ${camel(id)}Pack,`).join("\n")
   return `${GENERATED}
 /**
  * Bugfix PACK registry (stdout-oracle, sealed variant). Kept OUT of the locked
@@ -148,10 +149,16 @@ function packIndexModule(ids) {
  * loader in lib/scenarios/index.ts.
  */
 import type { BugFixScenario } from "../../../types"
+import type { BugfixPack } from "@/lib/bugfix/packs/types"
 ${imports}
 
 export const bugfixPackScenarios: BugFixScenario[] = [
-${list}
+${scenarioList}
+]
+
+/** Raw client-safe pack contracts (parallel to bugfixPackScenarios), for validation. */
+export const bugfixPacks: BugfixPack[] = [
+${packList}
 ]
 
 export default bugfixPackScenarios
