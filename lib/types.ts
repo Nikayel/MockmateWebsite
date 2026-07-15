@@ -3,6 +3,7 @@
  */
 
 import type { GuidedLabProgress } from "./bugfix/guided-lab/types"
+import type { PackProgress } from "./bugfix/packs/machine"
 
 export interface User {
   id: string
@@ -216,6 +217,12 @@ export interface InterviewSession {
     is_post_interview_discussion?: boolean
     /** Guided bug-fix lab progress (milestone gating), present only for guided labs. */
     guided_lab_progress?: GuidedLabProgress
+    /**
+     * Stdout-oracle pack interview progress (10-state machine), present only for pack
+     * sessions. Server-authoritative — never trusted from the client. See
+     * lib/bugfix/packs/machine.ts (PackProgress).
+     */
+    pack_progress?: PackProgress
   }
   // Clarifying questions assessment (Real Interview Mode)
   clarifying_questions_assessment?: {
