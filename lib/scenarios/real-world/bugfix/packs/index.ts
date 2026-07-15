@@ -31,6 +31,10 @@ import {
   palantirOntologyLinkRollupScenario,
 } from "./palantir-ontology-link-rollup"
 import {
+  stripeLedgerDoublePostPack,
+  stripeLedgerDoublePostScenario,
+} from "./stripe-ledger-double-post"
+import {
   stripeWebhookIdempotencyPack,
   stripeWebhookIdempotencyScenario,
 } from "./stripe-webhook-idempotency"
@@ -42,6 +46,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
   palantirEntityResolutionMergeScenario,
   palantirFoundryUsageRollupScenario,
   palantirOntologyLinkRollupScenario,
+  stripeLedgerDoublePostScenario,
   stripeWebhookIdempotencyScenario,
 ]
 
@@ -53,6 +58,7 @@ export const bugfixPacks: BugfixPack[] = [
   palantirEntityResolutionMergePack,
   palantirFoundryUsageRollupPack,
   palantirOntologyLinkRollupPack,
+  stripeLedgerDoublePostPack,
   stripeWebhookIdempotencyPack,
 ]
 

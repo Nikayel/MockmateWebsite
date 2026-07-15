@@ -1,0 +1,32 @@
+{
+  "bugLocation": "src/post_ledger.py — post(): the `for batch_id in batches: posted.extend(dedupe(batches[batch_id]))` accumulation, which dedups within each batch but never across batches before summing",
+  "bugSummary": "dedup is scoped per batch, so a transaction re-sent in an overlapping settlement window survives once in each batch's deduped list and is posted twice, over-crediting the one account whose transactions land in two batches",
+  "minimalFix": "Deduplicate the combined per-batch-deduped list once more before posting: `for txn in dedupe(posted):`",
+  "survivalStory": "Each batch is correctly deduplicated in isolation, so reading post() on its own looks right and even collapses the within-batch redeliveries; it only over-posts for the rare account whose transaction is re-sent in a second batch's overlap window, which the happy-path feeds (one batch per transaction) never exercised.",
+  "redHerrings": [
+    {
+      "location": "src/post_ledger.py — to_cents(): `int(whole) * 100 + int(frac)`",
+      "looksWrongBecause": "it concatenates the fractional part as cents with no scaling, which would misread a single-decimal amount like 42.5 as 4205 instead of 4250",
+      "provablyInnocentBecause": "the data contract guarantees every amount carries exactly two decimal places, so frac is always a two-digit cents value and the conversion is exact for every row in the fixture"
+    },
+    {
+      "location": "src/post_ledger.py — in_posting_order(): sorted(transactions, key=lambda txn: txn[\"posted_at\"])",
+      "looksWrongBecause": "it sorts ISO-8601 timestamps as plain strings and feeds a keep-first-seen dedup from a reordered list, so the kept record appears to depend on ordering",
+      "provablyInnocentBecause": "a balance is an order-independent sum of charges minus refunds and every set of colliding txn_id records carries an identical amount, so whichever record the dedup keeps contributes the same number and no printed value can change with the sort"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() in in_posting_order (and sorted(balances) for output ordering); parse, grouping, dedup, and balance accumulation are each O(n)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the high value to the atlas_market row and named the transactions re-sent across two batches (t-2001 and t-2002 on B1 and B2) collapsing only within each batch as the cause, in one sentence.",
+    "Shipped a minimal fix (dedup the combined list across batches) rather than rewriting post() or apply_transaction().",
+    "Tested the to_cents concatenation and the posted_at sort instead of assuming either was the fault, and could explain why each is exact/order-independent under the contract.",
+    "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the grouping and dedup loops.",
+    "Phase-2: added reversal as a debit type instead of rewriting, recognizing the reversal transactions were already parsed and deduped and only discarded at the posting step.",
+    "Recommend exactly one drill: a dedup-scoping drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2."
+  ]
+}

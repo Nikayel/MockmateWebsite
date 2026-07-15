@@ -1,0 +1,25 @@
+{
+  "id": "stripe-ledger-double-post",
+  "title": "Overlapping settlement batches over-credit one account's balance",
+  "summary": "The nightly ledger posting job reports one account's balance higher than the ledger of record, and that account's payout is held until the number reconciles.",
+  "company": {
+    "tag": "stripe-bug-squash",
+    "round_name": "Bug squash round",
+    "confidence": "styled",
+    "notes": "Stripe bug-squash: reproduce from the public oracle, follow the call path from re-sent settlement batches through a per-batch dedup step, and make a targeted fix without rewriting the surrounding parsing or posting code."
+  },
+  "companies": ["Stripe"],
+  "domain": "payments",
+  "language": "python",
+  "difficulty": 2,
+  "est_minutes": 45,
+  "run_cmd": "python3 src/post_ledger.py fixtures/input.txt",
+  "expected_output": "=== Ledger balance (cents) by account ===\natlas_market: 6000\ncedar_books: 2000\nnimbus_cafe: 4500\nvertex_gym: 6000\n",
+  "buggy_output": "=== Ledger balance (cents) by account ===\natlas_market: 12000\ncedar_books: 2000\nnimbus_cafe: 4500\nvertex_gym: 6000\n",
+  "bug_class": "double-count",
+  "phase2": {
+    "spec_patch": "Finance also needs reversals folded in. A `reversal` transaction means the funds were pulled back from the account, so it must subtract its amount from that account's balance, deduplicated by txn_id the same way a re-sent charge is: a reversal that arrives in two batches is still one reversal.",
+    "fixture_patch": "B2,t-2009,atlas_market,reversal,20.00,2026-03-02T09:00:00Z\nB3,t-2009,atlas_market,reversal,20.00,2026-03-02T09:05:00Z\nB2,t-2010,cedar_books,reversal,3.00,2026-03-02T09:10:00Z\n",
+    "expected_output_v2": "=== Ledger balance (cents) by account ===\natlas_market: 4000\ncedar_books: 1700\nnimbus_cafe: 3500\nvertex_gym: 6000\n"
+  }
+}

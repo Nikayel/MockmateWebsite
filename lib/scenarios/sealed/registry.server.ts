@@ -18,6 +18,7 @@ const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackCont
   "palantir-entity-resolution-merge": () => import("./palantir-entity-resolution-merge.server"),
   "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),
   "palantir-ontology-link-rollup": () => import("./palantir-ontology-link-rollup.server"),
+  "stripe-ledger-double-post": () => import("./stripe-ledger-double-post.server"),
   "stripe-webhook-idempotency": () => import("./stripe-webhook-idempotency.server"),
 }
 

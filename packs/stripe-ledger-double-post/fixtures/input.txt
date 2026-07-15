@@ -1,0 +1,14 @@
+# nightly settlement feed — columns: batch_id,txn_id,account,type,amount,posted_at
+B1,t-2001,atlas_market,charge,42.00,2026-03-01T08:05:00Z
+B1,t-2002,atlas_market,charge,18.00,2026-03-01T08:07:00Z
+B1,t-2003,cedar_books,charge,25.00,2026-03-01T09:10:00Z
+B1,t-2003,cedar_books,charge,25.00,2026-03-01T09:10:04Z
+B1,t-2004,cedar_books,refund,5.00,2026-03-01T11:20:00Z
+B1,t-2011,cedar_books,charge,9.00
+B2,t-2005,nimbus_cafe,charge,33.00,2026-03-01T12:00:00Z
+B2,t-2006,nimbus_cafe,charge,12.00,2026-03-01T12:30:00Z
+B2,t-2007,nimbus_cafe,reversal,10.00,2026-03-01T13:00:00Z
+B2,t-2001,atlas_market,charge,42.00,2026-03-01T08:05:02Z
+B2,t-2002,atlas_market,charge,18.00,2026-03-01T08:07:03Z
+B3,t-2008,vertex_gym,charge,60.00,2026-03-01T15:45:00Z
+B3,t-2012,vertex_gym,charge,pending,2026-03-01T18:00:00Z
