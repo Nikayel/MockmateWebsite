@@ -1,0 +1,33 @@
+{
+  "bugLocation": "src/settle.py — schedule(): `pending.remove(payout)` executed inside `for payout in pending`",
+  "bugSummary": "de-duplication removes each redelivered payout from the pending list while the loop is still iterating that list, so the payout immediately after the duplicate in file order is stepped over and never scheduled, under-crediting one merchant by a full payout",
+  "minimalFix": "The `seen` set already suppresses the redelivery, so drop the mutation and just skip: replace `pending.remove(payout)` + `continue` with a bare `continue` (or iterate a snapshot with `for payout in list(pending):`).",
+  "survivalStory": "Reads correctly in isolation: the `seen` set does dedupe redeliveries, and on every happy-path feed where no scheduled payout happens to sit immediately after a redelivery the mutation is harmless, so it looks like a working idempotency guard that even cleans the queue as it goes; it only strands a payout for the rare feed where a real payout follows a redelivery in file order.",
+  "redHerrings": [
+    {
+      "location": "src/settle.py — pack_into_batches(): sorted(group, key=lambda payout: payout[\"amount\"])",
+      "looksWrongBecause": "it reorders payouts and feeds the batch cutting, so it looks like it decides what lands in which batch and could let an overflow fall out",
+      "provablyInnocentBecause": "slicing a list into fixed-size chunks keeps every element and a merchant's total is the order-independent sum of their scheduled amounts across all batches, so neither the sort nor the cut can move a printed number; it also runs after schedule() has already dropped the payout"
+    },
+    {
+      "location": "src/settle.py — schedule(): `if payout[\"currency\"] not in SUPPORTED_CURRENCIES: continue`",
+      "looksWrongBecause": "it discards atlas_supply's cad payout (po_a3, 8000) and atlas is exactly the merchant whose total is short, so the filter looks like the reason atlas is low",
+      "provablyInnocentBecause": "the contract pays out only usd/eur/gbp, so setting the cad payout aside is correct and happens identically in the correct and shipped versions; removing the filter raises atlas by 8000 in both and never closes the 4000 gap"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() in pack_into_batches; parse, schedule, and totalling are O(n), and pending.remove() is an O(n) scan that fires only once per redelivery"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the low value to the atlas_supply row and named the redelivered po_n1 being removed mid-iteration, which steps the loop over the very next payout (po_a1, gbp 4000), as the cause, in one sentence.",
+    "Shipped a minimal fix (stop mutating the list under iteration; the seen-set already dedupes) rather than rewriting schedule() or pack_into_batches().",
+    "Tested the amount sort and the currency filter instead of assuming either was the fault, and could explain why a per-merchant total is order-independent and why the cad exclusion is contractually correct.",
+    "Reasoned about the order-dependence: recognized the dropped payout is whatever follows the redelivery in file order, so the symptom moves if the feed is reordered.",
+    "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the loops, and optionally noted pending.remove() is an O(n) scan.",
+    "Phase-2: added a held-totals section over the already-parsed, already-discarded hold rows instead of rewriting, recognizing the status guard was throwing that data away.",
+    "Recommend exactly one drill: a mutation-during-iteration drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2."
+  ]
+}

@@ -47,6 +47,10 @@ import {
   stripeLedgerDoublePostScenario,
 } from "./stripe-ledger-double-post"
 import {
+  stripePayoutBatchMutationPack,
+  stripePayoutBatchMutationScenario,
+} from "./stripe-payout-batch-mutation"
+import {
   stripeWebhookIdempotencyPack,
   stripeWebhookIdempotencyScenario,
 } from "./stripe-webhook-idempotency"
@@ -62,6 +66,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
   palantirOntologyLinkRollupScenario,
   palantirPipelineOrderDependenceScenario,
   stripeLedgerDoublePostScenario,
+  stripePayoutBatchMutationScenario,
   stripeWebhookIdempotencyScenario,
 ]
 
@@ -77,6 +82,7 @@ export const bugfixPacks: BugfixPack[] = [
   palantirOntologyLinkRollupPack,
   palantirPipelineOrderDependencePack,
   stripeLedgerDoublePostPack,
+  stripePayoutBatchMutationPack,
   stripeWebhookIdempotencyPack,
 ]
 

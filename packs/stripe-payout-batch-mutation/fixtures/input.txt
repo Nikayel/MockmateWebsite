@@ -1,0 +1,15 @@
+# nightly payout batch feed. columns: payout_id,merchant,currency,amount,status
+# ops flagged atlas_supply as scheduled below their pending ledger this morning
+po_n1,north_hardware,usd,5000,pending
+po_s1,sunset_bakery,eur,3000,pending
+po_a3,atlas_supply,cad,8000,pending
+po_h0,harbor_books,usd,0,pending
+po_n1,north_hardware,usd,5000,pending
+po_a1,atlas_supply,gbp,4000,pending
+po_a2,atlas_supply,gbp,1500,pending
+po_h1,harbor_books,usd,6000,pending
+po_d1,delta_foods,eur,2500,pending
+po_n2,north_hardware,usd,2000,pending
+po_hold1,sunset_bakery,eur,7000,hold
+po_bad,harbor_books,usd
+po_z9,delta_foods,gbp,notanumber,pending

@@ -22,6 +22,7 @@ const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackCont
   "palantir-ontology-link-rollup": () => import("./palantir-ontology-link-rollup.server"),
   "palantir-pipeline-order-dependence": () => import("./palantir-pipeline-order-dependence.server"),
   "stripe-ledger-double-post": () => import("./stripe-ledger-double-post.server"),
+  "stripe-payout-batch-mutation": () => import("./stripe-payout-batch-mutation.server"),
   "stripe-webhook-idempotency": () => import("./stripe-webhook-idempotency.server"),
 }
 

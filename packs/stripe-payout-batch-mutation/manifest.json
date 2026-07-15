@@ -1,0 +1,25 @@
+{
+  "id": "stripe-payout-batch-mutation",
+  "title": "Payout batching under-schedules one merchant depending on delivery order",
+  "summary": "The nightly settlement report schedules atlas_supply below their pending ledger, and their payout is held until the number reconciles; the shortfall moves to a different merchant if the feed is reordered.",
+  "company": {
+    "tag": "stripe-bug-squash",
+    "round_name": "Bug squash round",
+    "confidence": "styled",
+    "notes": "Stripe bug-squash: reproduce from the oracle, follow the call path from an at-least-once payout feed through de-duplication into batching, and make a targeted fix without rewriting the packer; the symptom is intermittent with respect to input ordering."
+  },
+  "companies": ["Stripe"],
+  "domain": "payments",
+  "language": "python",
+  "difficulty": 3,
+  "est_minutes": 50,
+  "run_cmd": "python3 src/settle.py fixtures/input.txt",
+  "expected_output": "=== Scheduled total (cents) by merchant ===\natlas_supply: 5500\ndelta_foods: 2500\nharbor_books: 6000\nnorth_hardware: 7000\nsunset_bakery: 3000\n",
+  "buggy_output": "=== Scheduled total (cents) by merchant ===\natlas_supply: 1500\ndelta_foods: 2500\nharbor_books: 6000\nnorth_hardware: 7000\nsunset_bakery: 3000\n",
+  "bug_class": "mutation-during-iteration",
+  "phase2": {
+    "spec_patch": "Compliance now needs held funds surfaced. Payouts with status `hold` are correctly kept out of tonight's batches, but ops needs a second section printed below the existing one, `=== Held total (cents) by merchant ===`, listing per merchant the total amount currently on hold, sorted by merchant the same way. The hold rows are already in the feed.",
+    "fixture_patch": "po_hold2,harbor_books,usd,4500,hold\npo_hold3,atlas_supply,gbp,9000,hold\npo_hold4,sunset_bakery,eur,1000,hold\n",
+    "expected_output_v2": "=== Scheduled total (cents) by merchant ===\natlas_supply: 5500\ndelta_foods: 2500\nharbor_books: 6000\nnorth_hardware: 7000\nsunset_bakery: 3000\n=== Held total (cents) by merchant ===\natlas_supply: 9000\nharbor_books: 4500\nsunset_bakery: 8000\n"
+  }
+}
