@@ -12,6 +12,7 @@ if (typeof window !== "undefined") {
 }
 
 const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackContent }>> = {
+  "datadog-metric-window-rollup": () => import("./datadog-metric-window-rollup.server"),
   "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),
   "palantir-ontology-link-rollup": () => import("./palantir-ontology-link-rollup.server"),
   "stripe-webhook-idempotency": () => import("./stripe-webhook-idempotency.server"),

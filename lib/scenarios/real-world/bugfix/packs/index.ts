@@ -7,6 +7,10 @@
 import type { BugFixScenario } from "../../../types"
 import type { BugfixPack } from "@/lib/bugfix/packs/types"
 import {
+  datadogMetricWindowRollupPack,
+  datadogMetricWindowRollupScenario,
+} from "./datadog-metric-window-rollup"
+import {
   palantirFoundryUsageRollupPack,
   palantirFoundryUsageRollupScenario,
 } from "./palantir-foundry-usage-rollup"
@@ -20,6 +24,7 @@ import {
 } from "./stripe-webhook-idempotency"
 
 export const bugfixPackScenarios: BugFixScenario[] = [
+  datadogMetricWindowRollupScenario,
   palantirFoundryUsageRollupScenario,
   palantirOntologyLinkRollupScenario,
   stripeWebhookIdempotencyScenario,
@@ -27,6 +32,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
 
 /** Raw client-safe pack contracts (parallel to bugfixPackScenarios), for validation. */
 export const bugfixPacks: BugfixPack[] = [
+  datadogMetricWindowRollupPack,
   palantirFoundryUsageRollupPack,
   palantirOntologyLinkRollupPack,
   stripeWebhookIdempotencyPack,

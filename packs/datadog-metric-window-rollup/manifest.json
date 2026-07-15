@@ -1,0 +1,25 @@
+{
+  "id": "datadog-metric-window-rollup",
+  "title": "Metric window rollup pages on-call for a minute that never spiked",
+  "summary": "The per-minute web.5xx rollup an on-call SRE watches reports one window higher than the metering dashboard, and it is one boundary sample away from paging someone at 3am.",
+  "company": {
+    "tag": "datadog-debugging",
+    "round_name": "Debugging pairing round",
+    "confidence": "styled",
+    "notes": "Observability-shaped metric aggregation over fixed time windows; a half-open-vs-closed boundary error, no syntax fault."
+  },
+  "companies": ["Generic"],
+  "domain": "observability",
+  "language": "python",
+  "difficulty": 2,
+  "est_minutes": 45,
+  "run_cmd": "python3 src/window_rollup.py fixtures/input.txt",
+  "expected_output": "=== web.5xx per 60s window ===\n12:00:00  count=2  sum=5\n12:01:00  count=2  sum=9\n12:02:00  count=1  sum=1\n",
+  "buggy_output": "=== web.5xx per 60s window ===\n12:00:00  count=3  sum=10\n12:01:00  count=2  sum=9\n12:02:00  count=1  sum=1\n",
+  "bug_class": "off-by-one-window",
+  "phase2": {
+    "spec_patch": "Ops also needs the web.4xx metric rolled up the same way, printed in its own section below the existing one. Same 60-second windows, same dedup, same output shape.",
+    "fixture_patch": "2026-05-01T12:00:50Z,web.4xx,b4,1\n2026-05-01T12:01:10Z,web.4xx,b2,4\n2026-05-01T12:02:00Z,web.4xx,b3,6\n",
+    "expected_output_v2": "=== web.5xx per 60s window ===\n12:00:00  count=2  sum=5\n12:01:00  count=2  sum=9\n12:02:00  count=1  sum=1\n=== web.4xx per 60s window ===\n12:00:00  count=2  sum=10\n12:01:00  count=1  sum=4\n12:02:00  count=1  sum=6\n"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "bugLocation": "src/window_rollup.py — rollup(): `in_window = [s for s in ordered if start <= s[\"epoch\"] <= end]`",
+  "bugSummary": "the window membership test includes the closing boundary, so a sample landing exactly on a window edge is counted in both the window it belongs to and the one before it, inflating the earlier window",
+  "minimalFix": "Make the upper bound exclusive so windows are half-open: `in_window = [s for s in ordered if start <= s[\"epoch\"] < end]`",
+  "survivalStory": "window_start() floors timestamps correctly, so each window's start is right and the rollup reads correctly for every sample that sits strictly inside its minute; it only doubles for a sample whose timestamp is exactly a window boundary, which the happy-path data (samples a few seconds into each minute) never produced, so the inclusive `<=` survived review.",
+  "redHerrings": [
+    {
+      "location": "src/window_rollup.py — rollup(): ordered.sort(key=lambda sample: sample[\"ts_text\"])",
+      "looksWrongBecause": "it sorts by the raw ISO-8601 string rather than the parsed epoch, and those sorted ends pick the first and last window, so a lexical sort looks like it could choose the wrong window range",
+      "provablyInnocentBecause": "the contract fixes the timestamps as fixed-width UTC strings with a constant Z offset, so lexical order equals chronological order and samples[0]/samples[-1] are the true min and max"
+    },
+    {
+      "location": "src/window_rollup.py — dedupe(): keying only on sample_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified and like it could drop legitimate repeated samples",
+      "provablyInnocentBecause": "the contract says the bus is at-least-once and a sample_id identifies exactly one sample, so the duplicate a2 line is a genuine redelivery with identical fields and dropping it is correct"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n) for the sort plus O(w·n) for the per-window rescans over w windows",
+    "space": "O(n)",
+    "dominantCost": "the window loop rescans all n samples for each of w windows (O(w·n)); a single pass bucketing each sample by window_start() once would make the rollup O(n)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the inflated value to the 12:00:00 window and named the boundary sample (a3 at 12:01:00) being counted in two windows as the cause, in one sentence.",
+    "Shipped a minimal fix (make the window upper bound exclusive) rather than rewriting rollup().",
+    "Complexity: identified the per-window rescan as O(w·n) and could describe the single-pass O(n) alternative, rather than pattern-matching the sort as the cost.",
+    "Phase-2: adapted by iterating metrics through the existing parse/print path instead of rewriting, and recognized the web.4xx rows were already parsed and thrown away by the metric filter.",
+    "Recommend exactly one drill: for a weak scoping pass, a half-open-vs-closed boundary drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}

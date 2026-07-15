@@ -1,0 +1,12 @@
+# timestamp,metric,sample_id,value  (UTC ISO-8601)
+# on-call flagged the 12:00 web.5xx window as higher than the metering dashboard
+2026-05-01T12:01:30Z,web.5xx,a4,4
+2026-05-01T12:00:15Z,web.5xx,a1,3
+2026-05-01T12:00:30Z,web.4xx,b1,9
+2026-05-01T12:01:00Z,web.5xx,a3,5
+2026-05-01T12:00:45Z,web.5xx,a2,2
+2026-05-01T12:02:20Z,web.5xx,a5,1
+# same sample redelivered by the at-least-once bus
+2026-05-01T12:00:45Z,web.5xx,a2,2
+2026-05-01T12:02:10Z,web.5xx,a7
+2026-05-01T12:00:50Z,web.5xx,a8,

@@ -10,3 +10,4 @@ appears >= 2 times.
 | palantir-foundry-usage-rollup | palantir-fdse | data-pipeline | double-count | 2 | validated | 2026-07-15 |
 | palantir-ontology-link-rollup | palantir-fdse | ontology-processing | silent-boundary | 1 | validated | 2026-07-15 |
 | stripe-webhook-idempotency | stripe-bug-squash | payments | wrong-dedup-key | 1 | validated | 2026-07-15 |
+| datadog-metric-window-rollup | datadog-debugging | observability | off-by-one-window | 2 | validated | 2026-07-15 |
