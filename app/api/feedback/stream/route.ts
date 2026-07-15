@@ -38,6 +38,7 @@ import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import { calculateBugfixEvidenceScore } from "@/lib/bugfix/scoring"
 import { scoreBugfixSemantics, BUGFIX_SEMANTIC_NEUTRAL } from "@/lib/bugfix/semantic-scorer"
+import { loadSealedPack } from "@/lib/scenarios/sealed/registry.server"
 import type {
   BugfixEvidenceEvent,
   BugfixEvidenceSummary,
@@ -206,6 +207,31 @@ export async function POST(request: NextRequest) {
             )
           : []
 
+      // Pack debrief seal (INTERVIEWER_SPEC.md DEBRIEF): for stdout-oracle packs the
+      // grading rubric + ground truth are SERVER-LOADED from the sealed module and
+      // override anything the client sent. loadSealedPack returns null for every
+      // non-pack scenario, so legacy assert-based feedback is unchanged. This is the
+      // only path where sealed solution content reaches an LLM.
+      let sealedRubric: string[] | null = null
+      let sealedGroundTruth: string | null = null
+      if (scenarioType === "bugfix" && typeof scenarioId === "string" && scenarioId) {
+        try {
+          const sealed = await loadSealedPack(scenarioId)
+          if (sealed) {
+            sealedRubric = sealed.debriefRubric.length > 0 ? sealed.debriefRubric : null
+            sealedGroundTruth = [
+              sealed.bugSummary,
+              `Bug location: ${sealed.bugLocation}.`,
+              sealed.minimalFix,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          }
+        } catch {
+          // Sealed content unavailable — fall back to the client-supplied values.
+        }
+      }
+
       // Run validation, extraction, and silent notes analysis in parallel
       const shouldValidateWithAI =
         scenarioType === "system-design" ||
@@ -254,8 +280,12 @@ export async function POST(request: NextRequest) {
             ? scoreBugfixSemantics({
                 deterministicSubScores: bugfixScoreBreakdownPreSemantic,
                 evidenceSummary: bugfixEvidenceSummary,
-                rootCauseRubric: Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : [],
-                bugDescription: typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : "",
+                rootCauseRubric:
+                  sealedRubric ??
+                  (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
+                bugDescription:
+                  sealedGroundTruth ??
+                  (typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : ""),
                 conversationExcerpt: transcriptMessages
                   .slice(-10)
                   .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
