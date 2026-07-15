@@ -1,0 +1,25 @@
+{
+  "id": "stripe-webhook-idempotency",
+  "title": "Webhook replay under-credits one merchant's balance",
+  "summary": "The webhook replay job that reports each merchant's net balance shows one merchant lower than the ledger, and payouts are held until it reconciles.",
+  "company": {
+    "tag": "stripe-bug-squash",
+    "round_name": "Bug squash round",
+    "confidence": "styled",
+    "notes": "Stripe bug-squash: reproduce from the failing oracle, follow the call path from an at-least-once webhook bus through the idempotency step, and make a targeted dedup fix without rewriting unrelated code."
+  },
+  "companies": ["Stripe"],
+  "domain": "payments",
+  "language": "python",
+  "difficulty": 1,
+  "est_minutes": 45,
+  "run_cmd": "python3 src/main.py fixtures/input.txt",
+  "expected_output": "=== Net balance (cents) by merchant ===\ndelta_foods: 8000\nluna_labs: 5400\norbit_goods: 4500\npine_market: 8400\n",
+  "buggy_output": "=== Net balance (cents) by merchant ===\ndelta_foods: 8000\nluna_labs: 5400\norbit_goods: 2000\npine_market: 8400\n",
+  "bug_class": "wrong-dedup-key",
+  "phase2": {
+    "spec_patch": "Finance also needs chargebacks folded in. A `dispute` event means the funds were pulled back from the merchant, so it must subtract its amount from that merchant's net balance, deduplicated by event_id the same way a redelivered charge is: a dispute that arrives more than once is still one dispute.",
+    "fixture_patch": "evt-11,dispute,luna_labs,5000,2026-03-02T09:00:00Z\nevt-11,dispute,luna_labs,5000,2026-03-02T09:00:04Z\nevt-13,dispute,delta_foods,3300,2026-03-02T12:30:00Z\n",
+    "expected_output_v2": "=== Net balance (cents) by merchant ===\ndelta_foods: 4700\nluna_labs: 400\norbit_goods: 4500\npine_market: 8400\n"
+  }
+}

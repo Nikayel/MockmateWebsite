@@ -41,15 +41,30 @@ function readDirFiles(dir) {
     .map((name) => ({ name, content: readFileSync(join(dir, name), "utf8") }))
 }
 
+function hasFile(dir, rel) {
+  try {
+    return statSync(join(dir, rel)).isFile()
+  } catch {
+    return false
+  }
+}
+
 function listPackIds() {
   return readdirSync(PACKS_DIR)
     .filter((name) => {
       if (name.startsWith(".")) return false
-      try {
-        return statSync(join(PACKS_DIR, join(name, "manifest.json"))).isFile()
-      } catch {
-        return false
+      const dir = join(PACKS_DIR, name)
+      // A complete pack has all six authoring inputs. Skip in-progress dirs (e.g. a
+      // pack still being authored) rather than crashing the whole compile.
+      const complete =
+        hasFile(dir, "manifest.json") &&
+        hasFile(dir, "sealed.json") &&
+        hasFile(dir, "task.md") &&
+        hasFile(dir, "solution.md")
+      if (hasFile(dir, "manifest.json") && !complete) {
+        console.warn(`skipping incomplete pack: ${name}`)
       }
+      return complete
     })
     .sort()
 }

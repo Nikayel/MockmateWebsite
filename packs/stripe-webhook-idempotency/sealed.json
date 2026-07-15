@@ -1,0 +1,27 @@
+{
+  "bugLocation": "src/main.py — dedupe(): `key = (event[\"merchant\"], event[\"type\"], event[\"amount\"])`",
+  "bugSummary": "the idempotency key is built from (merchant, type, amount) instead of the event_id, so a merchant's two distinct charges of the same amount collapse into one and that merchant is under-credited by a full charge",
+  "minimalFix": "Key the dedupe on event identity: `key = event[\"event_id\"]`",
+  "survivalStory": "The dedupe reads correctly in isolation and passes on every happy-path feed where each merchant's charges have distinct amounts; it only drops a legitimate event for the rare merchant who charges the same amount twice, so it looks like a working idempotency guard that even collapses real redeliveries correctly.",
+  "redHerrings": [
+    {
+      "location": "src/main.py — in_arrival_order(): sorted(events, key=lambda event: event[\"received_at\"])",
+      "looksWrongBecause": "it sorts ISO-8601 timestamps as plain strings and feeds a keep-first-seen dedupe from a reordered list, so the kept record appears to depend on ordering",
+      "provablyInnocentBecause": "a net balance is an order-independent sum of charges minus refunds and every set of colliding records carries an identical amount, so whichever record the dedupe keeps contributes the same number and no printed value can change with the sort"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() in in_arrival_order (and sorted(balances) for output ordering); parse, dedupe, and balance accumulation are each O(n)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the low value to the orbit_goods row and named the two distinct same-amount charges (evt-4 and evt-5) collapsing under an under-specified key as the cause, in one sentence.",
+    "Shipped a minimal fix (dedupe on event_id) rather than rewriting dedupe() or compute_balances().",
+    "Tested the timestamp sort instead of assuming it was the fault, and could explain why the net-balance sum is order-independent.",
+    "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the loops.",
+    "Phase-2: added dispute as a debit type instead of rewriting, recognizing the dispute events were already parsed and deduped and only discarded at the balance step.",
+    "Recommend exactly one drill: a dedup-key drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2."
+  ]
+}

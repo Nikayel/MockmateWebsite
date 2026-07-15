@@ -1,0 +1,26 @@
+{
+  "bugLocation": "src/link_rollup.py — parse_links(): next(handle, None)",
+  "bugSummary": "the loop discards the first record before reading, so the object type of the very first line is undercounted by one",
+  "minimalFix": "Remove the next(handle, None) that skips the first line; there is no header row, so the first record must be read like the rest.",
+  "survivalStory": "Skipping a header row is such a common CSV habit that it reads as correct in isolation; it only loses one link, and only for whichever object type happens to appear on the first line, so a spot check of the other types looks fine.",
+  "redHerrings": [
+    {
+      "location": "src/link_rollup.py — rollup(): source_system != COUNTED_SOURCE",
+      "looksWrongBecause": "filtering out non-graph sources looks like it silently drops legitimate links",
+      "provablyInnocentBecause": "the data contract says only graph-sourced links are counted in this report, so the warehouse link is correctly excluded"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() over the object types for output ordering; parse and aggregate are O(n)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the shortfall to the Asset row and named the discarded first record as the cause, in one sentence.",
+    "Shipped a minimal fix (stop skipping the first line) rather than reworking the parser.",
+    "Complexity: identified the sort as the dominant O(n log n) cost.",
+    "Phase-2: adapted the status filter to include pending instead of rewriting; recognized the pending links were already parsed and filtered out.",
+    "Recommend exactly one drill: for a weak boundary pass, a first/last-element boundary drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}

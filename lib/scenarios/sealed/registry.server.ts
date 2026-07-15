@@ -13,6 +13,8 @@ if (typeof window !== "undefined") {
 
 const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackContent }>> = {
   "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),
+  "palantir-ontology-link-rollup": () => import("./palantir-ontology-link-rollup.server"),
+  "stripe-webhook-idempotency": () => import("./stripe-webhook-idempotency.server"),
 }
 
 export function hasSealedPack(packId: string): boolean {

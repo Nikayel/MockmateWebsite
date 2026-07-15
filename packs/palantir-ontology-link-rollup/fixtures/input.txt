@@ -1,0 +1,10 @@
+graph,Asset,link-1,active
+graph,Asset,link-2,active
+graph,Asset,link-3,active
+# links below came from the nightly ontology export
+graph,Dataset,link-4,active
+graph,Dataset,link-5,active
+graph,Sensor,link-6,active
+graph,Asset,link-7,inactive
+warehouse,Dataset,link-8,active
+graph,Dataset,link-9

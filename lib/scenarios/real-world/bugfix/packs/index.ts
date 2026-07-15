@@ -10,10 +10,26 @@ import {
   palantirFoundryUsageRollupPack,
   palantirFoundryUsageRollupScenario,
 } from "./palantir-foundry-usage-rollup"
+import {
+  palantirOntologyLinkRollupPack,
+  palantirOntologyLinkRollupScenario,
+} from "./palantir-ontology-link-rollup"
+import {
+  stripeWebhookIdempotencyPack,
+  stripeWebhookIdempotencyScenario,
+} from "./stripe-webhook-idempotency"
 
-export const bugfixPackScenarios: BugFixScenario[] = [palantirFoundryUsageRollupScenario]
+export const bugfixPackScenarios: BugFixScenario[] = [
+  palantirFoundryUsageRollupScenario,
+  palantirOntologyLinkRollupScenario,
+  stripeWebhookIdempotencyScenario,
+]
 
 /** Raw client-safe pack contracts (parallel to bugfixPackScenarios), for validation. */
-export const bugfixPacks: BugfixPack[] = [palantirFoundryUsageRollupPack]
+export const bugfixPacks: BugfixPack[] = [
+  palantirFoundryUsageRollupPack,
+  palantirOntologyLinkRollupPack,
+  stripeWebhookIdempotencyPack,
+]
 
 export default bugfixPackScenarios
