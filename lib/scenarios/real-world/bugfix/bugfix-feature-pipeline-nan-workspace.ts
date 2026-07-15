@@ -1,25 +1,7 @@
 import type { BugFixScenario } from "../../types"
 
-const starter = `FEATURE_DEFAULTS = {
-    "age": 0.0,
-    "income": 0.0,
-    "sessions_30d": 0.0,
-}
-
-def build_feature_vector(row, feature_names):
-    vector = []
-    for name in feature_names:
-        vector.append(float(row.get(name, FEATURE_DEFAULTS.get(name, 0.0))))
-    return vector
-`
-
-const reference = `import math
-
-FEATURE_DEFAULTS = {
-    "age": 0.0,
-    "income": 0.0,
-    "sessions_30d": 0.0,
-}
+const starter = `import math
+from src.model_contract import FEATURE_DEFAULTS
 
 def build_feature_vector(row, feature_names):
     vector = []
@@ -28,143 +10,116 @@ def build_feature_vector(row, feature_names):
         try:
             value = float(raw_value)
         except (TypeError, ValueError):
-            value = FEATURE_DEFAULTS.get(name, 0.0)
+            value = 0.0
         if not math.isfinite(value):
-            value = FEATURE_DEFAULTS.get(name, 0.0)
+            value = 0.0
         vector.append(value)
     return vector
 `
 
-export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
-  id: "bugfix-feature-pipeline-nan-workspace",
-  title: "Feature Pipeline NaN Regression",
-  type: "bugfix",
-  executionMode: "workspace",
-  difficulty: "medium",
-  companies: ["Veeva", "Databricks", "Uber", "Google"],
-  description: "Fix feature vector generation after a schema change introduces missing values",
-  userReport:
-    "Model scoring job started rejecting batches with non-finite vector errors after last week's data schema migration. Around 12% of inference requests are failing — the data team added nullable fields the feature builder doesn't handle.",
-  tags: ["python", "ml", "data-pipeline", "validation", "real-codebase"],
-  estimatedTime: 45,
-  problemStatement: `A model scoring job started rejecting batches after a data schema migration. Some rows now contain missing strings, nulls, and NaN-like values. The feature builder should produce finite numeric vectors for downstream inference.
+const reference = `import math
+from src.model_contract import FEATURE_DEFAULTS
 
-Fix the feature conversion while preserving known defaults and feature ordering.`,
-  buggyCode: { python: starter },
-  codebaseFiles: {
-    python: [
-      {
-        fileName: "src/model_contract.py",
-        content: "Validates finite numeric vectors before inference.",
-        description: "Read-only model contract",
-      },
-      {
-        fileName: "tests/test_feature_pipeline.py",
-        content: "Visible schema-regression tests.",
-        description: "Visible tests",
-      },
-    ],
-  },
-  expectedBehavior:
-    "Feature vectors should preserve order and replace missing, invalid, or non-finite values with configured defaults.",
-  bugDescription:
-    "The builder calls float() directly, allowing NaN/inf through and crashing on invalid strings or None.",
-  hints: [
-    "The model contract rejects non-finite values.",
-    "Handle TypeError and ValueError at the trust boundary.",
-    "math.isfinite is the important guard after conversion.",
-  ],
-  testCases: [
-    {
-      input: { row: "schema migration values" },
-      expected: "finite vector",
-      description: "Workspace tests cover missing and non-finite values",
-    },
-  ],
-  expectedTouchedFiles: ["src/feature_pipeline.py"],
-  workspace: {
-    language: "python",
-    primaryFilePath: "src/feature_pipeline.py",
-    editableFilePaths: ["src/feature_pipeline.py"],
-    visibleTestPaths: ["tests/test_feature_pipeline.py"],
-    hiddenTestPaths: ["tests/test_feature_pipeline_hidden.py"],
-    testRunnerPath: "tests/run_workspace_tests.py",
-    files: [
-      { path: "src/__init__.py", role: "readonly", language: "python", content: "" },
-      { path: "tests/__init__.py", role: "test", language: "python", content: "", hidden: true },
-      {
-        path: "README.md",
-        role: "docs",
-        language: "markdown",
-        content:
-          "The scoring service accepts only finite floats. Feature defaults are part of the model contract.",
-      },
-      {
-        path: "src/model_contract.py",
-        role: "readonly",
-        language: "python",
-        content: `import math
+def _default_for(name):
+    return FEATURE_DEFAULTS.get(name, 0.0)
+
+def build_feature_vector(row, feature_names):
+    vector = []
+    for name in feature_names:
+        raw_value = row.get(name, _default_for(name))
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            value = _default_for(name)
+        if not math.isfinite(value):
+            value = _default_for(name)
+        vector.append(value)
+    return vector
+`
+
+const modelContract = `import math
+
+# Model contract, shared by the scoring service. Read-only.
+# Each feature has a calibrated default used when a value is missing or unusable.
+FEATURE_DEFAULTS = {
+    "age": 40.0,
+    "income": 50000.0,
+    "sessions_30d": 0.0,
+}
 
 def assert_finite_vector(vector):
     assert all(isinstance(value, float) for value in vector)
     assert all(math.isfinite(value) for value in vector)
-`,
-        description: "Read-only inference input contract",
-      },
-      {
-        path: "src/feature_pipeline.py",
-        role: "editable",
-        language: "python",
-        content: starter,
-        description: "Feature vector conversion logic",
-      },
-      {
-        path: "tests/test_feature_pipeline.py",
-        role: "test",
-        language: "python",
-        content: `from src.feature_pipeline import build_feature_vector
+`
+
+const visibleTests = `from src.feature_pipeline import build_feature_vector
 from src.model_contract import assert_finite_vector
 
 def run_tests(record):
-    def valid_values_keep_order():
-        vector = build_feature_vector({"age": "34", "income": 1200, "sessions_30d": 4}, ["age", "income", "sessions_30d"])
-        assert vector == [34.0, 1200.0, 4.0]
+    def valid_migration_values_keep_order():
+        # whitespace, scientific notation, ints and an unknown extra column
+        vector = build_feature_vector(
+            {"age": " 34 ", "income": "1e3", "sessions_30d": 4, "plan_tier": "gold"},
+            ["age", "income", "sessions_30d"],
+        )
+        assert vector == [34.0, 1000.0, 4.0]
         assert_finite_vector(vector)
 
-    def invalid_values_use_defaults():
-        vector = build_feature_vector({"age": None, "income": "nan", "sessions_30d": ""}, ["age", "income", "sessions_30d"])
-        assert vector == [0.0, 0.0, 0.0]
+    def nulled_income_falls_back_to_its_configured_default():
+        # the migration made income nullable; a null income must score as the income default (50000.0)
+        vector = build_feature_vector(
+            {"age": 29, "income": None, "sessions_30d": 2},
+            ["age", "income", "sessions_30d"],
+        )
+        assert vector == [29.0, 50000.0, 2.0]
         assert_finite_vector(vector)
 
-    record("valid values keep order", valid_values_keep_order)
-    record("invalid values use defaults", invalid_values_use_defaults)
-`,
-        description: "Visible feature pipeline tests",
-      },
-      {
-        path: "tests/test_feature_pipeline_hidden.py",
-        role: "test",
-        language: "python",
-        hidden: true,
-        content: `from src.feature_pipeline import build_feature_vector
+    record("valid migration values keep order", valid_migration_values_keep_order)
+    record("a nulled income falls back to its configured default", nulled_income_falls_back_to_its_configured_default)
+`
+
+const hiddenTests = `from src.feature_pipeline import build_feature_vector
 from src.model_contract import assert_finite_vector
 
 def run_tests(record):
-    def infinite_values_use_defaults():
-        vector = build_feature_vector({"income": "inf"}, ["income"])
-        assert vector == [0.0]
+    def non_finite_age_uses_its_default_not_zero():
+        vector = build_feature_vector({"age": "nan", "income": 42000, "sessions_30d": 1}, ["age", "income", "sessions_30d"])
+        assert vector == [40.0, 42000.0, 1.0]
         assert_finite_vector(vector)
 
-    record("infinite values use defaults", infinite_values_use_defaults)
-`,
-        description: "Hidden non-finite regression test",
-      },
-      {
-        path: "tests/run_workspace_tests.py",
-        role: "test",
-        language: "python",
-        hidden: true,
-        content: `import json
+    def infinite_income_uses_its_default_not_zero():
+        vector = build_feature_vector({"age": 51, "income": "inf", "sessions_30d": 0}, ["age", "income", "sessions_30d"])
+        assert vector == [51.0, 50000.0, 0.0]
+        assert_finite_vector(vector)
+
+    def missing_key_uses_its_configured_default():
+        # a key entirely absent (not just null) also uses the configured default
+        vector = build_feature_vector({"sessions_30d": 3}, ["age", "income", "sessions_30d"])
+        assert vector == [40.0, 50000.0, 3.0]
+        assert_finite_vector(vector)
+
+    def null_on_a_zero_default_feature_scores_zero():
+        # sessions_30d default is 0.0, so a null there is indistinguishable from a real zero
+        vector = build_feature_vector({"age": 33, "income": 60000, "sessions_30d": None}, ["age", "income", "sessions_30d"])
+        assert vector == [33.0, 60000.0, 0.0]
+        assert_finite_vector(vector)
+
+    def unknown_columns_and_whitespace_are_tolerated():
+        vector = build_feature_vector(
+            {"age": " 40 ", "income": "  75000 ", "sessions_30d": "5", "region": "EMEA", "notes": "vip"},
+            ["age", "income", "sessions_30d"],
+        )
+        assert vector == [40.0, 75000.0, 5.0]
+        assert_finite_vector(vector)
+
+    record("a non-finite age uses its default, not zero", non_finite_age_uses_its_default_not_zero)
+    record("an infinite income uses its default, not zero", infinite_income_uses_its_default_not_zero)
+    record("a missing key uses its configured default", missing_key_uses_its_configured_default)
+    record("a null on a zero-default feature scores zero", null_on_a_zero_default_feature_scores_zero)
+    record("unknown columns and whitespace are tolerated", unknown_columns_and_whitespace_are_tolerated)
+`
+
+const runner = `import json
 import os
 import sys
 import traceback
@@ -184,7 +139,155 @@ def record_factory(suite):
 test_feature_pipeline.run_tests(record_factory("visible feature pipeline"))
 test_feature_pipeline_hidden.run_tests(record_factory("hidden feature pipeline"))
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
-`,
+`
+
+export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
+  id: "bugfix-feature-pipeline-nan-workspace",
+  title: "Feature Pipeline: A Migrated Cohort Scores Wrong",
+  type: "bugfix",
+  executionMode: "workspace",
+  difficulty: "medium",
+  companies: ["Veeva", "Databricks", "Uber", "Google"],
+  description:
+    "A model scoring job stopped erroring after the feature builder was hardened, but accounts migrated from the legacy CRM now score like empty users even though their history exists.",
+  userReport:
+    "Risk analyst here. Ever since we hardened the feature builder, the scoring job stopped throwing errors, but the numbers look wrong for one slice of accounts. Everyone migrated off the legacy CRM last week is scoring like a brand-new user with no history, even though we clearly have their age and income on file. The vectors all pass validation and there is nothing in the logs. The scores are just wrong for that cohort.",
+  tags: ["python", "ml", "data-pipeline", "feature-engineering", "real-codebase"],
+  estimatedTime: 45,
+  problemStatement: `A model scoring job turns account rows into finite feature vectors for inference. The model contract sets a calibrated default per feature, used whenever a value is missing or unusable.
+
+**Incident Report**
+After last week's CRM migration, some rows arrive with nulls, NaN-like strings, and reformatted numbers. The builder was hardened so batches stopped erroring, but accounts from the migrated cohort now score like empty users despite having history on file. No errors are logged and every vector passes the finite-vector check; the scores are simply wrong for that cohort.
+
+Read the codebase files, run the tests, and make the smallest fix so the migrated cohort scores correctly. Keep feature ordering and the contract's defaults.`,
+  buggyCode: { python: starter },
+  codebaseFiles: {
+    python: [
+      {
+        fileName: "src/model_contract.py",
+        content: modelContract,
+        description: "Read-only model contract: per-feature defaults and the finite-vector check",
+      },
+      {
+        fileName: "tests/test_feature_pipeline.py",
+        content: visibleTests,
+        description: "Visible schema-migration tests",
+      },
+    ],
+  },
+  expectedBehavior:
+    "Every feature vector is finite and keeps feature order. When a value is missing, null, non-numeric, or non-finite, the builder substitutes that feature's configured default from the contract so downstream scores stay calibrated.",
+  bugDescription:
+    "The crash-guard fallbacks substitute a hard-coded 0.0 instead of the feature's configured default, so a present-but-invalid or non-finite value on a feature whose default is non-zero (age, income) is silently scored as zero. The vector still validates as finite, so the mis-score is invisible; only the missing-key path routes through the real defaults.",
+  groundTruth:
+    "Root cause: the try/except and non-finite guards were added to stop the builder crashing on migrated nulls, but they fall back to a literal 0.0 rather than the feature's configured default. The missing-key path (the row.get default) uses the real default and reads correct, so review approved it, while the newly added guards silently zero out invalid values on non-zero-default features. Fix: route every fallback through the same per-feature default. Survival story: two fallback styles coexist, the correct one on the missing-key path and the buggy literal on the crash-guard path, so a reviewer checking 'are defaults handled' and 'are crashes caught' sees both boxes ticked and misses the mismatch. Red herrings, all reachable and provably innocent: (1) float(' 34 ') and float('1e3') look risky but Python parses surrounding whitespace and scientific notation correctly, so those rows are not the bug; (2) unknown extra columns are ignored because only feature_names are read; (3) sessions_30d has a zero default, so a null there scores zero either way and is not evidence of the bug. assert_finite_vector passes on the buggy output, which is why the mis-score is silent.",
+  hints: [
+    "The vectors all pass validation, so the failure is in the numbers, not the shape. Score a migrated row by hand from the contract's defaults and compare it to what the builder returns.",
+    "Rows with clean values are fine. Look at what the builder does with a value it cannot use, and compare that between a feature whose default is zero and one whose default is not.",
+  ],
+  testCases: [
+    {
+      input: { row: "migrated account with a nulled income", income: null },
+      expected: "income scored at its configured default",
+      description:
+        "Workspace tests cover invalid and non-finite values on non-zero-default features",
+    },
+  ],
+  expectedTouchedFiles: ["src/feature_pipeline.py"],
+  observedSymptoms: [
+    "Accounts migrated from the legacy CRM score like empty users; a nulled income lands as 0 instead of the income default, and a NaN age lands as 0 instead of the age default.",
+    "Valid rows, missing keys, and features whose default is zero all score correctly, and every vector passes the finite-vector check.",
+  ],
+  reproductionSteps: [
+    "Read README.md and src/model_contract.py for the finite-vector rule and the per-feature defaults.",
+    "Inspect tests/test_feature_pipeline.py to see which migrated case scores wrong.",
+    "Run the workspace tests before editing.",
+  ],
+  successCriteria: [
+    "An invalid, null, or non-finite value scores at its feature's configured default, not a blanket zero.",
+    "Valid values, missing keys, and zero-default features are unchanged, and every vector stays finite.",
+    "Only src/feature_pipeline.py changes.",
+  ],
+  debuggingSkills: [
+    "reproduction",
+    "reading the data contract",
+    "hypothesis",
+    "minimal patch",
+    "verification",
+  ],
+  rootCauseRubric: [
+    "Identifies that the crash-guard fallbacks use a literal zero instead of the feature's configured default.",
+    "Connects the mis-scored cohort to invalid values on non-zero-default features, not to a crash or a validation gap.",
+    "Rules out whitespace/scientific-notation parsing, unknown columns, and the zero-default feature as innocent with evidence.",
+    "Names a regression guard such as a per-feature default test for invalid values.",
+  ],
+  workspace: {
+    language: "python",
+    primaryFilePath: "src/feature_pipeline.py",
+    editableFilePaths: ["src/feature_pipeline.py"],
+    visibleTestPaths: ["tests/test_feature_pipeline.py"],
+    hiddenTestPaths: ["tests/test_feature_pipeline_hidden.py"],
+    testRunnerPath: "tests/run_workspace_tests.py",
+    files: [
+      { path: "src/__init__.py", role: "readonly", language: "python", content: "" },
+      { path: "tests/__init__.py", role: "test", language: "python", content: "", hidden: true },
+      {
+        path: "README.md",
+        role: "docs",
+        language: "markdown",
+        content: `# Feature Scoring Pipeline
+
+The scoring service turns an account row into a finite feature vector for inference. It accepts only finite floats, and each feature has a calibrated default (defined in src/model_contract.py) used when a value is missing or unusable.
+
+## Feature defaults (model contract)
+
+- age: 40.0
+- income: 50000.0
+- sessions_30d: 0.0
+
+## Input contract
+
+- Values may arrive as ints, floats, or strings. Surrounding whitespace (" 34 ") and scientific notation ("1e3") are valid numbers.
+- A value that is missing, null, non-numeric, or non-finite (NaN/inf) is replaced with that feature's configured default.
+- Rows may carry extra columns that are not features; only the requested feature_names are read.
+- Feature order in the output matches the order of feature_names.`,
+        description: "Product and model-contract notes",
+      },
+      {
+        path: "src/model_contract.py",
+        role: "readonly",
+        language: "python",
+        content: modelContract,
+        description: "Read-only model contract (defaults + finite-vector check)",
+      },
+      {
+        path: "src/feature_pipeline.py",
+        role: "editable",
+        language: "python",
+        content: starter,
+        description: "Feature vector conversion logic",
+      },
+      {
+        path: "tests/test_feature_pipeline.py",
+        role: "test",
+        language: "python",
+        content: visibleTests,
+        description: "Visible feature pipeline tests",
+      },
+      {
+        path: "tests/test_feature_pipeline_hidden.py",
+        role: "test",
+        language: "python",
+        hidden: true,
+        content: hiddenTests,
+        description: "Hidden default-handling and terrain tests",
+      },
+      {
+        path: "tests/run_workspace_tests.py",
+        role: "test",
+        language: "python",
+        hidden: true,
+        content: runner,
         description: "Hidden workspace runner",
       },
     ],
