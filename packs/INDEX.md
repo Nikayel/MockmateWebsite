@@ -17,3 +17,4 @@ appears >= 2 times.
 | stripe-ledger-double-post | stripe-bug-squash | payments | double-count | 2 | validated | 2026-07-15 |
 | datadog-monitor-empty-series | datadog-debugging | observability | silent-boundary | 1 | validated | 2026-07-15 |
 | generic-cache-eviction-mutation | generic-fdse | caching | mutation-during-iteration | 2 | validated | 2026-07-15 |
+| palantir-pipeline-order-dependence | palantir-fdse | data-pipeline | order-dependence | 3 | validated | 2026-07-15 |

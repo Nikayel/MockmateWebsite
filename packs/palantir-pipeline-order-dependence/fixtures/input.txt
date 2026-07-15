@@ -1,0 +1,22 @@
+# Foundry transform feed — pipeline,record_id,size_bytes,ts (UTC ISO-8601)
+# FinOps flagged the enrich pipeline's materialized count as higher than the transform dashboard.
+normalize,n1,120,2026-05-01T09:00:05Z
+enrich,e1,300,2026-05-01T09:01:03Z
+normalize,n2,80,2026-05-01T09:00:02Z
+geocode,g1,45,2026-05-01T09:02:02Z
+enrich,e2,150,2026-05-01T09:01:01Z
+normalize,n3,64,2026-05-01T09:00:09Z
+publish,p1,500,2026-05-01T09:03:01Z
+enrich,e3,90,2026-05-01T09:01:05Z
+normalize,n4,200,2026-05-01T09:00:07Z
+# malformed row (missing timestamp) is skipped
+geocode,gX,64
+enrich,e4,110,2026-05-01T09:01:02Z
+normalize,n5,50,2026-05-01T09:00:04Z
+geocode,g2,77,2026-05-01T09:02:01Z
+# same enrich record redelivered by the at-least-once bus
+enrich,e2,150,2026-05-01T09:01:01Z
+normalize,n6,0,2026-05-01T09:00:06Z
+enrich,e5,abc,2026-05-01T09:01:04Z
+geocode,g3,33,2026-05-01T09:02:03Z
+publish,p2,410,2026-05-01T09:03:02Z

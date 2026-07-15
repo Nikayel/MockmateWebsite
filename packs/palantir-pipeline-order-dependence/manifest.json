@@ -1,0 +1,25 @@
+{
+  "id": "palantir-pipeline-order-dependence",
+  "title": "Foundry pipeline report over-counts one transform's materialized records",
+  "summary": "The nightly Foundry reconciliation job reports more materialized records for one transform pipeline than the platform dashboard, and usage billing is held until the count is trusted.",
+  "company": {
+    "tag": "palantir-fdse",
+    "round_name": "Re-engineering / debugging round",
+    "confidence": "styled",
+    "notes": "Foundry-shaped multi-pipeline reconciliation; an order-dependent shared-state flaw whose symptom moves if the pipelines are reordered, no syntax error."
+  },
+  "companies": ["Palantir"],
+  "domain": "data-pipeline",
+  "language": "python",
+  "difficulty": 3,
+  "est_minutes": 50,
+  "run_cmd": "python3 src/pipeline.py fixtures/input.txt",
+  "expected_output": "=== Records materialized by pipeline ===\nnormalize: materialized=5\nenrich: materialized=4\ngeocode: materialized=3\npublish: materialized=2\n",
+  "buggy_output": "=== Records materialized by pipeline ===\nnormalize: materialized=5\nenrich: materialized=6\ngeocode: materialized=3\npublish: materialized=2\n",
+  "bug_class": "order-dependence",
+  "phase2": {
+    "spec_patch": "Ops added a new transform pipeline, 'reconcile'. Its records already ride the shared feed; fold them into the report and print a 'reconcile' line in declared order after 'publish', counted the same way as the existing pipelines.",
+    "fixture_patch": "reconcile,r1,88,2026-05-01T09:04:01Z\nreconcile,r2,64,2026-05-01T09:04:02Z\nreconcile,r3,72,2026-05-01T09:04:03Z\n",
+    "expected_output_v2": "=== Records materialized by pipeline ===\nnormalize: materialized=5\nenrich: materialized=4\ngeocode: materialized=3\npublish: materialized=2\nreconcile: materialized=3\n"
+  }
+}

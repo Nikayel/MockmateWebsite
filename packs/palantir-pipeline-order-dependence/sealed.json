@@ -1,0 +1,32 @@
+{
+  "bugLocation": "src/pipeline.py — run_pipelines(): `batch` is created once above the pipeline loop and the end-of-pipeline flush `materialized += len(batch)` never clears it",
+  "bugSummary": "the commit batch is created once above the pipeline loop and the end-of-pipeline flush counts the trailing partial batch without clearing it, so a pipeline that leaves a partial batch has those leftover records folded into the next pipeline's first commit and counted a second time",
+  "minimalFix": "Reset the batch per pipeline: clear it after the flush (`batch = []`) or initialize `batch = []` at the top of the `for pipeline in PIPELINE_ORDER` loop.",
+  "survivalStory": "Inside a single pipeline the batch self-clears on every size-triggered commit (`batch = []`), so a pipeline whose valid-record count is a multiple of COMMIT_SIZE reads perfectly and run_pipelines looks correct in isolation. The only path that leaves the batch dirty is the end-of-pipeline flush, which counts the trailing partial but forgets to clear it. Happy-path feeds where each pipeline's valid-record count was a multiple of the commit size never exercised a non-empty flush, so the missing reset passed review.",
+  "redHerrings": [
+    {
+      "location": "src/pipeline.py — dedupe(): keying only on record_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified and could drop a legitimate record whose id happens to recur in another pipeline",
+      "provablyInnocentBecause": "the contract declares record_id globally unique across the whole feed, so the repeated enrich record (e2) is a genuine at-least-once redelivery and dropping it is correct"
+    },
+    {
+      "location": "src/pipeline.py — records_for(): subset.sort(key=lambda record: record[\"ts\"])",
+      "looksWrongBecause": "it sorts records by the raw ISO-8601 timestamp string rather than a parsed time, and reordering records changes which records share a commit batch, so it looks like it could change the counts",
+      "provablyInnocentBecause": "a pipeline's materialized count is the number of its valid, deduped records regardless of the order they are batched in, and the timestamps are fixed-width UTC with a constant Z offset so lexical order equals chronological order anyway; the sort cannot move any count"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n) for the per-pipeline sorts plus O(p·n) for re-scanning all n records once per pipeline in records_for",
+    "space": "O(n)",
+    "dominantCost": "records_for() rescans the entire record list for each of the p pipelines (O(p·n)); grouping records by pipeline in a single pass would drop that to O(n) plus the sort"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the inflated value to the enrich row and named the leftover from normalize's partial batch being folded into enrich's first commit as the cause, in one sentence.",
+    "Shipped a minimal fix (reset the batch per pipeline) rather than rewriting run_pipelines().",
+    "Recognized the symptom is order-dependent: reordering PIPELINE_ORDER moves the inflated pipeline, because the leftover is carried across the pipeline boundary.",
+    "Complexity: identified the per-pipeline rescan in records_for as O(p·n) and could describe the single-pass O(n) grouping alternative, rather than pattern-matching the sort as the cost.",
+    "Phase-2: adapted by adding 'reconcile' to PIPELINE_ORDER so its already-parsed records flow through the same path, instead of rewriting; recognized the reconcile rows were parsed and then discarded by the declared-set filter.",
+    "Recommend exactly one drill: for a weak scoping pass, a shared-state-reset (order-dependence) drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}
