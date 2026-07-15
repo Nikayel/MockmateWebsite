@@ -24,8 +24,7 @@ if (typeof window !== "undefined") {
  * server bundle when its pack is actually played.
  */
 const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackContent }>> = {
-  // Populated by generate-pack.md Step 4, e.g.
-  //   "pack-id": () => import("./pack-id.server"),
+  "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),
 }
 
 export function hasSealedPack(packId: string): boolean {

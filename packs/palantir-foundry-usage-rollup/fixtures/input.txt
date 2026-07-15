@@ -1,0 +1,12 @@
+# stream,account_id,event_id,compute_seconds
+primary,acme,evt-1,40
+primary,acme,evt-2,2
+backup,acme,evt-1,40
+primary,globex,evt-3,17
+backup,globex,evt-4,5
+primary,initech,evt-5,30
+primary,initech,evt-5,30
+backup,Umbrella,evt-6,12
+# truncated row below is skipped by contract
+backup,globex,evt-9
+backup,acme,evt-7,

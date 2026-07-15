@@ -14,7 +14,8 @@
  */
 
 import type { BugFixScenario } from "../../../types"
+import { palantirFoundryUsageRollupScenario } from "./palantir-foundry-usage-rollup"
 
-export const bugfixPackScenarios: BugFixScenario[] = []
+export const bugfixPackScenarios: BugFixScenario[] = [palantirFoundryUsageRollupScenario]
 
 export default bugfixPackScenarios

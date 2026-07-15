@@ -1,0 +1,10 @@
+# Pack coverage matrix
+
+Coverage = company tags x domains x bug_classes (enumerated in
+`future-sprints/PACK_REALISM_GUIDE.md`). Stop condition (generate-pack.md Step 1):
+every company tag has >= 1 pack per difficulty level (1,2,3) AND every bug_class
+appears >= 2 times.
+
+| pack-id | company | domain | bug_class | difficulty | status | date |
+|---------|---------|--------|-----------|------------|--------|------|
+| palantir-foundry-usage-rollup | palantir-fdse | data-pipeline | double-count | 2 | validated | 2026-07-15 |
