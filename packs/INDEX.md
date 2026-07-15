@@ -20,3 +20,4 @@ appears >= 2 times.
 | palantir-pipeline-order-dependence | palantir-fdse | data-pipeline | order-dependence | 3 | validated | 2026-07-15 |
 | stripe-payout-batch-mutation | stripe-bug-squash | payments | mutation-during-iteration | 3 | validated | 2026-07-15 |
 | generic-session-window-count | generic-fdse | sessionization | off-by-one-window | 3 | validated | 2026-07-15 |
+| datadog-alert-dedup-order | datadog-debugging | observability | order-dependence | 3 | validated | 2026-07-15 |

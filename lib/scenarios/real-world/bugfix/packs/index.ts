@@ -7,6 +7,10 @@
 import type { BugFixScenario } from "../../../types"
 import type { BugfixPack } from "@/lib/bugfix/packs/types"
 import {
+  datadogAlertDedupOrderPack,
+  datadogAlertDedupOrderScenario,
+} from "./datadog-alert-dedup-order"
+import {
   datadogEndpointLatencyPeakPack,
   datadogEndpointLatencyPeakScenario,
 } from "./datadog-endpoint-latency-peak"
@@ -60,6 +64,7 @@ import {
 } from "./stripe-webhook-idempotency"
 
 export const bugfixPackScenarios: BugFixScenario[] = [
+  datadogAlertDedupOrderScenario,
   datadogEndpointLatencyPeakScenario,
   datadogMetricWindowRollupScenario,
   datadogMonitorEmptySeriesScenario,
@@ -77,6 +82,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
 
 /** Raw client-safe pack contracts (parallel to bugfixPackScenarios), for validation. */
 export const bugfixPacks: BugfixPack[] = [
+  datadogAlertDedupOrderPack,
   datadogEndpointLatencyPeakPack,
   datadogMetricWindowRollupPack,
   datadogMonitorEmptySeriesPack,

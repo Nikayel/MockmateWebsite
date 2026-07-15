@@ -12,6 +12,7 @@ if (typeof window !== "undefined") {
 }
 
 const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackContent }>> = {
+  "datadog-alert-dedup-order": () => import("./datadog-alert-dedup-order.server"),
   "datadog-endpoint-latency-peak": () => import("./datadog-endpoint-latency-peak.server"),
   "datadog-metric-window-rollup": () => import("./datadog-metric-window-rollup.server"),
   "datadog-monitor-empty-series": () => import("./datadog-monitor-empty-series.server"),

@@ -1,0 +1,32 @@
+{
+  "bugLocation": "src/alert_dedup.py — count_incidents(): `previous_state = None` is created once above the loop and updated on every transition regardless of monitor",
+  "bugSummary": "the state that decides whether an ALERT opens a new incident is a single previous_state flag shared across all monitors instead of tracked per monitor, so when monitors interleave in the feed a fresh ALERT that immediately follows another monitor's ALERT is not counted as a new incident",
+  "minimalFix": "Track the previous state per monitor instead of in one shared flag: replace `previous_state` with a `last_state = {}` dict and test `last_state.get(monitor) != \"ALERT\"`, updating `last_state[monitor] = state` (grouping transitions by monitor before counting is an equivalent fix).",
+  "survivalStory": "Within a single monitor's contiguous transitions the shared previous_state tracks OK<->ALERT correctly, so count_incidents reads right in isolation and on any feed where each monitor's transitions arrive grouped together. It only miscounts when monitors interleave AND one monitor's fresh ALERT lands in feed order immediately after another monitor's ALERT. Happy-path tests that fed one monitor at a time, or whose interleavings never put two monitors' ALERTs back to back, never exercised that path, so the single shared flag passed review.",
+  "redHerrings": [
+    {
+      "location": "src/alert_dedup.py — in_timestamp_order(): sorted(transitions, key=lambda t: t[\"timestamp\"])",
+      "looksWrongBecause": "it sorts by the raw ISO-8601 string rather than a parsed time, and because incident boundaries depend on processing order a mis-sort looks like it could change the counts",
+      "provablyInnocentBecause": "the contract fixes the timestamps as fixed-width UTC with a constant Z offset so lexical order equals chronological order, and the feed is already in nondecreasing timestamp order, so the sort is a stable no-op that moves no transition and removing it yields identical output"
+    },
+    {
+      "location": "src/alert_dedup.py — dedupe(): keying only on event_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified and like it could drop a legitimate distinct transition",
+      "provablyInnocentBecause": "the contract says the bus is at-least-once and an event_id identifies exactly one transition, so the repeated evt-d1 line is a genuine redelivery with identical fields and dropping it is correct"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the in_timestamp_order() sort over all n transitions; parse, dedupe, the env filter, and the counting pass are each O(n), and the final sorted() over the m monitors is small"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the low value to the db-pool row and named the cause in one sentence: db-pool's second ALERT is preceded in feed order by disk-usage's ALERT, so the shared previous_state hides it.",
+    "Shipped a minimal fix (track previous state per monitor) rather than rewriting count_incidents().",
+    "Recognized the symptom is order-dependent: the miscount lives at the boundary between two interleaved monitors, and grouping by monitor or reordering the feed moves it.",
+    "Complexity: identified the timestamp sort as the dominant O(n log n) cost rather than pattern-matching the counting loop, and noted parse/dedupe/count are O(n).",
+    "Phase-2: adapted by iterating environments through the existing parse/filter/count path instead of rewriting, and recognized the staging rows were already parsed and thrown away by the env filter (and that the per-monitor fix must ship first or the staging section double-swallows an incident).",
+    "Recommend exactly one drill: for a weak scoping pass, a shared-state-reset (order-dependence) drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}

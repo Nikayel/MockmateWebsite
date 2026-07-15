@@ -1,0 +1,25 @@
+{
+  "id": "datadog-alert-dedup-order",
+  "title": "Alert-incident rollup hides a monitor's second page in an interleaved feed",
+  "summary": "The per-monitor alert-incident rollup an on-call engineer reads reports one monitor firing fewer times than the metering dashboard, hiding a real second incident that already paged.",
+  "company": {
+    "tag": "datadog-debugging",
+    "round_name": "Debugging pairing round",
+    "confidence": "styled",
+    "notes": "Observability-shaped alert-incident deduplication over interleaved monitor state transitions; an order-dependent shared-state logic error, no syntax fault."
+  },
+  "companies": ["Generic"],
+  "domain": "observability",
+  "language": "python",
+  "difficulty": 3,
+  "est_minutes": 50,
+  "run_cmd": "python3 src/alert_dedup.py fixtures/input.txt",
+  "expected_output": "=== Alert incidents by monitor (prod) ===\napi-latency: 1\ndb-pool: 2\ndisk-usage: 1\n",
+  "buggy_output": "=== Alert incidents by monitor (prod) ===\napi-latency: 1\ndb-pool: 1\ndisk-usage: 1\n",
+  "bug_class": "order-dependence",
+  "phase2": {
+    "spec_patch": "Ops promoted the staging monitors to the rollup and now wants their incident counts too, printed in their own section below the prod one. Same interleaved feed, same dedup, same per-monitor incident rule, same output shape.",
+    "fixture_patch": "2026-05-01T12:04:00Z,staging,cache-hit,OK,evt-c1\n2026-05-01T12:04:30Z,staging,queue-depth,ALERT,evt-q1\n2026-05-01T12:04:45Z,staging,cache-hit,ALERT,evt-c2\n2026-05-01T12:05:00Z,staging,queue-depth,OK,evt-q2\n2026-05-01T12:05:30Z,staging,queue-depth,ALERT,evt-q3\n",
+    "expected_output_v2": "=== Alert incidents by monitor (prod) ===\napi-latency: 1\ndb-pool: 2\ndisk-usage: 1\n=== Alert incidents by monitor (staging) ===\ncache-hit: 2\nqueue-depth: 2\n"
+  }
+}

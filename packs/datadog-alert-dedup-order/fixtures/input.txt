@@ -1,0 +1,16 @@
+# timestamp,env,monitor,state,event_id  (UTC ISO-8601, one line per monitor state transition)
+# on-call flagged db-pool as reporting fewer alert incidents than the metering dashboard
+2026-05-01T12:00:00Z,prod,api-latency,ALERT,evt-a1
+2026-05-01T12:00:30Z,prod,api-latency,ALERT,evt-a2
+2026-05-01T12:01:00Z,prod,api-latency,OK,evt-a3
+2026-05-01T12:01:15Z,staging,cache-hit,ALERT,evt-s1
+2026-05-01T12:01:30Z,prod,db-pool,ALERT,evt-d1
+# same transition redelivered by the at-least-once bus
+2026-05-01T12:01:30Z,prod,db-pool,ALERT,evt-d1
+2026-05-01T12:02:00Z,prod,db-pool,OK,evt-d2
+2026-05-01T12:02:30Z,prod,disk-usage,ALERT,evt-k1
+2026-05-01T12:02:35Z,prod,disk-usage,NODATA,evt-x1
+# truncated line below is skipped by contract
+2026-05-01T12:02:45Z,prod,db-pool
+2026-05-01T12:03:00Z,prod,db-pool,ALERT,evt-d3
+2026-05-01T12:03:30Z,prod,db-pool,OK,evt-d4
