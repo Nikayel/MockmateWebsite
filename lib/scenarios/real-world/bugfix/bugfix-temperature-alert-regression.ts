@@ -1,6 +1,11 @@
 import type { BugFixScenario } from "../../types"
 
-const starter = `function annotateWarmupWindows(readings) {
+const starter = `function toMinutes(observedAt) {
+  const [hours, mins] = observedAt.split(":").map(Number);
+  return hours * 60 + mins;
+}
+
+function annotateWarmupWindows(readings) {
   const waitMinutes = Array(readings.length).fill(0);
   const pendingIndexes = [];
 
@@ -12,7 +17,8 @@ const starter = `function annotateWarmupWindows(readings) {
       currentTemperature > readings[pendingIndexes[pendingIndexes.length - 1]].temperatureCelsius
     ) {
       const previousIndex = pendingIndexes.pop();
-      waitMinutes[previousIndex] = index - previousIndex;
+      waitMinutes[previousIndex] =
+        toMinutes(readings[index].observedAt) - toMinutes(readings[previousIndex].observedAt);
     }
 
     pendingIndexes.push(index);
@@ -27,7 +33,12 @@ const starter = `function annotateWarmupWindows(readings) {
 module.exports = { annotateWarmupWindows };
 `
 
-const reference = `function annotateWarmupWindows(readings) {
+const reference = `function toMinutes(observedAt) {
+  const [hours, mins] = observedAt.split(":").map(Number);
+  return hours * 60 + mins;
+}
+
+function annotateWarmupWindows(readings) {
   const waitMinutes = Array(readings.length).fill(0);
   const pendingIndexes = [];
 
@@ -39,7 +50,8 @@ const reference = `function annotateWarmupWindows(readings) {
       currentTemperature > readings[pendingIndexes[pendingIndexes.length - 1]].temperatureCelsius
     ) {
       const previousIndex = pendingIndexes.pop();
-      waitMinutes[previousIndex] = index - previousIndex;
+      waitMinutes[previousIndex] =
+        toMinutes(readings[index].observedAt) - toMinutes(readings[previousIndex].observedAt);
     }
 
     pendingIndexes.push(index);
@@ -72,16 +84,16 @@ const { annotateWarmupWindows } = require("../src/temperature-alerts");
 const { summarizeWarmupBreaches } = require("../src/alert-summary");
 
 async function runTests(record) {
-  await record("annotates every pending cooler reading when a warmer sample arrives", () => {
+  await record("a recovery resolves the whole streak using observed timestamps", () => {
     const readings = [
       { sensorId: "rack-a", observedAt: "09:00", temperatureCelsius: 70 },
-      { sensorId: "rack-a", observedAt: "09:01", temperatureCelsius: 69 },
-      { sensorId: "rack-a", observedAt: "09:02", temperatureCelsius: 71 },
+      { sensorId: "rack-a", observedAt: "09:02", temperatureCelsius: 69 },
+      { sensorId: "rack-a", observedAt: "09:05", temperatureCelsius: 71 },
     ];
 
     assert.deepEqual(
       annotateWarmupWindows(readings).map((reading) => reading.minutesUntilWarmer),
-      [2, 1, 0],
+      [5, 3, 0],
     );
   });
 
@@ -89,7 +101,7 @@ async function runTests(record) {
     const readings = [
       { sensorId: "rack-b", observedAt: "10:00", temperatureCelsius: 80 },
       { sensorId: "rack-b", observedAt: "10:01", temperatureCelsius: 78 },
-      { sensorId: "rack-b", observedAt: "10:02", temperatureCelsius: 77 },
+      { sensorId: "rack-b", observedAt: "10:04", temperatureCelsius: 77 },
     ];
 
     assert.deepEqual(
@@ -98,17 +110,19 @@ async function runTests(record) {
     );
   });
 
-  await record("downstream alert summaries use the annotated wait window", () => {
+  await record("downstream alert summaries use every annotated wait window", () => {
     const readings = [
       { sensorId: "rack-c", observedAt: "11:00", temperatureCelsius: 63 },
       { sensorId: "rack-c", observedAt: "11:01", temperatureCelsius: 62 },
       { sensorId: "rack-c", observedAt: "11:02", temperatureCelsius: 61 },
-      { sensorId: "rack-c", observedAt: "11:03", temperatureCelsius: 65 },
+      { sensorId: "rack-c", observedAt: "11:05", temperatureCelsius: 65 },
     ];
 
     const annotated = annotateWarmupWindows(readings);
     assert.deepEqual(summarizeWarmupBreaches(annotated, 2), [
-      { sensorId: "rack-c", observedAt: "11:00", minutesUntilWarmer: 3 },
+      { sensorId: "rack-c", observedAt: "11:00", minutesUntilWarmer: 5 },
+      { sensorId: "rack-c", observedAt: "11:01", minutesUntilWarmer: 4 },
+      { sensorId: "rack-c", observedAt: "11:02", minutesUntilWarmer: 3 },
     ]);
   });
 }
@@ -120,31 +134,44 @@ const hiddenTests = `const assert = require("node:assert/strict");
 const { annotateWarmupWindows } = require("../src/temperature-alerts");
 
 async function runTests(record) {
-  await record("does not treat equal temperatures as warmer", () => {
-    const readings = [
-      { sensorId: "rack-d", observedAt: "12:00", temperatureCelsius: 72 },
-      { sensorId: "rack-d", observedAt: "12:01", temperatureCelsius: 72 },
-      { sensorId: "rack-d", observedAt: "12:02", temperatureCelsius: 73 },
-    ];
-
-    assert.deepEqual(
-      annotateWarmupWindows(readings).map((reading) => reading.minutesUntilWarmer),
-      [2, 1, 0],
-    );
-  });
-
-  await record("resolves a long descending run when the recovery arrives", () => {
+  await record("resolves a long descending run with non-uniform gaps", () => {
     const readings = [
       { sensorId: "rack-e", observedAt: "13:00", temperatureCelsius: 74 },
       { sensorId: "rack-e", observedAt: "13:01", temperatureCelsius: 73 },
-      { sensorId: "rack-e", observedAt: "13:02", temperatureCelsius: 72 },
-      { sensorId: "rack-e", observedAt: "13:03", temperatureCelsius: 71 },
-      { sensorId: "rack-e", observedAt: "13:04", temperatureCelsius: 75 },
+      { sensorId: "rack-e", observedAt: "13:03", temperatureCelsius: 72 },
+      { sensorId: "rack-e", observedAt: "13:06", temperatureCelsius: 71 },
+      { sensorId: "rack-e", observedAt: "13:10", temperatureCelsius: 75 },
     ];
 
     assert.deepEqual(
       annotateWarmupWindows(readings).map((reading) => reading.minutesUntilWarmer),
-      [4, 3, 2, 1, 0],
+      [10, 9, 7, 4, 0],
+    );
+  });
+
+  await record("a flatline of equal temperatures is not a warmup", () => {
+    const readings = [
+      { sensorId: "rack-flat", observedAt: "14:00", temperatureCelsius: 72 },
+      { sensorId: "rack-flat", observedAt: "14:02", temperatureCelsius: 72 },
+      { sensorId: "rack-flat", observedAt: "14:05", temperatureCelsius: 72 },
+    ];
+
+    assert.deepEqual(
+      annotateWarmupWindows(readings).map((reading) => reading.minutesUntilWarmer),
+      [0, 0, 0],
+    );
+  });
+
+  await record("tolerates a duplicate-minute retry of a reading", () => {
+    const readings = [
+      { sensorId: "rack-r", observedAt: "15:00", temperatureCelsius: 62 },
+      { sensorId: "rack-r", observedAt: "15:02", temperatureCelsius: 66 },
+      { sensorId: "rack-r", observedAt: "15:02", temperatureCelsius: 66 },
+    ];
+
+    assert.deepEqual(
+      annotateWarmupWindows(readings).map((reading) => reading.minutesUntilWarmer),
+      [2, 0, 0],
     );
   });
 }
@@ -181,23 +208,23 @@ async function record(suite, name, fn) {
 
 export const bugfixTemperatureAlertRegressionScenario: BugFixScenario = {
   id: "bugfix-temperature-alert-regression",
-  title: "Temperature Alert Warmup Regression",
+  title: "Ops Panel Undercounts Cold-Streak Recovery Windows",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
   companies: ["Uber", "Google", "Startup"],
   description:
-    "An operations telemetry panel undercounts how long cold readings wait before the next warmer sample arrives.",
-  tags: ["javascript", "telemetry", "monotonic-stack", "arrays", "alerts", "real-codebase"],
-  estimatedTime: 25,
+    "A data-center telemetry panel annotates only part of a cold streak's recovery wait, so alert summaries look calmer than the racks actually ran.",
+  tags: ["javascript", "telemetry", "observability", "alerts", "real-codebase"],
+  estimatedTime: 30,
   problemStatement: `**Incident Report**
-The data-center operations panel annotates each temperature reading with how many minutes pass before that sensor reports a warmer value. After a refactor, some cold streaks show shorter or missing wait windows, which makes downstream alert summaries look calmer than they should.
+The data-center operations panel annotates each temperature reading with how many minutes pass before that sensor reports a warmer value, using each reading's observed timestamp. After a refactor, some cold streaks show shorter or missing wait windows, so downstream alert summaries under-report how long racks ran hot.
 
 **Artifacts**
-- The telemetry contract is documented in \`README.md\`.
-- The editable annotation logic is in \`src/temperature-alerts.js\`.
-- \`src/alert-summary.js\` is a shared reporting helper and should be treated as read-only.
-- Visible regression coverage is in \`tests/temperature-alerts.test.js\`.
+- The telemetry contract is documented in README.md.
+- The editable annotation logic is in src/temperature-alerts.js.
+- src/alert-summary.js is a shared reporting helper and should be treated as read-only.
+- Visible regression coverage is in tests/temperature-alerts.test.js.
 
 **Your Task**
 1. Reproduce the failing behavior and write a hypothesis.
@@ -214,36 +241,39 @@ The data-center operations panel annotates each temperature reading with how man
     ],
   },
   expectedBehavior:
-    "Each reading should be annotated with the number of later minutes until the next strictly warmer temperature; readings with no warmer future sample should stay at zero.",
+    "Each reading is annotated with the number of minutes, taken from the observedAt timestamps, until the next strictly warmer reading. A reading with no warmer future sample stays at zero, and equal temperatures do not count as warmer.",
   bugDescription:
-    "The stack resolution only pops one pending reading per warmer sample, so earlier cooler readings remain unresolved when a recovery should resolve a whole cold streak.",
+    "The pending-stack resolution runs only once per warmer sample instead of draining every cooler reading that sample clears, so when a single recovery ends a multi-reading cold streak, only the most recent cold reading gets its wait and the earlier ones stay at zero.",
+  groundTruth:
+    "Root cause: the pending-index resolution fires at most once per incoming reading, so a warmer sample that should clear a whole descending streak only resolves the last cold reading; the earlier ones are never annotated and stay at zero, which undercounts the recovery windows the ops summary reports. Fix: drain every pending reading the current sample is strictly warmer than, not just the top one. Survival story: resolving one pending reading per sample reads as reasonable and is correct for a single dip, so it passed review; it only undercounts on a sustained multi-reading cold streak. Red herrings, all reachable and provably innocent: (1) the strict > comparison invites a change to >=, but equal temperatures are a flatline, not a warmup, and a flatline test proves >= would over-annotate; (2) waits come from observedAt deltas, not index deltas, because sampling is non-uniform, so a fix that counts indexes is wrong; (3) a duplicate-minute retry is tolerated and yields a zero-length delta between the duplicates, which is correct.",
   hints: [
-    "Trace the pending index collection across a descending run followed by a warmer reading.",
-    "A single warmer sample can satisfy more than one previous reading.",
+    "Reproduce a long cold streak that ends with one warmer sample. Compare the wait each cold reading gets against how long it actually waited by its timestamp.",
+    "One warmer sample ends the streak, but only some of the cold readings end up annotated. Look at what happens to the readings below the one that got resolved.",
   ],
   testCases: [
     {
-      input: { temperatures: [70, 69, 71] },
-      expected: [2, 1, 0],
-      description: "Workspace tests cover warmup window annotation",
+      input: { temperatures: [70, 69, 71], observedAt: ["09:00", "09:02", "09:05"] },
+      expected: [5, 3, 0],
+      description: "Workspace tests cover warmup windows measured from observed timestamps",
     },
   ],
   expectedTouchedFiles: ["src/temperature-alerts.js"],
   userReport:
-    "Operations sees some temperature cold streaks reported as resolved too quickly, causing alert summaries to undercount sustained recovery windows.",
+    "Operations here. The panel shows some cold streaks recovering faster than they did on the floor, so our alert summaries undercount how long racks ran hot. It looks worst on a long slow cool-down that finally recovers; only the last reading before the recovery seems to get a wait, and the earlier ones read as fine.",
   observedSymptoms: [
-    "A cold streak followed by one warmer sample leaves an earlier reading with a zero-minute wait.",
-    "Strictly descending readings with no recovery still correctly stay unresolved.",
+    "On a multi-reading cold streak that ends with one warmer sample, only the last cold reading gets a wait window; the earlier readings stay at zero.",
+    "A strictly descending run with no recovery correctly stays at zero, and equal-temperature flatlines are not treated as recoveries.",
   ],
   reproductionSteps: [
-    "Read README.md for the telemetry annotation contract.",
-    "Inspect tests/temperature-alerts.test.js for visible regression examples.",
+    "Read README.md for the telemetry annotation contract and how observed timestamps are used.",
+    "Inspect tests/temperature-alerts.test.js for the streak-recovery examples.",
     "Run the workspace tests before editing.",
   ],
   successCriteria: [
-    "Every pending cooler reading resolved by a warmer sample receives the correct wait length.",
-    "Equal temperatures do not count as warmer.",
-    "Unresolved readings remain annotated with zero minutes.",
+    "Every cooler reading cleared by a warmer sample gets the correct wait, measured from observed timestamps.",
+    "Equal temperatures do not count as warmer, and unresolved readings stay at zero.",
+    "Non-uniform gaps and duplicate-minute retries behave exactly as before.",
+    "Only src/temperature-alerts.js changes.",
   ],
   debuggingSkills: [
     "reproduction",
@@ -253,9 +283,10 @@ The data-center operations panel annotates each temperature reading with how man
     "verification",
   ],
   rootCauseRubric: [
-    "Explains why a recovery sample can resolve multiple prior readings.",
+    "Explains why a single recovery sample can resolve multiple prior readings, not just the most recent.",
     "Connects the unresolved pending readings to the undercounted operations summary.",
-    "Proposes regression coverage for descending streaks, equal temperatures, and no-recovery readings.",
+    "Rules out the strict > comparison and the observedAt-delta as innocent, showing equal temps and non-uniform gaps are handled by design.",
+    "Proposes regression coverage for a long descending streak, a flatline, and a duplicate-minute retry.",
   ],
   workspace: {
     language: "javascript",
@@ -271,12 +302,13 @@ The data-center operations panel annotates each temperature reading with how man
         language: "markdown",
         content: `# Temperature Alert Warmup Windows
 
-Each telemetry reading is one minute apart for a single sensor stream. The annotation step adds \`minutesUntilWarmer\` to each reading.
+Each telemetry reading for a single sensor carries an observedAt timestamp (HH:MM) and a temperature. The annotation step adds minutesUntilWarmer to each reading.
 
 Rules:
-- A warmer reading must be strictly greater than the current temperature.
-- The value is the number of minutes until the next warmer reading appears.
-- Readings without a warmer future sample keep \`minutesUntilWarmer: 0\`.
+- A warmer reading must be strictly greater than the current temperature. Equal temperatures are a flatline, not a warmup.
+- minutesUntilWarmer is the difference between observed timestamps: the observedAt of the next strictly warmer reading minus the observedAt of the current reading.
+- Sampling is not uniform. Gaps between readings vary, and the sensor occasionally retries a reading at the same minute.
+- A reading with no warmer future sample keeps minutesUntilWarmer at 0.
 
 The alert summary uses those annotations to highlight readings that waited longer than an operations threshold.`,
         description: "Telemetry contract notes",
