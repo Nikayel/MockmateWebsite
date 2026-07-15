@@ -171,6 +171,7 @@ USERS = [
     User(id=2, name="Priya"),
     User(id=3, name="Marcus"),
     User(id=4, name="Dana"),
+    User(id=5, name="Nadia"),
 ]
 
 BOOKS = [
@@ -189,7 +190,10 @@ BOOKS = [
 # "today" for this dataset is 2026-06-28.
 # Alex finished a book on three consecutive days ending today and has one book
 # still in progress. Priya last finished over a week ago. Marcus has only an
-# in-progress book. Dana finished today but skipped a day beforehand.
+# in-progress book. Dana finished today but skipped a day beforehand. Nadia
+# re-logged the same book twice (a re-read): the SQLAlchemy model declares a
+# uq_user_book unique constraint, but this in-memory mirror does not enforce it,
+# so the stat code must tolerate more than one event for the same book.
 READING_EVENTS = [
     # Alex (user 1)
     ReadingEvent(id=1, user_id=1, book_id=1, started_at=date(2026, 6, 12), finished_at=date(2026, 6, 26)),
@@ -205,6 +209,12 @@ READING_EVENTS = [
     ReadingEvent(id=8, user_id=4, book_id=8, started_at=date(2026, 6, 20), finished_at=date(2026, 6, 28)),
     ReadingEvent(id=9, user_id=4, book_id=9, started_at=date(2026, 6, 22), finished_at=date(2026, 6, 27)),
     ReadingEvent(id=10, user_id=4, book_id=10, started_at=date(2026, 6, 19), finished_at=date(2026, 6, 25)),
+    # Nadia (user 5): re-logged book 1 (a re-read) plus one other book. She
+    # finishes on three consecutive days ending today. The started_at order
+    # differs from the finished_at order, and book 1 appears twice.
+    ReadingEvent(id=11, user_id=5, book_id=1, started_at=date(2026, 6, 5), finished_at=date(2026, 6, 27)),
+    ReadingEvent(id=12, user_id=5, book_id=1, started_at=date(2026, 6, 25), finished_at=date(2026, 6, 28)),
+    ReadingEvent(id=13, user_id=5, book_id=2, started_at=date(2026, 6, 24), finished_at=date(2026, 6, 26)),
 ]
 `
 
@@ -404,9 +414,16 @@ def run_tests(record):
         actual = calculate_streak(4, TODAY)
         assert actual == 2, f"expected streak 2 (a missed day truncates it), got {actual}"
 
+    def a_relogged_book_still_yields_the_finish_streak():
+        # Nadia re-logged book 1 (a re-read); the duplicate must not distort the
+        # finish-day streak, which is 3 consecutive days ending today.
+        actual = calculate_streak(5, TODAY)
+        assert actual == 3, f"expected streak 3 for the re-logged-book reader, got {actual}"
+
     record("in-progress-only user has no streak", in_progress_only_user_has_no_streak)
     record("no finish today means no current streak", no_finish_today_means_no_current_streak)
     record("a gap truncates the streak", a_gap_truncates_the_streak)
+    record("a re-logged book still yields the finish streak", a_relogged_book_still_yields_the_finish_streak)
 `
 
 const testHistoryHidden = `from app.services.reading_service import get_reading_history
@@ -426,9 +443,16 @@ def run_tests(record):
         got = get_reading_history(3)
         assert got == [], f"expected an empty history, got {[event.book_id for event in got]}"
 
+    def relogged_book_history_orders_by_finish():
+        # book 1 was re-logged; both events appear, ordered most-recently-finished
+        # first, independent of when each was started.
+        got = [event.book_id for event in get_reading_history(5)]
+        assert got == [1, 1, 2], f"expected book order [1, 1, 2] (most recently finished first), got {got}"
+
     record("in-progress books excluded from history", in_progress_books_excluded_from_history)
     record("history order holds for other users", history_order_holds_for_other_users)
     record("in-progress-only user has empty history", in_progress_only_user_has_empty_history)
+    record("re-logged book history orders by finish date", relogged_book_history_orders_by_finish)
 `
 
 const testRunner = `import json
@@ -521,7 +545,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Notion", "Shopify", "LinkedIn", "Stripe"],
+  companies: ["Amazon", "Apple", "Notion"],
   description:
     "Fix a reading-streak calculation and a history ordering in a small layered reading-tracker app",
   userReport:
@@ -530,9 +554,10 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
   estimatedTime: 40,
   problemStatement: `BookClub is a small reading-tracker app. Members finish books and the app shows a reading streak (consecutive days they finished a book), the number of books finished this month, total pages read, and a reading history.
 
-A support ticket reports that the reading streak and the reading history order look wrong, while the other stats look fine. The codebase is layered: routes call services, and services compute over the data model in \`app/\`.
+**Incident Report**
+A support ticket reports that a member's reading streak and reading history order look wrong, while books-this-month and total-pages read look fine. The codebase is layered: routes call services, and the services compute over the data model in \`app/\`.
 
-Work through it in order: first get the reading streak correct, then fix the reading history ordering. Each fix should match the behavior documented in the function docstrings and README, without breaking the books-this-month or total-pages stats.`,
+Read the code, run the tests, and fix the defects in the service layer so every stat matches the behavior its docstring and the README describe. Do not break the stats that are already correct.`,
   buggyCode: { python: mirrorStatsService },
   codebaseFiles: {
     python: [
@@ -572,6 +597,8 @@ Work through it in order: first get the reading streak correct, then fix the rea
     "The reading streak counts consecutive days, ending today, on which the user finished at least one book; the reading history lists finished books most-recently-finished first; books-this-month and total-pages-read stay correct.",
   bugDescription:
     "Two independent defects in the reading services: the streak aggregates events by their start date rather than their finish date, and the history list sorts by start date rather than finish date.",
+  groundTruth:
+    "Two independent one-field defects: calculate_streak builds its set of days from started_at instead of finished_at, and get_reading_history sorts by started_at instead of finished_at. Both read fine in isolation because started_at is always set, which is why they survived review; only seeded data where a book is started days before it is finished reveals them. The two passing stats, books_this_month and total_pages_read, share the same get_reading_history input, proving the shared dependency is fine and isolating each bug to its own function. Terrain and herrings, all provably innocent: (1) Nadia (user 5) re-logged book 1, so a user can carry more than one event for the same book; the stat code tolerates duplicates and the finish-day streak collapses same-day finishes via a set; (2) the SQLAlchemy reference model declares a uq_user_book unique constraint that the in-memory mirror deliberately does not enforce, so the duplicate looks like a constraint violation but is intended terrain, not the bug; (3) in-progress books (finished_at is None) are already excluded by get_reading_history and never reach either calculation.",
   observedSymptoms: [
     "Reading streak shows 0 despite recent daily finishes.",
     "Reading history is not ordered most-recently-finished first.",
@@ -594,10 +621,9 @@ Work through it in order: first get the reading streak correct, then fix the rea
     "verification",
   ],
   hints: [
-    "Start by reading each function's docstring, then check whether the code does what the docstring promises.",
-    "started_at and finished_at mean different things — one is when a book was opened, the other when it was completed.",
-    "A completion streak is about the days a book was finished; the history is ordered by when books were finished.",
-    "Books still in progress have no finish date — make sure they don't distort either result.",
+    "Two of the four stats are wrong and two are right. Compare the wrong ones against what the README says each should mean.",
+    "Every reading event carries more than one date. Check which date each calculation actually reads, and whether that matches the behavior its docstring promises.",
+    "Reproduce with the seeded reader, then trace the streak number and the history order back to the exact field each was built from.",
   ],
   testCases: [
     {
