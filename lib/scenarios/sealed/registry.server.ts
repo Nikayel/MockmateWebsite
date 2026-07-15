@@ -15,10 +15,12 @@ const SEALED_PACK_LOADERS: Record<string, () => Promise<{ sealed: SealedPackCont
   "datadog-endpoint-latency-peak": () => import("./datadog-endpoint-latency-peak.server"),
   "datadog-metric-window-rollup": () => import("./datadog-metric-window-rollup.server"),
   "datadog-monitor-empty-series": () => import("./datadog-monitor-empty-series.server"),
+  "generic-cache-eviction-mutation": () => import("./generic-cache-eviction-mutation.server"),
   "generic-log-error-rollup": () => import("./generic-log-error-rollup.server"),
   "palantir-entity-resolution-merge": () => import("./palantir-entity-resolution-merge.server"),
   "palantir-foundry-usage-rollup": () => import("./palantir-foundry-usage-rollup.server"),
   "palantir-ontology-link-rollup": () => import("./palantir-ontology-link-rollup.server"),
+  "palantir-pipeline-order-dependence": () => import("./palantir-pipeline-order-dependence.server"),
   "stripe-ledger-double-post": () => import("./stripe-ledger-double-post.server"),
   "stripe-webhook-idempotency": () => import("./stripe-webhook-idempotency.server"),
 }

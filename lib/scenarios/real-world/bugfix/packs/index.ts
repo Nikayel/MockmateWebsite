@@ -19,6 +19,10 @@ import {
   datadogMonitorEmptySeriesScenario,
 } from "./datadog-monitor-empty-series"
 import {
+  genericCacheEvictionMutationPack,
+  genericCacheEvictionMutationScenario,
+} from "./generic-cache-eviction-mutation"
+import {
   genericLogErrorRollupPack,
   genericLogErrorRollupScenario,
 } from "./generic-log-error-rollup"
@@ -35,6 +39,10 @@ import {
   palantirOntologyLinkRollupScenario,
 } from "./palantir-ontology-link-rollup"
 import {
+  palantirPipelineOrderDependencePack,
+  palantirPipelineOrderDependenceScenario,
+} from "./palantir-pipeline-order-dependence"
+import {
   stripeLedgerDoublePostPack,
   stripeLedgerDoublePostScenario,
 } from "./stripe-ledger-double-post"
@@ -47,10 +55,12 @@ export const bugfixPackScenarios: BugFixScenario[] = [
   datadogEndpointLatencyPeakScenario,
   datadogMetricWindowRollupScenario,
   datadogMonitorEmptySeriesScenario,
+  genericCacheEvictionMutationScenario,
   genericLogErrorRollupScenario,
   palantirEntityResolutionMergeScenario,
   palantirFoundryUsageRollupScenario,
   palantirOntologyLinkRollupScenario,
+  palantirPipelineOrderDependenceScenario,
   stripeLedgerDoublePostScenario,
   stripeWebhookIdempotencyScenario,
 ]
@@ -60,10 +70,12 @@ export const bugfixPacks: BugfixPack[] = [
   datadogEndpointLatencyPeakPack,
   datadogMetricWindowRollupPack,
   datadogMonitorEmptySeriesPack,
+  genericCacheEvictionMutationPack,
   genericLogErrorRollupPack,
   palantirEntityResolutionMergePack,
   palantirFoundryUsageRollupPack,
   palantirOntologyLinkRollupPack,
+  palantirPipelineOrderDependencePack,
   stripeLedgerDoublePostPack,
   stripeWebhookIdempotencyPack,
 ]

@@ -1,0 +1,25 @@
+{
+  "id": "generic-cache-eviction-mutation",
+  "title": "Cache eviction report over-reports one namespace's live entries",
+  "summary": "The overnight cache eviction report shows more live entries for one namespace than the cache's metrics endpoint, so the capacity-planning on-call cannot trust it.",
+  "company": {
+    "tag": "generic-fdse",
+    "round_name": "Debugging round",
+    "confidence": "styled",
+    "notes": "In-memory cache eviction sweep over a write log; subtle logic flaw, no syntax error, no crash."
+  },
+  "companies": ["Generic"],
+  "domain": "caching",
+  "language": "python",
+  "difficulty": 2,
+  "est_minutes": 45,
+  "run_cmd": "python3 src/cache_sweep.py fixtures/input.txt",
+  "expected_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 2\n",
+  "buggy_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 3\n",
+  "bug_class": "mutation-during-iteration",
+  "phase2": {
+    "spec_patch": "Ops also needs pinned entries to survive the sweep: a pinned entry is never evicted, even once it is expired, because those keys are hand-warmed and must stay resident. The pinned flag is already the optional fourth column on every write. Keep the same header and per-row format.",
+    "fixture_patch": "sessions,s-5,1699998000,pinned\nsearch,q-4,1699990000,pinned\n",
+    "expected_output_v2": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 4\nsessions: 3\n"
+  }
+}

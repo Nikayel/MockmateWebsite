@@ -1,0 +1,33 @@
+{
+  "bugLocation": "src/cache_sweep.py — evict_expired(): `entries.pop(index)` followed by an unconditional `index += 1`",
+  "bugSummary": "The sweep pops from the list it is walking by index and always advances the index, so the entry that shifts into a just-vacated slot is skipped; two adjacent expired entries leave the second one live.",
+  "minimalFix": "Build the survivors as a new list instead of mutating under the index: `return [entry for entry in entries if entry[\"expires_at\"] > now]` (or only advance the index in the else branch).",
+  "survivalStory": "evict_expired reads correctly in isolation and for every namespace whose expired entries are separated by live ones or sit last; it only over-counts the rare namespace with two adjacent expired entries, which the happy-path fixtures (isolated expirations) never exercised, and the inflated count still looks like a plausible per-namespace number.",
+  "redHerrings": [
+    {
+      "location": "src/cache_sweep.py — evict_expired(): `entry[\"expires_at\"] <= now`",
+      "looksWrongBecause": "the `<=` invites a `<`-vs-`<=` off-by-one suspicion on the expiry boundary",
+      "provablyInnocentBecause": "the data contract declares an entry whose expires_at equals now to be expired, and catalog's c-1 sits exactly at now, so `<=` is correct; changing it to `<` would break the currently-correct catalog row and has no effect on sessions, so it cannot cause the inflation"
+    },
+    {
+      "location": "src/cache_sweep.py — parse_line(): `part.strip()` field normalization",
+      "looksWrongBecause": "trimming fields looks like it could merge or split namespaces and drop data",
+      "provablyInnocentBecause": "the contract declares surrounding whitespace trimmed, so ` feed ` and feed are one namespace by design; the strip is load-bearing (it folds feed's f-2 into the feed bucket) and removing it would split feed into two rows, the opposite of the observed single-row inflation"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n)",
+    "space": "O(n)",
+    "dominantCost": "a single linear pass to parse and bucket the n log rows, then a linear sweep per namespace; the only sort is over the handful of namespaces for output ordering (O(k log k), k namespaces)"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the inflated value to the sessions row and named the skipped-after-pop entry (s-2 stepped over when s-1 was removed) as the cause, in one sentence.",
+    "Shipped a minimal fix (iterate a snapshot / build a new list, or guard the index advance) rather than rewriting the sweep.",
+    "Tested the `<=` expiry boundary against the contract (catalog's c-1 at exactly now) and cleared it instead of chasing it.",
+    "Tested the field strip normalization against the contract and cleared it instead of chasing it.",
+    "Complexity: identified the linear parse and per-namespace sweep as O(n) and noted the only sort is over the namespaces.",
+    "Phase-2: adapted evict_expired to exempt pinned entries, recognizing the pinned flag was already parsed and thrown away, instead of rewriting.",
+    "Recommend exactly one drill: for a weak sweep pass, a mutation-during-iteration drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}

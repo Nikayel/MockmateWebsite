@@ -16,3 +16,4 @@ appears >= 2 times.
 | palantir-entity-resolution-merge | palantir-fdse | entity-resolution | wrong-dedup-key | 2 | validated | 2026-07-15 |
 | stripe-ledger-double-post | stripe-bug-squash | payments | double-count | 2 | validated | 2026-07-15 |
 | datadog-monitor-empty-series | datadog-debugging | observability | silent-boundary | 1 | validated | 2026-07-15 |
+| generic-cache-eviction-mutation | generic-fdse | caching | mutation-during-iteration | 2 | validated | 2026-07-15 |

@@ -1,0 +1,20 @@
+# cache write log — columns: namespace,key,expires_at[,pinned]
+# eviction checkpoint now = 1700000000; an entry with expires_at <= now is expired
+sessions,s-1,1699990000
+catalog,c-1,1700000000
+search,q-1,1700007200
+sessions,s-2,1699995000
+feed,f-1,1699990000
+catalog,c-2,1700007200
+search,q-1,1700007200
+sessions,s-3,1700003600
+ feed ,f-2,1700003600
+search,q-2,1700010800,pinned
+catalog,c-3,1700010800
+feed,f-1,1700010800
+sessions,s-4,1700007200
+search,q-9
+catalog,c-4,1699998000
+feed,f-3,1699995000
+catalog,c-9,soon
+search,q-3,1700003600
