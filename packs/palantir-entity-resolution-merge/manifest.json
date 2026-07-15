@@ -1,0 +1,25 @@
+{
+  "id": "palantir-entity-resolution-merge",
+  "title": "Entity resolution merges two tenants' entities into one link count",
+  "summary": "The nightly ontology reconciliation report shows one entity name with far more resolved links than the registry dashboard, and the registry team stopped trusting the run until it is explained.",
+  "company": {
+    "tag": "palantir-fdse",
+    "round_name": "Re-engineering / debugging round",
+    "confidence": "styled",
+    "notes": "Foundry-shaped entity-resolution problem; an under-specified merge key that ignores the namespace, a subtle logic flaw with no syntax error."
+  },
+  "companies": ["Palantir"],
+  "domain": "entity-resolution",
+  "language": "python",
+  "difficulty": 2,
+  "est_minutes": 45,
+  "run_cmd": "python3 src/resolve_entities.py fixtures/input.txt",
+  "expected_output": "=== Links resolved per entity ===\ncommercial/acme: 3\ngov/acme: 2\ncommercial/globex: 4\ncommercial/initech: 2\ngov/umbrella: 1\n",
+  "buggy_output": "=== Links resolved per entity ===\ncommercial/acme: 5\ngov/acme: 5\ncommercial/globex: 4\ncommercial/initech: 2\ngov/umbrella: 1\n",
+  "bug_class": "wrong-dedup-key",
+  "phase2": {
+    "spec_patch": "Ops onboarded a new tenant namespace, `research`, and its links must be folded into the same per-entity report. A `research` entity that shares a name with a `commercial` or `gov` entity is still a different entity — namespaces stay distinct.",
+    "fixture_patch": "research,acme,L-4001\nresearch,globex,L-4002\nresearch,globex,L-4003\n",
+    "expected_output_v2": "=== Links resolved per entity ===\ncommercial/acme: 3\ngov/acme: 2\nresearch/acme: 1\ncommercial/globex: 4\nresearch/globex: 2\ncommercial/initech: 2\ngov/umbrella: 1\n"
+  }
+}

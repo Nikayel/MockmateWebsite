@@ -1,0 +1,31 @@
+{
+  "bugLocation": "src/resolve_entities.py — entity_key(): `return name`",
+  "bugSummary": "entity_key ignores the namespace and keys only on name, so two entities that share a name in different namespaces are merged into one count bucket and each of their rows shows the combined link count",
+  "minimalFix": "Key the entity on its full identity: `return (namespace, name)`. Both count_links and print_report route through entity_key, so they stay consistent.",
+  "survivalStory": "entity_key names both namespace and name in its signature and reads like the full identity, so it looks right in isolation; it only merges entities for a name that exists in more than one namespace, which the happy-path data (each name owned by a single tenant) never exercised, so the name-only return survived review.",
+  "redHerrings": [
+    {
+      "location": "src/resolve_entities.py — normalize_name(): raw.strip().lower()",
+      "looksWrongBecause": "folding case and whitespace could merge two different entities into one",
+      "provablyInnocentBecause": "the data contract declares entity names case-insensitive, so `Acme ` and `acme` are the same entity by design and the fixture proves it with commercial,Acme ,L-1003"
+    },
+    {
+      "location": "src/resolve_entities.py — dedupe_links(): keying only on link_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified, as if it could drop a link that legitimately repeats",
+      "provablyInnocentBecause": "the contract says the bus is at-least-once and a link_id identifies exactly one resolution, so the redelivered L-1002 line is a genuine duplicate and dropping it is correct"
+    }
+  ],
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() over the distinct entities for output ordering; parse, dedupe, and count are each O(n) in the number of link rows"
+  },
+  "debriefRubric": [
+    "Reproduced with the run command and diffed against the oracle before opening the source.",
+    "Localized the inflated counts to the two acme rows and named the shared name across the commercial and gov namespaces as the cause, in one sentence.",
+    "Shipped a minimal fix (key the entity on namespace and name together) rather than rewriting the count or report path.",
+    "Complexity: identified the sort over distinct entities as the dominant O(n log n) cost rather than pattern-matching the parse loops.",
+    "Phase-2: adapted the existing namespace filter to admit research instead of rewriting, and recognized the research rows were already parsed and dropped by REGISTERED_NAMESPACES.",
+    "Recommend exactly one drill: for a weak scoping pass, a dedup-key drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
+}

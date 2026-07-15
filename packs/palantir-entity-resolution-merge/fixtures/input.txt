@@ -1,0 +1,17 @@
+# namespace,entity_name,link_id
+# registry flagged the acme totals as higher than the reconciliation dashboard
+commercial,globex,L-1004
+gov,acme,L-2001
+commercial,acme,L-1001
+commercial,globex,L-1005
+commercial,acme,L-1002
+gov,umbrella,L-3001
+commercial,initech,L-1008
+gov,acme,L-2002
+commercial,Acme ,L-1003
+commercial,acme,L-1002
+commercial,globex,L-1006
+commercial,initech,L-1009
+# truncated row missing its link_id is skipped by contract
+commercial,globex
+commercial,globex,L-1007

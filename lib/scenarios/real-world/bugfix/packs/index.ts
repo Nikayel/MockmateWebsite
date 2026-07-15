@@ -19,6 +19,10 @@ import {
   genericLogErrorRollupScenario,
 } from "./generic-log-error-rollup"
 import {
+  palantirEntityResolutionMergePack,
+  palantirEntityResolutionMergeScenario,
+} from "./palantir-entity-resolution-merge"
+import {
   palantirFoundryUsageRollupPack,
   palantirFoundryUsageRollupScenario,
 } from "./palantir-foundry-usage-rollup"
@@ -35,6 +39,7 @@ export const bugfixPackScenarios: BugFixScenario[] = [
   datadogEndpointLatencyPeakScenario,
   datadogMetricWindowRollupScenario,
   genericLogErrorRollupScenario,
+  palantirEntityResolutionMergeScenario,
   palantirFoundryUsageRollupScenario,
   palantirOntologyLinkRollupScenario,
   stripeWebhookIdempotencyScenario,
@@ -45,6 +50,7 @@ export const bugfixPacks: BugfixPack[] = [
   datadogEndpointLatencyPeakPack,
   datadogMetricWindowRollupPack,
   genericLogErrorRollupPack,
+  palantirEntityResolutionMergePack,
   palantirFoundryUsageRollupPack,
   palantirOntologyLinkRollupPack,
   stripeWebhookIdempotencyPack,
