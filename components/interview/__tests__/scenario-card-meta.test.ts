@@ -34,7 +34,7 @@ describe("getScenarioCardContext", () => {
     expect(ctx.signal).toBe("Real codebase · 1 file")
   })
 
-  it("falls back to user report, then bug description for bugfix", () => {
+  it("falls back to user report for bugfix", () => {
     const scenario = {
       ...base,
       type: "bugfix",
@@ -49,6 +49,22 @@ describe("getScenarioCardContext", () => {
     } as unknown as Scenario
 
     expect(getScenarioCardContext(scenario).contextLine).toBe("It crashes sometimes")
+  })
+
+  it("never surfaces bugDescription on the card, even with no symptoms or report", () => {
+    const scenario = {
+      ...base,
+      type: "bugfix",
+      problemStatement: "",
+      buggyCode: {},
+      codebaseFiles: {},
+      expectedBehavior: "",
+      bugDescription: "Null deref in checkout",
+      hints: [],
+      testCases: [],
+    } as unknown as Scenario
+
+    expect(getScenarioCardContext(scenario).contextLine).toBe("Base description")
   })
 
   it("labels micro-debugging bugfixes as a focused bug", () => {

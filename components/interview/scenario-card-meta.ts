@@ -54,10 +54,11 @@ export function getScenarioCardContext(scenario: Scenario): ScenarioCardContext 
 
   switch (scenario.type) {
     case "bugfix": {
+      // bugDescription is deliberately excluded: it states the root cause and
+      // must never render on a candidate-visible surface before the debrief.
       const contextLine = firstNonEmpty(
         scenario.observedSymptoms?.[0],
         scenario.userReport,
-        scenario.bugDescription,
         scenario.description
       )
       const fileCount = countCodebaseFiles(scenario.codebaseFiles)

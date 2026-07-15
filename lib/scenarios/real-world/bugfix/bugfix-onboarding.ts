@@ -4,14 +4,21 @@ const starter = `function findAdjustmentPair(lineItems, targetCents) {
   const seenAmounts = new Map();
 
   for (let index = 0; index < lineItems.length; index += 1) {
-    const amount = lineItems[index].amountCents;
-    const needed = targetCents - amount;
+    const row = lineItems[index];
+
+    if (typeof row.amountCents !== "number") {
+      continue;
+    }
+
+    const needed = targetCents - row.amountCents;
 
     if (seenAmounts.has(needed)) {
       return [seenAmounts.get(needed), index];
     }
 
-    seenAmounts.set(targetCents, index);
+    if (row.status === "open") {
+      seenAmounts.set(row.amountCents, index);
+    }
   }
 
   return [];
@@ -24,14 +31,19 @@ const reference = `function findAdjustmentPair(lineItems, targetCents) {
   const seenAmounts = new Map();
 
   for (let index = 0; index < lineItems.length; index += 1) {
-    const amount = lineItems[index].amountCents;
-    const needed = targetCents - amount;
+    const row = lineItems[index];
+
+    if (typeof row.amountCents !== "number" || row.status !== "open") {
+      continue;
+    }
+
+    const needed = targetCents - row.amountCents;
 
     if (seenAmounts.has(needed)) {
       return [seenAmounts.get(needed), index];
     }
 
-    seenAmounts.set(amount, index);
+    seenAmounts.set(row.amountCents, index);
   }
 
   return [];
@@ -67,27 +79,37 @@ const { findAdjustmentPair } = require("../src/reconciliation");
 const { summarizeAdjustment } = require("../src/ledger");
 
 async function runTests(record) {
-  await record("returns the two ledger rows that reconcile the adjustment", () => {
+  await record("explains an adjustment with two open rows, credits included", () => {
     const lineItems = [
-      { id: "line_101", amountCents: 3200 },
-      { id: "line_102", amountCents: 1800 },
-      { id: "line_103", amountCents: 4100 },
+      { id: "inv_9001", amountCents: 3200, status: "open" },
+      { id: "inv_9002", amountCents: -1500, status: "open" },
+      { id: "inv_9003", amountCents: 1800, status: "open" },
     ];
 
     const pair = findAdjustmentPair(lineItems, 5000);
     const summary = summarizeAdjustment(lineItems, pair);
 
     assert.deepEqual(summary, {
-      ids: ["line_101", "line_102"],
+      ids: ["inv_9001", "inv_9003"],
       totalCents: 5000,
     });
   });
 
-  await record("returns an empty result when no reconciliation pair exists", () => {
+  await record("does not explain an adjustment with a row that was already reconciled", () => {
     const lineItems = [
-      { id: "line_201", amountCents: 1200 },
-      { id: "line_202", amountCents: 2500 },
-      { id: "line_203", amountCents: 3900 },
+      { id: "inv_9101", amountCents: 2600, status: "open" },
+      { id: "inv_9102", amountCents: 2400, status: "reconciled" },
+      { id: "inv_9103", amountCents: 900, status: "open" },
+    ];
+
+    assert.deepEqual(findAdjustmentPair(lineItems, 5000), []);
+  });
+
+  await record("returns an empty result when no open pair exists", () => {
+    const lineItems = [
+      { id: "inv_9201", amountCents: 1200, status: "open" },
+      { id: "inv_9202", amountCents: 2500, status: "open" },
+      { id: "inv_9203", amountCents: 3900, status: "open" },
     ];
 
     assert.deepEqual(findAdjustmentPair(lineItems, 6000), []);
@@ -104,29 +126,56 @@ const { summarizeAdjustment } = require("../src/ledger");
 async function runTests(record) {
   await record("matches a later row against an earlier duplicate amount", () => {
     const lineItems = [
-      { id: "line_301", amountCents: 2400 },
-      { id: "line_302", amountCents: 3100 },
-      { id: "line_303", amountCents: 2400 },
-      { id: "line_304", amountCents: 1600 },
+      { id: "led_301", amountCents: 2400, status: "open" },
+      { id: "led_302", amountCents: 3100, status: "open" },
+      { id: "led_303", amountCents: 2400, status: "open" },
+      { id: "led_304", amountCents: 1600, status: "open" },
     ];
 
     const pair = findAdjustmentPair(lineItems, 4700);
     const summary = summarizeAdjustment(lineItems, pair);
 
     assert.deepEqual(summary, {
-      ids: ["line_302", "line_304"],
+      ids: ["led_302", "led_304"],
       totalCents: 4700,
     });
   });
 
   await record("does not reuse the same row twice", () => {
     const lineItems = [
-      { id: "line_401", amountCents: 2500 },
-      { id: "line_402", amountCents: 1000 },
-      { id: "line_403", amountCents: 4100 },
+      { id: "led_401", amountCents: 2500, status: "open" },
+      { id: "led_402", amountCents: 1000, status: "open" },
+      { id: "led_403", amountCents: 4100, status: "open" },
     ];
 
     assert.deepEqual(findAdjustmentPair(lineItems, 5000), []);
+  });
+
+  await record("skips legacy export rows that are missing amounts", () => {
+    const lineItems = [
+      { id: "led_501", amountCents: 2000, status: "open" },
+      { id: "led_502", amountCents: null, status: "open" },
+      { id: "led_503", amountCents: 3000, status: "open" },
+    ];
+
+    assert.deepEqual(findAdjustmentPair(lineItems, 5000), [0, 2]);
+  });
+
+  await record("explains the adjustment with the open pair when a reconciled complement appears earlier", () => {
+    const lineItems = [
+      { id: "led_601", amountCents: 2600, status: "open" },
+      { id: "led_602", amountCents: 2400, status: "reconciled" },
+      { id: "led_603", amountCents: 1400, status: "open" },
+      { id: "led_604", amountCents: 3600, status: "open" },
+    ];
+
+    const pair = findAdjustmentPair(lineItems, 5000);
+    const summary = summarizeAdjustment(lineItems, pair);
+
+    assert.deepEqual(summary, {
+      ids: ["led_603", "led_604"],
+      totalCents: 5000,
+    });
   });
 }
 
@@ -162,22 +211,22 @@ async function record(suite, name, fn) {
 
 export const bugfixOnboardingScenario: BugFixScenario = {
   id: "bugfix-onboarding",
-  title: "Onboarding: Pricing Reconciliation Lookup",
+  title: "Onboarding: Adjustment Reconciliation Lookup",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "easy",
   companies: ["Stripe", "Shopify", "Square"],
   description:
-    "A pricing reconciliation service misses invoice line-item pairs that should explain manual adjustments.",
-  tags: ["javascript", "onboarding", "pricing", "hash-map", "reconciliation", "real-codebase"],
-  estimatedTime: 12,
+    "The billing review queue explained a manual invoice adjustment with ledger money that had already been settled, and finance approved the match before review caught it.",
+  tags: ["javascript", "onboarding", "billing", "reconciliation", "real-codebase"],
+  estimatedTime: 15,
   problemStatement: `Welcome to the CodeSparring bugfix workspace.
 
 **Incident Report**
-Finance support is reviewing manual invoice adjustments. The reconciliation job should identify the two ledger rows whose amounts add up to the adjustment amount, but some valid adjustments are returning "no match" in the review queue.
+Finance support approves a manual invoice adjustment when the review queue shows two ledger rows that explain it. On Tuesday the queue explained adjustment adj_88213 with a row that had already been consumed by last week's adjustment. Support approved it, and that account's ledger now double-counts the row. A second case was caught in review the same day. Most adjustments in the queue still reconcile normally.
 
 **Artifacts**
-- Product notes are in \`README.md\`.
+- The reconciliation contract and ledger row shape are in \`README.md\`.
 - The editable lookup logic is in \`src/reconciliation.js\`.
 - \`src/ledger.js\` is a shared helper used by the tests and should be treated as read-only.
 - Visible regression coverage is in \`tests/reconciliation.test.js\`.
@@ -198,48 +247,53 @@ Finance support is reviewing manual invoice adjustments. The reconciliation job 
     ],
   },
   expectedBehavior:
-    "The service should return two distinct ledger row indexes whose amounts add up to the requested adjustment, or an empty result when no pair exists.",
+    "The lookup returns two distinct open ledger rows whose amounts add up to the adjustment, skips reconciled rows and rows with missing amounts entirely, and returns an empty result when no open pair exists.",
   bugDescription:
-    "The lookup cache stores the target amount instead of the current line amount, so complement lookups never find most valid prior rows.",
+    "The open-status guard is applied only when caching a row, not when the current row completes a pair, so a reconciled row can still match against a previously cached open row and explain an adjustment with settled money.",
+  groundTruth:
+    "Root cause: the status filter is one-sided. Rows are cached only when open, but the match branch runs before any status check, so a reconciled row encountered later can complete a pair with a cached open row. Fix: skip rows that are not open before both the match and the cache, alongside the existing missing-amount skip. Red herrings, all provably innocent: (1) summarizeAdjustment's null guards in src/ledger.js look like they could swallow valid pairs, but they only reject malformed pairs and identical indexes; (2) the seenAmounts overwrite on duplicate amounts looks lossy, but any cached index with that amount satisfies the first-completing-pair contract; (3) negative credit amounts look risky, but integer cent arithmetic over negatives is exact and the contract allows credits in pairs.",
   hints: [
-    "Trace what value is being stored after each row is inspected.",
-    "The lookup should make the next row able to find a previously seen amount.",
+    "Run the visible tests first. Two pass and one fails. What do the passing cases have in common that the failing case does not?",
+    "The failing case returns a pair instead of an empty result. Which of the two returned rows should never have been part of an explanation, and at which point in the scan was it considered?",
   ],
   testCases: [
     {
       input: { adjustmentCents: 5000 },
-      expected: ["line_101", "line_102"],
-      description: "Workspace tests cover pricing reconciliation lookup behavior",
+      expected: [],
+      description:
+        "An adjustment whose only matching sum involves settled money must stay unexplained",
     },
   ],
   expectedTouchedFiles: ["src/reconciliation.js"],
   userReport:
-    "Finance support sees valid manual invoice adjustments land in the review queue as unreconciled even when two ledger rows add up to the adjustment amount.",
+    "Finance support approved an adjustment that the queue explained with a ledger row already consumed by an earlier adjustment. That account double-counts the row now, and support wants to know which queue explanations they can still trust.",
   observedSymptoms: [
-    "A visible regression case with 3200 cents and 1800 cents returns no usable pair for a 5000 cent adjustment.",
-    "No-match cases still need to remain empty.",
+    "Two adjustments this week were explained using a ledger row whose status was reconciled, and one was approved before review caught it.",
+    "Adjustments backed by two open rows, credits, no-match cases, and legacy rows with missing amounts all behave normally.",
   ],
   reproductionSteps: [
-    "Read README.md for the reconciliation contract.",
-    "Inspect tests/reconciliation.test.js to understand the visible failing behavior.",
+    "Read README.md for the reconciliation contract and the ledger row shape.",
+    "Inspect tests/reconciliation.test.js to see which behavior fails.",
     "Run the workspace tests before editing.",
   ],
   successCriteria: [
-    "Valid pairs are returned as two distinct indexes in scan order.",
-    "No-match adjustments still return an empty array.",
-    "Only src/reconciliation.js needs to change.",
+    "Adjustments are only explained by two distinct open rows, in first-completing scan order.",
+    "Reconciled rows can neither be cached nor complete a pair.",
+    "Credits, missing-amount rows, and no-match adjustments behave exactly as before.",
+    "Only src/reconciliation.js changes.",
   ],
   debuggingSkills: [
     "reproduction",
-    "map lookup tracing",
+    "scoping from passing cases",
     "hypothesis",
     "minimal patch",
     "verification",
   ],
   rootCauseRubric: [
-    "Explains the mismatch between the cached value and the later complement lookup.",
-    "Connects the failed customer-facing reconciliation to the stored lookup key.",
-    "Names a regression guard such as duplicate amount coverage or table-driven reconciliation tests.",
+    "Identifies that the status guard covers only the caching side of the scan, not the row that completes the pair.",
+    "Connects the false explanation to double-counting settled money in the ledger, not just to a failing test.",
+    "Rules out the ledger helper and the duplicate-amount overwrite with evidence instead of rewriting them.",
+    "Names a regression guard such as a reconciled-complement test case or status filtering at ingestion.",
   ],
   workspace: {
     language: "javascript",
@@ -253,11 +307,21 @@ Finance support is reviewing manual invoice adjustments. The reconciliation job 
         path: "README.md",
         role: "docs",
         language: "markdown",
-        content: `# Pricing Reconciliation Lookup
+        content: `# Adjustment Reconciliation Lookup
 
-The invoice review queue receives a target adjustment amount in cents and a list of ledger line items. The lookup should return the indexes for two distinct line items whose amounts add up to the adjustment.
+Finance support reviews manual invoice adjustments in the billing review queue. For each adjustment, the queue calls this lookup with the adjustment amount in cents and the account's ledger rows. A match means the adjustment is fully explained by two ledger rows and can be approved without escalation.
 
-The function returns an empty array when no pair exists. Callers preserve index order so support can jump back to the exact ledger rows.`,
+## Ledger row shape
+
+Each row has an \`id\`, an \`amountCents\` integer, and a \`status\` that is either \`"open"\` or \`"reconciled"\`.
+
+## Contract
+
+- Return the indexes of two distinct ledger rows whose amounts add up to the adjustment amount, or an empty array when no such pair exists.
+- Only rows with status \`"open"\` may explain an adjustment. A \`"reconciled"\` row was consumed by an earlier adjustment; matching it again would double-count money the ledger has already settled.
+- Credits appear as negative amounts and are legitimate: a credit plus a larger charge can explain an adjustment.
+- Rows imported from the legacy export can be missing \`amountCents\`. The importer flags them for backfill and the lookup must skip them.
+- When several pairs qualify, return the first pair that completes in scan order. Callers preserve index order so support can jump to the exact rows.`,
         description: "Product and service contract notes",
       },
       {
@@ -265,7 +329,7 @@ The function returns an empty array when no pair exists. Callers preserve index 
         role: "editable",
         language: "javascript",
         content: starter,
-        description: "Pricing reconciliation lookup",
+        description: "Adjustment reconciliation lookup",
       },
       {
         path: "src/ledger.js",
