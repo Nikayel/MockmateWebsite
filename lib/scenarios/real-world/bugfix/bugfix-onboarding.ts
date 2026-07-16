@@ -265,6 +265,19 @@ Finance support approves a manual invoice adjustment when the review queue shows
     },
   ],
   expectedTouchedFiles: ["src/reconciliation.js"],
+  task: "Explain an adjustment only with two distinct open ledger rows that sum to it, even when a reconciled row would complete the sum.",
+  // Grounded in the scenario's own second visible test, "does not explain an
+  // adjustment with a row that was already reconciled": inv_9101 (2600, open)
+  // and inv_9102 (2400, reconciled) against a 5000 adjustment. The starter
+  // returns that pair where the test asserts an empty result.
+  symptom: {
+    subject: "the 5000c adjustment",
+    tag: "reconciled row in the ledger",
+    expected: "[]",
+    actual: "[0, 1]",
+    delta: "+1 pair",
+    caveat: "Adjustments backed by two open rows, credits, and no-match cases resolve correctly.",
+  },
   userReport:
     "Finance support approved an adjustment that the queue explained with a ledger row already consumed by an earlier adjustment. That account double-counts the row now, and support wants to know which queue explanations they can still trust.",
   observedSymptoms: [
