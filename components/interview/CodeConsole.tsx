@@ -358,7 +358,8 @@ export function CodeConsole({
         <div className="flex items-center space-x-2">
           <Terminal className="text-muted-foreground h-3.5 w-3.5" />
           <span className="text-muted-foreground text-xs font-medium">Console</span>
-          {hasCodeError && (
+          {/* A crashed pack already reports "crashed"; two red badges is noise. */}
+          {hasCodeError && !packRun && (
             <Badge className="h-4 border-red-500/30 bg-red-500/20 px-1.5 text-[10px] text-red-400">
               Error
             </Badge>

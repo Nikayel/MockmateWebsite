@@ -36,6 +36,13 @@ export function validateWorkspaceScenario(scenario: WorkspaceScenario): string[]
     errors.push(`Unsupported workspace language: ${workspace.language}`)
   }
 
+  // Making testRunnerPath optional for packs must not let a non-pack scenario
+  // ship without one: it would validate clean, then die at runtime with
+  // "Workspace runner not found: undefined".
+  if (!isPackScenario(scenario) && !workspace.testRunnerPath) {
+    errors.push("Non-pack workspace scenario must declare a testRunnerPath")
+  }
+
   for (const file of workspace.files) {
     if (!isValidWorkspacePath(file.path)) {
       errors.push(`Invalid workspace file path: ${file.path}`)
