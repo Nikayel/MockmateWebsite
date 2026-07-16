@@ -156,6 +156,18 @@ export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "The API gateway lets a traffic spike reserve more requests than a customer's plan allows, and two accounts blew past their quota during this week's spikes.",
+  task: "Cap a burst at the client's remaining capacity in the rolling window, so requests arriving all at once can never reserve more than the plan limit allows.",
+  // Grounded in the scenario's own second visible test, "a burst is capped at
+  // the plan limit": 10 requests at now=1000 against limit 5 on an empty store.
+  // The test expects 5; the starter's burst path returns 10.
+  symptom: {
+    subject: "client",
+    tag: "burst of 10, limit 5",
+    expected: "5 allowed",
+    actual: "10 allowed",
+    delta: "+5",
+    caveat: "The same requests sent one at a time are still capped at the limit.",
+  },
   userReport:
     "Customer success here. Two accounts went over their plan's per-minute API quota during traffic spikes this week. The limiter caps requests fine when they trickle in one at a time, but when an account fires a burst all at once, more of them get through than the plan should allow. Billing is now disputing the overage.",
   tags: ["backend", "rate-limiting", "concurrency", "api-infrastructure", "real-codebase"],
