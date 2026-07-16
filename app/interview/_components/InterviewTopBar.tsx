@@ -89,11 +89,14 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   return (
     <div className="focus-header flex flex-shrink-0 items-center justify-between gap-2 pt-2 transition-all duration-300">
       <div className="flex min-w-0 flex-1 items-center space-x-2">
-        <h2 className="max-w-[200px] truncate text-sm font-semibold text-foreground sm:max-w-md">
+        {/* Title + difficulty live in the brief header. At lg+ the brief is on
+            screen, so rendering them here too showed the same pair twice, ~40px
+            apart. Below lg the brief is a tab and may not be showing, so they stay. */}
+        <h2 className="text-foreground max-w-[200px] truncate text-sm font-semibold sm:max-w-md lg:hidden">
           {selectedScenario?.title}
         </h2>
         <Badge
-          className={`${difficultyColorClass(selectedScenario?.difficulty)} shrink-0 text-xs`}
+          className={`${difficultyColorClass(selectedScenario?.difficulty)} shrink-0 text-xs lg:hidden`}
         >
           {selectedScenario?.difficulty?.toUpperCase()}
         </Badge>
@@ -106,7 +109,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
               ? `Workspace scenario language: ${selectedScenario.workspace.language}`
               : "Choose editor language"
           }
-          className="focus:ring-accent hidden rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground focus:ring-2 focus:outline-none sm:block"
+          className="focus:ring-accent border-border bg-muted text-foreground hidden rounded-md border px-2 py-1 text-xs focus:ring-2 focus:outline-none sm:block"
         >
           <option value="javascript">JavaScript</option>
           <option value="typescript">TypeScript</option>
@@ -120,7 +123,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
       </div>
 
       <div
-        className="flex items-center gap-1 rounded-lg bg-muted/50 p-0.5 lg:hidden"
+        className="bg-muted/50 flex items-center gap-1 rounded-lg p-0.5 lg:hidden"
         role="tablist"
         aria-label="Switch panel"
       >
