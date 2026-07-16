@@ -125,6 +125,10 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
       primaryFilePath,
       language: pack.language,
     },
+    // Every pack's task is the same shape, and it is the honest one: the oracle
+    // decides. No `symptom` card — a pack's symptom is the stdout diff itself,
+    // which the terminal shows once the candidate reproduces it.
+    task: `Find and fix the defect so that \`${pack.runCmd}\` prints the expected output from task.md byte-for-byte.`,
     userReport: pack.summary,
     observedSymptoms: [pack.summary],
     reproductionSteps: [
