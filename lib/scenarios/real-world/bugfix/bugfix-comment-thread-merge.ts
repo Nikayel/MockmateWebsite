@@ -131,6 +131,20 @@ export const bugfixCommentThreadMergeScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A collaborative editor's comment sidebar sometimes reports one more unresolved thread than the document actually has, and a reviewer held a doc open believing a comment was still unresolved.",
+  task: "Merge each incoming thread into the existing thread that shares its id, updating it in place so no thread is duplicated and the unresolved badge matches the open comments.",
+  // Grounded in the scenario's own first visible test, "resolving the root
+  // thread does not duplicate it": t1 and t2 both open, incoming resolves t1.
+  // The starter appends the resolved t1 as a third thread instead of updating
+  // the stored one, so the doc holds 3 threads and count_unresolved returns 2
+  // where the test asserts count_unresolved(merged) == 1.
+  symptom: {
+    subject: "unresolved badge",
+    tag: "sync resolves t1",
+    expected: "1 unresolved",
+    actual: "2 unresolved",
+    delta: "+1",
+    caveat: "Syncs that touch only later threads merge in place and count correctly.",
+  },
   userReport:
     "Reviewer here. Our comment sidebar shows an unresolved badge so we know when a doc still has open comments. On some docs the badge sits one higher than the open comments actually visible, and the very first comment shows up twice in the margin. It seems to follow a server sync that touches the top comment; edits to later comments look fine. I kept a doc open thinking a comment was still unresolved when it was not.",
   tags: ["python", "backend", "sync", "collaboration", "real-codebase"],
