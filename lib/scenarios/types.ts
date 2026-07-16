@@ -232,6 +232,29 @@ export interface DSAScenario extends BaseScenario {
  * state machine + character-exact stdout runner instead of the assert-test path.
  * Client-safe: carries only the PUBLIC oracle and run command, never sealed content.
  */
+/**
+ * The shape of the bug, stated as two comparable values.
+ *
+ * Lands pre-verbally: a candidate sees "1,240s vs 1,980s (+740)" faster than they
+ * read a paragraph. Strictly symptom-level — it says WHAT is wrong, never WHY.
+ * Never populate this from `bugDescription` or `groundTruth`; both name the root
+ * cause, and locating it is the assessment.
+ */
+export interface BugSymptom {
+  /** What the numbers are about, e.g. "acct_7f3". */
+  subject: string
+  /** Optional qualifier, e.g. "both streams". */
+  tag?: string
+  /** The correct value, e.g. "1,240s". */
+  expected: string
+  /** The observed wrong value, e.g. "1,980s". */
+  actual: string
+  /** Optional signed difference, e.g. "+740". */
+  delta?: string
+  /** One line scoping the blast radius, e.g. which accounts are affected. */
+  caveat?: string
+}
+
 export interface BugfixPackRuntime {
   packId: string
   /** e.g. "python3 src/main.py fixtures/input.txt". */
@@ -251,6 +274,14 @@ export interface BugFixScenario extends BaseScenario {
    * undefined and continue to run the workspace test suite.
    */
   pack?: BugfixPackRuntime
+  /**
+   * One imperative sentence: the first thing the candidate reads, and the answer
+   * to "what do I actually do?". Lives outside `problemStatement` so the brief can
+   * show the task without the surrounding incident narrative.
+   */
+  task?: string
+  /** Expected vs actual as two comparable values. Symptom-level only. */
+  symptom?: BugSymptom
   userReport?: string
   observedSymptoms?: string[]
   reproductionSteps?: string[]
