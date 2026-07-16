@@ -134,9 +134,16 @@ export const bugfixCommentThreadMergeScenario: BugFixScenario = {
   task: "Merge each incoming thread into the existing thread that shares its id, updating it in place so no thread is duplicated and the unresolved badge matches the open comments.",
   // Grounded in the scenario's own first visible test, "resolving the root
   // thread does not duplicate it": t1 and t2 both open, incoming resolves t1.
-  // The starter appends the resolved t1 as a third thread instead of updating
-  // the stored one, so the doc holds 3 threads and count_unresolved returns 2
-  // where the test asserts count_unresolved(merged) == 1.
+  // The starter appends the resolved t1 as a third thread instead of updating the
+  // stored one, so the doc holds 3 threads and count_unresolved returns 2 against
+  // the test's expected 1. Note the suite's summarize_threads assert raises first,
+  // so the failure a candidate SEES is the list mismatch; the badge framing here
+  // matches the incident report and the title, and both describe the same run.
+  //
+  // The caveat is about the in-place merge of a LATER thread, which only the
+  // hidden "later thread updates in place" test exercises. The visible
+  // "new thread appends after existing" test takes the append branch instead, so
+  // it does not demonstrate the caveat despite looking like it should.
   symptom: {
     subject: "unresolved badge",
     tag: "sync resolves t1",
