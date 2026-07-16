@@ -128,7 +128,7 @@ export const bugfixCommentThreadMergeScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Google", "Notion", "Dropbox", "Microsoft"],
+  companies: ["Generic"],
   description:
     "A collaborative editor's comment sidebar sometimes reports one more unresolved thread than the document actually has, and a reviewer held a doc open believing a comment was still unresolved.",
   userReport:

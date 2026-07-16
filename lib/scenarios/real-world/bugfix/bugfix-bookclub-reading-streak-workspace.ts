@@ -545,7 +545,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Amazon", "Apple", "Notion"],
+  companies: ["Generic"],
   description:
     "Fix a reading-streak calculation and a history ordering in a small layered reading-tracker app",
   userReport:

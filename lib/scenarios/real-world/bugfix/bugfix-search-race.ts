@@ -213,7 +213,7 @@ export const bugfixSearchRaceScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Airbnb", "Meta", "LinkedIn", "Startup"],
+  companies: ["Generic"],
   description:
     "A reservation support console sometimes shows the previous caller's booking after an agent searches a new ref, and an agent acted on the wrong reservation before catching it.",
   userReport:

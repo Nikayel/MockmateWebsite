@@ -153,7 +153,7 @@ export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "hard",
-  companies: ["Cloudflare", "Stripe", "Amazon", "Meta"],
+  companies: ["Generic"],
   description:
     "The API gateway lets a traffic spike reserve more requests than a customer's plan allows, and two accounts blew past their quota during this week's spikes.",
   userReport:

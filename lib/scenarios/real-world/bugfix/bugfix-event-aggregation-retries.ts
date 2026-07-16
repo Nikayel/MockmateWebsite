@@ -136,7 +136,7 @@ export const bugfixEventAggregationRetriesScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Databricks", "Snowflake", "LinkedIn", "Uber"],
+  companies: ["Generic"],
   description:
     "A customer analytics report shows one account with far more delivery events than its raw log supports, after the ingestion queue moved to at-least-once delivery.",
   userReport:

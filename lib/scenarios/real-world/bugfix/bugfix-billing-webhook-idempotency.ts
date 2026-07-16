@@ -164,7 +164,7 @@ export const bugfixBillingWebhookIdempotencyScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "hard",
-  companies: ["Stripe", "Shopify", "Square", "Amazon"],
+  companies: ["Stripe"],
   description:
     "Paid accounts got double monthly credits after a webhook replay, and one account was downgraded even though a later upgrade had already been applied.",
   userReport:

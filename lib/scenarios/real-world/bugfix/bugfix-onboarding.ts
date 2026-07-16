@@ -215,7 +215,7 @@ export const bugfixOnboardingScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "easy",
-  companies: ["Stripe", "Shopify", "Square"],
+  companies: ["Generic"],
   description:
     "The billing review queue explained a manual invoice adjustment with ledger money that had already been settled, and finance approved the match before review caught it.",
   tags: ["javascript", "onboarding", "billing", "reconciliation", "real-codebase"],

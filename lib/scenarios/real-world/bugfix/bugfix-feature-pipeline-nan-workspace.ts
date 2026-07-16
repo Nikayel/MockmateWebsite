@@ -147,7 +147,7 @@ export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Veeva", "Databricks", "Uber", "Google"],
+  companies: ["Generic"],
   description:
     "A model scoring job stopped erroring after the feature builder was hardened, but accounts migrated from the legacy CRM now score like empty users even though their history exists.",
   userReport:

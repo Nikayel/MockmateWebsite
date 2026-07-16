@@ -212,7 +212,7 @@ export const bugfixTemperatureAlertRegressionScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Uber", "Google", "Startup"],
+  companies: ["Generic"],
   description:
     "A data-center telemetry panel annotates only part of a cold streak's recovery wait, so alert summaries look calmer than the racks actually ran.",
   tags: ["javascript", "telemetry", "observability", "alerts", "real-codebase"],
