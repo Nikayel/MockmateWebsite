@@ -167,6 +167,20 @@ export const bugfixBillingWebhookIdempotencyScenario: BugFixScenario = {
   companies: ["Stripe"],
   description:
     "Paid accounts got double monthly credits after a webhook replay, and one account was downgraded even though a later upgrade had already been applied.",
+  task: "Apply each subscription event to an account at most once, and leave the account in the state of its newest applied event even when an older event arrives later.",
+  // Grounded in the scenario's own first visible test, "a duplicate event grants
+  // credits once": evt_1 carries a 100-credit grant and is delivered twice. The
+  // starter grants on both deliveries, so acct_1 ends at 200 credits where the
+  // test asserts 100.
+  symptom: {
+    subject: "acct_1",
+    tag: "same event twice",
+    expected: "100 credits",
+    actual: "200 credits",
+    delta: "+100",
+    caveat:
+      "Non-subscription events and events addressed to another account leave the account unchanged.",
+  },
   userReport:
     "Billing team here. After the payment provider replayed a batch of webhooks last Tuesday, several paid accounts show double their monthly credits. Separately, one account got knocked down to the free plan even though the customer had upgraded to team, because a delayed older event landed after the upgrade. Support is issuing manual corrections.",
   tags: ["backend", "billing", "webhooks", "subscriptions", "real-codebase"],
