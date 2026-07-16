@@ -44,10 +44,12 @@ export { buildPistonWorkspaceFiles } from "./piston-builder"
 export { parseWorkspaceExecutionOutput } from "./result-parser"
 export {
   isWorkspaceScenario,
+  isPackScenario,
   isValidWorkspacePath,
   normalizeWorkspaceEdits,
   validateWorkspaceScenario,
 } from "./validators"
+export type { PackScenario } from "./validators"
 export type {
   PistonWorkspaceFile,
   WorkspaceExecutionResult,
@@ -59,4 +61,6 @@ export type {
   WorkspaceTestResult,
   DsaTestResult,
   DsaExecutionResult,
+  PackRunView,
+  PackExecutionResult,
 } from "./types"

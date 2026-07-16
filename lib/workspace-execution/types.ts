@@ -76,3 +76,33 @@ export interface DsaExecutionResult {
   }
   error: string | null
 }
+
+/**
+ * Terminal view of one stdout-oracle pack run.
+ *
+ * Packs are verified by byte-exact stdout comparison, so the candidate-facing
+ * surface is the program's real output — not a pass/fail row. Deliberately
+ * carries NO expected output and NO diff: the oracle is already public in
+ * `task.md` and the visible `tests/expected_output.txt`, and locating which
+ * section is wrong is the skill the pack model assesses. The console reports
+ * the verdict and names the oracle; the candidate does the diffing.
+ */
+export interface PackRunView {
+  /** Command echoed at the `$` prompt, e.g. "python3 src/main.py fixtures/input.txt". */
+  runCmd: string
+  /** False when the program crashed or timed out before producing capturable stdout. */
+  ran: boolean
+  /** Exact captured stdout, verbatim (empty string on a crash). */
+  stdout: string
+  /** Candidate-visible oracle file the verdict refers to. */
+  oraclePath: string
+  /** True only on a byte-for-byte match against the public oracle. */
+  match: boolean
+  /** Crash/timeout message when `ran` is false, else null. */
+  crashError: string | null
+}
+
+export interface PackExecutionResult extends DsaExecutionResult {
+  kind: "pack"
+  packRun: PackRunView
+}

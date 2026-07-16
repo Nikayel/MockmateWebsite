@@ -1,10 +1,25 @@
-import type { Scenario } from "@/lib/scenarios/types"
+import type { BugFixScenario, BugfixPackRuntime, Scenario } from "@/lib/scenarios/types"
 import type { WorkspaceFileEdit, WorkspaceScenario } from "./types"
 
 const SUPPORTED_WORKSPACE_LANGUAGES = new Set(["javascript", "typescript", "python", "sql"])
 
 export function isWorkspaceScenario(scenario: Scenario): scenario is WorkspaceScenario {
   return scenario.executionMode === "workspace" && Boolean(scenario.workspace)
+}
+
+export type PackScenario = WorkspaceScenario & { pack: BugfixPackRuntime }
+
+/**
+ * A stdout-oracle pack, which must NOT go through the assert-based workspace
+ * runner: a pack's `testRunnerPath` is oracle config, not an executable runner.
+ * Packs run their `runCmd` and are graded by byte-exact stdout comparison.
+ */
+export function isPackScenario(scenario: Scenario): scenario is PackScenario {
+  return (
+    isWorkspaceScenario(scenario) &&
+    Boolean((scenario as BugFixScenario).pack) &&
+    scenario.workspace.language === "python"
+  )
 }
 
 export function isValidWorkspacePath(path: string): boolean {
