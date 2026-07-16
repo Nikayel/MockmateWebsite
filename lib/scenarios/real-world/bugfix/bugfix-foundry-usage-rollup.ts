@@ -197,6 +197,18 @@ export const bugfixFoundryUsageRollupScenario: BugFixScenario = {
   companies: ["Palantir"],
   description:
     "A metered compute-usage rollup overbills several accounts for compute-seconds after a backfill replayed a transform's backup build into the pipeline.",
+  task: "Meter each distinct event id once per account, even when the same id arrives on both the primary and the backup stream.",
+  // Grounded in the scenario's own first visible test: evt_1 at 5s on both
+  // streams. The starter dedupes each stream in isolation and then sums, so it
+  // reports 10s / 2 events where the test expects 5s / 1.
+  symptom: {
+    subject: "acct_1",
+    tag: "both builds",
+    expected: "5s",
+    actual: "10s",
+    delta: "+5s",
+    caveat: "Accounts whose events landed on only one build are billed correctly.",
+  },
   userReport:
     "Metering analyst here. Several accounts were billed for more compute-seconds than their transforms actually used. It started right after last week's backfill replayed the backup build into the usage rollup. The single-build numbers look right; it's the accounts whose events showed up on both builds that are inflated.",
   tags: ["backend", "data-pipeline", "metering", "foundry", "real-codebase"],
