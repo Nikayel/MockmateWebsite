@@ -21,17 +21,32 @@ import { getSessionsLimitForTier } from "./pricing"
 import { calculateTechnicalScoreFromBreakdown, SESSION } from "./constants"
 
 /**
+ * Stringify a test value for Firestore, mapping absent values to null.
+ *
+ * `JSON.stringify(undefined)` returns the VALUE `undefined`, not a string — and
+ * Firestore rejects undefined field values outright (the client is not configured
+ * with `ignoreUndefinedProperties`), failing the entire write. Workspace suites
+ * and packs legitimately have no expected/actual pair, so this is a real input.
+ */
+function stringifyTestValue(value: unknown): string | null {
+  return value === undefined ? null : JSON.stringify(value)
+}
+
+/**
  * Sanitize test results for Firestore storage
  * Firestore doesn't support nested arrays, so we stringify complex values
+ *
+ * Exported for tests: it is a pure function guarding every session write, and a
+ * single undefined here fails the whole document.
  */
-function sanitizeTestResultsForFirestore(testResults: Array<any>): Array<any> {
+export function sanitizeTestResultsForFirestore(testResults: Array<any>): Array<any> {
   return testResults.map((t: any) => ({
     description: t.description,
     passed: t.passed,
-    input: JSON.stringify(t.input),
-    expected: JSON.stringify(t.expected),
-    actual: JSON.stringify(t.actual),
-    error: t.error,
+    input: stringifyTestValue(t.input),
+    expected: stringifyTestValue(t.expected),
+    actual: stringifyTestValue(t.actual),
+    error: t.error ?? null,
   }))
 }
 
