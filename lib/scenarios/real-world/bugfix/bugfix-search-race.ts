@@ -225,8 +225,12 @@ export const bugfixSearchRaceScenario: BugFixScenario = {
     tag: "BK-2048 searched while BK-1024 is in flight",
     expected: "BK-2048",
     actual: "BK-1024",
-    caveat:
-      "Single lookups, and overlapping lookups that come back in order, show the right guest.",
+    // Deliberately says nothing about arrival ORDER. An in-order overlap is not
+    // safe here: the hidden "a stale response does not clear the spinner"
+    // test overlaps BK-7 and BK-42, resolves them in order, and still fails the
+    // starter. A caveat blessing in-order overlaps would steer the candidate to a
+    // sequence-counter fix that passes both visible tests and fails that hidden one.
+    caveat: "A lookup with no second search in flight shows the right guest.",
   },
   userReport:
     "Support agent here. I searched a booking ref while on a call and the console showed me a reservation for a different guest, one I had looked up a moment earlier. I started a refund on it before I noticed the name was wrong. It only seems to happen when I search a second ref before the first result comes back.",
