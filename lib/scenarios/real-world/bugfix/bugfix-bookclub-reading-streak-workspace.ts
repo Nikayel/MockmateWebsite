@@ -548,6 +548,19 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "Fix a reading-streak calculation and a history ordering in a small layered reading-tracker app",
+  task: "Count the reading streak as the consecutive days, ending today, on which the member finished a book, and list the reading history most recently finished first.",
+  // Grounded in the scenario's own visible streak test (tests/test_streak.py,
+  // "current streak counts consecutive finished days"): calculate_streak(1, TODAY)
+  // asserts 3 for Alex on 2026-06-28. The starter returns 0, while the same
+  // suite's books-this-month (3) and total-pages (950) assertions both pass.
+  symptom: {
+    subject: "alex",
+    tag: "reading streak",
+    expected: "3 days",
+    actual: "0 days",
+    delta: "-3 days",
+    caveat: "Books this month and total pages read are correct for the same reader.",
+  },
   userReport:
     "Two things look wrong on my BookClub profile. My reading streak says 0 even though I've finished a book three days running, and my reading history is in a strange order — the book I finished today isn't at the top. The books themselves all show up fine; it's the streak number and the ordering that seem off.",
   tags: ["python", "real-codebase", "data-modeling", "flask"],
