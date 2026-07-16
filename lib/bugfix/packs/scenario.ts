@@ -181,7 +181,9 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
       editableFilePaths,
       visibleTestPaths: [ORACLE_VISIBLE_PATH],
       hiddenTestPaths: [ORACLE_CONFIG_PATH],
-      testRunnerPath: ORACLE_CONFIG_PATH,
+      // No testRunnerPath: a pack has no executable runner. It is graded by
+      // running `pack.runCmd` and byte-diffing stdout. Pointing this at the
+      // oracle JSON is what made every pack run silently do nothing.
       files: packWorkspaceFiles(pack),
     },
   }

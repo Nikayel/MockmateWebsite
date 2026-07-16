@@ -113,7 +113,12 @@ export interface WorkspaceScenarioConfig {
   editableFilePaths: string[]
   visibleTestPaths: string[]
   hiddenTestPaths: string[]
-  testRunnerPath: string
+  /**
+   * Executable entrypoint for the assert-based runner. Absent for stdout-oracle
+   * packs, which are graded by running `pack.runCmd` and byte-diffing stdout —
+   * they have no test runner to execute.
+   */
+  testRunnerPath?: string
   files: WorkspaceScenarioFile[]
   referenceFiles?: WorkspaceScenarioFile[]
 }

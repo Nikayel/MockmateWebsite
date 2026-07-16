@@ -44,7 +44,8 @@ export function validateWorkspaceScenario(scenario: WorkspaceScenario): string[]
 
   for (const path of [
     workspace.primaryFilePath,
-    workspace.testRunnerPath,
+    // Packs legitimately have no test runner; only validate one when declared.
+    ...(workspace.testRunnerPath ? [workspace.testRunnerPath] : []),
     ...workspace.editableFilePaths,
     ...workspace.visibleTestPaths,
     ...workspace.hiddenTestPaths,
