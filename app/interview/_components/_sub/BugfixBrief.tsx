@@ -27,6 +27,39 @@ import type { BugSymptom } from "@/lib/scenarios/types"
 
 const LABEL = "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70"
 
+/**
+ * Sections of `problemStatement` that the brief now states in its own right, and
+ * which would otherwise be a second copy inside the collapsed report.
+ *
+ * Presentation-only: `problemStatement` itself stays whole, because it feeds RAG
+ * vectorization (lib/rag/vectorization/text-builders/bugfix-text.ts) and the AI
+ * context. This trims what the CANDIDATE reads, not what the model reads.
+ */
+const REDUNDANT_SECTIONS = /^\*\*(Your Task|Artifacts)\*\*\s*$/i
+
+/**
+ * Keep only the incident narrative: drop any "**Your Task**" / "**Artifacts**"
+ * section, which the task box and the file tree already cover. A section runs
+ * until the next `**Heading**` line or the end.
+ */
+export function extractIncidentNarrative(statement: string): string {
+  const lines = statement.split("\n")
+  const kept: string[] = []
+  let skipping = false
+
+  for (const line of lines) {
+    if (/^\*\*[^*]+\*\*\s*$/.test(line)) {
+      skipping = REDUNDANT_SECTIONS.test(line)
+    }
+    if (!skipping) kept.push(line)
+  }
+
+  return kept
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
 interface BugfixBriefProps {
   /** One imperative sentence. */
   task?: string
@@ -170,7 +203,10 @@ export function BugfixBrief({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="text-muted-foreground pt-1.5 pl-5 text-[12.5px] leading-relaxed">
-              <MarkdownRenderer content={report} className="text-[12.5px] leading-relaxed" />
+              <MarkdownRenderer
+                content={extractIncidentNarrative(report)}
+                className="text-[12.5px] leading-relaxed"
+              />
             </div>
           </CollapsibleContent>
         </Collapsible>
