@@ -258,6 +258,20 @@ The data-center operations panel annotates each temperature reading with how man
     },
   ],
   expectedTouchedFiles: ["src/temperature-alerts.js"],
+  task: "Annotate every reading with the minutes, taken from the observedAt timestamps, until that sensor's next strictly warmer sample, even when one recovery ends a whole cold streak.",
+  // Grounded in the scenario's own first visible test, "a recovery resolves the
+  // whole streak using observed timestamps": rack-a reads 70 at 09:00, 69 at
+  // 09:02, then recovers to 71 at 09:05. The starter returns [0, 3, 0] where the
+  // test asserts [5, 3, 0], so the 09:00 reading is annotated 0 instead of 5.
+  // The same suite's all-zero descending run (rack-b) already passes.
+  symptom: {
+    subject: "rack-a 09:00",
+    tag: "warmup window",
+    expected: "5 min",
+    actual: "0 min",
+    delta: "-5 min",
+    caveat: "Readings with no warmer sample ahead of them correctly stay at zero.",
+  },
   userReport:
     "Operations here. The panel shows some cold streaks recovering faster than they did on the floor, so our alert summaries undercount how long racks ran hot. It looks worst on a long slow cool-down that finally recovers; only the last reading before the recovery seems to get a wait, and the earlier ones read as fine.",
   observedSymptoms: [
