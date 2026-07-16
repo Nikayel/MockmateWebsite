@@ -153,13 +153,13 @@ export const bugfixEventAggregationRetriesScenario: BugFixScenario = {
     caveat: "The same account's opened total is correct, and distinct events still count.",
   },
   userReport:
-    "Analytics team here. The customer report dashboard is overstating engagement for one account since last month's queue migration. It shows roughly 40% more click events than that account's raw event log has rows for. Other accounts look right. The queue vendor told us delivery is now at-least-once and batches can arrive out of order.",
+    "Analytics team here. The customer report dashboard is overstating engagement for one account since last month's queue migration. It shows roughly 40% more sent events than that account's raw event log has rows for. Other accounts look right. The queue vendor told us delivery is now at-least-once and batches can arrive out of order.",
   tags: ["python", "data", "analytics", "event-pipeline", "real-codebase"],
   estimatedTime: 45,
   problemStatement: `A customer analytics report turns raw delivery events into per-account totals. Since the ingestion queue moved to at-least-once delivery, one account's totals are inflated versus its raw log.
 
 **Incident Report**
-The dashboard overstates one account's click volume by about 40% while other accounts match their logs. The queue can hand the aggregator the same event more than once and can deliver batches out of order.
+The dashboard overstates one account's send volume by about 40% while other accounts match their logs. The queue can hand the aggregator the same event more than once and can deliver batches out of order.
 
 Read the codebase files, run the tests, and make the smallest fix so an account's totals reflect its real events. Keep the public function signature.`,
   buggyCode: { python: starter },
@@ -196,7 +196,7 @@ Read the codebase files, run the tests, and make the smallest fix so an account'
   ],
   expectedTouchedFiles: ["src/event_aggregation.py"],
   observedSymptoms: [
-    "One account's click total is about 40% higher than its raw log; the inflation tracks events the queue happened to redeliver.",
+    "One account's sent total is about 40% higher than its raw log; the inflation tracks events the queue happened to redeliver.",
     "Other accounts match their logs, and an id shared across two accounts is two real events, not a duplicate.",
   ],
   reproductionSteps: [
