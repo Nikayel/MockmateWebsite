@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PYTHON_WRAPPER_LINE_OFFSET, JAVASCRIPT_WRAPPER_LINE_OFFSET } from "@/lib/piston"
+import { TerminalOutput, TERMINAL_PRE } from "./TerminalOutput"
+import type { PackRunView } from "@/lib/workspace-execution"
 
 /**
  * CodeConsole - IDE-like console panel for code execution output
@@ -29,8 +31,10 @@ export interface TestResult {
   description: string
   passed: boolean
   input: any
-  expected: any
-  actual: any
+  /** Absent for workspace suites, whose only honest signal is `error`. */
+  expected?: any
+  /** Absent for workspace suites, whose only honest signal is `error`. */
+  actual?: any
   error: string | null
   isHidden?: boolean
 }
@@ -54,6 +58,11 @@ interface CodeConsoleProps {
   onGoToLine?: (lineNum: number) => void
   /** Optional info banner (e.g. guided-lab "a new check just unlocked"). */
   notice?: string
+  /**
+   * Stdout-oracle pack run. When set, the console renders the program's real
+   * terminal output instead of pass/fail rows — a pack has no assert suite.
+   */
+  packRun?: PackRunView | null
 }
 
 /**
@@ -261,6 +270,22 @@ function formatErrorMessage(
   return { title, details, hint: hints[errorType] }
 }
 
+/**
+ * A test row has a real comparison to show only when the runner produced actual
+ * values. Workspace suites report an assert message instead, and the old code
+ * substituted the literals "pass"/"fail" — rendering `Expected: "pass"`.
+ */
+function hasComparison(result: TestResult): boolean {
+  return result.expected !== undefined || result.actual !== undefined
+}
+
+/** Exact by default; pretty-printed once a structure is too wide to scan inline. */
+function formatValue(value: unknown): string {
+  const compact = JSON.stringify(value)
+  if (compact === undefined) return String(value)
+  return compact.length > 60 ? JSON.stringify(value, null, 2) : compact
+}
+
 export function CodeConsole({
   outputs = [],
   testResults = [],
@@ -271,6 +296,7 @@ export function CodeConsole({
   language = "python",
   userCodeLineCount,
   notice,
+  packRun,
 }: CodeConsoleProps) {
   const consoleRef = useRef<HTMLDivElement>(null)
   const userScrolledUpRef = useRef(false)
@@ -318,7 +344,7 @@ export function CodeConsole({
         }`
       : null
 
-  const isEmpty = outputs.length === 0 && testResults.length === 0 && !isRunning
+  const isEmpty = outputs.length === 0 && testResults.length === 0 && !packRun && !isRunning
 
   return (
     <div
@@ -339,7 +365,22 @@ export function CodeConsole({
           )}
         </div>
         <div className="flex items-center space-x-2">
-          {testResults.length > 0 && !hasCodeError && (
+          {/* Packs have no test suite — report the oracle verdict, not a tally. */}
+          {packRun && (
+            <Badge
+              className={cn(
+                "h-5 text-xs",
+                !packRun.ran
+                  ? "border-red-500/30 bg-red-500/20 text-red-400"
+                  : packRun.match
+                    ? "border-green-500/30 bg-green-500/20 text-green-400"
+                    : "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
+              )}
+            >
+              {!packRun.ran ? "crashed" : packRun.match ? "oracle match" : "oracle mismatch"}
+            </Badge>
+          )}
+          {!packRun && testResults.length > 0 && !hasCodeError && (
             <Badge
               className={cn(
                 "h-5 text-xs",
@@ -358,7 +399,7 @@ export function CodeConsole({
               Running...
             </Badge>
           )}
-          {onClear && (outputs.length > 0 || testResults.length > 0) && (
+          {onClear && (outputs.length > 0 || testResults.length > 0 || packRun) && (
             <Button
               variant="ghost"
               size="sm"
@@ -416,12 +457,20 @@ export function CodeConsole({
             )}
           >
             <span className="text-muted-foreground select-none">{">"}</span>
-            <span className="break-all whitespace-pre-wrap">{output.message}</span>
+            {/* break-words, not break-all: break-all chops mid-token at arbitrary
+                characters and shreds paths, ids, and aligned output. */}
+            <span className="break-words whitespace-pre-wrap">{output.message}</span>
           </div>
         ))}
 
+        {/* Pack runs are graded by byte-exact stdout, so the program's real
+            terminal output IS the result. No pass/fail rows, no error banner —
+            a pack traceback points at the candidate's own file and must not go
+            through the wrapper-offset error formatter. */}
+        {packRun && !isRunning && <TerminalOutput {...packRun} />}
+
         {/* Test Results */}
-        {testResults.length > 0 && !isRunning && (
+        {!packRun && testResults.length > 0 && !isRunning && (
           <>
             {/* Error banner for syntax/runtime errors */}
             {hasCodeError && errorInfo && (
@@ -498,33 +547,43 @@ export function CodeConsole({
                             `input` as a tag, which is noise to display here. */}
                         {result.input != null && typeof result.input === "object" && (
                           <div className="flex items-start gap-2">
-                            <span className="text-muted-foreground w-14">Input:</span>
-                            <span className="break-all text-blue-300">
-                              {JSON.stringify(result.input)}
-                            </span>
+                            <span className="text-muted-foreground w-14 flex-shrink-0">Input:</span>
+                            <pre className={cn(TERMINAL_PRE, "text-blue-300")}>
+                              {formatValue(result.input)}
+                            </pre>
                           </div>
                         )}
-                        {/* Show expected/got for wrong output, show error for code errors */}
+                        {/* Show the error when there is one; otherwise the real
+                            expected/actual values. Workspace suites carry neither
+                            (their assert message is the signal), and inventing
+                            "Expected: pass / Got: fail" for them told the learner
+                            nothing. */}
                         {result.error ? (
                           <div className="flex items-start gap-2">
-                            <span className="text-muted-foreground w-14">Error:</span>
-                            <span className="break-all text-red-300">{result.error}</span>
+                            <span className="text-muted-foreground w-14 flex-shrink-0">Error:</span>
+                            <pre className={cn(TERMINAL_PRE, "text-red-300")}>{result.error}</pre>
                           </div>
-                        ) : (
+                        ) : hasComparison(result) ? (
                           <>
                             <div className="flex items-start gap-2">
-                              <span className="text-muted-foreground w-14">Expected:</span>
-                              <span className="break-all text-green-300">
-                                {JSON.stringify(result.expected)}
+                              <span className="text-muted-foreground w-14 flex-shrink-0">
+                                Expected:
                               </span>
+                              <pre className={cn(TERMINAL_PRE, "text-green-300")}>
+                                {formatValue(result.expected)}
+                              </pre>
                             </div>
                             <div className="flex items-start gap-2">
-                              <span className="text-muted-foreground w-14">Got:</span>
-                              <span className="break-all text-red-300">
-                                {JSON.stringify(result.actual)}
-                              </span>
+                              <span className="text-muted-foreground w-14 flex-shrink-0">Got:</span>
+                              <pre className={cn(TERMINAL_PRE, "text-red-300")}>
+                                {formatValue(result.actual)}
+                              </pre>
                             </div>
                           </>
+                        ) : (
+                          <span className="text-muted-foreground italic">
+                            This check did not pass.
+                          </span>
                         )}
                       </>
                     )}

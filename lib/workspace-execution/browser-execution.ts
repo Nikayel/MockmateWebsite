@@ -133,9 +133,13 @@ function formatWorkspaceResult(result: WorkspaceExecutionResult): BrowserExecuti
     results: result.results.map((item) => ({
       description: `${item.suite}: ${item.name}`,
       passed: item.passed,
+      // The suite name rides in `input` — the guided-lab reveal filter keys off it.
       input: item.suite,
-      expected: "pass",
-      actual: item.passed ? "pass" : "fail",
+      // A workspace suite has no expected/actual pair; its assert message is the
+      // signal. Synthesizing "pass"/"fail" here rendered `Expected: "pass"` and
+      // `Got: "fail"`, which told the learner nothing about what broke.
+      expected: undefined,
+      actual: undefined,
       error: item.error,
       isHidden: item.isHidden,
     })),
