@@ -6,6 +6,7 @@ import {
   type TestResult,
   type TestSummary,
 } from "@/components/interview/CodeConsole"
+import type { PackRunView } from "@/lib/workspace-execution"
 
 interface ConsoleOutputProps {
   editorConsoleOutputs: ConsoleOutputType[]
@@ -15,6 +16,7 @@ interface ConsoleOutputProps {
   onClearConsole: () => void
   onGoToLine?: (lineNum: number) => void
   notice?: string
+  packRun?: PackRunView | null
 }
 
 export function ConsoleOutput({
@@ -25,6 +27,7 @@ export function ConsoleOutput({
   onClearConsole,
   onGoToLine,
   notice,
+  packRun,
 }: ConsoleOutputProps) {
   return (
     <CodeConsole
@@ -36,6 +39,7 @@ export function ConsoleOutput({
       onClear={onClearConsole}
       onGoToLine={onGoToLine}
       notice={notice}
+      packRun={packRun}
     />
   )
 }

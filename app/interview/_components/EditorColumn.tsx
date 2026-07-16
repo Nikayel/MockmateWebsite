@@ -30,6 +30,7 @@ import {
   useRevealedTestSuites,
 } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
+import type { PackRunView } from "@/lib/workspace-execution"
 import type { EditorLanguage, WorkspaceContextFile } from "../_types"
 import {
   getWorkspaceFileRoleStyle,
@@ -63,6 +64,8 @@ interface EditorColumnProps {
   editorConsoleOutputs: ConsoleOutput[]
   testResults: TestResult[]
   testSummary: TestSummary
+  /** Set only for stdout-oracle packs, whose console shows real terminal output. */
+  packRun: PackRunView | null
   isRunningTests: boolean
   onClearConsole: () => void
   onSubmitSystemDesign: () => void
@@ -102,6 +105,7 @@ export const EditorColumn = memo(function EditorColumn({
   editorConsoleOutputs,
   testResults,
   testSummary,
+  packRun,
   isRunningTests,
   onClearConsole,
   onSubmitSystemDesign,
@@ -397,6 +401,7 @@ export const EditorColumn = memo(function EditorColumn({
             editorConsoleOutputs={editorConsoleOutputs}
             testResults={visibleTestResults}
             testSummary={visibleTestSummary}
+            packRun={packRun}
             isRunningTests={isRunningTests}
             onClearConsole={onClearConsole}
             onGoToLine={onGoToLine}

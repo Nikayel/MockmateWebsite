@@ -17,6 +17,7 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { type Scenario } from "@/lib/scenarios"
+import type { PackRunView } from "@/lib/workspace-execution"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
 // Interview phase tracking
@@ -296,6 +297,8 @@ function InterviewPageContent() {
 
   // Test states
   const [testResults, setTestResults] = useState<TestResult[]>([])
+  // Set only by stdout-oracle pack runs; drives the terminal console surface.
+  const [packRun, setPackRun] = useState<PackRunView | null>(null)
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLogEntry[]>([])
   const [isRunningTests, setIsRunningTests] = useState(false)
   const [testSummary, setTestSummary] = useState<TestSummary>({
@@ -892,7 +895,14 @@ function InterviewPageContent() {
     // anything memoized on it, churn on every 1s clock tick. exhaustive-deps only
     // recognizes the whole-object form, so its warning is suppressed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedScenario, user?.id, firebaseUser, hintAgent.updateCode, hintAgent.regenerateHints, code])
+  }, [
+    selectedScenario,
+    user?.id,
+    firebaseUser,
+    hintAgent.updateCode,
+    hintAgent.regenerateHints,
+    code,
+  ])
 
   const syncHintAgentWithTestOutcome = useCallback(
     (
@@ -1608,6 +1618,7 @@ function InterviewPageContent() {
     isFromRoadmap,
     activeRoadmap,
     setTestResults,
+    setPackRun,
     setConsoleLogs,
     setIsRunningTests,
     setTestSummary,
@@ -1636,6 +1647,7 @@ function InterviewPageContent() {
   const handleClearConsole = useCallback(() => {
     setConsoleLogs([])
     setTestResults([])
+    setPackRun(null)
     setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
   }, [])
 
@@ -2005,6 +2017,7 @@ function InterviewPageContent() {
                   editorConsoleOutputs={editorConsoleOutputs}
                   testResults={testResults}
                   testSummary={testSummary}
+                  packRun={packRun}
                   isRunningTests={isRunningTests}
                   onClearConsole={handleClearConsole}
                   onSubmitSystemDesign={submitSystemDesign}

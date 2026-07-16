@@ -4,6 +4,7 @@ import { analyzeCodeEfficiency } from "@/lib/interview"
 import { isExecutionServiceError } from "@/lib/piston"
 import { saveSessionState } from "@/lib/firestore-helpers"
 import type { Scenario } from "@/lib/scenarios"
+import type { PackRunView } from "@/lib/workspace-execution"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import type {
   ChatMessage,
@@ -64,6 +65,7 @@ export interface UseCodeExecutionOptions {
 
   // ---- state setters (page owns the state) ----
   setTestResults: Dispatch<SetStateAction<TestResult[]>>
+  setPackRun: Dispatch<SetStateAction<PackRunView | null>>
   setConsoleLogs: Dispatch<SetStateAction<ConsoleLogEntry[]>>
   setIsRunningTests: Dispatch<SetStateAction<boolean>>
   setTestSummary: Dispatch<SetStateAction<TestSummary>>
@@ -123,6 +125,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
     isFromRoadmap,
     activeRoadmap,
     setTestResults,
+    setPackRun,
     setConsoleLogs,
     setIsRunningTests,
     setTestSummary,
@@ -143,6 +146,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
     setIsRunningTests(true)
     setTestResults([])
+    setPackRun(null)
     setConsoleLogs([]) // Clear previous console logs
 
     // Analyze code efficiency
@@ -172,6 +176,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
       if (data.results) {
         setTestResults(data.results)
+        setPackRun(data.kind === "pack" ? data.packRun : null)
         setTestSummary(data.summary)
         applyGuidedLabGating(selectedScenario.id, data.results)
         updateTrackerOnTestsRun()
@@ -190,10 +195,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
         syncHintAgentWithTestOutcome(data.summary, data.results)
 
-        // Store console logs from execution
-        if (data.consoleLogs && data.consoleLogs.length > 0) {
-          setConsoleLogs(data.consoleLogs)
-        }
+        setConsoleLogs(data.consoleLogs ?? [])
 
         // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)
@@ -274,6 +276,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
     setIsRunningTests(true)
     setTestResults([])
+    setPackRun(null)
     setConsoleLogs([])
 
     // Analyze code efficiency
@@ -303,6 +306,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
       if (data.results) {
         setTestResults(data.results)
+        setPackRun(data.kind === "pack" ? data.packRun : null)
         setTestSummary(data.summary)
         applyGuidedLabGating(selectedScenario.id, data.results)
         updateTrackerOnTestsRun()
@@ -327,10 +331,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
         syncHintAgentWithTestOutcome(data.summary, data.results)
 
-        // Store console logs from execution
-        if (data.consoleLogs && data.consoleLogs.length > 0) {
-          setConsoleLogs(data.consoleLogs)
-        }
+        setConsoleLogs(data.consoleLogs ?? [])
 
         // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)

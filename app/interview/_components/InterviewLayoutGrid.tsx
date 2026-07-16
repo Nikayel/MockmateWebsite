@@ -51,6 +51,7 @@ interface InterviewLayoutGridProps {
   editorConsoleOutputs: EditorColumnProps["editorConsoleOutputs"]
   testResults: EditorColumnProps["testResults"]
   testSummary: EditorColumnProps["testSummary"]
+  packRun: EditorColumnProps["packRun"]
   isRunningTests: EditorColumnProps["isRunningTests"]
   onClearConsole: EditorColumnProps["onClearConsole"]
   onSubmitSystemDesign: EditorColumnProps["onSubmitSystemDesign"]
@@ -119,6 +120,7 @@ export function InterviewLayoutGrid({
   editorConsoleOutputs,
   testResults,
   testSummary,
+  packRun,
   isRunningTests,
   onClearConsole,
   onSubmitSystemDesign,
@@ -204,7 +206,7 @@ export function InterviewLayoutGrid({
               className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
               style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
             >
-              <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
+              <div className="group-hover:bg-accent/40 mx-auto h-full w-px bg-transparent transition-colors" />
             </div>
           )}
           {!intCollapsed && (
@@ -216,7 +218,7 @@ export function InterviewLayoutGrid({
               className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
               style={{ right: "calc(var(--w-int) + 0.25rem)" }}
             >
-              <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40" />
+              <div className="group-hover:bg-accent/40 mx-auto h-full w-px bg-transparent transition-colors" />
             </div>
           )}
           {labCollapsed && (
@@ -275,6 +277,7 @@ export function InterviewLayoutGrid({
         onStartInterview={onStartInterview}
         editorConsoleOutputs={editorConsoleOutputs}
         testResults={testResults}
+        packRun={packRun}
         testSummary={testSummary}
         isRunningTests={isRunningTests}
         onClearConsole={onClearConsole}
