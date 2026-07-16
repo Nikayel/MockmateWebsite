@@ -4,7 +4,6 @@ import { memo, type Dispatch, type RefObject, type SetStateAction } from "react"
 import {
   ChevronDown,
   ChevronUp,
-  ClipboardList,
   Clock,
   HardDrive,
   HelpCircle,
@@ -17,8 +16,10 @@ import { Badge } from "@/components/ui/badge"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
+import type { BugSymptom } from "@/lib/scenarios/types"
 import type { GuidedLabConfig } from "@/lib/bugfix/guided-lab/types"
 import type { WorkspaceContextFile } from "../_types"
+import { BugfixBrief } from "./_sub/BugfixBrief"
 import { ProblemHintSection } from "./_sub/ProblemHintSection"
 import { BugfixReflectionPanel } from "./_sub/BugfixReflectionPanel"
 import { WorkspaceFileViewer } from "./_sub/WorkspaceFileViewer"
@@ -36,6 +37,8 @@ type ScenarioPanelDetails = Scenario & {
   }
   reproductionSteps?: string[]
   successCriteria?: string[]
+  task?: string
+  symptom?: BugSymptom
   userReport?: string
   visibleLogs?: string[]
   guidedLab?: GuidedLabConfig
@@ -153,9 +156,7 @@ export const ProblemColumn = memo(function ProblemColumn({
             </div>
             <div className="flex flex-shrink-0 items-center gap-1.5">
               {selectedScenario && (
-                <Badge
-                  className={`text-xs ${difficultyColorClass(selectedScenario.difficulty)}`}
-                >
+                <Badge className={`text-xs ${difficultyColorClass(selectedScenario.difficulty)}`}>
                   {selectedScenario.difficulty}
                 </Badge>
               )}
@@ -182,89 +183,75 @@ export const ProblemColumn = memo(function ProblemColumn({
           )}
           {selectedScenario && (
             <>
-              {/* IMPROVED: Description with larger font and visual hierarchy */}
-              <div className="space-y-2">
-                <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                  <span className="bg-accent h-4 w-1 rounded-full"></span>
-                  Description
-                  {realInterviewMode && scenarioDetails?.fuzzyStatement && (
-                    <Badge className="border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-200">
-                      Real Interview Mode
-                    </Badge>
-                  )}
-                </h3>
-                <MarkdownRenderer
-                  content={
+              {/* Bug-fix: one brief, single source of truth. Everything else keeps
+                  the classic Description block. */}
+              {isBugfix ? (
+                <BugfixBrief
+                  task={scenarioDetails?.task}
+                  symptom={scenarioDetails?.symptom}
+                  acceptance={successCriteria}
+                  report={
                     realInterviewMode && scenarioDetails?.fuzzyStatement
                       ? scenarioDetails.fuzzyStatement
                       : selectedScenario.problemStatement
                   }
-                  className="text-foreground text-base leading-relaxed"
+                  fallbackStatement={
+                    realInterviewMode && scenarioDetails?.fuzzyStatement
+                      ? scenarioDetails.fuzzyStatement
+                      : selectedScenario.problemStatement
+                  }
+                  isFuzzy={Boolean(realInterviewMode && scenarioDetails?.fuzzyStatement)}
                 />
-              </div>
-
-              {isBugfix && (
-                <div
-                  className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-3"
-                  data-bugfix-tour="incident-report"
-                >
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-amber-200 uppercase">
-                    <span className="h-4 w-1 rounded-full bg-amber-300"></span>
-                    <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                    Incident Report
+              ) : (
+                <div className="space-y-2">
+                  <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
+                    <span className="bg-accent h-4 w-1 rounded-full"></span>
+                    Description
+                    {realInterviewMode && scenarioDetails?.fuzzyStatement && (
+                      <Badge className="border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-200">
+                        Real Interview Mode
+                      </Badge>
+                    )}
                   </h3>
-                  <div className="text-muted-foreground space-y-2 text-sm leading-relaxed">
-                    {scenarioDetails?.userReport && (
-                      <p className="text-foreground text-[15px] leading-relaxed">
-                        {scenarioDetails.userReport}
+                  <MarkdownRenderer
+                    content={
+                      realInterviewMode && scenarioDetails?.fuzzyStatement
+                        ? scenarioDetails.fuzzyStatement
+                        : selectedScenario.problemStatement
+                    }
+                    className="text-foreground text-base leading-relaxed"
+                  />
+                </div>
+              )}
+
+              {/* Repro steps and logs are evidence, not narrative: they stay, but
+                  below the brief and without a second telling of the incident. */}
+              {isBugfix && (reproductionSteps.length > 0 || visibleLogs.length > 0) && (
+                <div className="space-y-3">
+                  {reproductionSteps.length > 0 && (
+                    <div>
+                      <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
+                        Repro steps
                       </p>
-                    )}
-                    {scenarioDetails?.expectedBehavior && (
-                      <p>
-                        <span className="text-foreground font-medium">Expected:</span>{" "}
-                        {scenarioDetails.expectedBehavior}
+                      <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-[12px]">
+                        {reproductionSteps.map((step: string, index: number) => (
+                          <li key={`${step}-${index}`}>{step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                  {visibleLogs.length > 0 && (
+                    <div>
+                      <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
+                        Visible logs
                       </p>
-                    )}
-                    {reproductionSteps.length > 0 && (
-                      <div>
-                        <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
-                          Repro Steps
-                        </p>
-                        <ol className="text-muted-foreground list-decimal space-y-1.5 pl-4 text-xs">
-                          {reproductionSteps.map((step: string, index: number) => (
-                            <li key={`${step}-${index}`}>{step}</li>
-                          ))}
-                        </ol>
+                      <div className="border-border/60 bg-background/50 text-muted-foreground space-y-1 overflow-x-auto rounded border p-2 font-mono text-[11px] whitespace-pre">
+                        {visibleLogs.map((log: string, index: number) => (
+                          <p key={`${log}-${index}`}>{log}</p>
+                        ))}
                       </div>
-                    )}
-                    {visibleLogs.length > 0 && (
-                      <div>
-                        <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
-                          Visible Logs
-                        </p>
-                        <div className="border-border/60 bg-background/50 text-muted-foreground space-y-1 rounded border p-2 font-mono text-[11px]">
-                          {visibleLogs.map((log: string, index: number) => (
-                            <p key={`${log}-${index}`}>{log}</p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {successCriteria.length > 0 && (
-                      <div>
-                        <p className="mb-1 text-xs font-semibold tracking-wide text-emerald-200 uppercase">
-                          Success Criteria
-                        </p>
-                        <ul className="text-muted-foreground space-y-1 pl-1 text-xs">
-                          {successCriteria.map((criterion: string, index: number) => (
-                            <li key={`${criterion}-${index}`} className="flex gap-2">
-                              <span className="mt-1 h-1 w-1 flex-shrink-0 rounded-full bg-emerald-300" />
-                              <span>{criterion}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
