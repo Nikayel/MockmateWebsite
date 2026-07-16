@@ -150,6 +150,20 @@ export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A model scoring job stopped erroring after the feature builder was hardened, but accounts migrated from the legacy CRM now score like empty users even though their history exists.",
+  task: "Substitute the feature's configured default from the model contract for any value that is missing, null, non-numeric, or non-finite, keeping feature order intact.",
+  // Grounded in the scenario's own second visible test, "a nulled income falls
+  // back to its configured default": {"age": 29, "income": None,
+  // "sessions_30d": 2} asserts [29.0, 50000.0, 2.0], but the starter returns
+  // [29.0, 0.0, 2.0], so income lands at 0.0 instead of its 50000.0 default.
+  symptom: {
+    subject: "income",
+    tag: "nulled value",
+    expected: "50000.0",
+    actual: "0.0",
+    delta: "-50000.0",
+    caveat:
+      "Rows whose values are all clean score correctly, and every vector still passes the finite-vector check.",
+  },
   userReport:
     "Risk analyst here. Ever since we hardened the feature builder, the scoring job stopped throwing errors, but the numbers look wrong for one slice of accounts. Everyone migrated off the legacy CRM last week is scoring like a brand-new user with no history, even though we clearly have their age and income on file. The vectors all pass validation and there is nothing in the logs. The scores are just wrong for that cohort.",
   tags: ["python", "ml", "data-pipeline", "feature-engineering", "real-codebase"],
