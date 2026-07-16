@@ -485,9 +485,13 @@ export function CodeConsole({
                         💡 {errorInfo.hint}
                       </div>
                     )}
-                    <div className="bg-background/20 rounded p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-red-300/80">
+                    {/* A traceback is column-aligned output like any other: scroll
+                        it, never break-all it. */}
+                    <pre
+                      className={cn(TERMINAL_PRE, "bg-background/20 rounded p-2 text-red-300/80")}
+                    >
                       {errorInfo.details}
-                    </div>
+                    </pre>
                   </div>
                 </div>
               </div>
