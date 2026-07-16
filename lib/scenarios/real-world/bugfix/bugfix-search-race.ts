@@ -216,6 +216,18 @@ export const bugfixSearchRaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A reservation support console sometimes shows the previous caller's booking after an agent searches a new ref, and an agent acted on the wrong reservation before catching it.",
+  task: "Ensure the panel ends up showing the reservations for the booking ref the agent searched most recently, even when an earlier lookup's response arrives after it.",
+  // Grounded in the scenario's own second visible test: BK-1024 and BK-2048
+  // overlap and BK-1024 resolves last. The starter applies each response the
+  // moment it lands, so shownRef ends on BK-1024 where the test asserts BK-2048.
+  symptom: {
+    subject: "shownRef",
+    tag: "BK-2048 searched while BK-1024 is in flight",
+    expected: "BK-2048",
+    actual: "BK-1024",
+    caveat:
+      "Single lookups, and overlapping lookups that come back in order, show the right guest.",
+  },
   userReport:
     "Support agent here. I searched a booking ref while on a call and the console showed me a reservation for a different guest, one I had looked up a moment earlier. I started a refund on it before I noticed the name was wrong. It only seems to happen when I search a second ref before the first result comes back.",
   tags: ["async", "frontend", "state-management", "reservations", "support-tools", "real-codebase"],
