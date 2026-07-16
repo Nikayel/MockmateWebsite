@@ -33,8 +33,17 @@ const ROLES_BY_TAG: Record<PackCompanyTag, RoleTag[]> = {
 }
 
 /** Candidate-visible expected-output oracle lives in the workspace as a visible file. */
-const ORACLE_VISIBLE_PATH = "tests/expected_output.txt"
-/** Machine-readable oracle config (PUBLIC data) — satisfies the hidden-test slot. */
+export const ORACLE_VISIBLE_PATH = "tests/expected_output.txt"
+/**
+ * Machine-readable oracle config (PUBLIC data) — satisfies the hidden-test slot.
+ *
+ * NOT an executable runner. Packs are dispatched by `isPackScenario` to
+ * `executePackOracleClientSide`, which runs `pack.runCmd` and byte-diffs stdout.
+ * This file previously doubled as `workspace.testRunnerPath`, which silently fed
+ * JSON to Pyodide as a Python entrypoint — a JSON object is a valid dict literal,
+ * so it evaluated to nothing and every pack run reported "Test runner did not
+ * report any test results" without ever running the candidate's code.
+ */
 const ORACLE_CONFIG_PATH = "tests/oracle.json"
 
 function rolesForTag(tag: PackCompanyTag): RoleTag[] {

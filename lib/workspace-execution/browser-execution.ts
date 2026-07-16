@@ -1,20 +1,27 @@
 import type { Scenario } from "@/lib/scenarios"
 import type {
   DsaExecutionResult,
+  PackExecutionResult,
   WorkspaceExecutionResult,
   WorkspaceFileEdit,
   WorkspaceScenario,
 } from "./types"
 import { executeJsClientSide, executeWorkspaceScenarioJsClientSide } from "./js-sandbox"
-import { executePythonClientSide, executeWorkspaceScenarioPythonClientSide } from "./python-sandbox"
+import {
+  executePackOracleClientSide,
+  executePythonClientSide,
+  executeWorkspaceScenarioPythonClientSide,
+  type PackOracleRunResult,
+} from "./python-sandbox"
 import {
   executeSqlClientSide,
   executeWorkspaceScenarioSqlClientSide,
   type SqlSingleFileScenario,
 } from "./sql-sandbox"
-import { isWorkspaceScenario } from "./validators"
+import { ORACLE_VISIBLE_PATH } from "@/lib/bugfix/packs/scenario"
+import { isPackScenario, isWorkspaceScenario, type PackScenario } from "./validators"
 
-type BrowserExecutionResult = DsaExecutionResult | WorkspaceExecutionResult
+type BrowserExecutionResult = DsaExecutionResult | WorkspaceExecutionResult | PackExecutionResult
 
 type ScenarioWithCodebase = Scenario & {
   codebaseFiles?: Partial<Record<string, Array<{ fileName: string; content: string }>>>
@@ -67,6 +74,59 @@ function buildFullCode(code: string, scenario: ScenarioWithCodebase, language: s
   return `${supportingCode}\n\n${code}`
 }
 
+/**
+ * Map a stdout-oracle pack run onto the shared execution-result shape.
+ *
+ * `error` stays null for anything the runtime returned a verdict on — including a
+ * crash in the candidate's own code. Top-level `error` makes the caller treat the
+ * run as an infrastructure failure (`applyExecutionApiError`), but a candidate's
+ * ValueError is a legitimate result: it is real terminal output they need to read.
+ * Only a structurally impossible pack surfaces as a top-level error.
+ */
+function formatPackResult(
+  result: PackOracleRunResult,
+  scenario: PackScenario
+): PackExecutionResult {
+  const { runCmd } = scenario.pack
+  const passed = result.match
+
+  return {
+    kind: "pack",
+    success: passed,
+    // One row so test-summary consumers (bugfix evidence, hint agent) stay
+    // consistent with `summary`. The console renders `packRun` instead of this
+    // row, so no synthetic expected/actual is invented for it.
+    results: [
+      {
+        description: `$ ${runCmd}`,
+        passed,
+        input: "oracle",
+        expected: undefined,
+        actual: undefined,
+        error: result.ran ? null : result.error,
+      },
+    ],
+    consoleLogs: result.consoleLogs,
+    summary: {
+      total: 1,
+      passed: passed ? 1 : 0,
+      failed: passed ? 0 : 1,
+      passRate: passed ? 100 : 0,
+      serviceErrors: 0,
+      effectiveTotal: 1,
+    },
+    error: null,
+    packRun: {
+      runCmd,
+      ran: result.ran,
+      stdout: result.stdout,
+      oraclePath: ORACLE_VISIBLE_PATH,
+      match: result.match,
+      crashError: result.ran ? null : result.error,
+    },
+  }
+}
+
 function formatWorkspaceResult(result: WorkspaceExecutionResult): BrowserExecutionResult {
   return {
     ...result,
@@ -97,6 +157,17 @@ export async function executeScenarioInBrowser(options: {
 
   if (!isBrowserExecutionLanguage(language)) {
     return null
+  }
+
+  // Packs run their `runCmd` and are graded by byte-exact stdout. They must never
+  // reach the assert runner below: a pack's `testRunnerPath` is oracle config, not
+  // an executable runner, and feeding it to Pyodide silently produces no results.
+  if (isPackScenario(options.scenario)) {
+    const packResult = await executePackOracleClientSide(
+      options.scenario,
+      options.workspaceFiles || []
+    )
+    return formatPackResult(packResult, options.scenario)
   }
 
   if (isWorkspaceScenario(options.scenario)) {
