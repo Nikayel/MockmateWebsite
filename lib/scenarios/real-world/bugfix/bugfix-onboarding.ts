@@ -276,13 +276,19 @@ Finance support approves a manual invoice adjustment when the review queue shows
     expected: "[]",
     actual: "[0, 1]",
     delta: "+1 pair",
-    caveat: "Adjustments backed by two open rows, credits, and no-match cases resolve correctly.",
+    // Scoped to "no reconciled row in the ledger" on purpose. The unqualified
+    // claim is falsified by the hidden "explains the adjustment with the open pair
+    // when a reconciled complement appears earlier" test: that ledger IS backed by
+    // two open rows (led_603 + led_604) and still resolves wrong. The defect does
+    // not only ADD false explanations, it DISPLACES correct ones.
+    caveat:
+      "Adjustments with no reconciled row in the ledger, credits, and no-match cases resolve correctly.",
   },
   userReport:
     "Finance support approved an adjustment that the queue explained with a ledger row already consumed by an earlier adjustment. That account double-counts the row now, and support wants to know which queue explanations they can still trust.",
   observedSymptoms: [
     "Two adjustments this week were explained using a ledger row whose status was reconciled, and one was approved before review caught it.",
-    "Adjustments backed by two open rows, credits, no-match cases, and legacy rows with missing amounts all behave normally.",
+    "Adjustments whose ledger holds no reconciled row, credits, no-match cases, and legacy rows with missing amounts all behave normally.",
   ],
   reproductionSteps: [
     "Read README.md for the reconciliation contract and the ledger row shape.",
