@@ -40,7 +40,10 @@ import {
   buildSilentNotesContext,
   formatSilentNotesForFeedback,
 } from "@/lib/feedback"
-import { calculateFeedbackTestMetrics } from "@/lib/feedback/test-result-metrics"
+import {
+  calculateFeedbackTestMetrics,
+  describeFailingTest,
+} from "@/lib/feedback/test-result-metrics"
 // Import structured extraction for grounded feedback
 import {
   extractConversationEvidence,
@@ -820,10 +823,7 @@ REMAINING ISSUES (first 3):
 ${testResults
   .filter((t: any) => !t.passed)
   .slice(0, 3)
-  .map(
-    (t: any) =>
-      `- ${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
-  )
+  .map((t: any) => `- ${describeFailingTest(t)}`)
   .join("\n")}
 `
     : ""
@@ -891,10 +891,7 @@ FAILED TESTS (first 3):
 ${testResults
   .filter((t: any) => !t.passed)
   .slice(0, 3)
-  .map(
-    (t: any) =>
-      `- ${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
-  )
+  .map((t: any) => `- ${describeFailingTest(t)}`)
   .join("\n")}
 `
     : ""
@@ -1188,10 +1185,7 @@ CRITICAL INSTRUCTIONS:
           testResults
             ?.filter((t: any) => !t.passed)
             ?.slice(0, 5)
-            ?.map(
-              (t: any) =>
-                `${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
-            ) || [],
+            ?.map((t: any) => describeFailingTest(t)) || [],
       }).catch((err) => {
         logger.error("Misconception analysis error (background)", { error: err })
       })

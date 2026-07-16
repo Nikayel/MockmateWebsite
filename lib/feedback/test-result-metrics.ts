@@ -1,8 +1,30 @@
 export interface FeedbackTestResult {
   description?: string
   passed?: boolean
+  expected?: unknown
   actual?: unknown
   error?: string | null
+}
+
+/**
+ * One line describing a failing test for the feedback prompt.
+ *
+ * Only DSA cases carry an expected/actual pair. Workspace suites and packs report
+ * an assert message instead, and formatting those unconditionally produced
+ * "expected undefined, got undefined" — worse than the "expected pass, got fail"
+ * it replaced, because it reads as a bug to the model while hiding the real
+ * signal, which is `error`.
+ */
+export function describeFailingTest(test: FeedbackTestResult): string {
+  const label = test.description ?? "test"
+
+  if (test.expected !== undefined || test.actual !== undefined) {
+    return `${label}: expected ${JSON.stringify(test.expected)}, got ${JSON.stringify(test.actual)}`
+  }
+  if (test.error) {
+    return `${label}: ${test.error}`
+  }
+  return `${label}: did not pass`
 }
 
 export interface FeedbackTestMetrics {
