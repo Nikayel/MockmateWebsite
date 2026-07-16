@@ -97,7 +97,7 @@ export function TerminalOutput({
                 <>
                   output does not match {oraclePath}
                   <span className="text-muted-foreground/70 block text-[10px]">
-                    diff it yourself — the expected output is in task.md
+                    diff it yourself: the expected output is in task.md
                   </span>
                 </>
               )}
