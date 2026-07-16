@@ -139,6 +139,19 @@ export const bugfixEventAggregationRetriesScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A customer analytics report shows one account with far more delivery events than its raw log supports, after the ingestion queue moved to at-least-once delivery.",
+  task: "Count each of an account's real events once in its sent and opened totals, no matter how many times the queue delivers the same event or in what order batches arrive.",
+  // Grounded in the scenario's own first visible test, "a redelivered event
+  // counts once": e1 arrives twice for acct_1 and e2 once. The starter adds
+  // every delivery it is handed, so it reports sent: 2 where the test asserts
+  // sent: 1. The opened total in that same assertion is already correct.
+  symptom: {
+    subject: "acct_1",
+    tag: "sent total",
+    expected: "1 event",
+    actual: "2 events",
+    delta: "+1",
+    caveat: "The same account's opened total is correct, and distinct events still count.",
+  },
   userReport:
     "Analytics team here. The customer report dashboard is overstating engagement for one account since last month's queue migration. It shows roughly 40% more click events than that account's raw event log has rows for. Other accounts look right. The queue vendor told us delivery is now at-least-once and batches can arrive out of order.",
   tags: ["python", "data", "analytics", "event-pipeline", "real-codebase"],
