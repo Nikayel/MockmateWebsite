@@ -190,7 +190,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
         </Link>
         <Link
           href={`/learn/sql/${level.slug}`}
-          className="border-accent/40 bg-accent/10 text-accent hover:bg-accent/15 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
+          className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/15 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
         >
           LEVEL {level.id}
         </Link>

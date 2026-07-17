@@ -35,7 +35,7 @@ export function ResumeLearning({ levels }: { levels: PythonLevel[] }) {
     <div className="mt-6 flex justify-center">
       <Link
         href={`/learn/python/${target.slug}/${target.lessonId}`}
-        className="border-accent/30 bg-accent/10 text-accent hover:bg-accent/15 group inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors"
+        className="border-accent/30 bg-accent/10 text-accent-strong hover:bg-accent/15 group inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors"
       >
         Continue Level {target.levelId}
         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />

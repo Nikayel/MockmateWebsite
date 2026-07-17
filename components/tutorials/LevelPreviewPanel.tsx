@@ -53,7 +53,7 @@ export function LevelPreviewPanel({
   return (
     <div className="border-border bg-card/60 flex flex-col gap-5 rounded-2xl border p-5 shadow-sm backdrop-blur-sm">
       <div>
-        <p className="text-accent text-xs font-semibold tracking-wide uppercase">
+        <p className="text-accent-strong text-xs font-semibold tracking-wide uppercase">
           Level {level.id}
         </p>
         <h2 className="text-foreground mt-1 text-lg font-semibold">{level.title}</h2>
@@ -118,7 +118,7 @@ export function LevelPreviewPanel({
           <dt className="sr-only">Lessons</dt>
           <dd>
             {inProgress || isDone ? (
-              <span className="text-accent font-medium">
+              <span className="text-accent-strong font-medium">
                 {completedCount}/{lessonCount} done
               </span>
             ) : (

@@ -55,7 +55,7 @@ export function HintList({ hints, total }: { hints: string[]; total: number }) {
               className="border-border/60 bg-background/40 flex gap-2.5 rounded-lg border p-2.5"
             >
               <span
-                className="bg-accent/15 text-accent mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                className="bg-accent/15 text-accent-strong mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
                 aria-hidden="true"
               >
                 {i + 1}

@@ -71,7 +71,7 @@ export function ExecutorTopBar() {
               href="/account"
               aria-label="Account"
               title={label}
-              className="bg-accent/15 text-accent hover:bg-accent/25 focus-visible:ring-accent/50 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="bg-accent/15 text-accent-strong hover:bg-accent/25 focus-visible:ring-accent/50 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               {initial}
             </Link>
