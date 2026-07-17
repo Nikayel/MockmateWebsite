@@ -3282,6 +3282,8 @@ A check is only useful if it can **stop bad data**. A **quality gate** runs the 
 
 The checks are exactly the SQL you already know: a \`GROUP BY ... HAVING\` for duplicates, a conditional \`SUM\` for a null rate, a \`CASE\` for a pass or fail gate. The exercises run real checks over a \`staged_events\` batch: find the duplicated ids, then compute a null rate and decide whether the batch passes its gate.
 
+**Common mistake:** running quality checks only after the data is published. By then the bad data is already in the Gold tables the dashboards read, so the checks belong in a gate that runs before publish (write-audit-publish).
+
 **Interview nuance:** "how would you test this pipeline" wants the check families by name (uniqueness, completeness, validity, volume, referential integrity) and the idea of a quality gate that fails the run. Bonus points for naming dbt tests or Great Expectations, and for saying the checks run in a write-audit-publish step before the data is published.
 
 > **On a real platform this differs.** Real quality checks run as dbt tests or Great Expectations suites wired into the pipeline, emitting pass or fail per check with row-level samples of the failures. The \`staged_events\` table here lets you write the same checks as plain SQL so you can see what each framework runs for you underneath.`,
