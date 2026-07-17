@@ -2984,7 +2984,24 @@ WHERE amount <= 0;`,
         expected: { columns: ["bad_amounts"], rows: [[1]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-data-quality-checks-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the percentage of rows with a NULL \`country\` as \`(null_country_pct)\`, over \`staged_events\`, rounded to 2 decimals.`,
+      starterCode: `-- A completeness check on the country column.
+SELECT
+FROM staged_events;`,
+      hints: [
+        "`SUM(CASE WHEN country IS NULL THEN 1 ELSE 0 END)` counts the NULLs.",
+        "Divide by `COUNT(*)`, times 100.0, `ROUND(..., 2)`.",
+      ],
+      referenceSolution: `SELECT ROUND(100.0 * SUM(CASE WHEN country IS NULL THEN 1 ELSE 0 END) / COUNT(*), 2) AS null_country_pct
+FROM staged_events;`,
+      singleFile: {
+        seedSql: STAGED_EVENTS_SEED,
+        expected: { columns: ["null_country_pct"], rows: [[10]] },
+      },
+    },
   ],
 }
 
