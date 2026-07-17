@@ -1461,7 +1461,7 @@ FROM row_group_stats;`,
     {
       id: "sql-l6-row-groups-pushdown-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many row groups the file has and how many rows in total as \`(row_groups, total_rows)\`, over \`row_group_stats\`.`,
+      prompt: `**Easy.** Write a query that returns how many row groups the file has and how many rows in total as \`(row_groups, total_rows)\`, over \`row_group_stats\`.`,
       starterCode: `-- Count the row groups and sum their rows.
 SELECT
 FROM row_group_stats;`,
@@ -1476,7 +1476,7 @@ FROM row_group_stats;`,
     {
       id: "sql-l6-row-groups-pushdown-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the row group whose range contains \`order_id\` 250000 as \`(rg_id, min_order_id, max_order_id)\`, over \`row_group_stats\`.`,
+      prompt: `**Medium.** Write a query that returns the row group whose range contains \`order_id\` 250000 as \`(rg_id, min_order_id, max_order_id)\`, over \`row_group_stats\`.`,
       starterCode: `-- The row group whose [min, max] contains 250000.
 SELECT rg_id, min_order_id, max_order_id
 FROM row_group_stats
@@ -1499,7 +1499,7 @@ WHERE 250000 BETWEEN min_order_id AND max_order_id;`,
     {
       id: "sql-l6-row-groups-pushdown-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many row groups a point lookup \`WHERE order_id = 305000\` must read as \`(row_groups_read)\`, over \`row_group_stats\`.`,
+      prompt: `**Hard.** Write a query that returns how many row groups a point lookup \`WHERE order_id = 305000\` must read as \`(row_groups_read)\`, over \`row_group_stats\`.`,
       starterCode: `-- How many row groups overlap the single value 305000?
 SELECT
 FROM row_group_stats
