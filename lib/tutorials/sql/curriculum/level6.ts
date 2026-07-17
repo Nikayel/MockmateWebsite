@@ -1074,6 +1074,24 @@ FROM parquet_column_stats;`,
         expected: { columns: ["file_mb"], rows: [[296]] },
       },
     },
+    {
+      id: "sql-l6-rows-vs-columns-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the single largest column by compressed size as \`(column_name, mb)\`, over \`parquet_column_stats\`. Round \`mb\` to 2 decimals (1 MB = 1,000,000 bytes).`,
+      starterCode: `-- The one column that dominates the file.
+SELECT column_name, ROUND(compressed_bytes / 1000000.0, 2) AS mb
+FROM parquet_column_stats
+;`,
+      hints: ["`ORDER BY compressed_bytes DESC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT column_name, ROUND(compressed_bytes / 1000000.0, 2) AS mb
+FROM parquet_column_stats
+ORDER BY compressed_bytes DESC, column_name
+LIMIT 1;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        expected: { columns: ["column_name", "mb"], rows: [["url", 180]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
