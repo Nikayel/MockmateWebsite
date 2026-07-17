@@ -370,6 +370,8 @@ S3 is also **strongly read-after-write consistent**. Since December 2020, a read
 
 One more property worth stating plainly: S3's namespace is **flat**. The slashes in a key only look like folders. \`raw/events/2026-01-02/\` is a **prefix** of the key, not a real directory, and console "folders" are a convenience the UI draws. This matters in the partitioning module, where a layout like \`dt=2026-01-02/\` is just a key prefix that a query engine filters on.
 
+**Common mistake:** treating S3 like a filesystem. You cannot edit an object in place or append to it, and there are no real directories, only key prefixes, so code that expects to open and rewrite a file in place belongs on a block volume, not the lake.
+
 **Interview nuance:** "object versus block versus file, give an AWS example of each" is a near-guaranteed junior question. Answer with the access unit and mutability: block is a raw disk you format (EBS), file is a shared mount (EFS), object is whole files over HTTP that you replace rather than edit (S3), and the lake uses object storage for cheap, unlimited, engine-agnostic capacity.
 
 > **On a real platform this differs.** Real S3 inventory comes from an S3 Inventory report (a daily or weekly file listing every object with its size, storage class, and last-modified date) that you query in Athena. The \`s3_inventory\` table you query here is a small stand-in with the same columns, so the query you write is the query you would run for real.`,
