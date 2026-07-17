@@ -1903,6 +1903,24 @@ ORDER BY excess_files DESC;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-choosing-partition-key-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total number of files across all partitions as \`(total_files)\`, over \`partition_files\`.`,
+      starterCode: `-- Sum the file counts.
+SELECT
+FROM partition_files;`,
+      hints: ["`SUM(file_count)`.", "Alias it `total_files`."],
+      referenceSolution: `SELECT SUM(file_count) AS total_files
+FROM partition_files;`,
+      singleFile: {
+        seedSql: PARTITION_FILES_SEED,
+        expected: { columns: ["total_files"], rows: [[251]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const bucketingAndFullScanTrap: SqlLesson = {
