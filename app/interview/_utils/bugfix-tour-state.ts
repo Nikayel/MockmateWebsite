@@ -31,9 +31,12 @@ export const TOUR_STEPS: BugfixTourStep[] = [
     action: "Read the report, then go to the workspace files.",
   },
   {
+    // The explorer lives in the problem panel, beneath the brief. On mobile only
+    // one panel is mounted at a time, so a stale panel here would switch to the
+    // editor and spotlight a tree that is not on screen.
     id: "workspace-files",
     target: "workspace-files",
-    panel: "editor",
+    panel: "problem",
     title: "Inspect the codebase",
     body: "Bugfix scenarios include docs, source, helpers, and tests. Start with docs and visible tests before changing code.",
     action: "Open a docs or test file.",
