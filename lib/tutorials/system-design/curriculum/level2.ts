@@ -525,8 +525,10 @@ partition by \`conversation_id\` so all of a conversation's messages live togeth
 **Consistency is tunable per query.** Cassandra is a Dynamo-style AP system with **tunable
 consistency**: you choose how many replicas must acknowledge. \`ONE\` (fast, may read stale),
 \`QUORUM\` (majority). If reads and writes both use QUORUM on replication factor 3, read-quorum (2)
-plus write-quorum (2) overlap by at least one replica, giving read-your-writes strong consistency for
-that key while tolerating one node down.
+plus write-quorum (2) overlap by at least one replica, so a read always sees the latest acknowledged
+write (read-your-writes freshness) for that key while tolerating one node down. That is **quorum
+consistency**, not linearizability: the overlap does not order concurrent writes, which can land on
+different quorums and produce conflicting versions that still need reconciling.
 
 **Interview nuance:** The classic question is "why not just add a secondary index in Cassandra?"
 Answer: Cassandra secondary indexes query across all partitions (a scatter-gather that does not
@@ -692,8 +694,8 @@ layer. It gives **high recall at low latency** and is the default for most workl
 **IVF (Inverted File)** clusters vectors into \`nlist\` partitions (via k-means) and, at query time,
 only searches the few nearest partitions (\`nprobe\`). More memory-efficient and faster to build than
 HNSW but lower recall unless you probe more partitions. **PQ (Product Quantization)** compresses each
-vector into a short code (e.g. 1536 floats to 64 bytes), slashing memory 10 to 50x at the cost of
-some recall. **IVF-PQ** combines them and is the go-to for **billion-scale, memory-constrained**
+vector into a short code (e.g. a 1536-dim fp32 vector is 1536 x 4 = 6144 bytes; PQ codes it in 64
+bytes, a 96x reduction), slashing memory 10 to 100x at the cost of some recall. **IVF-PQ** combines them and is the go-to for **billion-scale, memory-constrained**
 deployments (what FAISS is known for). Rule of thumb: HNSW when recall and latency matter and you can
 afford RAM; IVF-PQ when scale and memory dominate.
 
@@ -1285,7 +1287,7 @@ export const systemDesignLevel2: DesignLevel = {
             modelAnswerOutline: [
               "The query is roughly `SELECT ... FROM orders WHERE user_id = ? AND status = ? ORDER BY created_at DESC LIMIT 20`. The right index is a **composite on (user_id, status, created_at)**.",
               "**Why that order:** `user_id` and `status` are both equality filters, so they go first; together they pin a single contiguous run of index entries. Within that run the entries are already sorted by `created_at`, so the ORDER BY ... LIMIT 20 becomes 'walk the tail of that run backward and stop after 20 rows': no separate sort step, no scanning rows that get discarded.",
-              "**Why other orders fail:** (created_at, user_id, status) is useless for this query because `created_at` leads with no equality on it; putting `created_at` before `status` breaks the free sort because entries interleave across statuses.",
+              "**Why other orders fail:** (created_at, user_id, status) is useless for this query because `created_at` leads with no equality on it, so the engine falls back to scanning the whole index. Putting `created_at` before `status` is subtler: the sort stays free (within a `user_id` the entries are still ordered by `created_at`), but the tight LIMIT dies. `status` is no longer part of the equality prefix, so the engine walks the user's whole `created_at` run discarding other statuses before it collects 20 rows, and the rarer the status the more it discards.",
               "**Direction:** define `created_at DESC` (or rely on the engine reading the B-tree backward, which Postgres and InnoDB both do) so the newest-first LIMIT is a cheap prefix read.",
               "**Covering:** add the columns the SELECT returns as included payload (`INCLUDE (total, currency)` in Postgres, or extend the key in MySQL) so the query becomes an index-only scan that never visits the heap, removing one random read per returned row. Only do this for a genuinely hot query: included columns widen every entry and increase storage and write cost.",
               "**The cost accepted:** this index must be maintained on every insert and every status update. Fine here because reads of a user's orders dominate.",
