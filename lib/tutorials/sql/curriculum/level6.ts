@@ -2122,7 +2122,28 @@ LIMIT 1;`,
         expected: { columns: ["bucket_id", "size_mb"], rows: [[7, 1400]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-bucketing-and-the-full-scan-trap-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the ids of the buckets larger than the average bucket size as \`(bucket_id)\`, ascending, over \`user_buckets\`.`,
+      starterCode: `-- Buckets bigger than the average (a skew tell).
+SELECT bucket_id
+FROM user_buckets
+;`,
+      hints: [
+        "Compare `size_bytes` to a scalar subquery `(SELECT AVG(size_bytes) FROM user_buckets)`.",
+        "`ORDER BY bucket_id`.",
+      ],
+      referenceSolution: `SELECT bucket_id
+FROM user_buckets
+WHERE size_bytes > (SELECT AVG(size_bytes) FROM user_buckets)
+ORDER BY bucket_id;`,
+      singleFile: {
+        seedSql: USER_BUCKETS_SEED,
+        orderMatters: true,
+        expected: { columns: ["bucket_id"], rows: [[7]] },
+      },
+    },
   ],
 }
 
