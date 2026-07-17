@@ -113,6 +113,36 @@ describe("validatePackQuality", () => {
       makePack({ srcFiles: [{ path: "src/main.py", content: leaky }] }),
       sealed
     )
-    expect(issues.some((i) => /sealed bug summary/.test(i.message))).toBe(true)
+    expect(issues.some((i) => /sealed content/.test(i.message))).toBe(true)
+  })
+
+  it("flags a verbatim sealed minimalFix leak", () => {
+    // The gate took only bugSummary, so a pack could ship its own sealed fix in
+    // task.md and score zero issues.
+    const minimalFix = "track previous_state per monitor instead of once above the loop"
+    const base = makePack()
+    const issues = validatePackQuality(makePack({ taskMd: `${base.taskMd}\n\n${minimalFix}\n` }), {
+      minimalFix,
+    })
+    expect(issues.some((i) => /sealed content/.test(i.message))).toBe(true)
+  })
+
+  it("flags a verbatim sealed bugLocation leak", () => {
+    const bugLocation = "src/main.py — count(): the flag is hoisted above the loop"
+    const base = makePack()
+    const issues = validatePackQuality(makePack({ taskMd: `${base.taskMd}\n\n${bugLocation}\n` }), {
+      bugLocation,
+    })
+    expect(issues.some((i) => /sealed content/.test(i.message))).toBe(true)
+  })
+
+  it("passes a clean pack when every sealed field is supplied", () => {
+    expect(
+      validatePackQuality(makePack(), {
+        bugSummary: "a flag shared across monitors",
+        minimalFix: "move the flag inside the loop",
+        bugLocation: "src/main.py — count()",
+      })
+    ).toEqual([])
   })
 })

@@ -18,6 +18,59 @@ describe("bugfix pack suite", () => {
     expect(bugfixPacks.length).toBeGreaterThan(0)
   })
 
+  // The gate is only worth running if it can fail. Passing every pack proves nothing
+  // if the check itself is blind, and it was: with only bugSummary wired up, a
+  // task.md carrying the sealed minimalFix verbatim scored zero issues.
+  describe("the leak gate actually catches a leak", () => {
+    const pack = bugfixPacks[0]
+
+    it("rejects a sealed minimalFix pasted into candidate-visible content", async () => {
+      const sealed = await loadSealedPack(pack.id)
+      const sabotaged = { ...pack, taskMd: `${pack.taskMd}\n\n${sealed!.minimalFix}` }
+
+      const issues = validatePackQuality(sabotaged, { minimalFix: sealed!.minimalFix })
+      expect(issues.length).toBeGreaterThan(0)
+    })
+
+    it("rejects a sealed bugSummary pasted into candidate-visible content", async () => {
+      const sealed = await loadSealedPack(pack.id)
+      const sabotaged = { ...pack, taskMd: `${pack.taskMd}\n\n${sealed!.bugSummary}` }
+
+      expect(
+        validatePackQuality(sabotaged, { bugSummary: sealed!.bugSummary }).length
+      ).toBeGreaterThan(0)
+    })
+
+    it("rejects a sealed bugLocation pasted into candidate-visible content", async () => {
+      const sealed = await loadSealedPack(pack.id)
+      expect(sealed!.bugLocation, "fixture pack must seal a location").toBeTruthy()
+
+      const sabotaged = { ...pack, taskMd: `${pack.taskMd}\n\n${sealed!.bugLocation}` }
+      expect(
+        validatePackQuality(sabotaged, { bugLocation: sealed!.bugLocation }).length
+      ).toBeGreaterThan(0)
+    })
+
+    it("still accepts a bare bugSummary string, so old callers keep working", async () => {
+      const sealed = await loadSealedPack(pack.id)
+      const sabotaged = { ...pack, taskMd: `${pack.taskMd}\n\n${sealed!.bugSummary}` }
+
+      expect(validatePackQuality(sabotaged, sealed!.bugSummary).length).toBeGreaterThan(0)
+      expect(validatePackQuality(pack, sealed!.bugSummary)).toEqual([])
+    })
+
+    it("does not flag a clean pack", async () => {
+      const sealed = await loadSealedPack(pack.id)
+      expect(
+        validatePackQuality(pack, {
+          bugSummary: sealed?.bugSummary,
+          minimalFix: sealed?.minimalFix,
+          bugLocation: sealed?.bugLocation,
+        })
+      ).toEqual([])
+    })
+  })
+
   for (const pack of bugfixPacks) {
     describe(`pack: ${pack.id}`, () => {
       it("compiles to a structurally valid workspace scenario with the pack marker", () => {
@@ -34,9 +87,18 @@ describe("bugfix pack suite", () => {
         expect(sealed?.packId).toBe(pack.id)
       })
 
-      it("passes the pack quality gate with no verbatim sealed-bug-summary leak", async () => {
+      it("passes the pack quality gate with no verbatim sealed leak", async () => {
         const sealed = await loadSealedPack(pack.id)
-        expect(validatePackQuality(pack, sealed?.bugSummary)).toEqual([])
+        // Check every sealed string, not just bugSummary: the gate used to pass a
+        // task.md with the sealed minimalFix pasted in verbatim, which hands the
+        // candidate the answer while reporting zero issues.
+        expect(
+          validatePackQuality(pack, {
+            bugSummary: sealed?.bugSummary,
+            minimalFix: sealed?.minimalFix,
+            bugLocation: sealed?.bugLocation,
+          })
+        ).toEqual([])
       })
 
       it("has partial wrongness — buggy output differs from the oracle but not entirely", async () => {
