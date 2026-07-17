@@ -2784,6 +2784,23 @@ FROM pipeline_runs;`,
         expected: { columns: ["runs", "failures"], rows: [[12, 2]] },
       },
     },
+    {
+      id: "sql-l6-pipelines-orchestration-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total rows written by successful runs as \`(rows_written)\`, over \`pipeline_runs\`.`,
+      starterCode: `-- Sum rows_out over the runs that succeeded.
+SELECT
+FROM pipeline_runs
+WHERE status = 'success';`,
+      hints: ["Filter `WHERE status = 'success'`.", "`SUM(rows_out)` and alias `rows_written`."],
+      referenceSolution: `SELECT SUM(rows_out) AS rows_written
+FROM pipeline_runs
+WHERE status = 'success';`,
+      singleFile: {
+        seedSql: PIPELINE_RUNS_SEED,
+        expected: { columns: ["rows_written"], rows: [[30900480]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
