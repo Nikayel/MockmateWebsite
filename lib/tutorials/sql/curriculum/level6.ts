@@ -1256,7 +1256,7 @@ FROM parquet_column_stats;`,
     {
       id: "sql-l6-compression-encoding-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the single best-compressing column and its ratio as \`(column_name, ratio)\`, over \`parquet_column_stats\`. The ratio is uncompressed divided by compressed, rounded to 2 decimals.`,
+      prompt: `**Easy.** Write a query that returns the single best-compressing column and its ratio as \`(column_name, ratio)\`, over \`parquet_column_stats\`. The ratio is uncompressed divided by compressed, rounded to 2 decimals.`,
       starterCode: `-- The column that shrinks the most.
 SELECT column_name, ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS ratio
 FROM parquet_column_stats
@@ -1274,7 +1274,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-compression-encoding-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many MB compression saved across the whole file as \`(saved_mb)\`, over \`parquet_column_stats\`. That is total uncompressed minus total compressed, in MB (1 MB = 1,000,000 bytes), rounded to 2 decimals.`,
+      prompt: `**Medium.** Write a query that returns how many MB compression saved across the whole file as \`(saved_mb)\`, over \`parquet_column_stats\`. That is total uncompressed minus total compressed, in MB (1 MB = 1,000,000 bytes), rounded to 2 decimals.`,
       starterCode: `-- Uncompressed total minus compressed total, in MB.
 SELECT
 FROM parquet_column_stats;`,
@@ -1292,7 +1292,7 @@ FROM parquet_column_stats;`,
     {
       id: "sql-l6-compression-encoding-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the columns that compress worse than 5x as \`(column_name, ratio)\`, worst first, over \`parquet_column_stats\`. The ratio is uncompressed divided by compressed, rounded to 2 decimals.`,
+      prompt: `**Hard.** Write a query that returns the columns that compress worse than 5x as \`(column_name, ratio)\`, worst first, over \`parquet_column_stats\`. The ratio is uncompressed divided by compressed, rounded to 2 decimals.`,
       starterCode: `-- Columns whose compression ratio is under 5.
 SELECT column_name, ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS ratio
 FROM parquet_column_stats
