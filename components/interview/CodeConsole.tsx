@@ -358,7 +358,11 @@ export function CodeConsole({
   return (
     <div
       className={cn(
-        "border-border flex flex-shrink-0 flex-col rounded border bg-[#1e1d1b]",
+        // The panel is always dark (bg-[#1e1d1b]); scope the subtree to `dark` so the
+        // theme tokens inside (muted-foreground, foreground, border) resolve to their
+        // light-on-dark values. Without this, light app mode paints dark-gray text on the
+        // dark panel (~3:1, fails AA).
+        "dark border-border flex flex-shrink-0 flex-col rounded border bg-[#1e1d1b]",
         className
       )}
     >
@@ -415,17 +419,22 @@ export function CodeConsole({
               size="sm"
               className="text-muted-foreground hover:text-muted-foreground h-5 w-5 p-0"
               onClick={onClear}
+              aria-label="Clear console"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3 w-3" aria-hidden="true" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Console Content */}
+      {/* Console Content. role="log" + aria-live so a screen reader announces run output
+          and test results as they stream in, instead of the panel updating silently. */}
       <div
         ref={consoleRef}
         onScroll={handleScroll}
+        role="log"
+        aria-live="polite"
+        aria-label="Console output"
         className="max-h-[200px] min-h-[100px] flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs"
       >
         {/* Optional info banner (e.g. guided-lab reveal signpost) */}

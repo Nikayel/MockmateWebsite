@@ -72,7 +72,7 @@ export function TestResultsPanel({
     </div>
   ) : (
     <div className="flex flex-shrink-0 items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2 text-xs text-amber-300">
+      <div className="flex min-w-0 items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
         {!isLanguageSupported(selectedLanguage) && (
           <span className="truncate">Use JS/Python to run tests</span>
         )}
