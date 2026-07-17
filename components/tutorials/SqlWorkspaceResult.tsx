@@ -8,6 +8,7 @@ import {
   type SqlTablePreview,
 } from "@/lib/workspace-execution"
 import { SqlResultGrid } from "./SqlResultGrid"
+import { LessonNotice } from "./LessonNotice"
 
 type Status = "idle" | "loading" | "ready" | "error"
 
@@ -100,13 +101,10 @@ export function SqlWorkspaceResult({
         {status === "ready" && (
           <>
             {scriptError && (
-              <p
-                role="alert"
-                className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300"
-              >
+              <LessonNotice className="p-2.5 text-xs">
                 Your script stopped at a SQL error: {scriptError}. The tables below reflect the
                 state up to that point.
-              </p>
+              </LessonNotice>
             )}
 
             {tables.length === 0 && !scriptError && (
