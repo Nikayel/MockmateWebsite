@@ -1716,6 +1716,25 @@ FROM partition_catalog
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-what-is-a-partition-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the whole table's size in GB and its total rows as \`(total_gb, total_rows)\`, over \`partition_catalog\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
+      starterCode: `-- Sum every partition's bytes and rows.
+SELECT
+FROM partition_catalog;`,
+      hints: ["`SUM(size_bytes) / 1000000000.0` for GB.", "`SUM(row_count)` for rows."],
+      referenceSolution: `SELECT ROUND(SUM(size_bytes) / 1000000000.0, 2) AS total_gb,
+       SUM(row_count) AS total_rows
+FROM partition_catalog;`,
+      singleFile: {
+        seedSql: PARTITION_CATALOG_SEED,
+        expected: { columns: ["total_gb", "total_rows"], rows: [[3.94, 39400000]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const choosingPartitionKey: SqlLesson = {
