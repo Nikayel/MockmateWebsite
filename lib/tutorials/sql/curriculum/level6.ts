@@ -863,7 +863,32 @@ ORDER BY db_name, table_name;`,
         },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-lake-warehouse-catalog-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many tables use each file format as \`(file_format, tables)\`, most common first, over \`glue_catalog\`.`,
+      starterCode: `-- Count of tables per file format.
+SELECT file_format, COUNT(*) AS tables
+FROM glue_catalog
+;`,
+      hints: ["`GROUP BY file_format`.", "`ORDER BY tables DESC, file_format`."],
+      referenceSolution: `SELECT file_format, COUNT(*) AS tables
+FROM glue_catalog
+GROUP BY file_format
+ORDER BY tables DESC, file_format;`,
+      singleFile: {
+        seedSql: GLUE_CATALOG_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["file_format", "tables"],
+          rows: [
+            ["parquet", 4],
+            ["csv", 1],
+            ["json", 1],
+          ],
+        },
+      },
+    },
   ],
 }
 
