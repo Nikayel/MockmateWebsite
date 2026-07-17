@@ -85,7 +85,7 @@ The demo below (turn on the input panel) materializes the anchor next to each da
     [
       "2026-03-06",
       5,
-      "2026-02-29"
+      "2026-03-01"
     ]
   ],
   "highlightCols": [
@@ -861,7 +861,7 @@ LAST_VALUE(amount) OVER (
 )
 \`\`\`
 
-\`FIRST_VALUE\` does not have this problem, because the default frame already starts at the partition beginning. \`LAST_VALUE\` is the one that bites. In the demo below, the two \`2026-01-02\` rows both report \`last_value_wrong = 50\`: they are peers, so each sees the other as the frame's last row, and neither reads the partition's true final \`300\`.
+\`FIRST_VALUE\` does not have this problem, because the default frame already starts at the partition beginning. \`LAST_VALUE\` is the one that bites. In the demo below, the two \`2026-01-02\` rows both report \`last_value_wrong = 50\`: they are peers, so they share one frame that runs through the end of their peer group, and both read the last tied row rather than the partition's true final \`300\`.
 
 ## Trap 2: ROWS and RANGE differ on ties
 
