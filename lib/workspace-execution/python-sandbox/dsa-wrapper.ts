@@ -1,3 +1,25 @@
+/**
+ * Embed a value in Python source as a literal it can actually evaluate.
+ *
+ * `JSON.stringify` is NOT safe here: JSON's `true`/`false`/`null` are not Python
+ * names, so interpolating it raw emitted `_input = [3,9,20,null,null,15,7]` and every
+ * test case with a boolean or a null died on `NameError: name 'null' is not defined`
+ * before the learner's code ran. That silently broke every tree/linked-list DSA
+ * scenario (null marks an absent child) and the Learn-Python booleans lessons.
+ *
+ * Base64 over the UTF-8 bytes sidesteps quoting entirely — no escaping rules to get
+ * subtly wrong for a string containing a quote, a newline, or an emoji — and matches
+ * how `pack-oracle-runner` already ferries stdout the other way. `json` is imported at
+ * the top of the wrapper; `base64` is imported alongside it.
+ */
+function toPythonLiteral(value: unknown): string {
+  const json = JSON.stringify(value) ?? "null"
+  const bytes = new TextEncoder().encode(json)
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return `json.loads(base64.b64decode("${btoa(binary)}").decode("utf-8"))`
+}
+
 function toSnakeCase(value: string): string {
   return value
     .replace(/^dsa-/, "")
@@ -55,6 +77,7 @@ export function buildPythonWrapper(
   )
 
   return `
+import base64
 import json
 
 class TreeNode:
@@ -125,8 +148,9 @@ def list_to_array(head):
 
 ${code}
 
-_input = ${JSON.stringify(inputValues)}
-_input_keys = ${JSON.stringify(inputKeys)}
+_input = ${toPythonLiteral(inputValues)}
+_input_keys = ${toPythonLiteral(inputKeys)}
+_candidates = ${toPythonLiteral(candidates)}
 _tree_keywords = {"root", "tree", "node", "p", "q", "t1", "t2", "left", "right", "subroot"}
 _list_keywords = {"head", "list", "l1", "l2"}
 
@@ -144,7 +168,7 @@ _result = None
 
 if "Solution" in globals():
     _solution_instance = Solution()
-    _solution_methods = [name for name in ${JSON.stringify(candidates)} if hasattr(_solution_instance, name)]
+    _solution_methods = [name for name in _candidates if hasattr(_solution_instance, name)]
     if _solution_methods:
         _result = getattr(_solution_instance, _solution_methods[0])(*_processed_input)
     else:
@@ -157,7 +181,7 @@ if "Solution" in globals():
         else:
             raise Exception("No callable Solution method found")
 else:
-    _functions = [name for name in ${JSON.stringify(candidates)} if name in globals() and callable(globals()[name])]
+    _functions = [name for name in _candidates if name in globals() and callable(globals()[name])]
     if not _functions:
         raise Exception("No callable function found")
     _result = globals()[_functions[0]](*_processed_input)
