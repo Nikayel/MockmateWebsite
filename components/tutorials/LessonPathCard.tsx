@@ -4,16 +4,25 @@ import { cn } from "@/lib/utils"
 import type { DifficultyLevel } from "@/lib/scenarios/types"
 import type { LessonPathNode } from "@/lib/tutorials/level-path"
 
-/** Difficulty dot color — easy=green, medium=amber, hard=red (readable in light + dark). */
+/**
+ * Difficulty dot color — easy=green, medium=amber, hard=red. A filled dot carries no text,
+ * so the 500 shades stay: their job is hue separation, and amber sits 48deg off rose.
+ */
 const DIFFICULTY_DOT: Record<DifficultyLevel, string> = {
   easy: "bg-emerald-500",
   medium: "bg-amber-500",
   hard: "bg-rose-500",
 }
+/**
+ * The label beside the dot IS text, so it needs contrast. The 700 shades measured
+ * 4.4-5.0:1 on the light card — amber-700 the weakest at 4.41:1 over the tint, under the
+ * 4.5:1 AA bar. The 800 shades clear 6.6:1+ and match LessonHeader's badge, so the same
+ * difficulty reads the same in both places.
+ */
 const DIFFICULTY_LABEL: Record<DifficultyLevel, string> = {
-  easy: "text-emerald-700 dark:text-emerald-400",
-  medium: "text-amber-700 dark:text-amber-400",
-  hard: "text-rose-700 dark:text-rose-400",
+  easy: "text-emerald-800 dark:text-emerald-400",
+  medium: "text-amber-800 dark:text-amber-400",
+  hard: "text-rose-800 dark:text-rose-400",
 }
 
 /** The leading status indicator — a real, four-state affordance, not a decorative circle. */
@@ -35,7 +44,9 @@ function StatusIndicator({ status }: { status: LessonPathNode["status"] }) {
     )
   }
   // open
-  return <span className="border-border h-7 w-7 shrink-0 rounded-full border-2" aria-hidden="true" />
+  return (
+    <span className="border-border h-7 w-7 shrink-0 rounded-full border-2" aria-hidden="true" />
+  )
 }
 
 /**
@@ -51,17 +62,25 @@ export function LessonPathCard({ node }: { node: LessonPathNode }) {
   const cardClass = cn(
     "group relative flex h-full flex-col rounded-xl border p-4 transition-all",
     "hover:border-accent/50 hover:-translate-y-0.5 hover:shadow-md",
-    isCurrent ? "border-accent bg-accent/[0.06] shadow-md shadow-accent/20" : "border-border bg-card"
+    isCurrent
+      ? "border-accent bg-accent/[0.06] shadow-accent/20 shadow-md"
+      : "border-border bg-card"
   )
 
   return (
     <Link href={href} className={cardClass} aria-current={isCurrent ? "step" : undefined}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-muted-foreground text-[11px] font-semibold tracking-wide tabular-nums uppercase">
+        <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase tabular-nums">
           Lesson {String(index).padStart(2, "0")}
         </span>
+        {/*
+          "Up next" marks the current step, which is the accent's job — the card it sits on
+          is already clay (border-accent / bg-accent/[0.06]) for that exact reason. It was
+          amber, so one affordance announced itself in two unrelated colours and the pill
+          read as a warning about the lesson rather than a pointer to it.
+        */}
         {isCurrent && (
-          <span className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+          <span className="border-accent/40 bg-accent/10 text-accent-strong rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
             Up next
           </span>
         )}
@@ -85,7 +104,10 @@ export function LessonPathCard({ node }: { node: LessonPathNode }) {
 
       <div className="mt-3 flex items-center justify-between gap-2 pt-0.5">
         <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px]">
-          <span className={cn("h-1.5 w-1.5 rounded-full", DIFFICULTY_DOT[item.difficulty])} aria-hidden="true" />
+          <span
+            className={cn("h-1.5 w-1.5 rounded-full", DIFFICULTY_DOT[item.difficulty])}
+            aria-hidden="true"
+          />
           <span className={cn("font-medium capitalize", DIFFICULTY_LABEL[item.difficulty])}>
             {item.difficulty}
           </span>
@@ -96,7 +118,10 @@ export function LessonPathCard({ node }: { node: LessonPathNode }) {
         {isCurrent ? (
           <span className="text-accent inline-flex items-center gap-0.5 text-xs font-semibold">
             Start
-            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            <ArrowRight
+              className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
           </span>
         ) : isDone ? (
           <span className="text-muted-foreground group-hover:text-foreground text-xs font-medium transition-colors">
