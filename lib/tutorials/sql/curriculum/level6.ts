@@ -665,7 +665,25 @@ JOIN storage_pricing p ON p.storage_class = i.storage_class;`,
         expected: { columns: ["monthly_bill_usd"], rows: [[34.71]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-storage-classes-lifecycle-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many times more expensive S3 Standard is per GB than Glacier Deep Archive as \`(standard_vs_deep)\`, rounded to 1 decimal, over \`storage_pricing\`.`,
+      starterCode: `-- Standard price divided by Deep Archive price.
+SELECT
+;`,
+      hints: [
+        "Use two scalar subqueries: the STANDARD price and the GLACIER_DEEP price.",
+        "Divide the first by the second and `ROUND(..., 1)`.",
+      ],
+      referenceSolution: `SELECT ROUND(
+  (SELECT usd_per_gb_month FROM storage_pricing WHERE storage_class = 'STANDARD')
+  / (SELECT usd_per_gb_month FROM storage_pricing WHERE storage_class = 'GLACIER_DEEP'), 1) AS standard_vs_deep;`,
+      singleFile: {
+        seedSql: STORAGE_PRICING_SEED,
+        expected: { columns: ["standard_vs_deep"], rows: [[23.2]] },
+      },
+    },
   ],
 }
 
