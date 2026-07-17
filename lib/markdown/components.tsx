@@ -94,18 +94,21 @@ export const markdownComponents: Components = {
   thead: ({ children }) => <thead>{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => <tr className="odd:bg-muted/20">{children}</tr>,
+  // Header muted, body at full foreground — matching SqlResultGrid, so a comparison table
+  // in prose and a live query result read as the same object. This was inverted: the th
+  // was `text-foreground` and every td was `text-muted-foreground`, making prose tables the
+  // only learner-facing table that dims its own DATA below the label naming it. The header
+  // is the signpost; the cells are the thing worth reading.
   th: ({ children }) => (
     <th
       scope="col"
-      className="bg-muted/50 text-foreground border-border border-b px-3 py-2 font-semibold whitespace-nowrap"
+      className="bg-muted/40 text-muted-foreground border-border border-b px-3 py-2 font-semibold whitespace-nowrap"
     >
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="text-muted-foreground border-border/60 border-b px-3 py-2 align-top">
-      {children}
-    </td>
+    <td className="border-border/60 border-b px-3 py-2 align-top">{children}</td>
   ),
 
   // Blockquotes - for notes/hints
