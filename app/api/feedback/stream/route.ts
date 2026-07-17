@@ -37,7 +37,11 @@ import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-anal
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import { calculateBugfixEvidenceScore } from "@/lib/bugfix/scoring"
-import { scoreBugfixSemantics, BUGFIX_SEMANTIC_NEUTRAL } from "@/lib/bugfix/semantic-scorer"
+import {
+  scoreBugfixSemantics,
+  fitTranscript,
+  BUGFIX_SEMANTIC_NEUTRAL,
+} from "@/lib/bugfix/semantic-scorer"
 import { loadSealedPack } from "@/lib/scenarios/sealed/registry.server"
 import type {
   BugfixEvidenceEvent,
@@ -286,11 +290,16 @@ export async function POST(request: NextRequest) {
                 bugDescription:
                   sealedGroundTruth ??
                   (typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : ""),
-                conversationExcerpt: transcriptMessages
-                  .slice(-10)
-                  .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-                  .join("\n\n")
-                  .slice(0, 2000),
+                // The transcript is now the ONLY place a candidate states their
+                // hypothesis, root cause, and prevention (the three textareas that
+                // used to carry them are gone). A hypothesis is stated EARLY, so the
+                // last-10-messages window would routinely cut off the very evidence
+                // hypothesisQuality is scored on. Send the whole conversation.
+                conversationExcerpt: fitTranscript(
+                  transcriptMessages
+                    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                    .join("\n\n")
+                ),
               }).catch(() => BUGFIX_SEMANTIC_NEUTRAL)
             : Promise.resolve(BUGFIX_SEMANTIC_NEUTRAL),
         ])
