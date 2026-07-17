@@ -1241,6 +1241,26 @@ ORDER BY cols DESC, data_type;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-rows-vs-columns-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns the compressed bytes a query reads if it selects only the INT64 columns, and that as a percent of the whole file, as \`(int_bytes, pct_of_file)\`, over \`parquet_column_stats\`. Round \`pct_of_file\` to 2 decimals.`,
+      starterCode: `-- Bytes read for a SELECT of just the INT64 columns, and its share.
+SELECT
+FROM parquet_column_stats;`,
+      hints: [
+        "`SUM(CASE WHEN data_type = 'INT64' THEN compressed_bytes ELSE 0 END)` is the bytes read.",
+        "Divide that by `SUM(compressed_bytes)`, times 100.0, `ROUND(..., 2)`.",
+      ],
+      referenceSolution: `SELECT SUM(CASE WHEN data_type = 'INT64' THEN compressed_bytes ELSE 0 END) AS int_bytes,
+       ROUND(100.0 * SUM(CASE WHEN data_type = 'INT64' THEN compressed_bytes ELSE 0 END) / SUM(compressed_bytes), 2) AS pct_of_file
+FROM parquet_column_stats;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        expected: { columns: ["int_bytes", "pct_of_file"], rows: [[60000000, 20.27]] },
+      },
+    },
   ],
 }
 
