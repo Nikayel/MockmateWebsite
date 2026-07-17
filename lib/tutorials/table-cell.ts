@@ -50,14 +50,20 @@ export function formatCellText(value: unknown): string {
  * Tailwind classes for a cell of this kind.
  *
  * Numbers right-align with `tabular-nums` so digits stack into comparable columns — the
- * whole reason to render a result as a table rather than a list. NULL and empty read as
- * muted italic: present, clearly not data.
+ * whole reason to render a result as a table rather than a list.
+ *
+ * NULL and empty are ITALIC but at full `text-muted-foreground`. The obvious move is to
+ * fade them, and DiagramTable did (`text-muted-foreground/60`) — but that measures 2.41:1
+ * in light mode and 3.71:1 in dark, both under the 4.5:1 AA bar. A NULL is not decoration;
+ * it is the answer to "why is this row wrong", and on this course it is frequently the
+ * whole point of the query. Muted-but-legible is 5.23:1 / 8.02:1, and the italic already
+ * carries the distinction from a literal `'NULL'` on its own.
  */
 export function cellToneClass(value: unknown): string {
   switch (classifyCell(value)) {
     case "null":
     case "empty":
-      return "text-muted-foreground/60 italic"
+      return "text-muted-foreground italic"
     case "number":
       return "text-right tabular-nums"
     default:

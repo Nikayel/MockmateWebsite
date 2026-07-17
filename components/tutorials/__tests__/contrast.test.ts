@@ -74,7 +74,36 @@ const TAILWIND = {
 const ACCENT = { light: "#bd6a39", dark: "#d0824f" }
 const ACCENT_STRONG = { light: "#a3522a", dark: "#d0824f" }
 
+/** globals.css --muted-foreground, per theme. */
+const MUTED_FOREGROUND = { light: "#6c685f", dark: "#b3afa4" }
+
+/** `text-<colour>/<alpha>` — Tailwind fades the TEXT, so composite it over its surface. */
+function fadedText(colour: string, alpha: number, surface: string): string {
+  return composite(colour, alpha, surface)
+}
+
 describe("learn UI colour contrast (WCAG AA, normal text)", () => {
+  /**
+   * A NULL cell is not decoration — on a course that teaches NULL semantics it is often the
+   * answer to "why is this row wrong". Fading it is the obvious move and it is the wrong
+   * one: DiagramTable's `text-muted-foreground/60` measured 2.41:1 light / 3.71:1 dark.
+   */
+  describe("table cells — a NULL must stay readable", () => {
+    it("renders NULL at a legible muted, not a faded one", () => {
+      expect(contrastRatio(MUTED_FOREGROUND.light, SURFACE.lightBg)).toBeGreaterThanOrEqual(
+        AA_NORMAL
+      )
+      expect(contrastRatio(MUTED_FOREGROUND.dark, SURFACE.darkBg)).toBeGreaterThanOrEqual(AA_NORMAL)
+    })
+
+    it("rejects the /60 fade it used to use, in both themes", () => {
+      const light = fadedText(MUTED_FOREGROUND.light, 0.6, SURFACE.lightBg)
+      const dark = fadedText(MUTED_FOREGROUND.dark, 0.6, SURFACE.darkBg)
+      expect(contrastRatio(light, SURFACE.lightBg)).toBeLessThan(AA_NORMAL)
+      expect(contrastRatio(dark, SURFACE.darkBg)).toBeLessThan(AA_NORMAL)
+    })
+  })
+
   describe("LessonNotice — the shared alert banner", () => {
     it("is readable in light mode over its own tint", () => {
       const tint = composite(TAILWIND["orange-500"], 0.1, SURFACE.lightBg)
