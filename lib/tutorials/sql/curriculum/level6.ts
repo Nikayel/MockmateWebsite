@@ -2951,6 +2951,24 @@ FROM staged_events;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-data-quality-checks-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total row count and the number of distinct \`event_id\` values as \`(total_rows, distinct_ids)\`, over \`staged_events\`. A gap between them means duplicates.`,
+      starterCode: `-- If total_rows > distinct_ids, the batch has duplicates.
+SELECT
+FROM staged_events;`,
+      hints: ["`COUNT(*)` is total rows.", "`COUNT(DISTINCT event_id)` is distinct ids."],
+      referenceSolution: `SELECT COUNT(*) AS total_rows, COUNT(DISTINCT event_id) AS distinct_ids
+FROM staged_events;`,
+      singleFile: {
+        seedSql: STAGED_EVENTS_SEED,
+        expected: { columns: ["total_rows", "distinct_ids"], rows: [[10, 7]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 export const sqlLevel6: SqlLevel = {
