@@ -276,8 +276,8 @@ One hour is \`3600\` seconds and one minute is \`60\` seconds. Combine both part
 
 // ───────────────────────────────────────────────────────────────────────────
 // L1-M5: Control Flow & Functions
-// `py-l1-temperature` (further down) is Agent 1's canonical single-file sample, pinned by
-// registry.test.ts; the three ticketed lessons below precede it in the module.
+// `py-l1-temperature` is defined further down (next to these, for historical reasons) but is
+// authored into L1-M1, right after `py-l1-hello`. See the note above its definition.
 // ───────────────────────────────────────────────────────────────────────────
 
 const conditionalsLesson: PythonLesson = {
@@ -666,6 +666,10 @@ For \`("b", "hi")\` return \`"<b>hi</b>"\`.`,
   },
 }
 
+// Agent 1's canonical single-file sample, pinned by registry.test.ts (which fixes its id and
+// exercise modes, never its position). Authored into L1-M1 directly after `py-l1-hello`, whose
+// teach block already introduces `def`/parameters/`return` and return-vs-print: this lesson
+// reinforces that shape on arithmetic and must not re-teach it from scratch.
 const temperatureLesson: PythonLesson = {
   id: "py-l1-temperature",
   title: "Functions & return values",
@@ -675,13 +679,9 @@ const temperatureLesson: PythonLesson = {
   skills: ["functions", "arithmetic", "return-values"],
   teach: {
     estimatedMinutes: 3,
-    markdown: `## Functions turn input into output
+    markdown: `## The same shape, now doing arithmetic
 
-Every real codebase is functions calling functions. A function packages a computation under a name so you write it once and call it from a hundred places. That is the whole point: no copy-pasted arithmetic, one place to fix a bug, and a name that says what the code does. Interview questions are phrased this way too, almost always "write a function that takes X and returns Y", so getting the input-to-output contract right is the skill being tested.
-
-### The mental model
-
-Think of a function as a machine with a labeled input slot and one output chute. You hand it arguments, it runs its body, and \`return\` sends one value back to the caller. You define it with \`def\`, name the inputs (its \`parameters\`), and use \`return\` to hand back the result.
+The last lesson used \`def\` and \`return\` to hand back a string. Nothing about that shape changes when the work is arithmetic instead: the function takes an input, computes, and returns one value. Interview questions are phrased this way almost every time, "write a function that takes X and returns Y", so this input-to-output contract is worth making automatic.
 
 \`\`\`python
 def square(n):
@@ -691,24 +691,7 @@ print(square(5))   # 25
 print(square(9))   # 81
 \`\`\`
 
-- \`def\` starts the definition, and \`square\` is the name you call.
-- \`n\` is a \`parameter\`, a placeholder filled in by the \`argument\` you pass at the call site.
-- Everything indented under \`def\` is the \`body\`.
-- \`return\` immediately exits the function and produces its result. A function that never hits a \`return\` hands back \`None\`.
-
-### \`return\` is not \`print\`
-
-This trips up almost everyone once. \`print\` draws text on the screen and hands back \`None\`. \`return\` gives a value to the surrounding code.
-
-\`\`\`python
-def bad(n):
-    print(n * n)     # shows it, returns None
-
-x = bad(5)           # prints 25
-print(x + 1)         # TypeError: NoneType + int
-\`\`\`
-
-The grader checks what you \`return\`, and only a returned value can be fed into other code. When a function should produce a value, \`return\` it.
+\`square\` takes a number rather than a string, but the contract is identical: one value in, one returned value out. The grader still reads what you \`return\`, so a function that prints its answer and returns nothing still fails.
 
 ### Pitfall: float vs floor division
 
@@ -2392,8 +2375,9 @@ export const level1: PythonLevel = {
     {
       id: "py-l1-fundamentals",
       title: "First Steps",
-      description: "Run your first program, show output, and store values in variables.",
-      lessons: [helloLesson, variablesLesson],
+      description:
+        "Run your first program, show output, return a computed value, and store values in variables.",
+      lessons: [helloLesson, temperatureLesson, variablesLesson],
     },
     {
       id: "py-l1-data-types",
@@ -2429,7 +2413,6 @@ export const level1: PythonLevel = {
         loopIdiomsLesson,
         functionsLesson,
         recursionLesson,
-        temperatureLesson,
       ],
     },
   ],
