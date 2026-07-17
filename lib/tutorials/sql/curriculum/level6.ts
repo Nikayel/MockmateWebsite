@@ -411,6 +411,28 @@ FROM s3_inventory
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-object-vs-block-storage-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many objects the bucket holds and their total size in TB as \`(objects, total_tb)\`, over \`s3_inventory\`. Treat 1 TB as 1,000,000,000,000 bytes and round \`total_tb\` to 2 decimals.`,
+      starterCode: `-- Object count and total size in TB.
+SELECT
+FROM s3_inventory;`,
+      hints: [
+        "`COUNT(*)` is the object count.",
+        "`SUM(size_bytes) / 1000000000000.0` is TB; `ROUND(..., 2)`.",
+      ],
+      referenceSolution: `SELECT COUNT(*) AS objects,
+       ROUND(SUM(size_bytes) / 1000000000000.0, 2) AS total_tb
+FROM s3_inventory;`,
+      singleFile: {
+        seedSql: S3_INVENTORY_SEED,
+        expected: { columns: ["objects", "total_tb"], rows: [[7, 2.74]] },
+      },
+    },
+    // MORE-L2
+  ],
 }
 
 const storageClassesLifecycle: SqlLesson = {
