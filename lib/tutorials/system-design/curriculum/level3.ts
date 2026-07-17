@@ -374,8 +374,8 @@ is a distributed operation, and a write that must change both is a distributed t
 
 A query that is not scoped to one shard key must fan out to every partition, and it is bounded by the
 **slowest shard**, not the average. This is **tail latency amplification**: if each shard's p99 is
-10ms and you hit 50 shards, the chance that *at least one* is slow approaches certainty, so the
-overall p99 is far worse than 10ms. Mitigations: avoid the fan-out by choosing the shard key to match
+10ms and you hit 50 shards, the chance that *at least one* is slow is 1 minus 0.99^50, roughly 40%,
+so the overall p99 is far worse than 10ms. Mitigations: avoid the fan-out by choosing the shard key to match
 the query, **denormalize** so the data you need is co-located, cap the fan-out width, and use
 hedged/speculative requests to blunt single-shard tail latency. The senior instinct is to design most
 reads to touch one shard and treat scatter-gather as the rare, budgeted case.
@@ -859,7 +859,7 @@ is on the hot path and a write is not.
   dashboard load, maintain a rollup table (\`daily_orders_by_region\`) that a job or a stream
   updates. Reads become a single indexed lookup. You trade freshness and storage for read latency.
 - **Approximate structures:** when the answer does not need to be exact, use sketches.
-  **HyperLogLog** counts unique visitors in ~12 KB per counter with ~2% error instead of storing
+  **HyperLogLog** counts unique visitors in ~12 KB per counter with ~0.8% standard error instead of storing
   every visitor id. **Count-Min Sketch** gives approximate frequencies for "top trending" in fixed
   memory. Redis ships both. Exactness is a cost you should only pay when the product needs it.
 - **Feed fan-out:** the canonical denormalization problem. A user opens their home timeline and wants
@@ -1742,7 +1742,7 @@ export const systemDesignLevel3: DesignLevel = {
             modelAnswerOutline: [
               "Assumptions: the live viewer count can be approximate within a percent or two, unique-viewer count needs to be close but not audit-grade, the trending board updates every few seconds, and read volume is enormous, so reads must never touch a relational primary.",
               "**Live concurrent count:** a maintained counter in Redis per stream, incremented/decremented on join/leave events (or derived from a heartbeat TTL set so crashed clients age out). Clients read the counter or, better, subscribe via pub/sub or WebSocket push so 300k viewers do not each poll.",
-              "**Unique viewers per session: a HyperLogLog per stream** (Redis PFADD/PFCOUNT), ~12 KB and ~2% error: exactness is too expensive here, since storing 300k+ viewer ids per stream to dedupe is wasteful, and '1.2M unique viewers' does not need audit precision.",
+              "**Unique viewers per session: a HyperLogLog per stream** (Redis PFADD/PFCOUNT), ~12 KB and ~0.8% standard error: exactness is too expensive here, since storing 300k+ viewer ids per stream to dedupe is wasteful, and '1.2M unique viewers' does not need audit precision.",
               "**Trending top 10:** a Count-Min Sketch or a windowed rollup: a stream job (Kafka Streams/Flink) aggregates viewer-join events into per-stream counts over a sliding window and writes a small sorted materialized table that the board reads directly.",
               "**The through-line:** reads are on the hot path and vastly outnumber writes, so all aggregation moves off the read path into precomputed counters, sketches, and rollup tables, trading a little exactness and a few seconds of freshness for O(1) lookups against Redis or a tiny serving table.",
               "Common wrong turn: `SELECT COUNT(DISTINCT viewer_id)` on every read, or storing every viewer id for exact uniques: either melts the DB and the memory budget at 300k concurrent viewers when a HyperLogLog answers the same question in 12 KB.",
