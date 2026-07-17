@@ -118,7 +118,11 @@ export function LessonOutline({
                   >
                     {labelFor(section)}
                   </span>
-                  <span className="text-muted-foreground/80 block text-xs">
+                  {/* The /80 alpha measured 3.47:1 at rest in light mode and got worse on
+                      hover (3.42) and when active (3.29), so its best case was still under
+                      the 4.5:1 bar. It passed in dark at 5.58, which is exactly why it
+                      slipped through unnoticed. */}
+                  <span className="text-muted-foreground block text-xs">
                     {SECTION_HINT[section]}
                   </span>
                 </button>

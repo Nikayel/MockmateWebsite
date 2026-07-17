@@ -71,9 +71,15 @@ export function LevelPreviewPanel({
               <span
                 className={[
                   "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  // Inactive chips are muted, not faded: the /50 alpha measured 2.07:1 in
+                  // light mode, and these name the phases of the lesson — a learner has to
+                  // read the ones they have not reached to know what is coming. The
+                  // active chip's border + tint already carries the distinction.
+                  // The active chip uses --accent-strong because plain text-accent is
+                  // 3.97:1 in light mode, under AA at 12px.
                   active
-                    ? "border-accent/40 bg-accent/10 text-accent"
-                    : "border-border text-muted-foreground/50",
+                    ? "border-accent/40 bg-accent/10 text-accent-strong"
+                    : "border-border text-muted-foreground",
                 ].join(" ")}
               >
                 {phase}
