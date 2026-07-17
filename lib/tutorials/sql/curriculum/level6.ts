@@ -1324,6 +1324,8 @@ The result is that data that would be a large CSV becomes a much smaller Parquet
 
 Each column in \`parquet_column_stats\` records both its **uncompressed** and its **compressed** size, so the compression ratio is just one divided by the other. The exercises compute the ratio per column (watch the low-cardinality strings win and the high-cardinality URL lose) and the whole file's overall shrink.
 
+**Common mistake:** expecting every column to shrink equally. Low-cardinality columns dictionary-encode to almost nothing, while a high-cardinality column like a URL or a raw id barely compresses, so a file's size is usually dominated by a few wide columns.
+
 **Interview nuance:** the second half of "why is Parquet faster and cheaper than CSV" is compression: columnar data groups like values, so dictionary and run-length encoding plus a codec like Snappy or Zstd shrink it far more than a row-interleaved CSV could. Naming an encoding (dictionary encoding for low-cardinality strings) is the detail that shows you understand *why*.
 
 > **On a real platform this differs.** Real compression ratios depend on the data, the encodings the writer chose, and the codec. The \`parquet_column_stats\` numbers here are illustrative but shaped like reality: a low-cardinality \`country\` string compresses far harder than a high-cardinality \`url\`. The ratio query is the real one.`,
