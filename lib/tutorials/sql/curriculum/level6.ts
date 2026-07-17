@@ -415,7 +415,7 @@ FROM s3_inventory
     {
       id: "sql-l6-object-vs-block-storage-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many objects the bucket holds and their total size in TB as \`(objects, total_tb)\`, over \`s3_inventory\`. Treat 1 TB as 1,000,000,000,000 bytes and round \`total_tb\` to 2 decimals.`,
+      prompt: `**Easy.** Write a query that returns how many objects the bucket holds and their total size in TB as \`(objects, total_tb)\`, over \`s3_inventory\`. Treat 1 TB as 1,000,000,000,000 bytes and round \`total_tb\` to 2 decimals.`,
       starterCode: `-- Object count and total size in TB.
 SELECT
 FROM s3_inventory;`,
@@ -434,7 +434,7 @@ FROM s3_inventory;`,
     {
       id: "sql-l6-object-vs-block-storage-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many objects sit in each storage class as \`(storage_class, objects)\`, most objects first, over \`s3_inventory\`.`,
+      prompt: `**Medium.** Write a query that returns how many objects sit in each storage class as \`(storage_class, objects)\`, most objects first, over \`s3_inventory\`.`,
       starterCode: `-- Object count per storage class.
 SELECT storage_class, COUNT(*) AS objects
 FROM s3_inventory
@@ -460,7 +460,7 @@ ORDER BY objects DESC, storage_class;`,
     {
       id: "sql-l6-object-vs-block-storage-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many objects sit under each top-level prefix as \`(prefix, objects)\`, most objects first, over \`s3_inventory\`.`,
+      prompt: `**Hard.** Write a query that returns how many objects sit under each top-level prefix as \`(prefix, objects)\`, most objects first, over \`s3_inventory\`.`,
       starterCode: `-- Object count per top-level key prefix.
 SELECT substr(object_key, 1, instr(object_key, '/') - 1) AS prefix, COUNT(*) AS objects
 FROM s3_inventory
