@@ -1092,7 +1092,32 @@ LIMIT 1;`,
         expected: { columns: ["column_name", "mb"], rows: [["url", 180]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-rows-vs-columns-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many columns the file has of each data type as \`(data_type, cols)\`, most common first, over \`parquet_column_stats\`.`,
+      starterCode: `-- Column count per data type.
+SELECT data_type, COUNT(*) AS cols
+FROM parquet_column_stats
+;`,
+      hints: ["`GROUP BY data_type`.", "`ORDER BY cols DESC, data_type`."],
+      referenceSolution: `SELECT data_type, COUNT(*) AS cols
+FROM parquet_column_stats
+GROUP BY data_type
+ORDER BY cols DESC, data_type;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["data_type", "cols"],
+          rows: [
+            ["STRING", 4],
+            ["INT64", 3],
+            ["DOUBLE", 1],
+          ],
+        },
+      },
+    },
   ],
 }
 
