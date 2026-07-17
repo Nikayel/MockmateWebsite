@@ -23,8 +23,14 @@ function getTargetRect(target: string): DOMRect | null {
   const element = document.querySelector<HTMLElement>(`[data-bugfix-tour="${target}"]`)
   if (!element) return null
 
+  const rect = element.getBoundingClientRect()
+  // A hidden panel (a collapsed rail, or the inactive panel on a one-panel mobile layout)
+  // still exists in the DOM but reports a 0x0 rect at the origin. Treat it as missing so the
+  // tour advances past the step instead of spotlighting an empty corner of the screen.
+  if (rect.width === 0 && rect.height === 0) return null
+
   element.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" })
-  return element.getBoundingClientRect()
+  return rect
 }
 
 function useBugfixTourState({
