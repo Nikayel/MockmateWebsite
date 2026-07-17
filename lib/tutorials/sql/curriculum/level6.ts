@@ -2609,7 +2609,23 @@ WHERE role = 'fact';`,
         expected: { columns: ["table_name", "size_gb"], rows: [["events", 48]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-skew-and-joins-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many dimension tables are small enough to broadcast as \`(broadcastable)\`, over \`join_inputs\`. A dimension broadcasts when it is under the 10 MB (10485760 byte) threshold.`,
+      starterCode: `-- Count the dimensions under the broadcast threshold.
+SELECT
+FROM join_inputs
+;`,
+      hints: ["`role = 'dimension'` AND `size_bytes < 10485760`.", "`COUNT(*)` over that filter."],
+      referenceSolution: `SELECT COUNT(*) AS broadcastable
+FROM join_inputs
+WHERE role = 'dimension' AND size_bytes < 10485760;`,
+      singleFile: {
+        seedSql: JOIN_INPUTS_SEED,
+        expected: { columns: ["broadcastable"], rows: [[3]] },
+      },
+    },
   ],
 }
 
