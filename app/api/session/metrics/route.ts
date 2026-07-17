@@ -21,6 +21,7 @@ import {
   trackAISuggestionApplied,
   completeSessionMetrics,
   getSessionMetrics,
+  verifySessionOwnership,
 } from "@/lib/session-metrics"
 import { logger } from "@/lib/logger"
 
@@ -41,6 +42,16 @@ export async function POST(request: NextRequest) {
 
     if (!event || !sessionId) {
       return NextResponse.json({ error: "Missing event or sessionId" }, { status: 400 })
+    }
+
+    // session_start establishes ownership (it writes userId onto the new session). Every
+    // other event targets an existing session, so confirm the caller owns it — otherwise a
+    // signed-in user could pass someone else's sessionId and corrupt or read their metrics.
+    if (event !== "session_start") {
+      const ownership = await verifySessionOwnership(sessionId, userId)
+      if (ownership === "forbidden") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
     }
 
     switch (event) {

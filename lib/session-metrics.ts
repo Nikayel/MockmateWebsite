@@ -216,6 +216,29 @@ export function getSessionMetrics(sessionId: string): SessionMetricsState | null
 }
 
 /**
+ * Confirm a session belongs to the authenticated user before any metrics event mutates or
+ * reads it. Without this, the metrics route authenticates the caller but then trusts the
+ * client-supplied sessionId, letting any signed-in user corrupt or read another user's
+ * session (an IDOR). Checks the in-memory state first (the common case, free), then falls
+ * back to the persisted interview_sessions doc for sessions not resident on this instance.
+ * Returns "not_found" when neither exists — there is no data to protect in that case.
+ */
+export async function verifySessionOwnership(
+  sessionId: string,
+  userId: string
+): Promise<"ok" | "forbidden" | "not_found"> {
+  const state = activeSessions.get(sessionId)
+  if (state) return state.userId === userId ? "ok" : "forbidden"
+  try {
+    const doc = await adminDb.collection("interview_sessions").doc(sessionId).get()
+    if (!doc.exists) return "not_found"
+    return doc.data()?.user_id === userId ? "ok" : "forbidden"
+  } catch {
+    return "not_found"
+  }
+}
+
+/**
  * Recalculate accumulated scores based on current session state
  * Called automatically after significant events (test run, message, hint)
  */
@@ -1015,12 +1038,7 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
         // the user's timezone and is idempotent for same-day / repeat writes, so
         // this writer and the topic-level writer can both fire for one session
         // without double-incrementing.
-        const streakDays = advanceStreak(
-          data.streak_days,
-          data.last_session_at,
-          userTimezone,
-          now
-        )
+        const streakDays = advanceStreak(data.streak_days, data.last_session_at, userTimezone, now)
 
         // Update topics
         const topics = data.topics || {}
