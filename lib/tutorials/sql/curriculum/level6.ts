@@ -2720,6 +2720,38 @@ FROM task_metrics;`,
         expected: { columns: ["shuffle_gb"], rows: [[0.36]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-distributed-execution-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns each stage's total task-seconds and its share of the whole job's time as \`(stage_id, stage_s, pct_of_job)\`, in stage order, over \`task_metrics\`. Round \`stage_s\` to 1 decimal and \`pct_of_job\` to 2 decimals.`,
+      starterCode: `-- Where the job spent its time, by stage.
+SELECT stage_id, ROUND(SUM(duration_s), 1) AS stage_s
+FROM task_metrics
+GROUP BY stage_id
+;`,
+      hints: [
+        "The job total is `(SELECT SUM(duration_s) FROM task_metrics)`.",
+        "`100.0 * SUM(duration_s) / (that total)` as `pct_of_job`; `ORDER BY stage_id`.",
+      ],
+      referenceSolution: `SELECT stage_id,
+       ROUND(SUM(duration_s), 1) AS stage_s,
+       ROUND(100.0 * SUM(duration_s) / (SELECT SUM(duration_s) FROM task_metrics), 2) AS pct_of_job
+FROM task_metrics
+GROUP BY stage_id
+ORDER BY stage_id;`,
+      singleFile: {
+        seedSql: TASK_METRICS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["stage_id", "stage_s", "pct_of_job"],
+          rows: [
+            [0, 47.6, 39.9],
+            [1, 71.7, 60.1],
+          ],
+        },
+      },
+    },
   ],
 }
 
