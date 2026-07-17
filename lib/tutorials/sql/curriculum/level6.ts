@@ -2200,6 +2200,27 @@ ORDER BY health;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-choosing-partition-key-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns the total number of excess files across all small-files partitions as \`(excess_files)\`, over \`partition_files\`. Count only partitions whose average file is under 128 MB, and sum their file count beyond a 4-file target.`,
+      starterCode: `-- Total wasted (excess) files created by the small-files problem.
+SELECT
+FROM partition_files
+;`,
+      hints: [
+        "Filter `WHERE total_bytes * 1.0 / file_count < 128000000`.",
+        "`SUM(file_count - 4)` over those partitions.",
+      ],
+      referenceSolution: `SELECT SUM(file_count - 4) AS excess_files
+FROM partition_files
+WHERE total_bytes * 1.0 / file_count < 128000000;`,
+      singleFile: {
+        seedSql: PARTITION_FILES_SEED,
+        expected: { columns: ["excess_files"], rows: [[232]] },
+      },
+    },
   ],
 }
 
