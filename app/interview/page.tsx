@@ -321,9 +321,6 @@ function InterviewPageContent() {
   const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContextFile[]>([])
   const [activeWorkspacePath, setActiveWorkspacePath] = useState<string | null>(null)
   const [bugfixEvidenceEvents, setBugfixEvidenceEvents] = useState<BugfixEvidenceEvent[]>([])
-  const [bugfixHypothesis, setBugfixHypothesis] = useState("")
-  const [bugfixRootCause, setBugfixRootCause] = useState("")
-  const [bugfixPrevention, setBugfixPrevention] = useState("")
   const recordedBugfixEditPathsRef = useRef<Set<string>>(new Set())
   const chatWorkspaceContext = useMemo(
     () =>
@@ -376,50 +373,11 @@ function InterviewPageContent() {
 
   const buildBugfixEvidencePayload = useCallback((): BugfixEvidenceEvent[] => {
     if (selectedScenario?.type !== "bugfix") return []
-
-    const events = [...bugfixEvidenceEvents]
-    const now = Date.now()
-    const hasHypothesisEvent = events.some((event) => event.type === "hypothesis_created")
-    const hasPreventionEvent = events.some((event) => event.type === "prevention_explained")
-
-    if (bugfixHypothesis.trim() && !hasHypothesisEvent) {
-      events.push(
-        createBugfixEvidenceEvent({
-          type: "hypothesis_created",
-          text: bugfixHypothesis.trim(),
-          timestamp: now,
-        })
-      )
-    }
-
-    if (bugfixPrevention.trim() && !hasPreventionEvent) {
-      events.push(
-        createBugfixEvidenceEvent({
-          type: "prevention_explained",
-          text: bugfixPrevention.trim(),
-          timestamp: now + 1,
-        })
-      )
-    }
-
-    if (bugfixRootCause.trim()) {
-      events.push(
-        createBugfixEvidenceEvent({
-          type: "submission_created",
-          text: bugfixRootCause.trim(),
-          timestamp: now + 2,
-        })
-      )
-    }
-
-    return events
-  }, [bugfixEvidenceEvents, bugfixHypothesis, bugfixPrevention, bugfixRootCause, selectedScenario])
+    return bugfixEvidenceEvents
+  }, [bugfixEvidenceEvents, selectedScenario])
 
   const resetBugfixSessionState = useCallback(() => {
     setBugfixEvidenceEvents([])
-    setBugfixHypothesis("")
-    setBugfixRootCause("")
-    setBugfixPrevention("")
     recordedBugfixEditPathsRef.current = new Set()
   }, [])
 
@@ -1204,9 +1162,6 @@ function InterviewPageContent() {
     setTestSummary,
     setConsoleLogs,
     setBugfixEvidenceEvents,
-    setBugfixHypothesis,
-    setBugfixRootCause,
-    setBugfixPrevention,
     setShowPostInterviewDiscussion,
     recordedBugfixEditPathsRef,
   })
@@ -1229,9 +1184,6 @@ function InterviewPageContent() {
     activeWorkspacePath,
     consoleLogs,
     bugfixEvidenceEvents,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     showPostInterviewDiscussion,
     realInterviewMode,
     strictTimeLimit,
@@ -1256,9 +1208,6 @@ function InterviewPageContent() {
     setActiveWorkspacePath,
     setConsoleLogs,
     setBugfixEvidenceEvents,
-    setBugfixHypothesis,
-    setBugfixRootCause,
-    setBugfixPrevention,
     setElapsedTime,
     setTestSummary,
     setShowPostInterviewDiscussion,
@@ -1315,9 +1264,6 @@ function InterviewPageContent() {
     workspaceContext,
     activeWorkspacePath,
     consoleLogs,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     conversationTracker,
     revealedHints,
     revealedHintIndices,
@@ -1574,9 +1520,6 @@ function InterviewPageContent() {
     experienceLevel,
     showPostInterviewDiscussion,
     targetCompany,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     setChatInput,
     setInterviewerInput,
     setChatMessages,
@@ -1606,9 +1549,6 @@ function InterviewPageContent() {
     chatMessages,
     interviewerMessages,
     consoleLogs,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     realInterviewMode,
     strictTimeLimit,
     currentSessionId,
@@ -1650,49 +1590,6 @@ function InterviewPageContent() {
     setPackRun(null)
     setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
   }, [])
-
-  const handleBugfixReflectionChange = useCallback(
-    (field: "hypothesis" | "rootCause" | "prevention", value: string) => {
-      if (field === "hypothesis") setBugfixHypothesis(value)
-      if (field === "rootCause") setBugfixRootCause(value)
-      if (field === "prevention") setBugfixPrevention(value)
-    },
-    []
-  )
-
-  const handleBugfixReflectionCommit = useCallback(
-    (field: "hypothesis" | "rootCause" | "prevention") => {
-      if (selectedScenario?.type !== "bugfix") return
-
-      if (field === "hypothesis" && bugfixHypothesis.trim()) {
-        recordBugfixEvidence({
-          type: "hypothesis_created",
-          text: bugfixHypothesis.trim(),
-        })
-      }
-
-      if (field === "rootCause" && bugfixRootCause.trim()) {
-        recordBugfixEvidence({
-          type: "submission_created",
-          text: bugfixRootCause.trim(),
-        })
-      }
-
-      if (field === "prevention" && bugfixPrevention.trim()) {
-        recordBugfixEvidence({
-          type: "prevention_explained",
-          text: bugfixPrevention.trim(),
-        })
-      }
-    },
-    [
-      bugfixHypothesis,
-      bugfixPrevention,
-      bugfixRootCause,
-      recordBugfixEvidence,
-      selectedScenario?.type,
-    ]
-  )
 
   const resetActiveWorkspaceFile = useCallback(() => {
     if (!activeWorkspacePath || !isWorkspaceScenario(selectedScenario)) return
@@ -1786,11 +1683,6 @@ function InterviewPageContent() {
   const problemCtx = useMemo<ProblemColumnCtx>(() => {
     return {
       activePanel,
-      bugfixReflection: {
-        hypothesis: bugfixHypothesis,
-        rootCause: bugfixRootCause,
-        prevention: bugfixPrevention,
-      },
       elapsedTime,
       fetchRAGHints,
       fileInputRef,
@@ -1807,8 +1699,6 @@ function InterviewPageContent() {
       revealedHints,
       selectedScenario,
       setIsCodeViewerOpen,
-      onBugfixReflectionChange: handleBugfixReflectionChange,
-      onBugfixReflectionCommit: handleBugfixReflectionCommit,
       setRevealedAIHintIndices,
       setRevealedHintIndices,
       setSelectedFile,
@@ -1822,9 +1712,6 @@ function InterviewPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activePanel,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     fetchRAGHints,
     fileInputRef,
     focusMode,
@@ -1840,8 +1727,6 @@ function InterviewPageContent() {
     revealedHints,
     selectedScenario,
     setIsCodeViewerOpen,
-    handleBugfixReflectionChange,
-    handleBugfixReflectionCommit,
     setRevealedAIHintIndices,
     setRevealedHintIndices,
     setSelectedFile,
@@ -2049,7 +1934,6 @@ function InterviewPageContent() {
                   interviewerInput={interviewerInput}
                   onInterviewerInputChange={setInterviewerInput}
                   bugfixTourEnabled={bugfixTourEnabled}
-                  bugfixHypothesis={bugfixHypothesis}
                   bugfixScenarioId={selectedScenario?.id}
                   testResultsCount={testResults.length}
                   userId={user?.id}
