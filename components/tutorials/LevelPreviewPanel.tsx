@@ -87,7 +87,7 @@ export function LevelPreviewPanel({
               {i < ALL_PHASES.length - 1 && (
                 <span
                   className={
-                    active && i + 1 < activePhases ? "text-accent" : "text-muted-foreground/40"
+                    active && i + 1 < activePhases ? "text-accent-strong" : "text-muted-foreground"
                   }
                   aria-hidden="true"
                 >
