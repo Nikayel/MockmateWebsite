@@ -645,6 +645,26 @@ LIMIT 1;`,
         },
       },
     },
+    {
+      id: "sql-l6-storage-classes-lifecycle-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total monthly storage bill across all objects as \`(monthly_bill_usd)\`, over \`s3_inventory\` joined to \`storage_pricing\`. Treat 1 GB as 1,000,000,000 bytes and round to 2 decimals.`,
+      starterCode: `-- Join each object to its class price and sum the cost.
+SELECT
+FROM s3_inventory i
+JOIN storage_pricing p ON p.storage_class = i.storage_class;`,
+      hints: [
+        "`SUM(i.size_bytes * p.usd_per_gb_month) / 1000000000.0` is the bill.",
+        "`ROUND(..., 2)` and alias `monthly_bill_usd`.",
+      ],
+      referenceSolution: `SELECT ROUND(SUM(i.size_bytes * p.usd_per_gb_month) / 1000000000.0, 2) AS monthly_bill_usd
+FROM s3_inventory i
+JOIN storage_pricing p ON p.storage_class = i.storage_class;`,
+      singleFile: {
+        seedSql: INVENTORY_AND_PRICING_SEED,
+        expected: { columns: ["monthly_bill_usd"], rows: [[34.71]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
