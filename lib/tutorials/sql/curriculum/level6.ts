@@ -808,7 +808,7 @@ FROM glue_catalog
     {
       id: "sql-l6-lake-warehouse-catalog-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns each database and how many tables it owns as \`(db_name, table_count)\`, most tables first, over \`glue_catalog\`.`,
+      prompt: `**Easy.** Write a query that returns each database and how many tables it owns as \`(db_name, table_count)\`, most tables first, over \`glue_catalog\`.`,
       starterCode: `-- Table count per database, busiest first.
 SELECT db_name, COUNT(*) AS table_count
 FROM glue_catalog
@@ -837,7 +837,7 @@ ORDER BY table_count DESC, db_name;`,
     {
       id: "sql-l6-lake-warehouse-catalog-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the Parquet tables that DO declare a partition key as \`(db_name, table_name, partition_keys)\`, ordered by \`db_name\` then \`table_name\`, over \`glue_catalog\`.`,
+      prompt: `**Medium.** Write a query that returns the Parquet tables that DO declare a partition key as \`(db_name, table_name, partition_keys)\`, ordered by \`db_name\` then \`table_name\`, over \`glue_catalog\`.`,
       starterCode: `-- Parquet tables that are partitioned (the healthy ones).
 SELECT db_name, table_name, partition_keys
 FROM glue_catalog
@@ -866,7 +866,7 @@ ORDER BY db_name, table_name;`,
     {
       id: "sql-l6-lake-warehouse-catalog-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many tables use each file format as \`(file_format, tables)\`, most common first, over \`glue_catalog\`.`,
+      prompt: `**Hard.** Write a query that returns how many tables use each file format as \`(file_format, tables)\`, most common first, over \`glue_catalog\`.`,
       starterCode: `-- Count of tables per file format.
 SELECT file_format, COUNT(*) AS tables
 FROM glue_catalog
