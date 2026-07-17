@@ -683,9 +683,14 @@ WHERE email IS NULL;      -- correct: finds the missing emails
 Remember the trap from the last lesson. If any value in a \`NOT IN\` list is NULL, the whole predicate can collapse to \`unknown\` for every row and return **nothing**:
 
 \`\`\`sql
--- If any customer_id in orders is NULL, this returns NO rows:
+-- If any customer_id in flagged is NULL, this returns NO rows:
 WHERE customer_id NOT IN (SELECT customer_id FROM flagged);
 \`\`\`
+
+Which side the NULL is on decides everything, and it is the side people get backwards:
+
+- A NULL in the **list** (\`flagged\`) makes \`customer_id <> NULL\` unknown for every row, so the whole \`AND\` chain is unknown and you get **nothing back**.
+- A NULL in the **column being checked** (\`orders.customer_id\`) only makes that one row's test unknown, so you lose **that row and no others**.
 
 The fix: filter NULLs out of the subquery, or use \`NOT EXISTS\` (Level 2).
 
