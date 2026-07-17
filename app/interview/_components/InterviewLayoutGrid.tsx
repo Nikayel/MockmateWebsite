@@ -85,7 +85,6 @@ interface InterviewLayoutGridProps {
   onInterviewerInputChange: ChatColumnProps["onInterviewerInputChange"]
   // BugfixOnboardingTour
   bugfixTourEnabled: BugfixOnboardingTourProps["enabled"]
-  bugfixHypothesis: BugfixOnboardingTourProps["hypothesis"]
   bugfixScenarioId: BugfixOnboardingTourProps["scenarioId"]
   testResultsCount: BugfixOnboardingTourProps["testResultsCount"]
   userId: BugfixOnboardingTourProps["userId"]
@@ -152,7 +151,6 @@ export function InterviewLayoutGrid({
   interviewerInput,
   onInterviewerInputChange,
   bugfixTourEnabled,
-  bugfixHypothesis,
   bugfixScenarioId,
   testResultsCount,
   userId,
@@ -323,7 +321,6 @@ export function InterviewLayoutGrid({
         <BugfixOnboardingTourLazy
           activePanel={activePanel}
           enabled={bugfixTourEnabled}
-          hypothesis={bugfixHypothesis}
           isAIPartnerExpanded={isAIPartnerExpanded}
           onAIPartnerExpandedChange={onAIPartnerExpandedChange}
           onActivePanelChange={onActivePanelChange}
