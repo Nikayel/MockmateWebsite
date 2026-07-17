@@ -2768,7 +2768,7 @@ ORDER BY over_by_min DESC;`,
     {
       id: "sql-l6-pipelines-orchestration-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total number of runs and how many failed as \`(runs, failures)\`, over \`pipeline_runs\`.`,
+      prompt: `**Easy.** Write a query that returns the total number of runs and how many failed as \`(runs, failures)\`, over \`pipeline_runs\`.`,
       starterCode: `-- Count all runs, and the failed ones.
 SELECT
 FROM pipeline_runs;`,
@@ -2787,7 +2787,7 @@ FROM pipeline_runs;`,
     {
       id: "sql-l6-pipelines-orchestration-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total rows written by successful runs as \`(rows_written)\`, over \`pipeline_runs\`.`,
+      prompt: `**Medium.** Write a query that returns the total rows written by successful runs as \`(rows_written)\`, over \`pipeline_runs\`.`,
       starterCode: `-- Sum rows_out over the runs that succeeded.
 SELECT
 FROM pipeline_runs
@@ -2804,7 +2804,7 @@ WHERE status = 'success';`,
     {
       id: "sql-l6-pipelines-orchestration-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the slowest successful run as \`(job, run_date, duration_min)\`, over \`pipeline_runs\`.`,
+      prompt: `**Hard.** Write a query that returns the slowest successful run as \`(job, run_date, duration_min)\`, over \`pipeline_runs\`.`,
       starterCode: `-- The successful run that took longest.
 SELECT job, run_date, duration_min
 FROM pipeline_runs
