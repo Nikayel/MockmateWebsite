@@ -2104,6 +2104,24 @@ FROM user_buckets;`,
         expected: { columns: ["users"], rows: [[1775000]] },
       },
     },
+    {
+      id: "sql-l6-bucketing-and-the-full-scan-trap-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the largest (skewed) bucket as \`(bucket_id, size_mb)\`, over \`user_buckets\`. Round \`size_mb\` to the nearest MB (1 MB = 1,000,000 bytes).`,
+      starterCode: `-- The one bucket a mega-key skewed.
+SELECT bucket_id, ROUND(size_bytes / 1000000.0, 0) AS size_mb
+FROM user_buckets
+;`,
+      hints: ["`ORDER BY size_bytes DESC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT bucket_id, ROUND(size_bytes / 1000000.0, 0) AS size_mb
+FROM user_buckets
+ORDER BY size_bytes DESC, bucket_id
+LIMIT 1;`,
+      singleFile: {
+        seedSql: USER_BUCKETS_SEED,
+        expected: { columns: ["bucket_id", "size_mb"], rows: [[7, 1400]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
