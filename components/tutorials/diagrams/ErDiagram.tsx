@@ -59,7 +59,8 @@ export function ErDiagram({ spec }: { spec: ErSpec }) {
               <span className="text-foreground">{rel.from}</span>
               <span className="text-accent-strong">{rel.kind}</span>
               <span className="text-foreground">{rel.to}</span>
-              {rel.label && <span className="text-muted-foreground/70">— {rel.label}</span>}
+              {/* The relationship's meaning, e.g. "places" — the edge's whole point. */}
+              {rel.label && <span className="text-muted-foreground">— {rel.label}</span>}
             </li>
           ))}
         </ul>

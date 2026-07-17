@@ -60,10 +60,19 @@ export function PythonMemoryDiagram({ spec }: { spec: PythonMemorySpec }) {
       groupLabel="Python names and heap objects, step-through"
     >
       <pre className="border-border bg-muted/30 mb-3 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed">
+        {/*
+          Non-current lines are muted, NOT faded. They were `text-muted-foreground/40`,
+          which measures 1.74:1 in light mode -- and this is the program the learner is
+          reading to follow the step-through, so the lines they have not reached yet were
+          the ones they could not read. The ▸ marker and the weight already say which line
+          is live; dimming the rest to near-invisibility is emphasis paid for in legibility.
+        */}
         {spec.steps.map((s, i) => (
           <div
             key={i}
-            className={cn(i === player.index ? "text-foreground" : "text-muted-foreground/40")}
+            className={cn(
+              i === player.index ? "text-foreground font-medium" : "text-muted-foreground"
+            )}
           >
             <span className="select-none">{i === player.index ? "▸ " : "  "}</span>
             {s.code}
@@ -112,7 +121,8 @@ export function PythonMemoryDiagram({ spec }: { spec: PythonMemorySpec }) {
                   <div className="flex items-center gap-1.5">
                     <span className={cn("inline-block size-2 rounded-full", c.dot)} aria-hidden />
                     <span className={cn("font-semibold", c.text)}>{id}</span>
-                    <span className="text-muted-foreground/70">{obj.kind}</span>
+                    {/* The object's type — `list` vs `int` IS the lesson here, not a label. */}
+                    <span className="text-muted-foreground">{obj.kind}</span>
                     {aliased && (
                       <span className="bg-muted text-muted-foreground rounded px-1 text-[10px]">
                         {refCount(id)} names
