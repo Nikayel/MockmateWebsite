@@ -623,6 +623,30 @@ FROM s3_inventory
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-storage-classes-lifecycle-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the cheapest storage class and its price as \`(storage_class, usd_per_gb_month)\`, over \`storage_pricing\`.`,
+      starterCode: `-- The lowest per-GB price in the list.
+SELECT storage_class, usd_per_gb_month
+FROM storage_pricing
+;`,
+      hints: ["`ORDER BY usd_per_gb_month ASC`.", "`LIMIT 1` keeps the cheapest."],
+      referenceSolution: `SELECT storage_class, usd_per_gb_month
+FROM storage_pricing
+ORDER BY usd_per_gb_month ASC
+LIMIT 1;`,
+      singleFile: {
+        seedSql: STORAGE_PRICING_SEED,
+        expected: {
+          columns: ["storage_class", "usd_per_gb_month"],
+          rows: [["GLACIER_DEEP", 0.00099]],
+        },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const lakeWarehouseCatalog: SqlLesson = {
