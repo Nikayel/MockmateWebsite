@@ -12,7 +12,19 @@
 // preprocessor fence the whole line, rendering it as raw monospace and breaking lists.
 // A genuine arrow diagram is still caught by its box-drawing chars or indented structure.
 const ASCII_ART_CHARS = /[─│┌┐└┘├┤┬┴┼═║╔╗╚╝╠╣╦╩╬▲▼◀▶●○◉■□▪▫]/
-const TREE_PATTERN = /^\s{2,}[\/\\|]|[\/\\]\s*$/
+// An indented line that OPENS with a diagram stroke, e.g. the `/ \` under a tree node.
+const TREE_PATTERN = /^\s{2,}[\/\\|]/
+/**
+ * A line whose slashes are diagram strokes rather than punctuation: strokes, pipes and
+ * spacing only, no prose.
+ *
+ * This used to be the `[\/\\]\s*$` half of TREE_PATTERN — "ends with a slash" — which
+ * fenced any ORDINARY SENTENCE that happened to end in one. A wrapped `pragma_index_list` /
+ * `pragma_index_info` in sql-l3-indexes rendered as a monospace code box holding half a
+ * sentence, and any line ending in a URL's trailing slash would do the same. It is the
+ * exact trap the arrow chars were already excluded for, one line up.
+ */
+const TREE_EDGE_LINE = /^[\s\/\\|_+.-]*[\/\\][\s\/\\|_+.-]*$/
 const BOX_PATTERN = /^\s*[\+\-\|]+\s*$/
 const DIAGRAM_INDENT = /^\s{4,}\S/ // Lines with 4+ spaces of indent
 
@@ -41,6 +53,7 @@ function isAsciiArtLine(line: string, inBlock: boolean): boolean {
   // Check for ASCII art indicators
   if (ASCII_ART_CHARS.test(line)) return true
   if (TREE_PATTERN.test(line)) return true
+  if (TREE_EDGE_LINE.test(line)) return true
   if (BOX_PATTERN.test(line)) return true
 
   // Check for diagram-like indentation patterns (4+ spaces with content)

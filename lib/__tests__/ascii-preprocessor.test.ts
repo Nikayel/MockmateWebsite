@@ -79,4 +79,37 @@ describe("preprocessAsciiArt", () => {
     const out = preprocessAsciiArt(input)
     expect(out).toContain("```")
   })
+
+  /**
+   * A trailing slash is punctuation far more often than it is a diagram stroke. The
+   * fencer used to treat ANY line ending in `/` or `\` as tree art, so a wrapped
+   * sentence became a monospace box holding half a thought — the same trap that arrows
+   * were already excluded for.
+   */
+  describe("a trailing slash in prose", () => {
+    it("leaves a sentence that wraps after a slash alone", () => {
+      // The exact line from sql-l3-indexes that rendered as a code box mid-paragraph.
+      const input = [
+        "**Execution mode:** you write a multi-statement script.",
+        "then hidden assertion queries inspect the indexes you created via `pragma_index_list` /",
+        "`pragma_index_info`.",
+      ].join("\n")
+      expect(preprocessAsciiArt(input)).toBe(input)
+    })
+
+    it("leaves a line ending in a URL's trailing slash alone", () => {
+      const input = "Read the reference at https://sqlite.org/lang_select.html/"
+      expect(preprocessAsciiArt(input)).toBe(input)
+    })
+
+    it("still fences a tree diagram's stroke lines", () => {
+      const input = ["Tree:", "      4", "     / \\", "    2   6"].join("\n")
+      expect(preprocessAsciiArt(input)).toContain("```")
+    })
+
+    it("still fences a bare stroke line with no prose on it", () => {
+      const input = ["Shape:", "  \\", "   \\", "    \\"].join("\n")
+      expect(preprocessAsciiArt(input)).toContain("```")
+    })
+  })
 })
