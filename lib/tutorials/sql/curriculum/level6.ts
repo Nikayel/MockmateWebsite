@@ -237,6 +237,28 @@ FROM platform_services;`,
         expected: { columns: ["platform_cost"], rows: [[8920]] },
       },
     },
+    {
+      id: "sql-l6-cloud-and-the-de-stack-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the single most expensive service and its cost as \`(service, monthly_cost_usd)\`, over \`platform_services\`.`,
+      starterCode: `-- The priciest service: order by cost and take the top row.
+SELECT service, monthly_cost_usd
+FROM platform_services
+;`,
+      hints: ["`ORDER BY monthly_cost_usd DESC`.", "`LIMIT 1` keeps only the top row."],
+      referenceSolution: `SELECT service, monthly_cost_usd
+FROM platform_services
+ORDER BY monthly_cost_usd DESC, service
+LIMIT 1;`,
+      singleFile: {
+        seedSql: PLATFORM_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["service", "monthly_cost_usd"],
+          rows: [["Redshift warehouse", 3100]],
+        },
+      },
+    },
     // MORE-L1
   ],
 }
