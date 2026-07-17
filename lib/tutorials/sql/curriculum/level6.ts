@@ -457,7 +457,36 @@ ORDER BY objects DESC, storage_class;`,
         },
       },
     },
-    // MORE-L2
+    {
+      id: "sql-l6-object-vs-block-storage-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many objects sit under each top-level prefix as \`(prefix, objects)\`, most objects first, over \`s3_inventory\`.`,
+      starterCode: `-- Object count per top-level key prefix.
+SELECT substr(object_key, 1, instr(object_key, '/') - 1) AS prefix, COUNT(*) AS objects
+FROM s3_inventory
+;`,
+      hints: [
+        "The prefix is `substr(object_key, 1, instr(object_key, '/') - 1)`.",
+        "`GROUP BY` that prefix, `ORDER BY objects DESC, prefix`.",
+      ],
+      referenceSolution: `SELECT substr(object_key, 1, instr(object_key, '/') - 1) AS prefix, COUNT(*) AS objects
+FROM s3_inventory
+GROUP BY prefix
+ORDER BY objects DESC, prefix;`,
+      singleFile: {
+        seedSql: S3_INVENTORY_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["prefix", "objects"],
+          rows: [
+            ["raw", 4],
+            ["archive", 1],
+            ["curated", 1],
+            ["exports", 1],
+          ],
+        },
+      },
+    },
   ],
 }
 
