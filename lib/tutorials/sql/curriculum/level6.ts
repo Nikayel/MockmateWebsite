@@ -627,7 +627,7 @@ FROM s3_inventory
     {
       id: "sql-l6-storage-classes-lifecycle-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the cheapest storage class and its price as \`(storage_class, usd_per_gb_month)\`, over \`storage_pricing\`.`,
+      prompt: `**Easy.** Write a query that returns the cheapest storage class and its price as \`(storage_class, usd_per_gb_month)\`, over \`storage_pricing\`.`,
       starterCode: `-- The lowest per-GB price in the list.
 SELECT storage_class, usd_per_gb_month
 FROM storage_pricing
@@ -648,7 +648,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-storage-classes-lifecycle-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total monthly storage bill across all objects as \`(monthly_bill_usd)\`, over \`s3_inventory\` joined to \`storage_pricing\`. Treat 1 GB as 1,000,000,000 bytes and round to 2 decimals.`,
+      prompt: `**Medium.** Write a query that returns the total monthly storage bill across all objects as \`(monthly_bill_usd)\`, over \`s3_inventory\` joined to \`storage_pricing\`. Treat 1 GB as 1,000,000,000 bytes and round to 2 decimals.`,
       starterCode: `-- Join each object to its class price and sum the cost.
 SELECT
 FROM s3_inventory i
@@ -668,7 +668,7 @@ JOIN storage_pricing p ON p.storage_class = i.storage_class;`,
     {
       id: "sql-l6-storage-classes-lifecycle-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many times more expensive S3 Standard is per GB than Glacier Deep Archive as \`(standard_vs_deep)\`, rounded to 1 decimal, over \`storage_pricing\`.`,
+      prompt: `**Hard.** Write a query that returns how many times more expensive S3 Standard is per GB than Glacier Deep Archive as \`(standard_vs_deep)\`, rounded to 1 decimal, over \`storage_pricing\`.`,
       starterCode: `-- Standard price divided by Deep Archive price.
 SELECT
 ;`,
