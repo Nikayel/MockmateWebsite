@@ -507,10 +507,10 @@ ORDER BY oi.item_id;`,
     executionMode: "single-file",
     prompt: `**Hard.** Join \`orders\` to \`customers\` and return each customer's \`customer_name\` and total
 \`revenue\` (sum of \`total_cents\`). Order by \`revenue\` descending, then \`customer_name\`.`,
-    starterCode: `SELECT c.customer_name, SUM(o.total_cents) AS revenue
+    starterCode: `SELECT c.customer_name, /* total revenue for this customer */ AS revenue
 FROM orders o
 JOIN customers c ON c.customer_id = o.customer_id
-GROUP BY c.customer_id
+GROUP BY /* one row per customer */
 ORDER BY revenue DESC, c.customer_name;`,
     hints: [
       "Join first, then GROUP BY the customer.",
@@ -601,10 +601,10 @@ ORDER BY c.customer_name;`,
     executionMode: "single-file",
     prompt: `**Hard.** Return each customer's \`customer_name\` and \`order_count\`, showing **0** for customers
 with no orders. Order by \`customer_name\`.`,
-    starterCode: `SELECT c.customer_name, COUNT(o.order_id) AS order_count
+    starterCode: `SELECT c.customer_name, /* count the matched orders, 0 when there are none */ AS order_count
 FROM customers c
 LEFT JOIN orders o ON o.customer_id = c.customer_id
-GROUP BY c.customer_id
+GROUP BY /* one row per customer */
 ORDER BY c.customer_name;`,
     hints: [
       "`COUNT(o.order_id)` counts only non-NULL matches, so a customer with no orders counts 0.",
@@ -639,7 +639,7 @@ export const sqlWindowRankingDrills: SqlExercise[] = [
     prompt: `**Easy.** Number every product from highest to lowest revenue with \`ROW_NUMBER()\`. Break ties by
 \`product\` so the numbering is deterministic. Return \`product\`, \`revenue\`, and \`rn\`, ordered by \`rn\`.`,
     starterCode: `SELECT product, revenue,
-  ROW_NUMBER() OVER (ORDER BY revenue DESC, product) AS rn
+  ROW_NUMBER() OVER (/* whole table, highest revenue first, ties broken by product */) AS rn
 FROM sales
 ORDER BY rn;`,
     hints: [
@@ -709,10 +709,10 @@ subquery and keep \`rn <= 2\`. Return \`category\`, \`product\`, \`revenue\`, or
     starterCode: `SELECT category, product, revenue
 FROM (
   SELECT category, product, revenue,
-    ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, product) AS rn
+    ROW_NUMBER() OVER (/* per category, highest revenue first, ties broken by product */) AS rn
   FROM sales
 ) ranked
-WHERE rn <= 2
+WHERE /* keep only the top 2 of each category */
 ORDER BY category, revenue DESC, product;`,
     hints: [
       "You can't filter a window function in WHERE directly, wrap it in a subquery first.",
@@ -750,7 +750,7 @@ export const sqlWindowOffsetDrills: SqlExercise[] = [
     prompt: `**Easy.** For each month, show the **previous month's** revenue with \`LAG()\`. Return \`month\`,
 \`revenue\`, and \`prev_revenue\` (NULL for the first month), ordered by \`month\`.`,
     starterCode: `SELECT month, revenue,
-  LAG(revenue) OVER (ORDER BY month) AS prev_revenue
+  /* the previous month's revenue, ordered by month */ AS prev_revenue
 FROM monthly
 ORDER BY month;`,
     hints: [
@@ -781,7 +781,7 @@ ORDER BY month;`,
     prompt: `**Medium.** Compute a **running total** of revenue by month with a windowed \`SUM()\`. Return
 \`month\`, \`revenue\`, and \`running_total\`, ordered by \`month\`.`,
     starterCode: `SELECT month, revenue,
-  SUM(revenue) OVER (ORDER BY month) AS running_total
+  /* revenue accumulated from the first month through this one */ AS running_total
 FROM monthly
 ORDER BY month;`,
     hints: [
@@ -812,7 +812,7 @@ ORDER BY month;`,
     prompt: `**Hard.** Compute the **month-over-month change** in revenue: this month minus last month, using
 \`LAG()\`. Return \`month\` and \`delta\` (NULL for the first month), ordered by \`month\`.`,
     starterCode: `SELECT month,
-  revenue - LAG(revenue) OVER (ORDER BY month) AS delta
+  /* this month's revenue minus the previous month's, ordered by month */ AS delta
 FROM monthly
 ORDER BY month;`,
     hints: [
