@@ -33,13 +33,6 @@ export const chatRequestSchema = z
     isProactive: z.boolean().optional(),
     scenarioTitle: z.string().optional(),
     scenarioType: z.string().optional(),
-    bugfixReflection: z
-      .object({
-        hypothesis: z.string().max(5000).optional(),
-        rootCause: z.string().max(5000).optional(),
-        prevention: z.string().max(5000).optional(),
-      })
-      .optional(),
     scenarioPattern: z.string().optional(),
     scenarioCompany: z.string().nullish(),
     elapsedTime: z.number().optional(),
