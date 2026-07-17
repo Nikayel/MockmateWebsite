@@ -1,5 +1,11 @@
 # SQL Level 6 — Cloud & Data Engineering Foundations
 
+**Status: SHIPPED (2026-07-17).** All 13 lessons across 4 modules authored in
+`lib/tutorials/sql/curriculum/level6.ts` and registered in `SQL_LEVELS`. Every single-file
+`expected` set is sql.js-generated and re-checked by `single-file-reference-solutions.test.ts`;
+teach demos and `csdiagram` fences pass their guards; typecheck, lint, and the full test suite
+(1551 tests) are green. `registry.test.ts` re-baselined to six levels.
+
 ## Why this level exists (the gap)
 
 Levels 1-5 teach **SQL query skill**: SELECT/JOIN/aggregation (L1-L2), modeling and

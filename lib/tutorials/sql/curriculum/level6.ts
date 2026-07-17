@@ -1969,7 +1969,7 @@ export const sqlLevel6: SqlLevel = {
     },
     {
       id: "sql-l6-file-formats",
-      title: "Module 6.2: File Formats — Why Columnar Wins",
+      title: "Module 6.2: File Formats and Why Columnar Wins",
       description:
         "Why Parquet beats CSV for analytics: column projection reads only the columns you select, columnar compression and encodings shrink each column hard, and row-group min/max stats let predicate pushdown skip data unread. Plus when a row format (Avro) is the right call.",
       lessons: [rowsVsColumns, compressionEncoding, rowGroupsPushdown],
