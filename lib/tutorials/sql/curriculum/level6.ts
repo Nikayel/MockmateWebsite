@@ -2801,7 +2801,29 @@ WHERE status = 'success';`,
         expected: { columns: ["rows_written"], rows: [[30900480]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-pipelines-orchestration-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the slowest successful run as \`(job, run_date, duration_min)\`, over \`pipeline_runs\`.`,
+      starterCode: `-- The successful run that took longest.
+SELECT job, run_date, duration_min
+FROM pipeline_runs
+WHERE status = 'success'
+;`,
+      hints: ["`ORDER BY duration_min DESC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT job, run_date, duration_min
+FROM pipeline_runs
+WHERE status = 'success'
+ORDER BY duration_min DESC, job, run_date
+LIMIT 1;`,
+      singleFile: {
+        seedSql: PIPELINE_RUNS_SEED,
+        expected: {
+          columns: ["job", "run_date", "duration_min"],
+          rows: [["bronze_ingest", "2026-01-04", 41]],
+        },
+      },
+    },
   ],
 }
 
