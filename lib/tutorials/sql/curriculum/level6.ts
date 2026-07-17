@@ -605,6 +605,442 @@ FROM glue_catalog
   },
 }
 
+// ---------------------------------------------------------------------------
+// Shared simulated-catalog seeds for Module 6.2. `parquet_column_stats` = one row per
+// column of a Parquet file with its uncompressed/compressed size; `row_group_stats` = one
+// row per row group with its min/max of the sort column, the raw material of pushdown.
+// ---------------------------------------------------------------------------
+
+const PARQUET_COLUMN_STATS_SEED = `CREATE TABLE parquet_column_stats (
+  column_name        TEXT,
+  data_type          TEXT,
+  uncompressed_bytes INTEGER,
+  compressed_bytes   INTEGER
+);
+INSERT INTO parquet_column_stats (column_name, data_type, uncompressed_bytes, compressed_bytes) VALUES
+  ('event_id',   'INT64',   80000000,  20000000),
+  ('user_id',    'INT64',   80000000,  24000000),
+  ('event_type', 'STRING',  200000000,  8000000),   -- low-cardinality, dictionary-encodes tiny
+  ('country',    'STRING',  120000000,  3000000),   -- very low cardinality
+  ('url',        'STRING',  500000000, 180000000),  -- high-cardinality, compresses poorly
+  ('device',     'STRING',  100000000,  5000000),
+  ('revenue',    'DOUBLE',   80000000, 40000000),
+  ('ts',         'INT64',    80000000, 16000000);`
+
+const ROW_GROUP_STATS_SEED = `CREATE TABLE row_group_stats (
+  rg_id            INTEGER,
+  row_count        INTEGER,
+  min_order_id     INTEGER,   -- the file is sorted by order_id, so each row group
+  max_order_id     INTEGER,   -- covers a tight, non-overlapping range
+  compressed_bytes INTEGER
+);
+INSERT INTO row_group_stats (rg_id, row_count, min_order_id, max_order_id, compressed_bytes) VALUES
+  (0, 100000,      1, 100000, 52000000),
+  (1, 100000, 100001, 200000, 53000000),
+  (2, 100000, 200001, 300000, 51000000),
+  (3, 100000, 300001, 400000, 54000000),
+  (4,  60000, 400001, 460000, 31000000);`
+
+// ---------------------------------------------------------------------------
+// Module 6.2 — File Formats: Why Columnar Wins
+// ---------------------------------------------------------------------------
+
+const rowsVsColumns: SqlLesson = {
+  id: "sql-l6-rows-vs-columns",
+  title: "Rows vs Columns on Disk, and Column Projection",
+  summary:
+    "Why a CSV is row-oriented and Parquet is column-oriented, and the first thing columnar buys you: a query reads only the columns it selects, not every byte of every row.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: [
+    "columnar storage",
+    "Parquet",
+    "column projection",
+    "conditional aggregation",
+    "bytes scanned",
+  ],
+  teach: {
+    estimatedMinutes: 13,
+    markdown: `## The same table, two ways on disk
+
+A CSV or a JSON file is **row-oriented**: it writes all of row 1, then all of row 2, and so on. That is perfect when you want a whole row at a time, which is what an application database does. Analytics is the opposite. You scan millions of rows but touch only a few columns ("total revenue by country last month" reads 2 columns out of 40), so the row-oriented order forces you to read the whole table to answer a two-column question.
+
+**Parquet** is **column-oriented**: it writes all of column A's values together, then all of column B's, and so on. Apache Parquet is the default file format of the data lake, and its columnar layout is the entire reason.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["aspect", "row store (CSV/JSON)", "column store (Parquet)"],
+  "rows": [
+    ["on-disk order", "all of row 1, then all of row 2", "all of column A, then all of column B"],
+    ["a 2-of-8-column SELECT reads", "every column of every row", "only those 2 column chunks"],
+    ["compression", "mixed types per row, compresses poorly", "like values together, compresses far better"],
+    ["good for", "writing and fetching whole rows", "scanning a few columns over many rows"]
+  ],
+  "highlightCols": ["column store (Parquet)"],
+  "caption": "Columnar stores each column together, so an analytic query reads only the columns it needs and compresses each one hard."
+}
+\`\`\`
+
+## What columnar buys you (part 1: column projection)
+
+The first and biggest win is **column projection** (also called column pruning). Because each column is stored as its own contiguous chunk, a query for two columns reads only those two chunks and physically skips the rest of the bytes. On a wide table this is enormous: selecting 2 columns out of 8 might read a few percent of the file, not all of it.
+
+This is why \`SELECT *\` is a code smell on a lake. On a row store it costs the same as naming your columns; on a columnar store every extra column you select is more bytes read, and more money on an engine that charges by bytes scanned. Name the columns you need.
+
+Parquet also stores the **schema and types inside the file** (in a footer), so a reader never has to guess whether a column is an integer or a string the way it must with CSV. You get typed, self-describing files for free.
+
+## Measuring it with SQL
+
+A Parquet file records, per column, how many bytes that column occupies. Reading those column statistics is how you predict what a query will scan and prove that projection pays off. The exercises here query a \`parquet_column_stats\` table (one row per column with its compressed size) and compute exactly how many bytes a two-column query reads versus the whole row.
+
+**Interview nuance:** "why is Parquet faster than CSV for analytics" has two halves, and column projection is the first: a columnar file lets a query read only the columns it selects instead of every byte of every row. (The second half, compression, is the next lesson.) Saying both, and adding "and predicate pushdown skips row groups too," is a complete junior answer.
+
+> **On a real platform this differs.** A real Parquet reader gets these per-column sizes from the file footer, and an engine like Athena reports "data scanned" per query. The \`parquet_column_stats\` table here is a small stand-in with one row per column, so the projection math you do is the math the engine does.`,
+    demoSeedSql: PARQUET_COLUMN_STATS_SEED,
+    demoCode: `-- Each column's footprint. Notice how few bytes the low-cardinality strings take.
+SELECT column_name, data_type,
+       ROUND(uncompressed_bytes / 1000000.0, 0) AS uncompressed_mb,
+       ROUND(compressed_bytes / 1000000.0, 0) AS compressed_mb
+FROM parquet_column_stats
+ORDER BY compressed_bytes DESC;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-rows-vs-columns-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns how many compressed bytes a \`SELECT event_type, country\` query reads and what percentage of the whole-row bytes that is, as \`(bytes_read, pct_of_full)\`, over \`parquet_column_stats(column_name, data_type, uncompressed_bytes, compressed_bytes)\`.
+
+Sum \`compressed_bytes\` for just those two columns for \`bytes_read\`, and divide it by the sum over all columns for the percentage. Round \`pct_of_full\` to 2 decimals.`,
+    starterCode: `-- Bytes a 2-column query reads, and its share of the full-row bytes.
+SELECT
+  -- sum compressed_bytes for event_type + country, and as a percent of the total
+FROM parquet_column_stats;`,
+    hints: [
+      "`SUM(CASE WHEN column_name IN ('event_type','country') THEN compressed_bytes ELSE 0 END)` totals just the two projected columns.",
+      "Divide that same conditional sum by `SUM(compressed_bytes)` (all columns) and multiply by 100.0 for the percentage.",
+      "Alias the two output columns exactly `bytes_read` and `pct_of_full`, and wrap the percentage in `ROUND(..., 2)`.",
+    ],
+    referenceSolution: `SELECT
+  SUM(CASE WHEN column_name IN ('event_type','country') THEN compressed_bytes ELSE 0 END) AS bytes_read,
+  ROUND(100.0 * SUM(CASE WHEN column_name IN ('event_type','country') THEN compressed_bytes ELSE 0 END)
+        / SUM(compressed_bytes), 2) AS pct_of_full
+FROM parquet_column_stats;`,
+    singleFile: {
+      seedSql: PARQUET_COLUMN_STATS_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["bytes_read", "pct_of_full"],
+        rows: [[11000000, 3.72]],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-rows-vs-columns-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each column's compressed size in MB and its share of the whole file, as \`(column_name, compressed_mb, pct_of_file)\`, largest share first, over the same \`parquet_column_stats\` table.
+
+Treat 1 MB as 1,000,000 bytes. Round \`compressed_mb\` and \`pct_of_file\` to 2 decimals, ordered by \`pct_of_file\` descending.`,
+    starterCode: `-- Each column's compressed MB and its percentage of the whole file.
+SELECT column_name
+  -- compressed_mb, and its share of the file total
+FROM parquet_column_stats
+ORDER BY pct_of_file DESC;`,
+    hints: [
+      "`compressed_bytes / 1000000.0` is the size in MB.",
+      "The file total is a scalar subquery: `(SELECT SUM(compressed_bytes) FROM parquet_column_stats)`.",
+      "`100.0 * compressed_bytes / (that subquery)` is the share; wrap both computed columns in `ROUND(..., 2)`.",
+    ],
+    singleFile: {
+      seedSql: PARQUET_COLUMN_STATS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["column_name", "compressed_mb", "pct_of_file"],
+        rows: [
+          ["url", 180, 60.81],
+          ["revenue", 40, 13.51],
+          ["user_id", 24, 8.11],
+          ["event_id", 20, 6.76],
+          ["ts", 16, 5.41],
+          ["event_type", 8, 2.7],
+          ["device", 5, 1.69],
+          ["country", 3, 1.01],
+        ],
+      },
+    },
+  },
+}
+
+const compressionEncoding: SqlLesson = {
+  id: "sql-l6-compression-encoding",
+  title: "Compression and Encoding: Why Columnar Shrinks So Much",
+  summary:
+    "Dictionary, run-length, delta, and bit-packing encodings plus a codec (Snappy, Zstd, Gzip) shrink a column far more than a row-interleaved CSV, and you can measure the ratio in SQL.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: [
+    "compression",
+    "dictionary / RLE encoding",
+    "Snappy / Zstd / Gzip",
+    "aggregation",
+    "cost reduction",
+  ],
+  teach: {
+    estimatedMinutes: 13,
+    markdown: `## Why columnar compresses so much better
+
+Storing a column together does more than let you skip columns: it makes the data **compress far better**, because a compressor works best on similar values sitting next to each other. A row store interleaves an integer id, a string country, and a float price on every row, so a general compressor sees noise. A column store hands the compressor a million \`country\` values in a row, and those are extremely repetitive.
+
+Two layers of shrinking happen, in order.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["encoding", "what it does", "great for"],
+  "rows": [
+    ["dictionary", "store each distinct value once, rows point to it by id", "low-cardinality strings (country, event_type)"],
+    ["run-length (RLE)", "store a repeated value once with a count", "long runs of one value (sorted or sparse columns)"],
+    ["delta", "store the difference between consecutive values", "sorted numbers, timestamps, ids"],
+    ["bit-packing", "use only as many bits as the values need", "small integers and dictionary ids"]
+  ],
+  "caption": "Column-local encodings shrink data first; a general codec (Snappy, Zstd, Gzip) then compresses the result further."
+}
+\`\`\`
+
+First, Parquet applies **column-local encodings** that exploit structure:
+
+- **Dictionary encoding** stores each distinct value once and replaces every row with a small integer id. A \`country\` column with 200 distinct values becomes a tiny dictionary plus a column of ids. This is why low-cardinality strings compress dramatically.
+- **Run-length encoding (RLE)** stores a repeated value once with a count, which crushes sorted or sparse columns.
+- **Delta encoding** stores the difference between consecutive values, ideal for sorted ids and timestamps.
+- **Bit-packing** uses only as many bits as the values actually need.
+
+Then, on top of the encoded column, Parquet applies a general **compression codec**. The three to know:
+
+- **Snappy** is fast with a modest ratio, and it is the default in Spark, pandas, and PyArrow. (State this precisely: the Parquet Java library itself defaults to *uncompressed*; it is those engines that default to Snappy.)
+- **Gzip** compresses smaller but slower.
+- **Zstd** is the modern balance, often near Gzip's size at near Snappy's speed, and is increasingly the default choice.
+
+The result is that data that would be a large CSV becomes a much smaller Parquet file, and because both storage and bytes-scanned cost money, that shrink is a direct cost saving.
+
+## Measuring the shrink with SQL
+
+Each column in \`parquet_column_stats\` records both its **uncompressed** and its **compressed** size, so the compression ratio is just one divided by the other. The exercises compute the ratio per column (watch the low-cardinality strings win and the high-cardinality URL lose) and the whole file's overall shrink.
+
+**Interview nuance:** the second half of "why is Parquet faster and cheaper than CSV" is compression: columnar data groups like values, so dictionary and run-length encoding plus a codec like Snappy or Zstd shrink it far more than a row-interleaved CSV could. Naming an encoding (dictionary encoding for low-cardinality strings) is the detail that shows you understand *why*.
+
+> **On a real platform this differs.** Real compression ratios depend on the data, the encodings the writer chose, and the codec. The \`parquet_column_stats\` numbers here are illustrative but shaped like reality: a low-cardinality \`country\` string compresses far harder than a high-cardinality \`url\`. The ratio query is the real one.`,
+    demoSeedSql: PARQUET_COLUMN_STATS_SEED,
+    demoCode: `-- Average compression ratio by data type: strings win because they dictionary-encode.
+SELECT data_type,
+       ROUND(SUM(uncompressed_bytes) * 1.0 / SUM(compressed_bytes), 2) AS ratio_by_type
+FROM parquet_column_stats
+GROUP BY data_type
+ORDER BY ratio_by_type DESC;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-compression-encoding-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each column's compression ratio (uncompressed divided by compressed), as \`(column_name, data_type, compression_ratio)\`, best-compressing first, over \`parquet_column_stats(column_name, data_type, uncompressed_bytes, compressed_bytes)\`.
+
+Round \`compression_ratio\` to 2 decimals, ordered by it descending, so the columns that compress best are on top.`,
+    starterCode: `-- Compression ratio per column, best first.
+SELECT column_name, data_type
+  -- uncompressed_bytes divided by compressed_bytes
+FROM parquet_column_stats
+ORDER BY compression_ratio DESC;`,
+    hints: [
+      "The ratio is `uncompressed_bytes * 1.0 / compressed_bytes` (the `* 1.0` forces real division, not integer).",
+      "Alias it exactly `compression_ratio` and wrap it in `ROUND(..., 2)`.",
+      "Order by `compression_ratio DESC`.",
+    ],
+    referenceSolution: `SELECT column_name, data_type,
+       ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS compression_ratio
+FROM parquet_column_stats
+ORDER BY compression_ratio DESC;`,
+    singleFile: {
+      seedSql: PARQUET_COLUMN_STATS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["column_name", "data_type", "compression_ratio"],
+        rows: [
+          ["country", "STRING", 40],
+          ["event_type", "STRING", 25],
+          ["device", "STRING", 20],
+          ["ts", "INT64", 5],
+          ["event_id", "INT64", 4],
+          ["user_id", "INT64", 3.33],
+          ["url", "STRING", 2.78],
+          ["revenue", "DOUBLE", 2],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-compression-encoding-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the whole table's total uncompressed and compressed size in MB and its overall compression ratio, as \`(uncompressed_mb, compressed_mb, overall_ratio)\`, over the same \`parquet_column_stats\` table.
+
+Treat 1 MB as 1,000,000 bytes. The overall ratio is total uncompressed divided by total compressed. Round every column to 2 decimals.`,
+    starterCode: `-- Whole-file totals: uncompressed MB, compressed MB, and the overall shrink.
+SELECT
+  -- SUM the two byte columns into MB, and divide for the ratio
+FROM parquet_column_stats;`,
+    hints: [
+      "`SUM(uncompressed_bytes) / 1000000.0` and `SUM(compressed_bytes) / 1000000.0` are the two totals in MB.",
+      "The overall ratio is `SUM(uncompressed_bytes) * 1.0 / SUM(compressed_bytes)`.",
+      "Alias the columns exactly `uncompressed_mb`, `compressed_mb`, `overall_ratio`, each wrapped in `ROUND(..., 2)`.",
+    ],
+    singleFile: {
+      seedSql: PARQUET_COLUMN_STATS_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["uncompressed_mb", "compressed_mb", "overall_ratio"],
+        rows: [[1240, 296, 4.19]],
+      },
+    },
+  },
+}
+
+const rowGroupsPushdown: SqlLesson = {
+  id: "sql-l6-row-groups-pushdown",
+  title: "Row Groups and Predicate Pushdown, plus Parquet vs ORC vs Avro",
+  summary:
+    "Inside a Parquet file: row groups, the footer, and the min/max stats that let a filter skip whole row groups without reading them. Then when a row format (Avro) is the right call.",
+  estimatedMinutes: 26,
+  difficulty: "medium",
+  skills: [
+    "row groups",
+    "predicate pushdown",
+    "min/max statistics",
+    "Parquet vs ORC vs Avro",
+    "conditional aggregation",
+  ],
+  teach: {
+    estimatedMinutes: 14,
+    markdown: `## Inside a Parquet file: row groups and the footer
+
+A Parquet file is not one undifferentiated blob. It is split into **row groups**, each holding a horizontal slice of the rows (a common default row-group size is 128 MB in the Parquet Java library, though the Apache docs recommend 512 MB to 1 GB, and engines tune it). Inside a row group, each column's values for those rows are stored together as a **column chunk**, and each chunk is split into **pages**. At the very end of the file sits the **footer**: the schema, and for every row group and every column, statistics including the **minimum, maximum, and null count**.
+
+A reader opens the **footer first**, because the footer is the map. That map is what makes the next trick possible.
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "Open footer", "note": "schema + per-row-group stats" },
+    { "label": "Check min/max", "note": "does this row group overlap the filter?" },
+    { "label": "Skip non-overlapping", "note": "read none of its bytes" },
+    { "label": "Read matching chunks", "note": "only the needed columns" }
+  ],
+  "caption": "A Parquet reader opens the footer, uses per-row-group min/max stats to skip whole groups, then reads only the needed column chunks."
+}
+\`\`\`
+
+## What columnar buys you (part 3: predicate pushdown)
+
+Because the footer records each row group's **min and max** for a column, a filter can skip entire row groups without reading their data. If a query says \`WHERE order_id BETWEEN 150000 AND 250000\` and a row group's stored range is 1 to 100000, its maximum (100000) is below the filter's floor, so the reader knows nothing in it can match and skips all of its bytes. This is **predicate pushdown**, and combined with partition pruning (the next module) it is how a query over a huge table reads only a sliver.
+
+Pushdown works best when the data is **sorted or clustered** on the filter column, so each row group covers a tight, non-overlapping range. If every row group spans the whole range of values, no group can be skipped and the min/max stats buy you nothing.
+
+## Parquet, ORC, and Avro
+
+Parquet is not the only format, and interviews like to check that you know when a row format is right.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["format", "layout", "best for"],
+  "rows": [
+    ["Parquet", "columnar", "analytics scans, the lake default"],
+    ["ORC", "columnar", "analytics in the Hive/Trino world, strong compression"],
+    ["Avro", "row-oriented", "streaming/Kafka, row-by-row writes, schema evolution"]
+  ],
+  "highlightCols": ["format"],
+  "caption": "Columnar (Parquet, ORC) for scan-heavy analytics; row-oriented (Avro) for streaming ingestion and whole-row writes."
+}
+\`\`\`
+
+**Parquet** and **ORC** are both columnar and both great for analytics (ORC is strong in the Hive and Trino world). **Avro** is **row-oriented**: it stores whole records together, which is the wrong shape for scanning a few columns but the right shape for streaming ingestion, row-by-row writes, and schema evolution. A very common pipeline ingests events as Avro (cheap to append record by record from Kafka) and then **compacts** them into Parquet for the analysts to scan.
+
+## Measuring pushdown with SQL
+
+A row group's min and max are just columns you can filter on. The exercises query a \`row_group_stats\` table and compute how many row groups (and bytes) a range filter must read versus the whole file, which is exactly what predicate pushdown does under the hood.
+
+**Interview nuance:** "how does a query skip data it does not need" is answered at two levels: **partition pruning** skips whole directories by the partition key, and **predicate pushdown** skips row groups inside a file by their min/max stats. Adding "and column projection skips columns you did not select" gives the complete picture of why a columnar lake query is cheap.
+
+> **On a real platform this differs.** Real engines read these min/max stats from the Parquet footer (and per-page indexes) and decide row-group skipping automatically; you never write the skip logic. The \`row_group_stats\` table here exposes those stats as rows so you can compute the skip yourself and see what the engine sees.`,
+    demoSeedSql: ROW_GROUP_STATS_SEED,
+    demoCode: `-- For WHERE order_id BETWEEN 150000 AND 250000, which row groups does pushdown read?
+SELECT rg_id, min_order_id, max_order_id,
+       ROUND(compressed_bytes / 1000000.0, 0) AS mb,
+       CASE WHEN max_order_id >= 150000 AND min_order_id <= 250000 THEN 'read' ELSE 'skip' END AS pushdown
+FROM row_group_stats
+ORDER BY rg_id;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-row-groups-pushdown-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns how many row groups a \`WHERE order_id BETWEEN 150000 AND 250000\` filter must read and their total compressed MB, as \`(row_groups_read, mb_read)\`, over \`row_group_stats(rg_id, row_count, min_order_id, max_order_id, compressed_bytes)\`.
+
+A row group must be read when its stored \`[min_order_id, max_order_id]\` range overlaps \`[150000, 250000]\`. Treat 1 MB as 1,000,000 bytes and round \`mb_read\` to 2 decimals.`,
+    starterCode: `-- Row groups (and MB) a range filter must read after pushdown.
+SELECT
+  -- count the overlapping row groups and sum their MB
+FROM row_group_stats
+-- a row group overlaps when its max is at or above the floor AND its min is at or below the ceiling
+;`,
+    hints: [
+      "Two ranges [a,b] and [c,d] overlap when `b >= c AND a <= d`. Here: `max_order_id >= 150000 AND min_order_id <= 250000`.",
+      "`COUNT(*)` over the filtered rows is `row_groups_read`.",
+      "`ROUND(SUM(compressed_bytes) / 1000000.0, 2)` is `mb_read`.",
+    ],
+    referenceSolution: `SELECT COUNT(*) AS row_groups_read,
+       ROUND(SUM(compressed_bytes) / 1000000.0, 2) AS mb_read
+FROM row_group_stats
+WHERE max_order_id >= 150000 AND min_order_id <= 250000;`,
+    singleFile: {
+      seedSql: ROW_GROUP_STATS_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["row_groups_read", "mb_read"],
+        rows: [[2, 104]],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-row-groups-pushdown-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns, for the same \`order_id BETWEEN 150000 AND 250000\` filter, the compressed MB a pushdown-aware reader reads, the whole file's MB, and the percentage of bytes skipped, as \`(mb_read, mb_total, pct_skipped)\`, over the same \`row_group_stats\` table.
+
+Read a row group only when its range overlaps the filter. Treat 1 MB as 1,000,000 bytes and round every column to 2 decimals.`,
+    starterCode: `-- Pushdown savings: MB read vs total, and the percentage skipped.
+SELECT
+  -- conditional SUM for the overlapping row groups, plain SUM for the total, and the skipped percentage
+FROM row_group_stats;`,
+    hints: [
+      "`SUM(CASE WHEN max_order_id >= 150000 AND min_order_id <= 250000 THEN compressed_bytes ELSE 0 END)` is the bytes read.",
+      "`SUM(compressed_bytes)` is the file total; divide each by 1000000.0 for MB.",
+      "`pct_skipped = 100.0 * (1 - bytes_read / total)`; build it from the same two sums and round to 2 decimals.",
+    ],
+    singleFile: {
+      seedSql: ROW_GROUP_STATS_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["mb_read", "mb_total", "pct_skipped"],
+        rows: [[104, 241, 56.85]],
+      },
+    },
+  },
+}
+
 export const sqlLevel6: SqlLevel = {
   id: 6,
   slug: "cloud-data-foundations",
@@ -625,6 +1061,13 @@ export const sqlLevel6: SqlLevel = {
         storageClassesLifecycle,
         lakeWarehouseCatalog,
       ],
+    },
+    {
+      id: "sql-l6-file-formats",
+      title: "Module 6.2: File Formats — Why Columnar Wins",
+      description:
+        "Why Parquet beats CSV for analytics: column projection reads only the columns you select, columnar compression and encodings shrink each column hard, and row-group min/max stats let predicate pushdown skip data unread. Plus when a row format (Avro) is the right call.",
+      lessons: [rowsVsColumns, compressionEncoding, rowGroupsPushdown],
     },
   ],
 }
