@@ -3047,6 +3047,8 @@ Each layer is a scheduled job that reads the one before it. Modern cloud pipelin
 
 You run a pipeline by watching its **run log**: which jobs succeeded, how many rows they wrote, how long they took, whether they met their SLA. Querying that operational metadata is a daily DE task. The capstone exercises query a \`pipeline_runs\` table to compute per-job reliability and to catch the runs that breached their freshness SLA.
 
+**Common mistake:** treating a green run as proof of good data. A job can succeed and still write duplicates, nulls, or half the rows, so a success status tells you the job ran, not that the data is correct.
+
 **Interview nuance:** "make this backfill safe to re-run" is a direct idempotency question: overwrite the target partition or MERGE on a key, so a second run replaces rather than duplicates. "How do you know the data is late" is a freshness/SLA question answered by comparing each run's duration or finish time to its SLA, which is exactly the capstone query.
 
 > **On a real platform this differs.** Real run metadata lives in Airflow's database, dbt's run results, or a warehouse audit table, with far more detail. The \`pipeline_runs\` table here keeps job, date, status, rows, duration, and SLA, which is enough to compute the reliability and freshness questions an on-call DE actually asks.`,
