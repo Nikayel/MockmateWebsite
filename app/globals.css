@@ -22,6 +22,12 @@
   /* Brand clay (terracotta) — aligned to design handoff */
   --accent-foreground: #ffffff;
   --accent-soft: rgba(189, 106, 57, 0.1);
+  /* Clay dark enough to be TEXT on a light surface. --accent itself measures only
+     3.74:1 on the page and 3.97:1 on a card, so `text-accent` at normal size fails
+     WCAG AA (4.5:1) everywhere in light mode. This shade clears it at 5.21 / 5.53
+     while reading as the same clay. Use it for accent-coloured TEXT; --accent stays
+     the fill/border/ring value. */
+  --accent-strong: #a3522a;
   --glow: rgba(189, 106, 57, 0.2);
   --line: rgba(38, 36, 31, 0.08);
   --faint: #a8a39a;
@@ -104,6 +110,10 @@
   --accent: #d0824f;
   --accent-foreground: #1a1917;
   --accent-soft: rgba(208, 130, 79, 0.14);
+  /* Dark mode's accent is already legible as text (5.85:1 on the background), so the
+     strong variant is the accent itself — the token exists to let a component ask for
+     "accent that is safe as text" without branching on theme. */
+  --accent-strong: #d0824f;
   --glow: rgba(208, 130, 79, 0.45);
   --line: rgba(236, 233, 225, 0.08);
   --faint: #8a8780;
@@ -431,6 +441,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  /* Enables `text-accent-strong` — accent-coloured text that passes AA in both themes. */
+  --color-accent-strong: var(--accent-strong);
   --color-neural: var(--neural);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
