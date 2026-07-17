@@ -431,6 +431,32 @@ FROM s3_inventory;`,
         expected: { columns: ["objects", "total_tb"], rows: [[7, 2.74]] },
       },
     },
+    {
+      id: "sql-l6-object-vs-block-storage-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many objects sit in each storage class as \`(storage_class, objects)\`, most objects first, over \`s3_inventory\`.`,
+      starterCode: `-- Object count per storage class.
+SELECT storage_class, COUNT(*) AS objects
+FROM s3_inventory
+;`,
+      hints: ["`GROUP BY storage_class`.", "`ORDER BY objects DESC, storage_class`."],
+      referenceSolution: `SELECT storage_class, COUNT(*) AS objects
+FROM s3_inventory
+GROUP BY storage_class
+ORDER BY objects DESC, storage_class;`,
+      singleFile: {
+        seedSql: S3_INVENTORY_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["storage_class", "objects"],
+          rows: [
+            ["STANDARD", 5],
+            ["GLACIER_DEEP", 1],
+            ["STANDARD_IA", 1],
+          ],
+        },
+      },
+    },
     // MORE-L2
   ],
 }
