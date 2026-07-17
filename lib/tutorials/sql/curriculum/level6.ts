@@ -841,6 +841,8 @@ A **lakehouse** is the newer middle: it layers warehouse features (ACID transact
 
 The catalog is itself a set of tables you can query, and auditing it is real work: which tables are still stored as slow CSV instead of Parquet, which tables have no partitions and will full-scan, which database owns the most tables. The exercises here query a stand-in \`glue_catalog\` to answer questions like these.
 
+**Common mistake:** believing the files are the table. A folder of Parquet in a bucket is just bytes until a catalog entry gives it a schema and a location, and a query engine reads that catalog first.
+
 **Interview nuance:** "how would you query a bunch of Parquet files in S3 with SQL, and where does the schema come from" is a direct junior question. The answer is Athena (or Spark or Trino) reading the file locations and column types from the Glue Data Catalog or a Hive metastore. "A table equals files plus a catalog entry" is the sentence that lands it.
 
 > **On a real platform this differs.** The real Glue Data Catalog exposes this metadata through an API and through queryable \`information_schema\` views, with far more columns (serde, compression, per-column stats). The \`glue_catalog\` table here keeps the few columns that carry the lesson: database, table, location, format, and partition keys.`,
