@@ -176,7 +176,7 @@ Wide-column stores (Cassandra, ScyllaDB, HBase, Bigtable) are the write-heavy wo
 
 2. **Hot partitions.** A celebrity conversation or a viral thread concentrates traffic on the one node owning that partition. Mitigate with **sub-partitioning**: add a bucket to the key (`(conversation_id, bucket)` where bucket is `0..N`) to spread a hot entity across N partitions, scattering the load at the cost of a scatter-gather read.
 
-**Consistency is tunable per query.** Cassandra is a Dynamo-style AP system with **tunable consistency**. You choose how many replicas must acknowledge: `ONE` (fast, may read stale), `QUORUM` (majority). If reads and writes both use `QUORUM` on a replication factor of 3, then read-quorum (2) plus write-quorum (2) overlap by at least one replica, giving you read-your-writes strong consistency for that key while tolerating one node down.
+**Consistency is tunable per query.** Cassandra is a Dynamo-style AP system with **tunable consistency**. You choose how many replicas must acknowledge: `ONE` (fast, may read stale), `QUORUM` (majority). If reads and writes both use `QUORUM` on a replication factor of 3, then read-quorum (2) plus write-quorum (2) overlap by at least one replica, so a read always sees the latest acknowledged write (read-your-writes freshness) for that key while tolerating one node down. That is quorum consistency, not linearizability.
 
 **Interview nuance:** The classic question is "why not just add a secondary index in Cassandra?" Answer: Cassandra secondary indexes query across all partitions (a scatter-gather that does not scale) and are an anti-pattern for high-cardinality columns; the idiomatic solution is a second denormalized table, not an index.
 
@@ -225,7 +225,7 @@ CREATE TABLE messages_by_conversation (
 
 **Avoiding hot partitions.** A viral group chat concentrates writes on one partition's replicas. If that becomes a problem I **sub-partition** by adding a small `shard` (`0..N`) to the partition key and scatter-gather across shards on read, trading a fan-out read for spread write load. I would only pay that cost for genuinely hot conversations.
 
-**Consistency.** I write and read at `QUORUM` on RF=3. Write-quorum (2 of 3) and read-quorum (2 of 3) overlap by at least one replica, so a reader always sees the latest acknowledged write: read-your-writes consistency, while tolerating one replica being down. For lower-value paths (typing indicators) I would drop to `ONE` for speed.
+**Consistency.** I write and read at `QUORUM` on RF=3. Write-quorum (2 of 3) and read-quorum (2 of 3) overlap by at least one replica, so a reader always sees the latest acknowledged write: read-your-writes freshness, not linearizability, while tolerating one replica being down. For lower-value paths (typing indicators) I would drop to `ONE` for speed.
 
 The common wrong turn is partitioning by `conversation_id` alone (unbounded partition), or adding a secondary index on `sender_id` instead of building a second `messages_by_sender` table.
 

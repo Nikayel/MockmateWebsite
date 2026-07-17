@@ -272,7 +272,7 @@ Common wrong turn: forgetting the RF=3 multiplier (understating storage 3x), lum
 
 **Model answer (revealed on demand):**
 
-Assumptions: 250M subscribers, 2 hours/day streaming each, 5 Mbps average delivered bitrate, catalog 100k titles x 15 GB/title across encodings and resolutions, 3x peak multiplier for concurrent viewing.
+Assumptions: 250M subscribers, 2 hours/day streaming each, 5 Mbps average delivered bitrate, catalog 100k titles x 15 GB/title across encodings and resolutions, a ~1.2x peak multiplier on concurrent viewing, below the usual 2x to 3x band because the subscriber base spans time zones and flattens the global concurrency curve.
 
 Catalog storage. 100k x 15 GB = 1.5 PB raw. With RF=3 plus geo-distribution that is a few PB, but this is a fixed, modest number: the catalog is small and mostly static. Storage is not the hard problem here.
 
