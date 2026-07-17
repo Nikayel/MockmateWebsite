@@ -1041,6 +1041,429 @@ FROM row_group_stats;`,
   },
 }
 
+// ---------------------------------------------------------------------------
+// Shared simulated-catalog seeds for Module 6.3. `partition_catalog` = one row per date
+// partition (the raw material of pruning math); `partition_files` = file count + bytes per
+// partition (the small-files problem); `user_buckets` = a hash-bucketed layout (skew).
+// ---------------------------------------------------------------------------
+
+const PARTITION_CATALOG_SEED = `CREATE TABLE partition_catalog (
+  dt         TEXT,      -- the partition key value, folder dt=YYYY-MM-DD
+  file_count INTEGER,
+  size_bytes INTEGER,
+  row_count  INTEGER
+);
+INSERT INTO partition_catalog (dt, file_count, size_bytes, row_count) VALUES
+  ('2026-01-01', 4, 520000000, 5200000),
+  ('2026-01-02', 4, 540000000, 5400000),
+  ('2026-01-03', 5, 610000000, 6100000),
+  ('2026-01-04', 4, 500000000, 5000000),
+  ('2026-01-05', 6, 700000000, 7000000),
+  ('2026-01-06', 4, 480000000, 4800000),
+  ('2026-01-07', 5, 590000000, 5900000);`
+
+const PARTITION_FILES_SEED = `CREATE TABLE partition_files (
+  partition_key TEXT,
+  file_count    INTEGER,
+  total_bytes   INTEGER
+);
+INSERT INTO partition_files (partition_key, file_count, total_bytes) VALUES
+  ('dt=2026-01-01', 4,   520000000),   -- 130 MB avg file, healthy
+  ('dt=2026-01-02', 4,   540000000),   -- 135 MB avg file, healthy
+  ('dt=2026-01-03', 40,   80000000),   -- 2 MB avg file, small-files problem
+  ('dt=2026-01-04', 200, 100000000),   -- 0.5 MB avg file, severe small-files
+  ('dt=2026-01-05', 3,   450000000);   -- 150 MB avg file, healthy`
+
+const USER_BUCKETS_SEED = `CREATE TABLE user_buckets (
+  bucket_id  INTEGER,   -- hash(user_id) % 8
+  user_count INTEGER,
+  size_bytes INTEGER
+);
+INSERT INTO user_buckets (bucket_id, user_count, size_bytes) VALUES
+  (0, 125000,  310000000),
+  (1, 130000,  320000000),
+  (2, 120000,  305000000),
+  (3, 128000,  315000000),
+  (4, 122000,  300000000),
+  (5, 131000,  322000000),
+  (6, 119000,  298000000),
+  (7, 900000, 1400000000);   -- a mega-user hashes here and skews the bucket`
+
+// ---------------------------------------------------------------------------
+// Module 6.3 — Partitioning a Large Table
+// ---------------------------------------------------------------------------
+
+const whatIsAPartition: SqlLesson = {
+  id: "sql-l6-what-is-a-partition",
+  title: "What a Partition Is, and Why Pruning Makes a Big Table Cheap",
+  summary:
+    "Hive-style dt=value folders put the partition key in the path, so a filter on it reads only the matching folders (pruning) and scans a fraction of the bytes, which on a pay-per-scan engine is directly cheaper.",
+  estimatedMinutes: 26,
+  difficulty: "medium",
+  skills: [
+    "partitioning",
+    "partition pruning",
+    "bytes scanned",
+    "conditional aggregation",
+    "cost reduction",
+  ],
+  teach: {
+    estimatedMinutes: 14,
+    markdown: `## What a partition actually is
+
+Partitioning splits one logical table into many folders, one per value of a **partition key**, and puts each folder's rows in its own files. The classic key is a date. On a lake the layout is literally directories named \`key=value\`:
+
+\`\`\`text
+s3://lake/events/
+  dt=2026-01-01/   part-0.parquet  part-1.parquet
+  dt=2026-01-02/   part-0.parquet  part-1.parquet
+  dt=2026-01-03/   part-0.parquet  part-1.parquet  part-2.parquet
+\`\`\`
+
+The partition value lives in the **path**, not inside every row. A query engine reads the folder names from the catalog, so it knows which folders hold which dates before it opens a single file.
+
+## Partition pruning: the whole point
+
+When a query filters on the partition key, the engine reads only the matching folders and skips the rest. This is **partition pruning**. A \`WHERE dt = '2026-01-03'\` over a year of daily partitions opens 1 folder out of 365 and ignores the other 364. Because serverless engines charge by **bytes scanned** (Amazon Athena bills about 5 dollars per terabyte scanned), reading one partition instead of the whole table is not just faster, it is directly cheaper.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["partition", "size", "WHERE dt = '2026-01-03'"],
+  "rows": [
+    ["dt=2026-01-01", "520 MB", "skip"],
+    ["dt=2026-01-02", "540 MB", "skip"],
+    ["dt=2026-01-03", "610 MB", "read"],
+    ["dt=2026-01-04", "500 MB", "skip"]
+  ],
+  "highlightCols": ["WHERE dt = '2026-01-03'"],
+  "caption": "A filter on the partition key reads only the matching folder. The engine skips the rest without opening them."
+}
+\`\`\`
+
+## Why you partition a large table
+
+Four reasons, in order of how often they come up:
+
+1. **Scan less data.** Prune to the partitions a query needs and read a fraction of the table. This is the big one.
+2. **Match the common filter.** Almost every query on an events table filters by date, so partitioning by date makes almost every query cheap.
+3. **Manage the lifecycle.** Dropping or expiring old data is a whole-folder operation: delete the \`dt=2025-01-01/\` partition, with no row-by-row delete.
+4. **Parallelism.** Independent partitions are natural units of parallel work.
+
+## Measuring pruning with SQL
+
+A partition catalog records, per partition, its size and row count, so you can compute exactly how many bytes a pruning query scans versus a full scan. The exercises query a \`partition_catalog\` and compute the savings from filtering to one day and to a date range.
+
+**Interview nuance:** asked "why would you partition this table," lead with pruning and cost: partitioning by the column you filter on most (usually date) lets the engine skip the partitions a query does not need, so it scans fewer bytes, runs faster, and on a pay-per-scan engine costs less.
+
+> **On a real platform this differs.** A real engine prunes by reading partition metadata from the catalog (Glue) and never lists the skipped folders. The \`partition_catalog\` here exposes one row per partition so you can compute the pruned scan yourself; the arithmetic (sum the matching partitions, compare to the total) is what the engine's cost estimate does.`,
+    demoSeedSql: PARTITION_CATALOG_SEED,
+    demoCode: `-- For WHERE dt = '2026-01-03', which partitions does the engine scan vs prune?
+SELECT dt, file_count,
+       ROUND(size_bytes / 1000000.0, 0) AS size_mb,
+       CASE WHEN dt = '2026-01-03' THEN 'scan' ELSE 'prune' END AS single_day_query
+FROM partition_catalog
+ORDER BY dt;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-what-is-a-partition-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the bytes a single-day query scans versus a full scan, and the percentage of bytes saved, as \`(partition_bytes, full_scan_bytes, pct_saved)\`, for \`dt = '2026-01-03'\` over \`partition_catalog(dt, file_count, size_bytes, row_count)\`.
+
+\`partition_bytes\` is the size of just that day's partition; \`full_scan_bytes\` is the whole table. Round \`pct_saved\` to 2 decimals.`,
+    starterCode: `-- Pruned single-day scan vs full scan, and the percentage saved.
+SELECT
+  -- bytes for dt = '2026-01-03', total bytes, and the percent saved
+FROM partition_catalog;`,
+    hints: [
+      "`SUM(CASE WHEN dt = '2026-01-03' THEN size_bytes ELSE 0 END)` is the single partition's bytes.",
+      "`SUM(size_bytes)` is the full-scan bytes.",
+      "`pct_saved = 100.0 * (1 - partition_bytes / full_scan_bytes)`; build it from the same two sums and round to 2 decimals.",
+    ],
+    referenceSolution: `SELECT
+  SUM(CASE WHEN dt = '2026-01-03' THEN size_bytes ELSE 0 END) AS partition_bytes,
+  SUM(size_bytes) AS full_scan_bytes,
+  ROUND(100.0 * (1 - 1.0 * SUM(CASE WHEN dt = '2026-01-03' THEN size_bytes ELSE 0 END) / SUM(size_bytes)), 2) AS pct_saved
+FROM partition_catalog;`,
+    singleFile: {
+      seedSql: PARTITION_CATALOG_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["partition_bytes", "full_scan_bytes", "pct_saved"],
+        rows: [[610000000, 3940000000, 84.52]],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-what-is-a-partition-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns how many partitions and bytes a \`WHERE dt BETWEEN '2026-01-02' AND '2026-01-04'\` query scans, and the percentage of the table it skips, as \`(partitions_scanned, bytes_scanned, pct_skipped)\`, over the same \`partition_catalog\` table.
+
+Count and sum only the partitions in the date range, and compare their bytes to the whole table. Round \`pct_skipped\` to 2 decimals.`,
+    starterCode: `-- A 3-day range scan: partitions read, bytes read, and percent skipped.
+SELECT
+  -- COUNT and SUM the in-range partitions; compare to the table total for pct_skipped
+FROM partition_catalog
+-- keep only the partitions in the date range
+;`,
+    hints: [
+      "Filter with `WHERE dt BETWEEN '2026-01-02' AND '2026-01-04'` (string dates compare correctly in YYYY-MM-DD form).",
+      "`COUNT(*)` and `SUM(size_bytes)` over the filtered rows are `partitions_scanned` and `bytes_scanned`.",
+      "For `pct_skipped`, divide the scanned bytes by the whole-table total from a subquery: `(SELECT SUM(size_bytes) FROM partition_catalog)`.",
+    ],
+    singleFile: {
+      seedSql: PARTITION_CATALOG_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["partitions_scanned", "bytes_scanned", "pct_skipped"],
+        rows: [[3, 1650000000, 58.12]],
+      },
+    },
+  },
+}
+
+const choosingPartitionKey: SqlLesson = {
+  id: "sql-l6-choosing-partition-key",
+  title: "Choosing a Partition Key, and the Small-Files Problem",
+  summary:
+    "Partition on the low-cardinality column you filter on (usually date). Partition on a high-cardinality key and you shred the table into millions of tiny files, where per-file overhead dominates.",
+  estimatedMinutes: 25,
+  difficulty: "medium",
+  skills: [
+    "partition key selection",
+    "cardinality",
+    "small-files problem",
+    "over-partitioning",
+    "conditional aggregation",
+  ],
+  teach: {
+    estimatedMinutes: 13,
+    markdown: `## Choosing the partition key is the real skill
+
+Partitioning is easy to do and easy to do badly. The interview question is never "can you partition," it is "what would you partition on, and what goes wrong if you choose wrong." Three rules cover most of it.
+
+**Rule 1: partition on the column you filter by, at low-to-moderate cardinality.** The whole payoff is pruning, and you only prune on the partition key, so partition on what queries actually filter on. That is almost always a **date** (\`dt\`), sometimes a region or a category. A date has naturally low cardinality (365 values a year) and matches how analysts slice data.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["candidate key", "cardinality", "result"],
+  "rows": [
+    ["dt (date)", "low (365 per year)", "great: matches the common filter, healthy file sizes"],
+    ["country", "low", "good: prunes region queries"],
+    ["user_id", "very high", "bad: millions of tiny partitions, small-files problem"],
+    ["event_id", "unique", "terrible: one partition per row"]
+  ],
+  "highlightCols": ["result"],
+  "caption": "Partition on a low-cardinality column you filter on. High-cardinality keys shred the table into tiny files."
+}
+\`\`\`
+
+**Rule 2: avoid the small-files problem.** Partition on a high-cardinality column like \`user_id\` and you get a huge number of tiny partitions, each with tiny files. This is pathological, because every file carries fixed overhead: the engine opens it, reads its footer, and tracks its metadata, and object stores start refusing requests when you hammer them (S3 returns "please reduce your request rate"). AWS measured reading 100,000 small files taking 11.5 seconds against 4.3 seconds for the same data in one file. The rule of thumb is to aim for files around **128 MB**, not kilobytes. Many small files are slower than a few big ones, even for the same total bytes.
+
+**Rule 3: do not over-partition.** Partitioning on a column you rarely filter on, or one with thousands of values, multiplies partition metadata and shreds your files without buying any pruning. If a would-be key is high cardinality, partition coarser (by month instead of day, or by a bucket of the value) or bucket it instead (next lesson).
+
+## Spotting the problem with SQL
+
+A partition catalog that records each partition's file count and total bytes lets you compute the average file size and flag the partitions suffering the small-files problem. The exercises do exactly that: find the partitions whose average file is far below the 128 MB target, and measure how many excess tiny files they add.
+
+**Interview nuance:** "you have millions of tiny files and queries are slow, what happened" is a classic. The answer is over-partitioning on a high-cardinality key: too many partitions means too many tiny files, and per-file overhead plus metadata dominate. The fix is a coarser partition key (or bucketing) and compaction into roughly 128 MB files.
+
+> **On a real platform this differs.** Real engines expose file counts and sizes through catalog stats or a storage inventory, and compaction jobs (or Iceberg and Delta "optimize") merge small files for you. The \`partition_files\` table here gives you the file count and bytes per partition so you can compute the average file size the same way an audit query would.`,
+    demoSeedSql: PARTITION_FILES_SEED,
+    demoCode: `-- A one-row overview: how many partitions, and how many have the small-files problem.
+SELECT COUNT(*) AS partitions,
+       SUM(CASE WHEN total_bytes * 1.0 / file_count < 128000000 THEN 1 ELSE 0 END) AS small_file_partitions,
+       SUM(file_count) AS total_files
+FROM partition_files;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l6-choosing-partition-key-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each partition's average file size in MB and a health flag, as \`(partition_key, file_count, avg_file_mb, health)\`, worst (smallest average file) first, over \`partition_files(partition_key, file_count, total_bytes)\`.
+
+The average file size is total bytes divided by file count (treat 1 MB as 1,000,000 bytes). \`health\` is \`'small-files'\` when the average file is under 128 MB and \`'ok'\` otherwise. Round \`avg_file_mb\` to 2 decimals, ordered by it ascending.`,
+    starterCode: `-- Average file size per partition, flagging the small-files problem.
+SELECT partition_key, file_count
+  -- avg file size in MB, and a 'small-files' / 'ok' health flag
+FROM partition_files
+ORDER BY avg_file_mb ASC;`,
+    hints: [
+      "Average file size in bytes is `total_bytes * 1.0 / file_count`; divide by 1000000.0 for MB.",
+      "`CASE WHEN total_bytes * 1.0 / file_count < 128000000 THEN 'small-files' ELSE 'ok' END AS health`.",
+      "Alias the size column `avg_file_mb`, round it to 2 decimals, and order by it ascending so the worst is first.",
+    ],
+    referenceSolution: `SELECT partition_key, file_count,
+       ROUND(total_bytes * 1.0 / file_count / 1000000.0, 2) AS avg_file_mb,
+       CASE WHEN total_bytes * 1.0 / file_count < 128000000 THEN 'small-files' ELSE 'ok' END AS health
+FROM partition_files
+ORDER BY avg_file_mb ASC;`,
+    singleFile: {
+      seedSql: PARTITION_FILES_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["partition_key", "file_count", "avg_file_mb", "health"],
+        rows: [
+          ["dt=2026-01-04", 200, 0.5, "small-files"],
+          ["dt=2026-01-03", 40, 2, "small-files"],
+          ["dt=2026-01-01", 4, 130, "ok"],
+          ["dt=2026-01-02", 4, 135, "ok"],
+          ["dt=2026-01-05", 3, 150, "ok"],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-choosing-partition-key-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns only the partitions suffering the small-files problem, with how many files they carry beyond a healthy 4-file target, as \`(partition_key, file_count, excess_files)\`, most excess first, over the same \`partition_files\` table.
+
+A partition has the problem when its average file (total bytes divided by file count) is under 128 MB. \`excess_files\` is its file count minus 4. Order by \`excess_files\` descending.`,
+    starterCode: `-- Small-files partitions and how many excess files each carries over a 4-file target.
+SELECT partition_key, file_count
+  -- excess_files = file_count - 4
+FROM partition_files
+-- keep only partitions whose average file is under 128 MB
+ORDER BY excess_files DESC;`,
+    hints: [
+      "Filter with `WHERE total_bytes * 1.0 / file_count < 128000000`.",
+      "`file_count - 4 AS excess_files`.",
+      "Order by `excess_files DESC`.",
+    ],
+    singleFile: {
+      seedSql: PARTITION_FILES_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["partition_key", "file_count", "excess_files"],
+        rows: [
+          ["dt=2026-01-04", 200, 196],
+          ["dt=2026-01-03", 40, 36],
+        ],
+      },
+    },
+  },
+}
+
+const bucketingAndFullScanTrap: SqlLesson = {
+  id: "sql-l6-bucketing-and-the-full-scan-trap",
+  title: "Bucketing vs Partitioning, and the Full-Scan Trap",
+  summary:
+    "Bucket (or cluster) a high-cardinality join column into a fixed number of files instead of partitioning it, and keep the partition key bare in a filter so the engine can actually prune.",
+  estimatedMinutes: 26,
+  difficulty: "medium",
+  skills: [
+    "bucketing / clustering",
+    "partition vs bucket",
+    "data skew",
+    "sargable predicates",
+    "full-scan trap",
+  ],
+  teach: {
+    estimatedMinutes: 14,
+    markdown: `## Bucketing: partitioning's high-cardinality cousin
+
+Some columns you want to organize by are exactly the ones you must not partition on: \`user_id\`, \`session_id\`, a hash. They are high cardinality, so partitioning explodes into tiny files. **Bucketing** (Spark and Hive) or **clustering** (Snowflake, BigQuery) solves this. Instead of one folder per value, you hash the column into a **fixed** number of buckets, say 8 or 256, and every row lands in one bucket by its hash. You get organization for joins and aggregations without the file explosion, because the number of files is capped no matter how many distinct values there are.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["technique", "key type", "how many files", "use for"],
+  "rows": [
+    ["partitioning", "low-cardinality (dt)", "one folder per value", "the column you filter on"],
+    ["bucketing / clustering", "high-cardinality (user_id)", "a fixed number of buckets", "the column you join or group on"]
+  ],
+  "highlightCols": ["technique"],
+  "caption": "Partition by the low-cardinality column you filter on; bucket by the high-cardinality column you join on. A table can do both."
+}
+\`\`\`
+
+The teaching rule: **partition by the low-cardinality column you filter on; bucket (or cluster) by the high-cardinality column you join or group on.** A table can do both: partition by \`dt\`, bucket by \`user_id\`.
+
+Bucketing only helps when the hash spreads evenly. A single mega-key (one user with a huge share of the rows) hashes entirely into one bucket and makes it far larger than the others, which reintroduces the skew you were trying to avoid. The exercises measure exactly this by comparing the largest bucket to the average.
+
+## The full-scan trap
+
+Pruning only happens when the engine can match your filter to the partition key, and it is easy to accidentally defeat it. Two classic mistakes:
+
+- **Filtering on a non-partition column.** If the table is partitioned by \`dt\` but you filter only on \`user_id\`, nothing prunes and the engine scans every partition.
+- **Wrapping the partition key in a function.** Comparing a **bare partition column to a constant** (\`WHERE dt = '2026-01-05'\`) prunes. Transforming the column first (a computed or dynamic expression on \`dt\`) can stop the engine from pruning, so it reads the whole table. The portable rule is to keep the partition column bare on one side and a constant on the other.
+
+The cost of the trap is total: a query that should read one partition ends up reading all of them. The exercises put a number on it by comparing a pruning query's bytes to a full scan.
+
+**Interview nuance:** "you partitioned by date but the query still scans everything, why" almost always means the filter did not land on the bare partition key: it filtered a different column, or wrapped \`dt\` in a function. Keep the partition column bare and compared to a constant.
+
+> **On a real platform this differs.** Modern table formats reduce these traps: Apache Iceberg supports **hidden partitioning** (you query \`event_time\` and Iceberg derives the \`day(event_time)\` partition for you) and **partition evolution** (change the scheme as a metadata-only operation, with no data rewrite). The bucketing and pruning arithmetic you compute here is the same reasoning those systems automate.`,
+    demoSeedSql: USER_BUCKETS_SEED,
+    demoCode: `-- The bucket layout, largest first. A balanced hash keeps buckets close in size.
+SELECT bucket_id, user_count,
+       ROUND(size_bytes / 1000000.0, 0) AS size_mb
+FROM user_buckets
+ORDER BY size_bytes DESC;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-bucketing-and-the-full-scan-trap-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns how balanced a bucketed layout is, as \`(bucket_count, avg_mb, max_mb, skew_ratio)\`, over \`user_buckets(bucket_id, user_count, size_bytes)\`.
+
+\`skew_ratio\` is the largest bucket size divided by the average bucket size (a balanced hash gives a ratio near 1; a mega-key pushes it up). Treat 1 MB as 1,000,000 bytes and round \`avg_mb\`, \`max_mb\`, and \`skew_ratio\` to 2 decimals.`,
+    starterCode: `-- How balanced are the buckets? count, average MB, largest MB, and the skew ratio.
+SELECT
+  -- COUNT the buckets, AVG and MAX their size, and divide MAX by AVG for the skew
+FROM user_buckets;`,
+    hints: [
+      "`COUNT(*)` is `bucket_count`; `AVG(size_bytes)` and `MAX(size_bytes)` are the average and largest bucket in bytes.",
+      "Divide each by 1000000.0 for MB.",
+      "`skew_ratio = MAX(size_bytes) * 1.0 / AVG(size_bytes)`; round every computed column to 2 decimals.",
+    ],
+    referenceSolution: `SELECT COUNT(*) AS bucket_count,
+       ROUND(AVG(size_bytes) / 1000000.0, 2) AS avg_mb,
+       ROUND(MAX(size_bytes) / 1000000.0, 2) AS max_mb,
+       ROUND(MAX(size_bytes) * 1.0 / AVG(size_bytes), 2) AS skew_ratio
+FROM user_buckets;`,
+    singleFile: {
+      seedSql: USER_BUCKETS_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["bucket_count", "avg_mb", "max_mb", "skew_ratio"],
+        rows: [[8, 446.25, 1400, 3.14]],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-bucketing-and-the-full-scan-trap-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the bytes a partition-pruning query scans when it filters \`dt = '2026-01-05'\`, versus a query that cannot prune and scans the whole table, and how many times more bytes the full scan reads, as \`(pruned_bytes, full_scan_bytes, scan_multiplier)\`, over \`partition_catalog(dt, file_count, size_bytes, row_count)\`.
+
+\`pruned_bytes\` is that one day's partition; \`full_scan_bytes\` is the whole table; \`scan_multiplier\` is full divided by pruned. Round \`scan_multiplier\` to 2 decimals.`,
+    starterCode: `-- The cost of the full-scan trap: pruned bytes vs a whole-table scan.
+SELECT
+  -- bytes for dt = '2026-01-05', total bytes, and full / pruned
+FROM partition_catalog;`,
+    hints: [
+      "`SUM(CASE WHEN dt = '2026-01-05' THEN size_bytes ELSE 0 END)` is the pruned bytes; `SUM(size_bytes)` is the full scan.",
+      "`scan_multiplier = SUM(size_bytes) * 1.0 / pruned_bytes` (full divided by pruned).",
+      "Round `scan_multiplier` to 2 decimals.",
+    ],
+    singleFile: {
+      seedSql: PARTITION_CATALOG_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["pruned_bytes", "full_scan_bytes", "scan_multiplier"],
+        rows: [[700000000, 3940000000, 5.63]],
+      },
+    },
+  },
+}
+
 export const sqlLevel6: SqlLevel = {
   id: 6,
   slug: "cloud-data-foundations",
@@ -1068,6 +1491,13 @@ export const sqlLevel6: SqlLevel = {
       description:
         "Why Parquet beats CSV for analytics: column projection reads only the columns you select, columnar compression and encodings shrink each column hard, and row-group min/max stats let predicate pushdown skip data unread. Plus when a row format (Avro) is the right call.",
       lessons: [rowsVsColumns, compressionEncoding, rowGroupsPushdown],
+    },
+    {
+      id: "sql-l6-partitioning",
+      title: "Module 6.3: Partitioning a Large Table",
+      description:
+        "The single most-asked 'make a big table fast and cheap' topic: how dt=value partition folders let a filter prune to a fraction of the data, how to choose the partition key without shredding the table into tiny files, and how bucketing and the full-scan trap fit in.",
+      lessons: [whatIsAPartition, choosingPartitionKey, bucketingAndFullScanTrap],
     },
   ],
 }
