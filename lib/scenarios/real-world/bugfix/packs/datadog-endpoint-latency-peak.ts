@@ -7,6 +7,7 @@ export const datadogEndpointLatencyPeakPack: BugfixPack = {
   title: "Peak latency report overstates one endpoint",
   summary:
     "The per-endpoint peak latency report shows one endpoint far slower than its own traces support, and a latency regression review is stuck on the discrepancy.",
+  task: "Report each endpoint's slowest request latency in milliseconds and how many requests it saw, so the performance reviewer can sign off on the latency regression.",
   company: {
     tag: "datadog-debugging",
     roundName: "Debugging pairing round",
@@ -18,7 +19,6 @@ export const datadogEndpointLatencyPeakPack: BugfixPack = {
   language: "python",
   difficulty: 1,
   estMinutes: 40,
-  bugClass: "accumulator-wrong-scope",
   taskMd:
     "# Peak latency report — per-endpoint slowest request\n\n## Who reads this\nA performance reviewer runs this before signing off on a latency regression. This\nmorning it shows one endpoint far slower at the peak than that endpoint's own traces\nsupport, and the review is stuck until the number reconciles.\n\n## The program\n`latency_rollup.py` reads a request-latency feed and prints, per endpoint, the peak\n(slowest) request latency in milliseconds and how many requests it saw.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Columns are `kind,endpoint,request_id,latency_ms`, one event per line.\n- Lines starting with `#` are comments.\n- Only events whose `kind` is `request` are metered; other kinds (e.g. `health`) are\n  excluded from this report.\n- A line that is truncated or has a non-numeric `latency_ms` is malformed and is\n  skipped.\n- Events may appear in any order.\n\n## Run it\n```\npython3 src/latency_rollup.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=60ms over 3\n/checkout: peak=900ms over 2\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
   srcFiles: [

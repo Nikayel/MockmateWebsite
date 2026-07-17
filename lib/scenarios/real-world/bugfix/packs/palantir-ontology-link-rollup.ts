@@ -7,6 +7,7 @@ export const palantirOntologyLinkRollupPack: BugfixPack = {
   title: "Ontology link report undercounts one object type",
   summary:
     "The ontology link report shows fewer active links for one object type than the graph explorer does, and a data-quality review is blocked until the counts reconcile.",
+  task: "Report, for each object type, how many active links came from the graph, so the rollup reconciles with the graph explorer the data-quality reviewer signs off against.",
   company: {
     tag: "palantir-fdse",
     roundName: "Re-engineering / debugging round",
@@ -19,7 +20,6 @@ export const palantirOntologyLinkRollupPack: BugfixPack = {
   language: "python",
   difficulty: 1,
   estMinutes: 40,
-  bugClass: "silent-boundary",
   taskMd:
     "# Ontology link report — active links per object type\n\n## Who reads this\nA data-quality reviewer runs this report before signing off on the ontology. This\nmorning it shows fewer active links for one object type than the graph explorer does,\nand the review is blocked until the two reconcile.\n\n## The program\n`link_rollup.py` reads a link feed and prints, per object type, how many active links\ncame from the graph.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Columns are `source_system,object_type,link_id,status`, one link per line.\n- Lines starting with `#` are comments.\n- Only links whose `source_system` is `graph` are counted; other systems (e.g.\n  `warehouse`) are excluded from this report.\n- Only links whose `status` is `active` are counted.\n- A line that is truncated or malformed is skipped.\n- Links may appear in any order.\n\n## Run it\n```\npython3 src/link_rollup.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Active links by object type ===\nAsset: 3\nDataset: 2\nSensor: 1\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
   srcFiles: [

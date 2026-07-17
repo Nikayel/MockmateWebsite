@@ -7,6 +7,7 @@ export const stripeLedgerDoublePostPack: BugfixPack = {
   title: "Overlapping settlement batches over-credit one account's balance",
   summary:
     "The nightly ledger posting job reports one account's balance higher than the ledger of record, and that account's payout is held until the number reconciles.",
+  task: "Report each account's balance in cents (charges minus refunds) from the settlement feed so the treasury on-call can reconcile it with the ledger of record and release the payout.",
   company: {
     tag: "stripe-bug-squash",
     roundName: "Bug squash round",
@@ -19,7 +20,6 @@ export const stripeLedgerDoublePostPack: BugfixPack = {
   language: "python",
   difficulty: 2,
   estMinutes: 45,
-  bugClass: "double-count",
   taskMd:
     "# Ledger posting — nightly account-balance report\n\n## Who reads this\nThe payments treasury on-call runs this posting job every night to compute each\naccount's balance (charges minus refunds) in cents, which feeds that account's\npayout. This morning they flagged one account: its balance in the report is higher\nthan the ledger of record, and the payout for that account is held until the two\nnumbers reconcile.\n\n## The program\n`post_ledger.py` reads the day's settlement feed and prints each account's balance\nin cents.\n\nTransactions are delivered in settlement batches. A settlement can re-send an\noverlapping window of a previous batch, so the SAME transaction (identified by its\n`txn_id`) can appear in more than one batch. Those re-sends are the same\ntransaction and must be applied only once. An account can also legitimately have\ntwo separate transactions that happen to share an amount (for example two customers\npaying the same price), and those are two distinct transactions.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments.\n- Columns are `batch_id,txn_id,account,type,amount,posted_at`.\n- `amount` is a non-negative dollar value recorded to the cent, with exactly two\n  decimal places (for example `42.00` or `9.05`); it is converted to integer cents.\n- `type` is `charge` (adds to the balance) or `refund` (subtracts from the balance).\n  A transaction may also carry another type, such as `reversal`; such a transaction\n  is recorded in the feed but does not move the balance in this report.\n- The same `txn_id` may appear more than once, including once in each of two\n  different batches (a re-sent settlement window); it is one transaction and is\n  applied once.\n- `posted_at` is an ISO-8601 UTC timestamp.\n- A line that does not have exactly six columns, or whose `amount` is not a\n  two-decimal number, is malformed and is skipped.\n\n## Run it\n```\npython3 src/post_ledger.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Ledger balance (cents) by account ===\natlas_market: 6000\ncedar_books: 2000\nnimbus_cafe: 4500\nvertex_gym: 6000\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
   srcFiles: [

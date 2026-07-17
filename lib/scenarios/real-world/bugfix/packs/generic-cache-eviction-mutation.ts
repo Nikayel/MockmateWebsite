@@ -7,6 +7,7 @@ export const genericCacheEvictionMutationPack: BugfixPack = {
   title: "Cache eviction report over-reports one namespace's live entries",
   summary:
     "The overnight cache eviction report shows more live entries for one namespace than the cache's metrics endpoint, so the capacity-planning on-call cannot trust it.",
+  task: "Report each namespace's live count at the sweep checkpoint so the capacity-planning on-call can size memory from a report that agrees with the cache's own metrics endpoint.",
   company: {
     tag: "generic-fdse",
     roundName: "Debugging round",
@@ -19,7 +20,6 @@ export const genericCacheEvictionMutationPack: BugfixPack = {
   language: "python",
   difficulty: 2,
   estMinutes: 45,
-  bugClass: "mutation-during-iteration",
   taskMd:
     "# Cache eviction report — live entries per namespace\n\n## Who reads this\nThe capacity-planning on-call reads this report every morning. It replays the\nprevious day's cache write log, runs the eviction sweep at a fixed checkpoint,\nand reports how many entries are still live in each namespace, so they can size\nthe memory each namespace needs. This morning one namespace's live count reads\nhigher than the cache's own metrics endpoint, and the report is not trusted\nuntil the two agree.\n\n## The program\n`cache_sweep.py` reads a cache write log and prints the number of live (not yet\nexpired) entries per namespace, with namespaces listed in alphabetical order.\n\nEach row of the log is a cache write: `namespace,key,expires_at[,pinned]`. The\n`expires_at` is an absolute epoch second. The sweep runs at a fixed checkpoint\n`now = 1700000000`; an entry is expired when its `expires_at` is at or before\n`now`. The log is not grouped by namespace and is not sorted by expiry.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments and are ignored.\n- Columns are comma-separated: `namespace,key,expires_at`, with an optional\n  fourth column `pinned`. Surrounding whitespace on any field is trimmed, so\n  ` feed ` and `feed` are the same namespace.\n- `expires_at` is an integer epoch second. An entry is expired when\n  `expires_at <= now`, where `now = 1700000000`; an entry whose `expires_at`\n  equals `now` exactly is expired.\n- A row with fewer than three fields, more than four fields, or a non-integer\n  `expires_at` is malformed and is skipped.\n- The same key may be written more than once for a namespace; a later write\n  refreshes that key's `expires_at` in place (last write wins), and duplicate\n  deliveries of the same write are therefore harmless.\n- Writes for different namespaces are interleaved and arrive out of order; a\n  key first seen as expired may be refreshed to a later expiry by a subsequent\n  write.\n\n## Run it\n```\npython3 src/cache_sweep.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 2\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
   srcFiles: [

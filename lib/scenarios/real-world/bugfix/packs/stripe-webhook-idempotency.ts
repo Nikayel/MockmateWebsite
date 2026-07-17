@@ -7,6 +7,7 @@ export const stripeWebhookIdempotencyPack: BugfixPack = {
   title: "Webhook replay under-credits one merchant's balance",
   summary:
     "The webhook replay job that reports each merchant's net balance shows one merchant lower than the ledger, and payouts are held until it reconciles.",
+  task: "Report each merchant's net balance in cents, charges minus refunds, from the replayed webhook event log so the payout it feeds reconciles with the merchant's own ledger.",
   company: {
     tag: "stripe-bug-squash",
     roundName: "Bug squash round",
@@ -19,7 +20,6 @@ export const stripeWebhookIdempotencyPack: BugfixPack = {
   language: "python",
   difficulty: 1,
   estMinutes: 45,
-  bugClass: "wrong-dedup-key",
   taskMd:
     "# Webhook replay — nightly net-balance report\n\n## Who reads this\nThe payments on-call replays the webhook event log every night to compute each\nmerchant's net balance (charges minus refunds) in cents, which feeds their payout.\nThis morning a merchant opened a ticket: their balance in the report is lower than\ntheir own ledger, and payouts are held for that merchant until the number reconciles.\n\n## The program\n`main.py` reads the webhook event log and prints each merchant's net balance in cents.\n\nEvents are delivered on an at-least-once bus, so the SAME event (identified by its\n`event_id`) can be delivered more than once, including a redelivery seconds later.\nThose redeliveries are the same event and must be applied only once. A merchant can\nalso legitimately have two separate events that happen to share an amount (for\nexample two customers buying the same item), and those are two distinct events.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments.\n- Columns are `event_id,type,merchant,amount,received_at`.\n- `amount` is a non-negative integer in cents. `type` is `charge` (adds to the\n  balance) or `refund` (subtracts from the balance).\n- The same `event_id` may appear more than once (an at-least-once redelivery); it is\n  one event and is applied once.\n- `received_at` is an ISO-8601 UTC timestamp.\n- A line that does not have exactly five columns, or has a non-numeric `amount`, is\n  malformed and is skipped.\n\n## Run it\n```\npython3 src/main.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Net balance (cents) by merchant ===\ndelta_foods: 8000\nluna_labs: 5400\norbit_goods: 4500\npine_market: 8400\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
   srcFiles: [
