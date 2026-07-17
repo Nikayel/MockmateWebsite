@@ -13,6 +13,7 @@ import { SqlWorkspaceResult } from "./SqlWorkspaceResult"
 import { useExerciseRun } from "./useExerciseRun"
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 import type { PythonExercise } from "@/lib/tutorials/types"
+import { LessonNotice } from "./LessonNotice"
 
 /**
  * Workspace (multi-file) exercise runner. Adapted from `BuildStation`: file tabs (editable files
@@ -239,14 +240,7 @@ export function WorkspaceExerciseRunner({
         )}
       </div>
 
-      {runError && (
-        <p
-          role="alert"
-          className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300"
-        >
-          {runError}
-        </p>
-      )}
+      {runError && <LessonNotice>{runError}</LessonNotice>}
 
       <TestResultsPanel results={results} isRunning={running} />
 
