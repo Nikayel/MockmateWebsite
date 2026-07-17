@@ -2,6 +2,8 @@
 
 import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { LessonNotice, LESSON_NOTICE_TEXT } from "./LessonNotice"
+import { cn } from "@/lib/utils"
 
 /**
  * Shared progress-state surfaces for the lesson players. Both the Python and SQL players load and
@@ -13,23 +15,24 @@ import { Button } from "@/components/ui/button"
 /** A non-blocking banner shown when progress fails to load or save, with a retry. */
 export function LessonErrorBanner({ error, onReload }: { error: string; onReload?: () => void }) {
   return (
-    <div
-      role="alert"
-      className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300"
+    <LessonNotice
+      className="mb-4"
+      leading={<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+      trailing={
+        onReload && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onReload}
+            className={cn("h-auto px-2 py-0.5", LESSON_NOTICE_TEXT)}
+          >
+            Retry
+          </Button>
+        )
+      }
     >
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <span className="flex-1">{error}</span>
-      {onReload && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onReload}
-          className="h-auto px-2 py-0.5 text-amber-700 dark:text-amber-300"
-        >
-          Retry
-        </Button>
-      )}
-    </div>
+      {error}
+    </LessonNotice>
   )
 }
 
