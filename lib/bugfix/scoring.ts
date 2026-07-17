@@ -14,6 +14,19 @@ const DEFAULT_WEIGHTS = {
   communication: 0.05,
 } satisfies Record<keyof Omit<BugfixScoreBreakdown, "overall">, number>
 
+/**
+ * Score for a language dimension that only the semantic scorer can judge, when it did
+ * not run (the no-AI fallback path).
+ *
+ * These three dimensions (hypothesis / root cause / prevention) used to be typed into
+ * textareas, so "no text" reliably meant "candidate said nothing" and scoring 0 was fair.
+ * The textareas are gone -- the candidate now states these to the interviewer -- so an
+ * empty `*Text` field means "we have no signal", not "they never reasoned". Scoring 0
+ * there would silently dock 28% of the total from every session the fallback path touches.
+ * Stay neutral instead, matching BUGFIX_SEMANTIC_NEUTRAL.
+ */
+const UNJUDGED_LANGUAGE_SCORE = 50
+
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
@@ -50,7 +63,7 @@ export function calculateBugfixEvidenceScore(
       evidence.inspectedTestOrDocs.length + evidence.visibleTestsRun,
       2
     ),
-    hypothesisQuality: overrides.hypothesisQuality ?? (evidence.hypothesisText ? 50 : 0),
+    hypothesisQuality: overrides.hypothesisQuality ?? UNJUDGED_LANGUAGE_SCORE,
     minimalFixQuality:
       expectedTouched === 0
         ? 70
@@ -61,8 +74,8 @@ export function calculateBugfixEvidenceScore(
       evidence.finalPassRate * 0.7 + evidence.visibleTestsRun * 15
     ),
     overEditControl: clampScore(100 - evidence.overEditedFiles.length * 35),
-    rootCauseUnderstanding: overrides.rootCauseAccuracy ?? (evidence.rootCauseText ? 50 : 0),
-    regressionPrevention: overrides.preventionQuality ?? (evidence.preventionText ? 50 : 0),
+    rootCauseUnderstanding: overrides.rootCauseAccuracy ?? UNJUDGED_LANGUAGE_SCORE,
+    regressionPrevention: overrides.preventionQuality ?? UNJUDGED_LANGUAGE_SCORE,
     aiCollaborationQuality: clampScore(
       70 + evidence.aiPartnerUseCount * 10 - evidence.aiShortcutCount * 35
     ),
