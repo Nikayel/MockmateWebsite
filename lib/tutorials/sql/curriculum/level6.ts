@@ -1907,7 +1907,7 @@ ORDER BY excess_files DESC;`,
     {
       id: "sql-l6-choosing-partition-key-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total number of files across all partitions as \`(total_files)\`, over \`partition_files\`.`,
+      prompt: `**Easy.** Write a query that returns the total number of files across all partitions as \`(total_files)\`, over \`partition_files\`.`,
       starterCode: `-- Sum the file counts.
 SELECT
 FROM partition_files;`,
@@ -1922,7 +1922,7 @@ FROM partition_files;`,
     {
       id: "sql-l6-choosing-partition-key-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the partition with the smallest average file as \`(partition_key, avg_file_mb)\`, over \`partition_files\`. The average is total bytes divided by file count, in MB (1 MB = 1,000,000 bytes), rounded to 2 decimals.`,
+      prompt: `**Medium.** Write a query that returns the partition with the smallest average file as \`(partition_key, avg_file_mb)\`, over \`partition_files\`. The average is total bytes divided by file count, in MB (1 MB = 1,000,000 bytes), rounded to 2 decimals.`,
       starterCode: `-- The single worst small-files offender.
 SELECT partition_key, ROUND(total_bytes * 1.0 / file_count / 1000000.0, 2) AS avg_file_mb
 FROM partition_files
@@ -1940,7 +1940,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-choosing-partition-key-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many partitions are healthy versus small-files as \`(health, partitions)\`, over \`partition_files\`. A partition is \`'small-files'\` when its average file is under 128 MB, else \`'ok'\`.`,
+      prompt: `**Hard.** Write a query that returns how many partitions are healthy versus small-files as \`(health, partitions)\`, over \`partition_files\`. A partition is \`'small-files'\` when its average file is under 128 MB, else \`'ok'\`.`,
       starterCode: `-- Bucket partitions into 'ok' vs 'small-files' and count each.
 SELECT
 FROM partition_files
