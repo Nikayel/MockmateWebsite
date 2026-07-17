@@ -834,6 +834,35 @@ ORDER BY table_count DESC, db_name;`,
         },
       },
     },
+    {
+      id: "sql-l6-lake-warehouse-catalog-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the Parquet tables that DO declare a partition key as \`(db_name, table_name, partition_keys)\`, ordered by \`db_name\` then \`table_name\`, over \`glue_catalog\`.`,
+      starterCode: `-- Parquet tables that are partitioned (the healthy ones).
+SELECT db_name, table_name, partition_keys
+FROM glue_catalog
+;`,
+      hints: [
+        "`file_format = 'parquet'` AND `partition_keys <> ''`.",
+        "Order by `db_name, table_name`.",
+      ],
+      referenceSolution: `SELECT db_name, table_name, partition_keys
+FROM glue_catalog
+WHERE file_format = 'parquet' AND partition_keys <> ''
+ORDER BY db_name, table_name;`,
+      singleFile: {
+        seedSql: GLUE_CATALOG_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["db_name", "table_name", "partition_keys"],
+          rows: [
+            ["analytics", "daily_active", "dt"],
+            ["analytics", "events", "dt"],
+            ["ml", "features", "dt"],
+          ],
+        },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
