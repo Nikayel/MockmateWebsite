@@ -226,8 +226,10 @@ export const InterviewTopBar = memo(function InterviewTopBar({
               : "bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
           }`}
           title={calmMode ? "Exit Calm Mode" : "Calm Mode (muted colors for focus)"}
+          aria-pressed={calmMode}
+          aria-label={calmMode ? "Exit calm mode" : "Enable calm mode"}
         >
-          <Leaf className="h-3.5 w-3.5" />
+          <Leaf className="h-3.5 w-3.5" aria-hidden="true" />
           <span className="hidden lg:inline">Calm</span>
         </button>
 
@@ -239,11 +241,13 @@ export const InterviewTopBar = memo(function InterviewTopBar({
               : "bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
           }`}
           title={focusMode ? "Exit Focus Mode (Esc)" : "Focus Mode ⌘K Z"}
+          aria-pressed={focusMode}
+          aria-label={focusMode ? "Exit focus mode" : "Enable focus mode"}
         >
           {focusMode ? (
-            <Minimize2 className="h-3.5 w-3.5" />
+            <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
           ) : (
-            <Maximize2 className="h-3.5 w-3.5" />
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
           )}
           <span className="hidden xl:inline">{focusMode ? "Exit Focus" : "Focus"}</span>
         </button>

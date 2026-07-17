@@ -47,9 +47,13 @@ export function SqlResultGrid({
         </div>
       )}
       <div
-        className="overflow-x-auto"
+        className="focus-visible:ring-ring overflow-x-auto focus-visible:ring-2 focus-visible:outline-none"
         role="region"
         aria-label={label ? `${label} result table` : "Result table"}
+        // A scrollable region must be keyboard-focusable so users can arrow to the off-screen
+        // columns of a wide result (WCAG 2.1.1). Intentionally a focus target.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={0}
       >
         <table className="w-full border-collapse text-left font-mono text-xs">
           <thead>
