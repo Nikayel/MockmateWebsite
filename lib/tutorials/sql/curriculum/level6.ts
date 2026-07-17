@@ -1720,7 +1720,7 @@ FROM partition_catalog
     {
       id: "sql-l6-what-is-a-partition-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the whole table's size in GB and its total rows as \`(total_gb, total_rows)\`, over \`partition_catalog\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
+      prompt: `**Easy.** Write a query that returns the whole table's size in GB and its total rows as \`(total_gb, total_rows)\`, over \`partition_catalog\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
       starterCode: `-- Sum every partition's bytes and rows.
 SELECT
 FROM partition_catalog;`,
@@ -1736,7 +1736,7 @@ FROM partition_catalog;`,
     {
       id: "sql-l6-what-is-a-partition-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the largest partition by size as \`(dt, size_mb)\`, over \`partition_catalog\`. Round \`size_mb\` to the nearest MB (1 MB = 1,000,000 bytes).`,
+      prompt: `**Medium.** Write a query that returns the largest partition by size as \`(dt, size_mb)\`, over \`partition_catalog\`. Round \`size_mb\` to the nearest MB (1 MB = 1,000,000 bytes).`,
       starterCode: `-- The single biggest day.
 SELECT dt, ROUND(size_bytes / 1000000.0, 0) AS size_mb
 FROM partition_catalog
@@ -1754,7 +1754,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-what-is-a-partition-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the partitions holding more than 4 files as \`(dt, file_count)\`, most files first, over \`partition_catalog\`.`,
+      prompt: `**Hard.** Write a query that returns the partitions holding more than 4 files as \`(dt, file_count)\`, most files first, over \`partition_catalog\`.`,
       starterCode: `-- Days that split into more than four files.
 SELECT dt, file_count
 FROM partition_catalog
