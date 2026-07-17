@@ -610,6 +610,8 @@ There is a real trap here, and it is a favorite interview follow-up: **moving co
 
 Cost is just arithmetic over the inventory: size in gigabytes times a per-GB price, summed. That is a join between the object inventory and a small price list, and it is exactly the kind of query a DE writes to justify a lifecycle change. The exercises here compute the current bill per class and the saving from a proposed transition.
 
+**Common mistake:** assuming a colder class is always cheaper. Infrequent-access and archive tiers add per-GB retrieval fees and minimum storage durations, so moving small or frequently read objects there can cost more than leaving them in Standard.
+
 **Interview nuance:** asked "you have 10 TB of logs you rarely read but must keep seven years, how do you store it cheaply," the answer is a lifecycle policy that transitions to Glacier Flexible or Deep Archive, and the detail that completes the answer is naming the retrieval-latency and minimum-duration trade rather than just saying "use Glacier."
 
 > **On a real platform this differs.** Real per-GB prices vary by Region and change over time, and AWS bills a "GB" as a specific byte count. The \`storage_pricing\` table here uses round, illustrative US prices and treats 1 GB as 1,000,000,000 bytes so the arithmetic stays clean. The query shape (join inventory to price, sum, compare) is the real one.`,
