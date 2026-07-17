@@ -21,9 +21,9 @@ def parse_line(raw):
 
     A usable line has exactly five comma-separated columns
     (timestamp, env, monitor, state, event_id) and a state the rollup reads as
-    a monitor transition. A comment, a blank line, a line with the wrong number
-    of columns, or a transition whose state is neither OK nor ALERT is terrain
-    the rollup tolerates by dropping it.
+    a monitor transition. A comment, a blank line, a line that does not split
+    into exactly five columns, or a transition whose state is neither OK nor
+    ALERT is terrain the rollup tolerates by dropping it.
     """
     line = raw.rstrip("\n")
     if not line or line.startswith("#"):
