@@ -1,9 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { cn } from "@/lib/utils"
 import type { BugSymptom } from "@/lib/scenarios/types"
@@ -16,9 +14,18 @@ import type { BugSymptom } from "@/lib/scenarios/types"
  * Report", and an Expected line restating it again). Roughly fifteen sentences of
  * read-before-you-code became three.
  *
- * Order is deliberate and answers the candidate's questions in the order they ask
- * them: what do I do (task) -> what is wrong (symptom) -> how do I know I'm done
- * (acceptance) -> why does this exist (report, collapsed).
+ * That de-duplication over-corrected. Collapsing the report by default hid 82.5% of
+ * every scenario's authored prose (measured across all 10 legacy scenarios: 7,315
+ * chars of incident behind the disclosure vs 1,554 visible), so what a candidate
+ * actually read was one abstract imperative and a number. The hidden text is not a
+ * fourth retelling — it is the only place the brief says what system this is, who
+ * noticed, and what may not change ("Preserve the public API because other console
+ * components call it directly"). A real ticket leads with that. The incident is now
+ * visible by default; the disclosure only hides the closing restatement of the task.
+ *
+ * Order answers the candidate's questions in the order they ask them: what do I do
+ * (task) -> why am I here (incident) -> what exactly is wrong (symptom) -> how do I
+ * know I'm done (acceptance).
  *
  * Nothing here may name the bug's cause or location. `bugDescription` and
  * `groundTruth` state the root cause outright and are deliberately not accepted as
@@ -28,19 +35,33 @@ import type { BugSymptom } from "@/lib/scenarios/types"
 const LABEL = "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70"
 
 /**
- * Sections of `problemStatement` that the brief now states in its own right, and
- * which would otherwise be a second copy inside the collapsed report.
+ * Sections of `problemStatement` whose HEADING AND BODY the brief states in its own
+ * right, and which would otherwise be a second copy inside the report.
  *
  * Presentation-only: `problemStatement` itself stays whole, because it feeds RAG
  * vectorization (lib/rag/vectorization/text-builders/bugfix-text.ts) and the AI
  * context. This trims what the CANDIDATE reads, not what the model reads.
+ *
+ * Deliberately narrow. It matches `**Bold**` headings only, so it no-ops on the 14
+ * packs and 8 of the 10 legacy scenarios, whose text uses `##` headings or none.
+ * That is correct and must stay: broadening it to `##` would strip a pack's
+ * "The program" and "Data contract" sections, which are the load-bearing content.
  */
 const REDUNDANT_SECTIONS = /^\*\*(Your Task|Artifacts)\*\*\s*$/i
 
 /**
- * Keep only the incident narrative: drop any "**Your Task**" / "**Artifacts**"
- * section, which the task box and the file tree already cover. A section runs
- * until the next `**Heading**` line or the end.
+ * Headings whose BODY is the content we want but whose LABEL the panel already
+ * prints above the prose. Dropping just the label avoids rendering "Incident
+ * Report" inline as a bold lead-in to its own first sentence, which is what
+ * markdown does with a single newline after a `**Bold**` line.
+ */
+const REDUNDANT_LABELS = /^\*\*(Incident Report)\*\*\s*$/i
+
+/**
+ * Trim the narrative down to what the brief does not already say: drop any
+ * "**Your Task**" / "**Artifacts**" section outright (the task box and file tree
+ * cover those), and drop the "**Incident Report**" label while keeping its body.
+ * A section runs until the next `**Heading**` line or the end.
  */
 export function extractIncidentNarrative(statement: string): string {
   const lines = statement.split("\n")
@@ -50,6 +71,7 @@ export function extractIncidentNarrative(statement: string): string {
   for (const line of lines) {
     if (/^\*\*[^*]+\*\*\s*$/.test(line)) {
       skipping = REDUNDANT_SECTIONS.test(line)
+      if (!skipping && REDUNDANT_LABELS.test(line)) continue
     }
     if (!skipping) kept.push(line)
   }
@@ -149,8 +171,6 @@ export function BugfixBrief({
   fallbackStatement,
   isFuzzy,
 }: BugfixBriefProps) {
-  const [reportOpen, setReportOpen] = useState(false)
-
   return (
     <div className="space-y-4" data-bugfix-tour="incident-report">
       {/* 1. Your task — always visible, boxed, one imperative line. */}
@@ -173,7 +193,21 @@ export function BugfixBrief({
         )
       )}
 
-      {/* 2. The symptom — the shape of the bug, pre-verbally. */}
+      {/* 2. The incident — what system this is, who noticed, and what may not
+             change. Visible: this is the ticket, not an appendix to it. */}
+      {report && task && (
+        <div className="space-y-1.5">
+          <div className={LABEL}>The incident</div>
+          <div className="border-border/70 bg-card/40 rounded-lg border px-3 py-2.5">
+            <MarkdownRenderer
+              content={extractIncidentNarrative(report)}
+              className="text-muted-foreground text-[12.5px] leading-relaxed"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 3. The symptom — the shape of the bug, pre-verbally. */}
       {symptom && (
         <div className="space-y-1.5">
           <div className={LABEL}>The symptom</div>
@@ -181,7 +215,7 @@ export function BugfixBrief({
         </div>
       )}
 
-      {/* 3. Done when — the real acceptance criteria. */}
+      {/* 4. Done when — the real acceptance criteria. */}
       {acceptance.length > 0 && (
         <div className="space-y-0.5">
           <div className={cn(LABEL, "mb-1")}>Done when</div>
@@ -189,27 +223,6 @@ export function BugfixBrief({
             <AcceptanceRow key={`${index}-${item.slice(0, 24)}`} text={item} />
           ))}
         </div>
-      )}
-
-      {/* 4. Full incident report — the ONLY copy of the narrative, collapsed. */}
-      {report && task && (
-        <Collapsible open={reportOpen} onOpenChange={setReportOpen}>
-          <CollapsibleTrigger className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 py-1 text-left transition-colors">
-            <ChevronDown
-              className={cn("h-3.5 w-3.5 transition-transform", reportOpen && "rotate-180")}
-              aria-hidden="true"
-            />
-            <span className={LABEL}>Full incident report</span>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="text-muted-foreground pt-1.5 pl-5 text-[12.5px] leading-relaxed">
-              <MarkdownRenderer
-                content={extractIncidentNarrative(report)}
-                className="text-[12.5px] leading-relaxed"
-              />
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
       )}
     </div>
   )
