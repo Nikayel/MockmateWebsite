@@ -371,6 +371,31 @@ function InterviewPageContent() {
     [currentSessionId, selectedScenario?.type]
   )
 
+  /**
+   * Open a workspace file in the editor from the problem column's file tree.
+   *
+   * Memoized deliberately: it is a `problemCtx` dependency, and a fresh identity
+   * each render would rebuild the ctx every render and defeat ProblemColumn's memo.
+   * Opening a file is also how bugfix inspection evidence is recorded, which feeds
+   * the codebaseNavigation and evidenceGathering scores.
+   */
+  const handleEditorFileSelect = useCallback(
+    (file: WorkspaceContextFile) => {
+      if (file.path !== activeWorkspacePath) {
+        setActiveWorkspacePath(file.path)
+        setCode(file.content || "")
+      }
+      if (selectedScenario?.type === "bugfix") {
+        recordBugfixEvidence({
+          type: file.role === "test" || file.role === "docs" ? "test_or_doc_opened" : "file_opened",
+          filePath: file.path,
+          fileRole: file.role,
+        })
+      }
+    },
+    [activeWorkspacePath, recordBugfixEvidence, selectedScenario?.type]
+  )
+
   const buildBugfixEvidencePayload = useCallback((): BugfixEvidenceEvent[] => {
     if (selectedScenario?.type !== "bugfix") return []
     return bugfixEvidenceEvents
@@ -1683,6 +1708,8 @@ function InterviewPageContent() {
   const problemCtx = useMemo<ProblemColumnCtx>(() => {
     return {
       activePanel,
+      activeWorkspacePath,
+      onWorkspaceFileSelect: handleEditorFileSelect,
       elapsedTime,
       fetchRAGHints,
       fileInputRef,
@@ -1712,6 +1739,8 @@ function InterviewPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activePanel,
+    activeWorkspacePath,
+    handleEditorFileSelect,
     fetchRAGHints,
     fileInputRef,
     focusMode,
@@ -1775,19 +1804,6 @@ function InterviewPageContent() {
 
   // Inline closures pre-built in page (recreated each render today — preserved
   // verbatim; intentionally NOT wrapped in useCallback).
-  const handleEditorFileSelect = (file: WorkspaceContextFile) => {
-    if (file.path !== activeWorkspacePath) {
-      setActiveWorkspacePath(file.path)
-      setCode(file.content || "")
-    }
-    if (selectedScenario?.type === "bugfix") {
-      recordBugfixEvidence({
-        type: file.role === "test" || file.role === "docs" ? "test_or_doc_opened" : "file_opened",
-        filePath: file.path,
-        fileRole: file.role,
-      })
-    }
-  }
   const onStartInterviewClick = () => startInterview()
   const onSendPartnerMessage = () => handleSendMessage(false)
   const onToggleInterviewerRecording = () => toggleVoiceRecording(true)
@@ -1920,7 +1936,6 @@ function InterviewPageContent() {
                   isLoadingChat={isLoadingChat}
                   onSendPartnerMessage={onSendPartnerMessage}
                   workspaceContext={workspaceContext}
-                  onEditorFileSelect={handleEditorFileSelect}
                   interviewerMessages={interviewerMessages}
                   isLoadingInterviewer={isLoadingInterviewer}
                   isGeneratingDiscussion={isGeneratingDiscussion}

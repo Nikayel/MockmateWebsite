@@ -69,7 +69,6 @@ interface InterviewLayoutGridProps {
   isLoadingChat: EditorColumnProps["isLoadingChat"]
   onSendPartnerMessage: EditorColumnProps["onSendPartnerMessage"]
   workspaceContext: EditorColumnProps["workspaceContext"]
-  onEditorFileSelect: EditorColumnProps["onFileSelect"]
   // ChatColumn
   interviewerMessages: ChatColumnProps["interviewerMessages"]
   isLoadingInterviewer: ChatColumnProps["isLoadingInterviewer"]
@@ -137,7 +136,6 @@ export function InterviewLayoutGrid({
   isLoadingChat,
   onSendPartnerMessage,
   workspaceContext,
-  onEditorFileSelect,
   interviewerMessages,
   isLoadingInterviewer,
   isGeneratingDiscussion,
@@ -294,7 +292,6 @@ export function InterviewLayoutGrid({
         isLoadingChat={isLoadingChat}
         onSendPartnerMessage={onSendPartnerMessage}
         workspaceContext={workspaceContext}
-        onFileSelect={onEditorFileSelect}
       />
 
       <ChatColumn
