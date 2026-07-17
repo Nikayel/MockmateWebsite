@@ -32,7 +32,7 @@ import type { BugSymptom } from "@/lib/scenarios/types"
  * props — locating the fault is the assessment.
  */
 
-const LABEL = "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70"
+const LABEL = "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
 
 /**
  * Sections of `problemStatement` whose HEADING AND BODY the brief states in its own
@@ -113,18 +113,18 @@ function SymptomCard({ symptom }: { symptom: BugSymptom }) {
       <div className="grid grid-cols-2">
         <div className="border-border/50 border-r px-3 py-2">
           <div className={cn(LABEL, "mb-1")}>Expected</div>
-          <div className="font-mono text-[17px] leading-tight text-emerald-400 tabular-nums">
+          <div className="font-mono text-[17px] leading-tight text-emerald-700 tabular-nums dark:text-emerald-400">
             {symptom.expected}
           </div>
         </div>
         <div className="px-3 py-2">
           <div className={cn(LABEL, "mb-1")}>Actual</div>
           <div className="flex items-baseline gap-1.5">
-            <span className="font-mono text-[17px] leading-tight text-red-400 tabular-nums">
+            <span className="font-mono text-[17px] leading-tight text-red-700 tabular-nums dark:text-red-400">
               {symptom.actual}
             </span>
             {symptom.delta && (
-              <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[10px] text-red-300">
+              <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-mono text-[10px] text-red-700 dark:text-red-300">
                 {symptom.delta}
               </span>
             )}
