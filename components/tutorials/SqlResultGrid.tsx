@@ -1,5 +1,7 @@
 "use client"
 
+import { cn } from "@/lib/utils"
+import { cellToneClass, formatCellText } from "@/lib/tutorials/table-cell"
 import type { SqlResultSet } from "@/lib/tutorials/types"
 
 /**
@@ -27,9 +29,12 @@ export function SqlResultGrid({
     )
   }
 
+  // `text-accent` measures 3.97:1 in light mode, under the 4.5:1 AA bar — and this is the
+  // header naming the target the learner is trying to match, so it is the last thing that
+  // should wash out. --accent-strong is the same clay at 5.5:1.
   const headerTone =
     tone === "expected"
-      ? "bg-accent/10 text-accent"
+      ? "bg-accent/10 text-accent-strong"
       : tone === "actual"
         ? "bg-muted/60 text-foreground"
         : "bg-muted/40 text-muted-foreground"
@@ -74,8 +79,14 @@ export function SqlResultGrid({
               result.rows.map((row, r) => (
                 <tr key={r} className="odd:bg-muted/20">
                   {result.columns.map((_, c) => (
-                    <td key={c} className="border-border/60 border-b px-3 py-1.5 whitespace-nowrap">
-                      {formatCell(row[c])}
+                    <td
+                      key={c}
+                      className={cn(
+                        "border-border/60 border-b px-3 py-1.5 whitespace-nowrap",
+                        cellToneClass(row[c])
+                      )}
+                    >
+                      {formatCellText(row[c])}
                     </td>
                   ))}
                 </tr>
@@ -86,9 +97,4 @@ export function SqlResultGrid({
       </div>
     </div>
   )
-}
-
-function formatCell(value: unknown): string {
-  if (value === null || value === undefined) return "NULL"
-  return String(value)
 }
