@@ -1751,7 +1751,32 @@ LIMIT 1;`,
         expected: { columns: ["dt", "size_mb"], rows: [["2026-01-05", 700]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-what-is-a-partition-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the partitions holding more than 4 files as \`(dt, file_count)\`, most files first, over \`partition_catalog\`.`,
+      starterCode: `-- Days that split into more than four files.
+SELECT dt, file_count
+FROM partition_catalog
+;`,
+      hints: ["`WHERE file_count > 4`.", "`ORDER BY file_count DESC, dt`."],
+      referenceSolution: `SELECT dt, file_count
+FROM partition_catalog
+WHERE file_count > 4
+ORDER BY file_count DESC, dt;`,
+      singleFile: {
+        seedSql: PARTITION_CATALOG_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["dt", "file_count"],
+          rows: [
+            ["2026-01-05", 6],
+            ["2026-01-03", 5],
+            ["2026-01-07", 5],
+          ],
+        },
+      },
+    },
   ],
 }
 
