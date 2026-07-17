@@ -1464,6 +1464,488 @@ FROM partition_catalog;`,
   },
 }
 
+// ---------------------------------------------------------------------------
+// Shared simulated-catalog seeds for Module 6.4. `task_metrics` = one row per Spark task
+// (stages, shuffle, the straggler); `join_inputs` = table sizes for a broadcast decision;
+// `pipeline_runs` = a medallion pipeline's run log (reliability + freshness/SLA).
+// ---------------------------------------------------------------------------
+
+const TASK_METRICS_SEED = `CREATE TABLE task_metrics (
+  stage_id            INTEGER,
+  task_id             INTEGER,
+  input_rows          INTEGER,
+  input_bytes         INTEGER,
+  shuffle_write_bytes INTEGER,   -- bytes this task wrote to the shuffle (0 on the read stage)
+  duration_s          REAL
+);
+INSERT INTO task_metrics (stage_id, task_id, input_rows, input_bytes, shuffle_write_bytes, duration_s) VALUES
+  (0, 0, 2500000, 260000000, 90000000, 12.0),   -- stage 0: scan + map (narrow), balanced
+  (0, 1, 2500000, 258000000, 89000000, 11.5),
+  (0, 2, 2500000, 262000000, 91000000, 12.3),
+  (0, 3, 2500000, 259000000, 90000000, 11.8),
+  (1, 0, 1200000, 120000000, 0,  8.0),           -- stage 1: reduce after the shuffle (wide)
+  (1, 1, 1300000, 130000000, 0,  8.5),
+  (1, 2, 1250000, 125000000, 0,  8.2),
+  (1, 3, 6000000, 600000000, 0, 47.0);           -- straggler: a skewed key landed on this task`
+
+const JOIN_INPUTS_SEED = `CREATE TABLE join_inputs (
+  table_name TEXT,
+  role       TEXT,       -- fact | dimension
+  size_bytes INTEGER
+);
+INSERT INTO join_inputs (table_name, role, size_bytes) VALUES
+  ('events',    'fact',      48000000000),   -- 48 GB, never broadcast
+  ('users',     'dimension',     9000000),   -- 9 MB
+  ('countries', 'dimension',      120000),   -- 0.12 MB
+  ('products',  'dimension',    42000000),   -- 42 MB, too big to broadcast
+  ('devices',   'dimension',     3500000);   -- 3.5 MB`
+
+const PIPELINE_RUNS_SEED = `CREATE TABLE pipeline_runs (
+  job          TEXT,
+  run_date     TEXT,
+  status       TEXT,       -- success | failed
+  rows_out     INTEGER,
+  duration_min REAL,
+  sla_min      INTEGER     -- freshness SLA: the run should finish within this many minutes
+);
+INSERT INTO pipeline_runs (job, run_date, status, rows_out, duration_min, sla_min) VALUES
+  ('bronze_ingest', '2026-01-01', 'success', 5200000, 22.0, 30),
+  ('bronze_ingest', '2026-01-02', 'success', 5400000, 24.0, 30),
+  ('bronze_ingest', '2026-01-03', 'failed',        0,  5.0, 30),
+  ('bronze_ingest', '2026-01-04', 'success', 5000000, 41.0, 30),   -- SLA breach
+  ('silver_clean',  '2026-01-01', 'success', 5100000, 18.0, 25),
+  ('silver_clean',  '2026-01-02', 'success', 5300000, 19.0, 25),
+  ('silver_clean',  '2026-01-03', 'failed',        0,  3.0, 25),
+  ('silver_clean',  '2026-01-04', 'success', 4900000, 28.0, 25),   -- SLA breach
+  ('gold_metrics',  '2026-01-01', 'success',     120,  6.0, 15),
+  ('gold_metrics',  '2026-01-02', 'success',     120,  6.5, 15),
+  ('gold_metrics',  '2026-01-03', 'success',     120,  7.0, 15),
+  ('gold_metrics',  '2026-01-04', 'success',     120, 20.0, 15);   -- SLA breach`
+
+// ---------------------------------------------------------------------------
+// Module 6.4 — Distributed Processing & Pipelines
+// ---------------------------------------------------------------------------
+
+const distributedExecution: SqlLesson = {
+  id: "sql-l6-distributed-execution",
+  title: "How a Distributed Engine Splits Work, and Why the Shuffle Is Expensive",
+  summary:
+    "Data splits into partitions, a job into stages, a stage into one task per partition. Narrow steps stay put; wide steps (group-by, join) force a shuffle across the network, the dominant cost of a big job.",
+  estimatedMinutes: 26,
+  difficulty: "medium",
+  skills: [
+    "distributed processing",
+    "Spark stages and tasks",
+    "narrow vs wide transformations",
+    "the shuffle",
+    "aggregation",
+  ],
+  teach: {
+    estimatedMinutes: 14,
+    markdown: `## Why one machine is not enough
+
+A terabyte does not fit in one machine's memory, and scanning it on one CPU takes forever. Distributed processing splits the **data** into partitions, ships a copy of the **compute** to where each partition lives, runs them in parallel, and combines the results. This is **scaling out** (more machines) rather than **scaling up** (a bigger machine), and it is how engines like Apache Spark chew through data a warehouse-load at a time.
+
+## The Spark execution model, briefly
+
+You do not need to run Spark to interview well, but you need its vocabulary, because it is the vocabulary of the whole field.
+
+- A dataset is split into **partitions**, the unit of parallel work.
+- A **job** breaks into **stages**, and each stage runs one **task** per partition.
+- Tasks run on **executors** spread across the cluster.
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "Partitions", "note": "the data, split into chunks" },
+    { "label": "Stage 0: map", "note": "one task per partition, no movement" },
+    { "label": "Shuffle", "note": "repartition so same-key rows co-locate" },
+    { "label": "Stage 1: reduce", "note": "group or join the co-located rows" },
+    { "label": "Result", "note": "combined output" }
+  ],
+  "highlight": ["Shuffle"],
+  "caption": "A job splits into stages; each stage runs one task per partition. A wide step needs a shuffle, the expensive move across the network."
+}
+\`\`\`
+
+The crucial split is **narrow** versus **wide** transformations:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["transformation", "kind", "needs a shuffle?"],
+  "rows": [
+    ["select, filter, map", "narrow", "no: each partition works alone"],
+    ["groupBy, join, distinct", "wide", "yes: rows must move to co-locate by key"],
+    ["repartition", "wide", "yes: data is redistributed on purpose"]
+  ],
+  "highlightCols": ["needs a shuffle?"],
+  "caption": "Narrow transformations stay within a partition. Wide transformations trigger a shuffle across the cluster."
+}
+\`\`\`
+
+- **Narrow** transformations (\`select\`, \`filter\`, \`map\`) touch one partition at a time and need no data to move. They are cheap and pipeline together.
+- **Wide** transformations (\`groupBy\`, \`join\`, \`distinct\`, \`repartition\`) need rows with the same key to end up on the same machine, which forces a **shuffle**.
+
+## The shuffle is the expensive thing
+
+A shuffle repartitions the data across the network so that every row with the same key lands together. It writes intermediate files to disk on the map side, transfers them across the network, and reads them back on the reduce side, paying disk I/O, serialization, and network cost all at once. Spark's own docs call it "a complex and costly operation." When a big job is slow, the shuffle is usually why, and a common tuning knob is the number of shuffle partitions (Spark defaults to 200).
+
+## Reading the execution with SQL
+
+An engine records per-task metrics: which stage, how many rows, how many bytes, how long. Reading those is how you understand where a job spent its time. The exercises query a \`task_metrics\` table (one row per task) to summarize the stages and see where the shuffle bytes were written.
+
+**Interview nuance:** "what is a shuffle and why is it slow" is a core distributed-systems question. The answer: a wide operation like a group-by or join has to move rows across the network so same-key rows co-locate, paying disk, serialization, and network cost. Narrow operations like filter and map avoid it.
+
+> **On a real platform this differs.** Real per-task metrics come from the Spark UI or history server, with dozens of columns. The \`task_metrics\` table here keeps the few that carry the lesson: stage, rows, bytes, shuffle write, and duration. The stage-level summary you compute is exactly the view the UI shows you.`,
+    demoSeedSql: TASK_METRICS_SEED,
+    demoCode: `-- Every task, by stage. Notice stage 0 writes the shuffle; stage 1 has one slow task.
+SELECT stage_id, task_id, input_rows,
+       ROUND(shuffle_write_bytes / 1000000.0, 0) AS shuffle_mb,
+       duration_s
+FROM task_metrics
+ORDER BY stage_id, task_id;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-distributed-execution-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that summarizes each stage, as \`(stage_id, task_count, total_input_rows, avg_duration_s)\`, in stage order, over \`task_metrics(stage_id, task_id, input_rows, input_bytes, shuffle_write_bytes, duration_s)\`.
+
+Group the tasks by \`stage_id\`, count them, sum \`input_rows\`, and average \`duration_s\`. Round \`avg_duration_s\` to 2 decimals, ordered by \`stage_id\`.`,
+    starterCode: `-- Per-stage summary: task count, total input rows, average task duration.
+SELECT stage_id
+  -- COUNT tasks, SUM input_rows, AVG duration_s
+FROM task_metrics
+GROUP BY stage_id
+ORDER BY stage_id;`,
+    hints: [
+      "`COUNT(*) AS task_count` counts the tasks in each stage.",
+      "`SUM(input_rows) AS total_input_rows` and `ROUND(AVG(duration_s), 2) AS avg_duration_s`.",
+      "Group by `stage_id` and order by it.",
+    ],
+    referenceSolution: `SELECT stage_id,
+       COUNT(*) AS task_count,
+       SUM(input_rows) AS total_input_rows,
+       ROUND(AVG(duration_s), 2) AS avg_duration_s
+FROM task_metrics
+GROUP BY stage_id
+ORDER BY stage_id;`,
+    singleFile: {
+      seedSql: TASK_METRICS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["stage_id", "task_count", "total_input_rows", "avg_duration_s"],
+        rows: [
+          [0, 4, 10000000, 11.9],
+          [1, 4, 9750000, 17.93],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-distributed-execution-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each stage's total shuffle write in MB and its total task time in seconds, as \`(stage_id, shuffle_mb, total_task_seconds)\`, in stage order, over the same \`task_metrics\` table.
+
+Treat 1 MB as 1,000,000 bytes. Sum \`shuffle_write_bytes\` and \`duration_s\` per stage, and round both to 2 decimals, ordered by \`stage_id\`. (Notice which stage writes the shuffle and which stage still runs longer.)`,
+    starterCode: `-- Per-stage shuffle MB written and total task seconds.
+SELECT stage_id
+  -- SUM shuffle_write_bytes into MB, SUM duration_s
+FROM task_metrics
+GROUP BY stage_id
+ORDER BY stage_id;`,
+    hints: [
+      "`SUM(shuffle_write_bytes) / 1000000.0` is the stage's shuffle write in MB.",
+      "`SUM(duration_s)` is the total task time for the stage.",
+      "Alias them `shuffle_mb` and `total_task_seconds`, round to 2 decimals, group and order by `stage_id`.",
+    ],
+    singleFile: {
+      seedSql: TASK_METRICS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["stage_id", "shuffle_mb", "total_task_seconds"],
+        rows: [
+          [0, 360, 47.6],
+          [1, 0, 71.7],
+        ],
+      },
+    },
+  },
+}
+
+const skewAndJoins: SqlLesson = {
+  id: "sql-l6-skew-and-joins",
+  title: "Data Skew, Stragglers, and Broadcast vs Shuffle Joins",
+  summary:
+    "One hot key overloads one task and the whole stage waits on that straggler. For a huge-to-tiny join, broadcast the small side so the big table never shuffles (Spark auto-broadcasts under 10 MB).",
+  estimatedMinutes: 26,
+  difficulty: "medium",
+  skills: [
+    "data skew",
+    "stragglers",
+    "broadcast join",
+    "shuffle join",
+    "autoBroadcastJoinThreshold",
+  ],
+  teach: {
+    estimatedMinutes: 14,
+    markdown: `## Data skew and the straggler
+
+Parallelism only helps if the work is spread evenly. **Data skew** is when one key has vastly more rows than the others: a NULL that swallows a third of the rows, one mega-customer, one hot product. In a group-by or join, all the rows for a key go to one task, so the task holding the giant key runs far longer than the rest. The whole stage cannot finish until that one **straggler** finishes, so a job that should take a minute takes twenty, and that one executor may run out of memory.
+
+You spot skew by comparing the slowest task to the typical task in its stage. A task running many times the stage's median duration is the tell. (Spark's Adaptive Query Execution, on by default since Spark 3.2, even detects and splits skewed partitions automatically, using "more than five times the median" as its threshold.) The beginner fixes are to **salt** the hot key (append a random suffix so it spreads across tasks), filter out the junk key (a NULL you do not need), or let AQE handle it.
+
+## Broadcast join vs shuffle join
+
+The most common join question a junior gets is "you are joining a huge fact table to a tiny lookup table, how do you avoid a shuffle." The answer is a **broadcast join**.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["join kind", "when", "data movement"],
+  "rows": [
+    ["broadcast join", "one side is small (under ~10 MB)", "copy the small table to every executor; the big table never moves"],
+    ["shuffle (sort-merge) join", "both sides are large", "shuffle both sides so same-key rows meet"]
+  ],
+  "highlightCols": ["join kind"],
+  "caption": "If one side is small enough to broadcast, you avoid shuffling the huge table entirely. Spark auto-broadcasts under 10 MB by default."
+}
+\`\`\`
+
+- If one side is **small**, the engine copies that whole table to every executor and each executor joins its slice of the big table locally. The huge table never moves. No shuffle.
+- If **both** sides are large, you cannot broadcast, so the engine shuffles both sides so matching keys meet. This is a **sort-merge join**, and it is the expensive default for big-to-big joins.
+
+Spark decides automatically: any table under \`spark.sql.autoBroadcastJoinThreshold\` (default **10 MB**, or 10485760 bytes) is broadcast. Setting the threshold to -1 disables it. Knowing that number, and that it is the small side that gets broadcast, is a clean junior answer.
+
+## Reading join and skew data with SQL
+
+The exercises compute both: a per-task straggler ratio (each task's duration over its stage average) that surfaces the skewed task, and, for a set of join inputs, which dimension tables are small enough to broadcast under the 10 MB threshold.
+
+**Interview nuance:** "huge fact table joined to a tiny dimension, avoid the shuffle" wants "broadcast the small table so the big one never moves." "One task is 10x slower than the rest" wants "data skew: a hot key overloaded one task; salt it, filter the null, or let AQE split it."
+
+> **On a real platform this differs.** Redshift co-locates join keys with a distribution key so matching rows already share a node; Snowflake runs elastic virtual warehouses over shared micro-partitions. The broadcast-vs-shuffle and skew reasoning is the same idea those systems express differently. The \`task_metrics\` and \`join_inputs\` tables here let you compute the decision the optimizer makes.`,
+    demoSeedSql: TASK_METRICS_SEED,
+    demoCode: `-- Per stage, the average vs the slowest task. A high ratio means a straggler (skew).
+SELECT stage_id,
+       ROUND(AVG(duration_s), 1) AS avg_s,
+       ROUND(MAX(duration_s), 1) AS max_s,
+       ROUND(MAX(duration_s) / AVG(duration_s), 2) AS straggler_ratio
+FROM task_metrics
+GROUP BY stage_id
+ORDER BY stage_id;`,
+    showDemoInput: false,
+  },
+  apply: {
+    id: "sql-l6-skew-and-joins-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each task in stage 1 with its duration and how many times the stage's average duration it ran, as \`(task_id, duration_s, x_stage_avg)\`, slowest first, over \`task_metrics(stage_id, task_id, input_rows, input_bytes, shuffle_write_bytes, duration_s)\`.
+
+\`x_stage_avg\` is the task's \`duration_s\` divided by the average duration of stage 1 (a straggler shows a value well above 1). Keep only stage 1, round \`x_stage_avg\` to 2 decimals, ordered by \`duration_s\` descending.`,
+    starterCode: `-- Stage-1 tasks vs the stage average: the straggler stands out.
+SELECT task_id, duration_s
+  -- duration_s divided by the stage-1 average duration
+FROM task_metrics
+WHERE stage_id = 1
+ORDER BY duration_s DESC;`,
+    hints: [
+      "The stage average is a scalar subquery: `(SELECT AVG(duration_s) FROM task_metrics WHERE stage_id = 1)`.",
+      "`duration_s / (that subquery) AS x_stage_avg`, rounded to 2 decimals.",
+      "Filter to `stage_id = 1` and order by `duration_s DESC`.",
+    ],
+    referenceSolution: `SELECT task_id, duration_s,
+       ROUND(duration_s / (SELECT AVG(duration_s) FROM task_metrics WHERE stage_id = 1), 2) AS x_stage_avg
+FROM task_metrics
+WHERE stage_id = 1
+ORDER BY duration_s DESC;`,
+    singleFile: {
+      seedSql: TASK_METRICS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["task_id", "duration_s", "x_stage_avg"],
+        rows: [
+          [3, 47, 2.62],
+          [1, 8.5, 0.47],
+          [2, 8.2, 0.46],
+          [0, 8, 0.45],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-skew-and-joins-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each dimension table and whether Spark would auto-broadcast it in a join to the \`events\` fact, as \`(table_name, size_mb, broadcast)\`, smallest first, over \`join_inputs(table_name, role, size_bytes)\`.
+
+Consider only rows where \`role\` is \`'dimension'\`. \`broadcast\` is \`'yes'\` when the table is under the 10 MB \`autoBroadcastJoinThreshold\` (10485760 bytes) and \`'no'\` otherwise. Treat 1 MB as 1,000,000 bytes for \`size_mb\`, round it to 2 decimals, ordered by \`size_bytes\` ascending.`,
+    starterCode: `-- Which dimension tables are small enough to broadcast (under 10 MB)?
+SELECT table_name,
+       ROUND(size_bytes / 1000000.0, 2) AS size_mb
+  -- a 'yes'/'no' broadcast flag against the 10485760-byte threshold
+FROM join_inputs
+WHERE role = 'dimension'
+ORDER BY size_bytes ASC;`,
+    hints: [
+      "Filter to `WHERE role = 'dimension'`.",
+      "`CASE WHEN size_bytes < 10485760 THEN 'yes' ELSE 'no' END AS broadcast` (10485760 = 10 MB in bytes).",
+      "`size_mb` is `size_bytes / 1000000.0` rounded to 2 decimals; order by `size_bytes ASC`.",
+    ],
+    singleFile: {
+      seedSql: JOIN_INPUTS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["table_name", "size_mb", "broadcast"],
+        rows: [
+          ["countries", 0.12, "yes"],
+          ["devices", 3.5, "yes"],
+          ["users", 9, "yes"],
+          ["products", 42, "no"],
+        ],
+      },
+    },
+  },
+}
+
+const pipelinesOrchestration: SqlLesson = {
+  id: "sql-l6-pipelines-orchestration",
+  title: "Pipelines, Orchestration, and Idempotency (Capstone)",
+  summary:
+    "A DAG of scheduled jobs moves data raw to useful (medallion Bronze/Silver/Gold, ELT). The reliability ideas that matter: idempotent re-runs, backfills, and freshness SLAs, all queryable from a run log.",
+  estimatedMinutes: 28,
+  difficulty: "medium",
+  skills: [
+    "data pipelines",
+    "DAG / orchestration",
+    "idempotency and backfill",
+    "medallion architecture",
+    "freshness SLA",
+  ],
+  teach: {
+    estimatedMinutes: 15,
+    markdown: `## From queries to pipelines
+
+A single query is not a data platform. A **pipeline** is a set of jobs wired by their dependencies, run on a schedule, that move data from raw to useful. In Apache Airflow a pipeline is a **DAG**, a Directed Acyclic Graph of tasks: "clean events" runs after "ingest events," "daily metrics" runs after "clean events," and a scheduler runs the whole graph every day. Acyclic means no loops, so there is always a valid order to run the tasks in.
+
+A very common way to layer a pipeline is the **medallion architecture**:
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "Bronze", "note": "raw, as received, append-only" },
+    { "label": "Silver", "note": "cleaned, validated, conformed" },
+    { "label": "Gold", "note": "aggregated, business-ready" }
+  ],
+  "caption": "The medallion architecture: each layer is a scheduled job that reads the previous layer. A DAG wires the dependencies."
+}
+\`\`\`
+
+- **Bronze** is the raw data exactly as it arrived, append-only, so you can always reprocess from source.
+- **Silver** is cleaned, validated, deduplicated, and conformed.
+- **Gold** is the business-level aggregates the dashboards read.
+
+Each layer is a scheduled job that reads the one before it. Modern cloud pipelines favor **ELT** (load raw into the lake or warehouse, then transform there with SQL) over the older **ETL** (transform before loading), because storage is cheap and the warehouse is powerful.
+
+## Two ideas that separate juniors from mid-levels
+
+- **Idempotency.** A job will be retried after a failure, and a backfill will re-run last week. If re-running **doubles** the data, your pipeline is broken. An **idempotent** job produces the same result no matter how many times it runs, achieved by **overwriting a partition**, using **MERGE** (upsert), or **delete-then-insert**, never a blind append. This is the single most important reliability property of a batch job.
+- **Backfill and freshness.** When logic changes or late data arrives, you **backfill**: re-run the pipeline over historical partitions. **Incremental** loads process only new data since a **high-water mark** (the last-seen timestamp), usually with a small look-back window to catch late arrivals. **Freshness** is how recent the data is, and a **freshness SLA** ("gold is never more than 30 minutes behind") is what you page someone about.
+
+## Operating a pipeline with SQL
+
+You run a pipeline by watching its **run log**: which jobs succeeded, how many rows they wrote, how long they took, whether they met their SLA. Querying that operational metadata is a daily DE task. The capstone exercises query a \`pipeline_runs\` table to compute per-job reliability and to catch the runs that breached their freshness SLA.
+
+**Interview nuance:** "make this backfill safe to re-run" is a direct idempotency question: overwrite the target partition or MERGE on a key, so a second run replaces rather than duplicates. "How do you know the data is late" is a freshness/SLA question answered by comparing each run's duration or finish time to its SLA, which is exactly the capstone query.
+
+> **On a real platform this differs.** Real run metadata lives in Airflow's database, dbt's run results, or a warehouse audit table, with far more detail. The \`pipeline_runs\` table here keeps job, date, status, rows, duration, and SLA, which is enough to compute the reliability and freshness questions an on-call DE actually asks.`,
+    demoSeedSql: PIPELINE_RUNS_SEED,
+    demoCode: `-- Per-job health: how many runs, how many failed, how many missed the SLA.
+SELECT job,
+       COUNT(*) AS runs,
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures,
+       SUM(CASE WHEN status = 'success' AND duration_min > sla_min THEN 1 ELSE 0 END) AS sla_breaches
+FROM pipeline_runs
+GROUP BY job
+ORDER BY job;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l6-pipelines-orchestration-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns each job's reliability, as \`(job, runs, failures, success_pct)\`, least reliable first, over \`pipeline_runs(job, run_date, status, rows_out, duration_min, sla_min)\`.
+
+\`runs\` is the total runs, \`failures\` counts \`status = 'failed'\`, and \`success_pct\` is the percentage of runs that succeeded. Round \`success_pct\` to 2 decimals, ordered by \`success_pct\` ascending and then \`job\`.`,
+    starterCode: `-- Per-job reliability: runs, failures, success percentage.
+SELECT job,
+       COUNT(*) AS runs
+  -- count failures, and compute the success percentage
+FROM pipeline_runs
+GROUP BY job
+ORDER BY success_pct ASC, job;`,
+    hints: [
+      "`SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures`.",
+      "`success_pct = 100.0 * SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*)`, rounded to 2 decimals.",
+      "Group by `job`, order by `success_pct ASC, job`.",
+    ],
+    referenceSolution: `SELECT job,
+       COUNT(*) AS runs,
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures,
+       ROUND(100.0 * SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*), 2) AS success_pct
+FROM pipeline_runs
+GROUP BY job
+ORDER BY success_pct ASC, job;`,
+    singleFile: {
+      seedSql: PIPELINE_RUNS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["job", "runs", "failures", "success_pct"],
+        rows: [
+          ["bronze_ingest", 4, 1, 75],
+          ["silver_clean", 4, 1, 75],
+          ["gold_metrics", 4, 0, 100],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-pipelines-orchestration-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns every successful run that missed its freshness SLA, as \`(job, run_date, duration_min, sla_min, over_by_min)\`, worst overrun first, over the same \`pipeline_runs\` table.
+
+A run missed its SLA when it succeeded but its \`duration_min\` exceeded its \`sla_min\`. \`over_by_min\` is how many minutes over it ran. Order by \`over_by_min\` descending. (Failed runs are excluded: a failure is a different alert.)`,
+    starterCode: `-- Successful runs that breached their freshness SLA, worst overrun first.
+SELECT job, run_date, duration_min, sla_min
+  -- over_by_min = duration_min - sla_min
+FROM pipeline_runs
+-- keep successful runs that ran longer than their SLA
+ORDER BY over_by_min DESC;`,
+    hints: [
+      "Filter with `WHERE status = 'success' AND duration_min > sla_min`.",
+      "`duration_min - sla_min AS over_by_min`, rounded to 2 decimals.",
+      "Order by `over_by_min DESC`.",
+    ],
+    singleFile: {
+      seedSql: PIPELINE_RUNS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["job", "run_date", "duration_min", "sla_min", "over_by_min"],
+        rows: [
+          ["bronze_ingest", "2026-01-04", 41, 30, 11],
+          ["gold_metrics", "2026-01-04", 20, 15, 5],
+          ["silver_clean", "2026-01-04", 28, 25, 3],
+        ],
+      },
+    },
+  },
+}
+
 export const sqlLevel6: SqlLevel = {
   id: 6,
   slug: "cloud-data-foundations",
@@ -1498,6 +1980,13 @@ export const sqlLevel6: SqlLevel = {
       description:
         "The single most-asked 'make a big table fast and cheap' topic: how dt=value partition folders let a filter prune to a fraction of the data, how to choose the partition key without shredding the table into tiny files, and how bucketing and the full-scan trap fit in.",
       lessons: [whatIsAPartition, choosingPartitionKey, bucketingAndFullScanTrap],
+    },
+    {
+      id: "sql-l6-distributed-pipelines",
+      title: "Module 6.4: Distributed Processing & Pipelines",
+      description:
+        "How big data is actually computed and how it flows: an engine splits data into partitions and tasks and pays for the shuffle, data skew creates stragglers, a broadcast join avoids shuffling a huge table, and a pipeline of scheduled, idempotent jobs (the medallion) moves data raw to useful under a freshness SLA.",
+      lessons: [distributedExecution, skewAndJoins, pipelinesOrchestration],
     },
   ],
 }
