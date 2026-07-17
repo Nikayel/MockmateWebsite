@@ -53,6 +53,47 @@ async function loadPyodideRuntime() {
   return pyodideReadyPromise
 }
 
+/** Every workspace run gets its own directory under this prefix. */
+const WORKSPACE_ROOT_PREFIX = "/home/pyodide/workspace_"
+
+/**
+ * Drop the previous run's workspace modules from the import cache.
+ *
+ * `sys.modules` is keyed by module NAME, not by path, so a fresh directory per run does
+ * NOT give a fresh import: run 2's `import solution` finds run 1's entry and returns it,
+ * and the learner's edit is silently ignored. Only the first run in a page load ever
+ * reflected their code -- every later Run re-graded the first, and a reload was the only
+ * way out. That is the same forged pass the fresh-globals namespace below exists to
+ * prevent; globals were just the layer it was caught at.
+ *
+ * Purging by workspace path prefix (rather than diffing against a boot snapshot) touches
+ * only the learner's own modules, so a previously imported stdlib or micropip package
+ * stays warm.
+ *
+ * `invalidate_caches()` matters too: the FS finder caches directory listings, and we are
+ * writing brand-new files under a brand-new path on every run.
+ */
+async function purgeWorkspaceModules(pyodide) {
+  await pyodide.runPythonAsync(`
+import sys, importlib
+
+def _from_workspace(module):
+    path = getattr(module, "__file__", None)
+    if path:
+        return str(path).startswith(${JSON.stringify(WORKSPACE_ROOT_PREFIX)})
+    # Namespace packages carry __path__ and no __file__.
+    for entry in getattr(module, "__path__", None) or ():
+        if str(entry).startswith(${JSON.stringify(WORKSPACE_ROOT_PREFIX)}):
+            return True
+    return False
+
+for _name in [n for n, m in list(sys.modules.items()) if m is not None and _from_workspace(m)]:
+    del sys.modules[_name]
+
+importlib.invalidate_caches()
+`)
+}
+
 function ensureParentDirectories(pyodide, path) {
   const parts = path.split("/").filter(Boolean)
   let currentPath = ""
@@ -97,7 +138,11 @@ self.onmessage = async function (event) {
 
     try {
       if (Array.isArray(files) && entrypoint) {
-        const workspaceRoot = `/home/pyodide/workspace_${workspaceRunCounter++}`
+        // Before anything is written: the previous run's modules must not answer this
+        // run's imports. See purgeWorkspaceModules.
+        await purgeWorkspaceModules(pyodide)
+
+        const workspaceRoot = `${WORKSPACE_ROOT_PREFIX}${workspaceRunCounter++}`
         pyodide.FS.mkdir(workspaceRoot)
 
         for (const file of files) {
