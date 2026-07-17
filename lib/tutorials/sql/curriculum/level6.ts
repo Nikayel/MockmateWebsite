@@ -2383,7 +2383,7 @@ ORDER BY stage_id;`,
     {
       id: "sql-l6-distributed-execution-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total number of tasks and total input rows across the job as \`(tasks, input_rows)\`, over \`task_metrics\`.`,
+      prompt: `**Easy.** Write a query that returns the total number of tasks and total input rows across the job as \`(tasks, input_rows)\`, over \`task_metrics\`.`,
       starterCode: `-- Count tasks, sum input rows.
 SELECT
 FROM task_metrics;`,
@@ -2398,7 +2398,7 @@ FROM task_metrics;`,
     {
       id: "sql-l6-distributed-execution-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the single slowest task as \`(stage_id, task_id, duration_s)\`, over \`task_metrics\`.`,
+      prompt: `**Medium.** Write a query that returns the single slowest task as \`(stage_id, task_id, duration_s)\`, over \`task_metrics\`.`,
       starterCode: `-- The one task that took longest.
 SELECT stage_id, task_id, duration_s
 FROM task_metrics
@@ -2416,7 +2416,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-distributed-execution-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total shuffle bytes written across the whole job in GB as \`(shuffle_gb)\`, over \`task_metrics\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
+      prompt: `**Hard.** Write a query that returns the total shuffle bytes written across the whole job in GB as \`(shuffle_gb)\`, over \`task_metrics\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
       starterCode: `-- Sum every task's shuffle write.
 SELECT
 FROM task_metrics;`,
