@@ -1851,6 +1851,8 @@ Four reasons, in order of how often they come up:
 
 A partition catalog records, per partition, its size and row count, so you can compute exactly how many bytes a pruning query scans versus a full scan. The exercises query a \`partition_catalog\` and compute the savings from filtering to one day and to a date range.
 
+**Common mistake:** partitioning a table but never filtering on the partition key. Pruning only happens when a query filters on the key, so a partition scheme your queries ignore adds file overhead with no payoff.
+
 **Interview nuance:** asked "why would you partition this table," lead with pruning and cost: partitioning by the column you filter on most (usually date) lets the engine skip the partitions a query does not need, so it scans fewer bytes, runs faster, and on a pay-per-scan engine costs less.
 
 > **On a real platform this differs.** A real engine prunes by reading partition metadata from the catalog (Glue) and never lists the skipped folders. The \`partition_catalog\` here exposes one row per partition so you can compute the pruned scan yourself; the arithmetic (sum the matching partitions, compare to the total) is what the engine's cost estimate does.`,
