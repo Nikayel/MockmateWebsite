@@ -27,7 +27,9 @@ export function ProblemNotesPanel() {
         onChange={(e) => setNotes(e.target.value)}
         onBlur={() => notes.trim() && setEditing(false)}
         placeholder={PLACEHOLDER}
-        className="text-foreground placeholder:text-muted-foreground/60 h-full w-full resize-none bg-transparent px-3 py-3 text-sm leading-relaxed outline-none"
+        // See NotesPanel: the /60 alpha measured 2.48:1 in light mode. A placeholder is
+        // the instruction for an empty field; it has to be readable to do its job.
+        className="text-foreground placeholder:text-muted-foreground h-full w-full resize-none bg-transparent px-3 py-3 text-sm leading-relaxed outline-none"
       />
     )
   }

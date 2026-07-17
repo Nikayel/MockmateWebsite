@@ -58,7 +58,11 @@ function NotesTier({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
-        className="text-foreground placeholder:text-muted-foreground/70 min-h-0 flex-1 resize-none bg-transparent px-3 pb-3 text-sm leading-relaxed outline-none"
+        // Placeholder at full muted-foreground: the /70 alpha measured 2.98:1 in light
+        // mode, and a placeholder is the instruction for an EMPTY field, so it is the one
+        // piece of text guaranteed to be all the learner has. The empty field and the
+        // greyer tone already say "placeholder" without buying it in contrast.
+        className="text-foreground placeholder:text-muted-foreground min-h-0 flex-1 resize-none bg-transparent px-3 pb-3 text-sm leading-relaxed outline-none"
       />
     </div>
   )

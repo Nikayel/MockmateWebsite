@@ -124,7 +124,9 @@ export function DesignAnswerPanel({
         <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-1.5">
           <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="text-muted-foreground font-mono text-xs">answer.md</span>
-          <span className="text-muted-foreground/70 ml-auto text-xs tabular-nums">
+          {/* The /70 alpha measured 2.87:1 on the page background. Its position (ml-auto,
+              small, tabular-nums) already reads as secondary without paying in contrast. */}
+          <span className="text-muted-foreground ml-auto text-xs tabular-nums">
             {wordCount} {wordCount === 1 ? "word" : "words"}
           </span>
         </div>
@@ -143,7 +145,9 @@ export function DesignAnswerPanel({
             placeholder={
               "Sketch your design. Assumptions -> clarifying questions -> the design -> tradeoffs.\n\nWrite in plain prose and bullet points; add an ASCII box diagram if it helps."
             }
-            className="text-foreground placeholder:text-muted-foreground/60 min-h-[280px] w-full resize-y bg-transparent px-3.5 py-3 font-mono text-sm leading-relaxed focus:outline-none"
+            // See NotesPanel: the /60 alpha measured 2.41:1 in light mode. This is a
+            // free-response design answer, so the placeholder is the prompt's scaffolding.
+            className="text-foreground placeholder:text-muted-foreground min-h-[280px] w-full resize-y bg-transparent px-3.5 py-3 font-mono text-sm leading-relaxed focus:outline-none"
           />
         )}
       </div>
