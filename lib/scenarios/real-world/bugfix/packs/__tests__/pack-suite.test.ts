@@ -97,6 +97,9 @@ describe("bugfix pack suite", () => {
             bugSummary: sealed?.bugSummary,
             minimalFix: sealed?.minimalFix,
             bugLocation: sealed?.bugLocation,
+            solutionMd: sealed?.solutionMd,
+            survivalStory: sealed?.survivalStory,
+            redHerrings: sealed?.redHerrings,
           })
         ).toEqual([])
       })

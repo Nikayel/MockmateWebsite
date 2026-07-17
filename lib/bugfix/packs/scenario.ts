@@ -230,6 +230,15 @@ export interface SealedPackSecrets {
   minimalFix?: string
   /** Prose naming the file and function, e.g. "src/x.py — f(): flag hoisted". */
   bugLocation?: string
+  /** The full sealed write-up — the single most revealing field. */
+  solutionMd?: string
+  survivalStory?: string
+  /** Each herring's prose; leaking why one is provably innocent removes the herring. */
+  redHerrings?: Array<{
+    location?: string
+    looksWrongBecause?: string
+    provablyInnocentBecause?: string
+  }>
 }
 
 /** Flatten the sealed bag into the strings a verbatim leak check can scan for. */
@@ -237,7 +246,18 @@ function sealedStrings(secrets: SealedPackSecrets | string | undefined): string[
   if (!secrets) return []
   if (typeof secrets === "string") return [secrets]
 
-  return [secrets.bugSummary, secrets.minimalFix, secrets.bugLocation]
+  return [
+    secrets.bugSummary,
+    secrets.minimalFix,
+    secrets.bugLocation,
+    secrets.solutionMd,
+    secrets.survivalStory,
+    ...(secrets.redHerrings ?? []).flatMap((h) => [
+      h.location,
+      h.looksWrongBecause,
+      h.provablyInnocentBecause,
+    ]),
+  ]
     .map((s) => s?.trim() ?? "")
     .filter((s) => s.length > 0)
 }
