@@ -2395,6 +2395,24 @@ FROM task_metrics;`,
         expected: { columns: ["tasks", "input_rows"], rows: [[8, 19750000]] },
       },
     },
+    {
+      id: "sql-l6-distributed-execution-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the single slowest task as \`(stage_id, task_id, duration_s)\`, over \`task_metrics\`.`,
+      starterCode: `-- The one task that took longest.
+SELECT stage_id, task_id, duration_s
+FROM task_metrics
+;`,
+      hints: ["`ORDER BY duration_s DESC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT stage_id, task_id, duration_s
+FROM task_metrics
+ORDER BY duration_s DESC, stage_id, task_id
+LIMIT 1;`,
+      singleFile: {
+        seedSql: TASK_METRICS_SEED,
+        expected: { columns: ["stage_id", "task_id", "duration_s"], rows: [[1, 3, 47]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
