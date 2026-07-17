@@ -51,7 +51,9 @@ export function LevelSummaryRail({
   return (
     <aside className="flex flex-col gap-5 lg:sticky lg:top-20 lg:self-start">
       <div>
-        <p className="text-accent text-xs font-semibold tracking-[0.18em] uppercase">{eyebrow}</p>
+        <p className="text-accent-strong text-xs font-semibold tracking-[0.18em] uppercase">
+          {eyebrow}
+        </p>
         <h1 className="text-foreground mt-1 text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="text-muted-foreground mt-1.5 text-sm text-pretty">{tagline}</p>
       </div>
@@ -93,7 +95,7 @@ export function LevelSummaryRail({
         <div>
           <Link
             href={firstLessonHref}
-            className="border-accent/40 bg-accent/10 text-accent hover:bg-accent/15 group flex h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors"
+            className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/15 group flex h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors"
           >
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
             Review level
