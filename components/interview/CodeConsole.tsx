@@ -157,8 +157,11 @@ function getErrorType(
     lowerError.includes("invalid syntax") ||
     lowerError.includes("unterminated string") ||
     lowerError.includes("missing )") ||
-    lowerError.includes("missing }") ||
-    lowerError.includes("expected")
+    lowerError.includes("missing }")
+    // NB: a bare "expected" is NOT a syntax signal — assert runners report failures as
+    // "expected X got Y". Real syntax errors that say "expected" also carry syntaxerror/
+    // indentationerror/unexpected token above, so they still land here. The logic bucket
+    // below owns a lone "expected".
   ) {
     return "syntax"
   }
