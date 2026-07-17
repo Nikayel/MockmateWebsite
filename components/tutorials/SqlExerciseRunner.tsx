@@ -14,6 +14,7 @@ import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
 import { useExerciseRun } from "./useExerciseRun"
 import { isSqlResultSet, type SqlExercise } from "@/lib/tutorials/types"
+import { LessonNotice } from "./LessonNotice"
 
 /**
  * Single-query SQL runner (L1/L2): one SQL editor, graded in-browser via the SAME `useExerciseRun`
@@ -181,12 +182,9 @@ export function SqlExerciseRunner({
       <HintList hints={hints.slice(0, hintsShown)} total={hints.length} />
 
       {(emptyWarning || runError) && (
-        <p
-          role="alert"
-          className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300"
-        >
+        <LessonNotice>
           {emptyWarning ? "Write your query first, then run it." : runError}
-        </p>
+        </LessonNotice>
       )}
 
       {(actualSet || showExpected) && (
