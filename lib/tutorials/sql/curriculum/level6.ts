@@ -2413,7 +2413,24 @@ LIMIT 1;`,
         expected: { columns: ["stage_id", "task_id", "duration_s"], rows: [[1, 3, 47]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-distributed-execution-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total shuffle bytes written across the whole job in GB as \`(shuffle_gb)\`, over \`task_metrics\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
+      starterCode: `-- Sum every task's shuffle write.
+SELECT
+FROM task_metrics;`,
+      hints: [
+        "`SUM(shuffle_write_bytes) / 1000000000.0`.",
+        "`ROUND(..., 2)` and alias `shuffle_gb`.",
+      ],
+      referenceSolution: `SELECT ROUND(SUM(shuffle_write_bytes) / 1000000000.0, 2) AS shuffle_gb
+FROM task_metrics;`,
+      singleFile: {
+        seedSql: TASK_METRICS_SEED,
+        expected: { columns: ["shuffle_gb"], rows: [[0.36]] },
+      },
+    },
   ],
 }
 
