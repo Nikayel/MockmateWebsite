@@ -1919,6 +1919,24 @@ FROM partition_files;`,
         expected: { columns: ["total_files"], rows: [[251]] },
       },
     },
+    {
+      id: "sql-l6-choosing-partition-key-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the partition with the smallest average file as \`(partition_key, avg_file_mb)\`, over \`partition_files\`. The average is total bytes divided by file count, in MB (1 MB = 1,000,000 bytes), rounded to 2 decimals.`,
+      starterCode: `-- The single worst small-files offender.
+SELECT partition_key, ROUND(total_bytes * 1.0 / file_count / 1000000.0, 2) AS avg_file_mb
+FROM partition_files
+;`,
+      hints: ["`ORDER BY total_bytes * 1.0 / file_count ASC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT partition_key, ROUND(total_bytes * 1.0 / file_count / 1000000.0, 2) AS avg_file_mb
+FROM partition_files
+ORDER BY total_bytes * 1.0 / file_count ASC, partition_key
+LIMIT 1;`,
+      singleFile: {
+        seedSql: PARTITION_FILES_SEED,
+        expected: { columns: ["partition_key", "avg_file_mb"], rows: [["dt=2026-01-04", 0.5]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
