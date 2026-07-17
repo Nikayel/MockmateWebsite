@@ -2589,6 +2589,26 @@ WHERE stage_id = 1;`,
         expected: { columns: ["max_s", "min_s"], rows: [[47, 8]] },
       },
     },
+    {
+      id: "sql-l6-skew-and-joins-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the fact table and its size in GB as \`(table_name, size_gb)\`, over \`join_inputs\`. Round \`size_gb\` to 2 decimals (1 GB = 1,000,000,000 bytes).`,
+      starterCode: `-- The big side of the join.
+SELECT table_name, ROUND(size_bytes / 1000000000.0, 2) AS size_gb
+FROM join_inputs
+;`,
+      hints: [
+        "Filter `WHERE role = 'fact'`.",
+        "That is the table that must never be shuffled needlessly.",
+      ],
+      referenceSolution: `SELECT table_name, ROUND(size_bytes / 1000000000.0, 2) AS size_gb
+FROM join_inputs
+WHERE role = 'fact';`,
+      singleFile: {
+        seedSql: JOIN_INPUTS_SEED,
+        expected: { columns: ["table_name", "size_gb"], rows: [["events", 48]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
