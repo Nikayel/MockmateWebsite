@@ -105,7 +105,7 @@ function buildScorerPrompt(input: BugfixSemanticScorerInput): string {
   const { deterministicSubScores: d, evidenceSummary: e, rootCauseRubric, bugDescription } = input
 
   return `
-You are scoring a candidate's bugfix session. You have 11 pre-computed deterministic signal
+You are scoring a candidate's bugfix session. You have 7 pre-computed deterministic signal
 scores and must produce 4 semantic scores that require language understanding.
 
 ═══ DETERMINISTIC SIGNALS (computed from observable behavior) ═══
