@@ -1058,6 +1058,24 @@ ORDER BY pct_of_file DESC;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-rows-vs-columns-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the whole file's compressed size in MB as \`(file_mb)\`, over \`parquet_column_stats\`. Treat 1 MB as 1,000,000 bytes, rounded to 2 decimals.`,
+      starterCode: `-- Sum every column chunk's compressed size.
+SELECT
+FROM parquet_column_stats;`,
+      hints: ["`SUM(compressed_bytes) / 1000000.0`.", "`ROUND(..., 2)` and alias `file_mb`."],
+      referenceSolution: `SELECT ROUND(SUM(compressed_bytes) / 1000000.0, 2) AS file_mb
+FROM parquet_column_stats;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        expected: { columns: ["file_mb"], rows: [[296]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const compressionEncoding: SqlLesson = {
