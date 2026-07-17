@@ -60,9 +60,11 @@ export function withBugfixIncidentDefaults(scenario: BugFixScenario): BugFixScen
   return {
     ...scenario,
     bugfixKind: scenario.bugfixKind || (workspace ? "real-codebase" : "micro-debugging"),
-    userReport:
-      scenario.userReport ||
-      `${scenario.description}. The candidate should investigate the incident without being handed the root cause.`,
+    // Fall back to the description alone. The previous default appended "The candidate
+    // should investigate ... without being handed the root cause", which is exactly the
+    // meta-commentary USERREPORT_ANTI_PATTERNS rejects — so the defaulter produced text its
+    // own validator would flag.
+    userReport: scenario.userReport || scenario.description,
     observedSymptoms: scenario.observedSymptoms || [scenario.expectedBehavior],
     reproductionSteps: scenario.reproductionSteps || [
       docs.length > 0 ? `Read ${docs[0]} for product context.` : "Read the incident context.",
@@ -164,8 +166,17 @@ export function validateBugfixScenarioQuality(scenario: BugFixScenario): BugfixQ
   }
 
   const rootCauseText = scenario.bugDescription.trim().toLowerCase()
+  // Every field the candidate can read, not just the problem statement and workspace files.
+  // A root-cause leak in the userReport, task, or a symptom/step list is just as damaging.
   const candidateVisibleTexts = [
     { field: "problemStatement", text: scenario.problemStatement },
+    { field: "description", text: scenario.description },
+    { field: "userReport", text: scenario.userReport ?? "" },
+    { field: "task", text: scenario.task ?? "" },
+    { field: "observedSymptoms", text: (scenario.observedSymptoms ?? []).join("\n") },
+    { field: "reproductionSteps", text: (scenario.reproductionSteps ?? []).join("\n") },
+    { field: "successCriteria", text: (scenario.successCriteria ?? []).join("\n") },
+    { field: "visibleLogs", text: (scenario.visibleLogs ?? []).join("\n") },
     ...workspace.files
       .filter((file) => !file.hidden)
       .map((file) => ({

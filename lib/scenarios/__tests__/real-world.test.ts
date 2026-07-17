@@ -7,6 +7,7 @@ import realWorldScenarios, {
   realWorldSystemDesignScenarios,
 } from "../../scenarios-realworld"
 import { scenarios } from "../../scenarios"
+import { bugfixPackScenarios } from "../real-world/bugfix/packs"
 import { validateBugfixScenarioQuality } from "../bugfix-quality"
 import { validateWorkspaceScenario, isWorkspaceScenario } from "../../workspace-execution"
 
@@ -36,10 +37,13 @@ describe("real-world scenario modules", () => {
     expect(realWorldScenarios.realWorldSystemDesignScenarios).toBe(realWorldSystemDesignScenarios)
   })
 
-  it("only mounts runnable real-world bugfix scenarios in the public registry", () => {
+  it("mounts the legacy bugfix bank plus the stdout-oracle packs in the public registry", () => {
+    // The packs are now reachable from the scenario browser (spread into the eager list in
+    // lib/scenarios.ts), so the public bugfix registry is the legacy bank followed by the packs.
+    const packIds = bugfixPackScenarios.map((scenario) => scenario.id)
     expect(
       scenarios.filter((scenario) => scenario.type === "bugfix").map((scenario) => scenario.id)
-    ).toEqual(publicBugfixIds)
+    ).toEqual([...publicBugfixIds, ...packIds])
   })
 
   it("exports complete scenario records for consumers", () => {
