@@ -1252,6 +1252,27 @@ FROM parquet_column_stats;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-compression-encoding-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the single best-compressing column and its ratio as \`(column_name, ratio)\`, over \`parquet_column_stats\`. The ratio is uncompressed divided by compressed, rounded to 2 decimals.`,
+      starterCode: `-- The column that shrinks the most.
+SELECT column_name, ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS ratio
+FROM parquet_column_stats
+;`,
+      hints: ["`ORDER BY` the ratio `DESC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT column_name, ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS ratio
+FROM parquet_column_stats
+ORDER BY uncompressed_bytes * 1.0 / compressed_bytes DESC, column_name
+LIMIT 1;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        expected: { columns: ["column_name", "ratio"], rows: [["country", 40]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const rowGroupsPushdown: SqlLesson = {
