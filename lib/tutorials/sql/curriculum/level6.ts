@@ -989,6 +989,29 @@ ORDER BY tables DESC, file_format;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-lake-warehouse-catalog-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns the distinct databases that own at least one non-Parquet table as \`(db_name)\`, alphabetical, over \`glue_catalog\`.`,
+      starterCode: `-- Databases that still have a non-Parquet table to migrate.
+SELECT DISTINCT db_name
+FROM glue_catalog
+;`,
+      hints: [
+        "`WHERE file_format <> 'parquet'`.",
+        "`SELECT DISTINCT db_name`, `ORDER BY db_name`.",
+      ],
+      referenceSolution: `SELECT DISTINCT db_name
+FROM glue_catalog
+WHERE file_format <> 'parquet'
+ORDER BY db_name;`,
+      singleFile: {
+        seedSql: GLUE_CATALOG_SEED,
+        orderMatters: true,
+        expected: { columns: ["db_name"], rows: [["analytics"], ["finance"]] },
+      },
+    },
   ],
 }
 
