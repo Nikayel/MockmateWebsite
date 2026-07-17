@@ -1733,6 +1733,24 @@ FROM partition_catalog;`,
         expected: { columns: ["total_gb", "total_rows"], rows: [[3.94, 39400000]] },
       },
     },
+    {
+      id: "sql-l6-what-is-a-partition-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the largest partition by size as \`(dt, size_mb)\`, over \`partition_catalog\`. Round \`size_mb\` to the nearest MB (1 MB = 1,000,000 bytes).`,
+      starterCode: `-- The single biggest day.
+SELECT dt, ROUND(size_bytes / 1000000.0, 0) AS size_mb
+FROM partition_catalog
+;`,
+      hints: ["`ORDER BY size_bytes DESC`.", "`LIMIT 1`."],
+      referenceSolution: `SELECT dt, ROUND(size_bytes / 1000000.0, 0) AS size_mb
+FROM partition_catalog
+ORDER BY size_bytes DESC, dt
+LIMIT 1;`,
+      singleFile: {
+        seedSql: PARTITION_CATALOG_SEED,
+        expected: { columns: ["dt", "size_mb"], rows: [["2026-01-05", 700]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
