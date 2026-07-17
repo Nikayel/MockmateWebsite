@@ -1473,6 +1473,29 @@ FROM row_group_stats;`,
         expected: { columns: ["row_groups", "total_rows"], rows: [[5, 460000]] },
       },
     },
+    {
+      id: "sql-l6-row-groups-pushdown-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the row group whose range contains \`order_id\` 250000 as \`(rg_id, min_order_id, max_order_id)\`, over \`row_group_stats\`.`,
+      starterCode: `-- The row group whose [min, max] contains 250000.
+SELECT rg_id, min_order_id, max_order_id
+FROM row_group_stats
+;`,
+      hints: [
+        "`WHERE 250000 BETWEEN min_order_id AND max_order_id`.",
+        "Only one row group covers a given id in a sorted file.",
+      ],
+      referenceSolution: `SELECT rg_id, min_order_id, max_order_id
+FROM row_group_stats
+WHERE 250000 BETWEEN min_order_id AND max_order_id;`,
+      singleFile: {
+        seedSql: ROW_GROUP_STATS_SEED,
+        expected: {
+          columns: ["rg_id", "min_order_id", "max_order_id"],
+          rows: [[2, 200001, 300000]],
+        },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
