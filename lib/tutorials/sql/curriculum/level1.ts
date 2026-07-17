@@ -1010,14 +1010,16 @@ Worked example:
 \`\`\`sql
 SELECT order_id, order_ts, total_cents
 FROM orders
-ORDER BY order_ts DESC, total_cents DESC;
+ORDER BY order_ts DESC, total_cents DESC, order_id ASC;
 \`\`\`
+
+Three rows share the newest-but-one timestamp, so \`total_cents DESC\` separates the 8000 row from the two 5000 rows. But those two 5000 rows tie on *both* keys, so \`order_id ASC\` is what finally pins them: without it, their relative order is whatever the engine happens to produce.
 
 Anatomy:
 
 \`\`\`
-ORDER BY  order_ts DESC ,  total_cents DESC
-          primary key       tie-breaker
+ORDER BY  order_ts DESC ,   total_cents DESC ,   order_id ASC
+          primary sort key  secondary key        unique tie-breaker
           DESC = high to low ; ASC (default) = low to high
 \`\`\`
 
@@ -1030,7 +1032,7 @@ ORDER BY  order_ts DESC ,  total_cents DESC
 **Recap.** \`ORDER BY\` makes output deterministic; add a unique tie-breaker column, and be explicit about NULL placement across dialects.`,
     demoCode: `SELECT order_id, order_ts, total_cents
 FROM orders
-ORDER BY order_ts DESC, total_cents DESC;`,
+ORDER BY order_ts DESC, total_cents DESC, order_id ASC;`,
     demoSeedSql: `CREATE TABLE orders (
   order_id    INTEGER,
   order_ts    TEXT,      -- ISO-8601, may repeat
