@@ -2088,6 +2088,24 @@ FROM query_log
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-bucketing-and-the-full-scan-trap-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total number of users across all buckets as \`(users)\`, over \`user_buckets\`.`,
+      starterCode: `-- Sum the per-bucket user counts.
+SELECT
+FROM user_buckets;`,
+      hints: ["`SUM(user_count)`.", "Alias it `users`."],
+      referenceSolution: `SELECT SUM(user_count) AS users
+FROM user_buckets;`,
+      singleFile: {
+        seedSql: USER_BUCKETS_SEED,
+        expected: { columns: ["users"], rows: [[1775000]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 // ---------------------------------------------------------------------------
