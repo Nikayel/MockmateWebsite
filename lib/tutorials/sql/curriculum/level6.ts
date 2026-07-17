@@ -2092,7 +2092,7 @@ FROM query_log
     {
       id: "sql-l6-bucketing-and-the-full-scan-trap-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total number of users across all buckets as \`(users)\`, over \`user_buckets\`.`,
+      prompt: `**Easy.** Write a query that returns the total number of users across all buckets as \`(users)\`, over \`user_buckets\`.`,
       starterCode: `-- Sum the per-bucket user counts.
 SELECT
 FROM user_buckets;`,
@@ -2107,7 +2107,7 @@ FROM user_buckets;`,
     {
       id: "sql-l6-bucketing-and-the-full-scan-trap-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the largest (skewed) bucket as \`(bucket_id, size_mb)\`, over \`user_buckets\`. Round \`size_mb\` to the nearest MB (1 MB = 1,000,000 bytes).`,
+      prompt: `**Medium.** Write a query that returns the largest (skewed) bucket as \`(bucket_id, size_mb)\`, over \`user_buckets\`. Round \`size_mb\` to the nearest MB (1 MB = 1,000,000 bytes).`,
       starterCode: `-- The one bucket a mega-key skewed.
 SELECT bucket_id, ROUND(size_bytes / 1000000.0, 0) AS size_mb
 FROM user_buckets
@@ -2125,7 +2125,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-bucketing-and-the-full-scan-trap-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the ids of the buckets larger than the average bucket size as \`(bucket_id)\`, ascending, over \`user_buckets\`.`,
+      prompt: `**Hard.** Write a query that returns the ids of the buckets larger than the average bucket size as \`(bucket_id)\`, ascending, over \`user_buckets\`.`,
       starterCode: `-- Buckets bigger than the average (a skew tell).
 SELECT bucket_id
 FROM user_buckets
