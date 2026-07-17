@@ -6,6 +6,11 @@ in `lib/tutorials/sql/curriculum/level6.ts` and registered in `SQL_LEVELS`. Ever
 teach demos and `csdiagram` fences pass their guards; typecheck, lint, and the full test suite
 (1555 tests) are green. `registry.test.ts` re-baselined to six levels.
 
+Each lesson also carries **4 optional extra-practice drills** (Easy/Medium/Medium/Hard, 56 total)
+that reuse the lesson's simulated catalog, plus a **"Common mistake" callout** in every teach
+section naming that concept's top pitfall. Drills are guarded by `extra-practice.test.ts` (each
+reference reproduces its `expected`) and the prompt-standard test (each opens with a difficulty tag).
+
 A 5-lens review council (coverage, accuracy, pedagogy, exercise-design, coherence) with
 adversarial verification surfaced 36 verified findings (0 high, 9 medium, 27 low). The
 substantive ones were actioned: a **14th lesson, Data Quality Checks** was added (Silver was
