@@ -1,10 +1,21 @@
 # SQL Level 6 — Cloud & Data Engineering Foundations
 
-**Status: SHIPPED (2026-07-17).** All 13 lessons across 4 modules authored in
-`lib/tutorials/sql/curriculum/level6.ts` and registered in `SQL_LEVELS`. Every single-file
+**Status: SHIPPED + COUNCIL-ITERATED (2026-07-17).** All 14 lessons across 4 modules authored
+in `lib/tutorials/sql/curriculum/level6.ts` and registered in `SQL_LEVELS`. Every single-file
 `expected` set is sql.js-generated and re-checked by `single-file-reference-solutions.test.ts`;
 teach demos and `csdiagram` fences pass their guards; typecheck, lint, and the full test suite
-(1551 tests) are green. `registry.test.ts` re-baselined to six levels.
+(1555 tests) are green. `registry.test.ts` re-baselined to six levels.
+
+A 5-lens review council (coverage, accuracy, pedagogy, exercise-design, coherence) with
+adversarial verification surfaced 36 verified findings (0 high, 9 medium, 27 low). The
+substantive ones were actioned: a **14th lesson, Data Quality Checks** was added (Silver was
+asserted "validated" but no check was taught or graded); L10's practice was redesigned to
+actually **model the full-scan trap**; and the skew exercise's mean-based ratio was reconciled
+with the AQE 5x-median rule it teaches. Plus a pass of verified accuracy/clarity fixes (S3
+strong consistency, Glacier retrieval latency, the part-1/2/3 device, shuffle-write attribution,
+batch-vs-streaming, and more). Deliberately NOT done (verifier-rejected scope creep): adding
+window/self-join exercises (the level's SQL simplicity is intentional; L1-L5 own SQL
+progression) and any loader-execution idempotency test (sql.js cannot simulate a re-run).
 
 ## Why this level exists (the gap)
 
@@ -51,7 +62,7 @@ the existing routing, registry, and test guards cover it with zero new wiring.
 - Content rules: **no em dashes** in learner-facing prose; every Apply/Practice prompt
   **leads with the deliverable** ("Write a query that returns...").
 
-## Modules & lessons (13)
+## Modules & lessons (14)
 
 ### 6.1 The Cloud Data Platform  (`sql-l6-cloud-platform`)
 1. `sql-l6-cloud-and-the-de-stack` — what the cloud is (region/AZ, managed services,
@@ -87,9 +98,12 @@ the existing routing, registry, and test guards cover it with zero new wiring.
     Query `task_metrics`: per-stage task count, shuffle bytes, avg duration.
 12. `sql-l6-skew-and-joins` — data skew/stragglers + broadcast vs shuffle join (10 MB
     threshold). Detect the straggler; reason about broadcast eligibility.
-13. `sql-l6-pipelines-orchestration` — DAGs, ETL vs ELT, idempotency, backfill,
-    freshness/SLA, medallion. Capstone over `pipeline_runs`: success rate, late/stale runs,
+13. `sql-l6-pipelines-orchestration` — DAGs, ETL vs ELT, batch vs streaming, idempotency,
+    backfill, freshness/SLA, medallion. Over `pipeline_runs`: success rate, late/stale runs,
     SLA breaches.
+14. `sql-l6-data-quality-checks` — (added by the council) the five check families +
+    quality gates (write-audit-publish). Grades duplicate detection (`GROUP BY … HAVING`) and
+    a null-rate completeness gate over `staged_events`.
 
 ## Simulated-table conventions
 
