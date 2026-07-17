@@ -218,6 +218,27 @@ FROM platform_services;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-cloud-and-the-de-stack-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the whole platform's total monthly cost as \`(platform_cost)\`, over \`platform_services\`.`,
+      starterCode: `-- One number: the sum of every service's monthly cost.
+SELECT
+FROM platform_services;`,
+      hints: [
+        "`SUM(monthly_cost_usd)` over the whole table.",
+        "Alias the total exactly `platform_cost`.",
+      ],
+      referenceSolution: `SELECT SUM(monthly_cost_usd) AS platform_cost
+FROM platform_services;`,
+      singleFile: {
+        seedSql: PLATFORM_SEED,
+        expected: { columns: ["platform_cost"], rows: [[8920]] },
+      },
+    },
+    // MORE-L1
+  ],
 }
 
 const objectVsBlockStorage: SqlLesson = {
