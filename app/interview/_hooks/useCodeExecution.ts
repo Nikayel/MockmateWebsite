@@ -51,9 +51,6 @@ export interface UseCodeExecutionOptions {
   chatMessages: ChatMessage[]
   interviewerMessages: ChatMessage[]
   consoleLogs: ConsoleLogEntry[]
-  bugfixHypothesis: string
-  bugfixRootCause: string
-  bugfixPrevention: string
   realInterviewMode: boolean
   strictTimeLimit: number | null
   currentSessionId: string | null
@@ -113,9 +110,6 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
     chatMessages,
     interviewerMessages,
     consoleLogs,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     realInterviewMode,
     strictTimeLimit,
     currentSessionId,
@@ -412,9 +406,6 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
               activeWorkspacePath,
               consoleLogs,
               bugfixEvidenceEvents: buildBugfixEvidencePayload(),
-              bugfixHypothesis,
-              bugfixRootCause,
-              bugfixPrevention,
               isPostInterviewDiscussion: true,
               realInterviewMode,
               strictTimeLimit,

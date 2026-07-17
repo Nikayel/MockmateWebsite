@@ -72,9 +72,6 @@ export interface UseSessionReopenOptions {
   setTestSummary: Dispatch<SetStateAction<TestSummary>>
   setConsoleLogs: Dispatch<SetStateAction<ConsoleLogEntry[]>>
   setBugfixEvidenceEvents: Dispatch<SetStateAction<BugfixEvidenceEvent[]>>
-  setBugfixHypothesis: Dispatch<SetStateAction<string>>
-  setBugfixRootCause: Dispatch<SetStateAction<string>>
-  setBugfixPrevention: Dispatch<SetStateAction<string>>
   setShowPostInterviewDiscussion: Dispatch<SetStateAction<boolean>>
 
   // Refs
@@ -320,9 +317,6 @@ Let's continue!`
               opts.setBugfixEvidenceEvents(
                 (savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || []
               )
-              opts.setBugfixHypothesis(savedState.bugfixHypothesis || "")
-              opts.setBugfixRootCause(savedState.bugfixRootCause || "")
-              opts.setBugfixPrevention(savedState.bugfixPrevention || "")
               opts.recordedBugfixEditPathsRef.current = new Set(
                 ((savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || [])
                   .filter((event) => event.type === "file_edited" && event.filePath)

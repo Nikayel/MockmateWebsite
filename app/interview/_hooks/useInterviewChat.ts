@@ -50,9 +50,6 @@ export interface UseInterviewChatOptions {
   experienceLevel: string
   showPostInterviewDiscussion: boolean
   targetCompany: string | null
-  bugfixHypothesis: string
-  bugfixRootCause: string
-  bugfixPrevention: string
 
   // ---- state setters (page owns the state) ----
   setChatInput: Dispatch<SetStateAction<string>>
@@ -162,9 +159,6 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     experienceLevel,
     showPostInterviewDiscussion,
     targetCompany,
-    bugfixHypothesis,
-    bugfixRootCause,
-    bugfixPrevention,
     setChatInput,
     setInterviewerInput,
     setChatMessages,
@@ -287,14 +281,6 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             scenarioTitle: selectedScenario?.title,
             scenarioType: selectedScenario?.type,
             guidedLab: getGuidedChatState(selectedScenario?.id),
-            bugfixReflection:
-              selectedScenario?.type === "bugfix"
-                ? {
-                    hypothesis: bugfixHypothesis,
-                    rootCause: bugfixRootCause,
-                    prevention: bugfixPrevention,
-                  }
-                : undefined,
             scenarioCompany: targetCompany, // Target company for RAG context
             isProactive: false,
             isPostInterview: showPostInterviewDiscussion,

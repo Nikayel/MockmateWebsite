@@ -57,9 +57,6 @@ export interface UseInterviewFeedbackOptions {
   workspaceContext: WorkspaceContextFile[]
   activeWorkspacePath: string | null
   consoleLogs: ConsoleLogEntry[]
-  bugfixHypothesis: string
-  bugfixRootCause: string
-  bugfixPrevention: string
   conversationTracker: ConversationTracker
   revealedHints: number
   revealedHintIndices: Set<number>
@@ -151,9 +148,6 @@ export function useInterviewFeedback(
           activeWorkspacePath: opts.activeWorkspacePath,
           consoleLogs: opts.consoleLogs,
           bugfixEvidenceEvents: bugfixEvidencePayload,
-          bugfixHypothesis: opts.bugfixHypothesis,
-          bugfixRootCause: opts.bugfixRootCause,
-          bugfixPrevention: opts.bugfixPrevention,
         })
       } catch (markError) {
         console.error("Failed to mark session as evaluating:", markError)
@@ -293,9 +287,6 @@ export function useInterviewFeedback(
             elapsedTimeSeconds: opts.elapsedTime,
             bugfixEvidenceEvents: bugfixEvidencePayload,
             bugfixExpectedTouchedFiles,
-            bugfixHypothesis: opts.bugfixHypothesis,
-            bugfixRootCause: opts.bugfixRootCause,
-            bugfixPrevention: opts.bugfixPrevention,
             bugfixRootCauseRubric:
               opts.selectedScenario?.type === "bugfix"
                 ? (opts.selectedScenario as BugFixScenario).rootCauseRubric
@@ -352,9 +343,6 @@ export function useInterviewFeedback(
             // Mark as processing - persist endpoint will update to "complete"
             feedbackStatus: "processing",
             bugfixEvidenceEvents: bugfixEvidencePayload,
-            bugfixHypothesis: opts.bugfixHypothesis,
-            bugfixRootCause: opts.bugfixRootCause,
-            bugfixPrevention: opts.bugfixPrevention,
           })
 
           opts

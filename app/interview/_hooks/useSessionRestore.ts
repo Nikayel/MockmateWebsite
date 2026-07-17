@@ -40,9 +40,6 @@ export interface UseSessionRestoreOptions {
   setActiveWorkspacePath: Dispatch<SetStateAction<string | null>>
   setConsoleLogs: Dispatch<SetStateAction<ConsoleLogEntry[]>>
   setBugfixEvidenceEvents: Dispatch<SetStateAction<BugfixEvidenceEvent[]>>
-  setBugfixHypothesis: Dispatch<SetStateAction<string>>
-  setBugfixRootCause: Dispatch<SetStateAction<string>>
-  setBugfixPrevention: Dispatch<SetStateAction<string>>
   setElapsedTime: (value: number) => void
   setTestSummary: Dispatch<SetStateAction<TestSummary>>
   setShowPostInterviewDiscussion: Dispatch<SetStateAction<boolean>>
@@ -207,9 +204,6 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
                     activeWorkspacePath: data.session.session_state.active_workspace_path,
                     consoleLogs: data.session.session_state.console_logs,
                     bugfixEvidenceEvents: data.session.session_state.bugfix_evidence_events,
-                    bugfixHypothesis: data.session.session_state.bugfix_hypothesis,
-                    bugfixRootCause: data.session.session_state.bugfix_root_cause,
-                    bugfixPrevention: data.session.session_state.bugfix_prevention,
                     isPostInterviewDiscussion:
                       data.session.session_state.is_post_interview_discussion,
                     savedAt: data.session.session_state.saved_at,
@@ -245,9 +239,6 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
           opts.setBugfixEvidenceEvents(
             (remoteData.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || []
           )
-          opts.setBugfixHypothesis(remoteData.bugfixHypothesis || "")
-          opts.setBugfixRootCause(remoteData.bugfixRootCause || "")
-          opts.setBugfixPrevention(remoteData.bugfixPrevention || "")
           opts.recordedBugfixEditPathsRef.current = new Set(
             ((remoteData.bugfixEvidenceEvents as BugfixEvidenceEvent[]) || [])
               .filter((event) => event.type === "file_edited" && event.filePath)
@@ -295,9 +286,6 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
           }
           opts.setConsoleLogs(localData.consoleLogs || [])
           opts.setBugfixEvidenceEvents(localData.bugfixEvidenceEvents || [])
-          opts.setBugfixHypothesis(localData.bugfixHypothesis || "")
-          opts.setBugfixRootCause(localData.bugfixRootCause || "")
-          opts.setBugfixPrevention(localData.bugfixPrevention || "")
           opts.recordedBugfixEditPathsRef.current = new Set(
             (localData.bugfixEvidenceEvents || [])
               .filter(

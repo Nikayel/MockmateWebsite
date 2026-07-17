@@ -33,9 +33,6 @@ export interface UseInterviewAutosaveOptions {
   activeWorkspacePath: string | null
   consoleLogs: ConsoleLogEntry[]
   bugfixEvidenceEvents: BugfixEvidenceEvent[]
-  bugfixHypothesis: string
-  bugfixRootCause: string
-  bugfixPrevention: string
   showPostInterviewDiscussion: boolean
 
   // Read-but-omitted from deps (see dep array below)
@@ -83,9 +80,6 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
           activeWorkspacePath: opts.activeWorkspacePath,
           consoleLogs: opts.consoleLogs,
           bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
-          bugfixHypothesis: opts.bugfixHypothesis,
-          bugfixRootCause: opts.bugfixRootCause,
-          bugfixPrevention: opts.bugfixPrevention,
           isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
           timestamp: Date.now(),
         }
@@ -109,9 +103,6 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
               activeWorkspacePath: opts.activeWorkspacePath,
               consoleLogs: opts.consoleLogs,
               bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
-              bugfixHypothesis: opts.bugfixHypothesis,
-              bugfixRootCause: opts.bugfixRootCause,
-              bugfixPrevention: opts.bugfixPrevention,
               isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
               realInterviewMode: opts.realInterviewMode,
               strictTimeLimit: opts.strictTimeLimit,
@@ -142,9 +133,6 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   activeWorkspacePath: opts.activeWorkspacePath,
                   consoleLogs: opts.consoleLogs,
                   bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
-                  bugfixHypothesis: opts.bugfixHypothesis,
-                  bugfixRootCause: opts.bugfixRootCause,
-                  bugfixPrevention: opts.bugfixPrevention,
                   isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
                   realInterviewMode: opts.realInterviewMode,
                   strictTimeLimit: opts.strictTimeLimit,
