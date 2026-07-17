@@ -35,8 +35,7 @@ that span.
 - A series can have a single sample in the window.
 - A series **alerts when its window average is at or above its critical
   threshold**; otherwise it is `OK`.
-- A series with **no samples in the window reports `NO DATA`** — it must never
-  be reported as `OK`.
+- A series with **no samples in the window reports `NO DATA`**.
 
 ## Run it
 ```
