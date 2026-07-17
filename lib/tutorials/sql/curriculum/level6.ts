@@ -1572,6 +1572,8 @@ This is also where **schema evolution** matters: schemas change over time as new
 
 A row group's min and max are just columns you can filter on. The exercises query a \`row_group_stats\` table and compute how many row groups (and bytes) a range filter must read versus the whole file, which is exactly what predicate pushdown does under the hood.
 
+**Common mistake:** expecting predicate pushdown to help on unsorted data. If every row group spans the whole range of values, no group can be skipped and the min/max stats buy you nothing, which is why clustering on the filter column matters.
+
 **Interview nuance:** "how does a query skip data it does not need" is answered at two levels: **partition pruning** skips whole directories by the partition key, and **predicate pushdown** skips row groups inside a file by their min/max stats. Adding "and column projection skips columns you did not select" gives the complete picture of why a columnar lake query is cheap.
 
 > **On a real platform this differs.** Real engines read these min/max stats from the Parquet footer (and per-page indexes) and decide row-group skipping automatically; you never write the skip logic. The \`row_group_stats\` table here exposes those stats as rows so you can compute the skip yourself and see what the engine sees.`,
