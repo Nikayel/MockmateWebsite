@@ -214,6 +214,15 @@ export async function POST(request: NextRequest) {
             )
           : []
 
+      // The semantic scorer judges hypothesis / root cause / prevention from what the
+      // candidate SAID. With no candidate turn (they ran and edited code but never spoke to
+      // the interviewer) there is nothing to judge, and scoring an empty transcript would
+      // return low marks and dock the 28% the redesign moved onto the transcript. Only run
+      // it when the candidate actually spoke; otherwise stay at the neutral floor.
+      const hasCandidateTurn = transcriptMessages.some(
+        (m) => m.role === "user" && m.content.trim().length > 0
+      )
+
       // Pack debrief seal (INTERVIEWER_SPEC.md DEBRIEF): for stdout-oracle packs the
       // grading rubric + ground truth are SERVER-LOADED from the sealed module and
       // override anything the client sent. loadSealedPack returns null for every
@@ -283,7 +292,10 @@ export async function POST(request: NextRequest) {
                 return { silentNotes: [], analysisMetadata: null }
               })
             : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
-          scenarioType === "bugfix" && bugfixEvidenceSummary && bugfixScoreBreakdownPreSemantic
+          scenarioType === "bugfix" &&
+          bugfixEvidenceSummary &&
+          bugfixScoreBreakdownPreSemantic &&
+          hasCandidateTurn
             ? scoreBugfixSemantics({
                 deterministicSubScores: bugfixScoreBreakdownPreSemantic,
                 evidenceSummary: bugfixEvidenceSummary,
