@@ -259,7 +259,24 @@ LIMIT 1;`,
         },
       },
     },
-    // MORE-L1
+    {
+      id: "sql-l6-cloud-and-the-de-stack-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the compute layer's share of total platform cost as a percentage \`(compute_pct)\`, rounded to 2 decimals, over \`platform_services\`.`,
+      starterCode: `-- Compute-layer cost as a percent of the whole platform.
+SELECT
+FROM platform_services;`,
+      hints: [
+        "Conditional sum: `SUM(CASE WHEN layer = 'compute' THEN monthly_cost_usd ELSE 0 END)`.",
+        "Divide by `SUM(monthly_cost_usd)`, multiply by 100.0, and `ROUND(..., 2)`.",
+      ],
+      referenceSolution: `SELECT ROUND(100.0 * SUM(CASE WHEN layer = 'compute' THEN monthly_cost_usd ELSE 0 END) / SUM(monthly_cost_usd), 2) AS compute_pct
+FROM platform_services;`,
+      singleFile: {
+        seedSql: PLATFORM_SEED,
+        expected: { columns: ["compute_pct"], rows: [[73.99]] },
+      },
+    },
   ],
 }
 
