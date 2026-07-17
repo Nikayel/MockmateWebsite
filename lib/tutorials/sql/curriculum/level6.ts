@@ -1974,6 +1974,42 @@ ORDER BY file_count DESC, dt;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-what-is-a-partition-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns each partition with the running total of bytes up to and including it, in date order, as \`(dt, running_bytes)\`, over \`partition_catalog\`.`,
+      starterCode: `-- A cumulative scan size as you add partitions oldest-first.
+SELECT dt,
+       -- running SUM of size_bytes ordered by dt
+       0 AS running_bytes
+FROM partition_catalog
+ORDER BY dt;`,
+      hints: [
+        "A window function: `SUM(size_bytes) OVER (ORDER BY dt)`.",
+        "Alias it `running_bytes` and `ORDER BY dt`.",
+      ],
+      referenceSolution: `SELECT dt,
+       SUM(size_bytes) OVER (ORDER BY dt) AS running_bytes
+FROM partition_catalog
+ORDER BY dt;`,
+      singleFile: {
+        seedSql: PARTITION_CATALOG_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["dt", "running_bytes"],
+          rows: [
+            ["2026-01-01", 520000000],
+            ["2026-01-02", 1060000000],
+            ["2026-01-03", 1670000000],
+            ["2026-01-04", 2170000000],
+            ["2026-01-05", 2870000000],
+            ["2026-01-06", 3350000000],
+            ["2026-01-07", 3940000000],
+          ],
+        },
+      },
+    },
   ],
 }
 
