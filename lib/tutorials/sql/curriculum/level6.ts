@@ -2568,6 +2568,29 @@ ORDER BY size_bytes ASC;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-skew-and-joins-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the slowest and fastest task duration in stage 1 as \`(max_s, min_s)\`, over \`task_metrics\`. Round each to 1 decimal.`,
+      starterCode: `-- The spread of stage-1 task durations (a skew tell).
+SELECT
+FROM task_metrics
+WHERE stage_id = 1;`,
+      hints: [
+        "`MAX(duration_s)` and `MIN(duration_s)`.",
+        "Filter to `stage_id = 1` and round to 1 decimal.",
+      ],
+      referenceSolution: `SELECT ROUND(MAX(duration_s), 1) AS max_s, ROUND(MIN(duration_s), 1) AS min_s
+FROM task_metrics
+WHERE stage_id = 1;`,
+      singleFile: {
+        seedSql: TASK_METRICS_SEED,
+        expected: { columns: ["max_s", "min_s"], rows: [[47, 8]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const pipelinesOrchestration: SqlLesson = {
