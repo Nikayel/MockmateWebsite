@@ -1062,7 +1062,7 @@ ORDER BY pct_of_file DESC;`,
     {
       id: "sql-l6-rows-vs-columns-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the whole file's compressed size in MB as \`(file_mb)\`, over \`parquet_column_stats\`. Treat 1 MB as 1,000,000 bytes, rounded to 2 decimals.`,
+      prompt: `**Easy.** Write a query that returns the whole file's compressed size in MB as \`(file_mb)\`, over \`parquet_column_stats\`. Treat 1 MB as 1,000,000 bytes, rounded to 2 decimals.`,
       starterCode: `-- Sum every column chunk's compressed size.
 SELECT
 FROM parquet_column_stats;`,
@@ -1077,7 +1077,7 @@ FROM parquet_column_stats;`,
     {
       id: "sql-l6-rows-vs-columns-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the single largest column by compressed size as \`(column_name, mb)\`, over \`parquet_column_stats\`. Round \`mb\` to 2 decimals (1 MB = 1,000,000 bytes).`,
+      prompt: `**Medium.** Write a query that returns the single largest column by compressed size as \`(column_name, mb)\`, over \`parquet_column_stats\`. Round \`mb\` to 2 decimals (1 MB = 1,000,000 bytes).`,
       starterCode: `-- The one column that dominates the file.
 SELECT column_name, ROUND(compressed_bytes / 1000000.0, 2) AS mb
 FROM parquet_column_stats
@@ -1095,7 +1095,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-rows-vs-columns-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many columns the file has of each data type as \`(data_type, cols)\`, most common first, over \`parquet_column_stats\`.`,
+      prompt: `**Hard.** Write a query that returns how many columns the file has of each data type as \`(data_type, cols)\`, most common first, over \`parquet_column_stats\`.`,
       starterCode: `-- Column count per data type.
 SELECT data_type, COUNT(*) AS cols
 FROM parquet_column_stats
