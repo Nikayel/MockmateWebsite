@@ -2398,6 +2398,41 @@ ORDER BY bucket_id;`,
         expected: { columns: ["bucket_id"], rows: [[7]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-bucketing-and-the-full-scan-trap-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns each bucket's size deviation from the average bucket, in MB, as \`(bucket_id, dev_mb)\`, most-above-average first, over \`user_buckets\`. Treat 1 MB as 1,000,000 bytes, round to 2 decimals.`,
+      starterCode: `-- How far each bucket sits above or below the mean (the skew).
+SELECT bucket_id
+FROM user_buckets
+;`,
+      hints: [
+        "The mean is a scalar subquery `(SELECT AVG(size_bytes) FROM user_buckets)`.",
+        "`(size_bytes - mean) / 1000000.0` as `dev_mb`; `ORDER BY dev_mb DESC, bucket_id`.",
+      ],
+      referenceSolution: `SELECT bucket_id,
+       ROUND((size_bytes - (SELECT AVG(size_bytes) FROM user_buckets)) / 1000000.0, 2) AS dev_mb
+FROM user_buckets
+ORDER BY dev_mb DESC, bucket_id;`,
+      singleFile: {
+        seedSql: USER_BUCKETS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["bucket_id", "dev_mb"],
+          rows: [
+            [7, 953.75],
+            [5, -124.25],
+            [1, -126.25],
+            [3, -131.25],
+            [0, -136.25],
+            [2, -141.25],
+            [4, -146.25],
+            [6, -148.25],
+          ],
+        },
+      },
+    },
   ],
 }
 
