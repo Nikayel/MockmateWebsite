@@ -145,7 +145,7 @@ The defining feature of the modern platform is that these layers are **decoupled
 
 You do not just build these layers, you operate them, and operating them means asking questions: what does each layer cost, which services are compute versus storage, where is the money going. Those questions are answered by querying a catalog of the platform itself. The exercises in this level do exactly that: you query a stand-in for each layer's own metadata, which is a real data-engineering skill (teams query cost-and-usage reports, storage inventories, and job logs with SQL every day).
 
-**Interview nuance:** when an interviewer asks you to "describe a data platform," the five-layer storage / catalog / compute / orchestration / serving spine is a clean, senior-sounding answer, and naming the decoupling of storage from compute is the detail that signals you actually understand cloud economics.
+**Interview nuance:** when an interviewer asks you to "describe a data platform," the five-layer storage / catalog / compute / orchestration / serving spine is a clean, complete answer, and naming the decoupling of storage from compute is the detail that shows you understand cloud economics.
 
 > **On a real platform this differs.** Here you query one small \`platform_services\` table in SQLite. On AWS the same reasoning runs against the Cost and Usage Report (queried in Athena or loaded into a warehouse), where each row is a service, usage type, and cost. The query shape (group by a layer or service, sum the cost, sort) is identical.`,
     demoSeedSql: PLATFORM_SEED,
@@ -226,7 +226,7 @@ const objectVsBlockStorage: SqlLesson = {
   summary:
     "The three storage shapes every cloud offers (S3, EBS, EFS), the immutable-blob-over-HTTP object model, eleven-nines durability, and why a data lake is files in a bucket.",
   estimatedMinutes: 26,
-  difficulty: "easy",
+  difficulty: "medium",
   skills: [
     "object storage",
     "block storage",
@@ -270,6 +270,8 @@ An object is a file plus its metadata, addressed by a **key** inside a **bucket*
 - **Any engine can read the files.** Because objects are just files behind an HTTP key, Athena, Spark, and a warehouse can all read the same bucket. Storage is decoupled from compute.
 
 The trade is that object storage is **not** a disk. You cannot edit an object in place: a write replaces the whole object (or, with versioning on, adds a new version). There is no "change these 8 bytes." That is fine for a lake, where you write files once and read them many times, and it is exactly why a live transactional database wants EBS, not S3.
+
+S3 is also **strongly read-after-write consistent**. Since December 2020, a read that follows a successful write (a new object or an overwrite) always returns the new bytes, in every Region, at no extra cost. If you hear "S3 is eventually consistent," that is the pre-2021 model and it is obsolete, so do not say it in an interview (only bucket-level configuration changes and the S3 Inventory snapshot are still eventually consistent). One more thing a junior should be able to say out loud: access is not open. Who can read or write a bucket is governed by **IAM and bucket policies**, S3 encrypts objects at rest by default, and columns holding personal data (PII) need extra care. You do not manage that in SQL, but the bucket is not public by default.
 
 One more property worth stating plainly: S3's namespace is **flat**. The slashes in a key only look like folders. \`raw/events/2026-01-02/\` is a **prefix** of the key, not a real directory, and console "folders" are a convenience the UI draws. This matters in the partitioning module, where a layout like \`dt=2026-01-02/\` is just a key prefix that a query engine filters on.
 
@@ -392,7 +394,7 @@ The pattern to internalize:
 - **S3 Standard** is for hot, frequently read data (your active lake and warehouse tables): highest per-GB price, instant retrieval, no minimum.
 - **Standard-Infrequent Access (Standard-IA)** is for data you still need instantly but read rarely (backups, older-but-live tables): cheaper per GB, but it bills a **30-day minimum** and adds a per-GB retrieval fee.
 - **Glacier Instant Retrieval** is archive priced, still milliseconds to read, with a **90-day minimum**.
-- **Glacier Flexible Retrieval** and **Glacier Deep Archive** are the cheapest, but reads take minutes to hours, with **90-** and **180-day** minimums. Deep Archive is the "look at it once a year" compliance tier.
+- **Glacier Flexible Retrieval** reads take minutes to hours (with a **90-day** minimum). **Glacier Deep Archive**, the cheapest "look at it once a year" compliance tier, takes hours to restore (roughly 12 hours standard, up to 48 hours bulk, with a **180-day** minimum).
 
 ## Lifecycle policies do this for you
 
@@ -404,7 +406,7 @@ There is a real trap here, and it is a favorite interview follow-up: **moving co
 
 Cost is just arithmetic over the inventory: size in gigabytes times a per-GB price, summed. That is a join between the object inventory and a small price list, and it is exactly the kind of query a DE writes to justify a lifecycle change. The exercises here compute the current bill per class and the saving from a proposed transition.
 
-**Interview nuance:** asked "you have 10 TB of logs you rarely read but must keep seven years, how do you store it cheaply," the answer is a lifecycle policy that transitions to Glacier Flexible or Deep Archive, and the senior detail is naming the retrieval-latency and minimum-duration trade rather than just saying "use Glacier."
+**Interview nuance:** asked "you have 10 TB of logs you rarely read but must keep seven years, how do you store it cheaply," the answer is a lifecycle policy that transitions to Glacier Flexible or Deep Archive, and the detail that completes the answer is naming the retrieval-latency and minimum-duration trade rather than just saying "use Glacier."
 
 > **On a real platform this differs.** Real per-GB prices vary by Region and change over time, and AWS bills a "GB" as a specific byte count. The \`storage_pricing\` table here uses round, illustrative US prices and treats 1 GB as 1,000,000,000 bytes so the arithmetic stays clean. The query shape (join inventory to price, sum, compare) is the real one.`,
     demoSeedSql: INVENTORY_AND_PRICING_SEED,
@@ -420,7 +422,7 @@ ORDER BY monthly_cost_usd DESC;`,
   apply: {
     id: "sql-l6-storage-classes-lifecycle-apply",
     executionMode: "single-file",
-    prompt: `Write a query that returns the total gigabytes and total monthly cost of each storage class, as \`(storage_class, total_gb, monthly_cost_usd)\`, most expensive first, over \`s3_inventory\` joined to \`storage_pricing(storage_class, usd_per_gb_month)\`.
+    prompt: `Write a query that returns the total gigabytes and total monthly cost of each storage class present in the inventory, as \`(storage_class, total_gb, monthly_cost_usd)\`, most expensive first, over \`s3_inventory\` joined to \`storage_pricing(storage_class, usd_per_gb_month)\`.
 
 Treat 1 GB as 1,000,000,000 bytes. Round \`total_gb\` and \`monthly_cost_usd\` to 2 decimals, and order by \`monthly_cost_usd\` descending.`,
     starterCode: `-- Total GB and monthly cost per storage class, most expensive first.
@@ -459,7 +461,7 @@ ORDER BY monthly_cost_usd DESC;`,
     executionMode: "single-file",
     prompt: `Write a query that returns, for each cold STANDARD object, the monthly saving from moving it to Standard-IA, as \`(object_key, current_cost_usd, ia_cost_usd, monthly_saving_usd)\`, largest saving first, over the same \`s3_inventory\` table.
 
-A cold object is in the \`STANDARD\` class with \`last_access_days\` greater than 90. Standard costs 0.023 per GB-month and Standard-IA costs 0.0125 per GB-month (1 GB = 1,000,000,000 bytes). Round every dollar column to 2 decimals, ordered by \`monthly_saving_usd\` descending.`,
+A cold object is in the \`STANDARD\` class with \`last_access_days\` greater than 90. Standard costs 0.023 per GB-month and Standard-IA costs 0.0125 per GB-month (1 GB = 1,000,000,000 bytes). Round every dollar column to 2 decimals, ordered by \`monthly_saving_usd\` descending. This is the storage-price saving only: Standard-IA also adds a per-GB retrieval fee and a 30-day minimum, which erode it for small or frequently read objects.`,
     starterCode: `-- Saving from moving each cold STANDARD object to Standard-IA, largest first.
 SELECT object_key
   -- current cost at 0.023/GB, IA cost at 0.0125/GB, and the difference
@@ -535,7 +537,7 @@ A **lakehouse** is the newer middle: it layers warehouse features (ACID transact
 
 ## Auditing the catalog with SQL
 
-The catalog is itself a set of tables you can query, and auditing it is real work: which tables are still stored as slow CSV instead of Parquet, which tables have no partitions and will full-scan, which database owns the most tables. The exercises here query a stand-in \`glue_catalog\` to answer exactly those questions.
+The catalog is itself a set of tables you can query, and auditing it is real work: which tables are still stored as slow CSV instead of Parquet, which tables have no partitions and will full-scan, which database owns the most tables. The exercises here query a stand-in \`glue_catalog\` to answer questions like these.
 
 **Interview nuance:** "how would you query a bunch of Parquet files in S3 with SQL, and where does the schema come from" is a direct junior question. The answer is Athena (or Spark or Trino) reading the file locations and column types from the Glue Data Catalog or a Hive metastore. "A table equals files plus a catalog entry" is the sentence that lands it.
 
@@ -684,7 +686,7 @@ A CSV or a JSON file is **row-oriented**: it writes all of row 1, then all of ro
 
 ## What columnar buys you (part 1: column projection)
 
-The first and biggest win is **column projection** (also called column pruning). Because each column is stored as its own contiguous chunk, a query for two columns reads only those two chunks and physically skips the rest of the bytes. On a wide table this is enormous: selecting 2 columns out of 8 might read a few percent of the file, not all of it.
+The first and biggest win is **column projection** (also called column pruning). Because each column is stored as its own contiguous chunk, a query for two columns reads only those two chunks and physically skips the rest of the bytes. On a wide table this is enormous: selecting 2 columns out of 8 might read a few percent of the file, not all of it. How small depends on how wide the table is and how large the columns you skip are, so the win is biggest on very wide tables or when the unselected columns dominate the bytes (as the fat \`url\` column does in the exercise).
 
 This is why \`SELECT *\` is a code smell on a lake. On a row store it costs the same as naming your columns; on a columnar store every extra column you select is more bytes read, and more money on an engine that charges by bytes scanned. Name the columns you need.
 
@@ -789,7 +791,7 @@ const compressionEncoding: SqlLesson = {
   ],
   teach: {
     estimatedMinutes: 13,
-    markdown: `## Why columnar compresses so much better
+    markdown: `## What columnar buys you (part 2: compression)
 
 Storing a column together does more than let you skip columns: it makes the data **compress far better**, because a compressor works best on similar values sitting next to each other. A row store interleaves an integer id, a string country, and a float price on every row, so a general compressor sees noise. A column store hands the compressor a million \`country\` values in a row, and those are extremely repetitive.
 
@@ -966,6 +968,8 @@ Parquet is not the only format, and interviews like to check that you know when 
 \`\`\`
 
 **Parquet** and **ORC** are both columnar and both great for analytics (ORC is strong in the Hive and Trino world). **Avro** is **row-oriented**: it stores whole records together, which is the wrong shape for scanning a few columns but the right shape for streaming ingestion, row-by-row writes, and schema evolution. A very common pipeline ingests events as Avro (cheap to append record by record from Kafka) and then **compacts** them into Parquet for the analysts to scan.
+
+This is also where **schema evolution** matters: schemas change over time as new fields are added. Adding a column is a backward-compatible change, because old files simply have no data for it and a reader returns NULL, which is why a columnar-plus-catalog table tolerates a new or missing column. Renaming or dropping a column is riskier and needs more care, and Avro's built-in schema handling is one reason it is favored for evolving streaming data.
 
 ## Measuring pushdown with SQL
 
@@ -1277,7 +1281,7 @@ Partitioning is easy to do and easy to do badly. The interview question is never
 }
 \`\`\`
 
-**Rule 2: avoid the small-files problem.** Partition on a high-cardinality column like \`user_id\` and you get a huge number of tiny partitions, each with tiny files. This is pathological, because every file carries fixed overhead: the engine opens it, reads its footer, and tracks its metadata, and object stores start refusing requests when you hammer them (S3 returns "please reduce your request rate"). AWS measured reading 100,000 small files taking 11.5 seconds against 4.3 seconds for the same data in one file. The rule of thumb is to aim for files around **128 MB**, not kilobytes. Many small files are slower than a few big ones, even for the same total bytes.
+**Rule 2: avoid the small-files problem.** Partition on a high-cardinality column like \`user_id\` and you get a huge number of tiny partitions, each with tiny files. This is pathological, because every file carries fixed overhead: the engine opens it, reads its footer, and tracks its metadata, and object stores start refusing requests when you hammer them (S3 returns "please reduce your request rate"). AWS measured reading 100,000 small files taking 11.5 seconds against 4.3 seconds for the same data in one file. The rule of thumb is to aim for files around **128 MB**, not kilobytes. Many small files are slower than a few big ones, even for the same total bytes. (This 128 MB is a whole-file target, which is a different knob from the 128 MB row-group default inside a Parquet file from the last module: a single file holds one or more row groups.)
 
 **Rule 3: do not over-partition.** Partitioning on a column you rarely filter on, or one with thousands of values, multiplies partition metadata and shreds your files without buying any pruning. If a would-be key is high cardinality, partition coarser (by month instead of day, or by a bucket of the value) or bucket it instead (next lesson).
 
@@ -1338,7 +1342,7 @@ ORDER BY avg_file_mb ASC;`,
     executionMode: "single-file",
     prompt: `Write a query that returns only the partitions suffering the small-files problem, with how many files they carry beyond a healthy 4-file target, as \`(partition_key, file_count, excess_files)\`, most excess first, over the same \`partition_files\` table.
 
-A partition has the problem when its average file (total bytes divided by file count) is under 128 MB. \`excess_files\` is its file count minus 4. Order by \`excess_files\` descending.`,
+A partition has the problem when its average file (total bytes divided by file count) is under 128 MB. A healthy partition of roughly half a gigabyte holds about four 128 MB files, so \`excess_files\` is its file count minus that 4-file target. Order by \`excess_files\` descending.`,
     starterCode: `-- Small-files partitions and how many excess files each carries over a 4-file target.
 SELECT partition_key, file_count
   -- excess_files = file_count - 4
@@ -1528,7 +1532,7 @@ const PIPELINE_RUNS_SEED = `CREATE TABLE pipeline_runs (
   status       TEXT,       -- success | failed
   rows_out     INTEGER,
   duration_min REAL,
-  sla_min      INTEGER     -- freshness SLA: the run should finish within this many minutes
+  sla_min      INTEGER     -- freshness SLA: the run should finish within this many minutes of its scheduled start
 );
 INSERT INTO pipeline_runs (job, run_date, status, rows_out, duration_min, sla_min) VALUES
   ('bronze_ingest', '2026-01-01', 'success', 5200000, 22.0, 30),
@@ -1599,7 +1603,7 @@ You do not need to run Spark to interview well, but you need its vocabulary, bec
   "type": "pipeline",
   "stages": [
     { "label": "Partitions", "note": "the data, split into chunks" },
-    { "label": "Stage 0: map", "note": "one task per partition, no movement" },
+    { "label": "Stage 0: map", "note": "one task per partition, no movement within it" },
     { "label": "Shuffle", "note": "repartition so same-key rows co-locate" },
     { "label": "Stage 1: reduce", "note": "group or join the co-located rows" },
     { "label": "Result", "note": "combined output" }
@@ -1631,6 +1635,8 @@ The crucial split is **narrow** versus **wide** transformations:
 ## The shuffle is the expensive thing
 
 A shuffle repartitions the data across the network so that every row with the same key lands together. It writes intermediate files to disk on the map side, transfers them across the network, and reads them back on the reduce side, paying disk I/O, serialization, and network cost all at once. Spark's own docs call it "a complex and costly operation." When a big job is slow, the shuffle is usually why, and a common tuning knob is the number of shuffle partitions (Spark defaults to 200).
+
+One detail that trips up beginners: the shuffle **write** is attributed to the producing (map) stage. So in the metrics you will query, stage 0 shows the shuffle bytes even though its own transformations are narrow, because it sits at the boundary to the wide step and writes the data the next stage reads back.
 
 ## Reading the execution with SQL
 
@@ -1737,7 +1743,9 @@ const skewAndJoins: SqlLesson = {
 
 Parallelism only helps if the work is spread evenly. **Data skew** is when one key has vastly more rows than the others: a NULL that swallows a third of the rows, one mega-customer, one hot product. In a group-by or join, all the rows for a key go to one task, so the task holding the giant key runs far longer than the rest. The whole stage cannot finish until that one **straggler** finishes, so a job that should take a minute takes twenty, and that one executor may run out of memory.
 
-You spot skew by comparing the slowest task to the typical task in its stage. A task running many times the stage's median duration is the tell. (Spark's Adaptive Query Execution, on by default since Spark 3.2, even detects and splits skewed partitions automatically, using "more than five times the median" as its threshold.) The beginner fixes are to **salt** the hot key (append a random suffix so it spreads across tasks), filter out the junk key (a NULL you do not need), or let AQE handle it.
+You spot skew by comparing the slowest task to a typical task in its stage. A task running many times a typical task's duration is the tell. (Spark's Adaptive Query Execution, on by default since Spark 3.2, even detects and splits skewed partitions automatically, when a partition is both more than five times the median partition size and larger than 256 MB.) The beginner fixes are to **salt** the hot key (append a random suffix so it spreads across tasks), filter out the junk key (a NULL you do not need), or let AQE handle it.
+
+One honest caveat about the exercise below: it divides each task's duration by the stage **average**, which is a one-line proxy you can write in SQL, but the straggler itself pulls that average up, so the ratio understates the skew. The slow task here runs about 2.6x the average, yet against a typical (non-straggler) task it is closer to 6x, which is what would trip AQE's five-times-the-median rule. When you can, compare to the median or a typical task, not the mean.
 
 ## Broadcast join vs shuffle join
 
@@ -1759,7 +1767,7 @@ The most common join question a junior gets is "you are joining a huge fact tabl
 - If one side is **small**, the engine copies that whole table to every executor and each executor joins its slice of the big table locally. The huge table never moves. No shuffle.
 - If **both** sides are large, you cannot broadcast, so the engine shuffles both sides so matching keys meet. This is a **sort-merge join**, and it is the expensive default for big-to-big joins.
 
-Spark decides automatically: any table under \`spark.sql.autoBroadcastJoinThreshold\` (default **10 MB**, or 10485760 bytes) is broadcast. Setting the threshold to -1 disables it. Knowing that number, and that it is the small side that gets broadcast, is a clean junior answer.
+Spark decides automatically: any table under \`spark.sql.autoBroadcastJoinThreshold\` (default **10 MB**, or 10485760 bytes) is broadcast. That default is really 10 MiB (10,485,760 bytes), so the byte comparison, not a rounded "10 MB", is what actually decides. Setting the threshold to -1 disables it. Knowing that number, and that it is the small side that gets broadcast, is a clean junior answer.
 
 ## Reading join and skew data with SQL
 
@@ -1891,10 +1899,12 @@ A very common way to layer a pipeline is the **medallion architecture**:
 
 Each layer is a scheduled job that reads the one before it. Modern cloud pipelines favor **ELT** (load raw into the lake or warehouse, then transform there with SQL) over the older **ETL** (transform before loading), because storage is cheap and the warehouse is powerful.
 
+**Batch vs streaming.** Everything so far is **batch**: a job runs on a schedule over a chunk of data. The other mode is **streaming**, where events are processed continuously as they arrive, usually off a **message queue or log** like **Apache Kafka** (an append-only, partitioned log whose consumers read by offset, and a common home for the Avro records from the last module). **Micro-batch** sits in between, running tiny batches every few seconds. Most analytics pipelines are batch or micro-batch; true streaming is for low-latency needs.
+
 ## Two ideas that separate juniors from mid-levels
 
-- **Idempotency.** A job will be retried after a failure, and a backfill will re-run last week. If re-running **doubles** the data, your pipeline is broken. An **idempotent** job produces the same result no matter how many times it runs, achieved by **overwriting a partition**, using **MERGE** (upsert), or **delete-then-insert**, never a blind append. This is the single most important reliability property of a batch job.
-- **Backfill and freshness.** When logic changes or late data arrives, you **backfill**: re-run the pipeline over historical partitions. **Incremental** loads process only new data since a **high-water mark** (the last-seen timestamp), usually with a small look-back window to catch late arrivals. **Freshness** is how recent the data is, and a **freshness SLA** ("gold is never more than 30 minutes behind") is what you page someone about.
+- **Idempotency.** A job will be retried after a failure, and a backfill will re-run last week. If re-running **doubles** the data, your pipeline is broken. An **idempotent** job produces the same result no matter how many times it runs, achieved by **overwriting a partition**, using **MERGE** (upsert), or **delete-then-insert**, never a blind append. This is the single most important reliability property of a batch job. You built exactly these idempotent rebuilds as SQL scripts in Level 5; here you reason about them operationally, and the duplicate-detection check in the next lesson is how you catch a re-run that was not idempotent.
+- **Backfill and freshness.** When logic changes or late data arrives, you **backfill**: re-run the pipeline over historical partitions. **Incremental** loads process only new data since a **high-water mark** (the last-seen timestamp), usually with a small look-back window to catch late arrivals. **Freshness** is how recent the data is, and a **freshness SLA** ("gold is never more than 30 minutes behind") is what you page someone about. In this lesson freshness is proxied by whether a run finishes within its SLA minutes; real freshness also depends on when the run started, not just how long it took.
 
 ## Operating a pipeline with SQL
 
@@ -2119,7 +2129,7 @@ export const sqlLevel6: SqlLevel = {
   tagline:
     "Learn the platform your SQL runs on: object storage, columnar files, partitioning, and distributed pipelines, the way a DE interview asks about them.",
   defaultExecutionMode: "single-file",
-  estimatedHours: 7,
+  estimatedHours: 6,
   modules: [
     {
       id: "sql-l6-cloud-platform",
