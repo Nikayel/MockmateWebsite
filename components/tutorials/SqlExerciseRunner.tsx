@@ -52,10 +52,13 @@ export function SqlExerciseRunner({
   revealReferenceAfter = 2,
   brief,
 }: SqlExerciseRunnerProps) {
-  const { running, warming, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
-    onPass,
-    onResult: onRunResult,
-  })
+  const { running, warming, results, runError, attempts, lastRunPassed, run } = useExerciseRun(
+    exercise,
+    {
+      onPass,
+      onResult: onRunResult,
+    }
+  )
   const [emptyWarning, setEmptyWarning] = useState(false)
   const [hintsShown, setHintsShown] = useState(0)
   const [showReference, setShowReference] = useState(false)
@@ -80,8 +83,9 @@ export function SqlExerciseRunner({
   const graded = results[0]
   const actualSet = isSqlResultSet(graded?.actual) ? graded.actual : undefined
   const expectedSet = isSqlResultSet(graded?.expected) ? graded.expected : undefined
-  // Show the target result only while the learner hasn't matched it yet.
-  const showExpected = Boolean(!passed && graded && expectedSet)
+  // Show the target result whenever the latest run hasn't matched it — including after a solved
+  // query is edited and re-run into a failure. Keyed on the latest run, not the ever-passed latch.
+  const showExpected = Boolean(lastRunPassed !== true && graded && expectedSet)
   const goal =
     hints.length > 0
       ? "Write your query, then Run it. Stuck? Tap Hint or check the data panel."
@@ -171,7 +175,7 @@ export function SqlExerciseRunner({
           <RotateCcw className="h-4 w-4" />
           Reset
         </Button>
-        {passed && (
+        {lastRunPassed === true && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />
             Result matches

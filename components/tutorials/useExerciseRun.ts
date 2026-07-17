@@ -31,7 +31,14 @@ export interface ExerciseRunState {
   results: TestResult[]
   runError: string | null
   attempts: number
+  /** Sticky "ever passed" latch — true once the exercise has passed, stays true. Gates onPass. */
   passed: boolean
+  /**
+   * Pass/fail of the LATEST graded run only, or null before the first run / on an errored run.
+   * Live indicators (the "passed" chip, showing the expected result) must read this, not `passed`,
+   * so breaking a solved query flips the UI back instead of leaving a stale green chip.
+   */
+  lastRunPassed: boolean | null
   run: (input: RunInput) => Promise<void>
 }
 
@@ -53,6 +60,7 @@ export function useExerciseRun(
   const [runError, setRunError] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
   const [passed, setPassed] = useState(false)
+  const [lastRunPassed, setLastRunPassed] = useState<boolean | null>(null)
 
   const run = async (input: RunInput) => {
     setRunning(true)
@@ -84,10 +92,12 @@ export function useExerciseRun(
       // A service/load failure with no graded rows: surface a retry message, not a blank panel.
       if (mapped.length === 0) {
         setRunError(result.error ?? "No tests ran. Please try again.")
+        setLastRunPassed(null)
         return
       }
 
       const allPassed = result.success && mapped.every((r) => r.passed)
+      setLastRunPassed(allPassed)
       onResult?.(allPassed)
       if (allPassed) {
         if (!passed) onPass?.()
@@ -99,6 +109,7 @@ export function useExerciseRun(
       setRunError(
         error instanceof Error ? error.message : "Something went wrong running your code."
       )
+      setLastRunPassed(null)
     } finally {
       markPythonRuntimeWarm()
       setWarming(false)
@@ -106,5 +117,5 @@ export function useExerciseRun(
     }
   }
 
-  return { running, warming, results, runError, attempts, passed, run }
+  return { running, warming, results, runError, attempts, passed, lastRunPassed, run }
 }

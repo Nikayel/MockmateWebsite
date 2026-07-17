@@ -115,7 +115,7 @@ export function WorkspaceExerciseRunner({
     [edits, starterEdits]
   )
 
-  const { running, warming, results, runError, passed, run } = useExerciseRun(exercise, {
+  const { running, warming, results, runError, lastRunPassed, run } = useExerciseRun(exercise, {
     onPass,
     onResult: onRunResult,
   })
@@ -232,7 +232,7 @@ export function WorkspaceExerciseRunner({
           <RotateCcw className="h-4 w-4" />
           Reset
         </Button>
-        {passed && (
+        {lastRunPassed === true && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />
             All tests passed

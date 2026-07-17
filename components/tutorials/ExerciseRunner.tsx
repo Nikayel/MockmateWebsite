@@ -51,10 +51,13 @@ export function ExerciseRunner({
   revealReferenceAfter = 2,
   brief,
 }: ExerciseRunnerProps) {
-  const { running, warming, results, runError, attempts, passed, run } = useExerciseRun(exercise, {
-    onPass,
-    onResult: onRunResult,
-  })
+  const { running, warming, results, runError, attempts, lastRunPassed, run } = useExerciseRun(
+    exercise,
+    {
+      onPass,
+      onResult: onRunResult,
+    }
+  )
   const [emptyWarning, setEmptyWarning] = useState(false)
   const [hintsShown, setHintsShown] = useState(0)
   const [showReference, setShowReference] = useState(false)
@@ -151,7 +154,7 @@ export function ExerciseRunner({
           <RotateCcw className="h-4 w-4" />
           Reset
         </Button>
-        {passed && (
+        {lastRunPassed === true && (
           <span className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />
             All tests passed
