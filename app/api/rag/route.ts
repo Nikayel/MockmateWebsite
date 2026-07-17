@@ -54,6 +54,11 @@ export async function POST(request: NextRequest) {
       "get-next-problems",
       "get-learning-path",
       "record-feedback",
+      // Both generate paid work for anonymous callers: get-hints runs an LLM
+      // (generateContextualHints) and get-similar-problems runs a vector search that
+      // embeds the query. Cost-bearing RAG actions require sign-in like the rest.
+      "get-hints",
+      "get-similar-problems",
     ]
 
     if (authRequiredActions.includes(action)) {
