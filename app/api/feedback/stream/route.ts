@@ -36,7 +36,10 @@ import {
 import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-analysis-edge"
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
-import { calculateBugfixEvidenceScore } from "@/lib/bugfix/scoring"
+import {
+  calculateBugfixEvidenceScore,
+  mapBugfixBreakdownToCategoryScores,
+} from "@/lib/bugfix/scoring"
 import {
   scoreBugfixSemantics,
   fitTranscript,
@@ -637,31 +640,10 @@ CRITICAL: Be SPECIFIC. Reference actual code patterns, conversation quotes, or t
 Do NOT give generic advice. Make it clear you analyzed THIS session.`
 }
 
-function averageScores(values: number[]): number {
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
-}
-
 function mapBugfixScoreToFeedbackScores(score: BugfixScoreBreakdown) {
-  return {
-    understanding: averageScores([
-      score.reproductionDiscipline,
-      score.codebaseNavigation,
-      score.evidenceGathering,
-      score.hypothesisQuality,
-    ]),
-    problemSolving: averageScores([
-      score.rootCauseUnderstanding,
-      score.regressionPrevention,
-      score.hypothesisQuality,
-    ]),
-    codeQuality: averageScores([
-      score.verificationDiscipline,
-      score.minimalFixQuality,
-      score.overEditControl,
-    ]),
-    communication: score.communication,
-    overall: score.overall,
-  }
+  // Category projection lives in lib/bugfix so the streaming and fallback paths agree.
+  // Each of the 11 dimensions has exactly one home there (no double-count, none dropped).
+  return { ...mapBugfixBreakdownToCategoryScores(score), overall: score.overall }
 }
 
 function buildBugfixEvidenceContext(params: {

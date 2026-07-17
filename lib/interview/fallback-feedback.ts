@@ -10,6 +10,7 @@
 import {
   summarizeBugfixEvidence,
   calculateBugfixEvidenceScore,
+  mapBugfixBreakdownToCategoryScores,
   type BugfixEvidenceEvent,
 } from "@/lib/bugfix"
 import { calculateUserScore, type InteractionMetrics } from "@/lib/scoring"
@@ -50,13 +51,16 @@ export function computeFallbackScores(request: FallbackFeedbackRequest): Fallbac
       expectedTouchedFiles: request.bugfixExpectedTouchedFiles || [],
     })
     const bugfixScores = calculateBugfixEvidenceScore(evidenceSummary)
+    // Project through the shared category mapping so the fallback breakdown matches
+    // the streaming feedback path (previously each picked a different single dimension).
+    const categories = mapBugfixBreakdownToCategoryScores(bugfixScores)
     return {
       performanceScore: bugfixScores.overall,
       scoreBreakdown: {
-        understandingScore: bugfixScores.rootCauseUnderstanding,
-        problemSolvingScore: bugfixScores.evidenceGathering,
-        codeQualityScore: bugfixScores.minimalFixQuality,
-        communicationScore: bugfixScores.communication,
+        understandingScore: categories.understanding,
+        problemSolvingScore: categories.problemSolving,
+        codeQualityScore: categories.codeQuality,
+        communicationScore: categories.communication,
       },
     }
   }

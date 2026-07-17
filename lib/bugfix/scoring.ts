@@ -31,6 +31,53 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
 
+function averageScores(values: number[]): number {
+  if (values.length === 0) return 0
+  return clampScore(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+export interface BugfixCategoryScores {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+}
+
+/**
+ * Project the 11 scored bugfix dimensions onto the four user-facing category scores.
+ *
+ * Each dimension has exactly ONE home, so nothing is double-counted or silently dropped:
+ *  - understanding: reproduction discipline, codebase navigation, evidence gathering
+ *  - problemSolving: hypothesis quality, root-cause understanding, regression prevention
+ *  - codeQuality:    minimal-fix quality, verification discipline, over-edit control
+ *  - communication:  communication, AI-collaboration quality
+ *
+ * Both the streaming feedback route and the fallback path project through this one helper,
+ * so the same evidence can no longer yield two different category breakdowns.
+ */
+export function mapBugfixBreakdownToCategoryScores(
+  score: BugfixScoreBreakdown
+): BugfixCategoryScores {
+  return {
+    understanding: averageScores([
+      score.reproductionDiscipline,
+      score.codebaseNavigation,
+      score.evidenceGathering,
+    ]),
+    problemSolving: averageScores([
+      score.hypothesisQuality,
+      score.rootCauseUnderstanding,
+      score.regressionPrevention,
+    ]),
+    codeQuality: averageScores([
+      score.verificationDiscipline,
+      score.minimalFixQuality,
+      score.overEditControl,
+    ]),
+    communication: averageScores([score.communication, score.aiCollaborationQuality]),
+  }
+}
+
 function ratioScore(count: number, target: number): number {
   if (target <= 0) return 100
   return clampScore((count / target) * 100)

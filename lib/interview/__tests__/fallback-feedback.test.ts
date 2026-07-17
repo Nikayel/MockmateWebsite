@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   summarizeBugfixEvidence,
   calculateBugfixEvidenceScore,
+  mapBugfixBreakdownToCategoryScores,
   type BugfixEvidenceEvent,
 } from "@/lib/bugfix"
 import { calculateUserScore, type InteractionMetrics } from "@/lib/scoring"
@@ -22,12 +23,14 @@ describe("computeFallbackScores", () => {
       summarizeBugfixEvidence({ events, expectedTouchedFiles })
     )
 
+    const categories = mapBugfixBreakdownToCategoryScores(expected)
     expect(result.performanceScore).toBe(expected.overall)
+    // Same shared projection the streaming feedback path uses (no divergent single-dim pick).
     expect(result.scoreBreakdown).toEqual({
-      understandingScore: expected.rootCauseUnderstanding,
-      problemSolvingScore: expected.evidenceGathering,
-      codeQualityScore: expected.minimalFixQuality,
-      communicationScore: expected.communication,
+      understandingScore: categories.understanding,
+      problemSolvingScore: categories.problemSolving,
+      codeQualityScore: categories.codeQuality,
+      communicationScore: categories.communication,
     })
   })
 
