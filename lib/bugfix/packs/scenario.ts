@@ -125,10 +125,15 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
       primaryFilePath,
       language: pack.language,
     },
-    // Every pack's task is the same shape, and it is the honest one: the oracle
-    // decides. No `symptom` card — a pack's symptom is the stdout diff itself,
-    // which the terminal shows once the candidate reproduces it.
-    task: `Find and fix the defect so that \`${pack.runCmd}\` prints the expected output from task.md byte-for-byte.`,
+    // The authored job, in the product's own terms. This used to be a template
+    // ("make `<runCmd>` print the expected output byte-for-byte") identical across
+    // every pack: it stated the grading mechanism rather than the work, and
+    // `successCriteria` below already says it.
+    //
+    // Still no `symptom` card. A pack's expected-vs-actual is the stdout diff, and
+    // printing it would hand over the SCALE/SCOPE state's exit answer — "which
+    // section is wrong" is the thing the pack machine grades.
+    task: pack.task,
     userReport: pack.summary,
     observedSymptoms: [pack.summary],
     reproductionSteps: [
@@ -198,6 +203,9 @@ export interface PackQualityIssue {
   message: string
 }
 
+/** One sentence. Matches the legacy brief's own bar (bugfix-brief-content.test.ts). */
+const TASK_MAX_CHARS = 180
+
 const PACK_GIVEAWAY_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\b(bug|fixme|herring|intentional|subtle|hack)\b/i, label: "bug/herring marker" },
   { pattern: /todo[:\s].*fix/i, label: "todo-fix marker" },
@@ -257,6 +265,27 @@ export function validatePackQuality(
     issues.push({ field: "fixtures", message: "A pack must ship at least one fixture." })
   }
 
+  const task = pack.task?.trim() ?? ""
+  if (!task) {
+    issues.push({ field: "task", message: "A pack must author a one-sentence task." })
+  } else {
+    if (task.length > TASK_MAX_CHARS) {
+      issues.push({
+        field: "task",
+        message: `Task is ${task.length} chars; the brief's box holds one sentence (max ${TASK_MAX_CHARS}).`,
+      })
+    }
+    // The old template stated the grading mechanism, not the job, and read identically
+    // on all 14 packs. Name it so it cannot drift back in.
+    if (/byte-for-byte|prints the expected output from task\.md/i.test(task)) {
+      issues.push({
+        field: "task",
+        message:
+          "Task restates the grading mechanism. State the job in the product's own terms; successCriteria already covers the oracle.",
+      })
+    }
+  }
+
   const expected = pack.expectedOutput
   if (!expected.trim()) {
     issues.push({ field: "expectedOutput", message: "Expected-output oracle must not be empty." })
@@ -298,6 +327,9 @@ export function validatePackQuality(
   const candidateVisible: Array<{ field: string; text: string }> = [
     { field: "title", text: pack.title },
     { field: "summary", text: pack.summary },
+    // The task box is the most prominent string in the brief; without this it would
+    // be the only candidate-visible field nothing scans.
+    { field: "task", text: pack.task },
     { field: "taskMd", text: pack.taskMd },
     ...pack.srcFiles.map((file) => ({ field: file.path, text: file.content })),
     ...pack.fixtures.map((file) => ({ field: file.path, text: file.content })),
