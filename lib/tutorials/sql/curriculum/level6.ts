@@ -1289,7 +1289,36 @@ FROM parquet_column_stats;`,
         expected: { columns: ["saved_mb"], rows: [[944]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-compression-encoding-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the columns that compress worse than 5x as \`(column_name, ratio)\`, worst first, over \`parquet_column_stats\`. The ratio is uncompressed divided by compressed, rounded to 2 decimals.`,
+      starterCode: `-- Columns whose compression ratio is under 5.
+SELECT column_name, ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS ratio
+FROM parquet_column_stats
+;`,
+      hints: [
+        "Filter `WHERE uncompressed_bytes * 1.0 / compressed_bytes < 5`.",
+        "`ORDER BY` the ratio `ASC, column_name`.",
+      ],
+      referenceSolution: `SELECT column_name, ROUND(uncompressed_bytes * 1.0 / compressed_bytes, 2) AS ratio
+FROM parquet_column_stats
+WHERE uncompressed_bytes * 1.0 / compressed_bytes < 5
+ORDER BY uncompressed_bytes * 1.0 / compressed_bytes ASC, column_name;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["column_name", "ratio"],
+          rows: [
+            ["revenue", 2],
+            ["url", 2.78],
+            ["user_id", 3.33],
+            ["event_id", 4],
+          ],
+        },
+      },
+    },
   ],
 }
 
