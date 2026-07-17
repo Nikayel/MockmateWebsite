@@ -804,6 +804,38 @@ FROM glue_catalog
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-lake-warehouse-catalog-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns each database and how many tables it owns as \`(db_name, table_count)\`, most tables first, over \`glue_catalog\`.`,
+      starterCode: `-- Table count per database, busiest first.
+SELECT db_name, COUNT(*) AS table_count
+FROM glue_catalog
+;`,
+      hints: [
+        "`GROUP BY db_name`, `COUNT(*) AS table_count`.",
+        "`ORDER BY table_count DESC, db_name`.",
+      ],
+      referenceSolution: `SELECT db_name, COUNT(*) AS table_count
+FROM glue_catalog
+GROUP BY db_name
+ORDER BY table_count DESC, db_name;`,
+      singleFile: {
+        seedSql: GLUE_CATALOG_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["db_name", "table_count"],
+          rows: [
+            ["analytics", 3],
+            ["finance", 2],
+            ["ml", 1],
+          ],
+        },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 // ---------------------------------------------------------------------------
