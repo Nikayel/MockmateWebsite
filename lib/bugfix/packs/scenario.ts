@@ -206,17 +206,47 @@ const PACK_GIVEAWAY_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
 ]
 
 /**
+ * The sealed strings that must never appear verbatim in candidate-visible content.
+ *
+ * `bugSummary` alone used to be the whole contract, which left the two fields that
+ * give the answer away most directly unchecked: pasting a pack's sealed `minimalFix`
+ * verbatim into its task.md passed the gate with zero issues.
+ *
+ * All three are free prose (see `SealedPackContent`), so this can only catch a
+ * verbatim paste — a copy-paste slip, which is the realistic authoring accident. It
+ * is not a paraphrase detector; §9 of PACK_REALISM_GUIDE is what governs prose an
+ * author writes themselves.
+ */
+export interface SealedPackSecrets {
+  bugSummary?: string
+  minimalFix?: string
+  /** Prose naming the file and function, e.g. "src/x.py — f(): flag hoisted". */
+  bugLocation?: string
+}
+
+/** Flatten the sealed bag into the strings a verbatim leak check can scan for. */
+function sealedStrings(secrets: SealedPackSecrets | string | undefined): string[] {
+  if (!secrets) return []
+  if (typeof secrets === "string") return [secrets]
+
+  return [secrets.bugSummary, secrets.minimalFix, secrets.bugLocation]
+    .map((s) => s?.trim() ?? "")
+    .filter((s) => s.length > 0)
+}
+
+/**
  * Validate the CLIENT-SAFE half of a pack. Unlike `validateBugfixScenarioQuality`
  * (legacy assert scenarios), this does NOT require a client-side reference solution —
  * packs seal their fix. It enforces the oracle + giveaway + newline discipline that
  * the stdout-oracle model depends on (PACK_REALISM_GUIDE.md §6–§7).
  *
- * `sealedBugSummary` (optional) is the one-sentence bug statement from the sealed
- * module; when provided, its verbatim presence in any candidate-visible file is a leak.
+ * `sealed` accepts the sealed module's secrets; any of them appearing verbatim in
+ * candidate-visible content is a leak. A bare string is read as `bugSummary` so
+ * existing callers keep working.
  */
 export function validatePackQuality(
   pack: BugfixPack,
-  sealedBugSummary?: string
+  sealed?: SealedPackSecrets | string
 ): PackQualityIssue[] {
   const issues: PackQualityIssue[] = []
 
@@ -273,15 +303,18 @@ export function validatePackQuality(
     ...pack.fixtures.map((file) => ({ field: file.path, text: file.content })),
   ]
 
-  const sealed = sealedBugSummary?.trim().toLowerCase()
+  const secrets = sealedStrings(sealed).map((s) => s.toLowerCase())
   for (const { field, text } of candidateVisible) {
     for (const giveaway of PACK_GIVEAWAY_PATTERNS) {
       if (giveaway.pattern.test(text)) {
         issues.push({ field, message: `Candidate-visible content includes ${giveaway.label}.` })
       }
     }
-    if (sealed && text.toLowerCase().includes(sealed)) {
-      issues.push({ field, message: "Candidate-visible content reveals the sealed bug summary." })
+    const haystack = text.toLowerCase()
+    for (const secret of secrets) {
+      if (haystack.includes(secret)) {
+        issues.push({ field, message: "Candidate-visible content reveals sealed content." })
+      }
     }
   }
 
