@@ -2955,7 +2955,7 @@ FROM staged_events;`,
     {
       id: "sql-l6-data-quality-checks-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the total row count and the number of distinct \`event_id\` values as \`(total_rows, distinct_ids)\`, over \`staged_events\`. A gap between them means duplicates.`,
+      prompt: `**Easy.** Write a query that returns the total row count and the number of distinct \`event_id\` values as \`(total_rows, distinct_ids)\`, over \`staged_events\`. A gap between them means duplicates.`,
       starterCode: `-- If total_rows > distinct_ids, the batch has duplicates.
 SELECT
 FROM staged_events;`,
@@ -2970,7 +2970,7 @@ FROM staged_events;`,
     {
       id: "sql-l6-data-quality-checks-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns how many rows have an invalid (non-positive) amount as \`(bad_amounts)\`, over \`staged_events\`.`,
+      prompt: `**Medium.** Write a query that returns how many rows have an invalid (non-positive) amount as \`(bad_amounts)\`, over \`staged_events\`.`,
       starterCode: `-- Count rows whose amount is zero or negative.
 SELECT
 FROM staged_events
@@ -2987,7 +2987,7 @@ WHERE amount <= 0;`,
     {
       id: "sql-l6-data-quality-checks-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the percentage of rows with a NULL \`country\` as \`(null_country_pct)\`, over \`staged_events\`, rounded to 2 decimals.`,
+      prompt: `**Hard.** Write a query that returns the percentage of rows with a NULL \`country\` as \`(null_country_pct)\`, over \`staged_events\`, rounded to 2 decimals.`,
       starterCode: `-- A completeness check on the country column.
 SELECT
 FROM staged_events;`,
