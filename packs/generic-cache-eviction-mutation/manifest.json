@@ -2,6 +2,7 @@
   "id": "generic-cache-eviction-mutation",
   "title": "Cache eviction report over-reports one namespace's live entries",
   "summary": "The overnight cache eviction report shows more live entries for one namespace than the cache's metrics endpoint, so the capacity-planning on-call cannot trust it.",
+  "task": "Report each namespace's live count at the sweep checkpoint so the capacity-planning on-call can size memory from a report that agrees with the cache's own metrics endpoint.",
   "company": {
     "tag": "generic-fdse",
     "round_name": "Debugging round",

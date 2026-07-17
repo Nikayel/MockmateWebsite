@@ -2,6 +2,7 @@
   "id": "stripe-webhook-idempotency",
   "title": "Webhook replay under-credits one merchant's balance",
   "summary": "The webhook replay job that reports each merchant's net balance shows one merchant lower than the ledger, and payouts are held until it reconciles.",
+  "task": "Report each merchant's net balance in cents, charges minus refunds, from the replayed webhook event log so the payout it feeds reconciles with the merchant's own ledger.",
   "company": {
     "tag": "stripe-bug-squash",
     "round_name": "Bug squash round",

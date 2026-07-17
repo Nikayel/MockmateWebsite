@@ -2,6 +2,7 @@
   "id": "generic-session-window-count",
   "title": "Session rollup over-counts one user's visits",
   "summary": "The per-user session count Growth reads each morning reports one user with more sessions than the product analytics dashboard, a single boundary click away from misreading a returning user as a power user.",
+  "task": "Group each user's overnight clicks into sessions and report how many sessions each user had, so the rollup agrees with the product analytics dashboard Growth compares it against.",
   "company": {
     "tag": "generic-fdse",
     "round_name": "Debugging round",

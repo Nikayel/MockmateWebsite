@@ -2,6 +2,7 @@
   "id": "palantir-foundry-usage-rollup",
   "title": "Foundry usage rollup bills one account too much",
   "summary": "The nightly Foundry usage rollup reports higher compute-seconds than the dashboard for one account, and billing is paused until it is trusted.",
+  "task": "Bill each account for the compute-seconds it used, counting each event once however many times the at-least-once bus delivers it, so nightly totals match the metering dashboard.",
   "company": {
     "tag": "palantir-fdse",
     "round_name": "Re-engineering / debugging round",

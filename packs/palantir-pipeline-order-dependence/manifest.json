@@ -2,6 +2,7 @@
   "id": "palantir-pipeline-order-dependence",
   "title": "Foundry pipeline report over-counts one transform's materialized records",
   "summary": "The nightly Foundry reconciliation job reports more materialized records for one transform pipeline than the platform dashboard, and usage billing is held until the count is trusted.",
+  "task": "Report how many records each transform pipeline materialized from the day's shared record feed, so FinOps can bill transform usage against the platform dashboard.",
   "company": {
     "tag": "palantir-fdse",
     "round_name": "Re-engineering / debugging round",

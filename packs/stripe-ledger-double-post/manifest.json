@@ -2,6 +2,7 @@
   "id": "stripe-ledger-double-post",
   "title": "Overlapping settlement batches over-credit one account's balance",
   "summary": "The nightly ledger posting job reports one account's balance higher than the ledger of record, and that account's payout is held until the number reconciles.",
+  "task": "Report each account's balance in cents (charges minus refunds) from the settlement feed so the treasury on-call can reconcile it with the ledger of record and release the payout.",
   "company": {
     "tag": "stripe-bug-squash",
     "round_name": "Bug squash round",

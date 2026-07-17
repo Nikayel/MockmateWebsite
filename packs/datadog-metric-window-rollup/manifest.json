@@ -2,6 +2,7 @@
   "id": "datadog-metric-window-rollup",
   "title": "Metric window rollup pages on-call for a minute that never spiked",
   "summary": "The per-minute web.5xx rollup an on-call SRE watches reports one window higher than the metering dashboard, and it is one boundary sample away from paging someone at 3am.",
+  "task": "Roll the collector feed's web.5xx samples into fixed 60-second windows and report each window's sample count and value sum so the on-call SRE knows when to page the owning team.",
   "company": {
     "tag": "datadog-debugging",
     "round_name": "Debugging pairing round",

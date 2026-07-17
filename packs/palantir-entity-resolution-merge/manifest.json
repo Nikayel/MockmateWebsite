@@ -2,6 +2,7 @@
   "id": "palantir-entity-resolution-merge",
   "title": "Entity resolution merges two tenants' entities into one link count",
   "summary": "The nightly ontology reconciliation report shows one entity name with far more resolved links than the registry dashboard, and the registry team stopped trusting the run until it is explained.",
+  "task": "Report how many distinct links resolved to each entity in the resolver's feed, so the registry team can confirm the overnight run did not drop or double-assign links.",
   "company": {
     "tag": "palantir-fdse",
     "round_name": "Re-engineering / debugging round",

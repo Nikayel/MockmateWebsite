@@ -2,6 +2,7 @@
   "id": "generic-log-error-rollup",
   "title": "Reliability rollup over-reports one service's ERROR count",
   "summary": "The nightly per-service ERROR-line rollup reports more errors for one service than the metering dashboard, so the on-call engineer cannot trust it.",
+  "task": "From the overnight log feed, report how many ERROR lines each service logged, so the on-call engineer knows which services to follow up on.",
   "company": {
     "tag": "generic-fdse",
     "round_name": "Debugging round",
