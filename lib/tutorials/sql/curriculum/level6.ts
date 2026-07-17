@@ -2066,6 +2066,8 @@ Partitioning is easy to do and easy to do badly. The interview question is never
 
 A partition catalog that records each partition's file count and total bytes lets you compute the average file size and flag the partitions suffering the small-files problem. The exercises do exactly that: find the partitions whose average file is far below the 128 MB target, and measure how many excess tiny files they add.
 
+**Common mistake:** partitioning on a high-cardinality column like user_id. It creates a partition per value, which shreds the table into millions of tiny files where per-file overhead dominates and object stores start throttling requests.
+
 **Interview nuance:** "you have millions of tiny files and queries are slow, what happened" is a classic. The answer is over-partitioning on a high-cardinality key: too many partitions means too many tiny files, and per-file overhead plus metadata dominate. The fix is a coarser partition key (or bucketing) and compaction into roughly 128 MB files.
 
 > **On a real platform this differs.** Real engines expose file counts and sizes through catalog stats or a storage inventory, and compaction jobs (or Iceberg and Delta "optimize") merge small files for you. The \`partition_files\` table here gives you the file count and bytes per partition so you can compute the average file size the same way an audit query would.`,
