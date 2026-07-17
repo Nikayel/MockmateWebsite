@@ -1937,7 +1937,36 @@ LIMIT 1;`,
         expected: { columns: ["partition_key", "avg_file_mb"], rows: [["dt=2026-01-04", 0.5]] },
       },
     },
-    /* __DRILL_SLOT__ */
+    {
+      id: "sql-l6-choosing-partition-key-drill-3",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many partitions are healthy versus small-files as \`(health, partitions)\`, over \`partition_files\`. A partition is \`'small-files'\` when its average file is under 128 MB, else \`'ok'\`.`,
+      starterCode: `-- Bucket partitions into 'ok' vs 'small-files' and count each.
+SELECT
+FROM partition_files
+GROUP BY health
+;`,
+      hints: [
+        "Use a `CASE` on `total_bytes * 1.0 / file_count < 128000000` as `health`.",
+        "`GROUP BY health`, `ORDER BY health`.",
+      ],
+      referenceSolution: `SELECT CASE WHEN total_bytes * 1.0 / file_count < 128000000 THEN 'small-files' ELSE 'ok' END AS health,
+       COUNT(*) AS partitions
+FROM partition_files
+GROUP BY health
+ORDER BY health;`,
+      singleFile: {
+        seedSql: PARTITION_FILES_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["health", "partitions"],
+          rows: [
+            ["ok", 3],
+            ["small-files", 2],
+          ],
+        },
+      },
+    },
   ],
 }
 
