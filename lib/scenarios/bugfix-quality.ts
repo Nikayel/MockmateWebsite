@@ -2,6 +2,11 @@ import type { BugFixScenario } from "./types"
 import { isWorkspaceScenario, validateWorkspaceScenario } from "@/lib/workspace-execution"
 
 const REQUIRED_INCIDENT_FIELDS = [
+  // `task` is the brief's most prominent slot and was the one thing nothing checked:
+  // all 10 scenarios author it by custom, but a new scenario could ship without one
+  // and render an empty box. Symptom stays UNREQUIRED on purpose — packs seal their
+  // expected-vs-actual, and requiring a card would push authors to print the diff.
+  "task",
   "userReport",
   "observedSymptoms",
   "reproductionSteps",
