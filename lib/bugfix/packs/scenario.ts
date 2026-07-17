@@ -328,8 +328,10 @@ export function validatePackQuality(
     { field: "title", text: pack.title },
     { field: "summary", text: pack.summary },
     // The task box is the most prominent string in the brief; without this it would
-    // be the only candidate-visible field nothing scans.
-    { field: "task", text: pack.task },
+    // be the only candidate-visible field nothing scans. Defaulted because a missing
+    // task is reported above as its own issue — the gate must not throw on the very
+    // input it exists to reject.
+    { field: "task", text: task },
     { field: "taskMd", text: pack.taskMd },
     ...pack.srcFiles.map((file) => ({ field: file.path, text: file.content })),
     ...pack.fixtures.map((file) => ({ field: file.path, text: file.content })),

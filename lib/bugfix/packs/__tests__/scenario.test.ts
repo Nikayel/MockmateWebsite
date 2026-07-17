@@ -13,6 +13,7 @@ function makePack(overrides: Partial<BugfixPack> = {}): BugfixPack {
     id: "pack-test-fixture",
     title: "Usage rollup totals are off for one account",
     summary: "The nightly rollup shows the wrong compute-seconds total for one account.",
+    task: "Bill each account for the compute-seconds it used so the nightly totals match the metering dashboard.",
     company: { tag: "palantir-fdse", roundName: "Re-engineering round", confidence: "styled" },
     companies: ["Palantir"],
     domain: "data-pipeline",
@@ -104,6 +105,34 @@ describe("validatePackQuality", () => {
       makePack({ srcFiles: [{ path: "src/main.py", content: leaky }] })
     )
     expect(issues.some((i) => i.field === "src/main.py")).toBe(true)
+  })
+
+  it("flags a pack with no authored task", () => {
+    expect(validatePackQuality(makePack({ task: "  " })).some((i) => i.field === "task")).toBe(true)
+  })
+
+  it("flags a task that restates the byte-for-byte oracle", () => {
+    // The old generated template. It stated the grading mechanism rather than the
+    // job and read identically on all 14 packs; name it so it cannot drift back.
+    const issues = validatePackQuality(
+      makePack({
+        task: "Find and fix the defect so that the run prints the expected output from task.md byte-for-byte.",
+      })
+    )
+    expect(issues.some((i) => /grading mechanism/.test(i.message))).toBe(true)
+  })
+
+  it("flags a task longer than one sentence's worth", () => {
+    const issues = validatePackQuality(makePack({ task: `Bill each account. ${"x".repeat(200)}` }))
+    expect(issues.some((i) => i.field === "task" && /max/.test(i.message))).toBe(true)
+  })
+
+  it("scans the task for sealed leaks — it is the brief's most prominent string", () => {
+    const minimalFix = "reset the accumulator inside the per-account loop"
+    const issues = validatePackQuality(makePack({ task: `Bill accounts: ${minimalFix}.` }), {
+      minimalFix,
+    })
+    expect(issues.some((i) => i.field === "task")).toBe(true)
   })
 
   it("flags a verbatim sealed-bug-summary leak", () => {
