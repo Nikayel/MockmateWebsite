@@ -19,8 +19,9 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
     [
       "code",
       "language",
-      "systemPrompt",
-      "userPrompt",
+      "optimalSpaceComplexity",
+      "optimalTimeComplexity",
+      "problemTitle",
     ],
   ],
   "fetch POST /api/chat": [
