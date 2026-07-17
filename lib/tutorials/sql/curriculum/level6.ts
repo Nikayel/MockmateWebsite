@@ -222,7 +222,7 @@ FROM platform_services;`,
     {
       id: "sql-l6-cloud-and-the-de-stack-drill-1",
       executionMode: "single-file",
-      prompt: `Write a query that returns the whole platform's total monthly cost as \`(platform_cost)\`, over \`platform_services\`.`,
+      prompt: `**Easy.** Write a query that returns the whole platform's total monthly cost as \`(platform_cost)\`, over \`platform_services\`.`,
       starterCode: `-- One number: the sum of every service's monthly cost.
 SELECT
 FROM platform_services;`,
@@ -240,7 +240,7 @@ FROM platform_services;`,
     {
       id: "sql-l6-cloud-and-the-de-stack-drill-2",
       executionMode: "single-file",
-      prompt: `Write a query that returns the single most expensive service and its cost as \`(service, monthly_cost_usd)\`, over \`platform_services\`.`,
+      prompt: `**Medium.** Write a query that returns the single most expensive service and its cost as \`(service, monthly_cost_usd)\`, over \`platform_services\`.`,
       starterCode: `-- The priciest service: order by cost and take the top row.
 SELECT service, monthly_cost_usd
 FROM platform_services
@@ -262,7 +262,7 @@ LIMIT 1;`,
     {
       id: "sql-l6-cloud-and-the-de-stack-drill-3",
       executionMode: "single-file",
-      prompt: `Write a query that returns the compute layer's share of total platform cost as a percentage \`(compute_pct)\`, rounded to 2 decimals, over \`platform_services\`.`,
+      prompt: `**Hard.** Write a query that returns the compute layer's share of total platform cost as a percentage \`(compute_pct)\`, rounded to 2 decimals, over \`platform_services\`.`,
       starterCode: `-- Compute-layer cost as a percent of the whole platform.
 SELECT
 FROM platform_services;`,
