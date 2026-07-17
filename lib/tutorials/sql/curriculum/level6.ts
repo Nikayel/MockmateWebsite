@@ -2764,6 +2764,28 @@ ORDER BY over_by_min DESC;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-pipelines-orchestration-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total number of runs and how many failed as \`(runs, failures)\`, over \`pipeline_runs\`.`,
+      starterCode: `-- Count all runs, and the failed ones.
+SELECT
+FROM pipeline_runs;`,
+      hints: [
+        "`COUNT(*)` is total runs.",
+        "`SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)` is failures.",
+      ],
+      referenceSolution: `SELECT COUNT(*) AS runs,
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures
+FROM pipeline_runs;`,
+      singleFile: {
+        seedSql: PIPELINE_RUNS_SEED,
+        expected: { columns: ["runs", "failures"], rows: [[12, 2]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const dataQualityChecks: SqlLesson = {
