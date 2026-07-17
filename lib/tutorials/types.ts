@@ -24,7 +24,8 @@ import type { DifficultyLevel, WorkspaceScenarioConfig } from "@/lib/scenarios/t
 export type CourseId = "python" | "sql" | "system-design"
 
 /**
- * SQL ships 5 levels (L5 is the advanced/company-specific DE-interview capstone); Python ships 4;
+ * SQL ships 6 levels (L5 is the advanced/company-specific DE-interview capstone; L6 is the
+ * Cloud & Data Engineering Foundations level); Python ships 4;
  * System Design ships 12 levels numbered **L0–L11** (L0 is the "Interview & Communication Method").
  * `PythonLevelId` stays pinned to 1-4 so Python-only maps (e.g. `LEVEL_PREVIEWS`) are not forced to
  * grow, while the shared `TutorialLevelId` (used by `TutorialLessonProgress.levelId` and the SQL /
@@ -248,6 +249,7 @@ export type SqlLevelSlug =
   | "modeling"
   | "engineering"
   | "advanced-company-sql"
+  | "cloud-data-foundations"
 
 export type SqlLesson = TutorialLesson<SqlExercise>
 export type SqlModule = TutorialModule<SqlExercise>
