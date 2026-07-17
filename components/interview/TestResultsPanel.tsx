@@ -7,6 +7,20 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 /**
+ * A SQL result set ({ columns, rows }) rather than a scalar test value. The SQL runner
+ * renders these as a readable grid above this panel, so dumping them again as JSON here is
+ * redundant and unreadable — we suppress the value rows and keep only the failure reason.
+ */
+function looksLikeResultSet(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as { columns?: unknown }).columns) &&
+    Array.isArray((value as { rows?: unknown }).rows)
+  )
+}
+
+/**
  * TestResultsPanel - Displays test case results
  *
  * Shows passed/failed tests with expandable details.
@@ -183,25 +197,31 @@ export function TestResultsPanel({ results, isRunning = false, className }: Test
             {/* Expanded details */}
             {expandedTests.has(index) && (
               <div className="space-y-1 px-2 pb-2 text-xs">
-                <div className="flex gap-2">
-                  <span className="text-muted-foreground w-16 flex-shrink-0">Input:</span>
-                  <code className="text-muted-foreground bg-muted/50 min-w-0 rounded px-1 break-all">
-                    {JSON.stringify(result.input)}
-                  </code>
-                </div>
-                <div className="flex gap-2">
-                  <span className="text-muted-foreground w-16 flex-shrink-0">Expected:</span>
-                  <code className="bg-muted/50 min-w-0 rounded px-1 break-all text-green-400">
-                    {JSON.stringify(result.expected)}
-                  </code>
-                </div>
-                {!result.passed && (
-                  <div className="flex gap-2">
-                    <span className="text-muted-foreground w-16 flex-shrink-0">Actual:</span>
-                    <code className="bg-muted/50 min-w-0 rounded px-1 break-all text-red-400">
-                      {JSON.stringify(result.actual)}
-                    </code>
-                  </div>
+                {/* SQL result sets are shown as a grid above this panel; only the failure
+                    reason below is useful here, so skip the redundant JSON dump for them. */}
+                {!looksLikeResultSet(result.expected) && !looksLikeResultSet(result.actual) && (
+                  <>
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground w-16 flex-shrink-0">Input:</span>
+                      <code className="text-muted-foreground bg-muted/50 min-w-0 rounded px-1 break-all">
+                        {JSON.stringify(result.input)}
+                      </code>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground w-16 flex-shrink-0">Expected:</span>
+                      <code className="bg-muted/50 min-w-0 rounded px-1 break-all text-green-400">
+                        {JSON.stringify(result.expected)}
+                      </code>
+                    </div>
+                    {!result.passed && (
+                      <div className="flex gap-2">
+                        <span className="text-muted-foreground w-16 flex-shrink-0">Actual:</span>
+                        <code className="bg-muted/50 min-w-0 rounded px-1 break-all text-red-400">
+                          {JSON.stringify(result.actual)}
+                        </code>
+                      </div>
+                    )}
+                  </>
                 )}
                 {result.error && (
                   <div className="mt-1 rounded border border-red-500/20 bg-red-500/10 p-1.5 break-words whitespace-pre-wrap text-red-400">
