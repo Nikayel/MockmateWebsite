@@ -159,7 +159,7 @@ function MiniTable({
                 scope="col"
                 className={cn(
                   "text-muted-foreground border-border border-b px-2 py-1 font-semibold",
-                  i === keyIdx && "text-accent"
+                  i === keyIdx && "text-accent-strong"
                 )}
               >
                 {c}

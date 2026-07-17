@@ -85,7 +85,7 @@ export function GroupByDiagram({ spec }: { spec: GroupBySpec }) {
                 <span className="text-foreground">{b.group}</span>
                 <span className="text-foreground tabular-nums">
                   {phase >= 2 ? (
-                    <span className="text-accent font-semibold">{b.value}</span>
+                    <span className="text-accent-strong font-semibold">{b.value}</span>
                   ) : (
                     <span className="text-muted-foreground">
                       {b.members.map((i) => spec.rows[i].value).join(" + ")}

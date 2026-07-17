@@ -23,7 +23,9 @@ export function DiagramTable({ spec }: { spec: TableSpec }) {
                 scope="col"
                 className={cn(
                   "border-border border-b px-3 py-1.5 font-semibold whitespace-nowrap",
-                  hot.has(col) ? "bg-accent/10 text-accent" : "bg-muted/40 text-muted-foreground"
+                  hot.has(col)
+                    ? "bg-accent/10 text-accent-strong"
+                    : "bg-muted/40 text-muted-foreground"
                 )}
               >
                 {col}

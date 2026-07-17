@@ -79,7 +79,7 @@ export function WindowFrameDiagram({ spec }: { spec: WindowFrameSpec }) {
                 <td
                   className={cn(
                     "border-border/50 text-muted-foreground border-b px-3 py-1.5 text-right tabular-nums",
-                    isCurrent && "text-accent font-semibold"
+                    isCurrent && "text-accent-strong font-semibold"
                   )}
                 >
                   {revealed ? pretty(frames[r].value) : ""}

@@ -36,7 +36,7 @@ export function ErDiagram({ spec }: { spec: ErSpec }) {
                   )}
                 >
                   {col.key === "pk" && (
-                    <Key className="text-accent size-3" aria-label={CARD_LABEL.pk} />
+                    <Key className="text-accent-strong size-3" aria-label={CARD_LABEL.pk} />
                   )}
                   {col.key === "fk" && (
                     <Link2 className="size-3 text-blue-500" aria-label={CARD_LABEL.fk} />
@@ -57,7 +57,7 @@ export function ErDiagram({ spec }: { spec: ErSpec }) {
           {spec.relations.map((rel, i) => (
             <li key={i} className="text-muted-foreground flex items-center gap-2 font-mono text-xs">
               <span className="text-foreground">{rel.from}</span>
-              <span className="text-accent">{rel.kind}</span>
+              <span className="text-accent-strong">{rel.kind}</span>
               <span className="text-foreground">{rel.to}</span>
               {rel.label && <span className="text-muted-foreground/70">— {rel.label}</span>}
             </li>
