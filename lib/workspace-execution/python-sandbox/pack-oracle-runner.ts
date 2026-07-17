@@ -88,9 +88,12 @@ export function buildPackOracleEntrypoint(runCmd: string): string {
 export function decodePackStdout(logMessages: string[]): string | null {
   const joined = logMessages.join("\n")
   // `*` (not `+`) so an intentionally-empty stdout marker decodes to "" not null.
-  const match = joined.match(/__PACK_STDOUT__:([A-Za-z0-9+/=]*)/)
-  if (!match) return null
-  const bytes = Uint8Array.from(atob(match[1]), (char) => char.charCodeAt(0))
+  // Take the LAST marker: the wrapper prints it after the program finishes, so any earlier
+  // occurrence would be one the candidate emitted (e.g. to fake an oracle match). Callers
+  // should also pass stdout-only logs, since the real marker never appears on stderr.
+  const matches = [...joined.matchAll(/__PACK_STDOUT__:([A-Za-z0-9+/=]*)/g)]
+  if (matches.length === 0) return null
+  const bytes = Uint8Array.from(atob(matches[matches.length - 1][1]), (char) => char.charCodeAt(0))
   return new TextDecoder("utf-8").decode(bytes)
 }
 
@@ -136,7 +139,11 @@ export async function executePackOracleClientSide(
       }
     }
 
-    const stdout = decodePackStdout(runResult.logs.map((log) => log.message))
+    // Only stdout-typed logs: the wrapper prints the marker to real stdout, so a candidate
+    // cannot forge an oracle match by writing a fake marker to stderr.
+    const stdout = decodePackStdout(
+      runResult.logs.filter((log) => log.type === "log").map((log) => log.message)
+    )
     if (stdout === null) {
       return {
         ran: false,

@@ -57,4 +57,13 @@ describe("decodePackStdout", () => {
     const enc = Buffer.from("", "utf-8").toString("base64")
     expect(decodePackStdout([`__PACK_STDOUT__:${enc}`])).toBe("")
   })
+
+  it("takes the LAST marker so an earlier forged one cannot win", () => {
+    // The wrapper prints its marker after the program finishes. A candidate who emits a
+    // fake marker earlier (e.g. base64 of the expected output) must not forge a match.
+    const forged = Buffer.from("acme: 42\n", "utf-8").toString("base64")
+    const real = Buffer.from("acme: 7\n", "utf-8").toString("base64")
+    const logs = [`__PACK_STDOUT__:${forged}`, "some program output", `__PACK_STDOUT__:${real}`]
+    expect(decodePackStdout(logs)).toBe("acme: 7\n")
+  })
 })
