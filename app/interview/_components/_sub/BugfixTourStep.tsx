@@ -2,7 +2,7 @@
 
 import type { RefObject } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, ArrowRight, CheckCircle, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   TOUR_STEPS,
@@ -20,10 +20,8 @@ interface BugfixTourStepProps {
   coachMarkPosition: CoachMarkPosition
   stepIndex: number
   step: BugfixTourStepData
-  hypothesisReady: boolean
   isFirstStep: boolean
   isLastStep: boolean
-  canContinue: boolean
   onBack: () => void
   onNext: () => void
   onSkip: () => void
@@ -34,10 +32,8 @@ export function BugfixTourStep({
   coachMarkPosition,
   stepIndex,
   step,
-  hypothesisReady,
   isFirstStep,
   isLastStep,
-  canContinue,
   onBack,
   onNext,
   onSkip,
@@ -78,14 +74,7 @@ export function BugfixTourStep({
         {step.body}
       </p>
       <div className="border-border bg-card/70 text-muted-foreground mb-4 rounded-md border px-3 py-2 text-xs">
-        {step.id === "hypothesis" && hypothesisReady ? (
-          <span className="flex items-center gap-2 text-emerald-300">
-            <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
-            Hypothesis draft detected. You can continue.
-          </span>
-        ) : (
-          step.action
-        )}
+        {step.action}
       </div>
       <div className="mb-4 flex gap-1.5" aria-hidden="true">
         {TOUR_STEPS.map((tourStep, index) => (
@@ -113,7 +102,6 @@ export function BugfixTourStep({
         </span>
         <Button
           type="button"
-          disabled={!canContinue}
           onClick={onNext}
           className="text-foreground justify-self-end bg-cyan-300 hover:bg-cyan-200"
         >

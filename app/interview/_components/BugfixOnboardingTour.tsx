@@ -149,7 +149,6 @@ function useBugfixTourState({
 interface BugfixOnboardingTourProps {
   activePanel: TourPanel
   enabled: boolean
-  hypothesis: string
   isAIPartnerExpanded: boolean
   onAIPartnerExpandedChange: (expanded: boolean) => void
   onActivePanelChange: (panel: TourPanel) => void
@@ -162,7 +161,6 @@ interface BugfixOnboardingTourProps {
 export function BugfixOnboardingTour({
   activePanel,
   enabled,
-  hypothesis,
   isAIPartnerExpanded,
   onAIPartnerExpandedChange,
   onActivePanelChange,
@@ -186,13 +184,9 @@ export function BugfixOnboardingTour({
   const step = TOUR_STEPS[stepIndex]
   const isFirstStep = stepIndex === 0
   const isLastStep = stepIndex === TOUR_STEPS.length - 1
-  const hypothesisReady = hypothesis.trim().length > 0
-  const canContinue = step.id !== "hypothesis" || hypothesisReady
 
   const handleNext = useCallback(
     (actionType: "button" | "keyboard" | "run-tests") => {
-      if (!canContinue) return
-
       trackEvent("bugfix_tour_step_completed", {
         scenario_id: scenarioId,
         step_id: step.id,
@@ -205,7 +199,7 @@ export function BugfixOnboardingTour({
         setStepIndex((current) => current + 1)
       }
     },
-    [canContinue, completeTour, isLastStep, scenarioId, step.id]
+    [completeTour, isLastStep, scenarioId, step.id]
   )
 
   const handleBack = useCallback(() => {
@@ -319,7 +313,7 @@ export function BugfixOnboardingTour({
       if (event.key === "Escape") {
         void skipTour("coachmark", step.id)
       }
-      if (event.key === "ArrowRight" && canContinue) {
+      if (event.key === "ArrowRight") {
         handleNext("keyboard")
       }
       if (event.key === "ArrowLeft" && !isFirstStep) {
@@ -329,7 +323,7 @@ export function BugfixOnboardingTour({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [canContinue, handleBack, handleNext, isFirstStep, isTourActive, skipTour, step.id])
+  }, [handleBack, handleNext, isFirstStep, isTourActive, skipTour, step.id])
 
   useEffect(() => {
     if (!isTourActive) {
@@ -432,8 +426,8 @@ export function BugfixOnboardingTour({
                 id="bugfix-tour-welcome-description"
                 className="text-muted-foreground mb-5 text-sm leading-relaxed"
               >
-                Bugfix practice is different from DSA. You&apos;ll inspect files, form a hypothesis,
-                run tests, make a minimal fix, and explain how to prevent the bug next time.
+                Bugfix practice is different from DSA. You&apos;ll inspect files, reproduce the
+                failure, make a minimal fix, and talk your interviewer through what broke and why.
               </p>
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button
@@ -478,10 +472,8 @@ export function BugfixOnboardingTour({
               coachMarkPosition={coachMarkPosition}
               stepIndex={stepIndex}
               step={step}
-              hypothesisReady={hypothesisReady}
               isFirstStep={isFirstStep}
               isLastStep={isLastStep}
-              canContinue={canContinue}
               onBack={handleBack}
               onNext={() => handleNext("button")}
               onSkip={() => void skipTour("coachmark", step.id)}
