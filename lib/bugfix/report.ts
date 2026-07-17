@@ -30,12 +30,19 @@ export function buildBugfixPostSessionReport(params: {
     filesInspected: params.evidence.inspectedFiles,
     testsDocsLogsInspected: params.evidence.inspectedTestOrDocs,
     testsRun: params.evidence.visibleTestsRun,
-    rootCause: params.rootCauseText || "Root cause explanation was not captured.",
+    // The candidate states root cause / prevention to the interviewer in conversation now
+    // (the note textareas are gone), so the fallback points at the transcript rather than
+    // claiming nothing was captured. Legacy sessions still surface their captured text.
+    rootCause:
+      params.rootCauseText ||
+      "Stated by the candidate in the session conversation and scored from the transcript.",
     minimalityAssessment:
       overEdited.length === 0
         ? "Patch stayed within the expected editable area."
         : `Patch also touched unrelated files: ${overEdited.join(", ")}.`,
-    preventionIdea: params.preventionText || "No regression-prevention idea was captured.",
+    preventionIdea:
+      params.preventionText ||
+      "Stated by the candidate in the session conversation and scored from the transcript.",
     nextRecommendedIncident: params.nextRecommendedIncident || "Beginner Debugger",
     score: params.score,
   }

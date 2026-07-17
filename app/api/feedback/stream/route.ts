@@ -678,18 +678,14 @@ BUGFIX SESSION EVIDENCE:
 - Visible test runs: ${summary.visibleTestsRun}
 - Final pass rate: ${Math.round(summary.finalPassRate)}%
 - Hypotheses captured: ${summary.hypothesisCount}
-- Root cause captured: ${rootCause.trim() || "not captured"}
-- Prevention idea captured: ${prevention.trim() || "not captured"}
+- Root cause & prevention: the candidate states these to the interviewer in the CONVERSATION TRANSCRIPT below, not a form. The semantic scorer judged them from the transcript — see the rationale and the Root Cause Understanding / Regression Prevention scores below.
 - AI partner uses: ${summary.aiPartnerUseCount}
 - AI shortcut requests: ${summary.aiShortcutCount}
 
 ROOT CAUSE RUBRIC (expected criteria):
 ${rubric.map((r, i) => `  ${i + 1}. ${r}`).join("\n")}
 
-CANDIDATE ROOT CAUSE: "${rootCause}"
-CANDIDATE PREVENTION: "${prevention}"
-
-SEMANTIC SCORING RATIONALE: "${semanticRationale}"
+${rootCause.trim() ? `CANDIDATE ROOT CAUSE (legacy notes field): "${rootCause}"\n` : ""}${prevention.trim() ? `CANDIDATE PREVENTION (legacy notes field): "${prevention}"\n` : ""}SEMANTIC SCORING RATIONALE: "${semanticRationale}"
 
 BUGFIX SCORE BREAKDOWN:
 - Reproduction Discipline: ${score.reproductionDiscipline}/100
