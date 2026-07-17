@@ -149,7 +149,7 @@ sharding.
 The consistency stance is the one interviewers probe hardest. For a feed, take an explicit position:
 "I favor availability over strong consistency. If a follower sees a new tweet a few seconds late, that
 is fine; if the feed is unavailable, that is not. So per PACELC, I choose AP during a partition and,
-even without a partition, I trade latency for consistency by serving from replicas and caches." That is
+even without a partition, I trade consistency for latency by serving from replicas and caches." That is
 a defensible stance with a reason, which is what scores. Saying "it should be consistent and available"
 fails, because CAP says you cannot have both under a partition and the interviewer will make you pick.
 
@@ -789,11 +789,11 @@ script. The template is a backbone you hang the specific prompt on, not a monolo
 
 \`\`\`
 1. Scope & requirements      ~5 min   functional + non-functional, clarify
-2. Estimation (back-of-env)  ~5 min   QPS, storage, bandwidth
+2. Estimation (back-of-env)  ~2 min   QPS, storage, bandwidth
 3. API + data model          ~5 min   the contract and the schema
-4. High-level design         ~10 min  box-and-arrow, request path
+4. High-level design         ~15 min  box-and-arrow, request path
 5. Deep dive(s)              ~10 min  the 1-2 hard parts
-6. Bottlenecks & wrap-up     ~5 min   scale, failure, tradeoffs, what next
+6. Bottlenecks & wrap-up     ~3 min   scale, failure, tradeoffs, what next
 \`\`\`
 
 **Stock clarifying and NFR prompts** to open with: who are the users and how many, read-heavy or
@@ -821,8 +821,8 @@ denormalize.
 - **Generic NFRs**: "it should be scalable and fast." Counter: attach numbers (100K QPS, p99 under
   200ms).
 - **Designing in silence**: thinking without narrating. Counter: talk continuously.
-- **No wrap-up**: running out of time with no summary. Counter: reserve 5 minutes to name bottlenecks
-  and next steps.
+- **No wrap-up**: running out of time with no summary. Counter: reserve the last 2 to 3 minutes to name
+  bottlenecks and next steps.
 
 **Interview nuance:** The template must bend to the prompt. If the interviewer says "assume you know
 the requirements, go straight to the storage design," skip phases 1 and 2 and say so. Rigidly marching
@@ -931,7 +931,7 @@ export const systemDesignLevel0: DesignLevel = {
           apply: {
             id: "sd-l0-clarify-scope-apply",
             prompt:
-              "Write the first 6 clarifying questions you would ask for the bare prompt 'Design Twitter', and for each one show how a likely answer narrows the design.",
+              "Write the 3 to 5 clarifying questions you would ask for the bare prompt 'Design Twitter', and for each one show how a likely answer narrows the design.",
             thinkAbout: [
               "Which product slice is actually in scope, and what will you explicitly defer?",
               "What do you need to know about actors, scale, and read/write mix before drawing anything?",
@@ -1168,7 +1168,7 @@ export const systemDesignLevel0: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Assumptions: 500M DAU, 2 uploads/day and 50 views/day per user, 2 MB per stored photo (post-compression, before thumbnails), 3x peak multiplier, replication factor 3.",
-              "**QPS.** Uploads/day = 500M x 2 = 10^9; views/day = 2.5 x 10^10. Dividing by ~10^5 s/day: avg upload QPS ~10,000 and avg view QPS ~250,000; with a 3x peak, ~30k peak upload QPS and ~750k peak view QPS. The 75:1 read:write skew screams CDN plus object store, not database-served images.",
+              "**QPS.** Uploads/day = 500M x 2 = 10^9; views/day = 2.5 x 10^10. Dividing by ~10^5 s/day: avg upload QPS ~10,000 and avg view QPS ~250,000; with a 3x peak, ~30k peak upload QPS and ~750k peak view QPS. The 25:1 read:write skew screams CDN plus object store, not database-served images.",
               "**Storage.** New photos/day = 10^9 at 2 MB each = 2 PB/day of raw blobs; with RF=3 about 6 PB/day provisioned, plus 10 to 20% for thumbnails. Over a year the blob footprint is on the order of an exabyte.",
               "That single number forces the storage choice: photos must live in an object store (S3-class) fronted by a CDN, with only compact metadata (photo id, owner, S3 key, timestamps, ~1 KB/photo, so ~1 TB/day) in a sharded database. You cannot put multi-petabyte-per-day blobs in Postgres.",
               "**Serving implications:** 750k peak view QPS is served almost entirely from the CDN edge, so origin QPS is a small fraction. 30k peak upload QPS goes through an ingest tier that writes blobs to the object store and enqueues thumbnail generation (Kafka or SQS plus workers). Metadata writes at 30k QPS need sharding by photo id or user id.",
@@ -1266,9 +1266,9 @@ export const systemDesignLevel0: DesignLevel = {
               "How skewed is title popularity, and what does that mean an edge cache needs to hold?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 250M subscribers, 2 hours/day each, 5 Mbps average delivered bitrate, catalog 100k titles x 15 GB/title across encodings, 3x peak multiplier for concurrent viewing.",
+              "Assumptions: 250M subscribers, 2 hours/day each, 5 Mbps average delivered bitrate, catalog 100k titles x 15 GB/title across encodings, and a ~1.2x peak multiplier on concurrent viewing, below the usual 2x to 3x band because the subscriber base spans time zones and flattens the global concurrency curve.",
               "**Catalog storage.** 100k x 15 GB = 1.5 PB raw; with RF=3 plus geo-distribution a few PB. A fixed, modest number: the catalog is small and mostly static. Storage is not the hard problem.",
-              "**Egress bandwidth is the real problem.** Bandwidth is about concurrency, not daily totals: if ~10% of subscribers stream at peak, that is 25M concurrent streams x 5 Mbps = 125 Tbps of peak egress. That number is the entire design constraint. You cannot serve 125 Tbps from central origins; it must come from a CDN deployed deep into ISP networks (Netflix's Open Connect model), caching popular titles inside or adjacent to ISPs.",
+              "**Egress bandwidth is the real problem.** Bandwidth is about concurrency, not daily totals: 250M x 2 h / 24 h = ~21M average concurrent streams, about 8% of subscribers. Applying the 1.2x peak multiplier gives ~25M concurrent streams at peak, roughly 10% of subscribers, x 5 Mbps = 125 Tbps of peak egress. That number is the entire design constraint. You cannot serve 125 Tbps from central origins; it must come from a CDN deployed deep into ISP networks (Netflix's Open Connect model), caching popular titles inside or adjacent to ISPs.",
               "**Cache/CDN tier.** Apply the 80/20 rule hard: a small fraction of titles (new releases, trending shows) drives the overwhelming majority of streams. Each edge appliance caches the hot terabytes (a few thousand popular titles) and serves them locally; misses fall back to regional caches then origin. Because the catalog is only ~1.5 PB, a full copy fits in a regional cache. Fill happens off-peak overnight.",
               "**Verdict:** not storage (1.5 PB is small), not control-plane QPS (playback starts are modest), but sustained peak egress at 125 Tbps, which forces a purpose-built edge CDN rather than a centralized serving tier.",
               "Common wrong turn: sizing central data-center bandwidth for 125 Tbps, or fixating on catalog storage when the binding constraint is peak concurrent egress served from the edge.",
@@ -1617,12 +1617,12 @@ export const systemDesignLevel0: DesignLevel = {
               "How do you adapt the template to the actual prompt's constraints?",
             ],
             modelAnswerOutline: [
-              "**Phase backbone (45-min budget):** (1) Scope and requirements, 5 min: functional plus non-functional, clarify before designing. (2) Estimation, 5 min: QPS, storage, bandwidth. (3) API and data model, 5 min. (4) High-level design, 10 min: box-and-arrow request path. (5) Deep dive on the 1 to 2 hard parts, 10 min. (6) Bottlenecks and wrap-up, 5 min.",
+              "**Phase backbone (45-min budget):** (1) Scope and requirements, 5 min: functional plus non-functional, clarify before designing. (2) Estimation, 2 min: QPS, storage, bandwidth. (3) API and data model, 5 min. (4) High-level design, 15 min: box-and-arrow request path. (5) Deep dive on the 1 to 2 hard parts, 10 min. (6) Bottlenecks and wrap-up, 3 min.",
               "**Clarifying and NFR questions to open with:** How many users (DAU) and what QPS? Read-heavy or write-heavy? Consistency requirement (strong or eventual)? Latency target (p99)? What is explicitly out of scope? Any hard constraints (regions, compliance, budget)?",
               "**Estimation checklist:** DAU x actions/day / 86,400 = average QPS, then x2 to x3 for peak. Storage = writes/day x bytes/record x retention. Bandwidth = QPS x payload. Cache = hot 20% of the data. Servers = peak QPS / per-box throughput.",
               "**Component palette:** load balancer, API gateway, stateless app tier, Redis cache, Kafka queue, CDN, S3 object store, Elasticsearch, primary DB with read replicas and shards.",
               "**Trade-off lenses:** CAP/PACELC, push vs pull, sync vs async, SQL vs NoSQL, normalize vs denormalize.",
-              "**The 5 pitfalls and counters:** (1) Solutioning before scoping: force the first 5 minutes onto requirements. (2) Unbounded feature list: pick 2 to 3 core features and defer the rest out loud. (3) Generic NFRs: attach real numbers to every 'scalable/fast.' (4) Designing in silence: narrate every assumption and choice continuously. (5) No wrap-up: reserve the last 5 minutes for bottlenecks, failure modes, and next steps.",
+              "**The 5 pitfalls and counters:** (1) Solutioning before scoping: force the first 5 minutes onto requirements. (2) Unbounded feature list: pick 2 to 3 core features and defer the rest out loud. (3) Generic NFRs: attach real numbers to every 'scalable/fast.' (4) Designing in silence: narrate every assumption and choice continuously. (5) No wrap-up: reserve the last 2 to 3 minutes for bottlenecks, failure modes, and next steps.",
               "**Adapting it:** the template is a backbone, not a script. If the interviewer hands over the requirements and says 'go to storage,' skip phases 1 and 2, say so, and jump in.",
               "Common wrong turn: memorizing this as a monologue and delivering it verbatim regardless of the actual prompt, which reads as not listening.",
             ],
@@ -1639,7 +1639,7 @@ export const systemDesignLevel0: DesignLevel = {
             modelAnswerOutline: [
               "With 35 minutes, compress rather than skip. The rubric axes are the same, so protect scoping and wrap-up (cheap to lose, expensive to miss) and compress the middle.",
               "**(1) Scope, 4 min:** core features are create-short-URL and redirect; name and defer analytics and custom aliases. NFRs: read-heavy (redirects outnumber creations roughly 100:1), redirect p99 under 100ms, high availability (a dead link is a broken product).",
-              "**(2) Estimation, 3 min:** assume 100M new URLs/month, about 40 writes/sec, and at 100:1 about 4K redirects/sec peak; 100M/month x 500 bytes x 5 years is low terabytes, small enough that the interesting problem is read latency, not storage.",
+              "**(2) Estimation, 3 min:** assume 100M new URLs/month, about 40 writes/sec on average, and at 100:1 about 4K redirects/sec on average, so 8K to 12K/sec at peak with the 2x to 3x multiplier; 100M/month x 500 bytes x 5 years is low terabytes, small enough that the interesting problem is read latency, not storage.",
               "**(3) API and key generation, 5 min:** `POST /shorten`, `GET /{code}` redirecting with 301/302; the code is base62 of a counter or a hash. Commit to a distributed counter (or pre-generated key ranges per host) to avoid collision-checking on the write path.",
               "**(4) High-level design, 9 min:** LB, stateless app tier, a KV store (DynamoDB or Cassandra) keyed by short code, and an aggressive cache (Redis plus CDN) in front because reads dominate and the hot set is small.",
               "**(5) One deep dive, 8 min:** read scaling and cache strategy, since that is where this design lives, not the write path.",
