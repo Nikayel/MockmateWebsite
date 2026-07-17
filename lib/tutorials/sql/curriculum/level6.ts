@@ -2947,6 +2947,40 @@ WHERE role = 'dimension' AND size_bytes < 10485760;`,
         expected: { columns: ["broadcastable"], rows: [[3]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-skew-and-joins-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns each dimension with its size in MB and the join Spark would pick as \`(table_name, mb, join_kind)\`, smallest first, over \`join_inputs\`. \`join_kind\` is \`'broadcast'\` when the table is under 10 MB (10485760 bytes) and \`'shuffle'\` otherwise. Round \`mb\` to 2 decimals.`,
+      starterCode: `-- The join plan for each dimension against the fact.
+SELECT table_name, ROUND(size_bytes / 1000000.0, 2) AS mb
+FROM join_inputs
+WHERE role = 'dimension'
+;`,
+      hints: [
+        "`CASE WHEN size_bytes < 10485760 THEN 'broadcast' ELSE 'shuffle' END AS join_kind`.",
+        "`ORDER BY size_bytes ASC, table_name`.",
+      ],
+      referenceSolution: `SELECT table_name,
+       ROUND(size_bytes / 1000000.0, 2) AS mb,
+       CASE WHEN size_bytes < 10485760 THEN 'broadcast' ELSE 'shuffle' END AS join_kind
+FROM join_inputs
+WHERE role = 'dimension'
+ORDER BY size_bytes ASC, table_name;`,
+      singleFile: {
+        seedSql: JOIN_INPUTS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["table_name", "mb", "join_kind"],
+          rows: [
+            ["countries", 0.12, "broadcast"],
+            ["devices", 3.5, "broadcast"],
+            ["users", 9, "broadcast"],
+            ["products", 42, "shuffle"],
+          ],
+        },
+      },
+    },
   ],
 }
 
