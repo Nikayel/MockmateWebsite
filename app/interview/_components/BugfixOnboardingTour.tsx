@@ -399,14 +399,14 @@ export function BugfixOnboardingTour({
       <AnimatePresence>
         {showWelcome && (
           <motion.div
-            aria-modal="true"
             className="bg-background/80 fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-sm"
             exit={reduceMotion ? undefined : { opacity: 0 }}
             initial={reduceMotion ? undefined : { opacity: 0 }}
-            role="dialog"
             animate={reduceMotion ? undefined : { opacity: 1 }}
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
               aria-describedby="bugfix-tour-welcome-description"
               aria-labelledby="bugfix-tour-welcome-title"
               className="bg-background w-full max-w-md rounded-lg border border-cyan-400/25 p-5 shadow-2xl shadow-cyan-950/40"
