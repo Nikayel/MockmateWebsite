@@ -47,7 +47,7 @@ CREATE TABLE stg_customer (
 
 Read it top to bottom: six columns, each with a declared type, and two of them carry a \`DEFAULT\`. \`is_active\` defaults to the integer \`1\`; \`loaded_at\` defaults to the timestamp at the moment a row is written.
 
-Note the parentheses in \`DEFAULT (datetime('now'))\`. A function-call default must be wrapped in \`()\`; writing \`DEFAULT datetime('now')\` is a syntax error. The bare keyword \`CURRENT_TIMESTAMP\` is the one exception that needs no parentheses.
+Note the parentheses in \`DEFAULT (datetime('now'))\`. A function-call default must be wrapped in \`()\`; writing \`DEFAULT datetime('now')\` is a syntax error. Plain literals need no parentheses, and neither do the bare time keywords \`CURRENT_TIMESTAMP\`, \`CURRENT_DATE\`, and \`CURRENT_TIME\`: they look like function calls but the grammar accepts them without.
 
 ### Declaring defaults: literals, strings, and expressions
 
@@ -123,9 +123,10 @@ CREATE TABLE dim_customer (
       },
       {
         suite: "defaults",
-        name: "loaded_at is declared with a datetime() default",
+        name: "loaded_at declares a current-timestamp default",
         isHidden: true,
-        sql: `SELECT 1 WHERE COALESCE((SELECT dflt_value FROM pragma_table_info('dim_customer') WHERE name = 'loaded_at'), '') NOT LIKE '%datetime%'`,
+        sql: `SELECT 1 WHERE COALESCE((SELECT dflt_value FROM pragma_table_info('dim_customer') WHERE name = 'loaded_at'), '') NOT LIKE '%datetime%'
+          AND COALESCE((SELECT dflt_value FROM pragma_table_info('dim_customer') WHERE name = 'loaded_at'), '') NOT LIKE '%CURRENT_TIMESTAMP%'`,
       },
     ],
   }),
@@ -912,9 +913,13 @@ Column-level constraints sit on one column; **table-level** constraints (\`UNIQU
 ### Keep each CHECK to one clear invariant
 
 A giant compound \`CHECK\` is unreadable and hard to debug when it fires. Common trap: a \`CHECK\`
-**passes** when its condition evaluates to \`NULL\` (three-valued logic). That's why the ship-date rule
-is written \`ship_date IS NULL OR ship_date >= order_date\`, so a *missing* ship date is allowed but a
-*wrong* one isn't.
+**passes** when its condition evaluates to \`NULL\` (three-valued logic). So a bare
+\`CHECK (ship_date >= order_date)\` *already* lets a missing ship date through: the \`NULL\` makes the
+condition unknown, not false, and it still rejects a wrong one. The \`ship_date IS NULL OR\` prefix in
+the worked example above adds no enforcement; it documents the intent for the next reader. If a ship
+date must always be present, that is a separate \`NOT NULL\`, not a longer \`CHECK\`. Watch the polarity
+flip: that same \`IS NULL OR\` prefix *is* load-bearing in a \`WHERE\` clause, where a \`NULL\` condition
+drops the row instead of letting it through.
 
 **Recap:** constraints are the cheapest DQ layer. Use \`NOT NULL\` for required fields, \`UNIQUE\` (incl.
 composite) for identity/dedup, and \`CHECK\` for enums and invariants. Author them even where the
@@ -2279,18 +2284,18 @@ partitioning/clustering instead.
 **Execution mode:** you write a multi-statement script. It runs against a fresh in-memory SQLite DB,
 then hidden assertion queries inspect the indexes you created via \`pragma_index_list\` /
 \`pragma_index_info\`.`,
-    demoCode: `-- Self-contained: run me to watch an index change the query plan.
-CREATE TABLE orders (order_id INTEGER PRIMARY KEY, customer_id INTEGER, total_cents INTEGER);
-INSERT INTO orders (customer_id, total_cents) VALUES (42, 1000), (7, 500), (42, 250);
-
--- customer_id is a plain column (not the PK) -> not auto-indexed -> this filter SCANs:
-EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer_id = 42;
-
--- Add the index the filter needs...
-CREATE INDEX idx_orders_customer ON orders(customer_id);
-
--- ...now the optimizer can SEARCH using idx_orders_customer instead of scanning:
-EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer_id = 42;`,
+    demoSeedSql: `CREATE TABLE orders_unindexed (order_id INTEGER PRIMARY KEY, customer_id INTEGER, total_cents INTEGER);
+CREATE TABLE orders_indexed   (order_id INTEGER PRIMARY KEY, customer_id INTEGER, total_cents INTEGER);
+INSERT INTO orders_unindexed (customer_id, total_cents) VALUES (42, 1000), (7, 500), (42, 250);
+INSERT INTO orders_indexed   (customer_id, total_cents) VALUES (42, 1000), (7, 500), (42, 250);
+CREATE INDEX idx_orders_indexed_customer ON orders_indexed(customer_id);`,
+    demoCode: `-- The SAME filter against two identical tables. Only orders_indexed has an index on customer_id.
+-- Read the detail column: the unindexed table SCANs every row, the indexed one SEARCHes straight to
+-- the match. The COMPOUND QUERY / UNION ALL rows are just the scaffolding that stacks the two.
+EXPLAIN QUERY PLAN
+SELECT * FROM orders_unindexed WHERE customer_id = 42
+UNION ALL
+SELECT * FROM orders_indexed   WHERE customer_id = 42;`,
   },
   apply: scriptExercise({
     id: "sql-l3-indexes-apply",
