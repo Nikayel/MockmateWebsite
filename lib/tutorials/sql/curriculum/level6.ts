@@ -1108,6 +1108,8 @@ Parquet also stores the **schema and types inside the file** (in a footer), so a
 
 A Parquet file records, per column, how many bytes that column occupies. Reading those column statistics is how you predict what a query will scan and prove that projection pays off. The exercises here query a \`parquet_column_stats\` table (one row per column with its compressed size) and compute exactly how many bytes a two-column query reads versus the whole row.
 
+**Common mistake:** reaching for SELECT star on a lake. On a columnar store every extra column you select is more bytes read and more money, so name only the columns you actually need.
+
 **Interview nuance:** "why is Parquet faster than CSV for analytics" has two halves, and column projection is the first: a columnar file lets a query read only the columns it selects instead of every byte of every row. (The second half, compression, is the next lesson.) Saying both, and adding "and predicate pushdown skips row groups too," is a complete junior answer.
 
 > **On a real platform this differs.** A real Parquet reader gets these per-column sizes from the file footer, and an engine like Athena reports "data scanned" per query. The \`parquet_column_stats\` table here is a small stand-in with one row per column, so the projection math you do is the math the engine does.`,
