@@ -104,7 +104,6 @@ export interface BugfixPack {
   language: PackLanguage
   difficulty: PackDifficulty
   estMinutes: number
-  bugClass: PackBugClass
   /**
    * task.md content: the spec, the run command, and the EXACT expected-output block.
    * PUBLIC, candidate-visible content — sealing applies to solution.md/phase-2 only.
@@ -150,6 +149,16 @@ export interface PackPhase2 {
  */
 export interface SealedPackContent {
   packId: string
+  /**
+   * The bug's category ("off-by-one-window", "wrong-dedup-key", ...).
+   *
+   * Sealed, not client-safe. It used to ship in the compiled client module, where
+   * nothing rendered it but anyone could read `bugClass: "order-dependence"` out of
+   * the bundle — a direct category hint for the fault the pack exists to hide. It is
+   * authoring/coverage metadata (see packs/INDEX.md), which reads it from
+   * manifest.json, not from the client module.
+   */
+  bugClass: PackBugClass
   /** Full solution.md prose (bug, minimal fix, symptom explanation, complexity, phase-2 path). */
   solutionMd: string
   /** "src/main.py:57" — the intended bug location. */

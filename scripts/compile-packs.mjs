@@ -104,7 +104,6 @@ function clientModule(pack) {
     language: manifest.language,
     difficulty: manifest.difficulty,
     estMinutes: manifest.est_minutes,
-    bugClass: manifest.bug_class,
     taskMd: pack.taskMd,
     srcFiles: pack.srcFiles,
     fixtures: pack.fixtures,
@@ -126,6 +125,7 @@ function sealedModule(pack) {
   const { manifest, sealed } = pack
   const obj = {
     packId: manifest.id,
+    bugClass: manifest.bug_class,
     solutionMd: pack.solutionMd,
     bugLocation: sealed.bugLocation,
     bugSummary: sealed.bugSummary,
