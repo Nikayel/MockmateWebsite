@@ -1693,6 +1693,26 @@ WHERE 305000 BETWEEN min_order_id AND max_order_id;`,
         expected: { columns: ["row_groups_read"], rows: [[1]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-row-groups-pushdown-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns how many row groups and MB a \`WHERE order_id BETWEEN 90000 AND 260000\` filter reads as \`(groups_read, mb_read)\`, over \`row_group_stats\`. A row group is read when its range overlaps the filter. Treat 1 MB as 1,000,000 bytes, round \`mb_read\` to 2 decimals.`,
+      starterCode: `-- Row groups and MB read for a range spanning several groups.
+SELECT
+FROM row_group_stats;`,
+      hints: [
+        "Overlap: `max_order_id >= 90000 AND min_order_id <= 260000`.",
+        "`COUNT(CASE WHEN <overlap> THEN 1 END)` and `SUM(CASE WHEN <overlap> THEN compressed_bytes ELSE 0 END)`.",
+      ],
+      referenceSolution: `SELECT COUNT(CASE WHEN max_order_id >= 90000 AND min_order_id <= 260000 THEN 1 END) AS groups_read,
+       ROUND(SUM(CASE WHEN max_order_id >= 90000 AND min_order_id <= 260000 THEN compressed_bytes ELSE 0 END) / 1000000.0, 2) AS mb_read
+FROM row_group_stats;`,
+      singleFile: {
+        seedSql: ROW_GROUP_STATS_SEED,
+        expected: { columns: ["groups_read", "mb_read"], rows: [[3, 156]] },
+      },
+    },
   ],
 }
 
