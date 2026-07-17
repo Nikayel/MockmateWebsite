@@ -208,13 +208,22 @@ function ResultTh({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * A NULL padded in by an OUTER join is the entire lesson of this diagram — it is what
+ * makes a LEFT JOIN a LEFT JOIN. It was rendered at `text-muted-foreground/60`, which
+ * measures 2.41:1 in light mode and 3.71:1 in dark, both under the 4.5:1 AA bar. So the
+ * cell the diagram is built to show was the one hardest to see.
+ *
+ * Italic still separates it from a literal `'NULL'`; the opacity was only costing
+ * legibility. Same call as `lib/tutorials/table-cell`'s cellToneClass.
+ */
 function ResultTd({ value, filled }: { value: DiagramCell; filled: boolean }) {
   const isNull = value === null
   return (
     <td
       className={cn(
         "border-border/60 border-b px-3 py-1",
-        (isNull || filled) && "text-muted-foreground/60 italic"
+        (isNull || filled) && "text-muted-foreground italic"
       )}
     >
       {formatCell(value)}
