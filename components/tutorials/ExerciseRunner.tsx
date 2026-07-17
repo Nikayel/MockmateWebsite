@@ -12,6 +12,7 @@ import { HintList } from "./HintList"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { useExerciseRun } from "./useExerciseRun"
 import type { PythonExercise } from "@/lib/tutorials/types"
+import { LessonNotice } from "./LessonNotice"
 
 /**
  * Single-file exercise runner: one editor, keyed test cases, graded in-browser via
@@ -161,12 +162,9 @@ export function ExerciseRunner({
       <HintList hints={hints.slice(0, hintsShown)} total={hints.length} />
 
       {(emptyWarning || runError) && (
-        <p
-          role="alert"
-          className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300"
-        >
+        <LessonNotice>
           {emptyWarning ? "Write your solution first, then run it." : runError}
-        </p>
+        </LessonNotice>
       )}
 
       {showReference && exercise.referenceSolution && (
