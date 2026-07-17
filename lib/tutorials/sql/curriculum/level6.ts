@@ -2967,6 +2967,23 @@ FROM staged_events;`,
         expected: { columns: ["total_rows", "distinct_ids"], rows: [[10, 7]] },
       },
     },
+    {
+      id: "sql-l6-data-quality-checks-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many rows have an invalid (non-positive) amount as \`(bad_amounts)\`, over \`staged_events\`.`,
+      starterCode: `-- Count rows whose amount is zero or negative.
+SELECT
+FROM staged_events
+;`,
+      hints: ["`WHERE amount <= 0`.", "`COUNT(*)` over that filter."],
+      referenceSolution: `SELECT COUNT(*) AS bad_amounts
+FROM staged_events
+WHERE amount <= 0;`,
+      singleFile: {
+        seedSql: STAGED_EVENTS_SEED,
+        expected: { columns: ["bad_amounts"], rows: [[1]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
