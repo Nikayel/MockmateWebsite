@@ -371,31 +371,6 @@ function InterviewPageContent() {
     [currentSessionId, selectedScenario?.type]
   )
 
-  /**
-   * Open a workspace file in the editor from the problem column's file tree.
-   *
-   * Memoized deliberately: it is a `problemCtx` dependency, and a fresh identity
-   * each render would rebuild the ctx every render and defeat ProblemColumn's memo.
-   * Opening a file is also how bugfix inspection evidence is recorded, which feeds
-   * the codebaseNavigation and evidenceGathering scores.
-   */
-  const handleEditorFileSelect = useCallback(
-    (file: WorkspaceContextFile) => {
-      if (file.path !== activeWorkspacePath) {
-        setActiveWorkspacePath(file.path)
-        setCode(file.content || "")
-      }
-      if (selectedScenario?.type === "bugfix") {
-        recordBugfixEvidence({
-          type: file.role === "test" || file.role === "docs" ? "test_or_doc_opened" : "file_opened",
-          filePath: file.path,
-          fileRole: file.role,
-        })
-      }
-    },
-    [activeWorkspacePath, recordBugfixEvidence, selectedScenario?.type]
-  )
-
   const buildBugfixEvidencePayload = useCallback((): BugfixEvidenceEvent[] => {
     if (selectedScenario?.type !== "bugfix") return []
     return bugfixEvidenceEvents
@@ -458,6 +433,37 @@ function InterviewPageContent() {
     showProblemPeek,
     setShowProblemPeek,
   } = useInterviewModes()
+
+  /**
+   * Open a workspace file in the editor from the problem column's file tree.
+   *
+   * Memoized deliberately: it is a `problemCtx` dependency, and a fresh identity
+   * each render would rebuild the ctx every render and defeat ProblemColumn's memo.
+   * Opening a file is also how bugfix inspection evidence is recorded, which feeds
+   * the codebaseNavigation and evidenceGathering scores. Declared after
+   * useInterviewModes so it can reveal the editor panel on file-select.
+   */
+  const handleEditorFileSelect = useCallback(
+    (file: WorkspaceContextFile) => {
+      // The file tree lives in the problem panel now. On mobile only one panel shows at a
+      // time, so opening a file must also reveal the editor — otherwise the tap silently
+      // swaps the editor's contents behind the problem panel and nothing appears to happen.
+      // On desktop every panel is visible, so this is a no-op there.
+      setActivePanel("editor")
+      if (file.path !== activeWorkspacePath) {
+        setActiveWorkspacePath(file.path)
+        setCode(file.content || "")
+      }
+      if (selectedScenario?.type === "bugfix") {
+        recordBugfixEvidence({
+          type: file.role === "test" || file.role === "docs" ? "test_or_doc_opened" : "file_opened",
+          filePath: file.path,
+          fileRole: file.role,
+        })
+      }
+    },
+    [activeWorkspacePath, recordBugfixEvidence, selectedScenario?.type, setActivePanel]
+  )
 
   // Experience level from roadmap (for level-appropriate interviewer questions)
   // Falls back to "intermediate" if no roadmap (direct practice mode)
