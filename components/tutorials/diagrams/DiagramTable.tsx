@@ -1,12 +1,16 @@
 import { cn } from "@/lib/utils"
 import { DiagramFrame } from "./primitives/DiagramFrame"
-import { formatCell } from "@/lib/tutorials/diagrams/format"
+import { cellToneClass, formatCellText } from "@/lib/tutorials/table-cell"
 import type { TableSpec } from "@/lib/tutorials/diagrams/schema"
 
 /**
  * A polished static table with column emphasis (static). For authored example tables
  * where a GFM table can't call out the column that matters — e.g. the aggregated
- * column a GROUP BY produces. Numbers right-align (tabular-nums); NULLs read as NULL.
+ * column a GROUP BY produces.
+ *
+ * Cell rendering comes from the shared `table-cell` contract, so an authored example and
+ * the live query result beside it agree on what a NULL, an empty string and a number look
+ * like.
  */
 export function DiagramTable({ spec }: { spec: TableSpec }) {
   const hot = new Set(spec.highlightCols ?? [])
@@ -44,11 +48,10 @@ export function DiagramTable({ spec }: { spec: TableSpec }) {
                     className={cn(
                       "border-border/60 border-b px-3 py-1.5 align-top",
                       hot.has(col) && "bg-accent/5 text-foreground font-medium",
-                      typeof v === "number" && "text-right tabular-nums",
-                      v === null && "text-muted-foreground/60 italic"
+                      cellToneClass(v)
                     )}
                   >
-                    {formatCell(v)}
+                    {formatCellText(v)}
                   </td>
                 )
               })}
