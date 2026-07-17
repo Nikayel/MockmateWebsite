@@ -1271,6 +1271,24 @@ LIMIT 1;`,
         expected: { columns: ["column_name", "ratio"], rows: [["country", 40]] },
       },
     },
+    {
+      id: "sql-l6-compression-encoding-drill-2",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many MB compression saved across the whole file as \`(saved_mb)\`, over \`parquet_column_stats\`. That is total uncompressed minus total compressed, in MB (1 MB = 1,000,000 bytes), rounded to 2 decimals.`,
+      starterCode: `-- Uncompressed total minus compressed total, in MB.
+SELECT
+FROM parquet_column_stats;`,
+      hints: [
+        "`SUM(uncompressed_bytes) - SUM(compressed_bytes)` is the bytes saved.",
+        "Divide by 1000000.0 and `ROUND(..., 2)`.",
+      ],
+      referenceSolution: `SELECT ROUND((SUM(uncompressed_bytes) - SUM(compressed_bytes)) / 1000000.0, 2) AS saved_mb
+FROM parquet_column_stats;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        expected: { columns: ["saved_mb"], rows: [[944]] },
+      },
+    },
     /* __DRILL_SLOT__ */
   ],
 }
