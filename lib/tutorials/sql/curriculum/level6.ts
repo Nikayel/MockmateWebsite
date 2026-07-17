@@ -2379,6 +2379,24 @@ ORDER BY stage_id;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-distributed-execution-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns the total number of tasks and total input rows across the job as \`(tasks, input_rows)\`, over \`task_metrics\`.`,
+      starterCode: `-- Count tasks, sum input rows.
+SELECT
+FROM task_metrics;`,
+      hints: ["`COUNT(*)` is the task count.", "`SUM(input_rows)` is total input rows."],
+      referenceSolution: `SELECT COUNT(*) AS tasks, SUM(input_rows) AS input_rows
+FROM task_metrics;`,
+      singleFile: {
+        seedSql: TASK_METRICS_SEED,
+        expected: { columns: ["tasks", "input_rows"], rows: [[8, 19750000]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 const skewAndJoins: SqlLesson = {
