@@ -116,7 +116,7 @@ export function LessonPathCard({ node }: { node: LessonPathNode }) {
         </span>
 
         {isCurrent ? (
-          <span className="text-accent inline-flex items-center gap-0.5 text-xs font-semibold">
+          <span className="text-accent-strong inline-flex items-center gap-0.5 text-xs font-semibold">
             Start
             <ArrowRight
               className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
