@@ -1,19 +1,9 @@
 "use client"
 
-import { memo, useState, type RefObject } from "react"
-import {
-  Bot,
-  ChevronDown,
-  ChevronUp,
-  Code,
-  PanelLeft,
-  PlayCircle,
-  RotateCcw,
-  Send,
-} from "lucide-react"
+import { memo, type RefObject } from "react"
+import { Bot, ChevronDown, ChevronUp, Code, PlayCircle, RotateCcw, Send } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { type CodeMirrorEditorRef } from "@/components/editor"
@@ -37,7 +27,6 @@ import {
   hasWorkspaceFileEdits,
   isWorkspaceScenario,
 } from "../_utils/workspace"
-import { FileTreeSidebar } from "./FileTreeSidebar"
 import { LazyCodeMirrorEditor } from "./LazyCodeMirrorEditor"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
@@ -83,7 +72,6 @@ interface EditorColumnProps {
   isLoadingChat: boolean
   onSendPartnerMessage: () => void
   workspaceContext?: WorkspaceContextFile[]
-  onFileSelect?: (file: WorkspaceContextFile) => void
   editorRef?: RefObject<CodeMirrorEditorRef | null>
   onGoToLine?: (lineNum: number) => void
 }
@@ -123,11 +111,9 @@ export const EditorColumn = memo(function EditorColumn({
   isLoadingChat,
   onSendPartnerMessage,
   workspaceContext = [],
-  onFileSelect,
   editorRef,
   onGoToLine,
 }: EditorColumnProps) {
-  const [showFilesDrawer, setShowFilesDrawer] = useState(false)
   const isWorkspace = isWorkspaceScenario(selectedScenario) && workspaceContext.length > 0
   const activeRoleStyle = activeWorkspaceFile
     ? getWorkspaceFileRoleStyle(activeWorkspaceFile.role)
@@ -183,11 +169,6 @@ export const EditorColumn = memo(function EditorColumn({
   )
   const guidedLabBlocksSubmit = guidedLabActiveForScenario && !guidedLabComplete
 
-  const handleFileSelect = (file: WorkspaceContextFile) => {
-    onFileSelect?.(file)
-    setShowFilesDrawer(false)
-  }
-
   const editorSurface = (
     <>
       <ErrorBoundary>
@@ -241,17 +222,6 @@ export const EditorColumn = memo(function EditorColumn({
         {isWorkspace ? (
           <div className="border-border bg-card/80 flex w-full items-center justify-between border-b pr-4">
             <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowFilesDrawer((open) => !open)}
-                className="border-border bg-card text-muted-foreground hover:bg-muted h-8 px-2 text-xs md:hidden"
-                title="Toggle file list"
-                aria-label="Toggle file list"
-                aria-expanded={showFilesDrawer}
-              >
-                <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              </Button>
               {activeWorkspaceFile && activeRoleStyle && ActiveRoleIcon ? (
                 <>
                   <ActiveRoleIcon
@@ -349,52 +319,11 @@ export const EditorColumn = memo(function EditorColumn({
       </CardHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
-        {isWorkspace ? (
-          <div
-            className="border-border relative min-h-0 flex-1 overflow-hidden rounded border"
-            data-bugfix-tour={selectedScenario?.type === "bugfix" ? "workspace-files" : undefined}
-          >
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              <ResizablePanel
-                defaultSize={24}
-                minSize={14}
-                maxSize={42}
-                className="hidden md:block"
-              >
-                <FileTreeSidebar
-                  files={workspaceContext}
-                  activePath={activeWorkspaceFile?.path}
-                  onFileSelect={handleFileSelect}
-                />
-              </ResizablePanel>
-              <ResizableHandle withHandle className="hidden md:flex" />
-              <ResizablePanel className="min-h-0">
-                <div className="relative h-full min-h-0 overflow-auto">{editorSurface}</div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-            {showFilesDrawer && (
-              <div className="absolute inset-0 z-20 flex md:hidden">
-                <div className="bg-card border-border w-3/4 max-w-xs overflow-y-auto border-r shadow-xl">
-                  <FileTreeSidebar
-                    files={workspaceContext}
-                    activePath={activeWorkspaceFile?.path}
-                    onFileSelect={handleFileSelect}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="bg-background/60 flex-1"
-                  aria-label="Close file list"
-                  onClick={() => setShowFilesDrawer(false)}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
-            {editorSurface}
-          </div>
-        )}
+        {/* The file tree lives in the problem column now, so the editor keeps the
+            whole width of the one column the candidate types in. */}
+        <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
+          {editorSurface}
+        </div>
 
         {isInterviewStarted && selectedScenario?.type !== "system-design" && (
           <ConsoleOutputPanel
