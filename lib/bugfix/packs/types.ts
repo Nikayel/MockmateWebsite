@@ -83,6 +83,20 @@ export interface BugfixPack {
   title: string
   /** One-line, symptom-only incident summary for cards. Must not name the bug/fix. */
   summary: string
+  /**
+   * The one-sentence job, in the product's own terms, for the brief's task box.
+   *
+   * Authored per pack. This slot used to hold a template whose only variable was the
+   * run command, so all 14 packs told the candidate the same thing: "make stdout
+   * match byte-for-byte" — the grading mechanism, not the job, and already stated in
+   * `successCriteria` one line below.
+   *
+   * Authoring rule (PACK_REALISM_GUIDE §9): state the JOB and add no fact that the
+   * public `## Data contract` does not already state. Never single out one contract
+   * clause — that points at the defect's terrain. Deletion test: if removing the
+   * sentence would make the fault harder to find, it is a hint, not a spec.
+   */
+  task: string
   company: PackCompany
   /** Company-union tags for BugFixScenario registration + card display. */
   companies: Company[]

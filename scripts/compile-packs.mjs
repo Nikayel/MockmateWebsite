@@ -92,6 +92,7 @@ function clientModule(pack) {
     id: manifest.id,
     title: manifest.title,
     summary: manifest.summary,
+    task: manifest.task,
     company: {
       tag: manifest.company.tag,
       roundName: manifest.company.round_name,
