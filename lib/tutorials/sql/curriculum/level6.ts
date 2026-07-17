@@ -749,6 +749,41 @@ SELECT
         expected: { columns: ["standard_vs_deep"], rows: [[23.2]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-storage-classes-lifecycle-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns the monthly storage cost of each top-level prefix as \`(prefix, cost)\`, most expensive first, over \`s3_inventory\` joined to \`storage_pricing\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
+      starterCode: `-- Cost per prefix: join to pricing, group by the key prefix.
+SELECT substr(i.object_key, 1, instr(i.object_key, '/') - 1) AS prefix
+FROM s3_inventory i
+JOIN storage_pricing p ON p.storage_class = i.storage_class
+GROUP BY prefix
+;`,
+      hints: [
+        "The prefix is `substr(object_key, 1, instr(object_key, '/') - 1)`.",
+        "`SUM(i.size_bytes * p.usd_per_gb_month) / 1000000000.0` per prefix; `ORDER BY cost DESC, prefix`.",
+      ],
+      referenceSolution: `SELECT substr(i.object_key, 1, instr(i.object_key, '/') - 1) AS prefix,
+       ROUND(SUM(i.size_bytes * p.usd_per_gb_month) / 1000000000.0, 2) AS cost
+FROM s3_inventory i
+JOIN storage_pricing p ON p.storage_class = i.storage_class
+GROUP BY prefix
+ORDER BY cost DESC, prefix;`,
+      singleFile: {
+        seedSql: INVENTORY_AND_PRICING_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["prefix", "cost"],
+          rows: [
+            ["raw", 30.5],
+            ["curated", 2.07],
+            ["exports", 1.15],
+            ["archive", 0.99],
+          ],
+        },
+      },
+    },
   ],
 }
 
