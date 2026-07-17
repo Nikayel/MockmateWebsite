@@ -40,4 +40,4 @@ orbit_goods: 4500
 pine_market: 8400
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

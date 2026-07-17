@@ -52,4 +52,4 @@ commercial/initech: 2
 gov/umbrella: 1
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

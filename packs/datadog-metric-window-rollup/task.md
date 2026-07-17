@@ -44,4 +44,4 @@ python3 src/window_rollup.py fixtures/input.txt
 12:02:00  count=1  sum=1
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

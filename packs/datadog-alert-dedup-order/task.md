@@ -50,4 +50,4 @@ db-pool: 2
 disk-usage: 1
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

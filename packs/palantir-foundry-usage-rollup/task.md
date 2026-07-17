@@ -35,4 +35,4 @@ initech: 30
 umbrella: 12
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

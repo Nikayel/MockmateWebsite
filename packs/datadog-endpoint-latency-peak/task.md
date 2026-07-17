@@ -31,4 +31,4 @@ python3 src/latency_rollup.py fixtures/input.txt
 /checkout: peak=900ms over 2
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

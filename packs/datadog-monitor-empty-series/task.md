@@ -52,4 +52,4 @@ web.error_rate: NO DATA
 web.latency_ms: OK
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.

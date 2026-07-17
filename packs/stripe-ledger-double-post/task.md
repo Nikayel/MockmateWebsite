@@ -47,4 +47,4 @@ nimbus_cafe: 4500
 vertex_gym: 6000
 ```
 
-The solution file is off-limits.
+`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.
