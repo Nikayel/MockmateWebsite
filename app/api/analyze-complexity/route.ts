@@ -7,7 +7,66 @@ import { logger } from "@/lib/logger"
 // Bound the input we will forward to the LLM (prevents oversized prompts
 // inflating cost). Matches the chat route's currentCode ceiling.
 const MAX_CODE_LENGTH = 100_000
-const MAX_PROMPT_LENGTH = 20_000
+const MAX_LABEL_LENGTH = 200
+
+// The system prompt is OWNED BY THE SERVER. It used to be accepted verbatim from the
+// request body, which turned this "complexity analysis" endpoint into a general-purpose
+// LLM proxy any signed-in user could steer. The client now sends only structured data.
+const COMPLEXITY_SYSTEM_PROMPT = `You are an expert algorithm analyst. Analyze the given code and determine its time and space complexity.
+
+RULES:
+1. Analyze the ACTUAL algorithm, not just syntax patterns
+2. Consider recursion depth and branching factor
+3. Account for early returns, break conditions, and optimizations
+4. Recognize common patterns: two-pointer, sliding window, divide-and-conquer, DP, etc.
+5. Consider amortized complexity where applicable
+6. Be precise: O(n) is different from O(n log n) is different from O(n²)
+
+CRITICAL - AMORTIZED COMPLEXITY PATTERNS:
+Some algorithms have nested loops but are still O(n) due to amortized analysis:
+
+- BUCKET SORT / COUNTING SORT: Even with nested loops iterating buckets, if total items across ALL buckets = n, the complexity is O(n), NOT O(n²). Example: Top K Frequent Elements using bucket sort.
+
+- MONOTONIC STACK/QUEUE: Inner while loop may run multiple times, but each element is pushed/popped at most once total, so O(n) amortized.
+
+- TWO POINTERS (same direction): Two pointers both moving forward = O(n) total, not O(n²).
+
+When you see nested loops, ask: "Does the inner loop's TOTAL iterations across ALL outer iterations equal n?" If yes, it's O(n) amortized.
+
+OUTPUT FORMAT (JSON only, no markdown):
+{
+  "timeComplexity": "O(n)" | "O(n log n)" | "O(n²)" | "O(2^n)" | etc.,
+  "spaceComplexity": "O(1)" | "O(n)" | "O(log n)" | etc.,
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "Brief explanation of why this complexity",
+  "algorithmPattern": "pattern name if recognized",
+  "suggestions": ["optional improvement suggestions"]
+}`
+
+/** Build the user prompt from structured, length-bounded fields — never from a client prompt. */
+function buildComplexityUserPrompt(params: {
+  code: string
+  language: string
+  problemTitle?: string
+  optimalTimeComplexity?: string
+  optimalSpaceComplexity?: string
+}): string {
+  const label = (value: unknown): string =>
+    typeof value === "string" ? value.slice(0, MAX_LABEL_LENGTH) : ""
+  const title = label(params.problemTitle)
+  const optTime = label(params.optimalTimeComplexity)
+  const optSpace = label(params.optimalSpaceComplexity)
+  return `Analyze this ${label(params.language)} code${title ? ` for the problem "${title}"` : ""}:
+
+\`\`\`
+${params.code}
+\`\`\`
+
+${optTime ? `Known optimal time complexity: ${optTime}` : ""}
+${optSpace ? `Known optimal space complexity: ${optSpace}` : ""}
+
+Return ONLY valid JSON, no markdown code blocks.`
+}
 
 /**
  * API endpoint for LLM-based code complexity analysis.
@@ -33,7 +92,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { systemPrompt, userPrompt, code, language } = body
+    // Accept only structured data. Any client-supplied systemPrompt/userPrompt is ignored;
+    // the prompt is built on the server so this endpoint cannot be used as an LLM proxy.
+    const { code, language, problemTitle, optimalTimeComplexity, optimalSpaceComplexity } = body
 
     if (!code || !language) {
       return NextResponse.json({ error: "Code and language are required" }, { status: 400 })
@@ -43,12 +104,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Code is invalid or too large" }, { status: 400 })
     }
 
-    if (
-      (typeof systemPrompt === "string" && systemPrompt.length > MAX_PROMPT_LENGTH) ||
-      (typeof userPrompt === "string" && userPrompt.length > MAX_PROMPT_LENGTH)
-    ) {
-      return NextResponse.json({ error: "Prompt too large" }, { status: 400 })
-    }
+    const systemPrompt = COMPLEXITY_SYSTEM_PROMPT
+    const userPrompt = buildComplexityUserPrompt({
+      code,
+      language,
+      problemTitle,
+      optimalTimeComplexity,
+      optimalSpaceComplexity,
+    })
 
     // Use a fast model for complexity analysis (it's a focused task)
     const aiResponse = await generateAIResponse(systemPrompt, userPrompt, [], {

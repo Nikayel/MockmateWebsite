@@ -42,59 +42,20 @@ export async function analyzeComplexityWithLLM(
   const { code, language, problemTitle, optimalTimeComplexity, optimalSpaceComplexity, authToken } =
     request
 
-  const systemPrompt = `You are an expert algorithm analyst. Analyze the given code and determine its time and space complexity.
-
-RULES:
-1. Analyze the ACTUAL algorithm, not just syntax patterns
-2. Consider recursion depth and branching factor
-3. Account for early returns, break conditions, and optimizations
-4. Recognize common patterns: two-pointer, sliding window, divide-and-conquer, DP, etc.
-5. Consider amortized complexity where applicable
-6. Be precise: O(n) is different from O(n log n) is different from O(n²)
-
-CRITICAL - AMORTIZED COMPLEXITY PATTERNS:
-Some algorithms have nested loops but are still O(n) due to amortized analysis:
-
-- BUCKET SORT / COUNTING SORT: Even with nested loops iterating buckets, if total items across ALL buckets = n, the complexity is O(n), NOT O(n²). Example: Top K Frequent Elements using bucket sort.
-
-- MONOTONIC STACK/QUEUE: Inner while loop may run multiple times, but each element is pushed/popped at most once total, so O(n) amortized.
-
-- TWO POINTERS (same direction): Two pointers both moving forward = O(n) total, not O(n²).
-
-When you see nested loops, ask: "Does the inner loop's TOTAL iterations across ALL outer iterations equal n?" If yes, it's O(n) amortized.
-
-OUTPUT FORMAT (JSON only, no markdown):
-{
-  "timeComplexity": "O(n)" | "O(n log n)" | "O(n²)" | "O(2^n)" | etc.,
-  "spaceComplexity": "O(1)" | "O(n)" | "O(log n)" | etc.,
-  "confidence": "high" | "medium" | "low",
-  "reasoning": "Brief explanation of why this complexity",
-  "algorithmPattern": "pattern name if recognized",
-  "suggestions": ["optional improvement suggestions"]
-}`
-
-  const userPrompt = `Analyze this ${language} code${problemTitle ? ` for the problem "${problemTitle}"` : ""}:
-
-\`\`\`${language}
-${code}
-\`\`\`
-
-${optimalTimeComplexity ? `Known optimal time complexity: ${optimalTimeComplexity}` : ""}
-${optimalSpaceComplexity ? `Known optimal space complexity: ${optimalSpaceComplexity}` : ""}
-
-Return ONLY valid JSON, no markdown code blocks.`
-
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" }
     if (authToken) headers.Authorization = `Bearer ${authToken}`
+    // The analysis prompt is built and owned by /api/analyze-complexity now; send only
+    // structured data so the endpoint can't be steered into a general-purpose LLM proxy.
     const response = await fetch("/api/analyze-complexity", {
       method: "POST",
       headers,
       body: JSON.stringify({
-        systemPrompt,
-        userPrompt,
         code,
         language,
+        problemTitle,
+        optimalTimeComplexity,
+        optimalSpaceComplexity,
       }),
     })
 
