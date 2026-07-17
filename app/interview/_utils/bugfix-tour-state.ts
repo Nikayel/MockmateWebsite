@@ -13,7 +13,7 @@ export interface StoredBugfixTourState {
 }
 
 export interface BugfixTourStep {
-  id: "incident-report" | "workspace-files" | "hypothesis" | "run-tests" | "ai-partner"
+  id: "incident-report" | "workspace-files" | "run-tests" | "ai-partner"
   target: string
   panel: TourPanel
   title: string
@@ -39,14 +39,6 @@ export const TOUR_STEPS: BugfixTourStep[] = [
     action: "Open a docs or test file.",
   },
   {
-    id: "hypothesis",
-    target: "hypothesis",
-    panel: "problem",
-    title: "Write your hypothesis",
-    body: "Before editing, write what you think is causing the bug. The AI interviewer can use this to ask better follow-ups.",
-    action: "Type a short hypothesis and click Save hypothesis.",
-  },
-  {
     id: "run-tests",
     target: "run-tests",
     panel: "editor",
@@ -59,7 +51,7 @@ export const TOUR_STEPS: BugfixTourStep[] = [
     target: "ai-partner",
     panel: "editor",
     title: "Use AI like a debugging partner",
-    body: "Ask for help interpreting files or test output. When your fix is verified, save root cause and prevention, then submit.",
+    body: "Ask for help interpreting files or test output. Talk through your hypothesis and root cause with your interviewer as you go, the way you would in a real round. That conversation is part of what gets assessed.",
     action: "Ask a debugging question or finish the tour.",
   },
 ]

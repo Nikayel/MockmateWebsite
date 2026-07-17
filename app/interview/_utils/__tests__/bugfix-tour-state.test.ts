@@ -56,12 +56,11 @@ afterEach(() => {
 })
 
 describe("TOUR_STEPS", () => {
-  it("has five steps in the expected order", () => {
-    expect(TOUR_STEPS).toHaveLength(5)
+  it("has four steps in the expected order", () => {
+    expect(TOUR_STEPS).toHaveLength(4)
     expect(TOUR_STEPS.map((step) => step.id)).toEqual([
       "incident-report",
       "workspace-files",
-      "hypothesis",
       "run-tests",
       "ai-partner",
     ])
@@ -75,6 +74,17 @@ describe("TOUR_STEPS", () => {
       expect(step.title.length).toBeGreaterThan(0)
       expect(step.body.length).toBeGreaterThan(0)
       expect(step.action.length).toBeGreaterThan(0)
+    }
+  })
+
+  it("only spotlights targets that exist in the DOM", () => {
+    // The tour finds each step by [data-bugfix-tour="<target>"] and cannot advance past
+    // a step whose target never mounts. The "hypothesis" step pointed at the removed
+    // Investigation Notes panel and gated Next on typing into it, so keeping it would
+    // have deadlocked the tour on a spotlight over nothing.
+    const RENDERED_TOUR_TARGETS = ["incident-report", "workspace-files", "run-tests", "ai-partner"]
+    for (const step of TOUR_STEPS) {
+      expect(RENDERED_TOUR_TARGETS).toContain(step.target)
     }
   })
 })
