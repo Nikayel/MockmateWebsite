@@ -161,6 +161,9 @@ INSERT INTO order_items VALUES
   (4, 102, 12, 1, 9900),
   (5, 102, 11, 2, 1500);`,
       orderMatters: false,
+      // The prompt requires aliasing to exactly total_revenue/order_count, so grade the
+      // names — otherwise a correct-values-but-unaliased answer passes the aliasing task.
+      assertColumnNames: true,
       expected: {
         columns: ["total_revenue", "order_count"],
         rows: [[16900, 3]],

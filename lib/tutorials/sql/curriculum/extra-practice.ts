@@ -281,6 +281,8 @@ FROM orders;`,
     singleFile: {
       seedSql: AGG_SEED,
       orderMatters: true,
+      // Prompt asks for the columns named order_count/total_cents, so grade the names.
+      assertColumnNames: true,
       expected: { columns: ["order_count", "total_cents"], rows: [[6, 29000]] },
     },
   },

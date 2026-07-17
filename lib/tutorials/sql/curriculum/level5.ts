@@ -1505,7 +1505,7 @@ Step through the join and watch the fan-out happen: each order's \`amount\` reap
     "rows": [[1, "A"], [1, "B"], [2, "A"], [3, "C"], [3, "A"], [3, "B"]]
   },
   "on": ["order_id", "order_id"],
-  "caption": "Order 1 matches 2 items and order 3 matches 3, so each amount repeats once per item. SUM(amount) over these 6 result rows is 550, not the true 350 — that is the fan-out."
+  "caption": "Order 1 matches 2 items and order 3 matches 3, so each amount repeats once per item. SUM(amount) over these 6 result rows is 550, not the true 350. That is the fan-out."
 }
 \`\`\`
 

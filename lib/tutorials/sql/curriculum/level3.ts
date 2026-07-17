@@ -2310,7 +2310,7 @@ that an index exists on the right column of \`fact_sales\`.`,
 
 -- CREATE INDEX idx_fact_sales_customer ON fact_sales(...);`,
     hints: [
-      "`CREATE INDEX idx_fact_sales_customer ON fact_sales(customer_sk);`. One statement is all you need.",
+      "One `CREATE INDEX` statement is all you need. Which column do the marts join `fact_sales` on?",
       "Name it `idx_<table>_<col>` by convention.",
       "`customer_sk` is a plain FK-style column, not the PK, so it isn't auto-indexed; `sale_id` is the `INTEGER PRIMARY KEY` (the `rowid`), so PK lookups are already fast without a separate index.",
     ],
