@@ -3179,6 +3179,39 @@ LIMIT 1;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-pipelines-orchestration-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns each job's success rate and the average duration of its successful runs as \`(job, success_pct, avg_success_min)\`, alphabetical by job, over \`pipeline_runs\`. Round both to 2 decimals.`,
+      starterCode: `-- Reliability and typical runtime per job.
+SELECT job
+FROM pipeline_runs
+GROUP BY job
+;`,
+      hints: [
+        "`success_pct = 100.0 * SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*)`.",
+        "`AVG(CASE WHEN status = 'success' THEN duration_min END)` averages only successful runs (NULLs are ignored by AVG).",
+      ],
+      referenceSolution: `SELECT job,
+       ROUND(100.0 * SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*), 2) AS success_pct,
+       ROUND(AVG(CASE WHEN status = 'success' THEN duration_min END), 2) AS avg_success_min
+FROM pipeline_runs
+GROUP BY job
+ORDER BY job;`,
+      singleFile: {
+        seedSql: PIPELINE_RUNS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["job", "success_pct", "avg_success_min"],
+          rows: [
+            ["bronze_ingest", 75, 29],
+            ["gold_metrics", 100, 9.88],
+            ["silver_clean", 75, 21.67],
+          ],
+        },
+      },
+    },
   ],
 }
 
