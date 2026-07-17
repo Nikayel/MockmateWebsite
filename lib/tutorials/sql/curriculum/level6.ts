@@ -1578,10 +1578,10 @@ A row group's min and max are just columns you can filter on. The exercises quer
 
 > **On a real platform this differs.** Real engines read these min/max stats from the Parquet footer (and per-page indexes) and decide row-group skipping automatically; you never write the skip logic. The \`row_group_stats\` table here exposes those stats as rows so you can compute the skip yourself and see what the engine sees.`,
     demoSeedSql: ROW_GROUP_STATS_SEED,
-    demoCode: `-- For WHERE order_id BETWEEN 150000 AND 250000, which row groups does pushdown read?
+    demoCode: `-- For WHERE order_id BETWEEN 250000 AND 350000, which row groups does pushdown read?
 SELECT rg_id, min_order_id, max_order_id,
        ROUND(compressed_bytes / 1000000.0, 0) AS mb,
-       CASE WHEN max_order_id >= 150000 AND min_order_id <= 250000 THEN 'read' ELSE 'skip' END AS pushdown
+       CASE WHEN max_order_id >= 250000 AND min_order_id <= 350000 THEN 'read' ELSE 'skip' END AS pushdown
 FROM row_group_stats
 ORDER BY rg_id;`,
     showDemoInput: false,
