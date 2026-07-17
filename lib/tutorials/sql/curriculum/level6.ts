@@ -2599,6 +2599,8 @@ One detail that trips up beginners: the shuffle **write** is attributed to the p
 
 An engine records per-task metrics: which stage, how many rows, how many bytes, how long. Reading those is how you understand where a job spent its time. The exercises query a \`task_metrics\` table (one row per task) to summarize the stages and see where the shuffle bytes were written.
 
+**Common mistake:** assuming more partitions always means faster. Past a point, tiny partitions mean thousands of tiny tasks whose scheduling and shuffle overhead outweighs the parallelism, so partition count is a tuning choice, not a free win.
+
 **Interview nuance:** "what is a shuffle and why is it slow" is a core distributed-systems question. The answer: a wide operation like a group-by or join has to move rows across the network so same-key rows co-locate, paying disk, serialization, and network cost. Narrow operations like filter and map avoid it.
 
 > **On a real platform this differs.** Real per-task metrics come from the Spark UI or history server, with dozens of columns. The \`task_metrics\` table here keeps the few that carry the lesson: stage, rows, bytes, shuffle write, and duration. The stage-level summary you compute is exactly the view the UI shows you.`,
