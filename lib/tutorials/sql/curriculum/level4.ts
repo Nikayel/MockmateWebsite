@@ -515,7 +515,7 @@ To flag a customer's **most recent** month, check whether the row has no success
 
 **Interview nuance:** window functions are computed after \`WHERE\`, \`GROUP BY\`, and \`HAVING\` have run, as part of evaluating the \`SELECT\` list. You therefore cannot filter on \`LAG\`/\`LEAD\` (or reference their aliases) in a \`WHERE\` or \`HAVING\` clause at the same query level. Wrap the window query in a CTE or subquery, then filter or flag on its output. That evaluation order is the single most common thing interviewers probe about window functions.
 
-> **In the warehouse this differs.** Snowflake, Oracle, and BigQuery let \`LAG\` / \`LEAD\` / \`FIRST_VALUE\` skip nulls with \`IGNORE NULLS\`, the usual "carry the last non-null value forward" trick. SQLite and Postgres have no \`IGNORE NULLS\`; writing it is a bare \`syntax error near "NULLS"\`. Carry the value forward with a correlated subquery instead:
+> **In the warehouse this differs.** Snowflake lets \`LAG\` / \`LEAD\` / \`FIRST_VALUE\` skip nulls with \`IGNORE NULLS\`, the usual "carry the last non-null value forward" trick, and Oracle and BigQuery accept \`IGNORE NULLS\` on \`FIRST_VALUE\` / \`LAST_VALUE\`. BigQuery's \`LAG\` / \`LEAD\` do not take it, though, so don't assume the clause is portable across every function. SQLite and Postgres have no \`IGNORE NULLS\` at all; writing it is a bare \`syntax error near "NULLS"\`. Carry the value forward with a correlated subquery instead:
 
 \`\`\`sql
 -- Warehouses: LAG(status) IGNORE NULLS OVER (PARTITION BY id ORDER BY ts)
