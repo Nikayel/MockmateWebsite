@@ -2816,6 +2816,8 @@ Spark decides automatically: any table under \`spark.sql.autoBroadcastJoinThresh
 
 The exercises compute both: a per-task straggler ratio (each task's duration over its stage average) that surfaces the skewed task, and, for a set of join inputs, which dimension tables are small enough to broadcast under the 10 MB threshold.
 
+**Common mistake:** trying to broadcast a table that is not actually small. Only the small side of a join broadcasts, and broadcasting a large table copies it to every executor and runs them out of memory, so check the size against the threshold first.
+
 **Interview nuance:** "huge fact table joined to a tiny dimension, avoid the shuffle" wants "broadcast the small table so the big one never moves." "One task is 10x slower than the rest" wants "data skew: a hot key overloaded one task; salt it, filter the null, or let AQE split it."
 
 > **On a real platform this differs.** Redshift co-locates join keys with a distribution key so matching rows already share a node; Snowflake runs elastic virtual warehouses over shared micro-partitions. The broadcast-vs-shuffle and skew reasoning is the same idea those systems express differently. The \`task_metrics\` and \`join_inputs\` tables here let you compute the decision the optimizer makes.`,
