@@ -277,6 +277,40 @@ FROM platform_services;`,
         expected: { columns: ["compute_pct"], rows: [[73.99]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-cloud-and-the-de-stack-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns each layer's total cost and its share of the whole platform as \`(layer, cost, pct_of_total)\`, most expensive first, over \`platform_services\`. Round \`pct_of_total\` to 2 decimals.`,
+      starterCode: `-- Per-layer cost plus each layer's percent of the platform total.
+SELECT layer, SUM(monthly_cost_usd) AS cost
+FROM platform_services
+GROUP BY layer
+;`,
+      hints: [
+        "The total is a scalar subquery: `(SELECT SUM(monthly_cost_usd) FROM platform_services)`.",
+        "`100.0 * SUM(monthly_cost_usd) / (that total)` is the share; `ORDER BY cost DESC, layer`.",
+      ],
+      referenceSolution: `SELECT layer, SUM(monthly_cost_usd) AS cost,
+       ROUND(100.0 * SUM(monthly_cost_usd) / (SELECT SUM(monthly_cost_usd) FROM platform_services), 2) AS pct_of_total
+FROM platform_services
+GROUP BY layer
+ORDER BY cost DESC, layer;`,
+      singleFile: {
+        seedSql: PLATFORM_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["layer", "cost", "pct_of_total"],
+          rows: [
+            ["compute", 6600, 73.99],
+            ["storage", 1200, 13.45],
+            ["serving", 570, 6.39],
+            ["orchestration", 400, 4.48],
+            ["catalog", 150, 1.68],
+          ],
+        },
+      },
+    },
   ],
 }
 
