@@ -21,7 +21,7 @@ export default function LearnSystemDesignPage() {
       <LearnPathTopBar label="Learn System Design" containerClass="max-w-4xl" />
       <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
         <header className="mb-10 text-center">
-          <p className="text-accent text-xs font-semibold tracking-[0.18em] uppercase">
+          <p className="text-accent-strong text-xs font-semibold tracking-[0.18em] uppercase">
             Learn System Design
           </p>
           <h1 className="text-foreground mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
@@ -35,7 +35,7 @@ export default function LearnSystemDesignPage() {
           <div className="mt-6 flex items-center justify-center gap-2">
             {LOOP_PHASES.map((phase, i) => (
               <span key={phase} className="flex items-center gap-2">
-                <span className="border-accent/30 bg-accent/10 text-accent rounded-full border px-3 py-1 text-sm font-medium">
+                <span className="border-accent/30 bg-accent/10 text-accent-strong rounded-full border px-3 py-1 text-sm font-medium">
                   {phase}
                 </span>
                 {i < LOOP_PHASES.length - 1 && (
@@ -59,7 +59,7 @@ export default function LearnSystemDesignPage() {
                   className="group border-border bg-card hover:border-accent/40 hover:bg-accent/[0.03] flex items-start gap-4 rounded-xl border p-5 transition-colors"
                 >
                   <span
-                    className="border-accent/30 text-accent bg-accent/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold"
+                    className="border-accent/30 text-accent-strong bg-accent/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold"
                     aria-hidden="true"
                   >
                     {level.id}
