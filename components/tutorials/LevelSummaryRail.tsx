@@ -13,10 +13,19 @@ function formatMinutes(minutes: number): string {
   return rem ? `${hours}h ${rem}m` : `${hours}h`
 }
 
+/**
+ * The section-status dot, as a FILL scale: empty ring -> ringed -> solid.
+ *
+ * It used to be a hue scale — clay for complete, amber-500 for in_progress — and those are
+ * 14deg apart (hue 24 vs 38). At `h-2 w-2` that is two warm oranges the size of a full
+ * stop: the rail was spending a colour to distinguish the two states it exists to
+ * distinguish, and distinguishing neither. Filled-ness survives both an 8px dot and
+ * colour-blindness, and it maps to the done/total count beside it.
+ */
 const SECTION_DOT: Record<LevelPathModel["sections"][number]["status"], string> = {
-  complete: "bg-accent",
-  in_progress: "bg-amber-500",
-  untouched: "bg-muted-foreground/40",
+  complete: "bg-accent border-accent border-2",
+  in_progress: "border-accent bg-accent/20 border-2",
+  untouched: "border-muted-foreground/40 border-2",
 }
 
 /**
@@ -70,10 +79,14 @@ export function LevelSummaryRail({
             className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 group flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             {path.done > 0 ? "Continue" : "Start learning"}
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            <ArrowRight
+              className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
           </Link>
           <p className="text-muted-foreground mt-2 truncate text-xs">
-            Next: <span className="text-foreground/80 font-medium">{continueTarget.lessonTitle}</span>
+            Next:{" "}
+            <span className="text-foreground/80 font-medium">{continueTarget.lessonTitle}</span>
           </p>
         </div>
       ) : isComplete && firstLessonHref ? (
@@ -104,8 +117,9 @@ export function LevelSummaryRail({
                   href={`#${section.id}`}
                   className="group hover:bg-muted/60 flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors"
                 >
+                  {/* Decorative: the done/total count beside it states the same thing in text. */}
                   <span
-                    className={cn("h-2 w-2 shrink-0 rounded-full", SECTION_DOT[section.status])}
+                    className={cn("h-2.5 w-2.5 shrink-0 rounded-full", SECTION_DOT[section.status])}
                     aria-hidden="true"
                   />
                   <span className="text-muted-foreground group-hover:text-foreground min-w-0 flex-1 truncate text-sm transition-colors">
