@@ -21,11 +21,8 @@ import type { GuidedLabConfig } from "@/lib/bugfix/guided-lab/types"
 import type { WorkspaceContextFile } from "../_types"
 import { BugfixBrief } from "./_sub/BugfixBrief"
 import { ProblemHintSection } from "./_sub/ProblemHintSection"
-import { BugfixReflectionPanel } from "./_sub/BugfixReflectionPanel"
 import { WorkspaceFileViewer } from "./_sub/WorkspaceFileViewer"
 import { GuidedLabRail } from "./guided-lab/GuidedLabRail"
-
-export type BugfixReflectionField = "hypothesis" | "rootCause" | "prevention"
 
 type ScenarioPanelDetails = Scenario & {
   expectedBehavior?: string
@@ -46,11 +43,6 @@ type ScenarioPanelDetails = Scenario & {
 
 export interface ProblemColumnCtx {
   activePanel: "problem" | "editor" | "chat"
-  bugfixReflection?: {
-    hypothesis: string
-    rootCause: string
-    prevention: string
-  }
   elapsedTime: number
   fetchRAGHints: () => Promise<void>
   fileInputRef: RefObject<HTMLInputElement | null>
@@ -67,8 +59,6 @@ export interface ProblemColumnCtx {
   revealedHints: number
   selectedScenario: Scenario | null
   setIsCodeViewerOpen: (open: boolean) => void
-  onBugfixReflectionChange?: (field: BugfixReflectionField, value: string) => void
-  onBugfixReflectionCommit?: (field: BugfixReflectionField) => void
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
   setRevealedHintIndices: Dispatch<SetStateAction<Set<number>>>
   setSelectedFile: (file: WorkspaceContextFile | null) => void
@@ -91,7 +81,6 @@ export const ProblemColumn = memo(function ProblemColumn({
 }: ProblemColumnProps) {
   const {
     activePanel,
-    bugfixReflection,
     elapsedTime,
     fetchRAGHints,
     fileInputRef,
@@ -108,8 +97,6 @@ export const ProblemColumn = memo(function ProblemColumn({
     revealedHints,
     selectedScenario,
     setIsCodeViewerOpen,
-    onBugfixReflectionChange,
-    onBugfixReflectionCommit,
     setRevealedAIHintIndices,
     setRevealedHintIndices,
     setSelectedFile,
@@ -253,14 +240,6 @@ export const ProblemColumn = memo(function ProblemColumn({
                     </div>
                   )}
                 </div>
-              )}
-
-              {isBugfix && isInterviewStarted && bugfixReflection && (
-                <BugfixReflectionPanel
-                  bugfixReflection={bugfixReflection}
-                  onBugfixReflectionChange={onBugfixReflectionChange}
-                  onBugfixReflectionCommit={onBugfixReflectionCommit}
-                />
               )}
 
               {/* Debugging signals - shown independently, right after description */}
