@@ -133,8 +133,11 @@ export const ProblemColumn = memo(function ProblemColumn({
                   */}
       <Card
         className={`glass-effect border-border bg-card/50 order-1 h-full flex-col gap-0 overflow-hidden py-0 ${
-          focusMode
-            ? "hidden" // Always hidden in focus mode - no responsive override
+          focusMode && !showFileTree
+            ? // Focus mode hides the problem description — but not when this column owns the
+              // workspace file tree, which is a working tool a bugfix candidate needs (and
+              // which records the codebase-navigation scoring evidence).
+              "hidden"
             : collapsed
               ? // Collapsed is a desktop affordance: hide at lg, still tab-able on mobile
                 activePanel === "problem"
