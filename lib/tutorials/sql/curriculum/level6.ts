@@ -1044,7 +1044,9 @@ FROM row_group_stats;`,
 // ---------------------------------------------------------------------------
 // Shared simulated-catalog seeds for Module 6.3. `partition_catalog` = one row per date
 // partition (the raw material of pruning math); `partition_files` = file count + bytes per
-// partition (the small-files problem); `user_buckets` = a hash-bucketed layout (skew).
+// partition, holding the SAME partitions in folder-name (`dt=...`) form to reinforce "the value
+// lives in the path" (the small-files problem); `user_buckets` = a hash-bucketed layout (skew);
+// `query_log` = one row per logged query, used to spot the full-scan trap.
 // ---------------------------------------------------------------------------
 
 const PARTITION_CATALOG_SEED = `CREATE TABLE partition_catalog (
@@ -1088,6 +1090,19 @@ INSERT INTO user_buckets (bucket_id, user_count, size_bytes) VALUES
   (5, 131000,  322000000),
   (6, 119000,  298000000),
   (7, 900000, 1400000000);   -- a mega-user hashes here and skews the bucket`
+
+const QUERY_LOG_SEED = `CREATE TABLE query_log (
+  query_id           INTEGER,
+  predicate          TEXT,      -- how the WHERE clause was written
+  partitions_scanned INTEGER,   -- the table has 7 partitions; 7 means a full scan
+  bytes_scanned      INTEGER
+);
+INSERT INTO query_log (query_id, predicate, partitions_scanned, bytes_scanned) VALUES
+  (1, 'bare dt = one day',           1,  700000000),   -- prunes to one partition
+  (2, 'dt BETWEEN two dates',        3, 1650000000),   -- prunes to three
+  (3, 'substr(dt,1,7) month prefix', 7, 3940000000),   -- function-wrapped: full scan
+  (4, 'filter on user_id (non-key)', 7, 3940000000),   -- non-partition column: full scan
+  (5, 'date(dt) function-wrapped',   7, 3940000000);   -- function-wrapped: full scan`
 
 // ---------------------------------------------------------------------------
 // Module 6.3 — Partitioning a Large Table
@@ -1392,9 +1407,11 @@ Bucketing only helps when the hash spreads evenly. A single mega-key (one user w
 Pruning only happens when the engine can match your filter to the partition key, and it is easy to accidentally defeat it. Two classic mistakes:
 
 - **Filtering on a non-partition column.** If the table is partitioned by \`dt\` but you filter only on \`user_id\`, nothing prunes and the engine scans every partition.
-- **Wrapping the partition key in a function.** Comparing a **bare partition column to a constant** (\`WHERE dt = '2026-01-05'\`) prunes. Transforming the column first (a computed or dynamic expression on \`dt\`) can stop the engine from pruning, so it reads the whole table. The portable rule is to keep the partition column bare on one side and a constant on the other.
+- **Wrapping the partition key in a function.** Comparing a **bare partition column to a constant** (\`WHERE dt = '2026-01-05'\`) prunes. Transforming the column first stops the engine from pruning, so it reads the whole table. For example \`WHERE substr(dt, 1, 7) = '2026-01'\` or \`WHERE date(dt) = date('2026-01-05')\` wraps \`dt\` in a function and forces a full scan, where a bare \`WHERE dt >= '2026-01-01' AND dt < '2026-02-01'\` would have pruned. The portable rule is to keep the partition column bare on one side and a constant on the other.
 
-The cost of the trap is total: a query that should read one partition ends up reading all of them. The exercises put a number on it by comparing a pruning query's bytes to a full scan.
+The cost of the trap is total: a query that should read one partition ends up reading all of them. The practice exercise reads a query log and flags the queries that defeated pruning and scanned every partition.
+
+One more bucketing payoff to bank: two tables **bucketed the same way** (same key, same bucket count) can be joined on the bucket key with no shuffle, because matching keys already sit in matching buckets. That is the join-side twin of the broadcast trick you will meet in the next module.
 
 **Interview nuance:** "you partitioned by date but the query still scans everything, why" almost always means the filter did not land on the bare partition key: it filtered a different column, or wrapped \`dt\` in a function. Keep the partition column bare and compared to a constant.
 
@@ -1440,25 +1457,29 @@ FROM user_buckets;`,
   practice: {
     id: "sql-l6-bucketing-and-the-full-scan-trap-practice",
     executionMode: "single-file",
-    prompt: `Write a query that returns the bytes a partition-pruning query scans when it filters \`dt = '2026-01-05'\`, versus a query that cannot prune and scans the whole table, and how many times more bytes the full scan reads, as \`(pruned_bytes, full_scan_bytes, scan_multiplier)\`, over \`partition_catalog(dt, file_count, size_bytes, row_count)\`.
+    prompt: `Write a query that returns the queries that fell into the full-scan trap (they scanned every one of the table's 7 partitions), as \`(query_id, predicate, bytes_scanned)\`, most bytes first, over \`query_log(query_id, predicate, partitions_scanned, bytes_scanned)\`.
 
-\`pruned_bytes\` is that one day's partition; \`full_scan_bytes\` is the whole table; \`scan_multiplier\` is full divided by pruned. Round \`scan_multiplier\` to 2 decimals.`,
-    starterCode: `-- The cost of the full-scan trap: pruned bytes vs a whole-table scan.
-SELECT
-  -- bytes for dt = '2026-01-05', total bytes, and full / pruned
-FROM partition_catalog;`,
+A query pruned correctly when it scanned fewer than all 7 partitions; it hit the trap when \`partitions_scanned\` equals 7 (it read the whole table). Order by \`bytes_scanned\` descending, then \`query_id\`.`,
+    starterCode: `-- Which logged queries defeated pruning and scanned all 7 partitions?
+SELECT query_id, predicate, bytes_scanned
+FROM query_log
+-- keep only queries that scanned every partition, most bytes first
+;`,
     hints: [
-      "`SUM(CASE WHEN dt = '2026-01-05' THEN size_bytes ELSE 0 END)` is the pruned bytes; `SUM(size_bytes)` is the full scan.",
-      "`scan_multiplier = SUM(size_bytes) * 1.0 / pruned_bytes` (full divided by pruned).",
-      "Round `scan_multiplier` to 2 decimals.",
+      "A full scan means the query read every partition: `partitions_scanned = 7`.",
+      "Filter on that, then order by `bytes_scanned DESC, query_id`.",
     ],
     singleFile: {
-      seedSql: PARTITION_CATALOG_SEED,
-      orderMatters: false,
+      seedSql: QUERY_LOG_SEED,
+      orderMatters: true,
       assertColumnNames: true,
       expected: {
-        columns: ["pruned_bytes", "full_scan_bytes", "scan_multiplier"],
-        rows: [[700000000, 3940000000, 5.63]],
+        columns: ["query_id", "predicate", "bytes_scanned"],
+        rows: [
+          [3, "substr(dt,1,7) month prefix", 3940000000],
+          [4, "filter on user_id (non-key)", 3940000000],
+          [5, "date(dt) function-wrapped", 3940000000],
+        ],
       },
     },
   },
@@ -1467,7 +1488,8 @@ FROM partition_catalog;`,
 // ---------------------------------------------------------------------------
 // Shared simulated-catalog seeds for Module 6.4. `task_metrics` = one row per Spark task
 // (stages, shuffle, the straggler); `join_inputs` = table sizes for a broadcast decision;
-// `pipeline_runs` = a medallion pipeline's run log (reliability + freshness/SLA).
+// `pipeline_runs` = a medallion pipeline's run log (reliability + freshness/SLA);
+// `staged_events` = a raw batch with planted quality issues (duplicates, nulls, bad values).
 // ---------------------------------------------------------------------------
 
 const TASK_METRICS_SEED = `CREATE TABLE task_metrics (
@@ -1521,6 +1543,24 @@ INSERT INTO pipeline_runs (job, run_date, status, rows_out, duration_min, sla_mi
   ('gold_metrics',  '2026-01-02', 'success',     120,  6.5, 15),
   ('gold_metrics',  '2026-01-03', 'success',     120,  7.0, 15),
   ('gold_metrics',  '2026-01-04', 'success',     120, 20.0, 15);   -- SLA breach`
+
+const STAGED_EVENTS_SEED = `CREATE TABLE staged_events (
+  event_id INTEGER,   -- should be unique per event
+  user_id  INTEGER,
+  amount   REAL,
+  country  TEXT
+);
+INSERT INTO staged_events (event_id, user_id, amount, country) VALUES
+  (1, 100, 12.50, 'US'),
+  (2, 101, 30.00, 'US'),
+  (3, NULL, 15.00, 'CA'),   -- null user_id (completeness issue)
+  (4, 102, -5.00, 'GB'),    -- negative amount (validity issue)
+  (5, 103, 20.00, 'US'),
+  (2, 101, 30.00, 'US'),    -- duplicate event_id 2
+  (5, 103, 20.00, 'US'),    -- duplicate event_id 5
+  (5, 103, 20.00, 'US'),    -- event_id 5 appears three times
+  (6, NULL,  8.00, NULL),   -- null user_id and null country
+  (7, 104, 40.00, 'US');`
 
 // ---------------------------------------------------------------------------
 // Module 6.4 — Distributed Processing & Pipelines
@@ -1813,7 +1853,7 @@ ORDER BY size_bytes ASC;`,
 
 const pipelinesOrchestration: SqlLesson = {
   id: "sql-l6-pipelines-orchestration",
-  title: "Pipelines, Orchestration, and Idempotency (Capstone)",
+  title: "Pipelines, Orchestration, and Idempotency",
   summary:
     "A DAG of scheduled jobs moves data raw to useful (medallion Bronze/Silver/Gold, ELT). The reliability ideas that matter: idempotent re-runs, backfills, and freshness SLAs, all queryable from a run log.",
   estimatedMinutes: 28,
@@ -1946,6 +1986,132 @@ ORDER BY over_by_min DESC;`,
   },
 }
 
+const dataQualityChecks: SqlLesson = {
+  id: "sql-l6-data-quality-checks",
+  title: "Data Quality Checks and Quality Gates",
+  summary:
+    "A pipeline can succeed and still write garbage. The check families a junior is expected to name (uniqueness, completeness, validity, volume, referential integrity) and the quality gate that stops bad data, all written as plain SQL.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: [
+    "data quality",
+    "duplicate detection",
+    "null-rate / completeness checks",
+    "quality gates (write-audit-publish)",
+    "conditional aggregation",
+  ],
+  teach: {
+    estimatedMinutes: 13,
+    markdown: `## "Validated" is not a wish, it is a set of checks
+
+The Silver layer earned the words "cleaned, validated, deduplicated" in the last lesson, and this lesson is where that word gets teeth. A pipeline can finish with a green status and still write garbage: a broken upstream export sends half the rows, a join fans out and duplicates every order, a bug lets NULLs into a key column. "The job succeeded" and "the data is correct" are two different questions, and a data engineer is expected to check the second one. "How do you know your data is correct, and how would you test a pipeline?" is one of the most common junior DE interview questions.
+
+## The check families
+
+Data-quality checks fall into a handful of families, and almost every real test is one of these:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["check family", "catches", "SQL shape"],
+  "rows": [
+    ["uniqueness / duplicates", "a key that repeats (broken dedup, fan-out join)", "GROUP BY key HAVING COUNT(*) > 1"],
+    ["completeness / null rate", "missing values in a required column", "SUM(CASE WHEN col IS NULL ...) / COUNT(*)"],
+    ["validity / range", "values outside the allowed domain", "WHERE col < 0 OR col NOT IN (...)"],
+    ["volume anomaly", "a load far bigger or smaller than usual", "compare COUNT(*) to a recent baseline"],
+    ["referential integrity", "a foreign key with no parent row", "LEFT JOIN dim WHERE dim.id IS NULL"]
+  ],
+  "highlightCols": ["SQL shape"],
+  "caption": "Every data-quality test is one of these families, and each is a plain SQL query underneath a tool like dbt or Great Expectations."
+}
+\`\`\`
+
+- **Uniqueness / duplicates.** A key that should be unique (one row per \`order_id\`) but is not signals a broken dedup or a fan-out join. This is also how you catch a non-idempotent re-run: run a job twice without an idempotent write and every key doubles. You find it with \`GROUP BY key HAVING COUNT(*) > 1\`.
+- **Completeness / null rate.** A column that should always be present but is NULL or blank. You measure the null rate and alert when it crosses a threshold.
+- **Validity / range.** A value outside its allowed domain: a negative price, a status not in the allowed set, a date in the future.
+- **Volume / row-count anomaly.** Today's load is a tenth of yesterday's, or triple. The row count itself is a signal (the \`rows_out\` your run log records).
+- **Referential integrity.** A \`user_id\` in the fact table that does not exist in the users dimension (an orphan).
+
+## Quality gates
+
+A check is only useful if it can **stop bad data**. A **quality gate** runs the checks and fails the pipeline (or quarantines the batch) when a check breaches its threshold, so the bad data never reaches the Gold tables the dashboards read. This is the **write-audit-publish** idea: write to a staging area, audit it with checks, and publish only if it passes. In practice you express these checks with a framework like **dbt tests** (\`unique\`, \`not_null\`, \`accepted_values\`, \`relationships\`) or **Great Expectations**, but every one of them is a SQL query underneath.
+
+## Writing the checks with SQL
+
+The checks are exactly the SQL you already know: a \`GROUP BY ... HAVING\` for duplicates, a conditional \`SUM\` for a null rate, a \`CASE\` for a pass or fail gate. The exercises run real checks over a \`staged_events\` batch: find the duplicated ids, then compute a null rate and decide whether the batch passes its gate.
+
+**Interview nuance:** "how would you test this pipeline" wants the check families by name (uniqueness, completeness, validity, volume, referential integrity) and the idea of a quality gate that fails the run. Bonus points for naming dbt tests or Great Expectations, and for saying the checks run in a write-audit-publish step before the data is published.
+
+> **On a real platform this differs.** Real quality checks run as dbt tests or Great Expectations suites wired into the pipeline, emitting pass or fail per check with row-level samples of the failures. The \`staged_events\` table here lets you write the same checks as plain SQL so you can see what each framework runs for you underneath.`,
+    demoSeedSql: STAGED_EVENTS_SEED,
+    demoCode: `-- A one-row quality scorecard for the staged batch before it is published.
+SELECT COUNT(*) AS total_rows,
+       SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) AS null_user_ids,
+       SUM(CASE WHEN amount <= 0 THEN 1 ELSE 0 END) AS bad_amounts
+FROM staged_events;`,
+    showDemoInput: true,
+  },
+  apply: {
+    id: "sql-l6-data-quality-checks-apply",
+    executionMode: "single-file",
+    prompt: `Write a query that returns every \`event_id\` that appears more than once, with how many copies it has, as \`(event_id, copies)\`, most copies first, over \`staged_events(event_id, user_id, amount, country)\`.
+
+\`event_id\` should be unique per event, so any id with more than one row is a duplicate a dedup step must resolve. Order by \`copies\` descending, then \`event_id\`.`,
+    starterCode: `-- Duplicate event_ids (a key that should be unique but is not).
+SELECT event_id, COUNT(*) AS copies
+FROM staged_events
+-- keep only ids that appear more than once, most copies first
+;`,
+    hints: [
+      "Group by `event_id` and `COUNT(*) AS copies`.",
+      "`HAVING COUNT(*) > 1` keeps only the duplicated ids (a plain WHERE cannot filter on the count).",
+      "Order by `copies DESC, event_id`.",
+    ],
+    referenceSolution: `SELECT event_id, COUNT(*) AS copies
+FROM staged_events
+GROUP BY event_id
+HAVING COUNT(*) > 1
+ORDER BY copies DESC, event_id;`,
+    singleFile: {
+      seedSql: STAGED_EVENTS_SEED,
+      orderMatters: true,
+      assertColumnNames: true,
+      expected: {
+        columns: ["event_id", "copies"],
+        rows: [
+          [5, 3],
+          [2, 2],
+        ],
+      },
+    },
+  },
+  practice: {
+    id: "sql-l6-data-quality-checks-practice",
+    executionMode: "single-file",
+    prompt: `Write a query that returns the batch's total row count, its null \`user_id\` rate as a percentage, and whether it passes a quality gate, as \`(total_rows, null_user_pct, gate)\`, over the same \`staged_events\` table.
+
+The gate requires the null \`user_id\` rate to be under 5 percent: return \`'pass'\` when it is and \`'fail'\` otherwise. Round \`null_user_pct\` to 2 decimals.`,
+    starterCode: `-- A completeness gate: fail the batch if too many user_id values are NULL.
+SELECT COUNT(*) AS total_rows
+  -- null_user_pct, and a 'pass' / 'fail' gate at a 5% threshold
+FROM staged_events;`,
+    hints: [
+      "`SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END)` counts the NULLs; divide by `COUNT(*)` and multiply by 100.0 for the rate.",
+      "`CASE WHEN 100.0 * SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) / COUNT(*) < 5 THEN 'pass' ELSE 'fail' END AS gate`.",
+      "Round `null_user_pct` to 2 decimals.",
+    ],
+    singleFile: {
+      seedSql: STAGED_EVENTS_SEED,
+      orderMatters: false,
+      assertColumnNames: true,
+      expected: {
+        columns: ["total_rows", "null_user_pct", "gate"],
+        rows: [[10, 20, "fail"]],
+      },
+    },
+  },
+}
+
 export const sqlLevel6: SqlLevel = {
   id: 6,
   slug: "cloud-data-foundations",
@@ -1985,8 +2151,8 @@ export const sqlLevel6: SqlLevel = {
       id: "sql-l6-distributed-pipelines",
       title: "Module 6.4: Distributed Processing & Pipelines",
       description:
-        "How big data is actually computed and how it flows: an engine splits data into partitions and tasks and pays for the shuffle, data skew creates stragglers, a broadcast join avoids shuffling a huge table, and a pipeline of scheduled, idempotent jobs (the medallion) moves data raw to useful under a freshness SLA.",
-      lessons: [distributedExecution, skewAndJoins, pipelinesOrchestration],
+        "How big data is actually computed and how it flows: an engine splits data into partitions and tasks and pays for the shuffle, data skew creates stragglers, a broadcast join avoids shuffling a huge table, a pipeline of scheduled, idempotent jobs (the medallion) moves data raw to useful under a freshness SLA, and data-quality checks and gates stop a green-but-wrong run from publishing bad data.",
+      lessons: [distributedExecution, skewAndJoins, pipelinesOrchestration, dataQualityChecks],
     },
   ],
 }
