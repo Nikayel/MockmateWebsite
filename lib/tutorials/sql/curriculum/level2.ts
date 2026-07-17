@@ -1561,7 +1561,7 @@ Columns are matched **by position, not by name**: the first column of the top qu
 
 ## \`UNION\` vs \`UNION ALL\`: a real cost decision
 
-\`UNION\` runs a deduplication pass (effectively a sort or hash) over the combined rows; \`UNION ALL\` just concatenates. When you *know* the sources don't overlap, or you *want* to preserve duplicates (e.g. two regions that both legitimately contain an order with the same total), use \`UNION ALL\`. Reaching for \`UNION\` by reflex silently drops legitimate duplicate rows *and* costs more.
+\`UNION\` runs a deduplication pass (effectively a sort or hash) over the combined rows; \`UNION ALL\` just concatenates. Note that \`UNION\` dedupes on the **entire row**, not on one key column: in the demo above, EU order 101 and US order 201 both have \`total_cents\` = 5000, yet swapping \`UNION ALL\` for \`UNION\` drops nothing and returns the same 5 rows, because their \`order_id\`s differ. A row disappears only when *every* selected column matches, such as the same order arriving in both regional feeds under the same \`order_id\` and total. When you *know* the sources don't overlap, or you *want* to keep such duplicates (two identical rows can be two real events), use \`UNION ALL\`. Reaching for \`UNION\` by reflex silently drops legitimate duplicate rows *and* costs more.
 
 ## Keep it readable / common pitfall
 
@@ -1716,7 +1716,9 @@ correlated:     inner query references an outer alias (o), re-evaluated per oute
 
 > **Performance note.** A correlated subquery conceptually re-runs per outer row, which can be slow on large tables. Very often the same result is expressible as a **join** or a **window function** (Level 4), which the optimizer executes in one pass. Reach for the correlated form for clarity, but know that "above their own group's average" is a textbook case a window function does faster.
 
-**Keep it readable / common pitfall:** a scalar subquery that accidentally returns more than one row is a runtime error (\`sub-select returns N columns/rows\`). And remember the \`NOT IN\` + NULL trap from Level 1: if the subquery can emit a NULL, prefer \`NOT EXISTS\`.
+**Keep it readable / common pitfall:** a scalar subquery that accidentally returns more than one row is *not* caught by SQLite, the engine this course runs. It silently uses whichever row the subquery produces first, so the mistake surfaces as quietly wrong data rather than an error. (Extra *columns* are caught: \`SELECT (SELECT order_id, total_cents FROM orders)\` raises \`sub-select returns 2 columns - expected 1\`. Extra rows are not.) And remember the \`NOT IN\` + NULL trap from Level 1: if the subquery can emit a NULL, prefer \`NOT EXISTS\`.
+
+> **In the warehouse this differs.** Real warehouses do reject a multi-row scalar subquery: Postgres raises \`more than one row returned by a subquery used as an expression\`, and Snowflake and BigQuery raise their own equivalent. SQLite never checks, so a query that fails loudly in production returns silently wrong rows here. Make the subquery provably single-row yourself with an aggregate (\`AVG\`, \`MAX\`) or a \`LIMIT 1\` instead of trusting the engine to catch it.
 
 **Recap:** Subqueries come in three shapes: scalar (one value), \`IN\` (a column of values), and correlated (re-runs per outer row referencing it); correlated logic is clear but often beaten on speed by a join or a window function.`,
     demoCode: `SELECT order_id, total_cents
