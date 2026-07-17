@@ -7,10 +7,20 @@ import type { TutorialLesson } from "@/lib/tutorials/types"
  * title, summary, and the authored meta — difficulty, estimated time, and skill chips. All
  * data-driven off the lesson object; `skills[]` are audited so they're safe to show as topic chips.
  */
+/**
+ * Difficulty stays a traffic light (green / amber / red) — the one place a yellow earns
+ * its keep, because the three steps must read as an ordered scale at a glance.
+ *
+ * Light mode uses the 800 shade, not 600: amber-600 measured 3.00:1 on the page
+ * background, well under the 4.5:1 AA needs, so "medium" was the badge nobody could
+ * read. amber-800 lands at 6.68:1 and, at hue 23deg, sits within a degree of the clay
+ * accent — so it reads as brand rather than as highlighter. Emerald and rose move with
+ * it to keep the three weights even.
+ */
 const DIFFICULTY_CLASS: Record<DifficultyLevel, string> = {
-  easy: "border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
-  medium: "border-amber-500/30 text-amber-600 dark:text-amber-400",
-  hard: "border-rose-500/30 text-rose-600 dark:text-rose-400",
+  easy: "border-emerald-500/30 text-emerald-800 dark:text-emerald-400",
+  medium: "border-amber-500/30 text-amber-800 dark:text-amber-400",
+  hard: "border-rose-500/30 text-rose-800 dark:text-rose-400",
 }
 
 export function LessonHeader({ lesson }: { lesson: TutorialLesson<unknown> }) {
