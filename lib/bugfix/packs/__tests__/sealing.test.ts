@@ -100,7 +100,7 @@ describe("Sealing test 2 — sealed content is imported only by server routes", 
   function grepImporters(pattern: string): string[] {
     try {
       const out = execSync(
-        `grep -rl --include=*.ts --include=*.tsx "${pattern}" app components lib hooks 2>/dev/null || true`,
+        `grep -rlE --include=*.ts --include=*.tsx "${pattern}" app components lib hooks 2>/dev/null || true`,
         { cwd: process.cwd(), encoding: "utf8" }
       )
       return out
@@ -121,13 +121,17 @@ describe("Sealing test 2 — sealed content is imported only by server routes", 
     }
   })
 
-  it("no client component imports anything from lib/scenarios/sealed", () => {
-    const importers = grepImporters("@/lib/scenarios/sealed").filter(
+  it("no client component imports any sealed module (alias OR relative path)", () => {
+    // Match any import of a sealed .server module regardless of prefix — the alias
+    // (@/lib/scenarios/sealed/x.server), a cross-dir relative (../../scenarios/sealed/x.server),
+    // or a sibling relative (../sealed/x.server). The old check matched only the alias, so a
+    // relative import could smuggle sealed string literals into a client bundle undetected.
+    const importers = grepImporters("sealed/[a-zA-Z0-9_-]+\\.server").filter(
       (path) => !path.includes("__tests__") && !path.startsWith("lib/scenarios/sealed/")
     )
     for (const importer of importers) {
       const contents = execSync(`cat "${importer}"`, { cwd: process.cwd(), encoding: "utf8" })
-      expect(contents.includes('"use client"')).toBe(false)
+      expect(contents.includes('"use client"'), `${importer} imports sealed content`).toBe(false)
     }
   })
 })
