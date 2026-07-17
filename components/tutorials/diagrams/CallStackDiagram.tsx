@@ -42,7 +42,7 @@ export function CallStackDiagram({ spec }: { spec: CallStackSpec }) {
                 "rounded-md border px-3 py-1.5 font-mono text-xs",
                 !player.reducedMotion && "transition-colors duration-300",
                 isReturning
-                  ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                  ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
                   : isTop
                     ? "border-accent/50 bg-accent/10 text-foreground"
                     : "border-border bg-muted/30 text-muted-foreground"

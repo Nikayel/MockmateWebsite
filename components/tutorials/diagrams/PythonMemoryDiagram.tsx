@@ -7,19 +7,26 @@ import { StepControls } from "./primitives/StepControls"
 import { useStepPlayer } from "./primitives/useStepPlayer"
 import type { PythonMemorySpec } from "@/lib/tutorials/diagrams/schema"
 
-/** Stable per-object accent so a name and the object it points at share a color (plus the id label). */
+/**
+ * Stable per-object accent so a name and the object it points at share a color (plus the id label).
+ *
+ * Dots and rings keep the 500 shades — they carry no text, and their job is hue separation.
+ * The labels take the 800 shades in light mode: on the real diagram surface (bg-card/40
+ * over the page) the 600/700s measured 4.47-4.87:1, straddling the 4.5:1 AA line, and a
+ * label the learner cannot read defeats the point of colour-matching it to its object.
+ */
 const OBJ_COLORS = [
   {
     dot: "bg-emerald-500",
     ring: "ring-emerald-500/50",
-    text: "text-emerald-700 dark:text-emerald-300",
+    text: "text-emerald-800 dark:text-emerald-300",
   },
-  { dot: "bg-blue-500", ring: "ring-blue-500/50", text: "text-blue-600 dark:text-blue-300" },
-  { dot: "bg-amber-500", ring: "ring-amber-500/50", text: "text-amber-700 dark:text-amber-300" },
+  { dot: "bg-blue-500", ring: "ring-blue-500/50", text: "text-blue-800 dark:text-blue-300" },
+  { dot: "bg-amber-500", ring: "ring-amber-500/50", text: "text-amber-800 dark:text-amber-300" },
   {
     dot: "bg-violet-500",
     ring: "ring-violet-500/50",
-    text: "text-violet-600 dark:text-violet-300",
+    text: "text-violet-800 dark:text-violet-300",
   },
 ]
 

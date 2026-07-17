@@ -2,10 +2,20 @@ import { ArrowRight } from "lucide-react"
 import { DiagramFrame } from "./primitives/DiagramFrame"
 import type { ComprehensionSpec } from "@/lib/tutorials/diagrams/schema"
 
+/**
+ * One colour per comprehension fragment, so the same part is the same colour on both
+ * sides of the desugaring. These are CATEGORY colours, not status — amber here means
+ * "the filter", not "a warning", which is why it does not follow LessonNotice to orange.
+ *
+ * Light mode uses the 800 shades and --accent-strong. Measured on the real diagram
+ * surface (bg-card/40 over the page), the previous shades sat on the AA line or under
+ * it: blue-600 4.47:1, amber-700 4.51:1, and text-accent 3.97:1 — the accent being the
+ * `output` fragment, the one the diagram most wants read. The 800s clear 6.4-7.5:1.
+ */
 const PART_STYLE: Record<string, string> = {
-  output: "border-accent/50 bg-accent/10 text-accent",
-  iterate: "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-300",
-  filter: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  output: "border-accent/50 bg-accent/10 text-accent-strong",
+  iterate: "border-blue-500/40 bg-blue-500/10 text-blue-800 dark:text-blue-300",
+  filter: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300",
 }
 
 /**
