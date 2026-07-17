@@ -2072,11 +2072,11 @@ A partition catalog that records each partition's file count and total bytes let
 
 > **On a real platform this differs.** Real engines expose file counts and sizes through catalog stats or a storage inventory, and compaction jobs (or Iceberg and Delta "optimize") merge small files for you. The \`partition_files\` table here gives you the file count and bytes per partition so you can compute the average file size the same way an audit query would.`,
     demoSeedSql: PARTITION_FILES_SEED,
-    demoCode: `-- A one-row overview: how many partitions, and how many have the small-files problem.
-SELECT COUNT(*) AS partitions,
-       SUM(CASE WHEN total_bytes * 1.0 / file_count < 128000000 THEN 1 ELSE 0 END) AS small_file_partitions,
-       SUM(file_count) AS total_files
-FROM partition_files;`,
+    demoCode: `-- The layout: how many files each partition split into (watch the outliers).
+SELECT partition_key, file_count,
+       ROUND(total_bytes / 1000000.0, 0) AS total_mb
+FROM partition_files
+ORDER BY file_count DESC, partition_key;`,
     showDemoInput: true,
   },
   apply: {
