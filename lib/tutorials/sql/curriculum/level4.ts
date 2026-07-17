@@ -621,14 +621,19 @@ Lead with \`DELETE FROM churn_signal;\` so the load re-runs cleanly.`,
 DELETE FROM churn_signal;
 
 -- INSERT INTO churn_signal (...)
--- WITH base AS ( ... LAG(revenue) ..., ROW_NUMBER() OVER (... ORDER BY order_month DESC) AS rn_latest ... )
--- SELECT ..., ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1) AS pct_change,
+-- WITH base AS ( ... LAG(revenue) ... AS prev_revenue, ROW_NUMBER() OVER (... ORDER BY order_month DESC) AS rn_latest ... ),
+--      calc AS (
+--        SELECT ..., rn_latest,
+--               ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1) AS pct_change
+--        FROM base
+--      )
+-- SELECT ..., pct_change,
 --        CASE WHEN rn_latest = 1 AND pct_change < -30 THEN 1 ELSE 0 END AS churn_flag
--- FROM base;`,
+-- FROM calc;`,
     hints: [
       "`pct_change = ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1)`: the `100.0` forces real division and `NULLIF` guards a zero prior month.",
       '"Latest month per customer" needs a second window: `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_month DESC) = 1` marks it.',
-      "Compute prev_revenue, pct_change, and the latest-month marker in one CTE, then `churn_flag = CASE WHEN rn_latest = 1 AND pct_change < -30 THEN 1 ELSE 0 END`.",
+      "Stage it in two CTEs: compute prev_revenue and the latest-month marker in the first, derive pct_change from prev_revenue in the second, then `churn_flag = CASE WHEN rn_latest = 1 AND pct_change < -30 THEN 1 ELSE 0 END`. SQLite cannot read an alias from a sibling expression in the same SELECT list, so each layer needs the one below it to be a finished subquery.",
       'Watch the sign: a *drop* is a negative pct_change; "more than 30% drop" is `pct_change < -30`.',
     ],
     seedSql: `DROP TABLE IF EXISTS monthly_revenue;
