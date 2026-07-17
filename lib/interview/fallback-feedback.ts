@@ -50,7 +50,16 @@ export function computeFallbackScores(request: FallbackFeedbackRequest): Fallbac
       events: request.bugfixEvidenceEvents || [],
       expectedTouchedFiles: request.bugfixExpectedTouchedFiles || [],
     })
-    const bugfixScores = calculateBugfixEvidenceScore(evidenceSummary)
+    // Pass the difficulty through (the stream path does): calculateBugfixEvidenceScore scales
+    // codebaseNavigation's target by it, so dropping it scored every fallback bugfix as medium.
+    const bugfixScores = calculateBugfixEvidenceScore(evidenceSummary, {
+      difficulty:
+        request.scenarioDifficulty === "easy" ||
+        request.scenarioDifficulty === "medium" ||
+        request.scenarioDifficulty === "hard"
+          ? request.scenarioDifficulty
+          : "medium",
+    })
     // Project through the shared category mapping so the fallback breakdown matches
     // the streaming feedback path (previously each picked a different single dimension).
     const categories = mapBugfixBreakdownToCategoryScores(bugfixScores)
