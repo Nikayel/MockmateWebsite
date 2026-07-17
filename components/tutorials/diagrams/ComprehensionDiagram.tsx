@@ -58,8 +58,15 @@ export function ComprehensionDiagram({ spec }: { spec: ComprehensionSpec }) {
               key={`${part.label}-${i}`}
               className={`rounded-md border px-2 py-1 font-mono text-[11px] ${PART_STYLE[part.label] ?? "border-border"}`}
             >
-              <span className="font-semibold uppercase">{part.label}</span>{" "}
-              <span className="opacity-80">{part.code}</span>
+              {/*
+                The code fragment carries no opacity: `opacity-80` composited it toward
+                the pill tint and dropped `output` to 3.36:1 (both themes) and `filter` to
+                4.22:1 in light, under the 4.5:1 bar at 11px. It dimmed the CODE while
+                leaving the LABEL crisp -- backwards, since the label is the signpost and
+                the code is the thing being pointed at. `font-semibold uppercase` on the
+                label already separates the two.
+              */}
+              <span className="font-semibold uppercase">{part.label}</span> <span>{part.code}</span>
             </li>
           ))}
         </ul>
