@@ -1462,6 +1462,40 @@ ORDER BY uncompressed_bytes * 1.0 / compressed_bytes ASC, column_name;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-compression-encoding-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns, per data type, the total uncompressed MB, total compressed MB, and the ratio as \`(data_type, unc_mb, comp_mb, ratio)\`, best-compressing type first, over \`parquet_column_stats\`. Treat 1 MB as 1,000,000 bytes, round every value to 2 decimals.`,
+      starterCode: `-- Compression rolled up by data type.
+SELECT data_type
+FROM parquet_column_stats
+GROUP BY data_type
+;`,
+      hints: [
+        "Sum both byte columns per type and divide by 1000000.0 for MB.",
+        "`ratio = SUM(uncompressed_bytes) * 1.0 / SUM(compressed_bytes)`; `ORDER BY ratio DESC, data_type`.",
+      ],
+      referenceSolution: `SELECT data_type,
+       ROUND(SUM(uncompressed_bytes) / 1000000.0, 2) AS unc_mb,
+       ROUND(SUM(compressed_bytes) / 1000000.0, 2) AS comp_mb,
+       ROUND(SUM(uncompressed_bytes) * 1.0 / SUM(compressed_bytes), 2) AS ratio
+FROM parquet_column_stats
+GROUP BY data_type
+ORDER BY ratio DESC, data_type;`,
+      singleFile: {
+        seedSql: PARQUET_COLUMN_STATS_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["data_type", "unc_mb", "comp_mb", "ratio"],
+          rows: [
+            ["STRING", 920, 196, 4.69],
+            ["INT64", 240, 60, 4],
+            ["DOUBLE", 80, 40, 2],
+          ],
+        },
+      },
+    },
   ],
 }
 
