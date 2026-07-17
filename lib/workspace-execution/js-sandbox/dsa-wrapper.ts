@@ -1,3 +1,16 @@
+/**
+ * Lines this module prepends before the learner's code. A stack trace from the sandbox
+ * reports positions in the WRAPPER, so the console subtracts this to name a line the
+ * learner can actually find in their editor.
+ *
+ * It lives here, next to the template it counts, because the previous constant lived in
+ * `lib/piston.ts` and described PISTON's wrapper (110 lines). Piston's fallback is no
+ * longer wired, so every line number the console printed was off by 30.
+ * `dsa-wrapper.test.ts` pins this to the template so an edit to the preamble cannot
+ * silently desync it again.
+ */
+export const JAVASCRIPT_WRAPPER_LINE_OFFSET = 80
+
 function isValidIdentifier(name: string): boolean {
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)
 }

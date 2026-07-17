@@ -1,4 +1,18 @@
 /**
+ * Lines this module prepends before the learner's code. A traceback from Pyodide
+ * reports positions in the WRAPPER, so the console subtracts this to name a line the
+ * learner can actually find in their editor.
+ *
+ * It lives here, next to the template it counts, because the previous constant lived in
+ * `lib/piston.ts` and described PISTON's wrapper (93 lines). Piston's fallback is no
+ * longer wired, so every line number the console printed was off by 23: errors in the
+ * first 23 lines of a solution lost their line marker entirely, and anything past that
+ * was confidently attributed to the wrong line. `dsa-wrapper.test.ts` pins this to the
+ * template so an edit to the preamble cannot silently desync it again.
+ */
+export const PYTHON_WRAPPER_LINE_OFFSET = 70
+
+/**
  * Embed a value in Python source as a literal it can actually evaluate.
  *
  * `JSON.stringify` is NOT safe here: JSON's `true`/`false`/`null` are not Python

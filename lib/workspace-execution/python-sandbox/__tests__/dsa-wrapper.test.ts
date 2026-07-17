@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest"
 import { execFileSync } from "child_process"
-import { buildPythonWrapper } from "../dsa-wrapper"
+import { buildPythonWrapper, PYTHON_WRAPPER_LINE_OFFSET } from "../dsa-wrapper"
 
 /** Runs the wrapper source and returns the value it resolves `_result` to. */
 function runWrapper(code: string, input: Record<string, unknown>, scenarioId: string): unknown {
@@ -56,6 +56,30 @@ describe("buildPythonWrapper emits executable Python", () => {
     for (const text of ["it's", 'say "hi"', "back\\slash", "line\nbreak", "emoji 😀", "null"]) {
       expect(runWrapper(code, { text }, "x")).toBe(text)
     }
+  })
+
+  /**
+   * The console subtracts PYTHON_WRAPPER_LINE_OFFSET from every traceback line to point
+   * the learner at their own editor. A stale constant is invisible until someone reads a
+   * wrong line number and mistrusts the whole console, so pin it to the template. The
+   * offset must also not depend on the INPUT, or a long payload would shift every line.
+   */
+  describe("PYTHON_WRAPPER_LINE_OFFSET", () => {
+    const MARKER = "###USER_CODE###"
+    const userCodeLine = (input: Record<string, unknown>) =>
+      buildPythonWrapper(MARKER, { input }, "def solution(n):\n    return n", "x")
+        .split("\n")
+        .findIndex((line) => line.includes(MARKER)) + 1
+
+    it("names the line the learner's code actually starts on", () => {
+      expect(userCodeLine({ n: 1 })).toBe(PYTHON_WRAPPER_LINE_OFFSET + 1)
+    })
+
+    it("does not shift with the size or shape of the input", () => {
+      for (const input of [{}, { root: [1, null, 2] }, { s: "x".repeat(5000) }, { a: true }]) {
+        expect(userCodeLine(input)).toBe(PYTHON_WRAPPER_LINE_OFFSET + 1)
+      }
+    })
   })
 
   it("still resolves a Solution class method and a bare function", () => {

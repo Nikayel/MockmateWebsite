@@ -20,28 +20,18 @@
 const PISTON_API_URL = process.env.PISTON_API_URL || "https://emkc.org/api/v2/piston"
 
 /**
- * Line offset for Python wrapper code.
- * User code is inserted after imports, helper classes, and setup functions.
- * When Python reports line numbers in errors, we need to subtract this offset
- * to get the actual line number in the user's code.
- *
- * Breakdown:
- * - import statements: 8 lines
- * - TreeNode class: 5 lines
- * - ListNode class: 4 lines
- * - _build_tree function: 18 lines
- * - _tree_to_array function: 14 lines
- * - _build_list function: 8 lines
- * - _list_to_array function: 9 lines
- * - Print capture setup: 10 lines
- * - Empty lines and comments: ~17 lines
- * Total: ~93 lines before user code
+ * @deprecated Describes THIS module's Python wrapper (`buildPythonWrapper` below), which
+ * only the unwired Piston fallback runs. Code the learner sees executed comes from
+ * `lib/workspace-execution/python-sandbox`, whose preamble is a different length — import
+ * `PYTHON_WRAPPER_LINE_OFFSET` from there instead. `CodeConsole` imported this one and
+ * reported every Python error line 23 lines off.
  */
 export const PYTHON_WRAPPER_LINE_OFFSET = 93
 
 /**
- * Line offset for JavaScript wrapper code.
- * Similar structure but slightly different count.
+ * @deprecated Same trap as {@link PYTHON_WRAPPER_LINE_OFFSET}: this counts Piston's JS
+ * wrapper, not the browser sandbox's. Import `JAVASCRIPT_WRAPPER_LINE_OFFSET` from
+ * `lib/workspace-execution` instead.
  */
 export const JAVASCRIPT_WRAPPER_LINE_OFFSET = 110
 

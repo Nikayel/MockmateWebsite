@@ -5,9 +5,15 @@ import { AlertCircle, CheckCircle, XCircle, Terminal, Trash2 } from "lucide-reac
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { PYTHON_WRAPPER_LINE_OFFSET, JAVASCRIPT_WRAPPER_LINE_OFFSET } from "@/lib/piston"
 import { TerminalOutput, TERMINAL_PRE } from "./TerminalOutput"
-import type { PackRunView } from "@/lib/workspace-execution"
+// The offsets must come from the wrappers that actually RAN the code. They used to be
+// imported from `lib/piston`, which describes Piston's wrappers — a fallback that is no
+// longer wired — so every line number here was off by 23 (Python) or 30 (JS).
+import {
+  PYTHON_WRAPPER_LINE_OFFSET,
+  JAVASCRIPT_WRAPPER_LINE_OFFSET,
+  type PackRunView,
+} from "@/lib/workspace-execution"
 
 /**
  * CodeConsole - IDE-like console panel for code execution output

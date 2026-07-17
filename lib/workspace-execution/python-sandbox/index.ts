@@ -1,4 +1,4 @@
-export { buildPythonWrapper } from "./dsa-wrapper"
+export { buildPythonWrapper, PYTHON_WRAPPER_LINE_OFFSET } from "./dsa-wrapper"
 export { executePythonClientSide } from "./dsa-runner"
 export { executeWorkspaceScenarioPythonClientSide } from "./workspace-runner"
 export {

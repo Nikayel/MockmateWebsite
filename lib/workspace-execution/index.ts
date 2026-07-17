@@ -4,9 +4,11 @@ export {
   executeWorkspaceScenarioJsClientSide,
   runInWorker,
   stripComments,
+  JAVASCRIPT_WRAPPER_LINE_OFFSET,
 } from "./js-sandbox"
 export {
   buildPythonWrapper,
+  PYTHON_WRAPPER_LINE_OFFSET,
   executePythonClientSide,
   executeWorkspaceScenarioPythonClientSide,
   executePackOracleClientSide,
