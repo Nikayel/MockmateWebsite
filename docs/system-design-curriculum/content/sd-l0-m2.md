@@ -87,7 +87,7 @@ Common wrong turn: computing storage to three significant figures while never st
 
 Assumptions: 500M DAU, 2 uploads/day and 50 views/day per user, 2 MB per stored photo (post-compression, before thumbnails), 3x peak multiplier, and a replication factor of 3.
 
-QPS. Uploads/day = 500M x 2 = 10^9. Views/day = 500M x 50 = 2.5 x 10^10. Dividing by ~10^5 s/day: avg upload QPS ~= 10,000, avg view QPS ~= 250,000. With a 3x peak: about 30k peak upload QPS and 750k peak view QPS. The 75:1 read:write skew screams CDN plus object store, not database-served images.
+QPS. Uploads/day = 500M x 2 = 10^9. Views/day = 500M x 50 = 2.5 x 10^10. Dividing by ~10^5 s/day: avg upload QPS ~= 10,000, avg view QPS ~= 250,000. With a 3x peak: about 30k peak upload QPS and 750k peak view QPS. The 25:1 read:write skew screams CDN plus object store, not database-served images.
 
 Storage. New photos/day = 10^9. At 2 MB each that is 2 x 10^15 bytes = 2 PB/day of raw blobs. With replication factor 3 that is about 6 PB/day provisioned, and thumbnails add maybe 10 to 20% more. Over a year the blob footprint is on the order of an exabyte. This single number forces the storage choice: photos must live in an object store (S3-class) fronted by a CDN, with only compact metadata (photo id, owner, S3 key, timestamps, roughly 1 KB/photo, so ~1 TB/day of metadata) in a sharded database. You cannot put multi-petabyte-per-day blobs in Postgres.
 

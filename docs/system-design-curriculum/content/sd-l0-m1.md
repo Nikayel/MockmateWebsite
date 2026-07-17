@@ -47,7 +47,7 @@ Recap: Scope the prompt in three to five sharp questions, negotiate what is out,
 
 #### Apply: think, then answer (save, then reveal)
 
-**Prompt:** Write the first 6 clarifying questions you would ask for the bare prompt "Design Twitter," and show how each answer narrows the design.
+**Prompt:** Write the 3 to 5 clarifying questions you would ask for the bare prompt "Design Twitter," and show how each answer narrows the design.
 
 **Think about:**
 - Which product slice is actually in scope, and what will you explicitly defer?
@@ -189,7 +189,7 @@ The NFR categories worth walking every time:
 - **Durability:** can you ever lose committed data? Lever: replication factor, write-ahead logs, quorum writes.
 - **Consistency:** strong or eventual, and where. Lever: this is your CAP/PACELC stance.
 
-The consistency stance is the one interviewers probe hardest. For a feed, take an explicit position: "I favor availability over strong consistency. If a follower sees a new tweet a few seconds late, that is fine; if the feed is unavailable, that is not. So per PACELC, I choose AP during a partition and, even without a partition, I trade latency for consistency by serving from replicas and caches." That is a defensible stance with a reason, which is what scores. Saying "it should be consistent and available" fails, because CAP says you cannot have both under a partition and the interviewer will make you pick.
+The consistency stance is the one interviewers probe hardest. For a feed, take an explicit position: "I favor availability over strong consistency. If a follower sees a new tweet a few seconds late, that is fine; if the feed is unavailable, that is not. So per PACELC, I choose AP during a partition and, even without a partition, I trade consistency for latency by serving from replicas and caches." That is a defensible stance with a reason, which is what scores. Saying "it should be consistent and available" fails, because CAP says you cannot have both under a partition and the interviewer will make you pick.
 
 Split read-path and write-path SLAs, because they are genuinely different systems. The read path (loading a feed) must be fast and is cacheable, so p99 under 200ms is reasonable. The write path (posting a tweet) must be durable and ordered but can be slower, so "the write is acknowledged in under 500ms and the tweet is durably stored" is the goal, with fan-out happening asynchronously afterward. Conflating them leads you to either make writes too slow or reads not durable enough.
 

@@ -49,7 +49,7 @@ Slug: `requirements-scoping` | 4 lessons
 
 - **learnFocus:** How to turn a one-line prompt into a scoped problem with 3-5 sharp questions and explicit out-of-scope.
 - **difficulty:** easy | **estimatedMinutes:** 25 | **skills:** scoping, requirements, communication
-- **applyPrompt:** Given the bare prompt 'Design Twitter', write the first 6 clarifying questions you would ask and show how each answer narrows the design.
+- **applyPrompt:** Given the bare prompt 'Design Twitter', write the 3 to 5 clarifying questions you would ask and show how each answer narrows the design.
 - **thinkAbout:**
   - Which product slice is actually in scope, and what will you explicitly defer?
   - What do you need to know about actors, scale, and read/write mix before drawing anything?
