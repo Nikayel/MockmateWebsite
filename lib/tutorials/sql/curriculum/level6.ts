@@ -2281,6 +2281,8 @@ The cost of the trap is total: a query that should read one partition ends up re
 
 One more bucketing payoff to bank: two tables **bucketed the same way** (same key, same bucket count) can be joined on the bucket key with no shuffle, because matching keys already sit in matching buckets. That is the join-side twin of the broadcast trick you will meet in the next module.
 
+**Common mistake:** wrapping the partition key in a function. Comparing the bare column to a constant prunes, but transforming it first (a substring or a cast) forces a full scan, so keep the partition column bare on one side and a constant on the other.
+
 **Interview nuance:** "you partitioned by date but the query still scans everything, why" almost always means the filter did not land on the bare partition key: it filtered a different column, or wrapped \`dt\` in a function. Keep the partition column bare and compared to a constant.
 
 > **On a real platform this differs.** Modern table formats reduce these traps: Apache Iceberg supports **hidden partitioning** (you query \`event_time\` and Iceberg derives the \`day(event_time)\` partition for you) and **partition evolution** (change the scheme as a metadata-only operation, with no data rewrite). The bucketing and pruning arithmetic you compute here is the same reasoning those systems automate.`,
