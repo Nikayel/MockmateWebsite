@@ -3053,11 +3053,10 @@ You run a pipeline by watching its **run log**: which jobs succeeded, how many r
 
 > **On a real platform this differs.** Real run metadata lives in Airflow's database, dbt's run results, or a warehouse audit table, with far more detail. The \`pipeline_runs\` table here keeps job, date, status, rows, duration, and SLA, which is enough to compute the reliability and freshness questions an on-call DE actually asks.`,
     demoSeedSql: PIPELINE_RUNS_SEED,
-    demoCode: `-- Per-job health: how many runs, how many failed, how many missed the SLA.
+    demoCode: `-- Per-job overview: how many runs and total rows written to the target.
 SELECT job,
        COUNT(*) AS runs,
-       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures,
-       SUM(CASE WHEN status = 'success' AND duration_min > sla_min THEN 1 ELSE 0 END) AS sla_breaches
+       SUM(rows_out) AS rows_written
 FROM pipeline_runs
 GROUP BY job
 ORDER BY job;`,
