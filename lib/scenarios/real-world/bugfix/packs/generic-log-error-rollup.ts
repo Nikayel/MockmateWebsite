@@ -12,7 +12,6 @@ export const genericLogErrorRollupPack: BugfixPack = {
     tag: "generic-fdse",
     roundName: "Debugging round",
     confidence: "styled",
-    notes: "Log-ingestion reliability report; subtle logic flaw, no syntax error, no crash.",
   },
   companies: ["Generic"],
   domain: "log-ingestion",

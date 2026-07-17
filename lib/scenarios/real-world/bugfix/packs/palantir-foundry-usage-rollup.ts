@@ -12,7 +12,6 @@ export const palantirFoundryUsageRollupPack: BugfixPack = {
     tag: "palantir-fdse",
     roundName: "Re-engineering / debugging round",
     confidence: "styled",
-    notes: "Foundry-shaped data-pipeline dedup problem; subtle logic flaw, no syntax error.",
   },
   companies: ["Palantir"],
   domain: "data-pipeline",

@@ -12,7 +12,6 @@ export const datadogEndpointLatencyPeakPack: BugfixPack = {
     tag: "datadog-debugging",
     roundName: "Debugging pairing round",
     confidence: "styled",
-    notes: "Observability latency rollup; subtle accumulator-scope flaw, no syntax error.",
   },
   companies: ["Generic"],
   domain: "observability",

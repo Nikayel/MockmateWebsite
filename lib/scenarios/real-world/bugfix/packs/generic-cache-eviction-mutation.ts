@@ -12,8 +12,6 @@ export const genericCacheEvictionMutationPack: BugfixPack = {
     tag: "generic-fdse",
     roundName: "Debugging round",
     confidence: "styled",
-    notes:
-      "In-memory cache eviction sweep over a write log; subtle logic flaw, no syntax error, no crash.",
   },
   companies: ["Generic"],
   domain: "caching",

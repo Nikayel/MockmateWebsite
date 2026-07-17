@@ -12,8 +12,6 @@ export const stripeLedgerDoublePostPack: BugfixPack = {
     tag: "stripe-bug-squash",
     roundName: "Bug squash round",
     confidence: "styled",
-    notes:
-      "Stripe bug-squash: reproduce from the public oracle, follow the call path from re-sent settlement batches through a per-batch dedup step, and make a targeted fix without rewriting the surrounding parsing or posting code.",
   },
   companies: ["Stripe"],
   domain: "payments",

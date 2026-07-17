@@ -12,8 +12,6 @@ export const palantirEntityResolutionMergePack: BugfixPack = {
     tag: "palantir-fdse",
     roundName: "Re-engineering / debugging round",
     confidence: "styled",
-    notes:
-      "Foundry-shaped entity-resolution problem; an under-specified merge key that ignores the namespace, a subtle logic flaw with no syntax error.",
   },
   companies: ["Palantir"],
   domain: "entity-resolution",

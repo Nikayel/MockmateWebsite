@@ -12,8 +12,6 @@ export const datadogMonitorEmptySeriesPack: BugfixPack = {
     tag: "datadog-debugging",
     roundName: "Debugging pairing round",
     confidence: "styled",
-    notes:
-      "Observability-shaped monitor evaluation over a fixed window; a mishandled empty-series case defaults the average instead of reporting NO DATA, no syntax fault.",
   },
   companies: ["Generic"],
   domain: "observability",

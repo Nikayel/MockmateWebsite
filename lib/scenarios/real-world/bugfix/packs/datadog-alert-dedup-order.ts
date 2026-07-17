@@ -12,8 +12,6 @@ export const datadogAlertDedupOrderPack: BugfixPack = {
     tag: "datadog-debugging",
     roundName: "Debugging pairing round",
     confidence: "styled",
-    notes:
-      "Observability-shaped alert-incident deduplication over interleaved monitor state transitions; an order-dependent shared-state logic error, no syntax fault.",
   },
   companies: ["Generic"],
   domain: "observability",

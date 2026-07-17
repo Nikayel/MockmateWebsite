@@ -12,8 +12,6 @@ export const palantirPipelineOrderDependencePack: BugfixPack = {
     tag: "palantir-fdse",
     roundName: "Re-engineering / debugging round",
     confidence: "styled",
-    notes:
-      "Foundry-shaped multi-pipeline reconciliation; an order-dependent shared-state flaw whose symptom moves if the pipelines are reordered, no syntax error.",
   },
   companies: ["Palantir"],
   domain: "data-pipeline",

@@ -12,8 +12,6 @@ export const stripePayoutBatchMutationPack: BugfixPack = {
     tag: "stripe-bug-squash",
     roundName: "Bug squash round",
     confidence: "styled",
-    notes:
-      "Stripe bug-squash: reproduce from the oracle, follow the call path from an at-least-once payout feed through de-duplication into batching, and make a targeted fix without rewriting the packer; the symptom is intermittent with respect to input ordering.",
   },
   companies: ["Stripe"],
   domain: "payments",

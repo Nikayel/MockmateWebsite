@@ -12,8 +12,6 @@ export const stripeWebhookIdempotencyPack: BugfixPack = {
     tag: "stripe-bug-squash",
     roundName: "Bug squash round",
     confidence: "styled",
-    notes:
-      "Stripe bug-squash: reproduce from the failing oracle, follow the call path from an at-least-once webhook bus through the idempotency step, and make a targeted dedup fix without rewriting unrelated code.",
   },
   companies: ["Stripe"],
   domain: "payments",

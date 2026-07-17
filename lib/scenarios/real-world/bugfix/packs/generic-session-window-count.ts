@@ -12,8 +12,6 @@ export const genericSessionWindowCountPack: BugfixPack = {
     tag: "generic-fdse",
     roundName: "Debugging round",
     confidence: "styled",
-    notes:
-      "Sessionization over an inactivity gap; an order-dependent boundary comparison error, no syntax fault and no crash.",
   },
   companies: ["Generic"],
   domain: "sessionization",

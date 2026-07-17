@@ -12,8 +12,6 @@ export const datadogMetricWindowRollupPack: BugfixPack = {
     tag: "datadog-debugging",
     roundName: "Debugging pairing round",
     confidence: "styled",
-    notes:
-      "Observability-shaped metric aggregation over fixed time windows; a half-open-vs-closed boundary error, no syntax fault.",
   },
   companies: ["Generic"],
   domain: "observability",

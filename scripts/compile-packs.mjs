@@ -97,7 +97,9 @@ function clientModule(pack) {
       tag: manifest.company.tag,
       roundName: manifest.company.round_name,
       confidence: manifest.company.confidence,
-      notes: manifest.company.notes,
+      // company.notes is authoring metadata that paraphrases the bug ("defaults the average
+      // instead of reporting NO DATA"); it is consumed nowhere and must not ship to the
+      // browser. It stays in manifest.json as the authoring record.
     },
     companies: manifest.companies,
     domain: manifest.domain,

@@ -12,8 +12,6 @@ export const palantirOntologyLinkRollupPack: BugfixPack = {
     tag: "palantir-fdse",
     roundName: "Re-engineering / debugging round",
     confidence: "styled",
-    notes:
-      "Foundry ontology entity-processing; subtle first-record boundary flaw, no syntax error.",
   },
   companies: ["Palantir"],
   domain: "ontology-processing",
