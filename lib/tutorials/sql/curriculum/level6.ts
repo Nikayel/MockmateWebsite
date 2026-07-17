@@ -145,6 +145,8 @@ The defining feature of the modern platform is that these layers are **decoupled
 
 You do not just build these layers, you operate them, and operating them means asking questions: what does each layer cost, which services are compute versus storage, where is the money going. Those questions are answered by querying a catalog of the platform itself. The exercises in this level do exactly that: you query a stand-in for each layer's own metadata, which is a real data-engineering skill (teams query cost-and-usage reports, storage inventories, and job logs with SQL every day).
 
+**Common mistake:** assuming storage is the expensive part. On most platforms the compute layer (query engines and warehouses) dominates the bill, which is why reading fewer bytes per query is the lever that matters.
+
 **Interview nuance:** when an interviewer asks you to "describe a data platform," the five-layer storage / catalog / compute / orchestration / serving spine is a clean, complete answer, and naming the decoupling of storage from compute is the detail that shows you understand cloud economics.
 
 > **On a real platform this differs.** Here you query one small \`platform_services\` table in SQLite. On AWS the same reasoning runs against the Cost and Usage Report (queried in Athena or loaded into a warehouse), where each row is a service, usage type, and cost. The query shape (group by a layer or service, sum the cost, sort) is identical.`,
