@@ -3390,6 +3390,31 @@ FROM staged_events;`,
         expected: { columns: ["null_country_pct"], rows: [[10]] },
       },
     },
+    ,
+    {
+      id: "sql-l6-data-quality-checks-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns a one-row quality scorecard as \`(total_rows, duplicate_rows, null_users, bad_amounts)\`, over \`staged_events\`. \`duplicate_rows\` is total rows minus distinct \`event_id\` values, \`null_users\` counts NULL \`user_id\`, and \`bad_amounts\` counts non-positive \`amount\`.`,
+      starterCode: `-- One row summarizing every quality issue in the batch.
+SELECT COUNT(*) AS total_rows
+FROM staged_events;`,
+      hints: [
+        "`COUNT(*) - COUNT(DISTINCT event_id)` is the duplicate rows.",
+        "Two conditional sums give `null_users` and `bad_amounts`.",
+      ],
+      referenceSolution: `SELECT COUNT(*) AS total_rows,
+       COUNT(*) - COUNT(DISTINCT event_id) AS duplicate_rows,
+       SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) AS null_users,
+       SUM(CASE WHEN amount <= 0 THEN 1 ELSE 0 END) AS bad_amounts
+FROM staged_events;`,
+      singleFile: {
+        seedSql: STAGED_EVENTS_SEED,
+        expected: {
+          columns: ["total_rows", "duplicate_rows", "null_users", "bad_amounts"],
+          rows: [[10, 3, 2, 1]],
+        },
+      },
+    },
   ],
 }
 
