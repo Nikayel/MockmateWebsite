@@ -1457,6 +1457,24 @@ FROM row_group_stats;`,
       },
     },
   },
+  extraPractice: [
+    {
+      id: "sql-l6-row-groups-pushdown-drill-1",
+      executionMode: "single-file",
+      prompt: `Write a query that returns how many row groups the file has and how many rows in total as \`(row_groups, total_rows)\`, over \`row_group_stats\`.`,
+      starterCode: `-- Count the row groups and sum their rows.
+SELECT
+FROM row_group_stats;`,
+      hints: ["`COUNT(*)` is the row-group count.", "`SUM(row_count)` is total rows."],
+      referenceSolution: `SELECT COUNT(*) AS row_groups, SUM(row_count) AS total_rows
+FROM row_group_stats;`,
+      singleFile: {
+        seedSql: ROW_GROUP_STATS_SEED,
+        expected: { columns: ["row_groups", "total_rows"], rows: [[5, 460000]] },
+      },
+    },
+    /* __DRILL_SLOT__ */
+  ],
 }
 
 // ---------------------------------------------------------------------------
