@@ -521,6 +521,37 @@ ORDER BY objects DESC, prefix;`,
         },
       },
     },
+    ,
+    {
+      id: "sql-l6-object-vs-block-storage-drill-4",
+      executionMode: "single-file",
+      prompt: `**Hard.** Write a query that returns the average object size in GB for each storage class as \`(storage_class, avg_gb)\`, largest average first, over \`s3_inventory\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
+      starterCode: `-- Average object size per storage class.
+SELECT storage_class, ROUND(AVG(size_bytes) / 1000000000.0, 2) AS avg_gb
+FROM s3_inventory
+GROUP BY storage_class
+;`,
+      hints: [
+        "`AVG(size_bytes) / 1000000000.0` is the average in GB.",
+        "`GROUP BY storage_class`, `ORDER BY avg_gb DESC, storage_class`.",
+      ],
+      referenceSolution: `SELECT storage_class, ROUND(AVG(size_bytes) / 1000000000.0, 2) AS avg_gb
+FROM s3_inventory
+GROUP BY storage_class
+ORDER BY avg_gb DESC, storage_class;`,
+      singleFile: {
+        seedSql: S3_INVENTORY_SEED,
+        orderMatters: true,
+        expected: {
+          columns: ["storage_class", "avg_gb"],
+          rows: [
+            ["GLACIER_DEEP", 1000],
+            ["STANDARD_IA", 600],
+            ["STANDARD", 228],
+          ],
+        },
+      },
+    },
   ],
 }
 
