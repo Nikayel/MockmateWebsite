@@ -139,7 +139,26 @@
       "Bash(pnpm dev *)",
       "Bash(jobs -l)",
       "Bash(kill 16472)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(git config *)",
+      "Bash(pnpm vitest *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(grep -rn \"workspace-tab\\\\|workspace-tabs-container\\\\|workspace-tab-filename\" app/globals.css)",
+      "Bash(python3 verify_bookclub.py)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"typecheck exit=$?\")",
+      "Read(//tmp/**)",
+      "Bash(echo \"lint exit=$?\")",
+      "Bash(graphify update *)",
+      "Bash(node -e \"try{require.resolve\\('playwright'\\);console.log\\('playwright module present'\\)}catch\\(e\\){console.log\\('no playwright module'\\)}\")",
+      "Bash(node -e \"try{require.resolve\\('puppeteer'\\);console.log\\('puppeteer present'\\)}catch\\(e\\){console.log\\('no puppeteer'\\)}\")",
+      "Bash(git push *)",
+      "Bash(echo \"EXIT $?\")",
+      "Bash(git commit -q -m 'refactor\\(python-executor\\): remove heading text, rebuild as full-height 2-pane layout *)",
+      "Bash(pnpm exec *)"
     ]
   }
 }
