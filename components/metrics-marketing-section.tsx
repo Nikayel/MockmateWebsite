@@ -4,6 +4,7 @@ import type { ComponentType, ReactNode } from "react"
 import { motion } from "framer-motion"
 import { BarChart3, Brain, Target, TrendingUp } from "lucide-react"
 import Link from "next/link"
+import { trackEvent } from "@/lib/analytics"
 import { MagneticButton } from "@/components/ui/magnetic-button"
 
 /**
@@ -174,7 +175,12 @@ export function MetricsMarketingSection() {
 
         {/* CTA */}
         <div className="mt-10 text-center">
-          <Link href="/login">
+          <Link
+            href="/login"
+            onClick={() =>
+              trackEvent("cta_click", { location: "home_metrics", destination: "/login" })
+            }
+          >
             <MagneticButton className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-lg px-6 py-3 font-medium transition-colors">
               Start tracking your progress
             </MagneticButton>
