@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
+import { trackSessionComplete } from "@/lib/analytics"
 
 /** A single RAG hint as rendered in the problem column. Only `hint` is read here. */
 interface MetricsRagHint {
@@ -71,6 +72,19 @@ export function useInterviewMetrics(
 
   const trackSessionCompletion = useCallback(
     async (params: TrackSessionCompletionParams) => {
+      // GA4 session_complete: /api/admin/analytics queries this exact event name.
+      // Fired before the token guard so an auth hiccup cannot drop the count.
+      // Scenario type/difficulty/duration are not plumbed into this hook and the
+      // admin dashboard aggregates by event name, so unknowns are acceptable here.
+      trackSessionComplete({
+        sessionId: params.sessionId,
+        scenarioId: selectedScenarioId || "unknown",
+        scenarioType: "unknown",
+        difficulty: "unknown",
+        language: params.language,
+        durationMinutes: 0,
+      })
+
       try {
         const token = await firebaseUser?.getIdToken()
         if (!token) return
@@ -98,7 +112,7 @@ export function useInterviewMetrics(
         console.error("[Session Metrics] Failed to track completion:", error)
       }
     },
-    [firebaseUser]
+    [firebaseUser, selectedScenarioId]
   )
 
   const updateSpacedRepetition = useCallback(
