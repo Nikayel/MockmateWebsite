@@ -224,9 +224,8 @@ is safe to re-run.`,
 DELETE FROM top_products;   -- re-runnable: clear before you repopulate
 
 -- INSERT INTO top_products (category, product, revenue, rank_in_category)
--- WITH per_product AS ( ... SUM(revenue) per (category, product) ... ),
---      ranked AS ( ... ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC, product) ... )
--- SELECT ... FROM ranked WHERE rank_in_category <= 3;`,
+-- First total each product's revenue within its category.
+-- Then give each product a 1-based slot per category, highest revenue first, and keep each category's top three.`,
     hints: [
       "First aggregate: `SELECT category, product, SUM(revenue) AS revenue FROM fact_sales GROUP BY category, product`. Rank on top of *that*, not the raw rows.",
       "You can't filter a window function in `WHERE`. Put the aggregate-plus-`ROW_NUMBER` in a CTE, then `SELECT ... WHERE rank_in_category <= 3` from it.",
@@ -344,11 +343,10 @@ your load with \`DELETE FROM leaderboard;\` so the script re-runs cleanly.`,
 DELETE FROM leaderboard;   -- re-runnable: clear before you repopulate
 
 -- INSERT INTO leaderboard (category, product, revenue, row_rank, rank_rank, dense_rank, is_podium)
--- 1) aggregate per (category, product): SUM(revenue) AS revenue, MIN(sold_at) AS first_sold
--- 2) over PARTITION BY category ORDER BY revenue DESC, compute:
---      ROW_NUMBER() (add first_sold, then product, as tiebreakers), RANK(), DENSE_RANK()
--- 3) is_podium = CASE WHEN dense_rank <= 3 THEN 1 ELSE 0 END
--- 4) keep only is_podium = 1`,
+-- 1) collapse to one row per product per category, carrying its total revenue and earliest sale date.
+-- 2) within each category, order by revenue and fill the three ranking columns the prompt describes.
+-- 3) set is_podium from whether the product falls in the top three revenue tiers.
+-- 4) keep only the podium rows.`,
     hints: [
       "Aggregate to per-product totals first, but carry `MIN(sold_at) AS first_sold` so you have a deterministic date tiebreaker.",
       "Compute all three ranking functions in the same CTE over the same `PARTITION BY category ORDER BY revenue DESC`; only the `ROW_NUMBER` needs the extra `, first_sold, product` tiebreaker.",
@@ -541,7 +539,7 @@ The target is seeded **empty**. Lead your load with \`DELETE FROM mom;\` so the 
 DELETE FROM mom;   -- re-runnable: clear before you repopulate
 
 -- INSERT INTO mom (customer_id, order_month, revenue, prev_revenue, mom_delta)
--- SELECT ..., LAG(revenue) OVER (PARTITION BY customer_id ORDER BY order_month) AS prev_revenue, ...
+-- For each row, carry the same customer's prior-month revenue as prev_revenue, then mom_delta = revenue - prev_revenue.
 -- FROM monthly_revenue;`,
     hints: [
       "`LAG(revenue) OVER (PARTITION BY customer_id ORDER BY order_month)` is the whole trick.",
@@ -621,15 +619,9 @@ Lead with \`DELETE FROM churn_signal;\` so the load re-runs cleanly.`,
 DELETE FROM churn_signal;
 
 -- INSERT INTO churn_signal (...)
--- WITH base AS ( ... LAG(revenue) ... AS prev_revenue, ROW_NUMBER() OVER (... ORDER BY order_month DESC) AS rn_latest ... ),
---      calc AS (
---        SELECT ..., rn_latest,
---               ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1) AS pct_change
---        FROM base
---      )
--- SELECT ..., pct_change,
---        CASE WHEN rn_latest = 1 AND pct_change < -30 THEN 1 ELSE 0 END AS churn_flag
--- FROM calc;`,
+-- Stage 1: for each row, pull the same customer's prior-month revenue and mark that customer's most recent month.
+-- Stage 2: turn prior-month revenue into the signed percent change, guarding a zero or missing prior month and keeping one decimal.
+-- Finally, flag a row only when it is the customer's latest month and its percent change is a drop of more than 30%.`,
     hints: [
       "`pct_change = ROUND((revenue - prev_revenue) * 100.0 / NULLIF(prev_revenue, 0), 1)`: the `100.0` forces real division and `NULLIF` guards a zero prior month.",
       '"Latest month per customer" needs a second window: `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_month DESC) = 1` marks it.',
@@ -839,8 +831,7 @@ The empty \`lifetime\` target table is created for you. Lead your script with \`
 DELETE FROM lifetime;
 
 -- INSERT INTO lifetime (customer_id, order_date, revenue, lifetime_revenue)
--- SELECT customer_id, order_date, revenue,
---   SUM(revenue) OVER (PARTITION BY ... ORDER BY ... ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+-- lifetime_revenue = each customer's revenue accumulated by date, up to and including the current row.
 -- FROM daily_revenue;`,
     hints: [
       "`SUM(revenue) OVER (PARTITION BY customer_id ORDER BY order_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`.",
@@ -927,10 +918,10 @@ The empty \`trend\` target is created for you. Lead with \`DELETE FROM trend;\` 
 DELETE FROM trend;
 
 -- INSERT INTO trend (customer_id, order_date, revenue, running_total, moving_avg_3, pct_of_total)
--- SELECT ..., three windows over PARTITION BY customer_id ORDER BY order_date:
---   running_total = SUM(revenue) OVER (... ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
---   moving_avg_3  = ROUND(AVG(revenue) OVER (... ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2)
---   pct_of_total  = ROUND(revenue * 100.0 / SUM(revenue) OVER (PARTITION BY customer_id), 1)
+-- Per customer, ordered by date, compute three figures:
+--   running_total = revenue accumulated up to and including the current day.
+--   moving_avg_3  = average of the current day and the two before it, to 2 decimals.
+--   pct_of_total  = the day's revenue as a percent of that customer's overall total, to 1 decimal.
 -- FROM daily_revenue;`,
     hints: [
       "Three windows over the same `PARTITION BY customer_id ORDER BY order_date`: running total (`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`), moving avg (`ROWS BETWEEN 2 PRECEDING AND CURRENT ROW`), and the per-customer grand total.",
@@ -1097,12 +1088,9 @@ The \`employees\` table is seeded; the empty \`org_depth\` target already exists
 DELETE FROM org_depth;   -- keep the load idempotent on re-run
 
 -- INSERT INTO org_depth (emp_id, name, depth)
--- WITH RECURSIVE org_tree AS (
---   anchor: the CEO (manager_id IS NULL) at depth 0
---   UNION ALL
---   recursive member: JOIN employees back to org_tree on manager_id = emp_id, depth + 1
--- )
--- SELECT emp_id, name, depth FROM org_tree;`,
+-- Seed the walk at the top (the employee with no manager) as depth 0.
+-- Then step outward one management level at a time, adding 1 to depth on each hop, until no reports remain.
+-- Load emp_id, name, and depth for every employee reached.`,
     hints: [
       "Anchor: `WHERE manager_id IS NULL` seeds the CEO at `depth 0`.",
       "Recursive member: `JOIN org_tree t ON e.manager_id = t.emp_id`, emitting `t.depth + 1`.",
@@ -1181,13 +1169,10 @@ with \`DELETE FROM category_path;\` so a re-run keeps exactly eight rows.`,
 DELETE FROM category_path;   -- keep the load idempotent on re-run
 
 -- INSERT INTO category_path (category_id, name, breadcrumb, depth, root_name)
--- WITH RECURSIVE cat_tree AS (
---   anchor: roots (parent_id IS NULL), seed breadcrumb = name, depth 0, root_name = name
---   UNION ALL
---   recursive member: breadcrumb = t.breadcrumb || ' > ' || c.name, depth + 1, carry t.root_name
---   ... WHERE t.depth < 20   -- cycle guard
--- )
--- SELECT category_id, name, breadcrumb, depth, root_name FROM cat_tree;`,
+-- Start at the root categories (no parent) with depth 0 and a breadcrumb of just their own name.
+-- Step down one level at a time, extending the breadcrumb with each child's name, adding 1 to depth, and carrying the root's name unchanged.
+-- Cap the recursion depth at 20 so a cyclic row cannot loop forever.
+-- Load all five columns for every category reached.`,
     hints: [
       "Seed both `breadcrumb` (`= name`) and `root_name` (`= name`) in the anchor so `root_name` propagates down unchanged.",
       "In the recursive member, `breadcrumb = t.breadcrumb || ' > ' || c.name`, but `root_name = t.root_name`: carry the root down, don't recompute it.",
@@ -1370,12 +1355,11 @@ Lead with \`DELETE FROM\` both targets so the load survives a re-run.`,
 DELETE FROM fact_sales;
 DELETE FROM dim_customer;
 
--- 1. Load the dimension; let customer_key auto-assign.
--- INSERT INTO dim_customer (email, name) SELECT ... FROM stg_customers;
+-- 1. Load the dimension first so each customer earns its surrogate customer_key.
+-- INSERT INTO dim_customer (email, name) ... FROM stg_customers;
 
--- 2. Load the fact: look up each customer_key by joining stg_sales to dim_customer on email.
--- INSERT INTO fact_sales (customer_key, amount)
--- SELECT dc.customer_key, s.amount FROM stg_sales s JOIN dim_customer dc ON ...;`,
+-- 2. Load the fact second, looking each customer_key up from the dimension by the shared natural key.
+-- INSERT INTO fact_sales (customer_key, amount) ...`,
     hints: [
       "Lead with `DELETE FROM fact_sales;` then `DELETE FROM dim_customer;` so a second run doesn't double the rows.",
       "Insert dims with `INSERT INTO dim_customer (email, name) SELECT email, name FROM stg_customers;`. The `customer_key` auto-fills.",
@@ -1460,15 +1444,13 @@ DELETE FROM dim_customer;
 DELETE FROM dim_product;
 DELETE FROM dim_date;
 
--- 1. Load each dimension, deduped by its natural key (SELECT DISTINCT ...).
--- INSERT INTO dim_customer (email, name)       SELECT DISTINCT ... FROM stg_orders;
--- INSERT INTO dim_product  (sku, product_name) SELECT DISTINCT ... FROM stg_orders;
--- INSERT INTO dim_date     (full_date)         SELECT DISTINCT ... FROM stg_orders;
+-- 1. Load each dimension with one row per distinct natural key.
+-- INSERT INTO dim_customer (email, name)       ... FROM stg_orders;
+-- INSERT INTO dim_product  (sku, product_name) ... FROM stg_orders;
+-- INSERT INTO dim_date     (full_date)         ... FROM stg_orders;
 
--- 2. Load the fact: join staging to ALL THREE dims on the natural keys to fetch the surrogate keys.
--- INSERT INTO fact_order_items (customer_key, product_key, date_key, qty, revenue)
--- SELECT dc.customer_key, dp.product_key, dd.date_key, o.qty, o.revenue
--- FROM stg_orders o JOIN ... JOIN ... JOIN ... ;`,
+-- 2. Load the fact, looking up all three surrogate keys from the dimensions by their natural keys.
+-- INSERT INTO fact_order_items (customer_key, product_key, date_key, qty, revenue) ...`,
     hints: [
       "Clear the targets first (`DELETE FROM fact_order_items;` then the three dims) so a re-run doesn't double the fact.",
       "Load each dimension with `INSERT … SELECT DISTINCT natural_key, attr FROM stg_orders`; `DISTINCT` collapses the repeated natural keys.",
@@ -1622,10 +1604,7 @@ surrogate \`customer_key\` untouched.`,
     starterCode: `-- dim_customer and stg_customer are already seeded for you.
 -- Apply a Type 1 overwrite: match on email, overwrite name + city, add no rows.
 
--- UPDATE dim_customer
--- SET name = (SELECT s.name FROM stg_customer s WHERE s.email = dim_customer.email),
---     city = ...
--- WHERE email IN (SELECT email FROM stg_customer);`,
+-- Pull the corrected name and city from the staging dump for each matching email, overwriting in place.`,
     hints: [
       "A single `UPDATE dim_customer SET … WHERE email IN (SELECT email FROM stg_customer)` does the whole job.",
       "Pull the new `city`/`name` with correlated subqueries matched on `email`.",
@@ -1691,9 +1670,7 @@ fresh key. Re-running your script must leave the row count unchanged.`,
 -- Apply a Type 1 step that OVERWRITES existing customers and INSERTS brand-new ones,
 -- leaving exactly one row per email, and idempotent on a re-run.
 
--- INSERT INTO dim_customer (email, name, city, tier)
--- SELECT email, name, city, tier FROM stg_customer WHERE true
--- ON CONFLICT(email) DO UPDATE SET ... ;`,
+-- In one statement, overwrite the customers already present and insert the brand-new one, ending with one row per email.`,
     hints: [
       "The clean one-statement form is `INSERT INTO dim_customer (email,name,city,tier) SELECT email,name,city,tier FROM stg_customer WHERE true ON CONFLICT(email) DO UPDATE SET name=excluded.name, city=excluded.city, tier=excluded.tier;`. `email` must be `UNIQUE` (it is).",
       "`excluded.<col>` refers to the row that would have been inserted; that's the new source value.",
@@ -1922,9 +1899,9 @@ with their validity windows meeting exactly.`,
     starterCode: `-- dim_customer already holds Ada's current London row (effective 2026-01-01).
 -- Apply the Type 2 change: as of 2026-03-01, Ada's city is Berlin.
 
--- Step 1: expire the current London row, SET effective_to = '2026-03-01', is_current = 0 ...
+-- Step 1: expire the current London row so it is no longer the active version, closing its validity window at the change date.
 
--- Step 2: insert the Berlin version, effective_from = '2026-03-01', effective_to = '9999-12-31', is_current = 1 ...`,
+-- Step 2: open a new Berlin version that is current from the change date forward.`,
     hints: [
       "Two statements: an `UPDATE` to expire, then an `INSERT` for the new version.",
       "Expire with `SET effective_to = '2026-03-01', is_current = 0 WHERE email = 'a@x.com' AND is_current = 1`.",
@@ -2012,14 +1989,12 @@ must leave \`dim_customer\` byte-for-byte identical.`,
 -- Trap: capture the CHANGED emails FIRST, before you expire or insert, so the
 -- insert can't re-detect its own freshly written rows on a second run.
 
--- Step 1: DROP + CREATE a temp table of changed emails
---   (null-safe: stg.city IS NOT the current dim row's city, so a NULL->value change is caught) ...
+-- Step 1: DROP + CREATE a temp table of the emails whose city changed
+--   (compare null-safely so a NULL becoming a value still counts as a change) ...
 
--- Step 2: expire the current row for those changed emails
---   (effective_to = snapshot_date, is_current = 0) ...
+-- Step 2: expire the current row for those changed emails, closing its window at the snapshot date ...
 
--- Step 3: insert the new current version for each changed email
---   (effective_from = snapshot_date, effective_to = '9999-12-31', is_current = 1) ...
+-- Step 3: open a new current version for each changed email, effective from the snapshot date ...
 
 -- Step 4: insert brand-new emails (present in stg, absent from dim) as one current version ...`,
     hints: [
@@ -2204,13 +2179,9 @@ into \`clean_customer(email, name, city, updated_at)\`, keeping the most recentl
     starterCode: `-- stg_customer is already seeded. Load one latest row per email into clean_customer.
 DELETE FROM clean_customer;
 
--- WITH ranked AS (
---   SELECT email, name, city, updated_at,
---          ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC) AS rn
---   FROM stg_customer
--- )
+-- Number each email's rows newest-first, then keep only the first row for each email.
 -- INSERT INTO clean_customer (email, name, city, updated_at)
--- SELECT email, name, city, updated_at FROM ranked WHERE rn = 1;`,
+-- SELECT that single kept row per email.`,
     hints: [
       "\`ROW_NUMBER() OVER (PARTITION BY email ORDER BY updated_at DESC)\` numbers each email's rows newest-first; keep \`rn = 1\`.",
       "Put the window in a CTE, then \`INSERT INTO clean_customer (email, name, city, updated_at) SELECT email, name, city, updated_at FROM ranked WHERE rn = 1\`.",
@@ -2281,16 +2252,9 @@ rows with a \`NULL\` \`updated_at\` that must lose to any non-null timestamp. Po
     starterCode: `-- raw_customer is already seeded. Deduplicate it to one current row per customer_code.
 DELETE FROM dedup_customer;
 
--- WITH ranked AS (
---   SELECT customer_code, email, updated_at, source_row_id,
---          ROW_NUMBER() OVER (
---            PARTITION BY customer_code
---            ORDER BY updated_at DESC, source_row_id DESC
---          ) AS rn
---   FROM raw_customer
--- )
+-- Number each customer_code's rows so the latest updated_at wins, breaking ties on the highest source_row_id, then keep the first row per code.
 -- INSERT INTO dedup_customer (customer_code, email, updated_at, source_row_id)
--- SELECT customer_code, email, updated_at, source_row_id FROM ranked WHERE rn = 1;`,
+-- SELECT that single kept row per customer_code.`,
     hints: [
       "SQLite sorts \`NULL\` as the lowest value, so \`ORDER BY updated_at DESC\` puts every non-null timestamp first and the NULLs last, exactly what you want when a NULL must lose to any real date.",
       "Add the tiebreaker so ties are deterministic: \`ORDER BY updated_at DESC, source_row_id DESC\` keeps the higher \`source_row_id\` when two rows share a date.",
@@ -2493,10 +2457,7 @@ Do it with a single \`INSERT … SELECT … ON CONFLICT(sku) DO UPDATE\`.`,
     starterCode: `-- dim_product (sku UNIQUE) and stg_product are already seeded.
 -- Upsert the staging extract into dim_product so re-runs never duplicate.
 
--- INSERT INTO dim_product (sku, name, price)
--- SELECT sku, name, price FROM stg_product
--- WHERE true
--- ON CONFLICT(sku) DO UPDATE SET ... ;`,
+-- Load every staging row so a new sku is inserted and an existing sku overwrites its name and price in one pass.`,
     hints: [
       "`INSERT INTO dim_product (sku,name,price) SELECT sku,name,price FROM stg_product WHERE true ON CONFLICT(sku) DO UPDATE SET name = excluded.name, price = excluded.price;`",
       "The `WHERE true` before `ON CONFLICT` is required with a `SELECT` source in SQLite.",
@@ -2586,14 +2547,9 @@ still leave 5 rows** with the same \`e3\` payload.`,
 -- Load the extract idempotently: dedup -> lookback window -> upsert on event_id.
 
 -- INSERT INTO fact_events (event_id, payload, event_ts, ingested_at)
--- SELECT event_id, payload, event_ts, ingested_at
--- FROM (
---   SELECT ..., ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ingested_at DESC, payload DESC) AS rn
---   FROM stg_events
--- ) d
--- WHERE d.rn = 1
---   AND d.event_ts >= date((SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events), '-3 days')
--- ON CONFLICT(event_id) DO UPDATE SET ... ;`,
+-- 1) dedup the extract to one row per event_id, keeping the latest ingested_at.
+-- 2) bound it with a lookback window on event_ts (reprocess a trailing few days), not a strict cutoff, so the late event is not dropped.
+-- 3) upsert on event_id so a re-seen key updates in place instead of duplicating.`,
     hints: [
       "Dedup the extract first with `ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY ingested_at DESC, payload DESC)` and keep `rn = 1` (the dedup pattern from Module 4.4).",
       "Bound it with a lookback window, not a strict cutoff: `AND d.event_ts >= date((SELECT COALESCE(MAX(event_ts),'1970-01-01') FROM fact_events), '-3 days')`. A strict `> MAX` (or even `>= MAX`) silently drops the late-arriving `e5` (event_ts 2026-02-28, before the 2026-03-02 high-water); re-scanning the last few days catches it. You can't filter a window function in `WHERE`, so put the `ROW_NUMBER()` in a subquery and filter `rn` (and the lookback) outside.",
@@ -2751,10 +2707,7 @@ its rows. On healthy data this table would be empty, and empty is the "pass" sta
 DELETE FROM orphan_facts;   -- clear first so a re-run recomputes instead of doubling rows
 
 -- INSERT INTO orphan_facts (customer_key)
--- SELECT f.customer_key
--- FROM fact_sales f
--- LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
--- WHERE d.customer_key IS NULL;`,
+-- Keep the fact rows whose customer_key has no match in dim_customer, and load those keys.`,
     hints: [
       "`LEFT JOIN dim_customer` and keep only the rows `WHERE dim_customer.customer_key IS NULL`: that's the orphan anti-join.",
       "Insert those unmatched keys into `orphan_facts`.",
@@ -2820,8 +2773,8 @@ re-run recomputes the four rows instead of stacking eight.`,
 DELETE FROM dq_results;   -- recompute cleanly on every run
 
 -- INSERT INTO dq_results (test_name, violations)
--- SELECT 'pk_unique', COUNT(*) FROM ( ...customer_keys appearing > 1 time... );
--- ...then 'email_not_null', 'status_accepted' (NULL status is ALSO a violation), and 'no_orphan_facts'...`,
+-- Add one row per test, storing its name and how many rows violate it:
+-- pk_unique, email_not_null, status_accepted (a NULL status also counts), and no_orphan_facts.`,
     hints: [
       "Each test is an `INSERT INTO dq_results SELECT '<name>', COUNT(*) FROM (<the violating rows>)`.",
       "`pk_unique`: `SELECT COUNT(*) FROM (SELECT customer_key FROM dim_customer GROUP BY customer_key HAVING COUNT(*) > 1)`.",
@@ -2979,7 +2932,7 @@ re-runnable so a second run doesn't error.`,
 --   EXPLAIN QUERY PLAN SELECT * FROM fact_sales WHERE customer_key = 1;
 -- into a SEARCH … USING INDEX seek.
 
--- CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);`,
+-- Create the index on the filtered column, and keep it re-runnable so a second run does not error.`,
     hints: [
       "`CREATE INDEX IF NOT EXISTS idx_fact_sales_customer ON fact_sales(customer_key);`. The `IF NOT EXISTS` keeps the script idempotent so a re-run doesn't error.",
       "The filter column is `customer_key`; that's the column to index, so `WHERE customer_key = ?` becomes a seek instead of a scan.",
@@ -3041,15 +2994,12 @@ doesn't double the rows.`,
 -- 3) Rewrite strftime('%Y', order_date) = '2026' as a sargable half-open range,
 --    then load the 2026 orders into orders_2026.
 
--- CREATE INDEX IF NOT EXISTS idx_fact_orders_customer ON fact_orders(customer_key);
--- CREATE INDEX IF NOT EXISTS idx_fact_orders_date     ON fact_orders(order_date);
+-- Add both indexes (keep them re-runnable so a second run does not error).
 
 -- DELETE FROM orders_2026;            -- lead the load so a re-run doesn't double rows
--- INSERT INTO orders_2026 (order_id, customer_key)
--- SELECT f.order_id, f.customer_key
--- FROM fact_orders f
--- JOIN dim_customer d ON d.customer_key = f.customer_key
--- WHERE f.order_date >= '2026-01-01' AND f.order_date < '2027-01-01';`,
+-- INSERT INTO orders_2026 (order_id, customer_key) the 2026 orders,
+-- joining to dim_customer so only orders with a real customer land,
+-- and filtering order_date with the bare-column range you rewrote (no year function).`,
     hints: [
       "Two indexes, both idempotent: `CREATE INDEX IF NOT EXISTS … ON fact_orders(customer_key)` for the join and `… ON fact_orders(order_date)` for the filter.",
       "Rewrite the filter as `order_date >= '2026-01-01' AND order_date < '2027-01-01'`: bare column, half-open range, no `strftime`.",
@@ -3252,9 +3202,9 @@ DROP TABLE IF EXISTS changed;
 
 -- 2a. Freeze the changed set (current dim row whose city differs) into TEMP changed ...
 
--- 2b. Expire the old current rows for changed codes (effective_to = '2026-03-01', is_current = 0) ...
+-- 2b. Expire the old current rows for changed codes, closing their window at the snapshot date ...
 
--- 2c. Insert the new current versions (effective_from = '2026-03-01', effective_to = '9999-12-31') ...`,
+-- 2c. Insert the new current versions, effective from the snapshot date ...`,
     hints: [
       "Guard each temp table with `DROP TABLE IF EXISTS clean_dump;` before `CREATE TEMP TABLE`, then dedup with `ROW_NUMBER() OVER (PARTITION BY customer_code ORDER BY updated_at DESC)` and keep `rn = 1`; this picks the Berlin row for C1.",
       "Compare the deduped dump to the current dim row (`is_current = 1`) to find changed cities, and freeze that set into a temp table before you touch `dim_customer`.",
@@ -3379,16 +3329,16 @@ DROP TABLE IF EXISTS changed;
 DROP TABLE IF EXISTS new_codes;
 
 -- 1. Dedup raw_customer_dump -> TEMP clean_dump: one row per customer_code,
---    latest updated_at, tiebreak by source_row_id DESC ...
+--    latest updated_at, tiebreak by the highest source_row_id ...
 
 -- 2a. Freeze changed codes (existing current row whose city differs) -> TEMP changed ...
 -- 2b. Freeze brand-new codes (no row at all in dim_customer)         -> TEMP new_codes ...
 -- 2c. Expire changed current rows; 2d. insert their new versions; 2e. insert the new customers ...
 
--- 3. Resolve fact_sales.customer_key with a half-open as-of UPDATE
---    (sale_date >= effective_from AND sale_date < effective_to) ...
+-- 3. Resolve fact_sales.customer_key with a half-open as-of UPDATE that
+--    matches each sale to the version valid on its sale date ...
 
--- 4. CREATE INDEX IF NOT EXISTS idx_fact_sales_customer_key ON fact_sales(customer_key) ...
+-- 4. Index fact_sales(customer_key) for the join seek, keeping it re-runnable ...
 
 -- 5. DQ gate: DELETE FROM dq_results, then INSERT three violation counts
 --    (pk_natural_one_current, orphan_facts, contiguous_windows) ...
@@ -3631,15 +3581,12 @@ INSERT INTO fact_sales VALUES
 DELETE FROM dim_product;
 DELETE FROM dim_category;
 
--- 1. Build dim_category from the DISTINCT categories; let category_key auto-assign.
--- INSERT INTO dim_category (category_name, category_manager)
--- SELECT DISTINCT ... FROM dim_product_wide;
+-- 1. Build dim_category with one row per distinct category; let category_key auto-assign.
+-- INSERT INTO dim_category (category_name, category_manager) ... FROM dim_product_wide;
 
 -- 2. Rebuild dim_product to reference category_key instead of the repeated columns.
---    Join dim_product_wide to dim_category on category_name to fetch each category_key.
--- INSERT INTO dim_product (product_key, sku, product_name, category_key)
--- SELECT w.product_key, w.sku, w.product_name, c.category_key
--- FROM dim_product_wide w JOIN dim_category c ON ...;`,
+--    Match each wide product to its sub-dimension row to fetch the category_key.
+-- INSERT INTO dim_product (product_key, sku, product_name, category_key) ...`,
     hints: [
       `Clear the targets first: \`DELETE FROM dim_product;\` then \`DELETE FROM dim_category;\`. Product references category, so delete the product rows first; a second run then reproduces the same rows.`,
       `Build the sub-dimension with \`INSERT INTO dim_category (category_name, category_manager) SELECT DISTINCT category_name, category_manager FROM dim_product_wide;\`. \`DISTINCT\` collapses the repeated categories to one row each, and \`category_key\` auto-assigns.`,
@@ -3724,13 +3671,9 @@ CREATE TABLE dim_product (
 -- Make the load re-runnable: clear the report first.
 DELETE FROM revenue_by_manager;
 
--- Revenue by category_manager needs BOTH joins: fact -> dim_product -> dim_category.
+-- Revenue by category_manager needs both hops: fact_sales to dim_product to dim_category.
 -- INSERT INTO revenue_by_manager (category_manager, total_revenue)
--- SELECT c.category_manager, SUM(f.revenue)
--- FROM fact_sales f
--- JOIN dim_product  p ON ...
--- JOIN dim_category c ON ...
--- GROUP BY c.category_manager;`,
+-- Total revenue with one row per manager.`,
     hints: [
       `\`category_manager\` is not on \`dim_product\`; it lives on \`dim_category\`. You need two joins: \`fact_sales\` to \`dim_product\` on \`product_key\`, then \`dim_product\` to \`dim_category\` on \`category_key\`.`,
       `Aggregate at the manager grain: \`GROUP BY c.category_manager\`, not \`GROUP BY p.category_key\`. Priya manages two categories, so grouping by category would split her into two rows that never combine.`,
@@ -3894,12 +3837,7 @@ DELETE FROM current_balance;   -- re-runnable: clear before you repopulate
 -- Goal: one row per account = its balance on its LATEST date_key.
 -- balance is SEMI-ADDITIVE, so never SUM it across time; pick the latest row per account.
 -- INSERT INTO current_balance (account_key, balance)
--- SELECT account_key, balance FROM (
---   SELECT account_key, balance,
---          ROW_NUMBER() OVER (PARTITION BY account_key ORDER BY ____ ) AS rn
---   FROM fact_daily_balance
--- ) ranked
--- WHERE rn = 1;`,
+-- For each account, keep only its most recent day's balance and load that single row.`,
     hints: [
       `The current total is each account's latest balance summed. First find each account's most recent \`date_key\`, which can differ from account to account, then read that day's balance.`,
       `\`ROW_NUMBER() OVER (PARTITION BY account_key ORDER BY date_key DESC)\` numbers each account's rows newest-first. Wrap that in a subquery and keep \`WHERE rn = 1\` to grab the latest row per account.`,
@@ -3977,8 +3915,7 @@ DELETE FROM sales_report;   -- re-runnable: clear before you repopulate
 -- overall AOV is NON-ADDITIVE: recompute from additive parts, never AVG the per-day ratios.
 -- Force decimal division with * 1.0 so integer division does not truncate.
 -- INSERT INTO sales_report (metric, value)
--- SELECT 'overall_aov', SUM(______) * 1.0 / SUM(______)
--- FROM fact_daily_sales;`,
+-- Store one row: metric 'overall_aov' and the value computed by dividing the two summed totals.`,
     hints: [
       `Average order value is total revenue divided by total orders. Sum the two additive columns first, then divide the sums; do not average a per-row ratio.`,
       `\`AVG(revenue / order_count)\` is the trap: it weights every day equally and ignores how many orders each day had. Use \`SUM(revenue) * 1.0 / SUM(order_count)\` instead.`,
@@ -4123,12 +4060,9 @@ Expected rows: order \`101\` (placed in month \`1\`, shipped in month \`2\`) yie
 -- Make the load re-runnable: clear the target first.
 DELETE FROM order_month_report;
 
--- Join dim_date TWICE (aliased order_d and ship_d) to fetch both months.
+-- Fetch both months by reading the single dim_date in two roles: an order role and a ship role.
 -- INSERT INTO order_month_report (order_key, order_month, ship_month)
--- SELECT f.order_key, order_d.month, ship_d.month
--- FROM fact_orders f
--- JOIN dim_date order_d ON ...
--- JOIN dim_date ship_d  ON ...;`,
+-- Pull order_month from the order-date lookup and ship_month from the ship-date lookup.`,
     hints: [
       `Lead with \`DELETE FROM order_month_report;\` so a second run doesn't double the rows.`,
       `The whole trick is joining the single \`dim_date\` twice under two aliases: \`JOIN dim_date order_d ON order_d.date_key = f.order_date_key\` and \`JOIN dim_date ship_d ON ship_d.date_key = f.ship_date_key\`.`,
@@ -4217,12 +4151,11 @@ The six seeded orders use four distinct flag combinations, so \`dim_order_flags\
 DELETE FROM dim_order_flags;
 UPDATE fact_order SET flag_key = NULL;
 
--- 1. Build the junk dim from the DISTINCT flag combinations; let flag_key auto-assign.
--- INSERT INTO dim_order_flags (is_gift, is_expedited, is_first_order)
--- SELECT DISTINCT ... FROM fact_order;
+-- 1. Build the junk dim with one row per flag combination that actually occurs; let flag_key auto-assign.
+-- INSERT INTO dim_order_flags (is_gift, is_expedited, is_first_order) ... FROM fact_order;
 
--- 2. Backfill fact_order.flag_key by matching all three flags to the dim.
--- UPDATE fact_order SET flag_key = (SELECT d.flag_key FROM dim_order_flags d WHERE ...);`,
+-- 2. Backfill fact_order.flag_key by matching all three flags to its dim row.
+-- UPDATE fact_order SET flag_key = ... ;`,
     hints: [
       `Clear the targets first: \`DELETE FROM dim_order_flags;\` then \`UPDATE fact_order SET flag_key = NULL;\` so the load re-runs cleanly.`,
       `Build the dim with \`INSERT INTO dim_order_flags (is_gift, is_expedited, is_first_order) SELECT DISTINCT is_gift, is_expedited, is_first_order FROM fact_order;\`. \`DISTINCT\` keeps only the combinations that occur, and \`flag_key\` auto-assigns.`,
