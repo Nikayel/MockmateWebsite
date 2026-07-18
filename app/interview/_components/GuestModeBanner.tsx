@@ -15,7 +15,9 @@ export function GuestModeBanner({ onSignUp }: GuestModeBannerProps) {
         <div className="flex items-center gap-2">
           <span className="text-accent font-medium">Free Trial</span>
           <span className="text-muted-foreground hidden sm:inline">
-            Complete this interview to see your AI-powered feedback
+            Run your code against real interview tests and get your score. Create a free account
+            to unlock the AI interviewer and full feedback. 8 free sessions a month, no credit
+            card.
           </span>
         </div>
         <button
