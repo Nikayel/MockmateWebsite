@@ -525,10 +525,14 @@ export async function checkQuota(
 
     // Check session limit (skip if user has free opens remaining)
     if (quota.freeOpensRemaining <= 0 && quota.sessionsUsed >= quota.sessionsLimit) {
+      const sessionLimitMessage =
+        tier === "free"
+          ? `You've used all ${quota.sessionsLimit} free sessions for this month. Upgrade to Pro for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions per month, a personalized roadmap, and spaced repetition.`
+          : `You've used all ${quota.sessionsLimit} Pro sessions for this month. Your limit resets on the 1st.`
       const response = NextResponse.json(
         {
           error: "Session limit exceeded",
-          message: `You've used all ${quota.sessionsLimit} sessions for this month. Upgrade to Pro for more sessions.`,
+          message: sessionLimitMessage,
           code: "QUOTA_EXCEEDED",
           quota: {
             sessionsUsed: quota.sessionsUsed,
