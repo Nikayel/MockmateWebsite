@@ -24,7 +24,7 @@ export function GuestModeBanner({ onSignUp }: GuestModeBannerProps) {
           onClick={onSignUp}
           className="text-accent hover:text-accent/80 font-medium transition-colors"
         >
-          Sign up for unlimited access
+          Create a free account
         </button>
       </div>
     </div>
