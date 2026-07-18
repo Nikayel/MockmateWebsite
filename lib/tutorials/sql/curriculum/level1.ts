@@ -568,7 +568,7 @@ INSERT INTO products VALUES
     id: "sql-l1-in-between-like-apply",
     executionMode: "single-file",
     prompt: `Filter \`products\` to category codes in the set \`('AUD','HOM')\` **and** a price band of \`2000\` to \`9000\` cents inclusive. Return \`product_id\`, \`category_code\`, \`unit_price_cents\`.`,
-    starterCode: `-- Combine IN for the category set with BETWEEN for the price band.
+    starterCode: `-- Keep only products whose category is in the given set and whose price sits in the band.
 SELECT product_id, category_code, unit_price_cents
 FROM products
 WHERE
@@ -613,7 +613,7 @@ INSERT INTO products VALUES
 - the \`sku\` matches the malformed prefix pattern \`TMP-%\` (temporary SKUs that should never ship),
 - the \`status\` is in the excluded set \`('draft','deprecated')\`,
 - the \`added_date\` is **outside** the valid window \`2026-01-01\` to \`2026-02-28\` (i.e., *not* \`BETWEEN\` those dates; ISO date text compares lexicographically, so \`BETWEEN\` works on \`'YYYY-MM-DD'\`).`,
-    starterCode: `-- Pattern-match the SKU, restrict the status set, and exclude the valid date window.
+    starterCode: `-- Keep rows meeting all three conditions: the SKU shape, the listed statuses, and dates outside the valid window.
 SELECT product_id, sku, status
 FROM products_raw
 WHERE
@@ -912,7 +912,7 @@ INSERT INTO orders VALUES
     id: "sql-l1-boolean-and-or-apply",
     executionMode: "single-file",
     prompt: `Return \`order_id\`, \`status\`, \`region\` for orders that are (\`status = 'paid'\` **or** \`status = 'shipped'\`) **and** \`region = 'EU'\`. Get the grouping right.`,
-    starterCode: `-- Filter: (paid OR shipped) AND region EU
+    starterCode: `-- Mind the grouping: the two status options belong together, then the region applies.
 SELECT order_id, status, region
 FROM orders
 WHERE ;`,
@@ -1090,7 +1090,7 @@ INSERT INTO orders VALUES
     id: "sql-l1-order-by-practice",
     executionMode: "single-file",
     prompt: `Produce a deterministic **newest-first preview** whose order can never change between runs, even though several rows share a timestamp. Sort by \`order_ts\` descending, then \`total_cents\` descending, then \`order_id\` ascending as the final unique tie-breaker. Return \`order_id\`, \`order_ts\`, \`region\`, \`total_cents\`. The output must come back in that exact sorted order.`,
-    starterCode: `-- Three sort keys make this fully deterministic
+    starterCode: `-- Add enough sort keys to make the ordering fully deterministic (no ties left unbroken)
 SELECT order_id, order_ts, region, total_cents
 FROM orders
 `,
@@ -1193,7 +1193,7 @@ INSERT INTO orders VALUES
     id: "sql-l1-limit-distinct-apply",
     executionMode: "single-file",
     prompt: `Return the **distinct** list of order statuses actually present in the source, sorted ascending. One column: \`status\`.`,
-    starterCode: `-- Return the distinct statuses, sorted A→Z
+    starterCode: `-- Return each status once, sorted A to Z
 SELECT
 
 FROM orders;`,
@@ -1228,7 +1228,7 @@ INSERT INTO orders VALUES
     id: "sql-l1-limit-distinct-practice",
     executionMode: "single-file",
     prompt: `Profile the raw table: return the **distinct \`(region, status)\` combinations** present, sorted by \`region\` ascending then \`status\` ascending, and take only the **top 10** with \`LIMIT\`. Columns: \`region\`, \`status\`.`,
-    starterCode: `-- Return distinct (region, status) pairs, sorted, top 10
+    starterCode: `-- Return each unique (region, status) pair, sorted, first 10 rows
 SELECT
 
 FROM orders;`,
@@ -1330,7 +1330,7 @@ INSERT INTO orders_raw VALUES
     id: "sql-l1-cast-types-apply",
     executionMode: "single-file",
     prompt: `Cast the text \`total_cents_text\` to an integer and compute dollars. Return \`order_id\`, \`total_cents\` (the cast integer), and \`total_dollars\` (\`total_cents / 100.0\`, keeping decimals).`,
-    starterCode: `-- Cast total_cents_text to INTEGER, then compute dollars.
+    starterCode: `-- Convert the text amount to a whole number, then compute dollars.
 SELECT
   order_id,
 
@@ -1369,7 +1369,7 @@ INSERT INTO orders_raw VALUES
     id: "sql-l1-cast-types-practice",
     executionMode: "single-file",
     prompt: `Write a query that returns \`payment_id\`, \`amount_cents\`, and \`amount_dollars\`. Cast \`amount_text\` to an integer for \`amount_cents\`, but when \`amount_text\` is missing (\`NULL\`) show \`0\` instead of \`NULL\`. \`amount_dollars\` = \`amount_cents / 100.0\`.`,
-    starterCode: `-- Cast the amount to integer cents; default a missing amount to 0.
+    starterCode: `-- Turn the amount into integer cents, treating a missing amount as 0.
 SELECT
   payment_id,
 
@@ -1465,7 +1465,7 @@ INSERT INTO customers_raw VALUES
     id: "sql-l1-strings-apply",
     executionMode: "single-file",
     prompt: `Normalize each email to a trimmed, lowercase join key. Return \`customer_id\` and \`email_key\` = \`LOWER(TRIM(email))\`.`,
-    starterCode: `-- Return customer_id and a normalized email_key = LOWER(TRIM(email))
+    starterCode: `-- Return customer_id and a normalized email_key (lower-cased, with surrounding spaces removed)
 SELECT
 
 FROM customers_raw;`,
