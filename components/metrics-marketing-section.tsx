@@ -174,7 +174,7 @@ export function MetricsMarketingSection() {
 
         {/* CTA */}
         <div className="mt-10 text-center">
-          <Link href="/signup">
+          <Link href="/login">
             <MagneticButton className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-lg px-6 py-3 font-medium transition-colors">
               Start tracking your progress
             </MagneticButton>
