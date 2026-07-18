@@ -103,7 +103,7 @@ customer's paid orders. Build it as two chained CTEs: \`paid\` (paid orders only
   -- paid orders only
 ),
 per_customer AS (
-  -- SUM(total_cents) AS revenue, grouped by customer_id, reading from paid
+  -- total revenue per customer, reading from paid
 )
 SELECT customer_id, revenue
 FROM per_customer
@@ -143,7 +143,7 @@ revenue is the sum of \`total_cents\` across that customer's paid orders, ordere
 then \`customer_name\`. Build a CTE \`customer_totals\` that sums paid revenue per \`customer_id\`, then join it
 back to \`customers\` to get the name.`,
     starterCode: `WITH customer_totals AS (
-  -- SUM(total_cents) AS revenue per customer, paid orders only
+  -- total paid revenue per customer
 )
 SELECT c.customer_name, t.revenue
 FROM customer_totals t
@@ -234,7 +234,7 @@ average order total** (a correlated subquery). Return \`order_id\` and \`total_c
     starterCode: `SELECT order_id, total_cents
 FROM orders o
 WHERE total_cents > (
-  -- average total for THIS row's customer: correlate on o.customer_id
+  -- the average order total for THIS row's own customer
 )
 ORDER BY order_id;`,
     hints: [
@@ -269,8 +269,8 @@ export const sqlAggregatesDrills: SqlExercise[] = [
     prompt: `**Easy.** Return two numbers for the whole \`orders\` table: the order count as \`order_count\` and
 the total revenue as \`total_cents\`.`,
     starterCode: `SELECT
-  -- COUNT of all rows AS order_count,
-  -- SUM of total_cents AS total_cents
+  -- the order count AS order_count,
+  -- the total revenue AS total_cents
 FROM orders;`,
     hints: [
       "`COUNT(*)` counts rows; `SUM(total_cents)` adds the column.",
@@ -290,7 +290,7 @@ FROM orders;`,
     id: "sql-l2-aggregates-drill2",
     executionMode: "single-file",
     prompt: `**Medium.** Per \`status\`, return the \`order_count\` and total \`total_cents\`. Order by \`status\`.`,
-    starterCode: `SELECT status, /* count */, /* sum */
+    starterCode: `SELECT status, /* how many orders */, /* total revenue */
 FROM orders
 GROUP BY status
 ORDER BY status;`,
@@ -447,7 +447,7 @@ export const sqlInnerJoinDrills: SqlExercise[] = [
 Order by \`order_id\`.`,
     starterCode: `SELECT o.order_id, c.customer_name
 FROM orders o
-JOIN customers c ON /* match customer_id */
+JOIN customers c ON /* link each order to its customer */
 ORDER BY o.order_id;`,
     hints: [
       "Join on the shared key: `ON c.customer_id = o.customer_id`.",
@@ -548,7 +548,7 @@ orders** (their \`order_id\` will be NULL). Return \`customer_name\` and \`order
 \`customer_name\`, then \`order_id\`.`,
     starterCode: `SELECT c.customer_name, o.order_id
 FROM customers c
-LEFT JOIN orders o ON /* match customer_id */
+LEFT JOIN orders o ON /* link each customer to their orders */
 ORDER BY c.customer_name, o.order_id;`,
     hints: [
       "A LEFT JOIN keeps every row from `customers` even with no matching order.",
@@ -675,7 +675,7 @@ ORDER BY rn;`,
 revenues share a rank. Return \`category\`, \`product\`, \`revenue\`, \`rnk\`, ordered by \`category\`, then
 \`rnk\`, then \`product\`.`,
     starterCode: `SELECT category, product, revenue,
-  RANK() OVER (/* per category, by revenue DESC */) AS rnk
+  RANK() OVER (/* within each category, highest revenue first */) AS rnk
 FROM sales
 ORDER BY category, rnk, product;`,
     hints: [
