@@ -65,12 +65,12 @@ export default function FreePracticePage() {
     {
       question: "Do I need to put in a credit card?",
       answer:
-        "No. Your first practice round is completely free. You only upgrade if you want unlimited access to our entire question bank and advanced scenarios (like System Design and Bug-Fix).",
+        "No. The free plan includes 8 full interview sessions every month across 20+ problems, with complete AI feedback on every session. You only upgrade to Pro if you want the 350+ problem bank plus spaced repetition scheduling and a personalized roadmap.",
     },
     {
       question: "Can I choose the question difficulty?",
       answer:
-        "The free tier provides a curated medium-difficulty problem designed to test your communication skills. Premium users can customize their difficulty and exact topic.",
+        "The free plan includes 20+ problems spanning core interview patterns and difficulties, so you can pick where to start. Pro users unlock the full 350+ problem bank and can customize their difficulty and exact topic.",
     },
   ]
 
