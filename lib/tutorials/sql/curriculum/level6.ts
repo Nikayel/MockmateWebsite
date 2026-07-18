@@ -165,7 +165,7 @@ ORDER BY monthly_cost_usd DESC;`,
 Group the services by their \`layer\` and sum \`monthly_cost_usd\`. Alias the summed column exactly \`monthly_cost\`, ordered descending.`,
     starterCode: `-- Total monthly cost per platform layer, most expensive first.
 SELECT
-  -- group the services by layer and sum their cost
+  -- one row per layer holding that layer's combined cost
 FROM platform_services;`,
     hints: [
       "Group by `layer` so each layer collapses to one row.",
@@ -200,7 +200,7 @@ ORDER BY monthly_cost DESC;`,
 Keep only layers with more than one service. Alias the columns exactly \`service_count\` and \`monthly_cost\`, ordered by \`monthly_cost\` descending.`,
     starterCode: `-- Layers running more than one service: layer, service_count, monthly_cost.
 SELECT
-  -- group by layer, count services, sum cost, keep groups with COUNT(*) > 1
+  -- one row per layer with its service count and total cost, dropping single-service layers
 FROM platform_services;`,
     hints: [
       "Group by `layer`, then `COUNT(*) AS service_count` and `SUM(monthly_cost_usd) AS monthly_cost`.",
@@ -243,7 +243,7 @@ FROM platform_services;`,
       id: "sql-l6-cloud-and-the-de-stack-drill-2",
       executionMode: "single-file",
       prompt: `**Medium.** Write a query that returns the single most expensive service and its cost as \`(service, monthly_cost_usd)\`, over \`platform_services\`.`,
-      starterCode: `-- The priciest service: order by cost and take the top row.
+      starterCode: `-- The single most expensive service.
 SELECT service, monthly_cost_usd
 FROM platform_services
 ;`,
@@ -392,7 +392,7 @@ ORDER BY size_bytes DESC;`,
 The top-level prefix is the part of \`object_key\` before the first slash (for \`raw/events/...\` it is \`raw\`). Group by that prefix and sum \`size_bytes\`. Alias the columns exactly \`prefix\` and \`total_bytes\`, most bytes first.`,
     starterCode: `-- Total bytes per top-level key prefix, largest first.
 SELECT
-  -- the prefix is everything before the first '/'; group by it and sum size_bytes
+  -- reduce to one row per top-level prefix, holding the bytes stored under it
 FROM s3_inventory;`,
     hints: [
       "`instr(object_key, '/')` gives the position of the first slash; `substr(object_key, 1, instr(object_key, '/') - 1)` is the text before it.",
@@ -633,7 +633,7 @@ ORDER BY monthly_cost_usd DESC;`,
 Treat 1 GB as 1,000,000,000 bytes. Round \`total_gb\` and \`monthly_cost_usd\` to 2 decimals, and order by \`monthly_cost_usd\` descending.`,
     starterCode: `-- Total GB and monthly cost per storage class, most expensive first.
 SELECT
-  -- join inventory to pricing, group by storage class, sum GB and cost
+  -- one row per storage class, carrying its total size and total cost
 FROM s3_inventory i
 JOIN storage_pricing p ON p.storage_class = i.storage_class;`,
     hints: [
@@ -718,7 +718,7 @@ LIMIT 1;`,
       id: "sql-l6-storage-classes-lifecycle-drill-2",
       executionMode: "single-file",
       prompt: `**Medium.** Write a query that returns the total monthly storage bill across all objects as \`(monthly_bill_usd)\`, over \`s3_inventory\` joined to \`storage_pricing\`. Treat 1 GB as 1,000,000,000 bytes and round to 2 decimals.`,
-      starterCode: `-- Join each object to its class price and sum the cost.
+      starterCode: `-- The whole monthly bill, priced per object by its storage class.
 SELECT
 FROM s3_inventory i
 JOIN storage_pricing p ON p.storage_class = i.storage_class;`,
@@ -757,7 +757,7 @@ SELECT
       id: "sql-l6-storage-classes-lifecycle-drill-4",
       executionMode: "single-file",
       prompt: `**Hard.** Write a query that returns the monthly storage cost of each top-level prefix as \`(prefix, cost)\`, most expensive first, over \`s3_inventory\` joined to \`storage_pricing\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
-      starterCode: `-- Cost per prefix: join to pricing, group by the key prefix.
+      starterCode: `-- Monthly storage cost totaled under each top-level prefix.
 SELECT substr(i.object_key, 1, instr(i.object_key, '/') - 1) AS prefix
 FROM s3_inventory i
 JOIN storage_pricing p ON p.storage_class = i.storage_class
@@ -1130,7 +1130,7 @@ ORDER BY compressed_bytes DESC;`,
 Sum \`compressed_bytes\` for just those two columns for \`bytes_read\`, and divide it by the sum over all columns for the percentage. Round \`pct_of_full\` to 2 decimals.`,
     starterCode: `-- Bytes a 2-column query reads, and its share of the full-row bytes.
 SELECT
-  -- sum compressed_bytes for event_type + country, and as a percent of the total
+  -- the bytes those two columns occupy, and their share of the file total
 FROM parquet_column_stats;`,
     hints: [
       "`SUM(CASE WHEN column_name IN ('event_type','country') THEN compressed_bytes ELSE 0 END)` totals just the two projected columns.",
@@ -1192,7 +1192,7 @@ ORDER BY pct_of_file DESC;`,
       id: "sql-l6-rows-vs-columns-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns the whole file's compressed size in MB as \`(file_mb)\`, over \`parquet_column_stats\`. Treat 1 MB as 1,000,000 bytes, rounded to 2 decimals.`,
-      starterCode: `-- Sum every column chunk's compressed size.
+      starterCode: `-- The whole file's total compressed size.
 SELECT
 FROM parquet_column_stats;`,
       hints: ["`SUM(compressed_bytes) / 1000000.0`.", "`ROUND(..., 2)` and alias `file_mb`."],
@@ -1346,7 +1346,7 @@ ORDER BY ratio_by_type DESC;`,
 Round \`compression_ratio\` to 2 decimals, ordered by it descending, so the columns that compress best are on top.`,
     starterCode: `-- Compression ratio per column, best first.
 SELECT column_name, data_type
-  -- uncompressed_bytes divided by compressed_bytes
+  -- add each column's compression ratio
 FROM parquet_column_stats
 ORDER BY compression_ratio DESC;`,
     hints: [
@@ -1385,7 +1385,7 @@ ORDER BY compression_ratio DESC;`,
 Treat 1 MB as 1,000,000 bytes. The overall ratio is total uncompressed divided by total compressed. Round every column to 2 decimals.`,
     starterCode: `-- Whole-file totals: uncompressed MB, compressed MB, and the overall shrink.
 SELECT
-  -- SUM the two byte columns into MB, and divide for the ratio
+  -- the two size totals in MB, and their overall ratio
 FROM parquet_column_stats;`,
     hints: [
       "`SUM(uncompressed_bytes) / 1000000.0` and `SUM(compressed_bytes) / 1000000.0` are the two totals in MB.",
@@ -1594,9 +1594,9 @@ ORDER BY rg_id;`,
 A row group must be read when its stored \`[min_order_id, max_order_id]\` range overlaps \`[150000, 250000]\`. Treat 1 MB as 1,000,000 bytes and round \`mb_read\` to 2 decimals.`,
     starterCode: `-- Row groups (and MB) a range filter must read after pushdown.
 SELECT
-  -- count the overlapping row groups and sum their MB
+  -- how many overlapping row groups, and their combined MB
 FROM row_group_stats
--- a row group overlaps when its max is at or above the floor AND its min is at or below the ceiling
+-- keep the row groups whose stored range overlaps the filter window
 ;`,
     hints: [
       "Two ranges [a,b] and [c,d] overlap when `b >= c AND a <= d`. Here: `max_order_id >= 150000 AND min_order_id <= 250000`.",
@@ -1625,7 +1625,7 @@ WHERE max_order_id >= 150000 AND min_order_id <= 250000;`,
 Read a row group only when its range overlaps the filter. Treat 1 MB as 1,000,000 bytes and round every column to 2 decimals.`,
     starterCode: `-- Pushdown savings: MB read vs total, and the percentage skipped.
 SELECT
-  -- conditional SUM for the overlapping row groups, plain SUM for the total, and the skipped percentage
+  -- the overlapping row groups' MB, the whole file's MB, and the share skipped
 FROM row_group_stats;`,
     hints: [
       "`SUM(CASE WHEN max_order_id >= 150000 AND min_order_id <= 250000 THEN compressed_bytes ELSE 0 END)` is the bytes read.",
@@ -1647,7 +1647,7 @@ FROM row_group_stats;`,
       id: "sql-l6-row-groups-pushdown-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns how many row groups the file has and how many rows in total as \`(row_groups, total_rows)\`, over \`row_group_stats\`.`,
-      starterCode: `-- Count the row groups and sum their rows.
+      starterCode: `-- how many row groups, and their rows in total
 SELECT
 FROM row_group_stats;`,
       hints: ["`COUNT(*)` is the row-group count.", "`SUM(row_count)` is total rows."],
@@ -1903,7 +1903,7 @@ FROM partition_catalog;`,
 Count and sum only the partitions in the date range, and compare their bytes to the whole table. Round \`pct_skipped\` to 2 decimals.`,
     starterCode: `-- A 3-day range scan: partitions read, bytes read, and percent skipped.
 SELECT
-  -- COUNT and SUM the in-range partitions; compare to the table total for pct_skipped
+  -- how many in-range partitions and their bytes, against the whole-table total
 FROM partition_catalog
 -- keep only the partitions in the date range
 ;`,
@@ -1927,7 +1927,7 @@ FROM partition_catalog
       id: "sql-l6-what-is-a-partition-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns the whole table's size in GB and its total rows as \`(total_gb, total_rows)\`, over \`partition_catalog\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
-      starterCode: `-- Sum every partition's bytes and rows.
+      starterCode: `-- the whole table's bytes and rows combined
 SELECT
 FROM partition_catalog;`,
       hints: ["`SUM(size_bytes) / 1000000000.0` for GB.", "`SUM(row_count)` for rows."],
@@ -1989,7 +1989,7 @@ ORDER BY file_count DESC, dt;`,
       prompt: `**Hard.** Write a query that returns each partition with the running total of bytes up to and including it, in date order, as \`(dt, running_bytes)\`, over \`partition_catalog\`.`,
       starterCode: `-- A cumulative scan size as you add partitions oldest-first.
 SELECT dt,
-       -- running SUM of size_bytes ordered by dt
+       -- the running total of bytes through this partition, in date order
        0 AS running_bytes
 FROM partition_catalog
 ORDER BY dt;`,
@@ -2124,7 +2124,7 @@ ORDER BY avg_file_mb ASC;`,
 A partition has the problem when its average file (total bytes divided by file count) is under 128 MB. A healthy partition of roughly half a gigabyte holds about four 128 MB files, so \`excess_files\` is its file count minus that 4-file target. Order by \`excess_files\` descending.`,
     starterCode: `-- Small-files partitions and how many excess files each carries over a 4-file target.
 SELECT partition_key, file_count
-  -- excess_files = file_count - 4
+  -- excess_files: how far its file count sits above the 4-file target
 FROM partition_files
 -- keep only partitions whose average file is under 128 MB
 ORDER BY excess_files DESC;`,
@@ -2151,7 +2151,7 @@ ORDER BY excess_files DESC;`,
       id: "sql-l6-choosing-partition-key-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns the total number of files across all partitions as \`(total_files)\`, over \`partition_files\`.`,
-      starterCode: `-- Sum the file counts.
+      starterCode: `-- the total number of files across all partitions
 SELECT
 FROM partition_files;`,
       hints: ["`SUM(file_count)`.", "Alias it `total_files`."],
@@ -2302,7 +2302,7 @@ ORDER BY size_bytes DESC;`,
 \`skew_ratio\` is the largest bucket size divided by the average bucket size (a balanced hash gives a ratio near 1; a mega-key pushes it up). Treat 1 MB as 1,000,000 bytes and round \`avg_mb\`, \`max_mb\`, and \`skew_ratio\` to 2 decimals.`,
     starterCode: `-- How balanced are the buckets? count, average MB, largest MB, and the skew ratio.
 SELECT
-  -- COUNT the buckets, AVG and MAX their size, and divide MAX by AVG for the skew
+  -- the bucket count, their average and largest size, and how far the largest sits above average
 FROM user_buckets;`,
     hints: [
       "`COUNT(*)` is `bucket_count`; `AVG(size_bytes)` and `MAX(size_bytes)` are the average and largest bucket in bytes.",
@@ -2358,7 +2358,7 @@ FROM query_log
       id: "sql-l6-bucketing-and-the-full-scan-trap-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns the total number of users across all buckets as \`(users)\`, over \`user_buckets\`.`,
-      starterCode: `-- Sum the per-bucket user counts.
+      starterCode: `-- the total users across all buckets
 SELECT
 FROM user_buckets;`,
       hints: ["`SUM(user_count)`.", "Alias it `users`."],
@@ -2621,7 +2621,7 @@ ORDER BY stage_id, task_id;`,
 Group the tasks by \`stage_id\`, count them, sum \`input_rows\`, and average \`duration_s\`. Round \`avg_duration_s\` to 2 decimals, ordered by \`stage_id\`.`,
     starterCode: `-- Per-stage summary: task count, total input rows, average task duration.
 SELECT stage_id
-  -- COUNT tasks, SUM input_rows, AVG duration_s
+  -- per stage: how many tasks, their total input rows, and typical task duration
 FROM task_metrics
 GROUP BY stage_id
 ORDER BY stage_id;`,
@@ -2658,7 +2658,7 @@ ORDER BY stage_id;`,
 Treat 1 MB as 1,000,000 bytes. Sum \`shuffle_write_bytes\` and \`duration_s\` per stage, and round both to 2 decimals, ordered by \`stage_id\`. (Notice which stage writes the shuffle and which stage still runs longer.)`,
     starterCode: `-- Per-stage shuffle MB written and total task seconds.
 SELECT stage_id
-  -- SUM shuffle_write_bytes into MB, SUM duration_s
+  -- each stage's shuffle write in MB and its total task time
 FROM task_metrics
 GROUP BY stage_id
 ORDER BY stage_id;`,
@@ -2685,7 +2685,7 @@ ORDER BY stage_id;`,
       id: "sql-l6-distributed-execution-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns the total number of tasks and total input rows across the job as \`(tasks, input_rows)\`, over \`task_metrics\`.`,
-      starterCode: `-- Count tasks, sum input rows.
+      starterCode: `-- how many tasks in all, and their total input rows
 SELECT
 FROM task_metrics;`,
       hints: ["`COUNT(*)` is the task count.", "`SUM(input_rows)` is total input rows."],
@@ -2718,7 +2718,7 @@ LIMIT 1;`,
       id: "sql-l6-distributed-execution-drill-3",
       executionMode: "single-file",
       prompt: `**Hard.** Write a query that returns the total shuffle bytes written across the whole job in GB as \`(shuffle_gb)\`, over \`task_metrics\`. Treat 1 GB as 1,000,000,000 bytes, rounded to 2 decimals.`,
-      starterCode: `-- Sum every task's shuffle write.
+      starterCode: `-- the whole job's shuffle bytes written, combined
 SELECT
 FROM task_metrics;`,
       hints: [
@@ -2840,7 +2840,7 @@ ORDER BY stage_id;`,
 \`x_stage_avg\` is the task's \`duration_s\` divided by the average duration of stage 1 (a straggler shows a value well above 1). Keep only stage 1, round \`x_stage_avg\` to 2 decimals, ordered by \`duration_s\` descending.`,
     starterCode: `-- Stage-1 tasks vs the stage average: the straggler stands out.
 SELECT task_id, duration_s
-  -- duration_s divided by the stage-1 average duration
+  -- each task's duration as a multiple of the stage-1 average
 FROM task_metrics
 WHERE stage_id = 1
 ORDER BY duration_s DESC;`,
@@ -2947,7 +2947,7 @@ WHERE role = 'fact';`,
       id: "sql-l6-skew-and-joins-drill-3",
       executionMode: "single-file",
       prompt: `**Hard.** Write a query that returns how many dimension tables are small enough to broadcast as \`(broadcastable)\`, over \`join_inputs\`. A dimension broadcasts when it is under the 10 MB (10485760 byte) threshold.`,
-      starterCode: `-- Count the dimensions under the broadcast threshold.
+      starterCode: `-- how many dimensions are small enough to broadcast
 SELECT
 FROM join_inputs
 ;`,
@@ -3109,7 +3109,7 @@ ORDER BY success_pct ASC, job;`,
 A run missed its SLA when it succeeded but its \`duration_min\` exceeded its \`sla_min\`. \`over_by_min\` is how many minutes over it ran. Order by \`over_by_min\` descending. (Failed runs are excluded: a failure is a different alert.)`,
     starterCode: `-- Successful runs that breached their freshness SLA, worst overrun first.
 SELECT job, run_date, duration_min, sla_min
-  -- over_by_min = duration_min - sla_min
+  -- over_by_min: how many minutes past the SLA it ran
 FROM pipeline_runs
 -- keep successful runs that ran longer than their SLA
 ORDER BY over_by_min DESC;`,
@@ -3137,7 +3137,7 @@ ORDER BY over_by_min DESC;`,
       id: "sql-l6-pipelines-orchestration-drill-1",
       executionMode: "single-file",
       prompt: `**Easy.** Write a query that returns the total number of runs and how many failed as \`(runs, failures)\`, over \`pipeline_runs\`.`,
-      starterCode: `-- Count all runs, and the failed ones.
+      starterCode: `-- the total runs, and how many of them failed
 SELECT
 FROM pipeline_runs;`,
       hints: [
@@ -3156,7 +3156,7 @@ FROM pipeline_runs;`,
       id: "sql-l6-pipelines-orchestration-drill-2",
       executionMode: "single-file",
       prompt: `**Medium.** Write a query that returns the total rows written by successful runs as \`(rows_written)\`, over \`pipeline_runs\`.`,
-      starterCode: `-- Sum rows_out over the runs that succeeded.
+      starterCode: `-- the total rows written by the successful runs
 SELECT
 FROM pipeline_runs
 WHERE status = 'success';`,
@@ -3373,7 +3373,7 @@ FROM staged_events;`,
       id: "sql-l6-data-quality-checks-drill-2",
       executionMode: "single-file",
       prompt: `**Medium.** Write a query that returns how many rows have an invalid (non-positive) amount as \`(bad_amounts)\`, over \`staged_events\`.`,
-      starterCode: `-- Count rows whose amount is zero or negative.
+      starterCode: `-- how many rows have a zero or negative amount
 SELECT
 FROM staged_events
 ;`,
