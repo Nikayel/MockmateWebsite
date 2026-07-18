@@ -137,7 +137,7 @@ WITH numbered AS (
   FROM daily_logins
 )
 SELECT
-  -- group by the (user_id, anchor) run, size it, then take the max per user
+  -- collapse each consecutive run to one row, size it, then keep each user's longest
 FROM numbered;`,
     hints: [
       "The anchor is `date(login_date, '-' || rn || ' days')`. Every row in one consecutive run collapses to the same anchor date.",
@@ -346,7 +346,7 @@ WITH with_prev AS (
   FROM events
 )
 SELECT
-  -- flag a new session on a > 30 min gap, running-sum it, then build session_id
+  -- open a fresh session past a 30-minute gap, number each user's sessions, then form session_id
 FROM with_prev;`,
     hints: [
       "Minutes between two timestamps: `(julianday(event_ts) - julianday(prev_ts)) * 1440`.",
@@ -520,7 +520,7 @@ WITH firsts AS (
   SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
 )
 SELECT
-  -- bucket into cohort weeks, LEFT JOIN to day-7 activity, count both sides
+  -- bucket into cohort weeks, keep every member while matching day-7 activity, count both sides
 FROM firsts;`,
     hints: [
       "Per user: `cohort_week = strftime('%Y-%W', first_date)` and `day7 = date(first_date, '+7 days')`.",
@@ -582,7 +582,7 @@ WITH firsts AS (
   SELECT user_id, MIN(event_date) AS first_date FROM events GROUP BY user_id
 )
 SELECT
-  -- cohort_week, week offset per event, COUNT(DISTINCT user_id)
+  -- cohort_week, the whole-week offset per event, then the retained-user count
 FROM firsts;`,
     hints: [
       "Join each event back to its user's `first_date`, then `cohort_week = strftime('%Y-%W', first_date)`.",
@@ -719,7 +719,7 @@ WITH per_user AS (
   FROM events GROUP BY user_id
 )
 SELECT
-  -- reached flags with the >= ordering guard, summed, then one row per step
+  -- mark who reached each step in order, total them, then one row per step
 FROM per_user;`,
     hints: [
       "Reached-cart flag: `t_view IS NOT NULL AND t_cart IS NOT NULL AND t_cart >= t_view`; extend the same chain for purchase.",
@@ -905,9 +905,9 @@ ORDER BY sale_date, amount DESC;`,
     prompt: `Write a query that returns every sale with the final sale amount in its region, as \`(region, sale_date, amount, region_final_amount)\`, over \`sales(region, sale_date, amount)\`.
 
 \`region_final_amount\` is the amount of the region's latest sale by date, and it must appear on **every** row of the region, not only the last one. Use \`LAST_VALUE\` with a frame that spans the whole partition (the default frame gives you the current row instead). Alias the columns exactly as named.`,
-    starterCode: `-- Every sale plus its region's true final amount (mind the LAST_VALUE frame).
+    starterCode: `-- Every sale plus its region's final amount, shown on every row of the region.
 SELECT region, sale_date, amount,
-  -- LAST_VALUE with an explicit full-partition frame
+  -- the region's final sale amount, taken over the whole region
   AS region_final_amount
 FROM sales;`,
     hints: [
@@ -1183,8 +1183,8 @@ INSERT INTO fct_order_pipeline
   (order_id, order_ts, picked_ts, shipped_ts, delivered_ts, days_order_to_ship, days_ship_to_deliver)
 SELECT
   order_id,
-  -- MIN(CASE WHEN milestone = '...' THEN event_ts END) for each of the four milestones,
-  -- then the two lag columns as CAST(julianday(later) - julianday(earlier) AS INTEGER)
+  -- one column per milestone: that order's first timestamp for the milestone,
+  -- then the two lag columns as whole-day gaps between the milestone dates
 FROM raw_order_events
 GROUP BY order_id;`,
     hints: [
@@ -1362,12 +1362,12 @@ ORDER BY o.order_id;`,
     prompt: `Write a query that attaches to each order the customer region that was current on the order's \`event_date\`, as \`(order_id, region)\`, over \`fact_orders(order_id, customer_id, event_date, amount)\` and the Type-2 \`dim_customer(customer_id, region, effective_from, effective_to, is_current)\`.
 
 Join to the dimension version whose validity window contains \`event_date\` using a half-open range (\`>= effective_from AND < effective_to\`), not the \`is_current\` row. Alias the columns exactly as named.`,
-    starterCode: `-- Attach the region that was valid on each order's event_date (as-of join).
+    starterCode: `-- Attach the region that was valid on each order's event_date.
 SELECT o.order_id, d.region
 FROM fact_orders o
 JOIN dim_customer d
   ON d.customer_id = o.customer_id
-  -- add the half-open effective-range predicate here
+  -- add the condition matching each order to the version in effect on its event_date
 ;`,
     hints: [
       "The as-of predicate is `o.event_date >= d.effective_from AND o.event_date < d.effective_to`.",
@@ -1420,10 +1420,10 @@ INSERT INTO fact_orders VALUES
 \`revenue_as_was\` sums \`amount\` grouped by the as-of region (the half-open range join); \`revenue_current\` sums \`amount\` grouped by the customer's \`is_current\` region. A region with no revenue under one attribution shows \`0\`. Alias the columns exactly as named.`,
     starterCode: `-- Revenue by as-was region vs by current region, side by side.
 WITH as_was AS (
-  -- SUM(amount) grouped by the as-of region (half-open range join)
+  -- total amount per region, attributed by the version in effect at event time
 ),
 current AS (
-  -- SUM(amount) grouped by the is_current region
+  -- total amount per region, attributed by the customer's current version
 )
 SELECT
   -- one row per region with both revenue columns (0 where a region is missing on one side)
@@ -1590,7 +1590,7 @@ INSERT INTO order_items VALUES
 This is the hot-key diagnostic that also flags the straggler key in a distributed shuffle. Alias the columns exactly as named.`,
     starterCode: `-- Hot keys: order_ids that appear more than once in order_items, by count descending.
 SELECT
-  -- order_id and COUNT(*), keeping only counts > 1, ordered by the count desc
+  -- each order_id with its number of item rows, keeping only the ones that repeat
 FROM order_items;`,
     hints: [
       "`GROUP BY order_id` and `COUNT(*) AS item_count`.",
@@ -1866,7 +1866,7 @@ WHERE updated_at > (SELECT watermark FROM state WHERE id = 1)
 ON CONFLICT(id) DO UPDATE SET load_date = excluded.load_date, updated_at = excluded.updated_at, amount = excluded.amount;
 
 -- advance the watermark to the newest updated_at in target, then
--- partition-overwrite backfill of load_date '2026-03-02'
+-- backfill load_date '2026-03-02' so a late row in it is recovered
 `,
     hints: [
       "Advance the watermark: `UPDATE state SET watermark = (SELECT MAX(updated_at) FROM target) WHERE id = 1`.",
@@ -1922,7 +1922,7 @@ INSERT INTO state VALUES (1, '2026-03-02 10:00');`,
     prompt: `Write a script that loads a corrected partition into target with partition-overwrite so that re-running it leaves the target unchanged, over \`source(id, load_date, amount)\` and a \`target(id, load_date, amount)\` pre-seeded with stale values for \`load_date\` \`'2026-03-05'\`.
 
 Delete the \`'2026-03-05'\` partition from target, then reinsert it from source for that same date. A naive append would violate the key or double rows on a retry; delete-then-insert stays idempotent.`,
-    starterCode: `-- Correct the 2026-03-05 partition with delete-then-insert (idempotent on re-run).
+    starterCode: `-- Correct the 2026-03-05 partition so re-running leaves it unchanged.
 DELETE FROM target WHERE load_date = '2026-03-05';
 -- reinsert that partition from source
 `,
@@ -2319,7 +2319,7 @@ WITH deduped AS (
          ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY version DESC) AS rn
   FROM raw_events
 )
--- keep rn = 1, sessionize per user (LAG gap + running-sum session_id), then select the four columns
+-- keep rn = 1, sessionize each user's events with the 30-minute gap rule, then select the four columns
 ;
 
 -- then INSERT the per-day distinct-session and event counts into gold_daily_metrics
