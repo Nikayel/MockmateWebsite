@@ -8,6 +8,7 @@ import type { CompanyId } from "@/lib/data/company-questions/types"
 import type { InterviewTargetCompany } from "@/lib/stores"
 import type { Scenario } from "@/lib/scenarios"
 import { createInterviewSession, recordSessionStart } from "@/lib/firestore-helpers"
+import { trackEvent } from "@/lib/analytics"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { PRICING_CONFIG } from "@/lib/config"
 import { extractProtectedElements } from "@/lib/code-protection"
@@ -267,6 +268,12 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           scenarioId: scenario.id,
           scenarioTitle: scenario.title,
           startedAt: new Date().toISOString(),
+        })
+
+        // Guest funnel: the trial actually began (session created server-side)
+        trackEvent("guest_trial_started", {
+          scenarioId: scenario.id,
+          scenarioType: scenario.type,
         })
 
         toast.success("Free trial started.", {
