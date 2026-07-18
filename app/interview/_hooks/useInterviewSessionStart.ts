@@ -268,8 +268,8 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           startedAt: new Date().toISOString(),
         })
 
-        toast.success("Free trial session started!", {
-          description: "Complete the interview to see your personalized feedback.",
+        toast.success("Free trial started.", {
+          description: "Run the tests, submit, and see your score. Sign up to unlock the AI interviewer.",
         })
       } catch (error) {
         console.error("Error creating guest session:", error)
