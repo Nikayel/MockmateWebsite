@@ -333,7 +333,7 @@ INSERT INTO products VALUES
     id: "sql-l2-group-by-apply",
     executionMode: "single-file",
     prompt: `Compute revenue per product category. A join isn't needed: the \`order_items_wide\` table already carries \`category\` and a \`line_revenue_cents\` per row. Return one row per \`category\` with columns \`category\` and \`revenue_cents\` (the sum of \`line_revenue_cents\` for that category), sorted by \`category\` ascending.`,
-    starterCode: `-- One row per category: SUM(line_revenue_cents) AS revenue_cents, sorted by category.
+    starterCode: `-- One row per category with its total line revenue as revenue_cents, sorted by category.
 SELECT
 
 FROM order_items_wide;`,
@@ -500,7 +500,7 @@ INSERT INTO order_items_wide VALUES
     id: "sql-l2-having-apply",
     executionMode: "single-file",
     prompt: `From \`order_items_wide\`, keep only categories whose **total** revenue exceeds \`5000\` cents. Return \`category\` and \`revenue_cents\` (the summed \`line_revenue_cents\`), sorted by \`category\` ascending.`,
-    starterCode: `-- Group by category, sum revenue, keep only groups over 5000 cents.
+    starterCode: `-- Per category, keep only those whose total revenue exceeds 5000 cents.
 SELECT
   category,
 
@@ -546,7 +546,7 @@ INSERT INTO order_items_wide VALUES
     id: "sql-l2-having-practice",
     executionMode: "single-file",
     prompt: `**Flag high-value segments.** From \`orders\`, find customers who are BOTH frequent AND high-spend. Consider only \`paid\` orders (a pre-aggregation filter). Group by \`customer_id\` and keep customers with **more than 3** paid orders AND **lifetime paid revenue over 20000 cents**. Return \`customer_id\`, \`order_count\` (count of their paid orders), and \`lifetime_revenue\` (sum of their paid \`total_cents\`), sorted by \`lifetime_revenue\` descending. Combine the pre-aggregation \`WHERE status='paid'\` with a two-condition \`HAVING\`.`,
-    starterCode: `-- Paid orders only; group by customer; keep frequent AND high-spend customers.
+    starterCode: `-- Paid orders only; per customer, keep the frequent AND high-spend ones.
 SELECT
   customer_id,
 
@@ -1033,7 +1033,7 @@ INSERT INTO orders VALUES
     executionMode: "single-file",
     prompt: `**Product coverage report:** For **every** product (including ones that never sold), report total units sold. Return \`product_id\`, \`product_name\`, and \`units_sold\` (sum of \`quantity\` from matching \`order_items\`, shown as \`0\`, not NULL, when the product never sold), sorted by \`product_id\`. A product with no sales must appear with \`units_sold = 0\`.`,
     starterCode: `-- Product coverage: every product with total units_sold (0 when never sold).
--- Drive from products, LEFT JOIN order_items, COALESCE the SUM, sort by product_id.
+-- Drive from products, LEFT JOIN order_items, total each product's units, showing 0 when never sold, sort by product_id.
 SELECT
 
 FROM products AS p
@@ -1430,7 +1430,7 @@ INSERT INTO employees VALUES
     prompt: `Self-join \`employees\` to pair each employee with their manager's name. Return \`employee\`
 (the person's name) and \`manager\` (their manager's name, or NULL for someone with no manager), sorted
 by \`employee\`.`,
-    starterCode: `-- Alias employees twice: e = the employee, m = their manager.
+    starterCode: `-- Pair each employee with their manager's name.
 -- Return employee, manager; sort by employee.
 SELECT
 
@@ -1475,7 +1475,7 @@ INSERT INTO employees VALUES
     id: "sql-l2-self-join-practice",
     executionMode: "single-file",
     prompt: `You run a daily diff on the customer dimension to feed a slowly-changing-dimension loader. Comparing yesterday's and today's snapshots, write a query that returns one row per customer with \`customer_id\` (the non-NULL id from whichever snapshot has it), \`tier_yesterday\`, and \`tier_today\`. A \`NULL\` on one side flags a customer added or dropped that day. Use a \`FULL OUTER JOIN\` on \`customer_id\` so rows present on only one side are still surfaced, and sort by \`customer_id\`.`,
-    starterCode: `-- FULL OUTER JOIN the two snapshots on customer_id.
+    starterCode: `-- Reconcile the two snapshots so a customer present on only one side still appears.
 -- Return the non-NULL customer_id plus each side's tier; sort by customer_id.
 SELECT
 
@@ -1595,7 +1595,7 @@ INSERT INTO orders_us VALUES
     id: "sql-l2-set-ops-apply",
     executionMode: "single-file",
     prompt: `Combine two regional order tables into one stream, keeping every row (including any coincidental duplicates). Return \`order_id\` and \`region\` for all EU and US orders, using \`UNION ALL\`, sorted by \`order_id\`, then \`region\`.`,
-    starterCode: `-- Stack both regional feeds with UNION ALL, keep every row, then sort.
+    starterCode: `-- Combine both regional feeds into one stream, keeping every row, then sort.
 SELECT order_id, region FROM orders_eu
 -- combine with orders_us here
 ;`,
@@ -1636,7 +1636,7 @@ INSERT INTO orders_us VALUES (200,'US'),(201,'US');`,
     id: "sql-l2-set-ops-practice",
     executionMode: "single-file",
     prompt: `Diff two source extracts. Find customer IDs that were present in yesterday's extract but are **missing** from today's (dropped customers) using \`EXCEPT\`. Return a single column \`dropped_customer_id\`, sorted ascending. (Both extracts may contain duplicate rows within themselves. \`EXCEPT\` treats each side as a set, which is exactly what you want for a presence diff.)`,
-    starterCode: `-- Rows present yesterday but absent today, via EXCEPT.
+    starterCode: `-- Rows present yesterday but absent from today.
 -- One column: dropped_customer_id, sorted ascending.
 SELECT customer_id AS dropped_customer_id FROM extract_yesterday
 ;`,
@@ -1782,7 +1782,7 @@ INSERT INTO orders VALUES
     prompt: `**Above-their-own-average orders (correlated).** For each order, keep it only if its \`total_cents\` is **strictly greater** than the average \`total_cents\` of that same customer's orders. Return \`customer_id\`, \`order_id\`, and \`total_cents\`, sorted by \`customer_id\`, then \`order_id\`. Use a correlated subquery that averages within the outer row's customer.
 
 (Note for yourself: a window function \`AVG() OVER (PARTITION BY customer_id)\` would compute this in one pass. You'll meet it in Level 4.)`,
-    starterCode: `-- Keep orders whose total exceeds their OWN customer's average (correlated subquery).
+    starterCode: `-- Keep orders whose total exceeds their OWN customer's average.
 SELECT o.customer_id, o.order_id, o.total_cents
 FROM orders AS o
 WHERE ;`,
@@ -2224,7 +2224,7 @@ INSERT INTO orders VALUES
 Return \`order_date\`, \`paid_count\`, \`shipped_count\`, \`cancelled_count\`, sorted by \`order_date\`.
 Every date present in the source must appear, and a status with zero occurrences that day must show
 \`0\` (not NULL).`,
-    starterCode: `-- One row per order_date; three conditional-aggregation count columns.
+    starterCode: `-- One row per order_date; a count column for each status.
 SELECT
   order_date,
 
