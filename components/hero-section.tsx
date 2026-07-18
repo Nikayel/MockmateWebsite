@@ -68,13 +68,14 @@ export function HeroSection() {
             Practice the interview rounds LeetCode skips.
           </motion.h1>
 
-          {/* One subhead — one sentence, no filler */}
+          {/* One subhead, two sentences: the mechanic, then the audience. No filler. */}
           <motion.p
             variants={staggerItem}
             style={{ textShadow: "0 1px 20px var(--bg)" }}
             className="text-muted-foreground mx-auto mb-9 max-w-xl text-base leading-7 sm:text-lg md:text-xl md:leading-8"
           >
-            Carry a case from clarify to build — with an AI interviewer that reacts as you work.
+            Carry a case from clarify to build, with an AI interviewer that reacts as you work.
+            Built for intern and new-grad SWE and DE loops.
           </motion.p>
 
           {/* Asymmetric CTA: one solid primary (foreground), one inline ghost link. */}
