@@ -565,10 +565,14 @@ export async function checkQuota(
 
     // Check budget limit
     if (quota.budgetUsed >= quota.budgetLimit) {
+      const budgetMessage =
+        tier === "free"
+          ? "You've hit this month's free AI usage limit. Upgrade to Pro for a 50x higher AI allowance plus 35 interview sessions."
+          : `You've used your full $${quota.budgetLimit.toFixed(2)} AI allowance for this month. Your allowance resets on the 1st.`
       const response = NextResponse.json(
         {
           error: "Budget limit exceeded",
-          message: `You've reached your $${quota.budgetLimit.toFixed(2)} monthly budget. Upgrade your plan or wait until next month.`,
+          message: budgetMessage,
           code: "BUDGET_EXCEEDED",
           quota: {
             budgetUsed: quota.budgetUsed,
