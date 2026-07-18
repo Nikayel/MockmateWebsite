@@ -39,7 +39,7 @@ const faqs = [
   {
     question: "What counts as a 'scenario'?",
     answer:
-      "A scenario is one AI interview session. Each scenario includes 10+ DSA problems that you can practice unlimited times. Only starting a new scenario counts against your monthly limit.",
+      "A scenario is one AI interview session. Starting a session uses 1 of your monthly sessions and grants 10 free opens, so you can come back to its problems again without spending another session.",
   },
 ]
 
