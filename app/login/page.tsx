@@ -432,9 +432,13 @@ function LoginPageContent() {
             {/* Headline */}
             <motion.div variants={staggerItem} className="mb-8">
               <h1 className="text-foreground mb-2 text-3xl font-bold tracking-tight">
-                Welcome back
+                {isTrialUsed ? "Your free session is done" : "Welcome back"}
               </h1>
-              <p className="text-muted-foreground text-sm">Sign in to sit your next round.</p>
+              <p className="text-muted-foreground text-sm">
+                {isTrialUsed
+                  ? "Create a free account to keep your score and continue practicing."
+                  : "Sign in to sit your next round."}
+              </p>
             </motion.div>
 
             {/* OAuth buttons */}
