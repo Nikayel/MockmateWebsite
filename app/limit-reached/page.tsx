@@ -167,7 +167,7 @@ export default function LimitReachedPage() {
                 <Link href="/upgrade">
                   <Button className="w-full bg-yellow-500 px-8 py-6 text-lg text-foreground hover:bg-yellow-600 md:w-auto">
                     <Crown className="mr-2 h-5 w-5" />
-                    Upgrade to Pro - $25/month
+                    Upgrade to Pro - from {PRICING_CONFIG.pro.website.yearly.priceDisplay}/mo
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
