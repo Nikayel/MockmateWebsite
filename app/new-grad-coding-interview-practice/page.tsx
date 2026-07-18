@@ -74,7 +74,7 @@ export default function NewGradInterviewPracticePage() {
     {
       question: "What languages should I use for a new grad interview?",
       answer:
-        "Use the language you are most comfortable with! Python, Java, and C++ are the most common for DSA rounds, but JavaScript/TypeScript are also widely accepted. CodeSparring supports all major languages.",
+        "Use the language you are most comfortable with. In real loops, Python, Java, and C++ are the most common for DSA rounds, and JavaScript/TypeScript are widely accepted. On CodeSparring, JavaScript, TypeScript, and Python run directly in your browser with executable tests. Java, C++, C#, Go, and Rust are available in the editor for writing and discussing solutions, without in-browser execution.",
     },
     {
       question: "Do new grads get asked system design questions?",
