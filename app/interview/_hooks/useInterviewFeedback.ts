@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
 import { markSessionEvaluating, updateInterviewSession } from "@/lib/firestore-helpers"
+import { trackEvent } from "@/lib/analytics"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { analyzeCodeEfficiency } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
@@ -460,6 +461,11 @@ export function useInterviewFeedback(
 
       // Show signup prompt for guest users
       if (opts.isGuestMode && opts.guestId) {
+        // Guest funnel: the trial reached the score screen
+        trackEvent("guest_trial_completed", {
+          score: calculatedPerformanceScore || 0,
+          scenarioId: opts.selectedScenario?.id,
+        })
         setTimeout(() => opts.setShowSignupPrompt(true), 2000)
         markFreeTrialUsed()
         if (opts.currentSessionId && opts.selectedScenario) {
