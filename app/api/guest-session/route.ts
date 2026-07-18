@@ -14,6 +14,7 @@ import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { guestSessionRateLimit } from "@/lib/rate-limit"
 import { SESSION } from "@/lib/constants"
+import { PRICING_CONFIG } from "@/lib/config"
 import {
   GuestSessionUpdateSchema,
   validateRequest,
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
           {
             error: "Free trial already used",
             code: "FREE_TRIAL_EXHAUSTED",
-            message: "You have already used your free trial. Sign up to continue practicing!",
+            message: `Your free guest session is used up. Create a free account to get ${PRICING_CONFIG.free.sessionsDisplay}. No credit card needed.`,
           },
           { status: 403 }
         )

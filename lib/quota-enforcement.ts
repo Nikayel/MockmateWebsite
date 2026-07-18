@@ -17,6 +17,7 @@ import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
 import { getSessionsLimitForTier } from "./pricing"
 import { CIRCUIT_BREAKER } from "./constants"
+import { PRICING_CONFIG } from "./config"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
 
 /**
@@ -203,7 +204,7 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
     if (hasCompletedSession) {
       return {
         allowed: false,
-        reason: "Free trial already used. Sign up to continue practicing!",
+        reason: `Your free guest session is used up. Create a free account to get ${PRICING_CONFIG.free.sessionsDisplay}. No credit card needed.`,
       }
     }
 

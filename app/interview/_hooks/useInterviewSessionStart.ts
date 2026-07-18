@@ -9,6 +9,7 @@ import type { InterviewTargetCompany } from "@/lib/stores"
 import type { Scenario } from "@/lib/scenarios"
 import { createInterviewSession, recordSessionStart } from "@/lib/firestore-helpers"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
+import { PRICING_CONFIG } from "@/lib/config"
 import { extractProtectedElements } from "@/lib/code-protection"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
 import { getBugfixScenarioLanguage, type EditorLanguage } from "../_utils/language"
@@ -248,8 +249,8 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
 
         if (!response.ok) {
           if (data.code === "FREE_TRIAL_EXHAUSTED") {
-            toast.error("Free trial already used", {
-              description: "Sign up to continue practicing!",
+            toast.error("Your free guest session is used up.", {
+              description: `Create a free account to get ${PRICING_CONFIG.free.sessionsDisplay}. No credit card needed.`,
             })
             markFreeTrialUsed()
             opts.router.push("/login?redirect=interview")
