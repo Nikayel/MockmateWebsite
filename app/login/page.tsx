@@ -37,6 +37,8 @@ function LoginPageContent() {
   const router = useRouter()
   const redirect = searchParams.get("redirect")
   const referralCode = searchParams.get("ref")
+  // Sent by useSessionReopen when a guest's free trial is exhausted
+  const isTrialUsed = searchParams.get("message") === "trial-used"
 
   // Store referral code in localStorage for processing after signup
   useEffect(() => {
