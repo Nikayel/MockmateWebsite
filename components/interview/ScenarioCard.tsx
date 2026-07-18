@@ -114,7 +114,9 @@ export const ScenarioCard = memo(function ScenarioCard({
       {isLocked && (
         <div className="mt-4 rounded-lg border border-border bg-card/[0.04] p-3">
           <p className="mb-1 text-xs font-medium text-foreground">Session limit reached</p>
-          <p className="mb-2 text-xs text-muted-foreground">Upgrade to Pro for unlimited access</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Upgrade to Pro for 35 sessions every month
+          </p>
           <Link href="/limit-reached">
             <Button
               size="sm"
