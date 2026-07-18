@@ -43,6 +43,12 @@ export default function NewGradInterviewPracticePage() {
             <li>Talking through your time and space complexity (Big O).</li>
             <li>Handling hints gracefully when you inevitably get stuck.</li>
           </ul>
+          <p className="mt-4">
+            DSA is not the whole loop, either. Many intern and new-grad OAs now include bug-fix
+            rounds where you diagnose a failing feature in an unfamiliar codebase, and data
+            engineering screens lean on SQL. CodeSparring covers both: bug-hunt scenarios set in a
+            real multi-file project, and SQL practice that runs against a live in-browser database.
+          </p>
         </>
       ),
     },
@@ -86,7 +92,7 @@ export default function NewGradInterviewPracticePage() {
     <LandingPageTemplate
       title="New Grad Coding Interview Practice"
       subtitle="Land Your First Tech Job"
-      heroDescription="Transition from grinding LeetCode to passing real interviews. Practice talking through algorithms, handling hints, and writing clean code with our AI interviewer."
+      heroDescription="Practice what intern and new-grad loops actually run: DSA with a live AI interviewer, bug hunts in a real codebase, and SQL for data engineering screens. Free to start, no credit card."
       primaryKeyword="new grad coding interview"
       contentSections={contentSections}
       faqs={faqs}
