@@ -130,7 +130,7 @@ export function ComparisonSection() {
       codesparring: true,
     },
     { feature: "Spaced repetition system", leetcode: false, human: false, codesparring: true },
-    { feature: "Unlimited practice sessions", leetcode: true, human: false, codesparring: true },
+    { feature: "Practice anytime, 24/7", leetcode: true, human: false, codesparring: true },
   ]
 
   // Shared font stacks from Design.md — resolved via CSS variables set in globals.css
@@ -296,7 +296,7 @@ export function ComparisonSection() {
                     marginTop: "2px",
                   }}
                 >
-                  Unlimited AI mock interviews
+                  AI mock interviews on demand
                 </p>
               </div>
 
