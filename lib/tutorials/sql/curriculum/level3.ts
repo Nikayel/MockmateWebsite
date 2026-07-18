@@ -75,7 +75,7 @@ re-runs cleanly.`,
     starterCode: `DROP TABLE IF EXISTS dim_customer;
 
 -- CREATE TABLE dim_customer ( ... );
--- Give is_active a DEFAULT of 1 and loaded_at a DEFAULT of (datetime('now')).`,
+-- is_active should default to 1; loaded_at should default to the current timestamp.`,
     hints: [
       "Start with `DROP TABLE IF EXISTS dim_customer;` so the script re-runs cleanly.",
       "Put `DEFAULT 1` right after `is_active INTEGER`.",
@@ -295,7 +295,7 @@ INSERT INTO dim_status (code, label) VALUES
 DROP TABLE IF EXISTS dim_product;
 
 -- CREATE TABLE dim_product ( ... );
--- INSERT INTO dim_product (...) SELECT ... FROM raw_product WHERE ... ;`,
+-- Populate dim_product from raw_product, cleaning each column and dropping the null-id rows.`,
     hints: [
       "Create `dim_product` with `INTEGER` id/price columns first.",
       "`UPPER(TRIM(sku))` normalizes the SKU in one expression.",
@@ -363,8 +363,8 @@ DROP TABLE IF EXISTS dim_customer;
 DROP TABLE IF EXISTS dim_product;
 
 -- CREATE the two target tables with INTEGER keys/price ...
--- INSERT … SELECT DISTINCT into dim_customer from raw_feed ...
--- INSERT … SELECT DISTINCT into dim_product from raw_feed ...`,
+-- Load dim_customer from raw_feed, cleaning each column and keeping one row per customer ...
+-- Load dim_product from raw_feed, cleaning each column and keeping one row per product ...`,
     hints: [
       "Create both target tables first, with `INTEGER` keys/price.",
       "Customers: `SELECT DISTINCT CAST(cust_id AS INTEGER), LOWER(TRIM(email)), UPPER(TRIM(country)) FROM raw_feed`. `DISTINCT` collapses the repeats.",
@@ -473,8 +473,8 @@ business key \`email\` as a plain attribute (add \`country_code\` too). Insert t
 specifying \`customer_sk\` and let SQLite assign it.`,
     starterCode: `DROP TABLE IF EXISTS dim_customer;
 
--- CREATE TABLE dim_customer with a surrogate INTEGER PRIMARY KEY customer_sk,
--- plus email TEXT and country_code TEXT ...
+-- Define dim_customer so customer_sk is a system-assigned surrogate identity,
+-- with email and country_code kept as plain attributes ...
 -- INSERT two customers WITHOUT listing customer_sk (let SQLite auto-assign it) ...`,
     hints: [
       "`customer_sk INTEGER PRIMARY KEY` is all you need for an auto-incrementing surrogate in SQLite.",
@@ -697,9 +697,9 @@ DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS customers;
 
 -- CREATE customers (customer_id PK, email) ...
--- CREATE orders with FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT ...
+-- Define orders so each order must point at a real customer, and deleting a customer with orders is blocked ...
 -- INSERT one customer, then one valid order for that customer ...
--- Guarded orphan attempt: INSERT ... SELECT 2, 999, 100 WHERE EXISTS (customer 999) -> no-op ...`,
+-- Then try to add an order for a customer who does not exist (999) so that it cleanly does not land ...`,
     hints: [
       "First line: `PRAGMA foreign_keys = ON;`. Without it your `REFERENCES` clause enforces nothing.",
       "Declare the FK inside `orders` with `FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT`.",
@@ -788,8 +788,8 @@ DROP TABLE IF EXISTS customers;
 --   order_items.product_id -> products   ON DELETE RESTRICT
 -- INSERT the valid chain: one customer, two products, then TWO orders (1 and 2),
 --   each with two order_items referencing real products ...
--- Guarded orphan: INSERT ... SELECT 103, 999, ... WHERE EXISTS (order 999)  -> no-op ...
--- DELETE FROM orders WHERE order_id = 1;  -- cascade clears order 1's items; order 2 survives ...`,
+-- Then try to add an item for an order that does not exist (999) so that it cleanly does not land ...
+-- Finally remove order 1 and confirm only its own items go while order 2 keeps both of its items ...`,
     hints: [
       "`PRAGMA foreign_keys = ON;` first. The cascade won't fire without it.",
       "Insert in dependency order: `products` and `customers`, then both `orders`, then all four `order_items`.",
@@ -1008,10 +1008,10 @@ duplicate \`(supplier_id, sku)\`, a negative price, and a bad status. Prove the 
 exactly one row.`,
     starterCode: `DROP TABLE IF EXISTS dim_product;
 
--- CREATE TABLE dim_product ( ... )
---   with a composite UNIQUE (supplier_id, sku),
---   a CHECK (unit_price_cents >= 0),
---   and a CHECK (status IN ('active','discontinued')) ...
+-- CREATE TABLE dim_product ( ... ) so the schema itself enforces three rules:
+--   the same sku may repeat across suppliers but never twice under one supplier,
+--   price can never be negative,
+--   and status must be either active or discontinued ...
 -- INSERT one fully valid row ...
 -- INSERT OR IGNORE one duplicate (supplier_id, sku), one negative price, one bad status ...`,
     hints: [
@@ -1217,7 +1217,7 @@ slots with a \`WHERE product_N IS NOT NULL\`. The slot columns are already \`INT
 
 -- INSERT … SELECT from slot 1 (product_1, qty_1, price_1) for every order ...
 
--- INSERT … SELECT from slot 2, then slot 3, each skipping empty slots (WHERE product_N IS NOT NULL) ...`,
+-- Do the same for slot 2 and slot 3, each skipping orders whose slot is empty ...`,
     hints: [
       "First `INSERT … SELECT order_id, product_1, qty_1, price_1 FROM raw_sales WHERE product_1 IS NOT NULL` for every order.",
       "Add one more `INSERT … SELECT` per slot (product_2/qty_2/price_2, then product_3/qty_3/price_3), each with `WHERE product_N IS NOT NULL` so empty slots are skipped.",
@@ -1592,11 +1592,8 @@ it re-runs cleanly.`,
     starterCode: `-- Build a wide, join-free reporting table from the normalized source.
 DROP TABLE IF EXISTS rpt_line;
 
--- CREATE TABLE rpt_line AS
--- SELECT oi.order_id, oi.product_id, oi.qty,
---        p.product_name, p.category,
---        oi.qty * p.unit_price_cents AS line_revenue_cents
--- FROM order_items oi JOIN products p ON ... ;`,
+-- Build rpt_line as a stored table carrying order_id, product_id, qty, the product's name and
+-- category, and a computed line_revenue_cents, so reading the report needs no joins ...`,
     hints: [
       "`CREATE TABLE rpt_line AS SELECT … FROM order_items oi JOIN products p ON p.product_id = oi.product_id`.",
       "Compute revenue in the projection: `oi.qty * p.unit_price_cents AS line_revenue_cents`.",
@@ -1656,8 +1653,8 @@ tables so it re-runs cleanly.`,
 DROP TABLE IF EXISTS obt_sales;
 DROP TABLE IF EXISTS obt_compare;
 
--- CREATE TABLE obt_sales AS SELECT ...  (join all four source tables once) ...
--- CREATE TABLE obt_compare AS SELECT 3 AS joins_normalized, 0 AS joins_flattened;`,
+-- Build obt_sales as one stored table gathering every dashboard column from all four sources at once ...
+-- Then store a tiny one-row obt_compare holding joins_normalized = 3 and joins_flattened = 0 ...`,
     hints: [
       "Build `obt_sales` with a four-table `CREATE TABLE … AS SELECT` that joins order_items, orders, products, and customers once.",
       "`line_revenue_cents = oi.qty * p.unit_price_cents` in the SELECT list.",
@@ -1862,8 +1859,8 @@ direction by joining the books back to their author.`,
 DROP TABLE IF EXISTS books;
 DROP TABLE IF EXISTS authors;
 
--- CREATE authors, the one side: author_id PRIMARY KEY, name. No FK here.
--- CREATE books, the many side: book_id PRIMARY KEY, title, author_id REFERENCES authors.
+-- Define the authors and books tables for a one-author-to-many-books relationship.
+-- Put the linking column on the correct table so each book resolves to exactly one author.
 -- INSERT one author, then two books that both point at that author.`,
     hints: [
       "\`authors(author_id INTEGER PRIMARY KEY, name TEXT)\`. The one side carries no FK.",
@@ -1927,8 +1924,8 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS model_notes;
 
 -- users, the one side of user 1:N playlists.
--- playlists, the many side: FK user_id REFERENCES users.
--- cover_images, the 1:1 split: playlist_id UNIQUE REFERENCES playlists.
+-- playlists, the many side: give it the column that links each playlist to its owning user.
+-- cover_images, the 1:1 split: link it to playlists and allow at most one cover per playlist.
 -- songs, standalone; the M:N link to playlists can't be a single FK.
 -- model_notes, record mn_needs_junction = 1.`,
     hints: [
@@ -2163,10 +2160,10 @@ claiming an already-taken position is rejected. Playlist 1 must stay at exactly 
 -- CREATE TABLE playlist_songs ( ... ) with:
 --   PRIMARY KEY (playlist_id, song_id)
 --   position INTEGER NOT NULL
---   UNIQUE (playlist_id, position)
+--   no two songs may share the same position slot in one playlist
 -- INSERT three rows into playlist 1 at positions 1, 2, 3 ...
--- INSERT OR IGNORE a repeat (playlist,song) pair, blocked by the PK ...
--- INSERT OR IGNORE a new song at an already-taken position, blocked by the UNIQUE ...`,
+-- INSERT OR IGNORE a repeat of an existing (playlist, song) pair; it should be skipped, not added ...
+-- INSERT OR IGNORE a new song at a position already taken in that playlist; it should be skipped too ...`,
     hints: [
       "`PRIMARY KEY (playlist_id, song_id)` for the pair; separately `UNIQUE (playlist_id, position)` for slot uniqueness.",
       "`position INTEGER NOT NULL`. The ordering fact depends on both the playlist and the song, so it lives on the junction.",
@@ -2308,7 +2305,7 @@ that an index exists on the right column of \`fact_sales\`.`,
     starterCode: `-- fact_sales(customer_sk) is the FK the marts join on, and it is NOT auto-indexed.
 -- Add the index that makes that join a seek (convention: idx_<table>_<col>):
 
--- CREATE INDEX idx_fact_sales_customer ON fact_sales(...);`,
+-- Create that index on fact_sales, naming it by the idx_<table>_<col> convention ...`,
     hints: [
       "One `CREATE INDEX` statement is all you need. Which column do the marts join `fact_sales` on?",
       "Name it `idx_<table>_<col>` by convention.",
@@ -2355,8 +2352,8 @@ FROM (WITH RECURSIVE n(value) AS (
     starterCode: `-- Index the two FK join columns on fact_sales, and nothing else.
 -- Then leave a comment explaining the write-cost trade-off.
 
--- CREATE INDEX ... ON fact_sales(customer_sk);
--- CREATE INDEX ... ON fact_sales(product_sk);`,
+-- Create an index for the customer_sk join column ...
+-- Create an index for the product_sk join column ...`,
     hints: [
       "Two `CREATE INDEX` statements, one per FK column on `fact_sales`.",
       "Skip `revenue_cents`: no query filters or joins on it, so an index there is pure write cost.",
@@ -2599,8 +2596,8 @@ DROP TABLE IF EXISTS cat_revenue;
 -- 1. dim_product: surrogate product_sk PK + business key product_id, name, category.
 --    Load it from raw_product (let product_sk auto-assign).
 
--- 2. fact_sales at one-row-per-sale grain: sale_sk PK, product_sk REFERENCES dim_product,
---    quantity, revenue_cents. Load by joining raw_sale to dim_product on product_id.
+-- 2. fact_sales at one-row-per-sale grain: sale_sk PK, a product_sk FK to dim_product,
+--    quantity, revenue_cents. Populate it from raw_sale, resolving each sale's product_sk ...
 
 -- 3. cat_revenue: materialize revenue-by-category from the star.`,
     hints: [
@@ -2700,7 +2697,7 @@ DROP TABLE IF EXISTS revenue_by_cat_month;
 --    dim_date: one row per DISTINCT order date, date_sk = YYYYMMDD, year_month = 'YYYY-MM'.
 
 -- 2. fact_sales at line-item grain: measures + FKs only, each surrogate looked up by natural key.
---    revenue_cents = qty * unit_price_cents. Zero orphan facts.
+--    revenue_cents is each line's quantity times its product's unit price. Zero orphan facts.
 
 -- 3. revenue_by_cat_month(category, year_month, revenue): BI query over the star.`,
     hints: [
