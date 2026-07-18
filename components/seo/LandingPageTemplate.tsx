@@ -1,7 +1,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
+import { TrackedCtaLink } from "@/components/seo/TrackedCtaLink"
 import { Terminal, CheckCircle2, ArrowRight } from "lucide-react"
 
 interface FAQ {
@@ -47,7 +47,11 @@ export function LandingPageTemplate({
             {heroDescription}
           </p>
           <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6">
-            <Link href="/interview">
+            <TrackedCtaLink
+              href="/interview"
+              location="seo_landing_hero"
+              keyword={primaryKeyword}
+            >
               <Button
                 size="lg"
                 className="h-14 bg-[#c4703f] px-8 text-lg font-bold text-black hover:bg-[#c4703f]/90"
@@ -55,7 +59,7 @@ export function LandingPageTemplate({
                 Start practicing free
                 <Terminal className="ml-2 h-5 w-5" />
               </Button>
-            </Link>
+            </TrackedCtaLink>
           </div>
         </div>
       </section>
@@ -106,7 +110,7 @@ export function LandingPageTemplate({
               </p>
             </div>
           </div>
-          <Link href="/interview">
+          <TrackedCtaLink href="/interview" location="seo_landing_footer" keyword={primaryKeyword}>
             <Button
               size="lg"
               variant="outline"
@@ -115,7 +119,7 @@ export function LandingPageTemplate({
               Start practicing free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-          </Link>
+          </TrackedCtaLink>
         </div>
       </section>
 
