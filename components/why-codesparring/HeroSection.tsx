@@ -64,7 +64,7 @@ export function HeroSection() {
                 href="/interview"
                 className="text-foreground/80 hover:text-accent inline-flex items-center gap-1 text-base font-medium transition-colors duration-200"
               >
-                Try free practice
+                Start practicing free
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </motion.div>

@@ -83,7 +83,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                   variant="outline"
                   className="mb-4 w-full border-white/20 text-white hover:bg-white/10"
                 >
-                  Get Started
+                  Start practicing free
                 </Button>
               </Link>
 

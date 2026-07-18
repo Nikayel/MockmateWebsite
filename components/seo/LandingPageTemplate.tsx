@@ -52,7 +52,7 @@ export function LandingPageTemplate({
                 size="lg"
                 className="h-14 bg-[#c4703f] px-8 text-lg font-bold text-black hover:bg-[#c4703f]/90"
               >
-                Start Practicing Free
+                Start practicing free
                 <Terminal className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -112,7 +112,7 @@ export function LandingPageTemplate({
               variant="outline"
               className="h-14 border-white/20 px-8 text-lg font-bold text-white hover:bg-white hover:text-black"
             >
-              Try a Mock Interview
+              Start practicing free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>

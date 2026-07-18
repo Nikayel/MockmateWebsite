@@ -77,7 +77,7 @@ export function CompanyRoadmapSection() {
                   }
                   className="bg-accent text-accent-foreground inline-flex items-center gap-2 rounded-[14px] px-8 py-3.5 text-base font-bold shadow-[0_0_36px_rgba(196,112,63,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-95"
                 >
-                  Try free
+                  Start practicing free
                 </Link>
                 <Link
                   href="/roadmap"

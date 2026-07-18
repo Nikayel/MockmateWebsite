@@ -91,7 +91,7 @@ export function HeroSection() {
                 }
                 className="bg-foreground text-background hover:bg-foreground/90 inline-flex rounded-[8px] px-8 py-3.5 text-base font-semibold transition-colors duration-200"
               >
-                Try free
+                Start practicing free
               </Link>
               {/* Microcopy lives directly under the primary button */}
               <span className="text-muted-foreground mt-2.5 text-[12px]">
