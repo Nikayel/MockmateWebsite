@@ -9,7 +9,12 @@
  */
 
 import { adminDb, FieldValue } from "./firebase-admin"
-import type { UserLearningState, TopicLearningState, Profile } from "./types"
+import type {
+  UserLearningState,
+  TopicLearningState,
+  Profile,
+  SpacedRepetitionMasteryLevel,
+} from "./types"
 import type { DSAPattern } from "./types/dsa-patterns"
 import type { Difficulty } from "./spaced-repetition/sm2-algorithm"
 import type { ProblemMastery } from "./spaced-repetition/scheduler"
@@ -94,7 +99,10 @@ export async function writeUserLearningState(
 ): Promise<void> {
   const learningStateRef = adminDb.collection("user_learning_state").doc(userId)
   await learningStateRef.set(
-    { ...fields, ...learningStateMeta(userId, { isNew: options.isNew ?? false, now: options.now }) },
+    {
+      ...fields,
+      ...learningStateMeta(userId, { isNew: options.isNew ?? false, now: options.now }),
+    },
     { merge: true }
   )
 }
@@ -378,10 +386,19 @@ export async function completeSessionWithMastery(
   // Update problem-level mastery
   const { initializeProblemMasteryFromSession, updateProblemMastery } =
     await import("./spaced-repetition/scheduler")
-  const { calculateNextInterval, mapScoreToQuality } =
-    await import("./spaced-repetition/sm2-algorithm")
-  const { recordReviewEvent, getUserAlgorithm, estimateRetention } =
-    await import("./spaced-repetition")
+  const { mapScoreToQuality } = await import("./spaced-repetition/sm2-algorithm")
+  // Route repeat reviews through the algorithm router (SM-2 OR FSRS per the user's
+  // assignment), not SM-2 directly. Previously this path hardcoded SM-2, so an
+  // FSRS-assigned user was scheduled with FSRS only on a problem's first attempt
+  // and silently fell back to SM-2 on every later review.
+  const {
+    recordReviewEvent,
+    getUserAlgorithm,
+    calculateNextReview,
+    reconstructState,
+    prepareStateForStorage,
+    estimateRetentionForAlgorithm,
+  } = await import("./spaced-repetition")
 
   // Check if problem mastery exists. The document ID is the scenario ID (see the
   // scheduler writers), so read that one document directly instead of scanning
@@ -392,9 +409,7 @@ export async function completeSessionWithMastery(
     .collection("problems")
     .doc(sessionData.scenarioId)
     .get()
-  const existingMastery = masteryDoc.exists
-    ? (masteryDoc.data() as ProblemMastery)
-    : undefined
+  const existingMastery = masteryDoc.exists ? (masteryDoc.data() as ProblemMastery) : undefined
 
   let masteryResult
   const now = new Date()
@@ -515,53 +530,83 @@ export async function completeSessionWithMastery(
     }
 
     // 3. LEGITIMATE REVIEW: Within due window or overdue
-    // Run full spaced repetition algorithm
+    // Run the full spaced repetition algorithm via the router so the schedule uses
+    // the user's assigned algorithm (SM-2 or FSRS), not SM-2 unconditionally.
+    const userAlgorithm = await getUserAlgorithm(userId)
+
     logger.info("Legitimate SR review - running full algorithm", {
       userId,
       problemId: sessionData.scenarioId,
+      algorithm: userAlgorithm,
       daysUntilDue,
       daysOverdue,
       reviewType: daysOverdue > 0 ? "overdue" : isEarlyReview ? "slightly-early" : "on-time",
     })
 
-    const sm2Result = calculateNextInterval({
-      previousInterval: existingMastery.interval_days,
-      previousEaseFactor: existingMastery.ease_factor,
-      performanceScore: scoreForSR, // Use mastery score for technical proficiency
-      reviewCount: existingMastery.review_count,
-      lastReviewDate: lastReviewAt,
-      problemDifficulty: sessionData.difficulty,
-      streakDays,
-      scoresHistory: existingMastery.scores_history,
-      isEarlyReview,
-      daysOverdue,
+    // Reconstruct the stored algorithm state. FSRS fields MUST be passed or the card
+    // is rebuilt from defaults (difficulty=5, stability=interval) and the learned
+    // difficulty/stability/lapses are lost on every review — mirrors the /complete route.
+    const currentState = reconstructState(userAlgorithm, {
+      interval_days: existingMastery.interval_days,
+      next_review_at: existingMastery.next_review_at,
+      review_count: existingMastery.review_count,
+      mastery_level: existingMastery.mastery_level as SpacedRepetitionMasteryLevel,
+      confidence: existingMastery.confidence,
+      ease_factor: existingMastery.ease_factor,
+      last_reviewed_at: existingMastery.last_reviewed_at,
+      scores_history: existingMastery.scores_history,
+      fsrs_difficulty: existingMastery.fsrs_difficulty,
+      fsrs_stability: existingMastery.fsrs_stability,
+      fsrs_state: existingMastery.fsrs_state,
+      fsrs_lapses: existingMastery.fsrs_lapses,
     })
 
-    const nextReview = new Date(now)
-    nextReview.setDate(nextReview.getDate() + sm2Result.nextInterval)
+    const predictedRetention = estimateRetentionForAlgorithm(
+      userAlgorithm,
+      currentState,
+      daysSinceLastReview
+    )
+
+    const reviewResult = await calculateNextReview(userId, currentState, {
+      performance_score: sessionData.performanceScore,
+      mastery_score: scoreForSR, // Code-focused score for SR calculations
+      time_spent_minutes: sessionData.timeSpentMinutes || 0,
+      hints_used: sessionData.hintsUsed || 0,
+      problem_difficulty: sessionData.difficulty,
+      is_early_review: isEarlyReview,
+      days_overdue: daysOverdue,
+      streak_days: streakDays,
+    })
+
+    // Persist the algorithm-computed schedule (SM-2 ease_factor, or the FSRS card
+    // fields). review_count is dropped here and incremented atomically below.
+    const storageData = prepareStateForStorage({
+      algorithm: reviewResult.algorithm,
+      interval_days: reviewResult.next_interval_days,
+      next_review_at: reviewResult.next_review_at,
+      review_count: existingMastery.review_count + 1,
+      mastery_level: reviewResult.mastery_level,
+      confidence: reviewResult.confidence,
+      ease_factor: reviewResult.ease_factor,
+      fsrs_state: reviewResult.fsrs_state,
+    })
+    const { review_count: _reviewCount, ...storageDataWithoutCount } = storageData as Record<
+      string,
+      unknown
+    >
 
     masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
       performance_score: sessionData.performanceScore,
       last_score: scoreForSR, // Technical/mastery score for display in practice page
       time_spent_minutes: sessionData.timeSpentMinutes,
       hints_used: sessionData.hintsUsed,
-      ease_factor: sm2Result.newEaseFactor,
-      interval_days: sm2Result.nextInterval,
-      review_count: existingMastery.review_count + 1,
-      next_review_at: nextReview.toISOString(),
-      mastery_level: sm2Result.masteryLevel,
-      confidence: sm2Result.confidence,
+      increment_review_count: true, // Atomic increment (mirrors the /complete route)
+      ...storageDataWithoutCount,
     })
 
     // Record research event for A/B testing analytics
     // This populates the research dashboard with real user data
     try {
-      const predictedRetention = estimateRetention(
-        existingMastery.interval_days,
-        existingMastery.ease_factor,
-        daysSinceLastReview
-      )
-
       await recordReviewEvent({
         userId,
         problemId: sessionData.scenarioId,
@@ -569,8 +614,8 @@ export async function completeSessionWithMastery(
         pattern: sessionData.pattern,
         difficulty: sessionData.difficulty,
         score: sessionData.performanceScore, // Full interview score
-        masteryScore: sessionData.masteryScore ?? sessionData.performanceScore, // Use actual mastery score when available
-        qualityRating: mapScoreToQuality(scoreForSR), // Use mastery score for quality rating
+        masteryScore: scoreForSR, // Code-focused score for research comparison
+        qualityRating: reviewResult.quality_rating,
         timeSpentMinutes: sessionData.timeSpentMinutes || 0,
         hintsUsed: sessionData.hintsUsed || 0,
         preReviewState: {
@@ -578,13 +623,15 @@ export async function completeSessionWithMastery(
           daysSinceLastReview,
           daysOverdue,
           easeFactor: existingMastery.ease_factor,
+          stability: currentState.fsrs_state?.stability,
           predictedRetention,
-          masteryLevel: existingMastery.mastery_level as any,
+          masteryLevel: existingMastery.mastery_level as SpacedRepetitionMasteryLevel,
         },
         postReviewState: {
-          newIntervalDays: sm2Result.nextInterval,
-          newEaseFactor: sm2Result.newEaseFactor,
-          masteryLevel: sm2Result.masteryLevel,
+          newIntervalDays: reviewResult.next_interval_days,
+          newEaseFactor: reviewResult.ease_factor,
+          newStability: reviewResult.fsrs_state?.stability,
+          masteryLevel: reviewResult.mastery_level,
         },
         isEarlyReview,
         isFirstReview: false,
