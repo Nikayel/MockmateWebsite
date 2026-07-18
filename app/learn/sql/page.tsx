@@ -7,7 +7,7 @@ import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 export const metadata: Metadata = {
   title: "Learn SQL — CodeSparring",
   description:
-    "Learn SQL & data engineering the way real engineers work: pick a level, then Read → Apply → Practice every concept against a live in-browser database.",
+    "Learn SQL and data engineering against a live in-browser database. Read, apply, and practice the exact SQL that data engineering internship interviews test.",
 }
 
 const LOOP_PHASES = ["Read", "Apply", "Practice"]

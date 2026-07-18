@@ -9,7 +9,7 @@ import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 export const metadata: Metadata = {
   title: "Learn Python — CodeSparring",
   description:
-    "Learn Python the way real engineers work: pick a level, then Read → Apply → Practice every concept.",
+    "Free interactive Python course that runs in your browser. Read, apply, and practice the exact Python that intern and new-grad SWE and DE interviews test.",
 }
 
 const LOOP_PHASES = ["Read", "Apply", "Practice"]
