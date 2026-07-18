@@ -51,6 +51,15 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
     "How CodeSparring works for you",
   ]
 
+  // Screen readers must match the visible labels: the welcome screen is an
+  // unnumbered intro, and the numbered screens say "Step 1 of 4" through
+  // "Step 4 of 4". The welcome screen is announced by title only.
+  const visibleStepCount = totalSteps - 1
+  const isIntroStep = step === 0
+  const stepAnnouncement = isIntroStep
+    ? stepTitles[0]
+    : `Step ${step} of ${visibleStepCount}: ${stepTitles[step]}`
+
   const handleComplete = async (takeTour: boolean) => {
     if (!selectedRole) return
 
@@ -120,14 +129,15 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
           aria-labelledby="onboarding-title"
           aria-describedby="onboarding-description"
         >
-          {/* Progress bar - Accessibility: aria-valuenow for screen readers */}
+          {/* Progress bar - Accessibility: aria-valuenow for screen readers.
+              The intro screen omits aria-valuenow so valuenow never exceeds valuemax. */}
           <div
             className="h-1 bg-muted"
             role="progressbar"
-            aria-valuenow={step + 1}
+            aria-valuenow={isIntroStep ? undefined : step}
             aria-valuemin={1}
-            aria-valuemax={totalSteps}
-            aria-label={`Step ${step + 1} of ${totalSteps}: ${stepTitles[step]}`}
+            aria-valuemax={visibleStepCount}
+            aria-label={stepAnnouncement}
           >
             <motion.div
               className="h-full bg-cyan-300"
@@ -139,7 +149,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
 
           {/* Hidden live region for step announcements */}
           <div className="sr-only" aria-live="polite" aria-atomic="true">
-            Step {step + 1} of {totalSteps}: {stepTitles[step]}
+            {stepAnnouncement}
           </div>
 
           <AnimatePresence mode="wait">
