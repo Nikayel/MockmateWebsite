@@ -4,6 +4,7 @@ import type { ReadonlyURLSearchParams } from "next/navigation"
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
+import { trackEvent } from "@/lib/analytics"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import { getScenarioById } from "@/lib/scenarios/index"
 import type { Scenario } from "@/lib/scenarios/types"
@@ -100,6 +101,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           return
         } else {
           // Free trial already used, require signup
+          trackEvent("guest_trial_exhausted")
           opts.router.push("/login?redirect=interview&message=trial-used")
           return
         }
