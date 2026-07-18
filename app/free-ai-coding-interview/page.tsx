@@ -33,8 +33,8 @@ export default function FreePracticePage() {
             </div>
           </div>
           <p>
-            Ready to jump into the real thing? Click below to start your first full, uninterrupted
-            AI mock interview—no credit card required.
+            Ready to jump in? Create a free account and start your first full AI mock interview. No
+            credit card required.
           </p>
         </>
       ),
