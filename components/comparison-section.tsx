@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from "react"
 import { motion, useInView, useSpring, useTransform } from "framer-motion"
 import { Check, X, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import { getProPricing } from "@/lib/config"
 
 /**
  * Comparison Section - Professional Redesign
@@ -113,6 +114,7 @@ function FeatureRow({
 export function ComparisonSection() {
   const sectionRef = useRef(null)
   const isInView = useInView(sectionRef, { once: true, amount: 0.1 })
+  const proMonthly = getProPricing("website").monthly
 
   const features = [
     {
@@ -302,7 +304,7 @@ export function ComparisonSection() {
 
               <div className="flex items-baseline gap-1">
                 <AnimatedPrice
-                  value={24}
+                  value={proMonthly.price}
                   delay={700}
                   className="font-light"
                   style={{
@@ -425,7 +427,7 @@ export function ComparisonSection() {
                   Ours
                 </span>
                 <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#c4703f" }}>
-                  $24/mo
+                  {proMonthly.priceDisplay}/mo
                 </span>
               </div>
             </div>
