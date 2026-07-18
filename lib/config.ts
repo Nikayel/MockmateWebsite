@@ -67,9 +67,9 @@ export const PRICING_CONFIG = {
     // Core value: what makes Pro worth it
     valueProps: [
       {
-        title: "Unlimited Practice per Scenario",
+        title: "Free Opens per Scenario",
         description:
-          "Each scenario unlocks 10+ DSA problems. Practice each problem as many times as you need—only the scenario counts against your limit.",
+          "Each scenario unlocks 10+ DSA problems. Starting a session uses 1 of your monthly sessions and grants 10 free opens, so you can come back to its problems again without spending another session.",
       },
       {
         title: "Spaced Repetition System",
