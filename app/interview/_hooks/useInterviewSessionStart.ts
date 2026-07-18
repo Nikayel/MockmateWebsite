@@ -8,7 +8,7 @@ import type { CompanyId } from "@/lib/data/company-questions/types"
 import type { InterviewTargetCompany } from "@/lib/stores"
 import type { Scenario } from "@/lib/scenarios"
 import { createInterviewSession, recordSessionStart } from "@/lib/firestore-helpers"
-import { trackEvent } from "@/lib/analytics"
+import { trackEvent, trackSessionStart } from "@/lib/analytics"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { PRICING_CONFIG } from "@/lib/config"
 import { extractProtectedElements } from "@/lib/code-protection"
@@ -187,6 +187,15 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           effectiveTargetCompany // Pass target company for RAG + analytics
         )
         opts.setCurrentSessionId(sessionId)
+
+        // GA4 session_start (the /api/admin/analytics dashboard queries this name)
+        trackSessionStart({
+          sessionId,
+          scenarioId: scenario.id,
+          scenarioType: scenario.type,
+          difficulty: scenario.difficulty,
+          language: opts.selectedLanguage,
+        })
 
         // Initialize session metrics tracking (required for completion tracking)
         const token = await opts.firebaseUser?.getIdToken()
