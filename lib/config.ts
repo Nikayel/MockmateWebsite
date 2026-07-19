@@ -63,13 +63,13 @@ export const PRICING_CONFIG = {
     },
     // Shared features
     sessionsPerMonth: 35,
-    sessionsDisplay: "350+ problems per month",
+    sessionsDisplay: "35 full interview sessions per month",
     // Core value: what makes Pro worth it
     valueProps: [
       {
-        title: "Free Opens per Scenario",
+        title: "Re-practice Every Scenario",
         description:
-          "Each scenario unlocks 10+ DSA problems. Starting a session uses 1 of your monthly sessions and grants 10 free opens, so you can come back to its problems again without spending another session.",
+          "Starting a session uses 1 of your monthly sessions and unlocks that scenario for repeated practice, so you can come back and run it again without spending another session.",
       },
       {
         title: "Spaced Repetition System",
@@ -84,12 +84,11 @@ export const PRICING_CONFIG = {
     ],
     // Complete feature list for Pro
     features: [
-      "350+ problems per month",
+      "35 full interview sessions per month",
       "Unlimited practice within each scenario",
-      "10+ DSA problems per scenario",
-      "Spaced repetition scheduling (SM-2 algorithm)",
+      "Spaced repetition scheduling",
       "Personalized study roadmap",
-      "Pattern mastery tracking (15 patterns)",
+      "Pattern mastery tracking (15+ patterns)",
       "Company-specific prep (FAANG, startups)",
       "System design interviews",
       "Detailed analytics & insights",
@@ -98,7 +97,7 @@ export const PRICING_CONFIG = {
     ],
     // Quick comparison for pricing cards
     highlights: [
-      "350+ problems/month",
+      "35 sessions/month",
       "Unlimited practice per problem",
       "Spaced repetition scheduling",
       "Personalized roadmap",
