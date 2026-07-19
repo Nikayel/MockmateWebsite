@@ -1,6 +1,7 @@
 "use client"
 
 import { parseFeedback } from "@/lib/feedback/parsers"
+import { getLetterGrade } from "@/lib/constants"
 import { ScoreDisplay, FeedbackSections } from "@/components/practice"
 import type { ChatMessage } from "@/lib/types"
 import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
@@ -197,21 +198,7 @@ export default function PracticeFeedback({
         ? normalizeScore(sections.scores.overall)
         : 0
 
-  const getLetterGrade = (score: number) => {
-    if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
-    if (score >= 90) return { grade: "A", color: "text-emerald-400" }
-    if (score >= 85) return { grade: "A-", color: "text-emerald-400" }
-    if (score >= 80) return { grade: "B+", color: "text-sky-400" }
-    if (score >= 75) return { grade: "B", color: "text-sky-400" }
-    if (score >= 70) return { grade: "B-", color: "text-sky-400" }
-    if (score >= 65) return { grade: "C+", color: "text-amber-400" }
-    if (score >= 60) return { grade: "C", color: "text-amber-400" }
-    if (score >= 55) return { grade: "C-", color: "text-amber-400" }
-    if (score >= 50) return { grade: "D", color: "text-orange-400" }
-    return { grade: "F", color: "text-red-400" }
-  }
-
-  const { grade } = getLetterGrade(overallScore)
+  const grade = getLetterGrade(overallScore)
 
   return (
     <div className="w-full space-y-4">
