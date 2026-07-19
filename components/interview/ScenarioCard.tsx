@@ -2,7 +2,8 @@
 
 import { memo } from "react"
 import Link from "next/link"
-import { Play, Check, Clock, Cpu, Bug, Wrench, Zap, Shield, Layers } from "lucide-react"
+import { Play, Check, Clock, Cpu, Bug } from "lucide-react"
+import { EXERCISE_TYPES } from "./scenario-display"
 import { Button } from "@/components/ui/button"
 import type { Scenario, ScenarioType } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
@@ -21,14 +22,10 @@ interface ScenarioCardProps {
   onStart: (scenario: Scenario) => void
 }
 
-const TYPE_ICONS: Record<ScenarioType, typeof Bug> = {
-  bugfix: Bug,
-  "add-functionality": Wrench,
-  optimization: Zap,
-  security: Shield,
-  "system-design": Layers,
-  dsa: Cpu,
-}
+// Derived from the shared EXERCISE_TYPES table so the card icons cannot drift from the filters.
+const TYPE_ICONS = Object.fromEntries(
+  EXERCISE_TYPES.map((type) => [type.id, type.icon])
+) as Record<ScenarioType, typeof Bug>
 
 export const ScenarioCard = memo(function ScenarioCard({
   scenario,

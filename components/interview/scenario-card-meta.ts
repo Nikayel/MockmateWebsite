@@ -1,4 +1,5 @@
 import type { Scenario, ScenarioType } from "@/lib/scenarios"
+import { EXERCISE_TYPES } from "./scenario-display"
 
 /**
  * Derived, display-only context for a scenario card. Keeps the "what makes this
@@ -14,14 +15,11 @@ export interface ScenarioCardContext {
   signal: string | null
 }
 
-const TYPE_LABELS: Record<ScenarioType, string> = {
-  bugfix: "Bug Fix",
-  "add-functionality": "Add Feature",
-  "system-design": "System Design",
-  dsa: "DSA",
-  optimization: "Optimize",
-  security: "Security",
-}
+// Derived from the shared EXERCISE_TYPES table; cards use the compact `cardLabel` (e.g. "DSA")
+// where one is defined, otherwise the full `label`.
+const TYPE_LABELS = Object.fromEntries(
+  EXERCISE_TYPES.map((type) => [type.id, type.cardLabel ?? type.label])
+) as Record<ScenarioType, string>
 
 function prettifyPattern(pattern: string): string {
   return pattern
