@@ -2784,7 +2784,7 @@ const skewAndJoins: SqlLesson = {
     estimatedMinutes: 14,
     markdown: `## Data skew and the straggler
 
-Parallelism only helps if the work is spread evenly. **Data skew** is when one key has vastly more rows than the others: a NULL that swallows a third of the rows, one mega-customer, one hot product. In a group-by or join, all the rows for a key go to one task, so the task holding the giant key runs far longer than the rest. The whole stage cannot finish until that one **straggler** finishes, so a job that should take a minute takes twenty, and that one executor may run out of memory.
+Parallelism only helps if the work is spread evenly. **Data skew** is when one key has vastly more rows than the others: a NULL that swallows a third of the rows, one mega-customer, one hot product. In a group-by or join, all the rows for a key go to one task, so the task holding the giant key runs far longer than the rest. The whole stage cannot finish until that one **straggler** finishes, so a job that should take a minute takes twenty, and that one executor may run out of memory. You already surfaced a hot key like this in Level 5's join fan-out lesson, where a \`GROUP BY key COUNT(*)\` exposed the one \`customer_id\` with far more rows than the rest; that same count is the first skew diagnostic here.
 
 You spot skew by comparing the slowest task to a typical task in its stage. A task running many times a typical task's duration is the tell. (Spark's Adaptive Query Execution, on by default since Spark 3.2, even detects and splits skewed partitions automatically, when a partition is both more than five times the median partition size and larger than 256 MB.) The beginner fixes are to **salt** the hot key (append a random suffix so it spreads across tasks), filter out the junk key (a NULL you do not need), or let AQE handle it.
 
@@ -3034,7 +3034,7 @@ A very common way to layer a pipeline is the **medallion architecture**:
 - **Silver** is cleaned, validated, deduplicated, and conformed.
 - **Gold** is the business-level aggregates the dashboards read.
 
-Each layer is a scheduled job that reads the one before it. Modern cloud pipelines favor **ELT** (load raw into the lake or warehouse, then transform there with SQL) over the older **ETL** (transform before loading), because storage is cheap and the warehouse is powerful.
+Each layer is a scheduled job that reads the one before it. You built exactly this medallion in Level 5's streaming capstone, one script that rebuilt Silver and Gold from Bronze with idempotent DELETE-then-INSERT loads; this lesson adds the orchestration layer that schedules those jobs as a DAG. Modern cloud pipelines favor **ELT** (load raw into the lake or warehouse, then transform there with SQL) over the older **ETL** (transform before loading), because storage is cheap and the warehouse is powerful.
 
 **Batch vs streaming.** Everything so far is **batch**: a job runs on a schedule over a chunk of data. The other mode is **streaming**, where events are processed continuously as they arrive, usually off a **message queue or log** like **Apache Kafka** (an append-only, partitioned log whose consumers read by offset, and a common home for the Avro records from the last module). **Micro-batch** sits in between, running tiny batches every few seconds. Most analytics pipelines are batch or micro-batch; true streaming is for low-latency needs.
 
@@ -3273,9 +3273,9 @@ Data-quality checks fall into a handful of families, and almost every real test 
 - **Volume / row-count anomaly.** Today's load is a tenth of yesterday's, or triple. The row count itself is a signal (the \`rows_out\` your run log records).
 - **Referential integrity.** A \`user_id\` in the fact table that does not exist in the users dimension (an orphan).
 
-## Quality gates
+## Quality gates (naming what you already built)
 
-A check is only useful if it can **stop bad data**. A **quality gate** runs the checks and fails the pipeline (or quarantines the batch) when a check breaches its threshold, so the bad data never reaches the Gold tables the dashboards read. This is the **write-audit-publish** idea: write to a staging area, audit it with checks, and publish only if it passes. In practice you express these checks with a framework like **dbt tests** (\`unique\`, \`not_null\`, \`accepted_values\`, \`relationships\`) or **Great Expectations**, but every one of them is a SQL query underneath.
+You have already written both halves of this. In Level 4 you wrote the four **dbt tests** (\`unique\`, \`not_null\`, \`accepted_values\`, \`relationships\`) as zero-rows-means-pass queries, and in Level 5 you built a **write-audit-publish (WAP)** gate that staged a batch, audited it with checks, and published only on a clean pass. The vocabulary consolidates here: a **quality gate** runs those checks and fails the pipeline (or quarantines the batch) when one breaches its threshold, so bad data never reaches the Gold tables the dashboards read. Frameworks like **dbt tests** or **Great Expectations** are how you wire these into production, but every one of them is a SQL query underneath, exactly the ones you wrote by hand.
 
 ## Writing the checks with SQL
 
@@ -3436,7 +3436,7 @@ export const sqlLevel6: SqlLevel = {
   slug: "cloud-data-foundations",
   title: "Level 6: Cloud & Data Engineering Foundations",
   tagline:
-    "Learn the platform your SQL runs on: object storage, columnar files, partitioning, and distributed pipelines, the way a DE interview asks about them.",
+    "Learn the platform your SQL runs on: object storage, columnar files, partitioning, and distributed pipelines, the way a DE interview asks about them. It is beginner-friendly and can be started right after Level 2, since its graded queries lean on GROUP BY and joins.",
   defaultExecutionMode: "single-file",
   estimatedHours: 6,
   modules: [
