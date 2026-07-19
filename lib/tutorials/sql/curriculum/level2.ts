@@ -717,7 +717,7 @@ INSERT INTO orders VALUES
   apply: {
     id: "sql-l2-inner-join-apply",
     executionMode: "single-file",
-    prompt: `Join \`orders\` to \`customers\` on \`customer_id\`. Return \`order_id\`, \`total_cents\`, and \`customer_name\`, one row per order that has a matching customer, sorted by \`order_id\`.`,
+    prompt: `Write a query that returns \`order_id\`, \`total_cents\`, and \`customer_name\`, one row per order that has a matching customer, sorted by \`order_id\`. Inner-join \`orders\` to \`customers\` on \`customer_id\`.`,
     starterCode: `-- Join orders to its customer, then sort by order_id.
 -- Return order_id, total_cents, customer_name.
 SELECT
@@ -1427,9 +1427,9 @@ INSERT INTO employees VALUES
   apply: {
     id: "sql-l2-self-join-apply",
     executionMode: "single-file",
-    prompt: `Self-join \`employees\` to pair each employee with their manager's name. Return \`employee\`
+    prompt: `Write a query that returns \`employee\`
 (the person's name) and \`manager\` (their manager's name, or NULL for someone with no manager), sorted
-by \`employee\`.`,
+by \`employee\`. Self-join \`employees\` to pair each person with their manager.`,
     starterCode: `-- Pair each employee with their manager's name.
 -- Return employee, manager; sort by employee.
 SELECT
@@ -1905,9 +1905,8 @@ INSERT INTO orders VALUES
   apply: {
     id: "sql-l2-ctes-apply",
     executionMode: "single-file",
-    prompt: `Rewrite a two-level nested subquery as **two chained CTEs**. From \`orders\`: first select the paid
-orders, then aggregate revenue per customer, then return only customers with revenue over \`5000\`.
-Return \`customer_id\` and \`revenue\`, sorted by \`customer_id\` ascending.`,
+    prompt: `Write a query that returns \`customer_id\` and \`revenue\` (a customer's total paid revenue), keeping only customers whose revenue is over \`5000\`, sorted by \`customer_id\` ascending. Build it as **two chained CTEs**: from \`orders\`, first select the paid
+orders, then aggregate revenue per customer, then filter.`,
     starterCode: `-- Two chained CTEs: paid_orders, then per_customer, then filter.
 WITH paid_orders AS (
 
