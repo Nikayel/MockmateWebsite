@@ -19,6 +19,7 @@ import { getSessionsLimitForTier } from "./pricing"
 import { CIRCUIT_BREAKER } from "./constants"
 import { PRICING_CONFIG } from "./config"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
+import { billingPeriodFromProfile, type BillingProfileFields } from "./quota/billing-period"
 
 /**
  * Options for quota enforcement.
@@ -256,15 +257,15 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
 async function getUserQuota(
   userId: string,
   // PERF-S4: callers that already fetched the profile (e.g. checkQuota, which
-  // reads it for the degraded-subscription gate) pass the resolved tier so we
+  // reads it for the degraded-subscription gate) pass its billing fields so we
   // skip a second profile read here. Omitted callers still read it below.
-  knownTier?: "free" | "pro" | "enterprise"
+  knownProfile?: BillingProfileFields
 ): Promise<UserQuota | null> {
   try {
     const now = new Date()
+    // usage_summaries stay keyed by calendar month (that is the budget
+    // writer's key) — independent of the quota billing window computed below.
     const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-    const currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
     // Get quota documents - limit to recent entries only (max 12 months of history)
     const quotaQueryPromise = adminDb
@@ -284,12 +285,12 @@ async function getUserQuota(
 
     // Batch fetch in parallel for better performance. Only read the profile when
     // the caller did not already resolve the tier.
-    let tier: "free" | "pro" | "enterprise"
+    let billingProfile: BillingProfileFields
     let quotaQuery: FirebaseFirestore.QuerySnapshot
     let usageSummaryDoc: FirebaseFirestore.DocumentSnapshot
-    if (knownTier) {
+    if (knownProfile) {
       ;[quotaQuery, usageSummaryDoc] = await Promise.all([quotaQueryPromise, usageSummaryPromise])
-      tier = knownTier
+      billingProfile = knownProfile
     } else {
       const [profileDoc, quotaResult, usageResult] = await Promise.all([
         adminDb.collection("profiles").doc(userId).get(),
@@ -298,9 +299,16 @@ async function getUserQuota(
       ])
       quotaQuery = quotaResult
       usageSummaryDoc = usageResult
-      const profile = profileDoc.data()
-      tier = (profile?.subscription_tier || "free") as "free" | "pro" | "enterprise"
+      billingProfile = (profileDoc.data() ?? {}) as BillingProfileFields
     }
+    const tier = billingProfile.subscription_tier || "free"
+
+    // QUOTA-1: match quota docs against the SAME anniversary/Stripe billing
+    // window every writer uses. The old calendar-month window disagreed with
+    // the writers' anniversary periods at month boundaries, mis-reporting
+    // usage right when a period rolled over.
+    const { periodStart: currentPeriodStart, periodEnd: currentPeriodEnd } =
+      billingPeriodFromProfile(billingProfile, now)
 
     // Find current period quota from limited results.
     //
@@ -506,9 +514,15 @@ export async function checkQuota(
       }
     }
 
-    // Get user quota. PERF-S4: reuse the tier from the profile we just read for
-    // the degraded-subscription gate so getUserQuota does not read it again.
-    const quota = await getUserQuota(userId, tier)
+    // Get user quota. PERF-S4: reuse the profile we just read for the
+    // degraded-subscription gate so getUserQuota does not read it again (and so
+    // it can compute the anniversary billing window from the same fields).
+    const quota = await getUserQuota(userId, {
+      subscription_tier: tier,
+      subscription_type: profile?.subscription_type,
+      created_at: profile?.created_at,
+      subscription_current_period_end: profile?.subscription_current_period_end,
+    })
     if (!quota) {
       // If we can't get quota, allow but log warning
       logger.warn("Could not retrieve user quota, allowing request", { userId })
