@@ -9,6 +9,7 @@
  */
 
 import { sendEmail, upsertContact, EmailResult } from "./brevo"
+import { getAppBaseUrl } from "../site-url"
 import { DEFAULT_TIMEZONE, getTodayInTimezone, getDateInTimezone } from "./timezone"
 import {
   getWelcomeEmailSubject,
@@ -54,7 +55,7 @@ import {
   TrialEndingEmailData,
 } from "./templates"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://mockmate.dev"
+const APP_URL = getAppBaseUrl()
 
 export async function sendWelcomeEmail(
   userId: string,
