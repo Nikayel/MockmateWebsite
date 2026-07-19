@@ -6,10 +6,10 @@ import {
   isPythonRuntimeWarm,
   markPythonRuntimeWarm,
 } from "@/lib/workspace-execution"
-import { getTutorialExerciseScenario } from "@/lib/tutorials/exercise-scenarios"
+import { toTutorialExerciseScenario } from "@/lib/tutorials/exercise-scenario-adapters"
 import { mapResultRow, type RawResultRow } from "@/lib/tutorials/test-result-mapping"
 import type { TestResult } from "@/components/interview/TestResultsPanel"
-import type { PythonExercise } from "@/lib/tutorials/types"
+import type { PythonExercise, SqlExercise } from "@/lib/tutorials/types"
 
 /**
  * Shared grading logic for both the single-file and workspace exercise runners. Runs the
@@ -50,7 +50,7 @@ export interface ExerciseRunCallbacks {
 }
 
 export function useExerciseRun(
-  exercise: PythonExercise,
+  exercise: PythonExercise | SqlExercise,
   callbacks: ExerciseRunCallbacks = {}
 ): ExerciseRunState {
   const { onPass, onResult } = callbacks
@@ -67,7 +67,7 @@ export function useExerciseRun(
     setWarming(!isPythonRuntimeWarm())
     setRunError(null)
     try {
-      const scenario = getTutorialExerciseScenario(exercise.id)
+      const scenario = toTutorialExerciseScenario(exercise)
       if (!scenario) {
         setRunError("This exercise could not be loaded. Please refresh and try again.")
         return
