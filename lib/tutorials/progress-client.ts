@@ -6,37 +6,11 @@
  * `TutorialProgressInput` is imported type-only, so this client module carries no runtime
  * dependency on the Admin-SDK-backed `./progress` service.
  */
-import { getCurrentUserToken } from "@/lib/firebase-lazy"
+import { REQUEST_TIMEOUT_MS, withTimeout, authHeaders } from "./learn-api-client"
 import type { TutorialLessonProgress } from "./types"
 import type { TutorialProgressInput } from "./progress"
 
-const REQUEST_TIMEOUT_MS = 8000
 const ENDPOINT = "/api/tutorials/progress"
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
-    promise.then(
-      (value) => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      (error) => {
-        clearTimeout(timer)
-        reject(error)
-      }
-    )
-  })
-}
-
-async function authHeaders(): Promise<Record<string, string> | null> {
-  const token = await getCurrentUserToken()
-  if (!token) return null
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  }
-}
 
 /** One lesson's progress (player resume). Null when signed out, missing, or on failure. */
 export async function fetchLessonProgress(
