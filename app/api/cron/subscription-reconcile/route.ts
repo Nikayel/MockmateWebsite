@@ -17,28 +17,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { timingSafeEqual } from "crypto"
+import { verifyCronRequest } from "@/lib/cron-auth"
 import { adminDb } from "@/lib/firebase-admin"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
 import { logger } from "@/lib/logger"
 
 const cronLogger = logger.child({ service: "cron-subscription-reconcile" })
-const CRON_SECRET = process.env.CRON_SECRET
 const MAX_PER_RUN = 50
 
 export async function GET(request: NextRequest) {
   try {
-    if (!CRON_SECRET) {
-      cronLogger.error("CRON_SECRET not configured")
-      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
-    }
-    const expectedToken = `Bearer ${CRON_SECRET}`
-    const headerValue = request.headers.get("authorization") || ""
-    const isValid =
-      headerValue.length === expectedToken.length &&
-      timingSafeEqual(Buffer.from(headerValue), Buffer.from(expectedToken))
-    if (!isValid) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = verifyCronRequest(request)
+    if (!auth.ok) {
+      if (auth.status === 500) {
+        cronLogger.error("CRON_SECRET not configured")
+      }
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
     const dryRun = new URL(request.url).searchParams.get("dryRun") === "true"
