@@ -11,7 +11,11 @@ import type { DesignAnswer, DesignAnswerInput } from "./design-answers"
 
 const ENDPOINT = "/api/tutorials/design-answers"
 
-/** One exercise's saved answer (player resume). Null when signed out, missing, or on failure. */
+/**
+ * One exercise's saved answer (player resume). Null when signed out or on a genuine 200 with no saved
+ * answer; THROWS on a real load failure so the player can keep the editor gated instead of treating a
+ * failed read as "no answer yet".
+ */
 export async function fetchDesignAnswer(exerciseId: string): Promise<DesignAnswer | null> {
   const headers = await withTimeout(authHeaders(), REQUEST_TIMEOUT_MS, "Auth token lookup")
   if (!headers) return null
@@ -23,7 +27,10 @@ export async function fetchDesignAnswer(exerciseId: string): Promise<DesignAnswe
       headers,
       signal: controller.signal,
     })
-    if (!res.ok) return null
+    // Distinguish a real load FAILURE from "no saved answer yet": throw on non-ok so the player keeps the
+    // design editor gated and never offers Save against an unread server doc; reserve null for a genuine
+    // 200 with `answer: null` (or signed-out above). (Mirrors progress-client Audit #4.)
+    if (!res.ok) throw new Error(`Design answer load failed with status ${res.status}`)
     const data = (await res.json()) as { answer: DesignAnswer | null }
     return data.answer ?? null
   } finally {
