@@ -37,6 +37,3 @@ export type {
   UserSummary,
   SmartRecommendationsResponse,
 } from "./useSkillInsights"
-
-export { useInterviewPhase } from "./useInterviewPhase"
-export type { UseInterviewPhaseReturn } from "./useInterviewPhase"
