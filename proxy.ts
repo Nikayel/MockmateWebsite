@@ -13,11 +13,16 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Routes that require authentication
-// "/learn/python", "/learn/sql", and "/learn/system-design" hard-gate the tutorials (progress +
-// saved answers require a real user); execution stays free/no-quota (client-side WASM, or none for
-// system design), so the page is auth-gated instead. The prefix match covers all sub-paths
-// (/learn/sql, /learn/sql/<level>/<lesson>).
+// Routes that require a plausible auth signal before render.
+// IMPORTANT: this layer is NOT a security boundary. hasAuthToken() below is a
+// presence check — ANY value in the __session / firebase-auth-token cookie
+// passes — so it only prevents the signed-out flash and bounces
+// obviously-anonymous visitors to /login. Real enforcement lives where it
+// must: admin RBAC in the admin layout + lib/admin/middleware.ts, and every
+// tutorial progress / saved-answer API verifies a real Firebase token
+// server-side. Tutorial lesson content itself is intentionally free, so a
+// spoofed cookie reveals nothing that is not already public. The prefix match
+// covers all sub-paths (/learn/sql, /learn/sql/<level>/<lesson>).
 const PROTECTED_ROUTES = ["/admin", "/learn/python", "/learn/sql", "/learn/system-design"]
 
 // Routes that should redirect authenticated users away
@@ -27,8 +32,10 @@ const AUTH_ROUTES = ["/login", "/signup"]
 const PUBLIC_ROUTES = ["/", "/pricing", "/blog", "/about", "/privacy", "/terms"]
 
 /**
- * Check if user appears to be authenticated
- * Note: This is a quick check - full verification happens server-side
+ * Check if user APPEARS to be authenticated — a presence check, spoofable by
+ * construction (any cookie value passes; nothing is verified at the edge).
+ * Treat strictly as a UX hint; every protected capability re-verifies a real
+ * token server-side.
  */
 function hasAuthToken(request: NextRequest): boolean {
   // Check for Firebase session cookie (set by Firebase Auth)
