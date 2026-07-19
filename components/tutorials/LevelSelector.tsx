@@ -7,7 +7,8 @@ import { LevelPreviewPanel } from "./LevelPreviewPanel"
 import { Reveal } from "./Reveal"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { recallLevel, rememberLevel } from "@/lib/tutorials/level-preference"
-import type { PythonLevel } from "@/lib/tutorials/types"
+import type { PythonLevelId } from "@/lib/tutorials/types"
+import type { PathLevelSummary } from "@/lib/tutorials/level-path"
 
 /**
  * Screen 1 — the Python Path (HANDOFF §B). A connected vertical spine of the four levels on the
@@ -16,9 +17,9 @@ import type { PythonLevel } from "@/lib/tutorials/types"
  * the chosen level (`localStorage[cs_py_level]`) and opens the level's first unfinished lesson.
  * Completion is hydrated best-effort from saved progress (empty when signed out).
  */
-export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
+export function LevelSelector({ levels }: { levels: PathLevelSummary<PythonLevelId>[] }) {
   const router = useRouter()
-  const [selectedId, setSelectedId] = useState<PythonLevel["id"]>(levels[0]?.id ?? 1)
+  const [selectedId, setSelectedId] = useState<PythonLevelId>(levels[0]?.id ?? 1)
   const completedLessonIds = useCompletedLessons()
 
   // Preselect the level the learner last started, if any.
@@ -32,19 +33,15 @@ export function LevelSelector({ levels }: { levels: PythonLevel[] }) {
     [levels, selectedId]
   )
 
-  const completedCountFor = (level: PythonLevel) =>
-    level.modules.reduce(
-      (total, mod) => total + mod.lessons.filter((l) => completedLessonIds.has(l.id)).length,
-      0
-    )
+  const completedCountFor = (level: PathLevelSummary<PythonLevelId>) =>
+    level.lessons.filter((l) => completedLessonIds.has(l.id)).length
 
-  const lessonCountFor = (level: PythonLevel) =>
-    level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
+  const lessonCountFor = (level: PathLevelSummary<PythonLevelId>) => level.lessons.length
 
-  const handleStart = (level: PythonLevel) => {
+  const handleStart = (level: PathLevelSummary<PythonLevelId>) => {
     rememberLevel(level.id)
     // Open the first not-yet-completed lesson in the level (a "continue"), else lesson 1.
-    const lessons = level.modules.flatMap((mod) => mod.lessons)
+    const lessons = level.lessons
     const next = lessons.find((l) => !completedLessonIds.has(l.id)) ?? lessons[0]
     router.push(next ? `/learn/python/${level.slug}/${next.id}` : `/learn/python/${level.slug}`)
   }

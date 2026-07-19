@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Terminal } from "lucide-react"
 import { listLevels } from "@/lib/tutorials/registry"
+import { toPathLevelSummary } from "@/lib/tutorials/level-path"
 import { LevelSelector } from "@/components/tutorials/LevelSelector"
 import { ResumeLearning } from "@/components/tutorials/ResumeLearning"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
@@ -16,7 +17,9 @@ const LOOP_PHASES = ["Read", "Apply", "Practice"]
 
 /** Screen 1 — the Python Path. Server Component: static content from `listLevels()`. */
 export default function LearnPythonPage() {
-  const levels = listLevels()
+  // Project to the lean Path summary so the ~440 KB authored PythonLevel[] (starter code, reference
+  // solutions, tests) never serializes into the client bundle — the landing only needs ids + skills.
+  const levels = listLevels().map((level) => toPathLevelSummary(level))
 
   return (
     <>

@@ -5,7 +5,8 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { recallLevel } from "@/lib/tutorials/level-preference"
-import type { PythonLevel } from "@/lib/tutorials/types"
+import type { PythonLevelId } from "@/lib/tutorials/types"
+import type { PathLevelSummary } from "@/lib/tutorials/level-path"
 
 /**
  * "Continue where you left off" — a Path-hero island shown only when the learner has a remembered
@@ -13,7 +14,7 @@ import type { PythonLevel } from "@/lib/tutorials/types"
  * lesson of that level. Renders nothing for first-timers (the Path is the entry) or once a level is
  * fully done. Best-effort: degrades to silent when signed out.
  */
-export function ResumeLearning({ levels }: { levels: PythonLevel[] }) {
+export function ResumeLearning({ levels }: { levels: PathLevelSummary<PythonLevelId>[] }) {
   const completed = useCompletedLessons()
 
   const target = useMemo(() => {
@@ -21,7 +22,7 @@ export function ResumeLearning({ levels }: { levels: PythonLevel[] }) {
     if (!levelId) return null
     const level = levels.find((l) => l.id === levelId)
     if (!level) return null
-    const lessons = level.modules.flatMap((mod) => mod.lessons)
+    const lessons = level.lessons
     const next = lessons.find((l) => !completed.has(l.id))
     // Only offer a resume when there's real, partially-done progress left in the level.
     if (next && completed.size > 0)
