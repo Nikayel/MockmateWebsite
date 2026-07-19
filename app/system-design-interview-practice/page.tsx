@@ -2,9 +2,12 @@ import { Metadata } from "next"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "System Design Interview Practice | CodeSparring",
+  title: "System Design Interview Practice",
   description:
     "Practice system design interviews with an AI interviewer. Master scalability, trade-offs, and architecture for FAANG senior engineering rounds.",
+  alternates: {
+    canonical: "/system-design-interview-practice",
+  },
 }
 
 export default function SystemDesignInterviewPracticePage() {

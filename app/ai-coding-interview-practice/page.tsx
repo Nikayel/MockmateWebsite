@@ -1,10 +1,14 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "AI Coding Interview Practice Simulator | CodeSparring",
+  title: "AI Coding Interview Practice Simulator",
   description:
     "Master coding interviews with an AI interviewer. Practice data structures, algorithms, and real-world coding problems with instant, actionable feedback.",
+  alternates: {
+    canonical: "/ai-coding-interview-practice",
+  },
 }
 
 export default function AICodingInterviewPracticePage() {
@@ -14,7 +18,7 @@ export default function AICodingInterviewPracticePage() {
       content: (
         <>
           <p>
-            Passing a coding interview isn't just about solving the problem—it's about how you
+            Passing a coding interview isn't just about solving the problem. It's about how you
             communicate your thought process. While platforms like LeetCode test your ability to
             pass test cases, they don't prepare you for the pressure of a real human interviewer
             asking follow-up questions or asking you to optimize your code.
@@ -22,7 +26,11 @@ export default function AICodingInterviewPracticePage() {
           <p>
             An AI coding interview simulator bridges this gap. It listens to you explain your
             approach, provides hints if you get stuck, and grades you on the same rubric used by
-            FAANG companies: problem-solving, coding ability, communication, and verification.
+            FAANG companies: problem-solving, coding ability, communication, and verification. See
+            how it stacks up in our{" "}
+            <Link href="/codesparring-vs-leetcode">CodeSparring vs LeetCode</Link> and{" "}
+            <Link href="/codesparring-vs-hellointerview">CodeSparring vs HelloInterview</Link>{" "}
+            comparisons.
           </p>
         </>
       ),

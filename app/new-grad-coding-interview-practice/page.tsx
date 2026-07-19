@@ -2,9 +2,12 @@ import { Metadata } from "next"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "New Grad Coding Interview Practice | CodeSparring",
+  title: "New Grad Coding Interview Practice",
   description:
     "Practice entry-level and new grad software engineering interviews. Master DSA, LeetCode style questions, and behavioral rounds for your first tech job.",
+  alternates: {
+    canonical: "/new-grad-coding-interview-practice",
+  },
 }
 
 export default function NewGradInterviewPracticePage() {

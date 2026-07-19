@@ -2,9 +2,12 @@ import { Metadata } from "next"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "Software Engineer Interview Practice | CodeSparring",
+  title: "Software Engineer Interview Practice",
   description:
     "Comprehensive interview practice for Software Engineers. Prepare for coding, system design, and behavioral rounds with our AI interviewer simulator.",
+  alternates: {
+    canonical: "/software-engineer-interview-practice",
+  },
 }
 
 export default function SWEInterviewPracticePage() {
@@ -15,7 +18,7 @@ export default function SWEInterviewPracticePage() {
         <>
           <p>
             Landing a job as a Software Engineer isn't just about passing a single coding test. You
-            have to survive the "loop"—a grueling series of 4 to 6 interviews covering algorithms,
+            have to survive the "loop," a grueling series of 4 to 6 interviews covering algorithms,
             system design, practical coding, and behavioral questions.
           </p>
           <p>
