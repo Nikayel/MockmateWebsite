@@ -8,6 +8,7 @@ import {
   summarizeBugfixEvidence,
 } from "@/lib/bugfix"
 import { realWorldBugFixScenarios } from "@/lib/scenarios-realworld"
+import { hydrateSealedLegacyBugfix } from "@/lib/scenarios/sealed/legacy-registry.server"
 
 describe("bugfix evidence learning loop", () => {
   it("penalizes passing tests without debugging evidence", () => {
@@ -132,8 +133,11 @@ describe("bugfix evidence learning loop", () => {
     expect(report.finalDiffSummary).toContain("src/fix.js")
   })
 
-  it("audits public bugfix scenarios for release governance", () => {
-    const rows = buildBugfixScenarioAuditRows(realWorldBugFixScenarios)
+  it("audits public bugfix scenarios for release governance", async () => {
+    // Re-merge the sealed answer content (reference files + bug description) the
+    // client modules no longer carry, exactly as the admin audit route does.
+    const hydrated = await Promise.all(realWorldBugFixScenarios.map(hydrateSealedLegacyBugfix))
+    const rows = buildBugfixScenarioAuditRows(hydrated)
 
     expect(rows).toHaveLength(realWorldBugFixScenarios.length)
     expect(rows.every((row) => row.complete)).toBe(true)

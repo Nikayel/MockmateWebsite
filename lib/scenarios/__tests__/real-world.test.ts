@@ -9,6 +9,10 @@ import {
 import { scenarios } from "../../scenarios"
 import { bugfixPackScenarios } from "../real-world/bugfix/packs"
 import { validateBugfixScenarioQuality } from "../bugfix-quality"
+import {
+  hydrateSealedLegacyBugfix,
+  loadSealedLegacyBugfix,
+} from "../sealed/legacy-registry.server"
 import { validateWorkspaceScenario, isWorkspaceScenario } from "../../workspace-execution"
 
 describe("real-world scenario modules", () => {
@@ -41,7 +45,7 @@ describe("real-world scenario modules", () => {
     ).toEqual([...publicBugfixIds, ...packIds])
   })
 
-  it("exports complete scenario records for consumers", () => {
+  it("exports complete scenario records for consumers", async () => {
     for (const scenario of [...realWorldBugFixScenarios, ...realWorldSystemDesignScenarios]) {
       expect(scenario.title).toBeTruthy()
       expect(scenario.type).toBeTruthy()
@@ -53,7 +57,10 @@ describe("real-world scenario modules", () => {
         expect(Object.keys(scenario.buggyCode).length).toBeGreaterThan(0)
         expect(scenario.testCases.length).toBeGreaterThan(0)
         expect(scenario.expectedBehavior).toBeTruthy()
-        expect(scenario.bugDescription).toBeTruthy()
+        // The root cause (bugDescription) is sealed server-side and no longer ships
+        // on the client module; assert it exists in the sealed legacy registry.
+        const sealed = await loadSealedLegacyBugfix(scenario.id)
+        expect(sealed?.bugDescription).toBeTruthy()
       } else {
         expect(scenario.constraints.length).toBeGreaterThan(0)
         expect(scenario.hints.length).toBeGreaterThan(0)
@@ -63,7 +70,7 @@ describe("real-world scenario modules", () => {
     }
   })
 
-  it("publishes only sophisticated workspace bugfix scenarios", () => {
+  it("publishes only sophisticated workspace bugfix scenarios", async () => {
     for (const scenario of realWorldBugFixScenarios) {
       const languages = Object.keys(scenario.buggyCode)
 
@@ -71,12 +78,18 @@ describe("real-world scenario modules", () => {
       expect(isWorkspaceScenario(scenario)).toBe(true)
       if (!isWorkspaceScenario(scenario)) continue
 
-      expect(validateWorkspaceScenario(scenario)).toEqual([])
-      expect(scenario.workspace.files.some((file) => file.role === "docs")).toBe(true)
-      expect(scenario.workspace.editableFilePaths.length).toBeGreaterThanOrEqual(1)
-      expect(scenario.workspace.visibleTestPaths.length).toBeGreaterThanOrEqual(1)
-      expect(scenario.workspace.hiddenTestPaths.length).toBeGreaterThanOrEqual(1)
-      expect(validateBugfixScenarioQuality(scenario)).toEqual([])
+      // The reference solution, bug description, and specific rubric are sealed
+      // server-side; re-merge them before the release audit (mirrors the admin route).
+      const hydrated = await hydrateSealedLegacyBugfix(scenario)
+      expect(isWorkspaceScenario(hydrated)).toBe(true)
+      if (!isWorkspaceScenario(hydrated)) continue
+
+      expect(validateWorkspaceScenario(hydrated)).toEqual([])
+      expect(hydrated.workspace.files.some((file) => file.role === "docs")).toBe(true)
+      expect(hydrated.workspace.editableFilePaths.length).toBeGreaterThanOrEqual(1)
+      expect(hydrated.workspace.visibleTestPaths.length).toBeGreaterThanOrEqual(1)
+      expect(hydrated.workspace.hiddenTestPaths.length).toBeGreaterThanOrEqual(1)
+      expect(validateBugfixScenarioQuality(hydrated)).toEqual([])
 
       for (const testCase of scenario.testCases) {
         expect(testCase.input).toBeTruthy()
