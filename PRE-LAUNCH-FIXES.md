@@ -53,7 +53,24 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 
 ## Part 2 — Remaining fixes
 
-### QUOTA-1 — Make `profile_quota` server-authoritative — **HIGH** — **NEEDS-STAGING**
+### QUOTA-1 — Make `profile_quota` server-authoritative — **HIGH** — **SHIPPED 2026-07-19, EMULATOR-VALIDATED**
+
+> **UPDATE 2026-07-19 (pre-launch sweep): DONE.** Shipped as: shared period math
+> extracted to `lib/quota/billing-period.ts` (anniversary/Stripe model everywhere);
+> `lib/quota/session-start-admin.ts` runs both quota transitions in one Admin-SDK
+> transaction targeting the most-conservative current-period doc; thin
+> `POST /api/usage/session-start` (verified-token identity only); client
+> `recordSessionStart` delegates to the API; `initializeUserQuota` replaced by
+> read-only `resolveUserQuota`; `getUserQuota` now matches docs against the real
+> billing window (the calendar/anniversary mismatch below is fixed); rules:
+> `profile_quota` create/update `if false`. Emulator drill
+> (`lib/quota/__tests__/session-start-admin.emulator.test.ts`, run via
+> `firebase emulators:exec`) passed 6/6: free-tier limit denial, pro limit,
+> free-open consumption order, rollover resets exactly once, conservative-doc
+> targeting with forged duplicates, history immutability.
+> **DEPLOY ORDER: deploy the app to Vercel BEFORE `firebase deploy --only
+> firestore:rules`**, or older client bundles fail to start sessions.
+> Original spec kept below for history.
 - **Files:** `firestore.rules` (`match /profile_quota/{quotaId}` ~L134–169),
   `lib/firestore-helpers.ts` (`initializeUserQuota` ~L299–419, `recordSessionStart`),
   `lib/quota-enforcement.ts` (`getUserQuota` ~L255–314).
