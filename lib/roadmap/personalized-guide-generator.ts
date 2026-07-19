@@ -693,7 +693,7 @@ function generatePersonalizedTips(
   if (unknownPatterns.length >= 5) {
     tips.push({
       category: "preparation",
-      tip: "You have many unfamiliar patterns. Start with pattern tutorials before diving into problems.",
+      tip: "You have many unfamiliar patterns. Warm up with the easier Practice scenarios for each one to build intuition before tackling harder problems.",
       reason: `${unknownPatterns.length} patterns marked as unknown.`,
       priority: 8,
     })
@@ -925,7 +925,7 @@ function generateAdaptiveRecommendations(
       actionItems: [
         `Prioritize: ${patternNames}`,
         "Skip low-priority patterns for now",
-        "Use video tutorials for faster pattern recognition",
+        "Run focused Practice scenarios for each pattern to speed up recognition",
       ],
     })
   }
