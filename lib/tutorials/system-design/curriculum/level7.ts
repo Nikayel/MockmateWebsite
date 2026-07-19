@@ -195,7 +195,7 @@ The thing that makes traces work across service boundaries is **context propagat
 const timeoutsRetriesTeach = `
 ## The self-inflicted DDoS
 
-The single most common way a distributed system takes itself down is not a hardware failure. It is a small blip amplified by its own retry logic into a self-inflicted DDoS. This lesson is the defense.
+Level 1's resilience-primitives lesson introduced the four call-policy parts (timeouts, retries, circuit breakers, isolation) as a first pass; this lesson is the deep walkthrough of the first two. The single most common way a distributed system takes itself down is not a hardware failure. It is a small blip amplified by its own retry logic into a self-inflicted DDoS, and this lesson is the defense.
 
 ## Every call needs a timeout
 
@@ -215,7 +215,7 @@ Retrying immediately after a failure is how a blip becomes an outage: the downst
 
 The exponential part (\`base * 2^attempt\`) spaces retries further apart as failures persist. The \`cap\` bounds the worst-case wait. The **jitter** (randomizing within the window) is the part juniors omit and the part that matters most: without it, a thousand clients that failed at the same instant all retry at the same instant, recreating the thundering herd. AWS's published guidance is full jitter, exactly the form above.
 
-**Cap total retries with a retry budget.** Even with backoff, blind retries multiply load. A retry budget limits retries to a small fraction of live traffic, for example "retries may not exceed 10% of successful requests in the last 10 seconds." When the downstream is broadly failing, the budget exhausts and you stop retrying, which is correct: retrying a dead dependency just delays recovery.
+**Cap total retries with a retry budget.** Even with backoff, blind retries multiply load. Level 1 introduced this guard as the rough "retries stay under ~10% of request volume"; in production you enforce it as a live ratio, for example retries may not exceed 5% of successful requests over a rolling 10-second window, tightened further for expensive downstreams. When the downstream is broadly failing, the budget exhausts and you stop retrying, which is correct: retrying a dead dependency just delays recovery.
 
 **Only retry idempotent operations.** A GET is safe. A POST that charges a card is not: a timeout does not tell you whether the charge happened, so a naive retry can double-charge. Make writes safe to retry with an idempotency key the server dedupes on.
 
@@ -227,7 +227,7 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
 const circuitBreakersTeach = `
 ## Three patterns of failure isolation
 
-Timeouts and retries stop one slow call from hanging forever. But if a dependency is broadly failing, you want to stop calling it at all, contain the damage to one part of your service, and serve something useful instead of an error. That is circuit breakers, bulkheads, and fallbacks: the three patterns of failure isolation.
+Level 1's resilience-primitives lesson sketched the circuit-breaker state machine (Closed to Open to Half-Open) as a first pass. This lesson credits that and goes past the single breaker to what senior answers actually hinge on: how the breaker and the bulkhead cover different halves of the same failure, and how a service mesh configures both. Timeouts and retries stop one slow call from hanging forever; when a dependency is broadly failing you instead want to stop calling it at all, contain the damage to one part of your service, and serve something useful instead of an error. That is circuit breakers, bulkheads, and fallbacks: the three patterns of failure isolation.
 
 ## Circuit breaker
 
@@ -244,7 +244,7 @@ A circuit breaker is a state machine wrapped around a dependency that trips like
 \`\`\`
 
 - **Closed** is normal: requests flow, and the breaker counts failures over a rolling window.
-- **Open** trips when the failure rate crosses a threshold (for example >50% of the last 20 requests failed). In Open state calls **fail immediately** without touching the dependency. This does two things: it protects your callers from waiting on timeouts, and it sheds all load off the sick dependency so it can recover instead of being pinned down.
+- **Open** trips when the failure rate crosses a threshold over a rolling window. Level 1 used the canonical "half of the last 20 calls"; real configs harden that by also gating on a minimum request volume (so a 2-of-3 blip cannot trip a breaker) and by pairing the error-rate threshold with a slow-call-rate threshold (so climbing latency alone can trip it before errors even appear). In Open state calls **fail immediately** without touching the dependency, which protects your callers from waiting on timeouts and sheds all load off the sick dependency so it can recover instead of being pinned down.
 - **Half-Open** starts after a cooldown (say 5 seconds). The breaker lets a small number of trial requests through. If they succeed, it closes; if they fail, it re-opens and waits again.
 
 The key insight is that failing fast is a feature. A breaker in Open state gives an instant error, which is far better than a client waiting 500 ms for a timeout on every request, and it is the only thing that lets an overloaded dependency drain its queue.
@@ -265,23 +265,15 @@ Fallbacks answer "what do we serve when the dependency is unavailable?" Options,
 const loadSheddingDegradationTeach = `
 ## Load shedding protects you from too many clients
 
-Circuit breakers protect you from a sick *dependency*. Load shedding protects you from too many *clients*. When demand exceeds capacity, you have two choices: try to serve everyone and serve no one (collapse), or deliberately reject some requests so the rest succeed. Controlled partial service beats total collapse, every time.
+Levels 1 and 4 already covered the shedding mechanics (reject early at the edge with 429/503, bound every queue, prioritize by request class, discover the limit with adaptive concurrency); this lesson recaps those in one pass and leads with the two ideas that decide whether shedding actually saves you: goodput versus throughput, and metastable failure. Circuit breakers protect you from a sick *dependency*; load shedding protects you from too many *clients*. When demand exceeds capacity you have two choices: try to serve everyone and serve no one (collapse), or deliberately reject some requests so the rest succeed. Controlled partial service beats total collapse, every time.
 
 ## Goodput, not throughput
 
 Throughput is requests you process; goodput is requests you process *successfully and in time*. Under overload these diverge sharply. Imagine a service that maxes out at 10k QPS of goodput. Push 20k QPS at it with no shedding and throughput climbs while goodput *falls*, because the machine spends its CPU on context switches, GC, and requests that will time out before the client sees them. You are doing 20k QPS of work and delivering maybe 3k useful responses. The extra 17k is pure waste that actively harms the 3k. Maximizing goodput means throwing away the doomed work early so the machine's capacity goes to requests that can actually complete.
 
-## Shed early and cheaply, at the edge
+## The mechanics, recapped in one pass
 
-The cost of a rejected request should be tiny. Rejecting at the load balancer or the front door, before you have parsed the body, hit the database, or spun up expensive work, costs almost nothing and frees capacity for real work. Rejecting *after* you have done the expensive part is nearly useless: you already paid. Return \`429 Too Many Requests\` or \`503 Service Unavailable\` with a \`Retry-After\` header so well-behaved clients back off instead of hammering.
-
-## Prioritize by request class
-
-Not all requests are equal. Shed low-value traffic first and protect high-value traffic: reject prefetch and speculative requests before real user actions; protect logged-in checkout over anonymous browsing; protect a paying customer's writes over a background batch job. This requires tagging requests with a criticality/class at the edge (a header or token claim) so the shedder knows what to drop.
-
-## Admission control beats unbounded queues
-
-The intuitive fix for overload is "add a bigger queue." It is a trap. A large queue does not add capacity; it adds *latency*. Requests sit in the queue past their deadline, so by the time you process them the client has already given up and retried, and you do work whose result nobody wants. Bounded queues plus concurrency limits (only N requests in flight at once, reject the rest) are the correct tool. Adaptive concurrency limits (as in Netflix's \`concurrency-limits\` library, a TCP-Vegas-style controller) find the right N automatically by watching latency.
+Levels 1 and 4 own the how, so this is only the recap. Shed at the edge with \`429 Too Many Requests\` or \`503 Service Unavailable\` plus a \`Retry-After\` header before you spend work on a request; prioritize by request class so prefetch and batch jobs die before checkout and paying-customer writes; and cap in-flight work with bounded queues and adaptive concurrency limits (a TCP-Vegas-style controller such as Netflix's \`concurrency-limits\`) rather than a bigger queue, which adds only latency and eventually an OOM. With those assumed, the rest of this lesson is *why* they work: goodput, and the metastable trap they exist to break.
 
 ## Metastable failures
 
