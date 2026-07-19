@@ -429,8 +429,10 @@ export function calculateTechnicalScore(components: TechnicalScoreComponents): n
 
 /**
  * Calculate technical/mastery score from score breakdown (legacy format)
- * This is a fallback for when objective metrics (correctness, time, independence)
- * are not available, using the AI-evaluated breakdown instead.
+ * This is the READ-TIME fallback for legacy documents that predate the Technical = Mastery
+ * unification: when a persisted technical_score is absent, derive one from the AI-evaluated
+ * breakdown. New writes persist the mastery score directly (app/api/feedback/persist), so this
+ * formula must not be used on the live write path.
  *
  * Uses a different weight distribution since breakdown scores are different metrics:
  * - Code Quality: 60% (closest proxy for correctness)
