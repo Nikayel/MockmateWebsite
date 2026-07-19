@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { apiRateLimit } from "@/lib/rate-limit"
 import { verifyToken } from "@/lib/admin/rbac"
 import { Timestamp, FieldValue } from "firebase-admin/firestore"
 import { logger } from "@/lib/logger"
@@ -239,6 +240,11 @@ export async function GET(request: NextRequest) {
 // POST - Dismiss an announcement
 export async function POST(request: NextRequest) {
   try {
+    // Dismissals work signed-out, so throttle per IP to keep the dismissal
+    // counters honest (API-ABUSE-1).
+    const rateLimitResult = await apiRateLimit(request)
+    if (rateLimitResult) return rateLimitResult
+
     if (!adminDb) {
       return NextResponse.json({ success: true })
     }
