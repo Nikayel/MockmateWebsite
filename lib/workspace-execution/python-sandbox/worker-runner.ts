@@ -11,6 +11,8 @@ interface PythonWorkerData {
   code?: string
   files?: { path: string; content: string }[]
   entrypoint?: string
+  /** Pre-warm ping: boot Pyodide, execute nothing (see warm-state's prewarmPythonRuntime). */
+  warm?: boolean
 }
 
 interface PendingPythonRun {
@@ -34,6 +36,9 @@ const EXEC_TIMEOUT_MESSAGE = "Code execution timed out. Try checking for infinit
 
 let pythonWorker: Worker | null = null
 let pendingRun: PendingPythonRun | null = null
+// The single worker does one job at a time, so runs queue behind each other on this chain (see
+// runPythonInWorker). Concurrent callers WAIT their turn instead of failing with "already running".
+let runQueue: Promise<unknown> = Promise.resolve()
 
 function resetPythonWorker(): void {
   if (pythonWorker) {
@@ -127,17 +132,32 @@ export function runPythonInWorker(
   execTimeoutMs = DEFAULT_EXEC_TIMEOUT_MS,
   bootTimeoutMs = DEFAULT_BOOT_TIMEOUT_MS
 ): Promise<PythonWorkerRunResult> {
+  if (typeof window === "undefined") {
+    return Promise.resolve({
+      success: false,
+      logs: [],
+      error: "Execution environment is not browser",
+    })
+  }
+
+  // One worker, one job at a time: queue each run behind the previous so concurrent callers — the
+  // prewarm ping, an interview Run, a graded lesson run — WAIT their turn instead of failing with
+  // "already running". A first Run issued while the pre-warm boots naturally waits for it.
+  const task = runQueue.then(() => startPythonRun(workerData, execTimeoutMs, bootTimeoutMs))
+  // Keep the chain alive regardless of any individual run's outcome (startPythonRun never rejects).
+  runQueue = task.then(
+    () => undefined,
+    () => undefined
+  )
+  return task
+}
+
+function startPythonRun(
+  workerData: string | PythonWorkerData,
+  execTimeoutMs: number,
+  bootTimeoutMs: number
+): Promise<PythonWorkerRunResult> {
   return new Promise((resolve) => {
-    if (typeof window === "undefined") {
-      resolve({ success: false, logs: [], error: "Execution environment is not browser" })
-      return
-    }
-
-    if (pendingRun) {
-      resolve({ success: false, logs: [], error: "Python execution is already running" })
-      return
-    }
-
     let worker: Worker
     try {
       worker = getPythonWorker()

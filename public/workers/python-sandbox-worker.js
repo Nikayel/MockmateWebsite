@@ -109,11 +109,18 @@ function ensureParentDirectories(pyodide, path) {
 }
 
 self.onmessage = async function (event) {
-  const { code, files, entrypoint } = event.data
+  const { code, files, entrypoint, warm } = event.data
   const logs = []
 
   try {
     const pyodide = await loadPyodideRuntime()
+
+    // Pre-warm ping: boot the runtime eagerly on workspace mount, then return before
+    // executing anything so the user's first real Run never pays the cold start.
+    if (warm) {
+      self.postMessage({ type: "result", success: true, logs: [] })
+      return
+    }
 
     pyodide.setStdout({
       batched: (message) => {
