@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "CodeSparring vs Interviewing.io | Mock Interview Platform Comparison",
   description:
     "Compare CodeSparring and Interviewing.io. Discover the pros and cons of AI mock interviews versus human interviewers for software engineering prep.",
+  alternates: {
+    canonical: "/codesparring-vs-interviewing-io",
+  },
 }
 
 export default function VsInterviewingIoPage() {
