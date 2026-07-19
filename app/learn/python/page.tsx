@@ -27,7 +27,7 @@ export default function LearnPythonPage() {
             Learn Python
           </p>
           <h1 className="text-foreground mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            The way real engineers actually learn a language
+            Python, the way real engineers actually learn it
           </h1>
           <p className="text-muted-foreground mx-auto mt-3 max-w-xl text-pretty">
             Pick a level, then learn every concept the same way: read it, write it, and practice it
