@@ -18,7 +18,7 @@ export interface ExerciseBriefMeta {
   eyebrow: string
   /** Plain-language title, e.g. "Your turn" / "Make it stick". */
   title: string
-  /** Practice only: show the "resurfaces in 3 days" spaced-repetition chip. */
+  /** Practice only: show the "repetition locks it in" nudge chip. */
   resurfaces?: boolean
 }
 
@@ -57,7 +57,7 @@ export function ExerciseBrief({
       {resurfaces && (
         <span className="border-accent/30 bg-accent/[0.08] text-accent-strong inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium">
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-          Resurfaces in 3 days to lock it in
+          Repetition locks it in
         </span>
       )}
 
