@@ -198,13 +198,8 @@ Return JSON only:
       const complexityAccurate = parsed.complexityAccurate ?? false
       const edgeCasesConsidered = parsed.edgeCasesConsidered ?? false
 
-      // Graduated communication score based on detected signals (not binary 60/30)
-      let communicationScore = 30
-      if (approachExplained) communicationScore += 30
-      if (complexityDiscussed) communicationScore += complexityAccurate ? 20 : 10
-      if (edgeCasesConsidered) communicationScore += 10
-      communicationScore = Math.min(100, communicationScore)
-
+      // The canonical scoring path (calculateValidatedScores) derives communication from these
+      // signals, so validateConversationEdge no longer computes its own graduated score.
       return {
         ...defaultResult,
         approachExplained,
@@ -214,7 +209,6 @@ Return JSON only:
         complexityAccurate,
         edgeCasesConsidered,
         statedComplexity: parsed.statedComplexity ?? null,
-        communicationScore,
       }
     }
   } catch {
