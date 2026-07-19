@@ -45,7 +45,7 @@ engine*, not a second engine. This folder is the planning + authoring pack; it m
 | L8 | **Security, Privacy & Multi-tenancy** | 5 | 16 | Secure a system: authn/authz, encryption/secrets, abuse defense, compliance/PII, tenant isolation, breach response. |
 | L9 | **Modern Architecture & Delivery** | 5 | 16 | Choose modern architecture and delivery: services, containers/mesh, serverless/edge, FinOps, OLTP vs OLAP. |
 | L10 | **Applied Case Studies** | 5 | 28 | Design complete end-to-end systems (the canon of "design X" problems) integrating every prior level. |
-| L11 | **Modern & Specialized Systems** | 4 | 15 | Design modern specialized systems: ML platforms, LLM/GenAI infra, real-time analytics, global data, IoT. |
+| L11 | **Specialized & Frontier Systems** | 4 | 15 | Design specialized and frontier systems: ML platforms, LLM/GenAI infra, real-time analytics, global data, IoT. |
 
 **12 levels, 56 modules, 208 lessons total.** Every module carries both real engineering knowledge and
 interview readiness. There is no code execution and no auto-grading anywhere in the course — the whole
@@ -85,9 +85,15 @@ Mirrors how the SQL and Python courses were built (an engineer, then a curriculu
 
 ## Status
 
-Planning + authored-content pack (docs only — no application code changed yet). The `CURRICULUM-MAP.md`
-and `curriculum-map.json` define the full 208-lesson contract; the remaining pack files
-(`ARCHITECTURE.md`, `RESEARCH.md`, `CONTENT.md`, the two AGENT runbooks) are the plan for shipping it.
-Before the course is live, the engineer must build the answer panel + persistence, and each lesson must
-be authored into a `DesignLesson` and verified to render Learn → Apply → reveal correctly on the Learn
-engine.
+**Shipped.** The full course is live on the Learn engine: 12 levels, 56 modules, 208 lessons, authored
+as `DesignLesson` objects in `lib/tutorials/system-design/curriculum/` (`level0.ts` through
+`level11.ts`, wired through `index.ts` and `registry.ts`) and served by the standard content tree,
+progress collection, and 3-column Lesson Player. The free-response answer panel plus answer persistence
+(the one genuinely new subsystem this pack specced) is built and wired, so lessons render Learn → Apply
+→ reveal end to end.
+
+This folder remains the planning and authoring pack of record. `CURRICULUM-MAP.md` and
+`curriculum-map.json` hold the 208-lesson contract with its stable lesson ids, and `ARCHITECTURE.md`,
+`RESEARCH.md`, `CONTENT.md`, and the two AGENT runbooks document how the course was specced and built.
+Ongoing work is content refinement (depth passes, de-duplication across levels, new case studies), not
+first-time delivery.
