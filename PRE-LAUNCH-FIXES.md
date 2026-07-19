@@ -104,7 +104,11 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 - **Verify:** emulator flow above + `pnpm vitest run lib/__tests__/quota-enforcement.test.ts`.
 - **Commit:** `security(quota): server-authoritative profile_quota writes`
 
-### API-IDOR-1 — `session/metrics` trusts body `sessionId` without ownership — **MEDIUM**
+### API-IDOR-1 — `session/metrics` trusts body `sessionId` without ownership — **MEDIUM** — **ALREADY FIXED (verified 2026-07-19)**
+
+> Verified in code: every non-session_start event now runs `verifySessionOwnership(sessionId, userId)`
+> (in-memory state first, `interview_sessions.user_id` fallback) and returns 403 on mismatch —
+> exactly this spec. Original text kept below for history.
 - **File:** `app/api/session/metrics/route.ts` (token verified L30–37; every branch acts
   on `body.sessionId` with no ownership check — `get_metrics` L133, `session_complete`,
   `chat_message`, `code_execution`).
@@ -123,7 +127,10 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
   owner and 403 for a different token.
 - **Commit:** `security(api): enforce session ownership on session/metrics`
 
-### API-COST-1 — `agents/recommendations` (+ `/next`) missing rate limit — **MEDIUM**
+### API-COST-1 — `agents/recommendations` (+ `/next`) missing rate limit — **MEDIUM** — **RESOLVED BY DELETION (verified 2026-07-19)**
+
+> Both routes were removed in the go-live dead-code sweep (`app/api/agents/` now contains only
+> `hints/`, which already rate-limits). Nothing to fix.
 - **Files:** `app/api/agents/recommendations/route.ts`,
   `app/api/agents/recommendations/next/route.ts`.
 - **Problem:** Both `verifyAuth` (good) but call LLM-backed generators with **no** rate
