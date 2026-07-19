@@ -198,12 +198,15 @@ async function setupMocks() {
     provider: "gemini-lite",
     latencyMs: 10,
     tokensUsed: 100,
+    tokensIn: 900,
+    tokensOut: 250,
   })
   vi.mocked(trackFeedbackGenerationServer).mockResolvedValue(undefined)
 
   return {
     generateFeedbackResponse,
     endRequestTracking,
+    trackFeedbackGenerationServer,
   }
 }
 
@@ -272,6 +275,23 @@ describe("/api/generate-feedback route", () => {
     )
     expect(generateFeedbackResponse).toHaveBeenCalledTimes(1)
     expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+  })
+
+  it("forwards provider-reported token usage to the feedback_generated event", async () => {
+    const { trackFeedbackGenerationServer } = await setupMocks()
+    const { POST } = await import("./route")
+
+    const response = await POST(createRequest(validFeedbackPayload))
+
+    expect(response.status).toBe(200)
+    expect(trackFeedbackGenerationServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-1",
+        // Measured usage from the narrative feedback call, unchanged.
+        tokensIn: 900,
+        tokensOut: 250,
+      })
+    )
   })
 
   it("ends request tracking when feedback generation fails", async () => {

@@ -97,6 +97,8 @@ async function setupMocks() {
     provider: "gemini-lite",
     latencyMs: 12,
     tokensUsed: 42,
+    tokensIn: 30,
+    tokensOut: 12,
   })
   vi.mocked(validateResponseRelevance).mockReturnValue({ valid: true, issues: [] })
   vi.mocked(trackAIChatServer).mockResolvedValue(undefined)
@@ -329,6 +331,9 @@ describe("/api/chat route", () => {
         userId: "user-1",
         interactionType: "partner",
         provider: "gemini-lite",
+        // Provider-reported usage must reach the ai_chat event unchanged.
+        tokensIn: 30,
+        tokensOut: 12,
       })
     )
     expect(endRequestTracking).toHaveBeenCalledWith("user-1")
