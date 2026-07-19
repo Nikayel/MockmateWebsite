@@ -87,7 +87,9 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                 </Button>
               </Link>
 
-              <p className="mb-2 text-xs text-gray-400">Try before you commit.</p>
+              <p className="mb-2 text-xs text-gray-400">
+                Try before you commit. Includes free Python, SQL, and System Design courses.
+              </p>
 
               <ul className="space-y-1.5 text-sm text-gray-400">
                 <li className="flex items-center gap-2">
@@ -136,7 +138,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
               <ul className="space-y-1.5 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
                   <Check className="text-accent h-3.5 w-3.5" />
-                  350+ problems/month
+                  35 sessions/month
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="text-accent h-3.5 w-3.5" />
@@ -156,7 +158,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
 
           {/* Trust - Single line */}
           <p className="mb-8 text-center text-xs text-gray-600">
-            30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta, Amazon
+            30-day money-back guarantee · Cancel anytime · Used by Palantir &amp; FAANG candidates
           </p>
         </div>
       </section>
