@@ -310,7 +310,7 @@ export type SectionStatus = "not_started" | "in_progress" | "completed"
 /**
  * Per-user, per-lesson progress. Persisted at `user_tutorial_progress/${uid}__${lessonId}`.
  * `userId` and timestamps are SERVER-owned — never trusted from the client. Course-agnostic: the
- * `lessonId` prefix (`py-` / `sql-`) namespaces the two courses in one collection.
+ * `lessonId` prefix (`py-` / `sql-` / `sd-`) namespaces all three courses in one collection.
  */
 export interface TutorialLessonProgress {
   userId: string

@@ -13,8 +13,9 @@ import { computeLevelPath, type LevelListModel } from "@/lib/tutorials/level-pat
 import type { PythonLevelId } from "@/lib/tutorials/types"
 
 /**
- * The level's lesson list, rebuilt as a guided path (not a catalog). Shared by both courses — only
- * `basePath` / `courseLabel` differ. A slim breadcrumb bar, a sticky resume-first summary rail, and a
+ * The level's lesson list, rebuilt as a guided path (not a catalog). Shared by all three courses
+ * (Python, SQL, and System Design) — only `basePath` / `courseLabel` differ. A slim breadcrumb bar, a
+ * sticky resume-first summary rail, and a
  * right column of sections whose lessons pack into an auto-fill grid. Per-lesson status, progress,
  * minutes-left, and the Continue target are all computed from the (best-effort) completion overlay.
  */
