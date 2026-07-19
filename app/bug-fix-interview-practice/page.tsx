@@ -1,10 +1,14 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "Bug-Fix Interview Practice | CodeSparring",
+  title: "Bug-Fix Interview Practice",
   description:
     "Practice debugging and bug-fix interviews with an AI interviewer. Learn to navigate existing codebases, trace errors, and apply robust fixes under pressure.",
+  alternates: {
+    canonical: "/bug-fix-interview-practice",
+  },
 }
 
 export default function BugFixInterviewPracticePage() {
@@ -57,13 +61,17 @@ export default function BugFixInterviewPracticePage() {
         <>
           <p>
             Practicing bug-fixes requires realistic scenarios. LeetCode doesn't offer this.
-            CodeSparring provides dozens of realistic bug-fix scenarios across React, Node.js,
-            Python, and more.
+            CodeSparring provides realistic bug-fix scenarios in JavaScript and Python, each with a
+            failing test you run in your browser.
           </p>
           <p>
             You'll be dropped into an editor with a broken application and an AI interviewer acting
             as your "Tech Lead." You must communicate your hypothesis, run the code, and discuss
-            your proposed fix before implementing it.
+            your proposed fix before implementing it. New to the format? Start with our{" "}
+            <Link href="/guides/how-to-practice-bug-fix-interviews">
+              guide to practicing bug-fix interviews
+            </Link>
+            .
           </p>
         </>
       ),
@@ -74,7 +82,7 @@ export default function BugFixInterviewPracticePage() {
     {
       question: "What languages are supported for bug-fix interviews?",
       answer:
-        "We support bug-fix scenarios in JavaScript, TypeScript, Python, Java, and Go, covering both frontend (React) and backend environments.",
+        "Bug-fix scenarios run in JavaScript and Python. You run the code and test suites directly in your browser and see the stack traces in real time.",
     },
     {
       question: "Do I get to run the code?",
