@@ -43,11 +43,13 @@ export const MODEL_FAMILIES = {
   'claude-sonnet-4': 'cl100k_base',
   'claude-opus-4': 'cl100k_base',
 
-  // Gemini models - cl100k_base is ~90% accurate
+  // Gemini models - cl100k_base is ~90% accurate. The live ids (see lib/ai/model-ids) must
+  // stay covered here so a model upgrade does not strand token accounting.
   'gemini-pro': 'cl100k_base',
   'gemini-1.5-pro': 'cl100k_base',
   'gemini-2.0-flash': 'cl100k_base',
   'gemini-2.5-flash': 'cl100k_base',
+  'gemini-2.5-flash-lite': 'cl100k_base',
 
   // DeepSeek - cl100k_base approximation
   'deepseek': 'cl100k_base',
@@ -242,6 +244,7 @@ export const MODEL_CONTEXT_LIMITS = {
   'gemini-1.5-pro': 2000000,
   'gemini-2.0-flash': 1000000,
   'gemini-2.5-flash': 1000000,
+  'gemini-2.5-flash-lite': 1000000,
   'deepseek': 128000,
   'deepseek-chat': 128000,
   'deepseek-coder': 128000,
