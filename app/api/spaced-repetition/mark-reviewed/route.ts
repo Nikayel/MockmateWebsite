@@ -10,11 +10,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { requireTierForUser } from "@/lib/quota-enforcement"
 import { getScenarioById, scenarios } from "@/lib/scenarios"
 import { logger } from "@/lib/logger"
 import { csrfProtection } from "@/lib/csrf"
+import { apiRateLimit } from "@/lib/rate-limit"
 import {
   updateProblemMastery,
   getAllUserProblems,
@@ -31,15 +33,21 @@ import {
 import type { Difficulty } from "@/lib/spaced-repetition"
 import type { SpacedRepetitionMasteryLevel } from "@/lib/types"
 
-interface MarkReviewedRequestBody {
-  problem_id: string
-  scenario_id: string
-}
+// scenario_id stays optional at runtime (the handler falls back to a title
+// lookup when it is absent), matching the pre-validation behavior.
+const markReviewedRequestSchema = z.object({
+  problem_id: z.string().min(1).max(256),
+  scenario_id: z.string().min(1).max(256).optional(),
+})
 
 const DEFAULT_MANUAL_REVIEW_SCORE = 75 // Assume decent performance for manual reviews
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting (shared per-IP API limit)
+    const rateLimitResponse = await apiRateLimit(request)
+    if (rateLimitResponse) return rateLimitResponse
+
     // SECURITY: CSRF protection for state-changing operation
     const csrfResult = csrfProtection(request)
     if (csrfResult) {
@@ -61,17 +69,23 @@ export async function POST(request: NextRequest) {
 
     const userId = authResult.userId
 
-    // Parse request body
-    const body: MarkReviewedRequestBody = await request.json()
-    const { problem_id, scenario_id } = body
-
-    // Validate required fields
-    if (!problem_id) {
+    // Parse + validate request body
+    const parsed = markReviewedRequestSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
       return NextResponse.json(
-        { error: "Bad Request", message: "problem_id is required" },
+        {
+          error: "Bad Request",
+          message: issue
+            ? `${issue.path.join(".") || "body"}: ${issue.message}`
+            : "Invalid request body",
+        },
         { status: 400 }
       )
     }
+
+    const { problem_id } = parsed.data
+    const scenario_id = parsed.data.scenario_id ?? ""
 
     // Get existing problem mastery
     const problems = await getAllUserProblems(userId)
@@ -220,10 +234,10 @@ export async function POST(request: NextRequest) {
         review_count: updatedMastery.review_count,
       },
     })
-  } catch (error: any) {
+  } catch (error) {
     logger.error("Error marking problem as reviewed", { error })
     return NextResponse.json(
-      { error: "Internal Server Error", message: error.message },
+      { error: "Internal Server Error", message: "Failed to mark problem as reviewed" },
       { status: 500 }
     )
   }
