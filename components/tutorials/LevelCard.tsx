@@ -1,16 +1,18 @@
 import { Check } from "lucide-react"
-import type { PythonLevel, PythonLevelId } from "@/lib/tutorials/types"
+import type { PythonLevelId } from "@/lib/tutorials/types"
+import type { PathLevelSummary } from "@/lib/tutorials/level-path"
 
 /**
  * One node on the Python Path (HANDOFF §B). A clickable card that *selects* its level — the sticky
- * preview reacts; the preview's CTA does the navigation. Models the loop deepening across levels via
- * phase badges, and overlays completion (a clay-filled check + an "n / total done" line) hydrated
- * from saved progress. The numbered spine + connector live in `LevelSelector`.
+ * preview reacts; the preview's CTA does the navigation. Every level runs the full Read/Apply/Practice
+ * loop (L3/L4 add a Files phase), shown as phase badges, and overlays completion (a clay-filled check +
+ * an "n / total done" line) hydrated from saved progress. The numbered spine + connector live in
+ * `LevelSelector`.
  */
 const LEVEL_PHASES: Record<PythonLevelId, string[]> = {
-  1: ["Read"],
-  2: ["Read", "Apply"],
-  3: ["Read", "Apply", "Practice"],
+  1: ["Read", "Apply", "Practice"],
+  2: ["Read", "Apply", "Practice"],
+  3: ["Read", "Apply", "Practice", "Files"],
   4: ["Read", "Apply", "Practice", "Files"],
 }
 
@@ -21,13 +23,13 @@ export function LevelCard({
   completedCount,
   onSelect,
 }: {
-  level: PythonLevel
+  level: PathLevelSummary<PythonLevelId>
   isSelected: boolean
   isCompleted: boolean
   completedCount: number
-  onSelect: (level: PythonLevel) => void
+  onSelect: (level: PathLevelSummary<PythonLevelId>) => void
 }) {
-  const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
+  const lessonCount = level.lessons.length
   const phases = LEVEL_PHASES[level.id]
   const hasProgress = completedCount > 0
 
