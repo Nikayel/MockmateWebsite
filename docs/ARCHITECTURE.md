@@ -446,7 +446,7 @@ The vectorization pipeline lives under `lib/rag/vectorization/`. It turns struct
 ### HTTP surface
 
 - **`POST /api/rag`** — Action-based JSON body (`action`: hints, similar problems, store solution, recommendations, …); some actions require auth (see `app/api/rag/route.ts`).
-- **`/api/rag/v2`**, **`/api/rag/health`** — Alternate or health paths.
+- **`/api/rag/v2`** — Alternate RAG path.
 
 ### Knowledge not in the vector index
 

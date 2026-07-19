@@ -57,8 +57,8 @@ Routes are grouped under `app/api/`. The following mirrors the product domains; 
 | Chat / interviewer | `chat/` | `lib/ai-providers.ts`, `lib/interview/`, `lib/rag/` |
 | Code execution | `execute/` | `lib/piston.ts`, validators |
 | Feedback | `generate-feedback/`, `feedback/*` | `lib/feedback/` |
-| Hints & agents | `agents/hints/`, `agents/recommendations/` | `lib/agents/` |
-| RAG | `rag/`, `rag/v2/`, `rag/health/` | `lib/rag/` |
+| Hints & agents | `agents/hints/` | `lib/agents/` |
+| RAG | `rag/`, `rag/v2/` | `lib/rag/` |
 | Complexity | `analyze-complexity/` | `lib/interview/` |
 
 ### Learning
@@ -100,7 +100,7 @@ Routes are grouped under `app/api/`. The following mirrors the product domains; 
 | Users, analytics, revenue | `admin/users`, `admin/analytics`, `admin/revenue`, … | RBAC-protected |
 | RAG & AI ops | `admin/rag-health`, `admin/feedback`, `admin/usage`, … | Cost/quality monitoring |
 | Feature flags & audit | `admin/feature-flags`, `admin/audit` | Controlled rollouts & compliance |
-| Maintenance | `admin/cleanup-orphans`, `vectorize-*`, `seed-vectors` | Data hygiene / indexing |
+| Maintenance | `vectorize-session/` | Session vectorization for RAG memory |
 
 ### Scheduled jobs
 
