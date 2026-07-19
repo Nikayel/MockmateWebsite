@@ -3,9 +3,9 @@
  *
  * User-facing endpoint for submitting NPS responses.
  *
- * UNWIRED: no NPS survey UI currently renders or posts to this endpoint, so the
- * admin/nps dashboard reads an always-empty dataset. Keep-vs-delete is a product
- * decision deferred to the owner; do not build on this until a survey surface exists.
+ * Wired to the in-app NPS survey (components/nps/NpsSurvey.tsx), mounted on the dashboard:
+ * GET reports whether the user is due (shouldShowNPSSurvey), POST records the 0-10 score plus
+ * optional feedback. Responses feed the admin Growth NPS dashboard.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
