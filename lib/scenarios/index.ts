@@ -318,43 +318,6 @@ export async function getScenariosByType(type: ScenarioType): Promise<Scenario[]
 }
 
 /**
- * Get scenarios by pattern (DSA only, lazy loads that pattern's module)
- */
-export async function getScenariosByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
-  return loadDSAByPattern(pattern)
-}
-
-/**
- * Get random scenario by criteria
- */
-export async function getRandomScenario(criteria?: {
-  type?: ScenarioType
-  difficulty?: DifficultyLevel
-  pattern?: DSAPattern
-  companies?: Company[]
-}): Promise<Scenario | undefined> {
-  let candidates = getAllScenarioMeta()
-
-  if (criteria?.type) {
-    candidates = candidates.filter((m) => m.type === criteria.type)
-  }
-  if (criteria?.difficulty) {
-    candidates = candidates.filter((m) => m.difficulty === criteria.difficulty)
-  }
-  if (criteria?.pattern) {
-    candidates = candidates.filter((m) => m.pattern === criteria.pattern)
-  }
-  if (criteria?.companies?.length) {
-    candidates = candidates.filter((m) => m.companies.some((c) => criteria.companies!.includes(c)))
-  }
-
-  if (candidates.length === 0) return undefined
-
-  const randomMeta = candidates[Math.floor(Math.random() * candidates.length)]
-  return getScenarioById(randomMeta.id)
-}
-
-/**
  * Initialize scenario registry from metadata
  * Call this once at app startup
  */
@@ -362,20 +325,4 @@ export async function initializeScenarioRegistry(): Promise<void> {
   // Load metadata from the metadata file (lightweight)
   const { scenarioMetadata } = await import("./metadata")
   scenarioMetadata.forEach((meta) => registerScenarioMeta(meta))
-}
-
-/**
- * Legacy compatibility: Get all scenarios synchronously
- * WARNING: This loads ALL scenarios into memory. Use lazy loading APIs instead.
- * @deprecated Use getScenarioById or getScenariosByType for better performance
- */
-export async function getAllScenarios(): Promise<Scenario[]> {
-  const [dsa, bugfix, systemDesign, addFunc] = await Promise.all([
-    getScenariosByType("dsa"),
-    getScenariosByType("bugfix"),
-    getScenariosByType("system-design"),
-    getScenariosByType("add-functionality"),
-  ])
-
-  return [...dsa, ...bugfix, ...systemDesign, ...addFunc]
 }
