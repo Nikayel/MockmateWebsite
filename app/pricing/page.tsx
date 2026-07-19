@@ -19,7 +19,7 @@ const faqs = [
   {
     question: "Is there a free trial?",
     answer:
-      "The free plan gives you 20+ problems with unlimited practice and 8 full interview sessions per month. Full AI feedback included. No credit card required.",
+      "The free plan gives you 20+ problems with unlimited practice and 8 full interview sessions per month. Full AI feedback included, plus free Python, SQL, and System Design courses to build your fundamentals. No credit card required.",
   },
   {
     question: "How does billing work?",
