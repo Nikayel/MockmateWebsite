@@ -82,7 +82,7 @@ Routes are grouped under `app/api/`. The following mirrors the product domains; 
 | Area | Example routes | Notes |
 |------|----------------|--------|
 | Stripe | `create-checkout/`, `customer-portal/`, `webhook/stripe/` | Checkout, portal, webhook-driven entitlement sync |
-| Referrals & promo | `referral/`, `promo-code/` | Growth mechanics |
+| Referrals | `referral/` | Growth mechanics (Stripe Checkout owns promo entry) |
 | NPS | `nps/` | Product feedback |
 
 ### Platform & voice
