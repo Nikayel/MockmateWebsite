@@ -46,6 +46,7 @@ import {
   BUGFIX_SEMANTIC_NEUTRAL,
 } from "@/lib/bugfix/semantic-scorer"
 import { loadSealedPack } from "@/lib/scenarios/sealed/registry.server"
+import { loadSealedLegacyBugfix } from "@/lib/scenarios/sealed/legacy-registry.server"
 import type {
   BugfixEvidenceEvent,
   BugfixEvidenceSummary,
@@ -223,13 +224,20 @@ export async function POST(request: NextRequest) {
         (m) => m.role === "user" && m.content.trim().length > 0
       )
 
-      // Pack debrief seal (INTERVIEWER_SPEC.md DEBRIEF): for stdout-oracle packs the
-      // grading rubric + ground truth are SERVER-LOADED from the sealed module and
-      // override anything the client sent. loadSealedPack returns null for every
-      // non-pack scenario, so legacy assert-based feedback is unchanged. This is the
-      // only path where sealed solution content reaches an LLM.
+      // Sealed grading content (SERVER-LOADED, never client-trusted). Two sources:
+      //   - stdout-oracle packs: rubric + ground truth from the sealed pack module.
+      //   - legacy assert-based bugfix (the locked bank of 10): root cause, ground
+      //     truth, and rubric now live in the sealed legacy registry instead of the
+      //     client bundle, so we source them here exactly as the client used to post
+      //     them (scoring behavior is preserved byte-for-byte).
+      // Both return null for any other scenario, so non-bugfix feedback is unchanged.
+      // This is the only path where sealed solution content reaches an LLM.
       let sealedRubric: string[] | null = null
       let sealedGroundTruth: string | null = null
+      // The legacy rubric ALSO feeds the feedback-generation prompt below (the client
+      // no longer posts it). Packs keep their prior behavior: the prompt still uses the
+      // client-sent generic pack rubric, not the sealed debrief rubric.
+      let sealedLegacyRubric: string[] | null = null
       if (scenarioType === "bugfix" && typeof scenarioId === "string" && scenarioId) {
         try {
           const sealed = await loadSealedPack(scenarioId)
@@ -242,6 +250,19 @@ export async function POST(request: NextRequest) {
             ]
               .filter(Boolean)
               .join(" ")
+          } else {
+            const legacy = await loadSealedLegacyBugfix(scenarioId)
+            if (legacy) {
+              sealedLegacyRubric =
+                legacy.rootCauseRubric && legacy.rootCauseRubric.length > 0
+                  ? legacy.rootCauseRubric
+                  : null
+              sealedRubric = sealedLegacyRubric
+              sealedGroundTruth =
+                typeof legacy.bugDescription === "string" && legacy.bugDescription
+                  ? legacy.bugDescription
+                  : null
+            }
           }
         } catch {
           // Sealed content unavailable — fall back to the client-supplied values.
@@ -414,7 +435,10 @@ export async function POST(request: NextRequest) {
         bugfixSemanticScores,
         bugfixRootCause,
         bugfixPrevention,
-        bugfixRootCauseRubric: Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : [],
+        // Legacy scenarios: the sealed rubric (client stopped posting it). Packs:
+        // sealedLegacyRubric is null, so the client-sent generic pack rubric is used.
+        bugfixRootCauseRubric:
+          sealedLegacyRubric ?? (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
         silentNotes: finalSilentNotes,
         code,
         language,
