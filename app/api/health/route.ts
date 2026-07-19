@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { logger } from "@/lib/logger"
+import { verifyCronRequest } from "@/lib/cron-auth"
 
 interface HealthStatus {
   status: "healthy" | "degraded" | "unhealthy"
@@ -174,7 +175,15 @@ export async function GET(request: NextRequest) {
     // Return appropriate HTTP status
     const httpStatus = overallStatus === "unhealthy" ? 503 : 200
 
-    return NextResponse.json(healthStatus, {
+    // API-LEAK-2: subsystem topology and check messages are internal-only.
+    // Anonymous uptime monitors get the status word + HTTP code; the detailed
+    // body requires the internal CRON_SECRET bearer (same check as cron).
+    const internal = verifyCronRequest(request).ok
+    const responseBody = internal
+      ? healthStatus
+      : { status: overallStatus, timestamp: healthStatus.timestamp }
+
+    return NextResponse.json(responseBody, {
       status: httpStatus,
       headers: {
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -184,11 +193,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("Health check failed", { requestId, error })
 
+    // Error detail stays in logs; the body never echoes internals.
     return NextResponse.json(
       {
         status: "unhealthy",
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : "Unknown error",
       },
       {
         status: 503,
