@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "CodeSparring vs HelloInterview | AI Mock Interview Comparison",
   description:
     "Compare CodeSparring and HelloInterview. Find the best AI technical interview platform for coding, system design, and software engineering prep.",
+  alternates: {
+    canonical: "/codesparring-vs-hellointerview",
+  },
 }
 
 export default function VsHelloInterviewPage() {
@@ -71,12 +74,12 @@ export default function VsHelloInterviewPage() {
     {
       question: "Is CodeSparring cheaper than human mock interviews?",
       answer:
-        "Yes. While human mock interviews can cost $150-$250 per hour, CodeSparring provides unlimited AI mock interviews for a fraction of that cost.",
+        "Yes. While human mock interviews can cost $150-$250 per hour, CodeSparring provides AI mock interviews for a fraction of that cost.",
     },
     {
       question: "Can I practice System Design on both?",
       answer:
-        "Yes, both platforms support conversational system design scenarios, allowing you to practice architectural trade-offs.",
+        "Yes, both platforms support conversational system design scenarios, allowing you to practice architectural trade-offs. CodeSparring also includes a free System Design curriculum you can work through to build the fundamentals before you practice.",
     },
   ]
 
