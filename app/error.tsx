@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Home, RotateCcw } from "lucide-react"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/components/monitoring/report-client-error"
 
 export default function Error({
   error,
@@ -18,6 +19,13 @@ export default function Error({
       message: error.message,
       digest: error.digest,
       stack: error.stack
+    })
+    // Fire-and-forget: funnels the crash into the server logger -> Sentry
+    // (the client-side logger above cannot reach Sentry itself).
+    reportClientError({
+      message: error.message || "Route error",
+      stack: error.stack,
+      source: "react-boundary",
     })
   }, [error])
 
