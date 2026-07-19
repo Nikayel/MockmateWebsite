@@ -4,6 +4,7 @@ import React from "react"
 import { Button } from "@/components/ui/button"
 import { AlertCircle } from "lucide-react"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/components/monitoring/report-client-error"
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -28,6 +29,13 @@ export class ErrorBoundary extends React.Component<
       message: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
+    })
+    // Fire-and-forget: the client-side logger above cannot reach Sentry itself.
+    reportClientError({
+      message: error.message || "ErrorBoundary crash",
+      stack: error.stack,
+      componentStack: errorInfo.componentStack ?? undefined,
+      source: "react-boundary",
     })
   }
 
