@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { NpsSurvey } from "@/components/nps/NpsSurvey"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -833,6 +834,7 @@ export default function DashboardPage() {
       </div>
 
       <Footer />
+      <NpsSurvey />
     </main>
   )
 }
