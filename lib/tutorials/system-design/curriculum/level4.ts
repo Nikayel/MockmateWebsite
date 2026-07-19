@@ -63,27 +63,20 @@ wins for hard-to-shard stateful tiers until you are forced to shard.
 `.trim()
 
 const lbL4L7Teach = `
-## Which layer, and why it decides everything
+## Stacking L4 and L7, the production shape
 
-A load balancer sits between clients and your fleet and decides which backend gets each request. The
-first design choice is **which layer of the network stack it operates at**, and getting it wrong
-costs you either routing features or raw throughput.
+Level 1's "Load Balancing: L4 vs L7 & Health Checks" lesson introduced the two layers. This lesson
+credits that and goes to the shape real systems actually run: an L4 tier stacked in front of an L7
+fleet. A one-paragraph refresher first, because the layer choice still decides your routing features
+and throughput.
 
-An **L4 (transport-layer) load balancer** works at TCP/UDP. It sees IP addresses and ports, not the
-HTTP payload. It picks a backend, often on the very first packet, and then just forwards packets
-without parsing anything above the transport layer. Because it does almost no work per packet, it is
-**fast and high-throughput**, handles millions of connections cheaply, and works for **any**
-protocol: raw TCP, database connections, WebSockets, custom protocols. AWS **NLB**, Google
-**Maglev**, and IPVS are L4. The price is that it is **content-blind**: it cannot route by URL path,
-read a header, terminate TLS, or rate-limit.
-
-An **L7 (application-layer) load balancer** terminates the connection, parses the HTTP/gRPC request,
-and routes on **content**: path (\`/api/*\` to one pool, \`/static/*\` to another), host header,
-cookies, or method. Because it understands requests it can also do **TLS termination**, **rate
-limiting**, **request/response transformation**, retries, and rich **observability** (per-route
-latency, status codes). AWS **ALB**, **Nginx**, **HAProxy** (HTTP mode), and **Envoy** are L7. The
-price is higher latency and lower throughput per node: parsing every request and terminating TLS
-costs CPU.
+**L4 (transport-layer)** balancers work at TCP/UDP, see only IP and port, and forward packets without
+parsing the payload, so they are fast, protocol-agnostic (raw TCP, database connections, WebSockets),
+and **content-blind**: no path routing, no TLS termination, no rate limiting (AWS **NLB**, Google
+**Maglev**, IPVS). **L7 (application-layer)** balancers terminate the connection, parse HTTP/gRPC, and
+route on content (path, host header, cookie, method), which also unlocks **TLS termination**, **rate
+limiting**, request/response transformation, and rich per-route **observability**, at a higher
+per-request CPU and latency cost (AWS **ALB**, **Nginx**, **HAProxy**, **Envoy**).
 
 ### Stack them
 
@@ -98,12 +91,12 @@ client --> L4 (NLB/Maglev) --+-- L7 proxy --------------> app pool B  (/static)
   raw TCP, high throughput   +-- L7 proxy --------------> app pool C  (routing, TLS, rate limit)
 \`\`\`
 
-### The LB itself cannot be a SPOF
+### The LB tier itself must be HA
 
-If all traffic funnels through one LB box and it dies, you are down regardless of how healthy the
-fleet is. So the LB tier is made HA: **active-active** LB nodes, a **floating/virtual IP** that fails
-over (keepalived/VRRP), or **anycast** so many LB nodes share one IP and BGP routes around a dead
-one. Cloud LBs bake this in and are themselves horizontally scaled behind the scenes.
+Whichever layer you run, the LB cannot be a SPOF: if all traffic funnels through one box and it dies,
+you are down regardless of fleet health. Make the tier HA with **active-active** nodes plus a failover
+mechanism, either a **floating/virtual IP** (keepalived/VRRP) or **anycast** so many nodes share one
+IP and BGP routes around a dead one. Cloud LBs bake this in.
 
 **Interview nuance:** a common trap is choosing L4 for an HTTP API and then discovering you need
 path-based routing or TLS termination, which L4 cannot do. If the question mentions per-path routing,
@@ -119,9 +112,10 @@ anycast) so it is never a SPOF.
 const lbAlgorithmsTeach = `
 ## The rule for who gets the next request
 
-Once a load balancer has a pool of healthy backends, it needs a rule for **which one gets the next
-request**. The rule matters because the wrong one creates hotspots: some nodes melt while others sit
-idle.
+Level 1 introduced load balancing at the L4/L7 layer and health checks; this lesson goes deep on the
+piece it left open, the algorithm that picks which backend serves the next request. Once a load
+balancer has a pool of healthy backends, it needs a rule for **which one gets the next request**. The
+rule matters because the wrong one creates hotspots: some nodes melt while others sit idle.
 
 - **Round robin (RR):** hand requests out in rotation. **Weighted RR** biases toward bigger nodes. RR
   is perfect when every node is identical and every request costs about the same. It is blind to how
@@ -174,9 +168,10 @@ even load and loses that node's state when it dies, so use it deliberately.
 const healthChecksTeach = `
 ## Send traffic only to nodes that can serve it
 
-A load balancer only helps if it sends traffic to nodes that can actually serve it and stops sending
-to nodes that cannot. That is the job of **health checks**, and the subtlety is doing it without
-evicting healthy nodes or dropping in-flight work during a deploy.
+Level 1's load-balancing lesson named health checks as the mechanism that keeps a pool healthy; this
+lesson is the deep treatment. A load balancer only helps if it sends traffic to nodes that can
+actually serve it and stops sending to nodes that cannot. That is the job of **health checks**, and
+the subtlety is doing it without evicting healthy nodes or dropping in-flight work during a deploy.
 
 There are two ways to know a node is bad. **Active checks** have the LB **probe** each backend on an
 interval (an HTTP GET \`/healthz\`, a TCP connect) and mark it unhealthy after N consecutive
@@ -573,10 +568,14 @@ the outage.
 const loadSheddingBackpressureTeach = `
 ## Systems die by accepting more than they can finish
 
-Rate limiting caps a client's demand. It does nothing when total legitimate demand simply exceeds
-your capacity, or a dependency slows down and requests pile up. The goal of overload protection is
-blunt: at 150% of capacity, stay up and keep serving the most important traffic, instead of trying to
-serve everything and serving nothing.
+Level 1's "Backpressure, Flow Control & Load Shedding" lesson established the primitives: bound every
+queue, let backpressure propagate, and reject early because latency explodes as utilization nears
+100%. This lesson takes those as given and leads with the failure they exist to prevent, the
+retry-storm death spiral, plus the two senior moves for beating it, adaptive concurrency limits and
+brownout. Rate limiting caps one client's demand; overload protection is what you reach for when total
+legitimate demand simply exceeds your capacity, or a dependency slows and requests pile up. The goal
+is blunt: at 150% of capacity, stay up and keep serving the most important traffic, instead of trying
+to serve everything and serving nothing.
 
 Understand the failure mode first. A server has finite concurrency. When arrival rate exceeds
 completion rate, in-flight requests and queues grow, each request waits longer, latency climbs,
