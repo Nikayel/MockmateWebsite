@@ -56,6 +56,8 @@ interface AnalyticsMetrics {
     total: number
     series: Array<{ week: string; count: number }>
   }
+  /** All-time scored rounds via aggregate count; range-independent. Null when the count failed. */
+  scoredRoundsAllTime?: number | null
   revenue: {
     mrr: number
     arr: number
@@ -249,6 +251,16 @@ export default function AdminDashboard() {
             iconColor="text-[#c4703f]"
             sparklineData={metrics.wcsr.series.slice(-8).map((w) => w.count)}
             sparklineColor="#c4703f"
+          />
+        )}
+        {typeof metrics.scoredRoundsAllTime === "number" && (
+          <MetricCard
+            title="Scored Rounds (All-Time)"
+            value={metrics.scoredRoundsAllTime}
+            subtitle="Measured aggregate count"
+            icon={TrendingUp}
+            valueColor="text-[#c4703f]"
+            iconColor="text-[#c4703f]"
           />
         )}
       </div>

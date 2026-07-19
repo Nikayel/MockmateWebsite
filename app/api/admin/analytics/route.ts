@@ -333,6 +333,26 @@ export async function GET(request: NextRequest) {
     const currentWeekKey = format(startOfISOWeek(new Date()), "yyyy-MM-dd")
     const wcsrCurrentWeek = wcsrByWeek[currentWeekKey] || 0
 
+    // All-time scored rounds, measured with a Firestore aggregate count so the
+    // headline stays constant across time-range filters and costs one index
+    // read instead of a collection scan. feedback_status "complete" is the
+    // modern write-path signal behind isScoredCompletedSession; the legacy
+    // pre-feedback_status branch (field missing + persisted score) cannot be
+    // expressed as an aggregate filter, so this counter can only UNDERCOUNT
+    // relative to the in-memory semantics — never inflate a quoted number.
+    let scoredRoundsAllTime: number | null = null
+    try {
+      const scoredCountSnapshot = await adminDb
+        .collection("interview_sessions")
+        .where("feedback_status", "==", "complete")
+        .count()
+        .get()
+      scoredRoundsAllTime = scoredCountSnapshot.data().count
+    } catch (error) {
+      // Additive metric: never let it break the existing dashboard payload.
+      console.error("Error counting all-time scored rounds:", error)
+    }
+
     // Fetch analytics events
     let eventsSnapshot
     try {
@@ -483,6 +503,10 @@ export async function GET(request: NextRequest) {
           total: sessionCounts.scored,
           series: wcsrSeries,
         },
+        // Additive: all-time scored rounds via aggregate count (null on failure).
+        // Unlike wcsr.total (scoped to the selected time range), this is
+        // range-independent — the number the founder quotes.
+        scoredRoundsAllTime,
         revenue: {
           mrr,
           arr: calculateARR(mrr),
