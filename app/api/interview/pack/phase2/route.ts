@@ -11,6 +11,10 @@ import { loadSealedPack } from "@/lib/scenarios/sealed/registry.server"
  * fixture_patch, expected_output_v2) ONLY when the owner's session has entered PHASE2.
  * 403 before that (INTERVIEWER_SPEC.md: "Before that it is not in any bundle or
  * prompt"). Ownership is taken from the verified token, never the body.
+ *
+ * UNWIRED (tracked wire-or-quarantine decision): no client currently drives the pack
+ * state machine, so this route is unreachable in production. Kept intact for the
+ * post-launch "wire the pack interviewer" work; do not delete.
  */
 const requestSchema = z.object({
   sessionId: z.string().min(1),

@@ -15,6 +15,12 @@ import type { PackInput } from "@/lib/bugfix/packs/machine"
  * SERVER-SIDE from the submitted stdout (v1 vs the public oracle, v2 vs the sealed
  * expected_output_v2), so the client cannot forge a passing FIX/PHASE2; judgment exits
  * relay the interviewer model's advance signal; DEBRIEF needs the literal phrase.
+ *
+ * UNWIRED (tracked wire-or-quarantine decision): no client currently drives the pack
+ * 10-state machine, so this route is unreachable in production and a started pack
+ * degrades to the generic bugfix interviewer. Kept intact for the post-launch "wire the
+ * pack interviewer" work; do not delete, and do not advertise an adaptive/phase-2
+ * interviewer in any copy until it is reachable.
  */
 const requestSchema = z.object({
   sessionId: z.string().min(1),
