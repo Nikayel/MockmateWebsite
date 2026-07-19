@@ -33,7 +33,7 @@ export const LEVEL_PREVIEWS: Record<PythonLevelId, LevelPreview> = {
   },
   2: {
     filename: "idioms.py",
-    audience: "Know the basics — ready to write code, not just read it",
+    audience: "Know the basics and ready to build fluency with the core idioms",
     sample: [
       [c("# read a concept, then write it yourself")],
       [k("def "), fn("normalize"), p("(name: "), fn("str"), p(") -> "), fn("str"), p(":")],
