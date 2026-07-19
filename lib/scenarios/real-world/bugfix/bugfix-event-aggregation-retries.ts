@@ -12,23 +12,6 @@ const starter = `def aggregate_events(events):
     return totals
 `
 
-const reference = `def aggregate_events(events):
-    totals = {}
-    seen = set()
-    for event in sorted(events, key=lambda item: item.get("occurred_at", 0)):
-        event_type = event["type"]
-        if event_type not in ("sent", "opened"):
-            continue
-        account_id = event["account_id"]
-        dedupe_key = (account_id, event.get("id"))
-        if dedupe_key in seen:
-            continue
-        seen.add(dedupe_key)
-        totals.setdefault(account_id, {"sent": 0, "opened": 0})
-        totals[account_id][event_type] += event.get("count", 1)
-    return totals
-`
-
 const reportingHelper = `def compact_totals(totals):
     return {account_id: data for account_id, data in sorted(totals.items())}
 `
@@ -179,10 +162,7 @@ Read the codebase files, run the tests, and make the smallest fix so an account'
   },
   expectedBehavior:
     "Each real event contributes to its account's totals exactly once, regardless of how many times the queue redelivers it or the order batches arrive in. Distinct events all count, including the same id seen for two different accounts.",
-  bugDescription:
-    "The aggregator sums every delivered event with no dedup, so at-least-once redeliveries double-count an account's totals. The dedup must be scoped per account: event ids are only unique within an account, so deduping by id alone would silently drop a second account's event that happens to share an id.",
-  groundTruth:
-    "Root cause: aggregate_events sums every event it is handed and never dedups, so a redelivered event is counted again and inflates the account whose events happened to be retried. Fix: dedup on the identity that makes two deliveries the same event, which is (account_id, id) rather than id alone, because ids are only unique within an account. Survival story: with exactly-once delivery the code was correct, so it passed review; the at-least-once migration is what made redeliveries possible. Naive fix trap: deduping by id alone passes the retry tests but silently drops a legitimate second-account event that shares an id, so it fails the cross-account case. Red herrings, all reachable and provably innocent: (1) the sort by occurred_at handles out-of-order delivery and is correct but is not the fix, since ordering alone never removes a duplicate; (2) skipping unknown event types (e.g. 'bounced') is intended and shared by the correct code; (3) count defaulting to 1 and buckets auto-created for a churned or first-seen account are both intended behavior, not the bug.",
+  bugDescription: "",
   hints: [
     "One account is inflated and the others are fine. Pull that account's raw events and compare the counted total against the number of distinct events you actually see.",
     "The same delivery can arrive more than once. Look at what distinguishes a genuine second event from a redelivery of the first, using only the fields on each event.",
@@ -216,12 +196,6 @@ Read the codebase files, run the tests, and make the smallest fix so an account'
     "hypothesis",
     "minimal patch",
     "verification",
-  ],
-  rootCauseRubric: [
-    "Identifies that the aggregator never dedups redelivered events under at-least-once delivery.",
-    "Scopes the dedup identity to the account, not the id alone, and explains why a shared id is two real events.",
-    "Rules out the sort, the unknown-type skip, and the count default as innocent with evidence.",
-    "Names a regression guard such as a cross-account shared-id test alongside the retry test.",
   ],
   workspace: {
     language: "python",
@@ -285,14 +259,6 @@ The reporting job rolls raw delivery events into per-account totals for the cust
         hidden: true,
         content: runner,
         description: "Hidden workspace runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "src/event_aggregation.py",
-        role: "editable",
-        language: "python",
-        content: reference,
       },
     ],
   },

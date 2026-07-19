@@ -60,49 +60,6 @@ def total_pages_read(user_id):
     return sum(pages_by_book[event.book_id] for event in events)
 `
 
-const mirrorStatsServiceFixed = `from datetime import date, timedelta
-
-from app.seed import BOOKS
-from app.services.reading_service import get_reading_history
-
-
-def calculate_streak(user_id, today=None):
-    """Return the user's current reading streak: the number of consecutive
-    calendar days, ending on the given day, on which they finished at least one book.
-
-    Books that are still in progress never count toward the streak.
-    """
-    if today is None:
-        today = date.today()
-    events = get_reading_history(user_id)
-    finished_days = {event.finished_at for event in events}
-    streak = 0
-    day = today
-    while day in finished_days:
-        streak += 1
-        day = day - timedelta(days=1)
-    return streak
-
-
-def books_this_month(user_id, today=None):
-    """Count how many books the user finished in the given day's calendar month."""
-    if today is None:
-        today = date.today()
-    events = get_reading_history(user_id)
-    return sum(
-        1
-        for event in events
-        if event.finished_at.year == today.year and event.finished_at.month == today.month
-    )
-
-
-def total_pages_read(user_id):
-    """Sum the page counts of every book the user has finished."""
-    pages_by_book = {book.id: book.pages for book in BOOKS}
-    events = get_reading_history(user_id)
-    return sum(pages_by_book[event.book_id] for event in events)
-`
-
 const mirrorReadingService = `from app.seed import READING_EVENTS
 
 
@@ -117,22 +74,6 @@ def get_reading_history(user_id):
         if event.user_id == user_id and event.finished_at is not None
     ]
     return sorted(finished, key=lambda event: event.started_at, reverse=True)
-`
-
-const mirrorReadingServiceFixed = `from app.seed import READING_EVENTS
-
-
-def get_reading_history(user_id):
-    """Return the user's finished reading events, most recently finished first.
-
-    Books that are still in progress (no finish date) are excluded.
-    """
-    finished = [
-        event
-        for event in READING_EVENTS
-        if event.user_id == user_id and event.finished_at is not None
-    ]
-    return sorted(finished, key=lambda event: event.finished_at, reverse=True)
 `
 
 const mirrorModels = `from dataclasses import dataclass
@@ -513,28 +454,28 @@ they **finish** it, and the app shows a few stats on each member's profile.
 
 ## Stats and what they mean
 
-- **Reading streak** — the number of consecutive calendar days, ending today,
+- **Reading streak**: the number of consecutive calendar days, ending today,
   on which the member **finished** at least one book. A book that is still in
   progress never counts toward the streak.
-- **Books this month** — how many books the member **finished** in the current
+- **Books this month**: how many books the member **finished** in the current
   calendar month.
-- **Total pages read** — the sum of pages across every book the member has
+- **Total pages read**: the sum of pages across every book the member has
   **finished**.
-- **Reading history** — the member's finished books, **most recently finished
+- **Reading history**: the member's finished books, **most recently finished
   first**. Books still in progress are not part of the history.
 
 ## Architecture
 
 The code is layered:
 
-- \`routes/\` — receive HTTP requests, call services, format responses.
-- \`services/\` — application logic: the stat calculations and the history query.
-- \`models.py\` — the data model (\`User\`, \`Book\`, \`ReadingEvent\`).
+- \`routes/\`: receive HTTP requests, call services, format responses.
+- \`services/\`: application logic, the stat calculations and the history query.
+- \`models.py\`: the data model (\`User\`, \`Book\`, \`ReadingEvent\`).
 
 A \`ReadingEvent\` always has a \`started_at\` date; its \`finished_at\` date is set
 only once the member marks the book complete (so it is \`None\` while in progress).
 
-> The \`reference/\` folder is the original Flask + SQLAlchemy app **as shipped** —
+> The \`reference/\` folder is the original Flask + SQLAlchemy app **as shipped**,
 > kept for reading, so it still contains the same defects. Read it to learn the
 > structure, not to copy. The runnable copy you edit and test lives under \`app/\`.
 `
@@ -562,7 +503,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
     caveat: "Books this month and total pages read are correct for the same reader.",
   },
   userReport:
-    "Two things look wrong on my BookClub profile. My reading streak says 0 even though I've finished a book three days running, and my reading history is in a strange order — the book I finished today isn't at the top. The books themselves all show up fine; it's the streak number and the ordering that seem off.",
+    "Two things look wrong on my BookClub profile. My reading streak says 0 even though I've finished a book three days running, and my reading history is in a strange order. The book I finished today isn't at the top. The books themselves all show up fine; it's the streak number and the ordering that seem off.",
   tags: ["python", "real-codebase", "data-modeling", "flask"],
   estimatedTime: 40,
   problemStatement: `BookClub is a small reading-tracker app. Members finish books and the app shows a reading streak (consecutive days they finished a book), the number of books finished this month, total pages read, and a reading history.
@@ -608,10 +549,7 @@ Read the code, run the tests, and fix the defects in the service layer so every 
   },
   expectedBehavior:
     "The reading streak counts consecutive days, ending today, on which the user finished at least one book; the reading history lists finished books most-recently-finished first; books-this-month and total-pages-read stay correct.",
-  bugDescription:
-    "Two independent defects in the reading services: the streak aggregates events by their start date rather than their finish date, and the history list sorts by start date rather than finish date.",
-  groundTruth:
-    "Two independent one-field defects: calculate_streak builds its set of days from started_at instead of finished_at, and get_reading_history sorts by started_at instead of finished_at. Both read fine in isolation because started_at is always set, which is why they survived review; only seeded data where a book is started days before it is finished reveals them. The two passing stats, books_this_month and total_pages_read, share the same get_reading_history input, proving the shared dependency is fine and isolating each bug to its own function. Terrain and herrings, all provably innocent: (1) Nadia (user 5) re-logged book 1, so a user can carry more than one event for the same book; the stat code tolerates duplicates and the finish-day streak collapses same-day finishes via a set; (2) the SQLAlchemy reference model declares a uq_user_book unique constraint that the in-memory mirror deliberately does not enforce, so the duplicate looks like a constraint violation but is intended terrain, not the bug; (3) in-progress books (finished_at is None) are already excluded by get_reading_history and never reach either calculation.",
+  bugDescription: "",
   observedSymptoms: [
     "Reading streak shows 0 despite recent daily finishes.",
     "Reading history is not ordered most-recently-finished first.",
@@ -646,11 +584,6 @@ Read the code, run the tests, and fix the defects in the service layer so every 
     },
   ],
   expectedTouchedFiles: ["app/services/stats_service.py", "app/services/reading_service.py"],
-  rootCauseRubric: [
-    "Identifies that the streak and history are computed from the wrong date field.",
-    "Explains why the finish date (not the start date) defines both a completion streak and a most-recently-finished ordering.",
-    "Confirms in-progress books are excluded and the monthly/total stats are unaffected.",
-  ],
   guidedLab: {
     version: "bookclub-guided-v1",
     milestones: [
@@ -663,19 +596,19 @@ Read the code, run the tests, and fix the defects in the service layer so every 
             kind: "knowledge-card",
             id: "kc-layers",
             title: "Layered architecture",
-            body: "This app has three layers. **Routes** receive requests and format responses — they don't compute values. **Services** hold the logic: the stat calculations and the history query. **Models** define the data shape. When an API value is wrong, it's almost always a *service* problem — not a route or a model problem.",
+            body: "This app has three layers. **Routes** receive requests and format responses. They don't compute values. **Services** hold the logic: the stat calculations and the history query. **Models** define the data shape. When an API value is wrong, it's almost always a *service* problem, not a route or a model problem.",
           },
           {
             kind: "knowledge-card",
             id: "kc-docstrings",
             title: "Docstrings are contracts",
-            body: 'Every function here has a docstring describing what it *should* do. When a function has a bug, the docstring is usually still correct — the code drifted from it. So don\'t ask "what does this code do?" Ask "does this code do what the docstring says?" A mismatch is your bug.',
+            body: 'Every function here has a docstring describing what it *should* do. When a function has a bug, the docstring is usually still correct. The code drifted from it. So don\'t ask "what does this code do?" Ask "does this code do what the docstring says?" A mismatch is your bug.',
           },
           {
             kind: "knowledge-card",
             id: "kc-model",
             title: "Two dates on every event",
-            body: "A `ReadingEvent` has `started_at` (always set — the day a book was opened) and `finished_at` (set only when the book is completed; `None` while in progress). `get_reading_history` returns only finished events.",
+            body: "A `ReadingEvent` has `started_at` (always set: the day a book was opened) and `finished_at` (set only when the book is completed; `None` while in progress). `get_reading_history` returns only finished events.",
           },
           {
             kind: "checkpoint",
@@ -705,7 +638,7 @@ Read the code, run the tests, and fix the defects in the service layer so every 
             kind: "knowledge-card",
             id: "kc-shared",
             title: "One shared dependency",
-            body: "All three stats call `get_reading_history()`. If that were broken, all three would be wrong. Two of them are correct — so the shared input is fine, and the bug lives inside the one function whose output is wrong.",
+            body: "All three stats call `get_reading_history()`. If that were broken, all three would be wrong. Two of them are correct, so the shared input is fine, and the bug lives inside the one function whose output is wrong.",
           },
           {
             kind: "quiz",
@@ -716,15 +649,15 @@ Read the code, run the tests, and fix the defects in the service layer so every 
               {
                 text: "get_reading_history returns the wrong events, but only the streak is affected",
                 rationale:
-                  "If the shared dependency were broken, all three stats would be affected — not just one.",
+                  "If the shared dependency were broken, all three stats would be affected, not just one.",
               },
               {
-                text: "The bug is inside calculate_streak — the only function whose output is wrong",
+                text: "The bug is inside calculate_streak, the only function whose output is wrong",
                 rationale:
                   "Two correct outputs from the shared dependency prove the input is fine, which isolates the bug to calculate_streak.",
               },
               {
-                text: "It's inconclusive — the bug could be anywhere",
+                text: "It's inconclusive: the bug could be anywhere",
                 rationale:
                   "The two correct values rule out the shared dependency, so it isn't inconclusive.",
               },
@@ -757,7 +690,7 @@ Read the code, run the tests, and fix the defects in the service layer so every 
             kind: "instruction",
             id: "inst-streak",
             aiRestraint: true,
-            body: "Read calculate_streak's docstring as a contract, then read the line that builds its set of days. Which field is it using — and is that the field the docstring describes? Make the one-word change in `app/services/stats_service.py`, then Run Tests. Try to spot it yourself before asking the debugging partner.",
+            body: "Read calculate_streak's docstring as a contract, then read the line that builds its set of days. Which field is it using, and is that the field the docstring describes? Make the one-word change in `app/services/stats_service.py`, then Run Tests. Try to spot it yourself before asking the debugging partner.",
           },
           {
             kind: "quiz",
@@ -768,7 +701,7 @@ Read the code, run the tests, and fix the defects in the service layer so every 
               {
                 text: "started_at is nullable and would crash",
                 rationale:
-                  "started_at is always set — it wouldn't crash. That is what makes this bug subtle.",
+                  "started_at is always set. It wouldn't crash. That is what makes this bug subtle.",
               },
               {
                 text: "A streak measures days you completed a book; when you started is irrelevant to whether you finished one that day",
@@ -777,12 +710,12 @@ Read the code, run the tests, and fix the defects in the service layer so every 
               {
                 text: "started_at and finished_at are always equal anyway",
                 rationale:
-                  "They're usually different — a book is started days before it is finished.",
+                  "They're usually different. A book is started days before it is finished.",
               },
               {
                 text: "Either field works since get_reading_history already filters to finished books",
                 rationale:
-                  "Both dates exist on finished events, but started_at is the wrong day — it's when the book was opened, not completed.",
+                  "Both dates exist on finished events, but started_at is the wrong day: it's when the book was opened, not completed.",
               },
             ],
             correctIndex: 1,
@@ -804,7 +737,7 @@ Read the code, run the tests, and fix the defects in the service layer so every 
             kind: "knowledge-card",
             id: "kc-logic-vs-display",
             title: "Logic bugs vs display bugs",
-            body: "Bug 1 was a *logic* bug — the computed value was wrong. This one is a *display* bug — the values are all correct, but they come back in the wrong order. Different category, different diagnosis: don't trace the calculation, look at the sort.",
+            body: "Bug 1 was a *logic* bug: the computed value was wrong. This one is a *display* bug: the values are all correct, but they come back in the wrong order. Different category, different diagnosis: don't trace the calculation, look at the sort.",
           },
           {
             kind: "instruction",
@@ -819,29 +752,29 @@ Read the code, run the tests, and fix the defects in the service layer so every 
               "Both bugs used the wrong field (started_at instead of finished_at). Do they have the same root cause?",
             options: [
               {
-                text: "Yes — one find-and-replace would fix both, so it's one root cause",
+                text: "Yes, one find-and-replace would fix both, so it's one root cause",
                 rationale:
-                  "Same fix is not the same root cause — these are two independent mistakes in two functions.",
+                  "Same fix is not the same root cause. These are two independent mistakes in two functions.",
               },
               {
-                text: "No — one is a wrong computed value (logic), the other is correct data in the wrong order (display); different categories needing different diagnosis",
+                text: "No, one is a wrong computed value (logic), the other is correct data in the wrong order (display); different categories needing different diagnosis",
                 rationale:
                   "Same wrong field, but structurally different mistakes in different functions.",
               },
               {
-                text: "Yes — the developer was confused about the fields, which is a single cause",
+                text: "Yes, the developer was confused about the fields, which is a single cause",
                 rationale:
-                  'A shared pattern is worth noting, but "same root cause" means one thing caused both — here each is independently present.',
+                  'A shared pattern is worth noting, but "same root cause" means one thing caused both. Here each is independently present.',
               },
               {
-                text: "No — they're in different files, so by definition different causes",
+                text: "No, they're in different files, so by definition different causes",
                 rationale:
                   "Different files don't define root cause; the real distinction is logic vs display.",
               },
             ],
             correctIndex: 1,
             explanation:
-              "Same wrong field — and that shared confusion (start vs finish date) is worth grepping for elsewhere. But here it surfaced as two different bug CLASSES: a logic error (wrong value) and a display error (wrong order), each needing its own diagnosis path.",
+              "Same wrong field, and that shared confusion (start vs finish date) is worth grepping for elsewhere. But here it surfaced as two different bug CLASSES: a logic error (wrong value) and a display error (wrong order), each needing its own diagnosis path.",
           },
           {
             kind: "checkpoint",
@@ -850,7 +783,7 @@ Read the code, run the tests, and fix the defects in the service layer so every 
             items: [
               "Streak, history, books-this-month, and total-pages all pass.",
               "You can explain each fix in one sentence.",
-              "You verified rather than assuming — that's how you found the second bug.",
+              "You verified rather than assuming. That's how you found the second bug.",
             ],
           },
         ],
@@ -980,20 +913,6 @@ Read the code, run the tests, and fix the defects in the service layer so every 
         hidden: true,
         content: testRunner,
         description: "Hidden workspace runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "app/services/stats_service.py",
-        role: "editable",
-        language: "python",
-        content: mirrorStatsServiceFixed,
-      },
-      {
-        path: "app/services/reading_service.py",
-        role: "editable",
-        language: "python",
-        content: mirrorReadingServiceFixed,
       },
     ],
   },

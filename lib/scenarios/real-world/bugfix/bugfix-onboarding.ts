@@ -27,31 +27,6 @@ const starter = `function findAdjustmentPair(lineItems, targetCents) {
 module.exports = { findAdjustmentPair };
 `
 
-const reference = `function findAdjustmentPair(lineItems, targetCents) {
-  const seenAmounts = new Map();
-
-  for (let index = 0; index < lineItems.length; index += 1) {
-    const row = lineItems[index];
-
-    if (typeof row.amountCents !== "number" || row.status !== "open") {
-      continue;
-    }
-
-    const needed = targetCents - row.amountCents;
-
-    if (seenAmounts.has(needed)) {
-      return [seenAmounts.get(needed), index];
-    }
-
-    seenAmounts.set(row.amountCents, index);
-  }
-
-  return [];
-}
-
-module.exports = { findAdjustmentPair };
-`
-
 const ledgerHelper = `function summarizeAdjustment(lineItems, pair) {
   if (!Array.isArray(pair) || pair.length !== 2) {
     return null;
@@ -248,10 +223,7 @@ Finance support approves a manual invoice adjustment when the review queue shows
   },
   expectedBehavior:
     "The lookup returns two distinct open ledger rows whose amounts add up to the adjustment, skips reconciled rows and rows with missing amounts entirely, and returns an empty result when no open pair exists.",
-  bugDescription:
-    "The open-status guard is applied only when caching a row, not when the current row completes a pair, so a reconciled row can still match against a previously cached open row and explain an adjustment with settled money.",
-  groundTruth:
-    "Root cause: the status filter is one-sided. Rows are cached only when open, but the match branch runs before any status check, so a reconciled row encountered later can complete a pair with a cached open row. Fix: skip rows that are not open before both the match and the cache, alongside the existing missing-amount skip. Red herrings, all provably innocent: (1) summarizeAdjustment's null guards in src/ledger.js look like they could swallow valid pairs, but they only reject malformed pairs and identical indexes; (2) the seenAmounts overwrite on duplicate amounts looks lossy, but any cached index with that amount satisfies the first-completing-pair contract; (3) negative credit amounts look risky, but integer cent arithmetic over negatives is exact and the contract allows credits in pairs.",
+  bugDescription: "",
   hints: [
     "Run the visible tests first. Two pass and one fails. What do the passing cases have in common that the failing case does not?",
     "The failing case returns a pair instead of an empty result. Which of the two returned rows should never have been part of an explanation, and at which point in the scan was it considered?",
@@ -307,12 +279,6 @@ Finance support approves a manual invoice adjustment when the review queue shows
     "hypothesis",
     "minimal patch",
     "verification",
-  ],
-  rootCauseRubric: [
-    "Identifies that the status guard covers only the caching side of the scan, not the row that completes the pair.",
-    "Connects the false explanation to double-counting settled money in the ledger, not just to a failing test.",
-    "Rules out the ledger helper and the duplicate-amount overwrite with evidence instead of rewriting them.",
-    "Names a regression guard such as a reconciled-complement test case or status filtering at ingestion.",
   ],
   workspace: {
     language: "javascript",
@@ -379,14 +345,6 @@ Each row has an \`id\`, an \`amountCents\` integer, and a \`status\` that is eit
         hidden: true,
         content: runner,
         description: "Hidden workspace test runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "src/reconciliation.js",
-        role: "editable",
-        language: "javascript",
-        content: reference,
       },
     ],
   },

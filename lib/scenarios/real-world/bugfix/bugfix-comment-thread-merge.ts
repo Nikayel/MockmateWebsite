@@ -15,21 +15,6 @@ const starter = `def merge_threads(existing_threads, incoming_threads):
     return merged
 `
 
-const reference = `def merge_threads(existing_threads, incoming_threads):
-    merged = list(existing_threads)
-    index_by_id = {thread["id"]: idx for idx, thread in enumerate(merged)}
-
-    for incoming in incoming_threads:
-        existing_index = index_by_id.get(incoming["id"])
-        if existing_index is not None:
-            merged[existing_index] = {**merged[existing_index], **incoming}
-        else:
-            index_by_id[incoming["id"]] = len(merged)
-            merged.append(incoming)
-
-    return merged
-`
-
 const projection = `def summarize_threads(threads):
     return [f"{thread['id']}:{thread.get('status', 'open')}" for thread in threads]
 
@@ -179,10 +164,7 @@ Read the codebase files, run the tests, and make the smallest fix in the merge f
   },
   expectedBehavior:
     "An incoming thread that matches an existing id updates that thread in place and keeps its position. No thread is ever duplicated or dropped, regardless of where it sits in the list, so the unresolved badge always reflects the real open-comment count.",
-  bugDescription:
-    "The merge treats a found position of zero as 'not found', so a thread stored at the front of the list is appended a second time instead of updated in place. Every other position updates correctly, and the duplicate leaves the unresolved badge one too high whenever the front thread was still open.",
-  groundTruth:
-    "Root cause: the presence check rejects a stored position of zero, so the thread at the front of the list is treated as new and duplicated; every other position updates correctly, which is why review and most syncs looked fine. Fix: test presence explicitly instead of by the position's sign, so a stored position of zero counts as found. Survival story: `existing_index > 0` reads as a plausible bounds check and holds for every thread except the one at the front, so it passed review and only the top thread duplicates. Red herrings, all reachable and provably innocent: (1) the merge never removes threads, so an existing resolved thread is preserved by design, not dropped; (2) a batch that repeats an id applies each update in order (last write wins) without creating duplicates; (3) an update for an id not yet local is appended as a new thread, the intended source-of-truth behavior. count_unresolved only excludes resolved threads and is not part of the duplication.",
+  bugDescription: "",
   hints: [
     "The badge sits one higher than the true open-comment count, and only on some docs. Reproduce that case and compare the merged threads against what the sidebar should show.",
     "Every thread merges cleanly except one. Look at what is different about the thread that gets duplicated versus the ones that update in place.",
@@ -216,12 +198,6 @@ Read the codebase files, run the tests, and make the smallest fix in the merge f
     "hypothesis",
     "minimal patch",
     "verification",
-  ],
-  rootCauseRubric: [
-    "Identifies that the presence check rejects a valid stored position at the front of the list.",
-    "Connects the duplicated thread to the badge over-count a reviewer believed, not just to a failing test.",
-    "Rules out thread removal, repeated ids, and unknown ids as innocent with evidence.",
-    "Names a regression guard such as a front-of-list update test.",
   ],
   workspace: {
     language: "python",
@@ -286,14 +262,6 @@ The editor syncs comment threads from the server into local state. A sidebar bad
         hidden: true,
         content: runner,
         description: "Hidden workspace runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "src/comment_threads.py",
-        role: "editable",
-        language: "python",
-        content: reference,
       },
     ],
   },

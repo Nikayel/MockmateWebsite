@@ -26,37 +26,6 @@ async function runReservationSearch(rawRef, reservationApi, state = createSearch
 module.exports = { runReservationSearch }
 `
 
-const reference = `const { createSearchState } = require("./state")
-const { normalizeBookingRef } = require("./normalize")
-
-async function runReservationSearch(rawRef, reservationApi, state = createSearchState()) {
-  const ref = normalizeBookingRef(rawRef)
-  state.activeRef = ref
-
-  if (ref === "") {
-    state.loading = false
-    state.shownRef = ""
-    state.reservations = []
-    return state
-  }
-
-  state.loading = true
-  const requestRef = ref
-  const reservations = await reservationApi(ref)
-
-  if (state.activeRef !== requestRef) {
-    return state
-  }
-
-  state.loading = false
-  state.shownRef = ref
-  state.reservations = reservations
-  return state
-}
-
-module.exports = { runReservationSearch }
-`
-
 const stateFactory = `function createSearchState() {
   return {
     activeRef: "",
@@ -259,10 +228,7 @@ Read the codebase files, run the tests, and make the smallest production-safe fi
   },
   expectedBehavior:
     "The panel must end up showing the reservations for the booking ref the agent most recently searched. A response for a ref that has since been superseded must not change the shown reservations or the loading state.",
-  bugDescription:
-    "runReservationSearch applies every response it receives, even after a newer lookup has become the active ref, so a slow response for a superseded booking ref overwrites the reservations shown for the current one and clears its loading state.",
-  groundTruth:
-    "Root cause: the controller applies whatever the reservation API returns without re-checking that the active ref is still the one it searched. Two overlapping lookups plus the earlier one resolving last leaves the panel showing the superseded booking. Fix: capture the ref at request time and, after awaiting, return early if state.activeRef has moved on. Survival story: the controller is correct for a single lookup and for back-to-back lookups that resolve in order, which is nearly all real usage, so it read fine in review. Red herrings, all reachable and provably innocent: (1) normalizeBookingRef (trim + uppercase) looks like it could merge two distinct bookings, but refs are case-insensitive by contract and it is deterministic, so ' bk-2048 ' and 'BK-2048' are the same reservation; (2) the empty-ref early return looks like it might swallow a real lookup, but it only fires when the agent clears the box, which by contract shows nothing and issues no request; (3) sharing one mutable state object across lookups looks like the culprit but is the intended design and is exercised by the passing single-lookup path.",
+  bugDescription: "",
   hints: [
     "In the failing test two lookups overlap. Line up what the agent searched last against what the panel ends up showing.",
     "Every response is applied the moment it returns. When a slow response finally lands, what does the state still know about the ref the agent actually wants?",
@@ -297,12 +263,6 @@ Read the codebase files, run the tests, and make the smallest production-safe fi
     "hypothesis",
     "minimal patch",
     "verification",
-  ],
-  rootCauseRubric: [
-    "Identifies that a response is applied without re-checking whether the active ref changed during the await.",
-    "Connects the wrong-guest display to a superseded lookup resolving late, not to normalization or shared state.",
-    "Rules out normalizeBookingRef and the empty-ref guard with evidence instead of rewriting them.",
-    "Names a regression guard such as an overlapping-lookup ordering test.",
   ],
   workspace: {
     language: "javascript",
@@ -377,14 +337,6 @@ Support agents look up a guest's reservation by booking ref while on a call. The
         hidden: true,
         content: runner,
         description: "Hidden workspace test runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "src/search-controller.js",
-        role: "editable",
-        language: "javascript",
-        content: reference,
       },
     ],
   },
