@@ -15,7 +15,7 @@ import { useCompletedLessons } from "./useCompletedLessons"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
 import { ExerciseRunner } from "./ExerciseRunner"
-import { WorkspaceExerciseRunner } from "./WorkspaceExerciseRunner"
+import { WorkspaceExerciseRunner, type WorkspaceEditorState } from "./WorkspaceExerciseRunner"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonRail } from "./LessonRail"
 import { type UpNextLesson } from "./LessonOutline"
@@ -54,6 +54,7 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
   const { reload } = useTutorialProgressSync(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
+  const storeLessonId = useTutorialStore((s) => s.lessonId)
   const isLoading = useTutorialStore((s) => s.isLoading)
   const error = useTutorialStore((s) => s.error)
   const completeSection = useTutorialStore((s) => s.completeSection)
@@ -65,6 +66,11 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
     [lesson.apply.id]: lesson.apply.starterCode,
     [lesson.practice.id]: lesson.practice.starterCode,
   })
+  // Workspace (multi-file) edits live here too, so switching Apply ↔ Practice — which unmounts the
+  // runner — doesn't reset the learner's code back to starter. Keyed by exercise id, seeded lazily.
+  const [workspaceStateByExercise, setWorkspaceStateByExercise] = useState<
+    Record<string, WorkspaceEditorState>
+  >({})
 
   // Which exercises passed this session — gates the "Mark as done" control (grading stays the bar to
   // complete; the learner saves the section when they choose to).
@@ -110,10 +116,15 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
   const didResume = useRef(false)
   useEffect(() => {
     if (isLoading || didResume.current) return
+    // Wait until the store actually holds THIS lesson's progress. The tutorial store is global, so on
+    // a fresh player mount (new lesson via `key`) it still carries the previous lesson's snapshot for
+    // one commit — resuming off that would jump a brand-new lesson to the prior lesson's open section
+    // (e.g. Practice instead of Read). Gating on the loaded lesson id defaults a new lesson to Read.
+    if (storeLessonId !== lesson.id) return
     didResume.current = true
     const next = LESSON_SECTION_ORDER.find((s) => sections[s] !== "completed")
     if (next) setActive(next)
-  }, [isLoading, sections])
+  }, [isLoading, sections, storeLessonId, lesson.id])
 
   const goToSection = (section: LessonSection) => {
     setActive(section)
@@ -147,6 +158,10 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
           workspace={exercise.workspace}
           brief={opts.brief}
           onPass={opts.onPass}
+          persistedState={workspaceStateByExercise[exercise.id]}
+          onPersistState={(state) =>
+            setWorkspaceStateByExercise((prev) => ({ ...prev, [exercise.id]: state }))
+          }
         />
       )
     }
