@@ -1,7 +1,8 @@
 import { ArrowRight, BookOpen, Clock, Layers } from "lucide-react"
 import { CodeWindow } from "./CodeWindow"
 import { LEVEL_PREVIEWS } from "@/lib/tutorials/level-previews"
-import type { PythonLevel, PythonLevelId } from "@/lib/tutorials/types"
+import type { PythonLevelId } from "@/lib/tutorials/types"
+import type { PathLevelSummary } from "@/lib/tutorials/level-path"
 
 /**
  * The Path's sticky preview panel (HANDOFF §B): a faux code-window for the selected level, the
@@ -11,17 +12,15 @@ import type { PythonLevel, PythonLevelId } from "@/lib/tutorials/types"
  */
 const ALL_PHASES = ["Read", "Apply", "Practice", "Files"] as const
 
-const LEVEL_PHASE_COUNT: Record<PythonLevelId, number> = { 1: 1, 2: 2, 3: 3, 4: 4 }
+const LEVEL_PHASE_COUNT: Record<PythonLevelId, number> = { 1: 3, 2: 3, 3: 4, 4: 4 }
 
 const MAX_CHIPS = 7
 
 /** Unique skills across a level's lessons, in first-seen order, capped for the chip row. */
-function levelTopics(level: PythonLevel): string[] {
+function levelTopics(level: PathLevelSummary<PythonLevelId>): string[] {
   const seen = new Set<string>()
-  for (const mod of level.modules) {
-    for (const lesson of mod.lessons) {
-      for (const skill of lesson.skills) seen.add(skill)
-    }
+  for (const lesson of level.lessons) {
+    for (const skill of lesson.skills) seen.add(skill)
   }
   return Array.from(seen).slice(0, MAX_CHIPS)
 }
@@ -31,14 +30,14 @@ export function LevelPreviewPanel({
   completedCount = 0,
   onStart,
 }: {
-  level: PythonLevel
+  level: PathLevelSummary<PythonLevelId>
   /** Lessons completed in this level (drives the Start/Continue/Review CTA + counts). */
   completedCount?: number
-  onStart: (level: PythonLevel) => void
+  onStart: (level: PathLevelSummary<PythonLevelId>) => void
 }) {
   // Every authored level (1–4) has a preview; guard defensively so a future level id can't crash.
   const preview = LEVEL_PREVIEWS[level.id] ?? LEVEL_PREVIEWS[1]
-  const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
+  const lessonCount = level.lessons.length
   const activePhases = LEVEL_PHASE_COUNT[level.id]
   const topics = levelTopics(level)
 
@@ -62,7 +61,8 @@ export function LevelPreviewPanel({
 
       <CodeWindow filename={preview.filename} lines={preview.sample} />
 
-      {/* Phase strip — the loop deepens per level; unreached phases dim out. */}
+      {/* Phase strip: every level runs Read/Apply/Practice; L3/L4 add Files, so only the Files chip
+          dims on Levels 1-2. */}
       <div className="flex items-center gap-1.5" aria-label="Lesson loop for this level">
         {ALL_PHASES.map((phase, i) => {
           const active = i < activePhases
