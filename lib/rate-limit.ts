@@ -570,12 +570,28 @@ export const sensitiveOperationRateLimit = rateLimit({
   prefix: "rl:sensitive",
 })
 
+/**
+ * Guest session creations per hour per IP. Default 3 — strict, because guest
+ * sessions carry real AI cost. GUEST_SESSION_LIMIT_PER_HOUR exists for event
+ * windows (career-fair tables, lecture-hall demos) where a whole room shares one
+ * NAT'd IP and the default would kill the funnel after three people: set it
+ * (e.g. 50) in the deployment env for the event, unset it after. Read once at
+ * boot; invalid or out-of-range values fall back to the default.
+ */
+export function parseGuestSessionLimit(raw: string | undefined): number {
+  const DEFAULT_LIMIT = 3
+  const MAX_LIMIT = 1000
+  if (!raw) return DEFAULT_LIMIT
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_LIMIT) return DEFAULT_LIMIT
+  return parsed
+}
+
 // Guest session rate limit - strict to prevent abuse
-// 3 guest session creations per hour per IP
 export const guestSessionRateLimit = rateLimit({
   interval: 60 * 60 * 1000, // 1 hour
   uniqueTokenPerInterval: 500,
-  maxRequests: 3,
+  maxRequests: parseGuestSessionLimit(process.env.GUEST_SESSION_LIMIT_PER_HOUR),
   prefix: "rl:guest",
 })
 
