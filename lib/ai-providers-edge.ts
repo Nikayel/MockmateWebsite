@@ -8,6 +8,10 @@
  * - Any Node.js-specific APIs
  *
  * Used by /api/feedback/stream for streaming feedback generation.
+ *
+ * Gemini-first with an Edge-safe DeepSeek fallback (plain fetch against the
+ * OpenAI-compatible endpoint), so a Gemini outage or model retirement cannot
+ * hard-fail the only runtime that has no other fallback path.
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
@@ -15,13 +19,67 @@ import { GEMINI_MODELS } from "./ai/model-ids"
 
 export interface EdgeAIResponse {
   text: string
-  provider: "gemini"
+  provider: "gemini" | "deepseek"
   latencyMs: number
 }
 
 // Initialize Gemini client
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
+
+// Fallback vendor (mirrors the deepseek-chat config in lib/ai-providers.ts)
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ""
+
+/**
+ * Edge-safe DeepSeek call: plain fetch, OpenAI-compatible chat completions.
+ * Fallback path only — Gemini stays primary for cost and scoring consistency.
+ */
+async function generateDeepSeekResponseEdge(
+  systemPrompt: string,
+  userMessage: string,
+  options?: {
+    maxTokens?: number
+    temperature?: number
+  }
+): Promise<EdgeAIResponse> {
+  const startTime = Date.now()
+
+  const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      max_tokens: options?.maxTokens ?? 2048,
+      temperature: options?.temperature ?? 0.3,
+      stream: false,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`DeepSeek fallback failed: ${response.status}`)
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>
+  }
+  const text = data.choices?.[0]?.message?.content
+  if (!text) {
+    throw new Error("DeepSeek fallback returned no content")
+  }
+
+  return {
+    text,
+    provider: "deepseek",
+    latencyMs: Date.now() - startTime,
+  }
+}
 
 /**
  * Generate AI response using Gemini (Edge-compatible)
@@ -38,26 +96,38 @@ export async function generateAIResponseEdge(
   const startTime = Date.now()
 
   if (!genAI) {
+    if (DEEPSEEK_API_KEY) {
+      return generateDeepSeekResponseEdge(systemPrompt, userMessage, options)
+    }
     throw new Error("Gemini API key not configured")
   }
 
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODELS.flash,
-    generationConfig: {
-      maxOutputTokens: options?.maxTokens ?? 2048,
-      temperature: options?.temperature ?? 0.3,
-    },
-    systemInstruction: systemPrompt,
-  })
+  try {
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODELS.flash,
+      generationConfig: {
+        maxOutputTokens: options?.maxTokens ?? 2048,
+        temperature: options?.temperature ?? 0.3,
+      },
+      systemInstruction: systemPrompt,
+    })
 
-  const result = await model.generateContent(userMessage)
-  const response = result.response
-  const text = response.text()
+    const result = await model.generateContent(userMessage)
+    const response = result.response
+    const text = response.text()
 
-  return {
-    text,
-    provider: "gemini",
-    latencyMs: Date.now() - startTime,
+    return {
+      text,
+      provider: "gemini",
+      latencyMs: Date.now() - startTime,
+    }
+  } catch (error) {
+    // The Edge runtime has no other fallback path: a Gemini outage or model
+    // retirement must degrade to DeepSeek here, not hard-fail streaming feedback.
+    if (DEEPSEEK_API_KEY) {
+      return generateDeepSeekResponseEdge(systemPrompt, userMessage, options)
+    }
+    throw error
   }
 }
 
