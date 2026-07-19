@@ -9,6 +9,7 @@ import {
 } from "@/lib/firebase-analytics-admin"
 import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { calculateMRR, calculateARR, getMonthlyPrice } from "@/lib/pricing"
+import { isScoredCompletedSession, summarizeSessionFunnelCounts } from "@/lib/firestore-helpers"
 import { adminCache, getCacheKey, CACHE_TTL } from "@/lib/admin/cache"
 import {
   format,
@@ -18,6 +19,7 @@ import {
   startOfDay,
   startOfWeek,
   startOfMonth,
+  startOfISOWeek,
   parseISO,
 } from "date-fns"
 
@@ -273,38 +275,63 @@ export async function GET(request: NextRequest) {
     }
 
     const totalSessions = sessionsSnapshot.size || 0
-    let completedSessions = 0
     let totalPerformanceScore = 0
     let sessionsWithScore = 0
+
+    // WCSR series: scored completions bucketed by the ISO week they completed in.
+    const wcsrByWeek: Record<string, number> = {}
 
     const sessionsByType: Record<string, number> = {}
     const sessionsByDifficulty: Record<string, number> = {}
 
-    if (sessionsSnapshot.docs) {
-      sessionsSnapshot.docs.forEach((doc: any) => {
-        const session = doc.data()
+    // Guest/registered + scored-completion partition, shared with the funnel route
+    // so the two dashboards can't drift. Existing totals below stay unchanged so
+    // the dashboard renders identically; the split fields are additive.
+    const sessionData: any[] = sessionsSnapshot.docs
+      ? sessionsSnapshot.docs.map((doc: any) => doc.data())
+      : []
+    const sessionCounts = summarizeSessionFunnelCounts(sessionData)
+    const completedSessions = sessionCounts.completed
 
-        if (session.completed_at) {
-          completedSessions++
+    for (const session of sessionData) {
+      if (isScoredCompletedSession(session)) {
+        // Bucket by ISO week of completion for the weekly WCSR series.
+        try {
+          const completedRaw = session.completed_at
+          const completedDate =
+            typeof completedRaw === "string"
+              ? parseISO(completedRaw)
+              : completedRaw?.toDate?.() || new Date(completedRaw)
+          const weekKey = format(startOfISOWeek(completedDate), "yyyy-MM-dd")
+          wcsrByWeek[weekKey] = (wcsrByWeek[weekKey] || 0) + 1
+        } catch {
+          // Skip invalid completed_at values
         }
+      }
 
-        if (session.performance_score !== undefined) {
-          totalPerformanceScore += session.performance_score
-          sessionsWithScore++
-        }
+      if (session.performance_score !== undefined) {
+        totalPerformanceScore += session.performance_score
+        sessionsWithScore++
+      }
 
-        // Count by type
-        const type = session.type || "unknown"
-        sessionsByType[type] = (sessionsByType[type] || 0) + 1
+      // Count by type
+      const type = session.type || "unknown"
+      sessionsByType[type] = (sessionsByType[type] || 0) + 1
 
-        // Count by difficulty
-        const difficulty = session.difficulty || "unknown"
-        sessionsByDifficulty[difficulty] = (sessionsByDifficulty[difficulty] || 0) + 1
-      })
+      // Count by difficulty
+      const difficulty = session.difficulty || "unknown"
+      sessionsByDifficulty[difficulty] = (sessionsByDifficulty[difficulty] || 0) + 1
     }
 
     const avgPerformanceScore =
       sessionsWithScore > 0 ? Math.round(totalPerformanceScore / sessionsWithScore) : 0
+
+    // Weekly completed-scored-rounds (WCSR) series + current-week headline.
+    const wcsrSeries = Object.entries(wcsrByWeek)
+      .map(([week, count]) => ({ week, count }))
+      .sort((a, b) => a.week.localeCompare(b.week))
+    const currentWeekKey = format(startOfISOWeek(new Date()), "yyyy-MM-dd")
+    const wcsrCurrentWeek = wcsrByWeek[currentWeekKey] || 0
 
     // Fetch analytics events
     let eventsSnapshot
@@ -443,6 +470,18 @@ export async function GET(request: NextRequest) {
           avgPerformanceScore,
           byType: sessionsByType,
           byDifficulty: sessionsByDifficulty,
+          // Additive: scored completions + guest/registered partition (UI opts in).
+          scoredCompleted: sessionCounts.scored,
+          guest: sessionCounts.guest,
+          registered: sessionCounts.registered,
+          registeredCompleted: sessionCounts.registeredCompleted,
+          registeredScoredCompleted: sessionCounts.registeredScored,
+        },
+        // North Star: weekly completed-scored-rounds (rounds with a persisted score).
+        wcsr: {
+          currentWeek: wcsrCurrentWeek,
+          total: sessionCounts.scored,
+          series: wcsrSeries,
         },
         revenue: {
           mrr,

@@ -19,6 +19,7 @@ import {
 import { Profile, ProfileQuota } from "./types"
 import { getSessionsLimitForTier } from "./pricing"
 import { calculateTechnicalScoreFromBreakdown, SESSION } from "./constants"
+import type { Attribution } from "./attribution"
 
 /**
  * Stringify a test value for Firestore, mapping absent values to null.
@@ -75,7 +76,8 @@ export async function createOrUpdateProfile(
   userId: string,
   email: string,
   displayName?: string | null,
-  photoURL?: string | null
+  photoURL?: string | null,
+  attribution?: Attribution | null
 ): Promise<Profile> {
   if (!userId) {
     throw new Error("User ID is required to create/update profile")
@@ -149,6 +151,29 @@ export async function createOrUpdateProfile(
       milestone_celebrations: true,
       marketing_emails: false,
     }
+  }
+
+  // First-touch acquisition attribution: stamp the self-declared campaign params
+  // once, never overwriting an existing source. This is a first-party write that
+  // is independent of GA4 and cookie consent, so signups-by-channel stays a plain
+  // Firestore query even for users who decline analytics. Values are re-clamped
+  // here as a defensive trust boundary.
+  const existingAcquisitionSource = (
+    existingProfile as { acquisition_source?: string } | null
+  )?.acquisition_source
+  if (attribution && !existingAcquisitionSource && (attribution.source || attribution.campaign)) {
+    const clampAttribution = (value?: string): string | undefined =>
+      value ? value.slice(0, 200) : undefined
+    const source = clampAttribution(attribution.source)
+    const medium = clampAttribution(attribution.medium)
+    const campaign = clampAttribution(attribution.campaign)
+    const landingPage = clampAttribution(attribution.landingPage)
+    if (source) profileDataForFirestore.acquisition_source = source
+    if (medium) profileDataForFirestore.acquisition_medium = medium
+    if (campaign) profileDataForFirestore.acquisition_campaign = campaign
+    if (landingPage) profileDataForFirestore.acquisition_landing_page = landingPage
+    profileDataForFirestore.acquisition_captured_at =
+      clampAttribution(attribution.capturedAt) || new Date().toISOString()
   }
 
   // Build the Profile object for return (can have undefined optional fields)
@@ -584,6 +609,92 @@ export async function createInterviewSession(
  * - 'failed': Feedback generation failed (user can retry)
  */
 export type FeedbackStatus = "pending" | "processing" | "complete" | "failed"
+
+/**
+ * Whether an interview_sessions doc counts as a completed AND scored round, the
+ * unit behind WCSR (weekly completed-scored-rounds). completed_at alone is not
+ * enough: markSessionEvaluating() stamps completed_at the moment evaluation
+ * STARTS, so pending/failed rounds carry completed_at but never got a score.
+ * Gate on feedback_status "complete"; for docs written before feedback_status
+ * existed, fall back to a persisted performance_score.
+ */
+export function isScoredCompletedSession(session: {
+  completed_at?: unknown
+  feedback_status?: unknown
+  performance_score?: unknown
+}): boolean {
+  if (!session.completed_at) return false
+  if (session.feedback_status === "complete") return true
+  // Pre-feedback_status docs: a persisted score is the only completion signal.
+  if (session.feedback_status === undefined || session.feedback_status === null) {
+    return session.performance_score !== undefined && session.performance_score !== null
+  }
+  return false
+}
+
+/** Session shape needed to partition the funnel; a loose read model over Firestore. */
+export interface SessionFunnelInput {
+  is_guest?: unknown
+  completed_at?: unknown
+  feedback_status?: unknown
+  performance_score?: unknown
+}
+
+/** Guest/registered + scored-completion partition of a set of interview_sessions. */
+export interface SessionFunnelCounts {
+  total: number
+  completed: number
+  scored: number
+  guest: number
+  guestCompleted: number
+  registered: number
+  registeredCompleted: number
+  registeredScored: number
+}
+
+/**
+ * Partition interview_sessions into guest vs registered and count completed and
+ * scored rounds, the shared shape behind both the admin funnel and analytics.
+ *
+ * Guests live in the same interview_sessions collection with is_guest: true and
+ * have no profiles doc, so they must be excluded from registered conversion (they
+ * otherwise inflate the Signup->Session numerator while being absent from its
+ * denominator). Kept in one place so the two admin routes cannot drift.
+ */
+export function summarizeSessionFunnelCounts(
+  sessions: Iterable<SessionFunnelInput>
+): SessionFunnelCounts {
+  const counts: SessionFunnelCounts = {
+    total: 0,
+    completed: 0,
+    scored: 0,
+    guest: 0,
+    guestCompleted: 0,
+    registered: 0,
+    registeredCompleted: 0,
+    registeredScored: 0,
+  }
+
+  for (const session of sessions) {
+    counts.total++
+    const isGuest = session.is_guest === true
+    if (isGuest) counts.guest++
+    else counts.registered++
+
+    if (session.completed_at) {
+      counts.completed++
+      if (isGuest) counts.guestCompleted++
+      else counts.registeredCompleted++
+    }
+
+    if (isScoredCompletedSession(session)) {
+      counts.scored++
+      if (!isGuest) counts.registeredScored++
+    }
+  }
+
+  return counts
+}
 
 /**
  * Update interview session on completion
