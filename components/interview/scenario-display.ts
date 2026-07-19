@@ -1,17 +1,28 @@
 import { Cpu, Bug, Wrench, Zap, Shield, Layers } from "lucide-react"
 import type { ScenarioType, DifficultyLevel } from "@/lib/scenarios"
 
-// Shared display config for scenarios. Used by both the card grid (ScenarioCard)
-// and the compact list (ScenarioListRow) so the type/difficulty presentation
-// stays in one place.
-export const EXERCISE_TYPES = [
-  { id: "bugfix", label: "Bug Fix", icon: Bug },
-  { id: "add-functionality", label: "Add Feature", icon: Wrench },
-  { id: "optimization", label: "Optimize", icon: Zap },
-  { id: "security", label: "Security", icon: Shield },
-  { id: "system-design", label: "System Design", icon: Layers },
-  { id: "dsa", label: "DSA Drill", icon: Cpu },
-] as const
+/**
+ * The single scenario-type table. Every scenario-type surface derives from this: the filter
+ * pills (ScenarioFilters, uses `description`), the card type marker (scenario-card-meta, uses
+ * `cardLabel ?? label`), and the card/list icons (ScenarioCard, ScenarioListRow, use `icon`).
+ */
+export interface ExerciseTypeConfig {
+  id: ScenarioType
+  label: string
+  /** Compact label for the card type marker; falls back to `label`. */
+  cardLabel?: string
+  description: string
+  icon: typeof Bug
+}
+
+export const EXERCISE_TYPES: readonly ExerciseTypeConfig[] = [
+  { id: "bugfix", label: "Bug Fix", description: "Repair failing codebases", icon: Bug },
+  { id: "add-functionality", label: "Add Feature", description: "Extend codebases", icon: Wrench },
+  { id: "optimization", label: "Optimize", description: "Improve performance", icon: Zap },
+  { id: "security", label: "Security", description: "Fix vulnerabilities", icon: Shield },
+  { id: "system-design", label: "System Design", description: "Architecture & scalability", icon: Layers },
+  { id: "dsa", label: "DSA Drill", cardLabel: "DSA", description: "Algorithms & data structures", icon: Cpu },
+]
 
 export const getDifficultyStyle = (difficulty: DifficultyLevel) => {
   switch (difficulty) {

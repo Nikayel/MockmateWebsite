@@ -1,19 +1,9 @@
 "use client"
 
 import { memo, useState, useRef, useEffect } from "react"
-import {
-  Cpu,
-  Bug,
-  Wrench,
-  Zap,
-  Shield,
-  Check,
-  X,
-  ChevronDown,
-  Building2,
-  Layers,
-} from "lucide-react"
+import { Check, X, ChevronDown, Building2 } from "lucide-react"
 import { scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
+import { EXERCISE_TYPES } from "./scenario-display"
 import { ScenarioSearchBar } from "./ScenarioSearchBar"
 
 interface ScenarioFiltersProps {
@@ -43,46 +33,6 @@ interface ScenarioFiltersProps {
   /** Restrict which type pills are shown (per tab). Empty array hides the row. */
   availableTypes?: ScenarioType[]
 }
-
-// Exercise type quick filters with descriptions
-const EXERCISE_TYPES = [
-  {
-    id: "bugfix",
-    label: "Bug Fix",
-    description: "Repair failing codebases",
-    icon: Bug,
-  },
-  {
-    id: "add-functionality",
-    label: "Add Feature",
-    description: "Extend codebases",
-    icon: Wrench,
-  },
-  {
-    id: "optimization",
-    label: "Optimize",
-    description: "Improve performance",
-    icon: Zap,
-  },
-  {
-    id: "security",
-    label: "Security",
-    description: "Fix vulnerabilities",
-    icon: Shield,
-  },
-  {
-    id: "system-design",
-    label: "System Design",
-    description: "Architecture & scalability",
-    icon: Layers,
-  },
-  {
-    id: "dsa",
-    label: "DSA Drill",
-    description: "Algorithms & data structures",
-    icon: Cpu,
-  },
-] as const
 
 const DIFFICULTIES = [
   { id: "easy", label: "Easy", color: "border-emerald-300/25 text-emerald-200" },
