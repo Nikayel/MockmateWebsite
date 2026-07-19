@@ -1559,9 +1559,9 @@ A BI query against \`rpt_sales\` ("revenue by category by country") now touches 
 four-way join happened *once*, at build time, not on every dashboard load. \`CREATE TABLE … AS SELECT\`
 (CTAS) runs a query and stores its result set as a brand-new, **physical** table: real rows on disk,
 not a view. (A true **view**, by contrast, is just a *saved SELECT* that stores no data of its own and
-re-runs its query on every read. You'll build views in a later lesson; \`rpt_sales\` here is a
-materialized *table*, which is exactly why its join cost is paid once at build time and never again on
-read.)
+re-runs its query on every read, so it always reflects the latest source rows but pays its full query
+cost on every read. \`rpt_sales\` here is a materialized *table*, which is exactly why its join cost is
+paid once at build time and never again on read.)
 
 > **In the warehouse this differs. This is the warehouse's whole point.** Columnar warehouses
 > (Snowflake/BigQuery/Redshift) are built to scan wide denormalized tables fast, and storage is cheap,
