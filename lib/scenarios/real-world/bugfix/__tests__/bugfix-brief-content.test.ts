@@ -17,6 +17,17 @@ import type { BugFixScenario } from "@/lib/scenarios/types"
 
 const allBugfix: BugFixScenario[] = [...realWorldBugFixScenarios, ...bugfixPackScenarios]
 
+describe("legacy bugfix answer sealing", () => {
+  for (const scenario of realWorldBugFixScenarios) {
+    it(`${scenario.id} ships no client-side root cause or ground truth`, () => {
+      // The answers live only in lib/scenarios/sealed/legacy/<id>.server.ts, so the client module
+      // must carry an empty bugDescription and no groundTruth: nothing can leak into the brief.
+      expect(scenario.bugDescription ?? "").toBe("")
+      expect(scenario.groundTruth ?? "").toBe("")
+    })
+  }
+})
+
 /** Words that would give away the cause rather than describe the effect. */
 const CAUSE_WORDS = /\b(because|root cause|the bug is|caused by|due to a|fix:)\b/i
 
