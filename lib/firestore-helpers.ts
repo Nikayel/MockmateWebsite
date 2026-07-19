@@ -11,8 +11,6 @@ import {
   query,
   where,
   getDocs,
-  runTransaction,
-  increment,
   limit,
   orderBy,
 } from "firebase/firestore"
@@ -251,11 +249,16 @@ export async function getUserProfile(
 export { calculateAnniversaryPeriod, calculateBillingPeriod } from "./quota/billing-period"
 
 /**
- * Initialize user quota for the current billing period
- * Uses anniversary-based billing (resets monthly from signup date, not 1st of month)
- * For paid users with Stripe, uses Stripe's billing period
+ * Resolve the user's quota for the current billing period — READ-ONLY.
+ *
+ * QUOTA-1: the client no longer creates or syncs profile_quota docs (Firestore
+ * rules are write:false; the Admin-SDK writers own all mutations). This
+ * resolves what to DISPLAY: the most-conservative current-period doc with the
+ * tier's limit applied, or a virtual zero-usage quota when the period has no
+ * doc yet — the server writer creates the real doc on the period's first
+ * session start.
  */
-export async function initializeUserQuota(
+export async function resolveUserQuota(
   userId: string,
   subscriptionTier: "free" | "pro" | "enterprise" = "free",
   signupDate?: Date | string,
@@ -281,94 +284,52 @@ export async function initializeUserQuota(
   )
 
   const quotaSnap = await getDocs(quotaQuery)
+  const sessionsLimit = getSessionsLimitForTier(subscriptionTier)
 
-  // Filter by date range in memory to avoid composite index requirement
-  // Match quota whose period_start falls within the calculated billing period
   if (!quotaSnap.empty) {
-    const matchQuota = (quota: ProfileQuota): boolean => {
-      const quotaStart = new Date(quota.period_start)
-      // Primary match: stored period_start falls within the calculated billing period
-      return quotaStart >= periodStart && quotaStart <= periodEnd
-    }
+    // Filter by date range in memory to avoid composite index requirement,
+    // then choose the MOST-CONSERVATIVE doc (max sessions_used, tie -> fewest
+    // free opens) — the same selection the server read path uses, so the UI and
+    // the enforcement path always report the same numbers.
+    const inWindow = quotaSnap.docs
+      .map((docSnap) => docSnap.data() as ProfileQuota)
+      .filter((quota) => {
+        const quotaStart = new Date(quota.period_start)
+        return quotaStart >= periodStart && quotaStart <= periodEnd
+      })
 
-    const currentPeriodQuota = quotaSnap.docs
-      .map((doc) => doc.data() as ProfileQuota)
-      .find(matchQuota)
+    const current = inWindow.reduce<ProfileQuota | undefined>((best, candidate) => {
+      if (!best) return candidate
+      if (candidate.sessions_used > best.sessions_used) return candidate
+      if (candidate.sessions_used < best.sessions_used) return best
+      return (candidate.free_opens_remaining ?? 0) < (best.free_opens_remaining ?? 0)
+        ? candidate
+        : best
+    }, undefined)
 
-    if (currentPeriodQuota) {
-      // Update quota limit if subscription tier changed (single source — DUP-2)
-      const sessionsLimit = getSessionsLimitForTier(subscriptionTier)
-
-      // Check if we need to update anything
-      let needsUpdate = false
-      const updateData: Record<string, any> = {
-        updated_at: new Date().toISOString(),
+    if (current) {
+      // Reflect the tier's limit (and downgrade cap) in the RETURNED object
+      // without persisting — the server writer syncs the doc on next start.
+      return {
+        ...current,
+        sessions_limit: sessionsLimit,
+        sessions_used: Math.min(current.sessions_used, sessionsLimit),
       }
-
-      // If limit changed, update it
-      if (currentPeriodQuota.sessions_limit !== sessionsLimit) {
-        updateData.sessions_limit = sessionsLimit
-        currentPeriodQuota.sessions_limit = sessionsLimit
-        needsUpdate = true
-      }
-
-      // Cap sessions_used if it exceeds the limit (e.g., after downgrade)
-      if (currentPeriodQuota.sessions_used > sessionsLimit) {
-        updateData.sessions_used = sessionsLimit
-        currentPeriodQuota.sessions_used = sessionsLimit
-        needsUpdate = true
-      }
-
-      // Sync period_start and period_end to the calculated values
-      const storedPeriodStart = new Date(currentPeriodQuota.period_start).getTime()
-      const storedPeriodEnd = new Date(currentPeriodQuota.period_end).getTime()
-      if (Math.abs(storedPeriodStart - periodStart.getTime()) > 60000) {
-        updateData.period_start = periodStart.toISOString()
-        currentPeriodQuota.period_start = periodStart.toISOString()
-        needsUpdate = true
-      }
-      if (Math.abs(storedPeriodEnd - periodEnd.getTime()) > 60000) {
-        updateData.period_end = periodEnd.toISOString()
-        currentPeriodQuota.period_end = periodEnd.toISOString()
-        needsUpdate = true
-      }
-
-      if (needsUpdate) {
-        const quotaRef = quotaSnap.docs.find((doc) => {
-          const quota = doc.data() as ProfileQuota
-          return matchQuota(quota)
-        })?.ref
-
-        if (quotaRef) {
-          await setDoc(quotaRef, updateData, { merge: true })
-        }
-      }
-
-      return currentPeriodQuota
     }
   }
 
-  // Create new quota for this period
-  // This automatically resets usage when a new month starts
-  const sessionsLimit = getSessionsLimitForTier(subscriptionTier)
-
-  const quotaData: ProfileQuota = {
-    id: "", // Will be auto-generated by Firestore
+  // No doc for this period yet: report a virtual zero-usage quota.
+  return {
+    id: "",
     user_id: userId,
     sessions_used: 0,
     sessions_limit: sessionsLimit,
     free_opens_remaining: 0,
     period_start: periodStart.toISOString(),
     period_end: periodEnd.toISOString(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
   }
-
-  const quotaRef = doc(collection(db, "profile_quota"))
-  quotaData.id = quotaRef.id
-  await setDoc(quotaRef, quotaData)
-
-  return quotaData
 }
 
 /**
@@ -383,7 +344,7 @@ export async function checkUsageLimit(userId: string): Promise<{
   periodEnd: string
 }> {
   const profile = await getUserProfile(userId)
-  const quota = await initializeUserQuota(
+  const quota = await resolveUserQuota(
     userId,
     profile?.subscription_tier || "free",
     profile?.created_at,
@@ -397,67 +358,6 @@ export async function checkUsageLimit(userId: string): Promise<{
     limit: quota.sessions_limit,
     freeOpensRemaining: quota.free_opens_remaining || 0,
     periodEnd: quota.period_end,
-  }
-}
-
-/**
- * Check if starting a session will cost usage
- * Returns: { costsUsage: boolean, freeOpensRemaining: number, reason: string }
- *
- * Usage model:
- * - First session costs 1 usage, grants 10 free opens
- * - After 10 opens, next session costs 1 usage, grants 10 more free opens
- * - Pro users have higher limits but same free opens system
- */
-export async function checkSessionCost(userId: string): Promise<{
-  costsUsage: boolean
-  freeOpensRemaining: number
-  allowed: boolean
-  reason: string
-  quota: ProfileQuota
-}> {
-  const profile = await getUserProfile(userId)
-  const quota = await initializeUserQuota(
-    userId,
-    profile?.subscription_tier || "free",
-    profile?.created_at,
-    profile?.subscription_current_period_end,
-    profile?.subscription_type
-  )
-
-  const freeOpens = quota.free_opens_remaining || 0
-  const used = quota.sessions_used
-  const limit = quota.sessions_limit
-
-  // If user has free opens remaining, no cost
-  if (freeOpens > 0) {
-    return {
-      costsUsage: false,
-      freeOpensRemaining: freeOpens,
-      allowed: true,
-      reason: `${freeOpens} free opens remaining`,
-      quota,
-    }
-  }
-
-  // No free opens - check if user has usage left
-  if (used < limit) {
-    return {
-      costsUsage: true,
-      freeOpensRemaining: 0,
-      allowed: true,
-      reason: `Will use 1 session (${used + 1}/${limit}), then get 10 free opens`,
-      quota,
-    }
-  }
-
-  // No free opens and no usage left
-  return {
-    costsUsage: true,
-    freeOpensRemaining: 0,
-    allowed: false,
-    reason: `Session limit reached (${used}/${limit})`,
-    quota,
   }
 }
 
@@ -1124,125 +1024,48 @@ export async function findLatestSubmittedSession(
 }
 
 /**
- * Record session start and manage usage
+ * Record session start and manage usage.
  *
- * New model:
- * - If user has free opens, decrement free_opens_remaining
- * - If no free opens, increment sessions_used and grant 10 free opens
+ * QUOTA-1: quota mutations are server-authoritative. This helper keeps its old
+ * shape for callers but delegates to POST /api/usage/session-start with the
+ * signed-in user's token. Identity comes from the verified token — the userId
+ * argument is no longer trusted — and profile_quota is client-read-only in
+ * Firestore rules, so this API call is the only way to spend a session.
  */
-export async function recordSessionStart(
-  userId: string,
-  precomputedQuota?: ProfileQuota
-): Promise<{
+export async function recordSessionStart(_userId: string): Promise<{
   success: boolean
   usedPaidSession: boolean
   freeOpensRemaining: number
 }> {
-  // Reuse the quota a preceding checkSessionCost already resolved when the
-  // caller threads it through, so a session start does not repeat the profile
-  // read plus quota initialization that check just performed (PERF-S11).
-  let quota = precomputedQuota
-  if (!quota) {
-    const profile = await getUserProfile(userId)
-    quota = await initializeUserQuota(
-      userId,
-      profile?.subscription_tier || "free",
-      profile?.created_at,
-      profile?.subscription_current_period_end,
-      profile?.subscription_type
-    )
+  const { getCurrentUserToken } = await import("./firebase-lazy")
+  const token = await getCurrentUserToken()
+  if (!token) {
+    throw new Error("Authentication required to start a session")
   }
 
-  // quota.id is the profile_quota document id, so read that document directly
-  // rather than running an equality query against the id field. When the id is
-  // missing or empty we surface the same "Quota not found" error the previous
-  // query produced (its result set was empty in that case).
-  if (!quota.id) {
-    throw new Error("Quota not found")
-  }
-
-  const quotaRef = doc(db, "profile_quota", quota.id)
-  const quotaSnap = await getDoc(quotaRef)
-
-  if (!quotaSnap.exists()) {
-    throw new Error("Quota not found")
-  }
-  let usedPaidSession = false
-  let newFreeOpens = 0
-
-  await runTransaction(db, async (transaction) => {
-    const quotaDoc = await transaction.get(quotaRef)
-
-    if (!quotaDoc.exists()) {
-      throw new Error("Quota document does not exist")
-    }
-
-    const data = quotaDoc.data()
-    const currentUsage = data.sessions_used || 0
-    const sessionLimit = data.sessions_limit || 0
-    const freeOpens = data.free_opens_remaining || 0
-
-    // If user has free opens, use one
-    if (freeOpens > 0) {
-      newFreeOpens = freeOpens - 1
-      transaction.update(quotaRef, {
-        free_opens_remaining: newFreeOpens,
-        last_session_start: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      usedPaidSession = false
-    } else {
-      // No free opens - need to use a paid session
-      if (currentUsage >= sessionLimit) {
-        throw new Error("Session limit exceeded")
-      }
-
-      // Use 1 session, grant 10 free opens
-      newFreeOpens = 10
-      transaction.update(quotaRef, {
-        sessions_used: increment(1),
-        free_opens_remaining: newFreeOpens,
-        last_session_start: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      usedPaidSession = true
-    }
+  const response = await fetch("/api/usage/session-start", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
   })
+
+  if (response.status === 403) {
+    // Preserve the exact error surface callers have always handled.
+    throw new Error("Session limit exceeded")
+  }
+  if (!response.ok) {
+    throw new Error("Failed to record session start")
+  }
+
+  const data = (await response.json()) as {
+    usedPaidSession?: boolean
+    freeOpensRemaining?: number
+  }
 
   return {
     success: true,
-    usedPaidSession,
-    freeOpensRemaining: newFreeOpens,
+    usedPaidSession: !!data.usedPaidSession,
+    freeOpensRemaining: data.freeOpensRemaining ?? 0,
   }
-}
-
-/**
- * @deprecated Use recordSessionStart instead
- * Kept for backward compatibility
- */
-export async function incrementSessionUsage(userId: string): Promise<void> {
-  await recordSessionStart(userId)
-}
-
-/**
- * Update user quota when subscription tier changes
- * This ensures existing quotas get updated limits
- */
-export async function updateQuotaForSubscriptionTier(
-  userId: string,
-  subscriptionTier: "free" | "pro" | "enterprise",
-  signupDate?: string,
-  stripeCurrentPeriodEnd?: string,
-  subscriptionType?: string
-): Promise<void> {
-  // This will update the quota limit if it exists, or create a new one
-  await initializeUserQuota(
-    userId,
-    subscriptionTier,
-    signupDate,
-    stripeCurrentPeriodEnd,
-    subscriptionType
-  )
 }
 
 // ============================================================================
