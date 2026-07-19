@@ -215,7 +215,7 @@ export function ComparisonSection() {
 
               <div className="flex items-baseline gap-2">
                 <AnimatedPrice
-                  value={747}
+                  value={750}
                   delay={300}
                   className="font-light"
                   style={{
@@ -227,7 +227,7 @@ export function ComparisonSection() {
                 />
                 <span style={{ fontFamily: fontBody, color: "#7a7a7a" }}>–</span>
                 <AnimatedPrice
-                  value={1119}
+                  value={1125}
                   delay={500}
                   className="font-light"
                   style={{
