@@ -2,6 +2,7 @@ import type { EmbeddingProvider, VectorDocument } from "@/lib/rag/types"
 import { vectorDB } from "@/lib/rag/vectordb"
 import { getScenariosByType } from "@/lib/scenarios/index"
 import type { BugFixScenario } from "@/lib/scenarios/types"
+import { hydrateSealedLegacyBugfix } from "@/lib/scenarios/sealed/legacy-registry.server"
 import { bugFixToEmbeddingText } from "../text-builders/bugfix-text"
 import type { VectorizationJobResult, VectorizationProgressCallback } from "../types"
 
@@ -48,7 +49,11 @@ export async function vectorizeBugFixScenarios(
 
   try {
     onProgress?.("Loading Bug Fix scenarios", 0, 1, "Loading...")
-    const scenarios = (await getScenariosByType("bugfix")) as BugFixScenario[]
+    const clientScenarios = (await getScenariosByType("bugfix")) as BugFixScenario[]
+    // Re-merge sealed answer content (bug description, ground truth, rubric) server-side
+    // so the retrieval text stays as rich as it was before that content was sealed out
+    // of the client bundle. Non-legacy scenarios (packs) pass through unchanged.
+    const scenarios = await Promise.all(clientScenarios.map(hydrateSealedLegacyBugfix))
     onProgress?.("Loading Bug Fix scenarios", 1, 1, `Loaded ${scenarios.length} scenarios`)
 
     await vectorDB.delete(REMOVED_LEGACY_BUGFIX_SCENARIO_IDS.map((id) => `bugfix-${id}`))
