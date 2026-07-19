@@ -758,6 +758,23 @@ interface QuotaLimits {
 - CORS configuration
 - Webhook signature verification
 
+### Sealed scenario content
+
+Interview answers must never reach the browser. For bug-fix scenarios the root cause, ground
+truth, scoring rubric, and reference solution live in server-only `*.server.ts` modules, never in
+the client scenario objects:
+
+- **Stdout-oracle packs**: `lib/scenarios/sealed/<pack-id>.server.ts`, loaded by
+  `lib/scenarios/sealed/registry.server.ts`.
+- **Legacy bug-fix bank (10 scenarios)**: `lib/scenarios/sealed/legacy/<id>.server.ts`, loaded by
+  `lib/scenarios/sealed/legacy-registry.server.ts`. The client module keeps only the symptom-level
+  brief and a generic process rubric.
+
+Each sealed module is window-guarded (`if (typeof window !== "undefined") throw`) and may be
+imported only by whitelisted server routes (feedback stream, admin bug-fix quality, RAG
+vectorization). The `sealing.test.ts` import-graph test fails CI if any client component imports a
+sealed module, or if a non-whitelisted file loads the registry.
+
 ### Headers
 
 ```typescript
