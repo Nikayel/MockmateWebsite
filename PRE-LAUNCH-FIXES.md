@@ -168,7 +168,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 - **Verify:** `pnpm typecheck`.
 - **Commit:** `security(api): stop leaking internal errors in 5xx responses`
 
-### API-LEAK-2 — unauthenticated health/topology disclosure — **LOW**
+### API-LEAK-2 — unauthenticated health/topology disclosure — **LOW** — **FIXED 2026-07-19** (anonymous gets {status,timestamp}; detail behind CRON_SECRET bearer via verifyCronRequest; catch no longer echoes error.message)
 - **Files:** `app/api/health/route.ts`, `app/api/rag/health/route.ts`.
 - **Problem:** Expose which subsystems are healthy + RAG provider/vector counts/namespaces
   to any caller, echoing raw error messages.
@@ -177,7 +177,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 - **Verify:** `pnpm typecheck`; anonymous GET returns only `{ status }`.
 - **Commit:** `security(api): restrict health endpoint detail to internal callers`
 
-### API-VALID-2 — `notifications/preferences` unvalidated writes — **LOW**
+### API-VALID-2 — `notifications/preferences` unvalidated writes — **LOW** — **FIXED 2026-07-19** (zod-clamped every PUT mode; unknown keys stripped)
 - **File:** `app/api/notifications/preferences/route.ts:59–144`.
 - **Problem:** `fcmToken`, `timezone`, `channels`, full `preferences` written straight
   into `set(..., { merge: true })` (self-scoped document-shape pollution).
