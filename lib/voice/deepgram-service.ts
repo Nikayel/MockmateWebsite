@@ -124,7 +124,13 @@ export class DeepgramVoiceService {
     })
 
     if (!response.ok) {
-      throw new Error("Failed to fetch voice token")
+      // 503 = the server refused to serve a key (ephemeral minting unavailable);
+      // typing input keeps working, so tell the user that instead of a generic failure.
+      throw new Error(
+        response.status === 503
+          ? "Voice transcription is temporarily unavailable. You can keep typing your answers."
+          : "Failed to fetch voice token"
+      )
     }
 
     const data = await response.json()
