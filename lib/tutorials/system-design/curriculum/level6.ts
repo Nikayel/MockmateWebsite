@@ -418,6 +418,8 @@ replay window or replays double-apply.
 const deliverySemanticsTeach = `
 ## Three promises a pipeline can make
 
+Level 5's distributed-systems theory already proved the theorem this lesson stands on: **exactly-once delivery over a network is impossible**, because a sender that never gets an ack cannot tell "message lost" from "ack lost" (the Two Generals problem). Take that as settled. The operational question here is the one the theory does not answer: given that impossibility, which of three promises does your pipeline actually make, and where does the ack sit that decides it?
+
 Every message pipeline makes one of three promises, and stating which one, end to end, is the single most important sentence in an async design.
 
 **At-most-once**: a message is delivered zero or one times. You never see a duplicate, but you can lose messages. You get this by acknowledging (committing your read position) *before* you process. If the consumer crashes after the commit but before the work finishes, that message is gone forever. Fine for a metrics sample or a best-effort log line, unacceptable for a payment.
@@ -426,11 +428,9 @@ Every message pipeline makes one of three promises, and stating which one, end t
 
 **Exactly-once**: every message takes effect once, no loss, no duplicate. This is what everyone wants and what the network cannot give you.
 
-## Exactly-once delivery over a network is impossible
+## From impossible delivery to exactly-once processing
 
-Here is the sentence that separates a senior answer from a junior one. **Exactly-once delivery over a network is impossible.** The sender transmits a message and waits for an ack. If the ack does not arrive, the sender cannot distinguish "the message was lost" from "the message arrived and the ack was lost." Its only two moves are resend (risk a duplicate, that is at-least-once) or give up (risk a loss, that is at-most-once). No protocol escapes this, because the failure is indistinguishable from the receiving side's silence. This is the Two Generals problem in production clothing.
-
-So what do the vendors mean by "exactly-once"? They mean **exactly-once processing**, achieved by taking at-least-once delivery and making the effect idempotent or transactional so that duplicates do not change the outcome. You convert a delivery guarantee into a processing guarantee at the consumer.
+Since delivery itself cannot be exactly-once (the impossibility is stated above and proved in Level 5), the useful move is to redefine the goal. So what do the vendors mean by "exactly-once"? They mean **exactly-once processing**, achieved by taking at-least-once delivery and making the effect idempotent or transactional so that duplicates do not change the outcome. You convert a delivery guarantee into a processing guarantee at the consumer.
 
 \`\`\`
   producer --(at-least-once delivery, may duplicate)--> broker --> consumer
@@ -450,23 +450,13 @@ Where the ack sits is the whole game: commit-before-process is at-most-once, pro
 `.trim()
 
 const idempotencyDedupTeach = `
-## Idempotency is your defense against duplicates
+## Idempotency, past the definition
 
-Once you accept at-least-once delivery (and you should for anything that matters), **idempotency is your primary defense against duplicate side effects**. An operation is idempotent if performing it twice has the same observable effect as performing it once. The goal is that a redelivered message, a client retry after a timeout, or a double-tapped "Pay" button all converge to a single outcome.
-
-There are three flavors, in rough order of preference:
-
-1. **Naturally idempotent operations.** \`SET status = shipped\` or an upsert keyed by a stable id is idempotent for free; applying it twice lands in the same state. Prefer designing operations this way. \`INCR balance\` is the opposite: repeating it corrupts state, so counters need explicit protection.
-2. **Idempotent by design via state machines.** Model the aggregate as states with legal transitions (\`CREATED -> PAID -> SHIPPED\`). A command that tries an already-taken transition is a no-op. Combined with a per-aggregate **expected version** (optimistic concurrency), a replayed or stale command is simply rejected.
-3. **Enforced idempotency via a dedup store.** For everything else, attach an **idempotency key** (a client-supplied UUID, or the event id) and keep a **dedup store** that records which keys you have already processed, with the result.
-
-## Store the result, not a boolean
-
-The single most important detail: the dedup store must save the **result**, not just a "seen" flag. If you store only a boolean, two concurrent duplicates both see "not seen," both execute, and now you have diverged and no stored answer to return. Store the outcome (the created order id, the HTTP response body) keyed by the idempotency key, and return it verbatim on any repeat.
+Level 5's delivery-and-idempotency lesson established the key mechanics: attach a unique **idempotency key** to a request, do the work once, store the *result* keyed by that key, and return the stored result on any retry, all written atomically with the side effect. This lesson takes that as given and goes at the two things that actually break in production once you accept at-least-once delivery: the concurrent-duplicate race, and how long you must remember a key.
 
 ## The concurrent-duplicate race
 
-**The concurrent-duplicate race** is what interviewers probe. Two copies of the same request arrive at two servers at the same millisecond. A read-then-write check ("is this key present? no -> insert") has a race between the read and the write where both pass. You must make the check-and-set **atomic**:
+**The concurrent-duplicate race** is what interviewers probe. Two copies of the same request arrive at two servers at the same millisecond. A read-then-write check ("is this key present? no -> insert") has a race between the read and the write where both pass, both execute, and you double-apply. You must make the check-and-set **atomic**:
 
 \`\`\`
   INSERT INTO idempotency_keys (key, status, result)
@@ -478,13 +468,23 @@ The single most important detail: the dedup store must save the **result**, not 
 
 A unique constraint (or a Redis \`SET key value NX\`, or a DynamoDB conditional \`PutItem\` with \`attribute_not_exists\`) makes exactly one writer win. The loser reads back the row: if it is \`in_progress\`, it waits or returns 409/retry; if \`completed\`, it returns the stored result.
 
+**Store the result, not a boolean.** This is the detail the race turns on. If the dedup store keeps only a "seen" flag, two concurrent duplicates both find "not seen," both execute, and there is no stored answer to hand back. Save the outcome (the created order id, the HTTP response body) keyed by the idempotency key, and return it verbatim on any repeat.
+
 ## Sizing the dedup window
 
-The dedup store keeps keys for a TTL. That TTL must be **at least as long as the longest window in which a duplicate can arrive.** Two windows matter: client retry horizon (how long clients keep retrying, minutes) and broker **replay/retention** window (Kafka can replay days of history during a reprocess or consumer reset). If your dedup TTL is 1 hour but you replay a 3-day-old topic, every replayed message looks new and re-applies. Size the TTL to cover the replay window, or use a permanent natural key so replays are inherently safe.
+The dedup store keeps keys for a TTL, and that TTL must be **at least as long as the longest window in which a duplicate can arrive.** Two windows matter: the client retry horizon (how long clients keep retrying, usually minutes) and the broker **replay/retention** window (Kafka can replay days of history during a reprocess or consumer reset). If your dedup TTL is 1 hour but you replay a 3-day-old topic, every replayed message looks new and re-applies. Size the TTL to cover the replay window, or use a permanent natural key so replays are inherently safe.
+
+## The idempotency toolkit
+
+The dedup store is the general fallback, but two cheaper flavors come first when the operation allows:
+
+1. **Naturally idempotent operations.** \`SET status = shipped\` or an upsert keyed by a stable id lands in the same state however many times it runs. Design for this where you can. \`INCR balance\` is the opposite: repeating it corrupts state, so counters need explicit protection.
+2. **Idempotent by design via state machines.** Model the aggregate as states with legal transitions (\`CREATED -> PAID -> SHIPPED\`). A command that tries an already-taken transition is a no-op, and a per-aggregate **expected version** (optimistic concurrency) rejects a replayed or stale command outright.
+3. **Enforced idempotency via a dedup store.** For everything else, the idempotency-key-plus-stored-result machinery above, guarded by the atomic check-and-set.
 
 **Interview nuance:** distinguish the idempotency key's *scope*. A client-supplied key dedups client retries of the same logical request. An event-id key dedups broker redeliveries. They are different keys guarding different duplicate sources, and a robust design often uses both.
 
-**Recap:** idempotency neutralizes at-least-once duplicates via natural idempotency, state machines with expected-version checks, or a dedup store that saves the *result* under an idempotency key; resolve the concurrent race with an atomic check-and-set (unique constraint), and size the TTL to cover both the client-retry and broker-replay windows.
+**Recap:** past the L5 key mechanics, the two production hazards are the concurrent-duplicate race (resolve it with an atomic check-and-set on a unique constraint, storing the *result* not a flag) and the dedup window (size the TTL to cover both the client-retry and broker-replay horizons); prefer naturally idempotent operations or state-machine transitions before falling back to a dedup store.
 `.trim()
 
 const retriesDlqBackpressureTeach = `
