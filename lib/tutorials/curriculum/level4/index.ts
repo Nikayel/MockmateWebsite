@@ -2869,10 +2869,10 @@ Some tests are hidden.`,
 export const level4: PythonLevel = {
   id: 4,
   slug: "engineering",
-  title: "Level 4: Codebase",
-  tagline: "Work across real files: follow imports, change a function, prove it with a test.",
+  title: "Level 4: Engineering",
+  tagline: "Advanced OOP, decorators, concurrency, async, profiling, and packaging.",
   defaultExecutionMode: "workspace",
-  estimatedHours: 8,
+  estimatedHours: 4,
   modules: [
     {
       id: "py-l4-advanced-oop",
