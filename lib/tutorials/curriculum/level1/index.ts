@@ -596,18 +596,7 @@ def power(exp=2, base):   # SyntaxError: non-default argument follows default ar
 
 Python cannot fill positional arguments left to right if a required parameter sits behind an optional one. Fix it by ordering required parameters first: \`def power(base, exp=2)\`.
 
-**Interview nuance:** a default value is evaluated **once**, when \`def\` runs, not on each call. That is harmless for immutable defaults like \`2\`, but a mutable default is shared across every call:
-
-\`\`\`python
-def append_to(item, bucket=[]):
-    bucket.append(item)
-    return bucket
-
-print(append_to(1))   # [1]
-print(append_to(2))   # [1, 2]   same list reused!
-\`\`\`
-
-The fix is the standard sentinel pattern: default to \`None\`, then create a fresh object inside the body (\`if bucket is None: bucket = []\`). Interviewers use this to check whether you understand that \`def\` runs once but the body runs every call.`,
+**Interview nuance:** a default value is evaluated **once**, when \`def\` runs, not on each call, so a mutable default like \`bucket=[]\` is shared across calls and quietly accumulates results between them. The next lesson, References, copies and the mutable-default trap, covers why this happens and the \`None\`-sentinel fix in full.`,
     demoCode: `def power(base, exp=2):
     return base ** exp
 
@@ -1020,6 +1009,20 @@ word[1:-1]  # "ytho"  drop the first and last character
 \`\`\`
 
 That \`word[1:-1]\` pattern is exactly what the Practice needs. \`text[1:-1]\` starts at the second character and stops just before the last, so \`"[hi]"\` becomes \`"hi"\`.
+
+## Slicing with a step
+
+A slice takes an optional third number, the **step**: \`text[start:stop:step]\`. The step sets how far to jump between characters, so \`word[::2]\` keeps every second character (\`"pto"\` from \`"python"\`). Leaving \`start\` and \`stop\` empty runs across the whole string.
+
+A **negative** step walks backward, so the idiom \`text[::-1]\` reverses a string by stepping from the end to the start:
+
+\`\`\`python
+word[::2]    # "pto"     every second character
+word[::-1]   # "nohtyp"  the whole string, reversed
+"abc"[::-1]  # "cba"
+\`\`\`
+
+Reversing with \`[::-1]\` is the idiomatic way to test a palindrome: \`text == text[::-1]\`.
 
 ## Strings are immutable
 
@@ -1999,7 +2002,7 @@ x in a_dict    # O(1) average: same hashing, keyed lookup
 
 ### The classic upgrade
 
-The demo below turns a list into a set and compares lengths. \`set(nums)\` drops duplicates, so if the set is shorter than the list, something repeated. That is the whole idea behind \`has_duplicates\`: \`len(set(nums)) != len(nums)\`. When you need the scan itself, grow a \`seen\` set as you go:
+The demo below turns a list into a set and compares lengths. \`set(nums)\` drops duplicates, so if the set is shorter than the list, something repeated. That length comparison is the whole idea behind \`has_duplicates\`. When you need the scan itself, grow a \`seen\` set as you go:
 
 \`\`\`python
 seen = set()
@@ -2370,7 +2373,7 @@ export const level1: PythonLevel = {
   title: "Level 1: Foundations",
   tagline: "Reference-style basics: variables, types, loops, and functions.",
   defaultExecutionMode: "single-file",
-  estimatedHours: 4,
+  estimatedHours: 3,
   modules: [
     {
       id: "py-l1-fundamentals",
@@ -2395,13 +2398,7 @@ export const level1: PythonLevel = {
       id: "py-l1-collections",
       title: "Collections",
       description: "Lists, tuples, sets, and dictionaries (Python's core containers).",
-      lessons: [
-        listsLesson,
-        tuplesSetsLesson,
-        dictsLesson,
-        referencesCopyLesson,
-        complexityChoiceLesson,
-      ],
+      lessons: [listsLesson, tuplesSetsLesson, dictsLesson],
     },
     {
       id: "py-l1-control-flow",
@@ -2412,6 +2409,8 @@ export const level1: PythonLevel = {
         loopsLesson,
         loopIdiomsLesson,
         functionsLesson,
+        referencesCopyLesson,
+        complexityChoiceLesson,
         recursionLesson,
       ],
     },
