@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAdminAccess } from "@/lib/admin/middleware"
+import {
+  cohortPeriodKey,
+  collectLearnActivityPeriods,
+  type CohortPeriodType,
+  type LearnProgressActivityInput,
+} from "@/lib/admin/cohort-activity"
 import { format, startOfMonth, startOfWeek, differenceInWeeks, differenceInMonths, subMonths } from "date-fns"
 
 interface CohortData {
   cohort: string
   size: number
   retention: number[]
+  /** Retained-active counting interview OR Learn-lesson activity that period. */
+  retentionInclLearn: number[]
 }
 
 /**
@@ -32,12 +40,28 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const cohortType = searchParams.get("type") || "monthly" // weekly or monthly
+    // Normalize to the two supported bucketings (garbage input always bucketed monthly before).
+    const cohortType: CohortPeriodType =
+      searchParams.get("type") === "weekly" ? "weekly" : "monthly"
     const numCohorts = parseInt(searchParams.get("cohorts") || "6", 10)
 
     // Get all users with their signup dates
     const profilesSnapshot = await adminDb.collection("profiles").get()
     const sessionsSnapshot = await adminDb.collection("interview_sessions").get()
+
+    // Learn-lesson progress feeds the "incl. Learn" retention split: a cohort
+    // user counts as retained-active when they did interview OR Learn activity
+    // that period. Fetched best-effort so a failure never breaks the existing
+    // interview-only retention numbers.
+    let learnProgressDocs: LearnProgressActivityInput[] = []
+    try {
+      const progressSnapshot = await adminDb.collection("user_tutorial_progress").get()
+      learnProgressDocs = progressSnapshot.docs.map(
+        (doc) => doc.data() as LearnProgressActivityInput
+      )
+    } catch (error) {
+      console.error("Error fetching tutorial progress for cohorts:", error)
+    }
 
     // Build user activity map: userId -> Set of activity dates
     const userActivity: Map<string, Set<string>> = new Map()
@@ -53,9 +77,8 @@ export async function GET(request: NextRequest) {
             ? new Date(startedAt)
             : startedAt.toDate?.() || new Date(startedAt)
 
-          const periodKey = cohortType === "weekly"
-            ? format(startOfWeek(date), "yyyy-MM-dd")
-            : format(startOfMonth(date), "yyyy-MM")
+          // Same bucketing as before, now shared with the Learn activity map.
+          const periodKey = cohortPeriodKey(date, cohortType)
 
           if (!userActivity.has(userId)) {
             userActivity.set(userId, new Set())
@@ -66,6 +89,9 @@ export async function GET(request: NextRequest) {
         }
       }
     })
+
+    // userId -> Set of periods with Learn activity, bucketed identically.
+    const learnActivity = collectLearnActivityPeriods(learnProgressDocs, cohortType)
 
     // Build cohorts
     const now = new Date()
@@ -115,6 +141,7 @@ export async function GET(request: NextRequest) {
           cohort: cohortLabel,
           size: 0,
           retention: [],
+          retentionInclLearn: [],
         })
         continue
       }
@@ -123,6 +150,7 @@ export async function GET(request: NextRequest) {
       const maxPeriods = cohortType === "weekly" ? 8 : 6 // 8 weeks or 6 months
       const periodsToCalculate = Math.min(maxPeriods, numCohorts - cohorts.length)
       const retention: number[] = []
+      const retentionInclLearn: number[] = []
 
       for (let p = 0; p < periodsToCalculate; p++) {
         const periodStart = cohortType === "weekly"
@@ -133,28 +161,37 @@ export async function GET(request: NextRequest) {
           ? format(periodStart, "yyyy-MM-dd")
           : format(periodStart, "yyyy-MM")
 
-        // Count users active in this period
+        // Count users active in this period (interview-only, and incl. Learn)
         let activeUsers = 0
+        let activeUsersInclLearn = 0
         cohortUsers.forEach((userId) => {
-          const activity = userActivity.get(userId)
-          if (activity?.has(periodKey)) {
+          const sessionActive = userActivity.get(userId)?.has(periodKey) ?? false
+          const learnActive = learnActivity.get(userId)?.has(periodKey) ?? false
+          if (sessionActive) {
             activeUsers++
+          }
+          if (sessionActive || learnActive) {
+            activeUsersInclLearn++
           }
         })
 
         const retentionRate = (activeUsers / cohortUsers.length) * 100
         retention.push(Math.round(retentionRate * 10) / 10)
+        const retentionRateInclLearn = (activeUsersInclLearn / cohortUsers.length) * 100
+        retentionInclLearn.push(Math.round(retentionRateInclLearn * 10) / 10)
       }
 
       cohorts.push({
         cohort: cohortLabel,
         size: cohortUsers.length,
         retention,
+        retentionInclLearn,
       })
     }
 
     // Calculate average retention per period
     const avgRetention: number[] = []
+    const avgRetentionInclLearn: number[] = []
     const maxRetentionPeriods = Math.max(...cohorts.map((c) => c.retention.length))
 
     for (let p = 0; p < maxRetentionPeriods; p++) {
@@ -167,6 +204,18 @@ export async function GET(request: NextRequest) {
           Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
         )
       }
+
+      const valuesInclLearn = cohorts
+        .filter((c) => c.retentionInclLearn[p] !== undefined)
+        .map((c) => c.retentionInclLearn[p])
+
+      if (valuesInclLearn.length > 0) {
+        avgRetentionInclLearn.push(
+          Math.round(
+            (valuesInclLearn.reduce((a, b) => a + b, 0) / valuesInclLearn.length) * 10
+          ) / 10
+        )
+      }
     }
 
     return NextResponse.json({
@@ -177,6 +226,8 @@ export async function GET(request: NextRequest) {
         totalCohorts: cohorts.length,
         totalUsers: cohorts.reduce((sum, c) => sum + c.size, 0),
         avgRetention,
+        // Additive: same averages when Learn-lesson activity also counts.
+        avgRetentionInclLearn,
         periodLabels: cohortType === "weekly"
           ? ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"]
           : ["M1", "M2", "M3", "M4", "M5", "M6"],

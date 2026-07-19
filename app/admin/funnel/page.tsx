@@ -30,12 +30,21 @@ interface FunnelData {
     sessionToScored: number
   }
   signupsBySource?: Record<string, number>
+  /** First scored round within 24h of signup, fixed signup window (null when unavailable). */
+  activation?: {
+    windowDays: number
+    signups: number
+    activated: number
+    rate: number
+  } | null
 }
 
 interface CohortData {
   cohort: string
   size: number
   retention: number[]
+  /** Retained-active counting interview OR Learn-lesson activity that period. */
+  retentionInclLearn?: number[]
 }
 
 export default function FunnelPage() {
@@ -216,6 +225,40 @@ export default function FunnelPage() {
         </div>
       )}
 
+      {/* Activation (council definition): first scored round within 24h of signup, fixed 30-day signup cohort. */}
+      {funnel?.activation && (
+        <div>
+          <h2 className="text-xl font-bold text-white mb-1">
+            Activation (last {funnel.activation.windowDays} days)
+          </h2>
+          <p className="text-gray-400 text-sm mb-3">
+            Users who signed up in the last {funnel.activation.windowDays} days and completed
+            their first scored round within 24 hours of signup.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { label: "Signups", value: funnel.activation.signups, isCount: true },
+              { label: "Activated within 24h", value: funnel.activation.activated, isCount: true },
+              { label: "Activation rate", value: funnel.activation.rate, highlight: true },
+            ].map((stat) => (
+              <Card
+                key={stat.label}
+                className={`border-gray-800 ${stat.highlight ? "bg-[#c4703f]/10 border-[#c4703f]/30" : "bg-gray-900/50"}`}
+              >
+                <CardContent className="p-4 text-center">
+                  <div
+                    className={`text-2xl font-bold ${stat.highlight ? "text-[#c4703f]" : "text-white"}`}
+                  >
+                    {stat.isCount ? stat.value.toLocaleString() : `${stat.value.toFixed(1)}%`}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{stat.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Signups by acquisition source (first-touch src/ref) — measures which channels drive signups. */}
       {funnel?.signupsBySource && Object.keys(funnel.signupsBySource).length > 0 && (
         <div>
@@ -290,6 +333,17 @@ export default function FunnelPage() {
             <p className="text-gray-400">No cohort data available</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Same cohorts with Learn-lesson activity also counting as retained-active. */}
+      {cohorts.length > 0 && cohorts.some((c) => (c.retentionInclLearn?.length ?? 0) > 0) && (
+        <CohortHeatmap
+          title="User Retention (incl. Learn)"
+          subtitle={`${cohortType === "weekly" ? "Weekly" : "Monthly"} cohorts · interview or Learn activity`}
+          data={cohorts.map((c) => ({ ...c, retention: c.retentionInclLearn ?? [] }))}
+          periodLabels={periodLabels}
+          icon={Users}
+        />
       )}
     </div>
   )
