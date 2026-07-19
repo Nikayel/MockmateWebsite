@@ -12,6 +12,7 @@ import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
 import { ReferralCapture } from "@/components/ReferralCapture"
 import { AttributionCapture } from "@/components/AttributionCapture"
+import { ClientErrorReporter } from "@/components/monitoring/ClientErrorReporter"
 import {
   OrganizationJsonLd,
   SoftwareApplicationJsonLd,
@@ -231,6 +232,7 @@ html {
         <PerformancePolyfill />
         <ReferralCapture />
         <AttributionCapture />
+        <ClientErrorReporter />
         {/* disableTransitionOnChange intentionally omitted. The light↔dark
             crossfade is handled by the View Transitions API in
             components/ThemeToggle.tsx, not a per-element CSS transition. */}
