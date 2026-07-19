@@ -7,8 +7,6 @@
 export { useNotifications } from "./useNotifications"
 export type { UseNotificationsOptions, UseNotificationsReturn } from "./useNotifications"
 
-export { useSessionMetrics } from "./use-session-metrics"
-
 export { useFocusTrap } from "./useFocusTrap"
 
 export { useSpacedRepetition } from "./useSpacedRepetition"
