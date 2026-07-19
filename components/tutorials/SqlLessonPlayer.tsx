@@ -88,7 +88,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
   // The player is a Client Component and the route sets no metadata, so set the tab title here.
   useEffect(() => {
     const previous = document.title
-    document.title = `${lesson.title} — Learn SQL`
+    document.title = `${lesson.title} | Learn SQL`
     return () => {
       document.title = previous
     }
@@ -324,8 +324,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
                   {sections.practice === "completed" && (
                     <div className="flex flex-col gap-3">
                       <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                        Lesson complete. Nice work. This idea resurfaces in 3 days for spaced
-                        practice.
+                        Lesson complete. Nice work. Revisit it in a few days to lock it in.
                       </p>
                       <div>
                         {nextStep.kind === "lesson" && (
@@ -339,10 +338,10 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
                         {nextStep.kind === "level-complete" && (
                           <div className="border-accent/40 bg-accent/[0.07] flex flex-col gap-3 rounded-xl border p-4">
                             <p className="text-foreground text-sm font-semibold">
-                              Level {level.id} complete. You finished {level.title}.
+                              You finished {level.title}.
                             </p>
                             <p className="text-muted-foreground text-sm">
-                              Next up: Level {nextStep.levelId}, {nextStep.levelTitle}.
+                              Next up: {nextStep.levelTitle}.
                             </p>
                             <div className="flex flex-wrap gap-2">
                               <Button asChild className="gap-2">
@@ -362,9 +361,9 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
                         )}
                         {nextStep.kind === "finished" && (
                           <Button asChild variant="outline" className="gap-2">
-                            <Link href="/learn/sql">
+                            <Link href="/labs">
                               <ArrowLeft className="h-4 w-4" />
-                              You finished the path. Back to levels
+                              You finished the path. Try the case labs
                             </Link>
                           </Button>
                         )}
