@@ -99,7 +99,7 @@ export default async function Image() {
             marginTop: 48,
           }}
         >
-          {['Voice-Enabled', '24/7 Available', 'AI Feedback', '15 DSA Patterns'].map((feature) => (
+          {['Voice-Enabled', '24/7 Available', 'AI Feedback', '15+ DSA Patterns'].map((feature) => (
             <div
               key={feature}
               style={{

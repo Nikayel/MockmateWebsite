@@ -477,7 +477,7 @@ export function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="text-primary h-3.5 w-3.5" />
-                  Pattern mastery tracking across 15 DSA patterns
+                  Pattern mastery tracking across 15+ DSA patterns
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="text-primary h-3.5 w-3.5" />
@@ -545,7 +545,7 @@ export function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="text-primary h-3.5 w-3.5" />
-                Pattern mastery tracking across 15 DSA patterns
+                Pattern mastery tracking across 15+ DSA patterns
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="text-primary h-3.5 w-3.5" />
