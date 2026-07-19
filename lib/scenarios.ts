@@ -1,5 +1,5 @@
 /**
- * Interview scenarios for MockMate
+ * Interview scenarios for CodeSparring
  * Shared between website and extension
  *
  * This file serves as the main entry point for all scenarios.
