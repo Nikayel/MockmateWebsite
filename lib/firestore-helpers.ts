@@ -495,6 +495,90 @@ export function summarizeSessionFunnelCounts(
   return counts
 }
 
+/** Session shape needed to locate a user's first scored round; loose read model over Firestore. */
+export interface ActivationSessionInput {
+  user_id?: unknown
+  completed_at?: unknown
+  feedback_status?: unknown
+  performance_score?: unknown
+}
+
+/** Signup-cohort activation: first scored round within the activation window of signup. */
+export interface ActivationCohortSummary {
+  /** Users who signed up inside the cohort window (denominator). */
+  signups: number
+  /** Of those, users whose FIRST scored round completed within the activation window (numerator). */
+  activated: number
+  /** activated / signups as a 0-100 percentage, 1-decimal precision (0 when there are no signups). */
+  rate: number
+}
+
+/** Council-fixed activation window: first scored round within 24h of signup. */
+const DEFAULT_ACTIVATION_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/** Parse the string | Firestore-Timestamp | Date shapes these collections mix; null when invalid. */
+function toActivationDate(value: unknown): Date | null {
+  if (!value) return null
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+  const maybeTimestamp = value as { toDate?: () => Date }
+  if (typeof maybeTimestamp.toDate === "function") {
+    const date = maybeTimestamp.toDate()
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  return null
+}
+
+/**
+ * Activation for a signup cohort (council definition): a user is ACTIVATED
+ * when their FIRST scored round (same scored-complete semantics as WCSR via
+ * isScoredCompletedSession) completed within `activationWindowMs` of signup.
+ *
+ * Pass sessions covering the cohort window: a qualifying round can only start
+ * after its user signed up, so sessions started since `signupSince` see every
+ * candidate round for that cohort.
+ */
+export function summarizeActivationCohort(
+  profiles: Iterable<{ userId: string; createdAt: unknown }>,
+  sessions: Iterable<ActivationSessionInput>,
+  options: { signupSince: Date; activationWindowMs?: number }
+): ActivationCohortSummary {
+  const { signupSince, activationWindowMs = DEFAULT_ACTIVATION_WINDOW_MS } = options
+
+  // Earliest scored completion per user. Order-independent: the minimum wins.
+  const firstScoredAtByUser = new Map<string, number>()
+  for (const session of sessions) {
+    if (typeof session.user_id !== "string" || !session.user_id) continue
+    if (!isScoredCompletedSession(session)) continue
+    const completedAt = toActivationDate(session.completed_at)
+    if (!completedAt) continue
+    const previous = firstScoredAtByUser.get(session.user_id)
+    if (previous === undefined || completedAt.getTime() < previous) {
+      firstScoredAtByUser.set(session.user_id, completedAt.getTime())
+    }
+  }
+
+  let signups = 0
+  let activated = 0
+  for (const profile of profiles) {
+    const createdAt = toActivationDate(profile.createdAt)
+    if (!createdAt || createdAt < signupSince) continue
+    signups++
+    const firstScoredAt = firstScoredAtByUser.get(profile.userId)
+    if (firstScoredAt !== undefined && firstScoredAt <= createdAt.getTime() + activationWindowMs) {
+      activated++
+    }
+  }
+
+  const rate = signups > 0 ? Math.round((activated / signups) * 1000) / 10 : 0
+  return { signups, activated, rate }
+}
+
 /**
  * Update interview session on completion
  *

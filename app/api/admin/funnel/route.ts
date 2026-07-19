@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
-import { summarizeSessionFunnelCounts } from "@/lib/firestore-helpers"
+import {
+  summarizeSessionFunnelCounts,
+  summarizeActivationCohort,
+  type ActivationCohortSummary,
+} from "@/lib/firestore-helpers"
 
 interface FunnelStage {
   name: string
@@ -100,6 +104,38 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Activation (council-fixed definition): % of the last-30-days signup
+    // cohort whose FIRST scored round completed within 24h of signup. The
+    // signup window is fixed at 30 days regardless of the page's timeRange
+    // filter so the quoted rate never moves with the range selector. Bounded
+    // session query: a qualifying round can only start after its user signed
+    // up, so sessions started since the window floor see every candidate.
+    const ACTIVATION_SIGNUP_WINDOW_DAYS = 30
+    const activationSince = new Date(
+      Date.now() - ACTIVATION_SIGNUP_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    )
+    let activation: (ActivationCohortSummary & { windowDays: number }) | null = null
+    try {
+      const activationSessionsSnapshot = await adminDb
+        .collection("interview_sessions")
+        .where("started_at", ">=", activationSince.toISOString())
+        .get()
+      activation = {
+        windowDays: ACTIVATION_SIGNUP_WINDOW_DAYS,
+        ...summarizeActivationCohort(
+          profilesSnapshot.docs.map((doc) => {
+            const profile = doc.data()
+            return { userId: doc.id, createdAt: profile.created_at || profile.createdAt }
+          }),
+          activationSessionsSnapshot.docs.map((doc) => doc.data()),
+          { signupSince: activationSince }
+        ),
+      }
+    } catch (error) {
+      // Additive metric: never let it break the existing funnel payload.
+      console.error("Error computing activation metric:", error)
+    }
+
     // Try to get real page view data from Firebase Analytics if available
     // Otherwise, use an estimate based on signup conversion rates
     let pageViews: number
@@ -178,6 +214,9 @@ export async function GET(request: NextRequest) {
         guestCompletedSessions: sessionCounts.guestCompleted,
         registeredConversionRates,
         signupsBySource,
+        // Activation: % of last-30d signups whose first scored round came
+        // within 24h of signup (null when the computation failed).
+        activation,
       },
     })
   } catch (error) {
