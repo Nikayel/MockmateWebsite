@@ -49,8 +49,8 @@ export interface WorkspaceExerciseRunnerProps {
   /**
    * Persisted editor state. When provided, seeds the initial edits + open tab and is kept in sync via
    * `onPersistState`, so switching sections (which unmounts this runner) doesn't discard the learner's
-   * work — the parent re-seeds it on remount. Omitted by callers that don't need it (the Python
-   * player), which leaves the runner fully self-managed.
+   * work — the parent re-seeds it on remount. Both the Python and SQL players pass it; a caller that
+   * omits it leaves the runner fully self-managed.
    */
   persistedState?: WorkspaceEditorState
   onPersistState?: (state: WorkspaceEditorState) => void
