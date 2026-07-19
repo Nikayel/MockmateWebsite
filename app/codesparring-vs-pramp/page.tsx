@@ -4,7 +4,10 @@ import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 export const metadata: Metadata = {
   title: "CodeSparring vs Pramp | Mock Interview Comparison",
   description:
-    "Compare CodeSparring to Pramp. Find out why practicing with an AI interviewer is often more effective than peer-to-peer mock interviews.",
+    "Compare CodeSparring to Pramp (now Exponent Practice). Find out why practicing with an AI interviewer is often more effective than peer-to-peer mock interviews.",
+  alternates: {
+    canonical: "/codesparring-vs-pramp",
+  },
 }
 
 export default function VsPrampPage() {
@@ -16,7 +19,9 @@ export default function VsPrampPage() {
           <p>
             Pramp is a popular platform that pairs you with another engineer for a peer-to-peer mock
             interview. You spend 30 minutes interviewing them, and they spend 30 minutes
-            interviewing you. It's free and a great way to start practicing speaking out loud.
+            interviewing you. It's free and a great way to start practicing speaking out loud. Since
+            July 2024, Pramp is part of Exponent and its practice tool is now called Exponent
+            Practice, though the peer-to-peer format is unchanged.
           </p>
           <p>
             CodeSparring replaces the peer with an advanced AI. Instead of splitting your time
@@ -62,12 +67,12 @@ export default function VsPrampPage() {
     {
       question: "Is CodeSparring free like Pramp?",
       answer:
-        "CodeSparring offers free practice rounds so you can experience the AI, along with premium tiers for unlimited access and advanced real-world scenarios.",
+        "CodeSparring offers free practice rounds so you can experience the AI, along with a Pro tier for more monthly sessions and advanced real-world scenarios.",
     },
     {
       question: "Will the AI actually judge my communication skills?",
       answer:
-        "Yes! Our platform explicitly grades you on communication—whether you asked clarifying questions, stated your assumptions, and explained your code clearly while typing.",
+        "Yes! Our platform explicitly grades you on communication, including whether you asked clarifying questions, stated your assumptions, and explained your code clearly while typing.",
     },
   ]
 
@@ -75,7 +80,7 @@ export default function VsPrampPage() {
     <LandingPageTemplate
       title="CodeSparring vs Pramp"
       subtitle="Consistent, On-Demand Practice"
-      heroDescription="Pramp is great for peer-to-peer practice, but the quality is hit-or-miss. Discover why thousands of engineers are switching to AI mock interviews for consistent, high-quality feedback."
+      heroDescription="Pramp is great for peer-to-peer practice, but the quality is hit-or-miss. Discover why an AI interviewer gives you consistent, high-quality feedback on every session, on demand."
       primaryKeyword="peer-to-peer mock interview"
       contentSections={contentSections}
       faqs={faqs}
