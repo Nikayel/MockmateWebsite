@@ -244,51 +244,52 @@ separate from ACID isolation, and always reach for the weakest model that is sti
 `.trim()
 
 const sessionGuaranteesTeach = `
-## Most "the app feels broken" bugs are not deep
+## Placing session guarantees on the consistency spectrum
 
-A user updates their profile photo, the page reloads, and the old photo is back. They post a comment,
-refresh, and it is gone. Nothing is corrupted; a read hit a replica that had not caught up. The fix
-is not global linearizability. It is the four **client-centric session guarantees** (from the Bayou
-system), which promise consistency *relative to one client's own view* rather than globally. That is
-usually exactly what the product needs, and it is far cheaper.
+Level 3's "Replication Lag & Session Guarantees" lesson introduced the four **client-centric session
+guarantees** (from the Bayou system) and how to implement them. This lesson credits that treatment and
+adds the theory frame the interview rewards: where these per-client promises sit on the consistency
+spectrum from the previous lesson, and why they are the pragmatic default for user-facing reads.
 
-The setup that causes the pain: writes go to a **primary**, reads are served from **asynchronous read
-replicas** that lag by anywhere from a few milliseconds to seconds. Each guarantee patches one
-symptom of that lag.
+A self-contained recap of the four, since nothing here is corrupted (a read just hit a replica that
+lags the primary, and each guarantee cures one symptom of that lag):
 
-- **Read-your-writes (read-after-write):** once you have written a value, your later reads never
-  return an *older* value. Symptom without it: you edit your bio, reload, and see the old bio.
-- **Monotonic reads:** if you read a value, later reads never show you an *earlier* state. Symptom
-  without it: you refresh a thread, see 10 comments, refresh again and see 8. Time goes backward.
-- **Monotonic writes:** your writes are applied in the order you issued them. Symptom without it: you
-  set status to "away" then "online," but a replica applies them out of order.
-- **Writes-follow-reads (causal on your session):** if you read X and then write Y in response,
-  everyone sees X before Y. Symptom without it: your reply shows up on a replica that has not yet
-  received the comment it answers.
+- **Read-your-writes:** after you write a value, your own later reads never return an *older* one.
+- **Monotonic reads:** once you have seen a value, later reads never show an *earlier* state.
+- **Monotonic writes:** your writes are applied in the order you issued them.
+- **Writes-follow-reads:** if you read X and then write Y in response, everyone sees X before Y.
 
-### How you actually implement them
+Implementation was covered in depth in Level 3, so one line here: pin a user's reads to the primary or
+a caught-up replica for a short window after a write (**sticky routing**, single-device), or return a
+**logical version token** (an LSN or commit timestamp) that later reads carry so the read path waits
+for a replica caught up past it (**version tokens**, the only option that survives the phone-write then
+laptop-read cross-device case, because a cookie-scoped sticky session does not travel).
 
-1. **Sticky routing.** After a user writes, pin their reads to the primary (or to the specific
-   replica that has the write) for a short window, via a cookie or a "read from primary for N
-   seconds" flag. Simple; delivers read-your-writes and monotonic reads for a single session on a
-   single device.
-2. **Version tokens.** On each write, return a **logical version** (a WAL position / LSN, a commit
-   timestamp, an opaque "consistency token"). The client sends it back on reads, and the read path
-   either routes to a replica that has caught up to that version or waits until it has.
+### Where they land, and why that is the point
 
-**Interview nuance:** the sharp follow-up is the **cross-device** case. Sticky sessions live in one
-client's cookie, so they do nothing when you write on your phone and read on your laptop. Only a
-**shared version token** carried per user (or a read-from-primary window keyed on the user, not the
-connection) fixes cross-device read-your-writes. If you only mention stickiness, expect "what about
-my other device?"
+The previous lesson lined up the *global* models: linearizable, sequential, causal, eventual, ordered
+by how much they constrain what **all** clients observe. Session guarantees are a different cut of the
+same problem. They are **client-centric**: each one constrains only what a *single* client sees of its
+*own* actions, and says nothing about how two different users are ordered relative to each other. That
+is exactly why they are cheap, and why they do not sit as one point on that global line.
 
-These guarantees are strictly weaker than linearizability (they say nothing about what *other* users
-see relative to each other), which is the whole point: user-visible correctness for a fraction of the
-coordination cost.
+Two framings worth carrying into an interview:
 
-Recap: the four session guarantees fix the common lag symptoms per client, implement them with sticky
-routing or version/LSN tokens, remember tokens are required for cross-device, and never promise
-read-your-writes off async replicas with neither routing nor a token.
+- **Relative strength.** For one client's own view the guarantees are real, but globally they are
+  **weaker than causal consistency**: causal ordering holds across all observers, session guarantees
+  hold only within your own session. Taken together, the four compose to *per-client* causal
+  consistency, not the global causal consistency of the spectrum lesson.
+- **Why they win in practice.** Almost every "the app feels broken" report (you edit your bio and the
+  old one returns, a thread flickers between 8 and 10 comments) is a per-user staleness bug, not a
+  cross-user ordering bug. Session guarantees kill exactly that class for the cost of a token compare
+  while leaving the read fleet unpinned. The senior move is refusing to reach for linearizability when
+  the product only needs "the user sees their own action," and reserving the strong end for genuinely
+  global invariants (a uniqueness check, a lock, "claim this seat").
+
+Recap: session guarantees are the client-centric cut of the consistency spectrum, weaker than global
+causal because they bind only one client's own view (though the four together give per-client causal);
+implement them with sticky routing or version tokens (Level 3 has the depth), and prefer them over
+linearizability for user-facing reads, escalating only for truly global invariants.
 `.trim()
 
 const logicalClocksTeach = `
@@ -807,13 +808,12 @@ Distinguish the operation types:
   doubles the effect. Make them safe with an idempotency key plus stored result, or convert to
   conditional/versioned updates (compare-and-set, or a unique constraint on the operation id).
 
-### Kafka EOS and fencing tokens
+### Fencing tokens (Kafka EOS lives in Level 6)
 
-**Kafka's "exactly-once semantics" (EOS)** is real but narrowly scoped: exactly-once *within a
-Kafka-to-Kafka pipeline* (idempotent producers deduping by producer id + sequence number, plus
-transactions that atomically commit consumer offsets and output records). The guarantee stops at
-Kafka's boundary. If your consumer's side effect is an *external* action (charge a card, send an
-email), Kafka EOS does not cover it: those still need application-level idempotency.
+One boundary to name and then hand off: **Kafka's "exactly-once semantics" (EOS)** convert
+at-least-once into effectively-once, but only *within a Kafka-to-Kafka pipeline*, never for external
+side effects like charging a card. Level 6's Kafka material owns that scoping in depth, so this lesson
+states it in one line and keeps its own distinct ground: fencing tokens.
 
 **Fencing tokens** protect against a different failure: a *stale* operation from a delayed or paused
 actor. A process pauses (long GC), is presumed dead, a new one takes over, then the old one wakes and
@@ -827,9 +827,9 @@ superseded actor*. Different problems, both needed.
 dedup state lives and how it is made atomic with the side effect.
 
 Recap: networks force at-most-once (may lose) or at-least-once (may duplicate); build exactly-once
-*effect* with an idempotency key whose stored result is written atomically with the side effect;
-Kafka EOS covers only the pipeline, not external effects; and fencing tokens separately reject stale
-writes from superseded actors.
+*effect* with an idempotency key whose stored result is written atomically with the side effect; and
+fencing tokens separately reject stale writes from a superseded actor (Kafka's own EOS scoping is
+covered in Level 6's Kafka material).
 `.trim()
 
 const crdtsTeach = `
