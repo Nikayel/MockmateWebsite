@@ -32,7 +32,7 @@ export const LEVEL_PREVIEWS: Record<PythonLevelId, LevelPreview> = {
     ],
   },
   2: {
-    filename: "apply.py",
+    filename: "idioms.py",
     audience: "Know the basics — ready to write code, not just read it",
     sample: [
       [c("# read a concept, then write it yourself")],
@@ -45,7 +45,7 @@ export const LEVEL_PREVIEWS: Record<PythonLevelId, LevelPreview> = {
   },
   3: {
     filename: "patterns.py",
-    audience: "Comfortable writing functions — learning the idioms teams use",
+    audience: "Comfortable writing functions, learning the idioms teams use",
     sample: [
       [k("from "), p("dataclasses "), k("import "), p("dataclass")],
       [],
@@ -70,7 +70,7 @@ export const LEVEL_PREVIEWS: Record<PythonLevelId, LevelPreview> = {
   },
   4: {
     filename: "billing/discounts.py",
-    audience: "Ready to work like an engineer — across real files, proven by tests",
+    audience: "Ready to work like an engineer across real files, proven by tests",
     sample: [
       [k("from "), p(".pricing "), k("import "), p("apply_discount")],
       [],
