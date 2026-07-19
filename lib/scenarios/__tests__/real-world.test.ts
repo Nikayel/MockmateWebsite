@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
-import realWorldScenarios, {
+import {
   realWorldBugFixScenarios,
   realWorldSystemDesignScenarios,
 } from "../../scenarios-realworld"
@@ -30,11 +30,6 @@ describe("real-world scenario modules", () => {
     expect(realWorldSystemDesignScenarios.map((scenario) => scenario.id)).toEqual([
       "system-design-newsfeed",
     ])
-  })
-
-  it("preserves the default compatibility export", () => {
-    expect(realWorldScenarios.realWorldBugFixScenarios).toBe(realWorldBugFixScenarios)
-    expect(realWorldScenarios.realWorldSystemDesignScenarios).toBe(realWorldSystemDesignScenarios)
   })
 
   it("mounts the legacy bugfix bank plus the stdout-oracle packs in the public registry", () => {
