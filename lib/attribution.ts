@@ -5,6 +5,12 @@
  * so every later analytics event can be tied back to the channel that produced it
  * (content / dev-communities / paid). First-touch only — we never overwrite the
  * original source once captured.
+ *
+ * Also captures two lighter-weight signals so short campus links and the product's
+ * own referral share URLs are not invisible:
+ *  - ?src=<channel>  maps to source=<channel>, medium "campaign"
+ *  - ?ref=<code>     maps to source "referral", campaign=<code>
+ * Explicit utm_* params always win over src/ref when both are present.
  */
 
 const STORAGE_KEY = "cs_attribution"
@@ -32,22 +38,36 @@ export interface Attribution {
 
 /**
  * Capture first-touch attribution from the current URL. Safe to call on every
- * page load — it no-ops if there are no UTM params or if attribution already
- * exists. Client-only.
+ * page load — it no-ops when there are no utm_*, ?src=, or ?ref= params, or if
+ * attribution already exists. Client-only.
  */
 export function captureAttribution(): void {
   if (typeof window === "undefined") return
   try {
     const params = new URLSearchParams(window.location.search)
     const hasUtm = UTM_PARAMS.some((key) => params.get(key))
-    if (!hasUtm) return
+    // Lighter-weight campaign signals: campus/QR links (?src=) and referral share
+    // URLs (?ref=). Present on landings that carry no utm_* params at all.
+    const src = clean(params.get("src"))
+    const ref = clean(params.get("ref"))
+    if (!hasUtm && !src && !ref) return
     // First-touch wins: don't overwrite an existing source.
     if (window.localStorage.getItem(STORAGE_KEY)) return
 
+    // Explicit utm_* always wins; ?ref= then ?src= fill in the source only when no
+    // utm_source was given, so a referral link still records source "referral".
+    let source = clean(params.get("utm_source"))
+    let medium = clean(params.get("utm_medium"))
+    let campaign = clean(params.get("utm_campaign"))
+    if (!source && ref) source = "referral"
+    if (!source && src) source = src
+    if (!medium && src) medium = "campaign"
+    if (!campaign && ref) campaign = ref
+
     const attribution: Attribution = {
-      source: clean(params.get("utm_source")),
-      medium: clean(params.get("utm_medium")),
-      campaign: clean(params.get("utm_campaign")),
+      source,
+      medium,
+      campaign,
       term: clean(params.get("utm_term")),
       content: clean(params.get("utm_content")),
       referrer: typeof document !== "undefined" ? document.referrer || undefined : undefined,
