@@ -10,13 +10,23 @@
  */
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
-import type { TutorialLessonProgress } from "./types"
+import type { CourseId, TutorialLessonProgress } from "./types"
 
 const COLLECTION = "user_tutorial_progress"
 
 /** Deterministic, per-user-per-lesson document id. */
 export function progressDocId(userId: string, lessonId: string): string {
   return `${userId}__${lessonId}`
+}
+
+/**
+ * Which course a lesson belongs to, from its id prefix (`sd-` → system-design, `sql-` → sql, else
+ * python). Persisted on every progress doc so dashboards can group by course without a backfill.
+ */
+function courseIdFromLessonId(lessonId: string): CourseId {
+  if (lessonId.startsWith("sd-")) return "system-design"
+  if (lessonId.startsWith("sql-")) return "sql"
+  return "python"
 }
 
 const sectionStatusSchema = z.enum(["not_started", "in_progress", "completed"])
@@ -27,7 +37,7 @@ const sectionStatusSchema = z.enum(["not_started", "in_progress", "completed"])
  */
 export const tutorialProgressInputSchema = z.object({
   lessonId: z.string().min(1),
-  // Python ships L1-4, SQL L1-5, and System Design L0-11 (L0 is the interview-method level). The
+  // Python ships L1-4, SQL L1-6, and System Design L0-11 (L0 is the interview-method level). The
   // literal union spans the full shared 0..11 `TutorialLevelId` range so every course's section
   // progress persists AND `z.infer` narrows to `TutorialLevelId` (not a bare `number`).
   levelId: z.union([
@@ -66,6 +76,7 @@ function composeProgress(
   return {
     userId,
     lessonId: input.lessonId,
+    courseId: courseIdFromLessonId(input.lessonId),
     levelId: input.levelId,
     sections: input.sections,
     lessonStatus: input.lessonStatus,
