@@ -6,13 +6,81 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { verifyAuth } from '@/lib/auth-helpers'
 import {
   getNotificationPreferencesServer,
   updateNotificationPreferencesServer,
 } from '@/lib/notification-helpers-server'
-import type { NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge'
-import type { NotificationChannel } from '@/lib/types/notifications'
+
+// Mirrors NotificationType in lib/rag/knowledge-base/notification-knowledge.ts.
+const notificationTypeSchema = z.enum([
+  'welcome',
+  'spaced_repetition_review',
+  'pattern_decay_alert',
+  'daily_practice_reminder',
+  'streak_maintenance',
+  'interview_countdown',
+  'milestone_celebration',
+  'weak_pattern_focus',
+  'roadmap_behind',
+  'optimal_review_time',
+  'new_challenge_unlock',
+  'rest_reminder',
+  'mock_interview_due',
+])
+
+const channelSchema = z.enum(['push', 'email', 'in_app'])
+
+const channelTogglesSchema = z.object({
+  push: z.boolean(),
+  email: z.boolean(),
+  in_app: z.boolean(),
+})
+
+const quietHoursSchema = z.object({
+  enabled: z.boolean(),
+  start: z.number().int().min(0).max(23),
+  end: z.number().int().min(0).max(23),
+})
+
+const timezoneSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_+/-]+$/)
+
+/**
+ * API-VALID-2: every PUT mode's payload is clamped before it reaches the merge
+ * write — enums enforced, numerics ranged, unknown keys STRIPPED (zod default)
+ * — so junk values can no longer pollute the preferences document shape.
+ */
+const updateSchema = z.object({
+  fcmToken: z.string().min(10).max(4096).optional(),
+  toggleType: notificationTypeSchema.optional(),
+  enabled: z.boolean().optional(),
+  type: notificationTypeSchema.optional(),
+  channels: z.union([z.array(channelSchema).max(3), channelTogglesSchema]).optional(),
+  quietHours: quietHoursSchema.optional(),
+  timezone: timezoneSchema.optional(),
+  preferences: z
+    .object({
+      enabled: z.boolean().optional(),
+      timezone: timezoneSchema.optional(),
+      channels: channelTogglesSchema.optional(),
+      quietHours: quietHoursSchema.optional(),
+      typePreferences: z
+        .record(
+          notificationTypeSchema,
+          z.object({
+            enabled: z.boolean(),
+            channels: z.array(channelSchema).max(3),
+          })
+        )
+        .optional(),
+    })
+    .optional(),
+})
 
 /**
  * GET /api/notifications/preferences
@@ -64,22 +132,34 @@ export async function PUT(request: NextRequest) {
     }
 
     const userId = authResult.userId
-    const body = await request.json()
+
+    let rawBody: unknown
+    try {
+      rawBody = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid update payload' }, { status: 400 })
+    }
+
+    const parsedUpdate = updateSchema.safeParse(rawBody)
+    if (!parsedUpdate.success) {
+      return NextResponse.json({ error: 'Invalid update payload' }, { status: 400 })
+    }
+    const update = parsedUpdate.data
 
     // Handle FCM token update
-    if (body.fcmToken !== undefined) {
-      await updateNotificationPreferencesServer(userId, { fcmToken: body.fcmToken })
+    if (update.fcmToken !== undefined) {
+      await updateNotificationPreferencesServer(userId, { fcmToken: update.fcmToken })
       return NextResponse.json({ success: true, message: 'FCM token updated' })
     }
 
     // Handle type toggle
-    if (body.toggleType !== undefined) {
+    if (update.toggleType !== undefined) {
       const prefs = await getNotificationPreferencesServer(userId)
       const typePreferences = {
         ...prefs.typePreferences,
-        [body.toggleType as NotificationType]: {
-          ...prefs.typePreferences[body.toggleType as NotificationType],
-          enabled: body.enabled ?? true,
+        [update.toggleType]: {
+          ...prefs.typePreferences[update.toggleType],
+          enabled: update.enabled ?? true,
         },
       }
       await updateNotificationPreferencesServer(userId, { typePreferences })
@@ -87,13 +167,13 @@ export async function PUT(request: NextRequest) {
     }
 
     // Handle channel update for specific type
-    if (body.type && body.channels) {
+    if (update.type && Array.isArray(update.channels)) {
       const prefs = await getNotificationPreferencesServer(userId)
       const typePreferences = {
         ...prefs.typePreferences,
-        [body.type]: {
-          ...prefs.typePreferences[body.type as NotificationType],
-          channels: body.channels as NotificationChannel[],
+        [update.type]: {
+          ...prefs.typePreferences[update.type],
+          channels: update.channels,
         },
       }
       await updateNotificationPreferencesServer(userId, { typePreferences })
@@ -101,40 +181,40 @@ export async function PUT(request: NextRequest) {
     }
 
     // Handle quiet hours update
-    if (body.quietHours !== undefined) {
+    if (update.quietHours !== undefined) {
       await updateNotificationPreferencesServer(userId, {
-        quietHours: body.quietHours,
+        quietHours: update.quietHours,
       })
       return NextResponse.json({ success: true, message: 'Quiet hours updated' })
     }
 
     // Handle global enabled toggle
-    if (body.enabled !== undefined) {
+    if (update.enabled !== undefined) {
       await updateNotificationPreferencesServer(userId, {
-        enabled: body.enabled,
+        enabled: update.enabled,
       })
       return NextResponse.json({ success: true, message: 'Notifications toggled' })
     }
 
     // Handle global channel toggles
-    if (body.channels !== undefined) {
+    if (update.channels !== undefined && !Array.isArray(update.channels)) {
       await updateNotificationPreferencesServer(userId, {
-        channels: body.channels,
+        channels: update.channels,
       })
       return NextResponse.json({ success: true, message: 'Channels updated' })
     }
 
     // Handle timezone update
-    if (body.timezone !== undefined) {
+    if (update.timezone !== undefined) {
       await updateNotificationPreferencesServer(userId, {
-        timezone: body.timezone,
+        timezone: update.timezone,
       })
       return NextResponse.json({ success: true, message: 'Timezone updated' })
     }
 
     // Handle full preferences update
-    if (body.preferences) {
-      const updated = await updateNotificationPreferencesServer(userId, body.preferences)
+    if (update.preferences) {
+      const updated = await updateNotificationPreferencesServer(userId, update.preferences)
       return NextResponse.json({ success: true, preferences: updated })
     }
 
