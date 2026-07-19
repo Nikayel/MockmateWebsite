@@ -863,9 +863,9 @@ LAST_VALUE(amount) OVER (
 
 \`FIRST_VALUE\` does not have this problem, because the default frame already starts at the partition beginning. \`LAST_VALUE\` is the one that bites. In the demo below, the two \`2026-01-02\` rows both report \`last_value_wrong = 50\`: they are peers, so they share one frame that runs through the end of their peer group, and both read the last tied row rather than the partition's true final \`300\`.
 
-## Trap 2: ROWS and RANGE differ on ties
+## Trap 2: ROWS and RANGE differ on ties (recap from Level 4)
 
-\`ROWS\` counts physical rows; \`RANGE\` groups rows that are tied on the \`ORDER BY\` key into one step. On two sales that share a date, a running \`SUM\` under \`RANGE\` gives both tied rows the same total (it includes every peer), while \`ROWS\` gives them different running totals, one physical row at a time. When a running total looks too high on duplicate keys, an unintended \`RANGE\` default is usually why. The demo puts the two side by side on a tied date.
+You proved this in Level 4's running-totals lesson: \`ROWS\` counts physical rows, while \`RANGE\` folds every row tied on the \`ORDER BY\` key into one step, so an unintended \`RANGE\` default reads too high on duplicate keys. It resurfaces here because the same tie is what makes \`LAST_VALUE\` above misread its peer group, and the demo puts both effects side by side on one tied date.
 
 ## Trap 3: a window function cannot go in WHERE
 
@@ -1132,9 +1132,9 @@ const factGrainsAccumulatingSnapshot: SqlLesson = {
   ],
   teach: {
     estimatedMinutes: 10,
-    markdown: `## Three fact grains, and the one that updates in place
+    markdown: `## The three fact grains, and the one that updates in place
 
-A fact table's grain is the answer to "what does one row mean". Three grains cover most of dimensional modeling, and interviewers ask you to tell them apart:
+You told these three grains apart in Level 4's additivity lesson (transaction, periodic snapshot, accumulating snapshot); the one-line reminder is that a fact table's grain answers "what does one row mean". Here they are again before we build the grain that mutates in place:
 
 | Grain | One row per | Changes after insert? |
 |---|---|---|
@@ -1517,7 +1517,7 @@ The rule is simple: know the grain of every table in your join, and never sum a 
 
 A related discipline: define revenue in exactly one CTE and reuse it for every cut. When "revenue by region" and "revenue by category" both read from the same order-grain CTE, they roll up to the same grand total by construction. When each cut re-derives revenue with its own join, they drift, and now two dashboards disagree and nobody can say which is right. The demo shows both cuts summing to the same total precisely because they share one metric definition.
 
-**Interview nuance:** the same \`GROUP BY key COUNT(*)\` that finds a fan-out key is how you find a skewed key in a distributed engine. One \`order_id\` or \`customer_id\` with far more rows than the rest is the straggler that makes one Spark task run long after the others finish. Surfacing the hot key with a count is the first diagnostic, before you fix it by salting the key, broadcasting the small table, or letting Adaptive Query Execution split the skew.
+**Interview nuance:** the same \`GROUP BY key COUNT(*)\` that finds a fan-out key is how you find a skewed key in a distributed engine. One \`order_id\` or \`customer_id\` with far more rows than the rest is the straggler that makes one Spark task run long after the others finish. Surfacing the hot key with a count is the first diagnostic, before you fix it by salting the key, broadcasting the small table, or letting Adaptive Query Execution split the skew. Level 6 teaches the distributed machinery behind these terms (salting, broadcast joins, and Adaptive Query Execution).
 
 > **In the warehouse this differs.** The SQL is identical everywhere. A semantic layer (Airbnb Minerva, dbt MetricFlow, LookML) declares the measure and its grain once, which is what guarantees the aggregate-before-join you wrote by hand. In Spark, the hot key you surface with a \`GROUP BY\` count is the straggler you fix with salting, a broadcast join, or Adaptive Query Execution skew splitting.`,
     demoSeedSql: `CREATE TABLE orders (order_id INTEGER, customer_id INTEGER, amount INTEGER);
@@ -1822,18 +1822,18 @@ Reloading a whole table every run is safe but slow and expensive. Three loaders 
 Store one watermark in a \`state\` table. Each run:
 
 1. Read the watermark: \`SELECT watermark FROM state\`.
-2. Pull the new slice: \`WHERE updated_at > watermark\`. Use strict \`>\`, not \`>=\`, or a row exactly on the boundary reloads every run and, without an upsert, duplicates.
+2. Pull the new slice: \`WHERE updated_at > watermark\`. Strict \`>\` keeps a row sitting exactly on the boundary from reloading every run. That is an efficiency choice, not a correctness one: because step 3 upserts on the business key, either \`>\` or \`>=\` stays idempotent, exactly as Level 4 noted.
 3. Upsert the slice into the target, keyed on the business key.
 4. Advance the watermark to the newest value you just loaded.
 
 ## Late arrivals and the backfill
 
-Strict \`>\` has a cost: a row that arrives late with an \`updated_at\` below the current watermark is never picked up. The fix is a rolling lookback, reprocessing the last few partitions each run so late rows are caught. The mechanism is **partition-overwrite**: \`DELETE\` a bounded \`load_date\` range, then \`INSERT ... SELECT\` the same range from source. Because you delete before you insert, re-running does not duplicate, which is the whole point.
+Strict \`>\` has a cost: a row that arrives late with an \`updated_at\` below the current watermark is never picked up. The fix is a rolling lookback, reprocessing the last few partitions each run so late rows are caught. You met this rolling-lookback idea in Level 4's idempotent-merge lesson, where re-scanning the last few days stayed safe only because the upsert underneath was idempotent; the same pairing holds here. The mechanism is **partition-overwrite**: \`DELETE\` a bounded \`load_date\` range, then \`INSERT ... SELECT\` the same range from source. Because you delete before you insert, re-running does not duplicate, which is the whole point.
 
 When you need to correct history rather than catch late rows, the two production answers share that shape:
 
 - **Partition-overwrite**: delete and reinsert a bounded date range.
-- **Staging plus atomic swap**: build a corrected copy in a staging table, validate it, then swap it in inside a transaction so readers never see a half-built table.
+- **Staging plus atomic swap**: build a corrected copy in a staging table, validate it, then swap it in inside a transaction, which commits the swap all at once or not at all, so readers never see a half-built table.
 
 The invariant across all of it is **idempotency per partition**: running the same load twice leaves the same rows. That is what makes a retried or backfilled run safe.
 
@@ -2152,7 +2152,7 @@ The DE system-design round is a conversation: you are handed a vague prompt ("de
 
 ## Four mechanisms, each reduced to SQL
 
-- **Partition pruning (does my filter scan the whole table).** A filter on the partition or clustering column lets the engine skip files. The SQL analog is a sargable predicate that can use an index: \`WHERE ts >= '2026-07-03' AND ts < '2026-07-04'\` uses the index, while \`WHERE date(ts) = '2026-07-03'\` wraps the column in a function and forces a full scan. \`EXPLAIN QUERY PLAN\` shows the difference (SEARCH USING INDEX versus SCAN), the same reason a function on a partition key defeats pruning and bills terabytes in BigQuery.
+- **Partition pruning (does my filter scan the whole table).** A filter on the partition or clustering column lets the engine skip files. The SQL analog is a sargable predicate that can use an index: \`WHERE ts >= '2026-07-03' AND ts < '2026-07-04'\` uses the index, while \`WHERE date(ts) = '2026-07-03'\` wraps the column in a function and forces a full scan. \`EXPLAIN QUERY PLAN\` shows the difference (SEARCH USING INDEX versus SCAN), the same reason a function on a partition key defeats pruning and bills terabytes in BigQuery. Level 6 teaches the distributed machinery behind these terms (partitioning and file pruning).
 - **Kafka consumer lag (is my consumer keeping up).** Lag is \`latest_offset - committed_offset\` per partition. That one subtraction over an offsets table is exactly what \`kafka-consumer-groups --describe\` reports, and a partition whose lag keeps climbing is a consumer falling behind.
 - **Event-time tumbling windows (count per fixed interval, flag late data).** Floor the event timestamp into fixed buckets with \`strftime\` and group. An event whose ingest time lands more than a window past its bucket is late data, the thing a streaming watermark decides whether to admit.
 - **DAG dependency eligibility (which task can run now).** A task is eligible when every upstream dependency has succeeded, a join over a dependency edge table, the same check an orchestrator makes before it schedules a task.
