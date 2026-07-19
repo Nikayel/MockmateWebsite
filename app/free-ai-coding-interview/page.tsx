@@ -1,10 +1,14 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "Free AI Coding Interview Practice | CodeSparring",
+  title: "Free AI Coding Interview Practice",
   description:
     "Try a free mock coding interview with our AI. Practice data structures, algorithms, and system design without a credit card.",
+  alternates: {
+    canonical: "/free-ai-coding-interview",
+  },
 }
 
 export default function FreePracticePage() {
@@ -34,7 +38,9 @@ export default function FreePracticePage() {
           </div>
           <p>
             Ready to jump in? Create a free account and start your first full AI mock interview. No
-            credit card required.
+            credit card required. Want to shore up the basics first? Our free{" "}
+            <Link href="/learn/python">Python</Link>, <Link href="/learn/sql">SQL</Link>, and{" "}
+            <Link href="/learn/system-design">System Design</Link> courses run right in your browser.
           </p>
         </>
       ),
@@ -65,12 +71,12 @@ export default function FreePracticePage() {
     {
       question: "Do I need to put in a credit card?",
       answer:
-        "No. The free plan includes 8 full interview sessions every month across 20+ problems, with complete AI feedback on every session. You only upgrade to Pro if you want the 350+ problem bank plus spaced repetition scheduling and a personalized roadmap.",
+        "No. The free plan includes 8 full interview sessions every month across 20+ problems, with complete AI feedback on every session. You only upgrade to Pro if you want 35 interview sessions a month plus spaced repetition scheduling and a personalized roadmap.",
     },
     {
       question: "Can I choose the question difficulty?",
       answer:
-        "The free plan includes 20+ problems spanning core interview patterns and difficulties, so you can pick where to start. Pro users unlock the full 350+ problem bank and can customize their difficulty and exact topic.",
+        "The free plan includes 20+ problems spanning core interview patterns and difficulties, so you can pick where to start. Pro users get 35 interview sessions a month and can customize their difficulty and exact topic.",
     },
   ]
 
@@ -78,7 +84,7 @@ export default function FreePracticePage() {
     <LandingPageTemplate
       title="Free AI Coding Interview"
       subtitle="Experience the Simulator"
-      heroDescription="Take a completely free AI mock interview. Test your skills, get instant feedback on your communication and code, and see why thousands of engineers use CodeSparring."
+      heroDescription="Take a completely free AI mock interview. Test your skills, get instant feedback on your communication and code, and see exactly where you stand before the real thing."
       primaryKeyword="free coding interview practice"
       contentSections={contentSections}
       faqs={faqs}
