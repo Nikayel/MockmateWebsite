@@ -18,6 +18,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GEMINI_MODELS } from "./ai/model-ids"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
 import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
 import { recordGlobalSpend } from "./global-spend-guard"
@@ -63,7 +64,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-2.5-flash", // Gemini 2.5 Flash - fast without thinking overhead
+    model: GEMINI_MODELS.flash, // Gemini 2.5 Flash - fast without thinking overhead
     maxTokens: 4096, // Increased further to prevent feedback truncation
     temperature: 0.7,
     costPer1kTokens: 0.00015, // $0.10/1M input, $0.40/1M output averaged
@@ -72,7 +73,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     name: "gemini-lite",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-2.5-flash-lite", // Actually use Flash-Lite now: $0.10/1M input, $0.40/1M output
+    model: GEMINI_MODELS.flashLite, // Actually use Flash-Lite now: $0.10/1M input, $0.40/1M output
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.00025, // Averaged - very cheap

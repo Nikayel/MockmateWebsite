@@ -11,6 +11,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GEMINI_MODELS } from "./ai/model-ids"
 
 export interface EdgeAIResponse {
   text: string
@@ -41,7 +42,7 @@ export async function generateAIResponseEdge(
   }
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: GEMINI_MODELS.flash,
     generationConfig: {
       maxOutputTokens: options?.maxTokens ?? 2048,
       temperature: options?.temperature ?? 0.3,
