@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Github, Terminal } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
+import { getAttribution } from "@/lib/attribution"
 import { useState, useEffect, Suspense } from "react"
 import { toast } from "sonner"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -90,11 +91,15 @@ function LoginPageContent() {
           const isNewUser =
             firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime
 
+          // Persist stored first-touch attribution on the new profile so signups
+          // can be broken down by channel. createOrUpdateProfile never overwrites
+          // an already-stamped source, so this is a no-op for returning users.
           await createOrUpdateProfile(
             firebaseUser.uid,
             firebaseUser.email || "",
             firebaseUser.displayName,
-            firebaseUser.photoURL
+            firebaseUser.photoURL,
+            isNewUser ? getAttribution() : null
           )
 
           // Check for pending guest session migration
