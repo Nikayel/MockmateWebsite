@@ -20,11 +20,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { requireTierForUser } from "@/lib/quota-enforcement"
 import { getScenarioById } from "@/lib/scenarios"
 import { logger } from "@/lib/logger"
 import { csrfProtection } from "@/lib/csrf"
+import { apiRateLimit } from "@/lib/rate-limit"
 import {
   updateProblemMastery,
   initializeProblemMasteryFromSession,
@@ -51,20 +53,27 @@ import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type { Difficulty } from "@/lib/spaced-repetition"
 import type { SpacedRepetitionMasteryLevel } from "@/lib/types"
 
-interface CompleteRequestBody {
-  problem_id: string
-  scenario_id?: string
-  performance_score: number // Interview score (includes communication)
-  mastery_score?: number // Code-focused score for SR (optional, calculated if not provided)
-  time_spent_minutes?: number
-  hints_used?: number
-  test_cases_passed?: number // For mastery score calculation
-  test_cases_total?: number // For mastery score calculation
-  completed_at?: string
-}
+// Every numeric here feeds mastery/streak/research state, so out-of-range values
+// are rejected instead of trusted (a user could otherwise inflate their own
+// mastery inputs). Ranges are deliberately generous versus real sessions.
+const completeRequestSchema = z.object({
+  problem_id: z.string().min(1).max(256),
+  scenario_id: z.string().min(1).max(256).optional(),
+  performance_score: z.number().min(0).max(100), // Interview score (includes communication)
+  mastery_score: z.number().min(0).max(100).optional(), // Code-focused score for SR (calculated if not provided)
+  time_spent_minutes: z.number().min(0).max(1440).default(0),
+  hints_used: z.number().int().min(0).max(100).default(0),
+  test_cases_passed: z.number().int().min(0).max(1000).default(0), // For mastery score calculation
+  test_cases_total: z.number().int().min(0).max(1000).default(0), // For mastery score calculation
+  completed_at: z.string().datetime().optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting (shared per-IP API limit)
+    const rateLimitResponse = await apiRateLimit(request)
+    if (rateLimitResponse) return rateLimitResponse
+
     // SECURITY: CSRF protection for state-changing operation
     const csrfResult = csrfProtection(request)
     if (csrfResult) {
@@ -86,35 +95,33 @@ export async function POST(request: NextRequest) {
 
     const userId = authResult.userId
 
-    // Parse request body
-    const body: CompleteRequestBody = await request.json()
+    // Parse + validate request body (rejects out-of-range numerics before they
+    // reach mastery/streak calculations)
+    const parsed = completeRequestSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
+      return NextResponse.json(
+        {
+          error: "Bad Request",
+          message: issue
+            ? `${issue.path.join(".") || "body"}: ${issue.message}`
+            : "Invalid request body",
+        },
+        { status: 400 }
+      )
+    }
 
     const {
       problem_id,
       scenario_id = problem_id,
       performance_score,
       mastery_score: providedMasteryScore,
-      time_spent_minutes = 0,
-      hints_used = 0,
-      test_cases_passed = 0,
-      test_cases_total = 0,
+      time_spent_minutes,
+      hints_used,
+      test_cases_passed,
+      test_cases_total,
       completed_at = new Date().toISOString(),
-    } = body
-
-    // Validate required fields
-    if (!problem_id || performance_score === undefined) {
-      return NextResponse.json(
-        { error: "Bad Request", message: "problem_id and performance_score are required" },
-        { status: 400 }
-      )
-    }
-
-    if (performance_score < 0 || performance_score > 100) {
-      return NextResponse.json(
-        { error: "Bad Request", message: "performance_score must be between 0 and 100" },
-        { status: 400 }
-      )
-    }
+    } = parsed.data
 
     // Get scenario details
     const scenario = getScenarioById(scenario_id)
@@ -424,7 +431,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Internal Server Error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: "Failed to record review completion",
       },
       { status: 500 }
     )
