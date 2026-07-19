@@ -205,7 +205,7 @@ EDGE-13 … EDGE-17; DUP-12; PERF-S14, PERF-S15; PERF-C13; API-3, API-4.
 - **Verify:** `pnpm vitest run lib/feedback/__tests__` + manually diff instant vs final
   overall for one fixed set of subscores.
 
-### [~] API-1 — /api/voice/token hands the raw account-level Deepgram API key to every signed-in client — P1 (PARTIAL — see progress log)
+### [x] API-1 — /api/voice/token hands the raw account-level Deepgram API key to every signed-in client — P1 (CLOSED 2026-07-19: fallback flipped to fail-closed 503; voice serves 503 until the owner grants keys:write — see AUDIT-STAGING-HANDOFF.md item 3)
 - **Where:** `app/api/voice/token/route.ts:21-26` (returns
   `{ apiKey: process.env.DEEPGRAM_API_KEY }`); consumed at
   `lib/voice/deepgram-service.ts:122-131`, used in a browser WebSocket at :251.

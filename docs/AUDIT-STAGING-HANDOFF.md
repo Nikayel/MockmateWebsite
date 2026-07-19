@@ -93,21 +93,24 @@ If the query throws `FAILED_PRECONDITION` at runtime, the index isn't deployed.
 
 ### 3. API-1 — finish the Deepgram ephemeral key (partial `[~]`)
 
-`app/api/voice/token/route.ts` mints an ephemeral `usage:write` key via
-`lib/voice/deepgram-management.ts`, but **falls back to the raw account key**
-when minting fails (line ~43), so the hole isn't fully closed yet.
+**UPDATE 2026-07-19: the fallback is now FAIL-CLOSED (shipped, pre-launch sweep).**
+`app/api/voice/token/route.ts` returns **503** when ephemeral minting is unavailable
+instead of handing the raw account key to the browser, `lib/voice/deepgram-service.ts`
+surfaces a clear "voice unavailable, keep typing" error, and
+`app/api/voice/token/route.test.ts` locks the ephemeral-only contract. The credential
+leak is closed. (This deliberately reverses the earlier "don't flip until the scope is
+granted" sequencing: launch priorities changed — fail closed now, restore voice via the
+dashboard grant.)
 
-1. Confirm `DEEPGRAM_API_KEY` has the **`keys:write`** scope (Deepgram dashboard),
-   or set `DEEPGRAM_PROJECT_ID` + a management-capable key.
-2. Smoke-test: `GET /api/voice/token` should return a key **different** from
-   `DEEPGRAM_API_KEY`, and a voice interview should still connect.
-3. Once confirmed, **flip the fallback to fail-closed** — replace the line-43
-   `return NextResponse.json({ apiKey: accountKey })` with a 503:
-   ```ts
-   return NextResponse.json({ error: "Voice transcription temporarily unavailable" }, { status: 503 })
-   ```
-   Keep the warning `logger.warn` above it. Then `pnpm typecheck && pnpm build`,
-   commit, and flip API-1's checkbox from `[~]` to `[x]` in the plan doc.
+**Remaining (account-owner action, ~5 min):** voice transcription serves 503 in prod
+until `DEEPGRAM_API_KEY` gets the **`keys:write`** scope in the Deepgram dashboard
+(optionally set `DEEPGRAM_PROJECT_ID`). Smoke-test after granting:
+`GET /api/voice/token` should return a key **different** from `DEEPGRAM_API_KEY`, and
+a voice interview should connect end-to-end.
+
+Also: `NEXT_PUBLIC_DEEPGRAM_API_KEY` exists in env but is referenced **nowhere** in
+the codebase — delete it from Vercel + local env files (stale, and `NEXT_PUBLIC_`
+vars ship to the client bundle).
 
 ### 4. PERF-C12 part A (optional, partial `[~]`)
 
