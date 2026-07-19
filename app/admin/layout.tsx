@@ -146,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
               <div>
                 <span className="font-heading text-sm font-semibold text-white">Admin</span>
-                <span className="-mt-0.5 block text-[10px] text-gray-500">Mockmate</span>
+                <span className="-mt-0.5 block text-[10px] text-gray-500">CodeSparring</span>
               </div>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
               <div>
                 <span className="font-heading text-sm font-semibold text-white">Admin</span>
-                <span className="-mt-0.5 block text-[10px] text-gray-500">Mockmate</span>
+                <span className="-mt-0.5 block text-[10px] text-gray-500">CodeSparring</span>
               </div>
             </Link>
           )}
