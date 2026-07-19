@@ -48,6 +48,35 @@ export { scenarios, getScenarioById as getScenarioByIdSync, filterScenarios } fr
 const loadedModules: Map<string, Scenario[]> = new Map()
 
 /**
+ * The DSA pattern modules loaded for a full "dsa" type fetch. Canonical loadable set: the dp-tree
+ * pattern is served by the dp-1d..dp-lcs modules and the heap-priority-queue / priority-queue
+ * aliases are served by the "heap" module (see loadDSAByPattern), so they are not listed here.
+ * One named constant keeps getScenariosByType from drifting away from loadDSAByPattern's switch.
+ */
+const DSA_PATTERN_KEYS: DSAPattern[] = [
+  "arrays-hashing",
+  "stack",
+  "two-pointers",
+  "sliding-window",
+  "linked-list",
+  "trees",
+  "graphs",
+  "dp-1d",
+  "dp-2d",
+  "dp-knapsack",
+  "dp-lcs",
+  "heap",
+  "intervals",
+  "binary-search",
+  "backtracking",
+  "greedy",
+  "trie",
+  "bit-manipulation",
+  "math-geometry",
+  "binary-search-tree",
+]
+
+/**
  * Lazy load DSA scenarios by pattern
  */
 async function loadDSAByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
@@ -194,30 +223,7 @@ export async function getScenarioById(id: string): Promise<Scenario | undefined>
 export async function getScenariosByType(type: ScenarioType): Promise<Scenario[]> {
   switch (type) {
     case "dsa":
-      // Load all DSA patterns
-      const patterns: DSAPattern[] = [
-        "arrays-hashing",
-        "stack",
-        "two-pointers",
-        "sliding-window",
-        "linked-list",
-        "trees",
-        "graphs",
-        "dp-1d",
-        "dp-2d",
-        "dp-knapsack",
-        "dp-lcs",
-        "heap",
-        "intervals",
-        "binary-search",
-        "backtracking",
-        "greedy",
-        "trie",
-        "bit-manipulation",
-        "math-geometry",
-        "binary-search-tree",
-      ]
-      const dsaResults = await Promise.all(patterns.map(loadDSAByPattern))
+      const dsaResults = await Promise.all(DSA_PATTERN_KEYS.map(loadDSAByPattern))
       return dsaResults.flat()
 
     case "bugfix":
