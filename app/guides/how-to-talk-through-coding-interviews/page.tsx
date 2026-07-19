@@ -2,9 +2,12 @@ import { Metadata } from "next"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "How to Talk Through Coding Interviews | CodeSparring Guide",
+  title: "How to Talk Through Coding Interviews",
   description:
     "Learn how to communicate effectively during a software engineering interview. Stop coding in silence and start articulating your thought process.",
+  alternates: {
+    canonical: "/guides/how-to-talk-through-coding-interviews",
+  },
 }
 
 export default function TalkThroughGuidePage() {

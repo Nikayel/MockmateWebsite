@@ -2,9 +2,12 @@ import { Metadata } from "next"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "What is a Real-World Coding Interview? | CodeSparring Guide",
+  title: "What is a Real-World Coding Interview?",
   description:
     "Learn what to expect in practical, real-world software engineering interview rounds and how to prepare for them.",
+  alternates: {
+    canonical: "/guides/what-is-a-real-world-coding-interview-round",
+  },
 }
 
 export default function RealWorldGuidePage() {
