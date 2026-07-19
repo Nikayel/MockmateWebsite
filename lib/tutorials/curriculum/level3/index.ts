@@ -216,7 +216,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "loc
 - **Splitting without \`maxsplit\`.** \`"url = a=b".split("=")\` returns three parts, so \`key, value = ...\` raises \`ValueError: too many values to unpack (expected 2)\`. Passing \`1\` splits on the first \`=\` only and keeps any \`=\` inside the value intact.
 - **Forgetting to trim the key.** \`"host = localhost".split("=", 1)\` gives \`["host ", " localhost"]\`. The value passes through \`coerce\`, which trims it, but the key does not. Store \`"host "\` (with the trailing space) as the key and a later \`config["host"]\` lookup raises \`KeyError\` instead of returning the value. Call \`.strip()\` on the key before storing it.
 
-**Interview nuance:** a module's top-level code runs exactly once per process. After the first import, Python serves the cached object from \`sys.modules\` and does not re-execute the file. That is why import side effects fire once, why a module-level constant is shared rather than recomputed across every importer, and why two modules that import each other at top level can fail with a circular-import error. Interviewers use this to check that you understand \`import\` as "execute the file once, then cache and bind a name," not as textually pasting code into the caller.`,
+**Interview nuance:** bounded splitting is the detail interviewers probe when you parse text. \`stripped.split("=", 1)\` splits on the first \`=\` only, so a value that itself contains \`=\` (a URL like \`url = a=b\`, a base64 token, a connection string) stays intact, while a bare \`split("=")\` raises \`ValueError\` the instant a value holds a second delimiter. Pair that with deciding a value's type from the raw string (trim it, strip a leading sign, then test \`isdigit\`) and you are doing real boundary parsing: turning loose text into typed data without trusting its shape.`,
   },
   apply: {
     id: "py-l3-parse-config-apply",
@@ -1998,7 +1998,7 @@ def run_tests(record):
 
 const loggingErrorsLesson: PythonLevel["modules"][number]["lessons"][number] = {
   id: "py-l3-logging-errors",
-  title: "logging & exception design",
+  title: "Error boundaries & logging habits",
   summary: "Use logging instead of print and design where errors get caught.",
   estimatedMinutes: 17,
   difficulty: "medium",
@@ -2258,7 +2258,7 @@ def run_tests(record):
 
 const cliLesson: PythonLevel["modules"][number]["lessons"][number] = {
   id: "py-l3-cli",
-  title: "Building a CLI (argparse / typer)",
+  title: "Building a CLI: parse and dispatch argv (argparse/typer preview)",
   summary: "Turn argument lists into commands with a testable dispatcher.",
   estimatedMinutes: 18,
   difficulty: "medium",
@@ -2536,7 +2536,7 @@ def run_tests(record):
 
 const restPydanticLesson: PythonLevel["modules"][number]["lessons"][number] = {
   id: "py-l3-rest-pydantic",
-  title: "Consuming a REST API with httpx + pydantic",
+  title: "Validating API data at the boundary (httpx/pydantic preview)",
   summary: "Fetch external JSON and validate it into a typed model at the boundary.",
   estimatedMinutes: 20,
   difficulty: "hard",
@@ -3042,7 +3042,7 @@ export const level3: PythonLevel = {
   title: "Level 3: Patterns",
   tagline: "The production-shaped syntax: modules, imports, and working across real files.",
   defaultExecutionMode: "workspace",
-  estimatedHours: 6,
+  estimatedHours: 4,
   modules: [
     {
       id: "py-l3-project-structure",
