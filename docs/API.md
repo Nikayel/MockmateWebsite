@@ -32,7 +32,7 @@ const token = await auth.currentUser?.getIdToken()
 | Category | Endpoints | Auth Required |
 |----------|-----------|---------------|
 | [Interview](#interview-apis) | `/chat`, `/execute`, `/generate-feedback` | Optional (rate-limited) |
-| [User](#user-apis) | `/user/profile`, `/user/metrics`, `/user/usage` | Yes |
+| [User](#user-apis) | `/user/profile`, `/user/metrics` | Yes |
 | [Spaced Repetition](#spaced-repetition-apis) | `/spaced-repetition/*` | Yes |
 | [Payments](#payment-apis) | `/create-checkout`, `/customer-portal` | Yes |
 | [Admin](#admin-apis) | `/admin/*` | Yes (Admin only) |
@@ -325,30 +325,6 @@ Get user's interview performance metrics.
   lastSessionAt: string
 }
 ```
-
-### GET /api/user/usage
-
-Get user's AI usage for current billing period.
-
-```typescript
-// Response
-{
-  currentPeriod: {
-    start: string
-    end: string
-  }
-  usage: {
-    sessionsUsed: number
-    sessionsLimit: number
-    budgetUsed: number        // USD
-    budgetLimit: number       // USD
-    tokensUsed: number
-  }
-  tier: 'free' | 'pro' | 'enterprise'
-}
-```
-
----
 
 ## Spaced Repetition APIs
 

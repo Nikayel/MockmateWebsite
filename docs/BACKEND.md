@@ -72,8 +72,8 @@ Routes are grouped under `app/api/`. The following mirrors the product domains; 
 
 | Area | Example routes | Notes |
 |------|----------------|--------|
-| Profile & subscription | `user/profile`, `user/subscription-status`, `user/metrics`, `user/usage`, … | Firestore `profiles`, usage aggregates |
-| Notifications | `notifications/`, `user/notification-preferences` | Preferences + delivery |
+| Profile & subscription | `user/profile`, `user/subscription-status`, `user/metrics`, … | Firestore `profiles`, usage aggregates |
+| Notifications | `notifications/` | Preferences + delivery |
 | Account lifecycle | `delete-account/` | GDPR-style deletion path |
 | Guest | `guest-session/`, `guest-session/migrate/` | Anonymous → registered |
 
