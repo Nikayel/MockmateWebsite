@@ -37,8 +37,8 @@ function Feature() {
               Traditional vs. Interactive
             </h2>
             <p className="max-w-xl text-lg leading-relaxed tracking-tight text-gray-400 lg:max-w-xl">
-              Compare LeetCode&apos;s silent code editor (right) with CodeSparring&apos;s
-              interactive voice-enabled AI mock interview interface (left).
+              An illustration of the difference: a silent, solo code editor (right) versus an
+              interactive, voice-enabled AI mock interview (left).
             </p>
           </div>
           <div className="w-full pt-8">
@@ -74,7 +74,7 @@ function Feature() {
               </div>
               <Image
                 src="https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=1920&auto=format&fit=crop"
-                alt="LeetCode Editor UI View"
+                alt="Illustration representing a traditional silent code editor"
                 width={1920}
                 height={1080}
                 priority
@@ -85,7 +85,7 @@ function Feature() {
               />
               <Image
                 src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1920&auto=format&fit=crop"
-                alt="CodeSparring Voice Interview UI View"
+                alt="Illustration representing an interactive voice-enabled AI mock interview"
                 width={1920}
                 height={1080}
                 priority
