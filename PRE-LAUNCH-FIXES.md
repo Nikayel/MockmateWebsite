@@ -185,7 +185,10 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
   `app/api/user/notification-preferences/route.ts`.
 - **Commit:** `security(api): validate notification preference writes`
 
-### API-VALID-3 — `analyze-complexity` forwards client `systemPrompt`/`userPrompt` — **LOW**
+### API-VALID-3 — `analyze-complexity` forwards client `systemPrompt`/`userPrompt` — **LOW** — **ALREADY FIXED (verified 2026-07-19)**
+
+> Verified in code: the route builds the prompt server-side via buildComplexityUserPrompt
+> from length-bounded structured fields; no client systemPrompt/userPrompt is accepted.
 - **File:** `app/api/analyze-complexity/route.ts:36–58`.
 - **Problem:** Auth/rate-limit/quota/size caps all present (spend bounded), but any signed-in
   user gets a general-purpose LLM proxy within their quota — the required `code` field
