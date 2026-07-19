@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { ALL_COMPANIES, getCompanyById, CompanyId } from "@/lib/data/company-questions"
+import { ALL_COMPANIES, COMPANY_TIERS, getCompanyById, CompanyId } from "@/lib/data/company-questions"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 import { CompanyPrepContent } from "@/components/interview-prep/CompanyPrepContent"
 import { CompanyHeroCTA } from "@/components/interview-prep/CompanyHeroCTA"
@@ -30,8 +30,9 @@ export async function generateMetadata({
     }
   }
 
-  const title = `${company.name} Interview Prep Guide 2025 | Patterns, Questions & Tips`
-  const description = `Complete ${company.name} coding interview preparation guide. Learn the top ${company.topPatterns.length} DSA patterns, ${company.mustKnowQuestions.length}+ must-know questions, ${company.interviewProcess.totalRounds}-round interview process, and insider tips. Updated for 2025.`
+  const currentYear = new Date().getFullYear()
+  const title = `${company.name} Interview Prep Guide ${currentYear} | Patterns, Questions & Tips`
+  const description = `Complete ${company.name} coding interview preparation guide. Learn the top ${company.topPatterns.length} DSA patterns, ${company.mustKnowQuestions.length}+ must-know questions, ${company.interviewProcess.totalRounds}-round interview process, and insider tips. Updated for ${currentYear}.`
 
   return {
     title,
@@ -41,13 +42,16 @@ export async function generateMetadata({
       `${company.name} coding interview`,
       `${company.name} technical interview`,
       `${company.name} DSA questions`,
-      `${company.name} interview questions 2025`,
+      `${company.name} interview questions ${currentYear}`,
       `${company.name} interview process`,
       `${company.name} interview tips`,
       `how to prepare for ${company.name} interview`,
       `${company.name} leetcode questions`,
       `${company.name} interview difficulty`,
     ],
+    alternates: {
+      canonical: `/interview-prep/${company.id}`,
+    },
     openGraph: {
       title: `${company.name} Interview Prep | CodeSparring`,
       description: `Master your ${company.name} interview with our comprehensive guide. ${company.topPatterns.length} patterns, ${company.mustKnowQuestions.length}+ must-know questions.`,
@@ -73,8 +77,15 @@ export default async function CompanyPrepPage({
     notFound()
   }
 
-  // Find related companies in same tier
-  const relatedCompanies = ALL_COMPANIES.filter((c) => c.id !== company.id).slice(0, 3)
+  // Find related companies, preferring the same tier first, then filling from the
+  // rest of the roster. Still capped at slice(0, 3) so the rendered shape is unchanged.
+  const sameTierIds: readonly string[] =
+    Object.values(COMPANY_TIERS).find((tier) => tier.companies.includes(company.id))?.companies ??
+    []
+  const relatedCompanies = [
+    ...ALL_COMPANIES.filter((c) => c.id !== company.id && sameTierIds.includes(c.id)),
+    ...ALL_COMPANIES.filter((c) => c.id !== company.id && !sameTierIds.includes(c.id)),
+  ].slice(0, 3)
 
   return (
     <main className="bg-background min-h-screen">
