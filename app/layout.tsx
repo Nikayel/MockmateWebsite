@@ -50,7 +50,7 @@ const siteConfig = {
   name: "CodeSparring",
   tagline: "AI Technical Interview Practice for Coding, System Design, and Real-World Rounds",
   description:
-    "Practice technical interviews with an AI interviewer. CodeSparring helps engineers prepare for coding, system design, bug-fix, and real-world interview rounds with feedback, hints, and performance tracking.",
+    "Practice technical interviews with an AI interviewer. CodeSparring helps engineers prepare for coding, system design, bug-fix, and real-world interview rounds, plus free Python, SQL, and System Design courses, with feedback, hints, and performance tracking.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
   // OG images are now dynamically generated via app/opengraph-image.tsx
 }
@@ -129,10 +129,11 @@ export const metadata: Metadata = {
   },
 
   // Canonical URL
+  // metadataBase lets child pages declare relative self-referencing canonicals.
+  // The root layout intentionally does NOT set alternates.canonical: a root
+  // canonical is inherited by every page and would point them all at the
+  // homepage. The homepage sets its own canonical in app/page.tsx.
   metadataBase: new URL(siteConfig.url),
-  alternates: {
-    canonical: "/",
-  },
 
   // Open Graph - for social sharing
   // Images are auto-generated via app/opengraph-image.tsx

@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { ProblemTeaser } from "@/components/problem-teaser"
@@ -25,6 +26,14 @@ import { HomepagePositioningFAQJsonLd } from "@/components/seo/JsonLd"
  * either the marketing content (for non-authenticated users) or the
  * authenticated dashboard (for logged-in users).
  */
+// The homepage owns the "/" canonical (moved off the root layout so it is not
+// inherited by every route).
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "/",
+  },
+}
+
 export default function HomePage() {
   const header = <Header />
   const footer = <Footer />
