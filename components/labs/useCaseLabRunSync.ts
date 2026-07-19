@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useCaseLabStore } from "@/lib/stores/case-lab-store"
 import { fetchActiveCaseLabRun, saveCaseLabRun } from "@/lib/labs/case-lab-runs-client"
+import type { CaseLabRun } from "@/lib/labs/types"
 
 const SAVE_DEBOUNCE_MS = 1000
 
@@ -81,14 +82,22 @@ export function useCaseLabRunSync(caseLabId: string | null) {
   // Debounced autosave on meaningful run changes.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSaved = useRef<string>("")
+  // The latest save-eligible run, mirrored to a ref so the unmount/tab-hide flush can read it. Non-null
+  // only while a change is scheduled but not yet written.
+  const pending = useRef<{ snapshot: string; run: CaseLabRun } | null>(null)
   useEffect(() => {
     if (!activeRun) return
     const snapshot = savableSnapshot(activeRun)
-    if (snapshot === lastSaved.current) return
+    if (snapshot === lastSaved.current) {
+      pending.current = null
+      return
+    }
+    pending.current = { snapshot, run: activeRun }
 
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       lastSaved.current = snapshot
+      pending.current = null
       saveCaseLabRun(activeRun)
         .then((saved) => {
           // Adopt a server-assigned id (first save) without clobbering edits
@@ -105,6 +114,34 @@ export function useCaseLabRunSync(caseLabId: string | null) {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
   }, [activeRun, setActiveRun, setError])
+
+  // Flush a pending save on unmount or when the tab is hidden. Answering a milestone and then clicking
+  // through the lab (or hiding/closing the tab) can unmount this sync within the 1s debounce; without a
+  // flush the scheduled save is cleared and the answer is lost. It fires only when there is a genuine
+  // unsaved change (`pending`), so a plain tab switch is a no-op, and client navigation does not unload
+  // the page so the fetch completes. The server-id adoption path stays on the debounced branch only.
+  useEffect(() => {
+    const flushPending = () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+      const flush = pending.current
+      if (flush) {
+        lastSaved.current = flush.snapshot
+        pending.current = null
+        void saveCaseLabRun(flush.run).catch(() => {})
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushPending()
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+      flushPending()
+    }
+  }, [])
 
   return { reload }
 }
