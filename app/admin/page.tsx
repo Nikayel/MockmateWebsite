@@ -45,6 +45,16 @@ interface AnalyticsMetrics {
     avgPerformanceScore: number
     byType: Record<string, number>
     byDifficulty: Record<string, number>
+    scoredCompleted?: number
+    guest?: number
+    registered?: number
+    registeredCompleted?: number
+    registeredScoredCompleted?: number
+  }
+  wcsr?: {
+    currentWeek: number
+    total: number
+    series: Array<{ week: string; count: number }>
   }
   revenue: {
     mrr: number
@@ -229,7 +239,45 @@ export default function AdminDashboard() {
           icon={TrendingUp}
           valueColor="text-[#c4703f]"
         />
+        {metrics.wcsr && (
+          <MetricCard
+            title="Weekly Scored Rounds"
+            value={metrics.wcsr.currentWeek}
+            subtitle={`North Star · ${metrics.wcsr.total.toLocaleString()} all-time`}
+            icon={TrendingUp}
+            valueColor="text-[#c4703f]"
+            iconColor="text-[#c4703f]"
+            sparklineData={metrics.wcsr.series.slice(-8).map((w) => w.count)}
+            sparklineColor="#c4703f"
+          />
+        )}
       </div>
+
+      {/* Registered vs guest sessions (honest split) + scored rounds */}
+      {metrics.sessions.registered !== undefined && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Registered sessions", value: metrics.sessions.registered ?? 0 },
+            { label: "Guest sessions", value: metrics.sessions.guest ?? 0 },
+            { label: "Registered completed", value: metrics.sessions.registeredCompleted ?? 0 },
+            { label: "Scored rounds", value: metrics.sessions.scoredCompleted ?? 0, highlight: true },
+          ].map((s) => (
+            <Card
+              key={s.label}
+              className={`border-gray-800 ${s.highlight ? "bg-[#c4703f]/10 border-[#c4703f]/30" : "bg-gray-900/50"}`}
+            >
+              <CardContent className="p-4">
+                <div
+                  className={`text-xl font-bold ${s.highlight ? "text-[#c4703f]" : "text-white"}`}
+                >
+                  {s.value.toLocaleString()}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">{s.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
