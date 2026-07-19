@@ -773,27 +773,9 @@ Run the demo below. It seeds a \`daily_sales\` table where two rows share \`2024
 
 Watch the two tied rows: under \`RANGE\` they both jump to the same total (every peer is summed at once), while \`ROWS\` climbs one physical row at a time. For a deterministic row-by-row running total, always write \`ROWS BETWEEN\`.
 
-## LAST_VALUE reads the frame, not the partition
+## The same frame default bites the positional functions
 
-A frame does not only feed \`SUM\` and \`AVG\`. The positional functions \`FIRST_VALUE\`, \`LAST_VALUE\`, and \`NTH_VALUE\` read a specific row *inside the frame*, and that is exactly where \`LAST_VALUE\` bites. With the default frame ending at the current row, \`LAST_VALUE\` returns the current row, not the partition's last value, so it looks like it just copies the column:
-
-\`\`\`sql
-SELECT order_date, revenue,
-  LAST_VALUE(revenue) OVER (ORDER BY order_date) AS wrong_last,
-  LAST_VALUE(revenue) OVER (
-    ORDER BY order_date
-    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-  ) AS right_last
-FROM daily_revenue;   -- rows 100 / 200 / 300 by date
-\`\`\`
-
-| order_date | revenue | wrong_last | right_last |
-|---|---|---|---|
-| 2024-01-01 | 100 | 100 | 300 |
-| 2024-01-02 | 200 | 200 | 300 |
-| 2024-01-03 | 300 | 300 | 300 |
-
-\`wrong_last\` tracks the current row; \`right_last\` is the true final only once the frame is widened to \`UNBOUNDED FOLLOWING\`. \`FIRST_VALUE\` is safe because the default frame already starts at the partition top, and \`NTH_VALUE(col, 2)\` needs the same widened frame to see past the current row.
+\`FIRST_VALUE\`, \`LAST_VALUE\`, and \`NTH_VALUE\` read a specific row *inside* the frame, so the current-row frame default that a running total relies on quietly makes \`LAST_VALUE\` report the current row instead of the partition's last, until you widen the frame to \`UNBOUNDED FOLLOWING\`. Level 5 teaches that positional-function trap in depth and grades it, so the full deep dive lives there; the running-total frame above is all L4's graded exercises need.
 
 ## Pitfalls
 
@@ -2444,16 +2426,14 @@ script** to confirm the row count doesn't move.`,
   },
   apply: scriptExercise({
     id: "sql-l4-idempotent-merge-apply",
-    prompt: `Convert a blind \`INSERT\` into an **\`INSERT … ON CONFLICT\` upsert** keyed on a unique
-column. \`dim_product\` already exists with \`sku\` declared \`UNIQUE\` and two rows in it; \`stg_product\`
-holds a fresh extract (already seeded). Load \`stg_product\` into \`dim_product\` so that:
+    prompt: `Write a load that leaves \`dim_product\` in exactly this state:
 
 - a **new** SKU (\`SKU3\`) is inserted,
-- an **existing** SKU (\`SKU1\`) updates its \`name\` and \`price\`,
+- an **existing** SKU (\`SKU1\`) has its \`name\` and \`price\` updated,
 - \`SKU2\` (not in the extract) is left untouched,
 - and **re-running the load adds no rows**: the table stays at exactly 3.
 
-Do it with a single \`INSERT … SELECT … ON CONFLICT(sku) DO UPDATE\`.`,
+\`dim_product\` already exists with \`sku\` declared \`UNIQUE\` and two rows in it; \`stg_product\` holds a fresh extract (already seeded). Get there by converting a blind \`INSERT\` into a single \`INSERT … SELECT … ON CONFLICT(sku) DO UPDATE\` upsert keyed on the unique \`sku\`.`,
     starterCode: `-- dim_product (sku UNIQUE) and stg_product are already seeded.
 -- Upsert the staging extract into dim_product so re-runs never duplicate.
 
