@@ -8,11 +8,10 @@
  */
 
 // External scenario imports (real-world scenarios from separate files)
-import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from "./scenarios-realworld"
-// Stdout-oracle bugfix packs. Kept as their own export (the legacy-10 bank stays locked),
-// but listed here so the scenario browser can actually surface and start them — without
-// this spread the 14 packs resolve by id yet appear on no start surface.
-import { bugfixPackScenarios } from "./scenarios/real-world/bugfix/packs"
+import { realWorldSystemDesignScenarios } from "./scenarios-realworld"
+// The complete public bugfix bank (locked legacy-10 bank + stdout-oracle packs) as one shared
+// composition, so the scenario browser and the lazy loader never disagree on what it contains.
+import { bugfixScenarios } from "./scenarios/real-world/bugfix/all"
 import { addFunctionalityScenarios } from "./scenarios/add-functionality"
 import { DSAPattern, DSA_PATTERNS } from "./types/dsa-patterns"
 
@@ -87,8 +86,7 @@ export const scenarios: Scenario[] = [
   ...systemDesignScenarios,
 
   // Real-world scenarios from separate files
-  ...realWorldBugFixScenarios,
-  ...bugfixPackScenarios,
+  ...bugfixScenarios,
   ...realWorldSystemDesignScenarios,
 
   // Add functionality scenarios - real-world feature implementation
