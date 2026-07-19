@@ -6,52 +6,42 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "palantir-foundry-usage-rollup",
-  bugClass: "double-count",
-  solutionMd:
-    '# SEALED — solution for palantir-foundry-usage-rollup\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/palantir-foundry-usage-rollup.server.ts`.\n\n## Bug (src/rollup.py, in `rollup()`)\n`primary` and `backup` are each deduplicated by `event_id` in isolation and then\nsummed. An event delivered on BOTH replicas (same `event_id` on primary and backup)\nsurvives both per-stream dedupes and is counted twice for any account present in both\nstreams.\n\n## Minimal fix\nDeduplicate the combined streams by `event_id` before summing:\n\n```python\nfor event in dedupe(primary + backup):\n```\n\n## Why the symptom presents as it does\nOnly `acme` has an event (`evt-1`) on both primary and backup, so only `acme` is\ndoubled (82 instead of 42). Every other account appears on a single stream, so the\nrest of the table is already correct — partial wrongness.\n\n## Red herrings (both reachable, both provably innocent)\n1. `account_id.lower()` — looks like it could merge distinct accounts, but the data\n   contract declares account ids case-insensitive ("Umbrella" and "umbrella" are the\n   same account by design), so the normalization is correct.\n2. The malformed-line skip (`len(parts) != 4` and the non-numeric `compute_seconds`\n   guard) — looks like silent data loss, but the contract says malformed lines are\n   skipped and the only such fixture rows are genuinely truncated/blank.\n\n## Complexity\nParse and dedupe are O(n) in the number of events; the dominant cost is\n`sorted(totals)` over the accounts. Time O(n log n), space O(n).\n\n## Phase-2 adaptation path\nOps adds a third replica stream, `audit`. The audit events already flow through\n`parse_events` but are discarded by the `stream not in VALID_STREAMS` filter. Add\n`"audit"` to `VALID_STREAMS` and fold every valid event through one cross-stream\ndedupe (`for event in dedupe(events)`) — an adaptation of the same fix, not a rewrite.\nThe audit fixture includes a cross-stream duplicate (`evt-1` for acme), so the fix\nmust still hold: acme stays 42, globex gains the new audit event (22 -> 30).\n\n## Debrief\nDeliver the intended bug vs the candidate\'s actual path, what they did well, where\nsignal was lost, and exactly ONE drill (dedup-key scoping if the SCOPE pass was weak;\nadapt-vs-rewrite if PHASE2 was weak).\n',
-  bugLocation: "src/rollup.py — rollup(): `for event in primary + backup`",
-  bugSummary:
-    "dedupe is scoped per stream, so an event delivered on both primary and backup is counted twice for any account present in both streams",
-  minimalFix:
-    "Deduplicate the combined streams before summing: `for event in dedupe(primary + backup):`",
-  survivalStory:
-    "Each stream is correctly deduplicated in isolation, so reading rollup() on its own looks right; it only doubles for the rare account whose event lands on BOTH replicas, which the happy-path fixtures (one stream per account) never exercised.",
-  redHerrings: [
+  "packId": "palantir-foundry-usage-rollup",
+  "bugClass": "double-count",
+  "solutionMd": "# SEALED — solution for palantir-foundry-usage-rollup\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/palantir-foundry-usage-rollup.server.ts`.\n\n## Bug (src/rollup.py, in `rollup()`)\n`primary` and `backup` are each deduplicated by `event_id` in isolation and then\nsummed. An event delivered on BOTH replicas (same `event_id` on primary and backup)\nsurvives both per-stream dedupes and is counted twice for any account present in both\nstreams.\n\n## Minimal fix\nDeduplicate the combined streams by `event_id` before summing:\n\n```python\nfor event in dedupe(primary + backup):\n```\n\n## Why the symptom presents as it does\nOnly `acme` has an event (`evt-1`) on both primary and backup, so only `acme` is\ndoubled (82 instead of 42). Every other account appears on a single stream, so the\nrest of the table is already correct — partial wrongness.\n\n## Red herrings (both reachable, both provably innocent)\n1. `account_id.lower()` — looks like it could merge distinct accounts, but the data\n   contract declares account ids case-insensitive (\"Umbrella\" and \"umbrella\" are the\n   same account by design), so the normalization is correct.\n2. The malformed-line skip (`len(parts) != 4` and the non-numeric `compute_seconds`\n   guard) — looks like silent data loss, but the contract says malformed lines are\n   skipped and the only such fixture rows are genuinely truncated/blank.\n\n## Complexity\nParse and dedupe are O(n) in the number of events; the dominant cost is\n`sorted(totals)` over the accounts. Time O(n log n), space O(n).\n\n## Phase-2 adaptation path\nOps adds a third replica stream, `audit`. The audit events already flow through\n`parse_events` but are discarded by the `stream not in VALID_STREAMS` filter. Add\n`\"audit\"` to `VALID_STREAMS` and fold every valid event through one cross-stream\ndedupe (`for event in dedupe(events)`) — an adaptation of the same fix, not a rewrite.\nThe audit fixture includes a cross-stream duplicate (`evt-1` for acme), so the fix\nmust still hold: acme stays 42, globex gains the new audit event (22 -> 30).\n\n## Debrief\nDeliver the intended bug vs the candidate's actual path, what they did well, where\nsignal was lost, and exactly ONE drill (dedup-key scoping if the SCOPE pass was weak;\nadapt-vs-rewrite if PHASE2 was weak).\n",
+  "bugLocation": "src/rollup.py — rollup(): `for event in primary + backup`",
+  "bugSummary": "dedupe is scoped per stream, so an event delivered on both primary and backup is counted twice for any account present in both streams",
+  "minimalFix": "Deduplicate the combined streams before summing: `for event in dedupe(primary + backup):`",
+  "survivalStory": "Each stream is correctly deduplicated in isolation, so reading rollup() on its own looks right; it only doubles for the rare account whose event lands on BOTH replicas, which the happy-path fixtures (one stream per account) never exercised.",
+  "redHerrings": [
     {
-      location: "src/rollup.py — parse_events(): account_id.lower()",
-      looksWrongBecause: "normalizing case could merge two different accounts",
-      provablyInnocentBecause:
-        "the data contract declares account ids case-insensitive, so Umbrella and umbrella are the same account by design",
+      "location": "src/rollup.py — parse_events(): account_id.lower()",
+      "looksWrongBecause": "normalizing case could merge two different accounts",
+      "provablyInnocentBecause": "the data contract declares account ids case-insensitive, so Umbrella and umbrella are the same account by design"
     },
     {
-      location: "src/rollup.py — parse_events(): len(parts) != 4 and the int() guard",
-      looksWrongBecause: "silently skipping lines looks like data loss",
-      provablyInnocentBecause:
-        "the contract says malformed lines are skipped, and the only skipped fixture rows are genuinely truncated/blank",
-    },
+      "location": "src/rollup.py — parse_events(): len(parts) != 4 and the int() guard",
+      "looksWrongBecause": "silently skipping lines looks like data loss",
+      "provablyInnocentBecause": "the contract says malformed lines are skipped, and the only skipped fixture rows are genuinely truncated/blank"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n log n)",
-    space: "O(n)",
-    dominantCost:
-      "the sorted() over the account totals for output ordering; parse and dedupe are O(n)",
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() over the account totals for output ordering; parse and dedupe are O(n)"
   },
-  phase2: {
-    specPatch:
-      "Ops added a third replica stream, 'audit'. Its events must be folded into each account's compute-seconds, deduplicated by event_id the same way — an event on audit that also arrived on primary or backup is still one event.",
-    fixturePatch: "audit,acme,evt-1,40\naudit,globex,evt-7,8\n",
-    expectedOutputV2:
-      "=== Compute-seconds by account ===\nacme: 42\nglobex: 30\ninitech: 30\numbrella: 12\n",
+  "phase2": {
+    "specPatch": "Ops added a third replica stream, 'audit'. Its events must be folded into each account's compute-seconds, deduplicated by event_id the same way. An event on audit that also arrived on primary or backup is still one event.",
+    "fixturePatch": "audit,acme,evt-1,40\naudit,globex,evt-7,8\n",
+    "expectedOutputV2": "=== Compute-seconds by account ===\nacme: 42\nglobex: 30\ninitech: 30\numbrella: 12\n"
   },
-  buggyOutput:
-    "=== Compute-seconds by account ===\nacme: 82\nglobex: 22\ninitech: 30\numbrella: 12\n",
-  debriefRubric: [
+  "buggyOutput": "=== Compute-seconds by account ===\nacme: 82\nglobex: 22\ninitech: 30\numbrella: 12\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the wrong value to the acme row and named the cross-stream duplicate (evt-1 on primary and backup) as the cause, in one sentence.",
     "Shipped a minimal fix (dedupe the combined streams) rather than rewriting rollup().",
     "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the nested-looking loops.",
     "Phase-2: adapted the existing dedupe to include the audit stream instead of rewriting; recognized the audit data was already parsed and thrown away.",
-    "Recommend exactly one drill: for a weak scoping pass, a dedup-key drill; for a weak phase-2, an adapt-vs-rewrite drill.",
-  ],
+    "Recommend exactly one drill: for a weak scoping pass, a dedup-key drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
 }

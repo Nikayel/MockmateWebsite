@@ -1,4 +1,4 @@
-# Ledger posting — nightly account-balance report
+# Ledger posting: nightly account-balance report
 
 ## Who reads this
 The payments treasury on-call runs this posting job every night to compute each

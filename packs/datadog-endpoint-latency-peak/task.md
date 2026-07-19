@@ -1,4 +1,4 @@
-# Peak latency report — per-endpoint slowest request
+# Peak latency report: per-endpoint slowest request
 
 ## Who reads this
 A performance reviewer runs this before signing off on a latency regression. This

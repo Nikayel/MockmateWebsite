@@ -6,56 +6,43 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "generic-session-window-count",
-  bugClass: "off-by-one-window",
-  solutionMd:
-    "# SEALED — solution for generic-session-window-count\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/generic-session-window-count.server.ts`.\n\n## Bug (src/session_rollup.py, in `count_sessions()`)\nThe new-session test is `event[\"epoch\"] - previous_epoch >= GAP_SECONDS`, which\nopens a new session as soon as the gap REACHES the window. The contract says two\nevents belong to the same session when the gap is at most `GAP_SECONDS`; a new\nsession should begin only when the gap is strictly LARGER than the window. So a\ngap of exactly `GAP_SECONDS` (1800s) is treated as a new session when it should\nstay in the current one, splitting one session into two.\n\n## Minimal fix\nMake the comparison strict so a gap equal to the window stays in the same session:\n\n```python\n        elif event[\"epoch\"] - previous_epoch > GAP_SECONDS:\n```\n\n## Why the symptom presents as it does\nOnly one user has two consecutive events exactly one window apart: `bob`, whose\n`08:00:00` and `08:30:00` clicks are 1800 seconds apart. Correctly those two plus\n`08:50:00` are one session; the boundary comparison splits `08:00:00` off into its\nown session, so `bob` reads 2 sessions instead of 1. Every other user's gaps are\neither well under 1800s (same session) or well over it (a genuine new session),\nso their counts are already correct — partial wrongness, and the one inflated row\nis the only user with an exact-boundary gap. `alice`'s 70-minute gap and `dan`'s\n110-minute gap are true session breaks that both versions agree on; `carol` has a\nsingle event and is one session in both.\n\n## Red herrings (both reachable, both provably innocent)\n1. `sorted(user_events, key=lambda event: event[\"ts_text\"])` in `count_sessions()`\n   — sorts by the raw ISO-8601 string rather than the parsed epoch, and that order\n   drives every gap in the session count. Looks like a lexical string sort could\n   misorder timestamps and fabricate or hide a gap. Provably innocent: the contract\n   fixes the timestamps as fixed-width UTC with a constant `Z` offset, so lexical\n   order equals chronological order. Reachable because the fixture delivers `alice`,\n   `bob`, and `dan` out of order, so the sort actually reorders their rows before the\n   gaps are measured.\n2. `dedupe()` keying only on `event_id` — looks under-specified (why is one field\n   enough to identify an event, and could it drop a legitimate repeat?). Provably\n   innocent: the contract says the bus is at-least-once and an `event_id` identifies\n   exactly one event, so the repeated `ed2` line is a genuine redelivery with\n   identical fields; dropping it is correct. Reachable because the fixture contains\n   that redelivery. It is also count-neutral here: a duplicate lands at the same\n   timestamp, inside the same session, so keeping it would not change any count —\n   another reason it cannot be the cause of an inflated total.\n\n## Complexity\nParsing and dedup are O(n). Grouping is O(n). Sorting each user's events is\nO(m log m) per user, O(n log n) overall. The session scan is one linear pass per\nuser, O(n) total. So time is O(n log n), dominated by the per-user sort; space is\nO(n) for the retained events. Output order is an explicit `sorted()` over the keys,\nnever set or hash iteration.\n\n## Phase-2 adaptation path\nOps wants sessions split by platform. The `platform` column is ALREADY parsed into\nevery event dict by `parse_line` and is thrown away today — `group_by_user` keys on\n`user_id` alone. Adapt, don't rewrite: key the grouping on `(user_id, platform)`,\ncarry that key through `build_counts`, and change the print to `user/platform:`\nsorted by the key. The fix must ship first: the split is orthogonal to the boundary\ncomparison, and `bob` still needs the strict comparison to read 1 web session. The\nphase-2 fixture only adds `mobile` rows for `alice` at times that fall inside her\nexisting web sessions, so unadapted code (which ignores platform) merges them in and\nprints the v1 report unchanged — the silent platform blindness is exactly the ops\ncomplaint.\n\n## Debrief\nDeliver the intended boundary-comparison flaw vs the candidate's actual path, what\nthey did well, where signal was lost, and exactly ONE drill (at-most-vs-strictly\nboundary reasoning if the SCOPE pass was weak; adapt-vs-rewrite if PHASE2 was weak).\n",
-  bugLocation:
-    'src/session_rollup.py — count_sessions(): `elif event["epoch"] - previous_epoch >= GAP_SECONDS:`',
-  bugSummary:
-    "The inactivity-gap test starts a new session when the gap reaches the window instead of only when it strictly exceeds it, so a user whose events are exactly one window apart has a single session split into two.",
-  minimalFix:
-    'Make the comparison strict so a gap equal to the window stays in the same session: `elif event["epoch"] - previous_epoch > GAP_SECONDS:`',
-  survivalStory:
-    "The `>=` reads like a plausible English rule ('a gap of thirty minutes or more starts a new session') and is correct for every gap that is comfortably inside or outside the window, so the happy-path data (gaps of a few minutes or over an hour) never exposed it; it only splits a session when two consecutive events land exactly GAP_SECONDS apart, an alignment the reviewers' examples never hit.",
-  redHerrings: [
+  "packId": "generic-session-window-count",
+  "bugClass": "off-by-one-window",
+  "solutionMd": "# SEALED — solution for generic-session-window-count\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/generic-session-window-count.server.ts`.\n\n## Bug (src/session_rollup.py, in `count_sessions()`)\nThe new-session test is `event[\"epoch\"] - previous_epoch >= GAP_SECONDS`, which\nopens a new session as soon as the gap REACHES the window. The contract says two\nevents belong to the same session when the gap is at most `GAP_SECONDS`; a new\nsession should begin only when the gap is strictly LARGER than the window. So a\ngap of exactly `GAP_SECONDS` (1800s) is treated as a new session when it should\nstay in the current one, splitting one session into two.\n\n## Minimal fix\nMake the comparison strict so a gap equal to the window stays in the same session:\n\n```python\n        elif event[\"epoch\"] - previous_epoch > GAP_SECONDS:\n```\n\n## Why the symptom presents as it does\nOnly one user has two consecutive events exactly one window apart: `bob`, whose\n`08:00:00` and `08:30:00` clicks are 1800 seconds apart. Correctly those two plus\n`08:50:00` are one session; the boundary comparison splits `08:00:00` off into its\nown session, so `bob` reads 2 sessions instead of 1. Every other user's gaps are\neither well under 1800s (same session) or well over it (a genuine new session),\nso their counts are already correct — partial wrongness, and the one inflated row\nis the only user with an exact-boundary gap. `alice`'s 70-minute gap and `dan`'s\n110-minute gap are true session breaks that both versions agree on; `carol` has a\nsingle event and is one session in both.\n\n## Red herrings (both reachable, both provably innocent)\n1. `sorted(user_events, key=lambda event: event[\"ts_text\"])` in `count_sessions()`\n   — sorts by the raw ISO-8601 string rather than the parsed epoch, and that order\n   drives every gap in the session count. Looks like a lexical string sort could\n   misorder timestamps and fabricate or hide a gap. Provably innocent: the contract\n   fixes the timestamps as fixed-width UTC with a constant `Z` offset, so lexical\n   order equals chronological order. Reachable because the fixture delivers `alice`,\n   `bob`, and `dan` out of order, so the sort actually reorders their rows before the\n   gaps are measured.\n2. `dedupe()` keying only on `event_id` — looks under-specified (why is one field\n   enough to identify an event, and could it drop a legitimate repeat?). Provably\n   innocent: the contract says the bus is at-least-once and an `event_id` identifies\n   exactly one event, so the repeated `ed2` line is a genuine redelivery with\n   identical fields; dropping it is correct. Reachable because the fixture contains\n   that redelivery. It is also count-neutral here: a duplicate lands at the same\n   timestamp, inside the same session, so keeping it would not change any count —\n   another reason it cannot be the cause of an inflated total.\n\n## Complexity\nParsing and dedup are O(n). Grouping is O(n). Sorting each user's events is\nO(m log m) per user, O(n log n) overall. The session scan is one linear pass per\nuser, O(n) total. So time is O(n log n), dominated by the per-user sort; space is\nO(n) for the retained events. Output order is an explicit `sorted()` over the keys,\nnever set or hash iteration.\n\n## Phase-2 adaptation path\nOps wants sessions split by platform. The `platform` column is ALREADY parsed into\nevery event dict by `parse_line` and is thrown away today — `group_by_user` keys on\n`user_id` alone. Adapt, don't rewrite: key the grouping on `(user_id, platform)`,\ncarry that key through `build_counts`, and change the print to `user/platform:`\nsorted by the key. The fix must ship first: the split is orthogonal to the boundary\ncomparison, and `bob` still needs the strict comparison to read 1 web session. The\nphase-2 fixture only adds `mobile` rows for `alice` at times that fall inside her\nexisting web sessions, so unadapted code (which ignores platform) merges them in and\nprints the v1 report unchanged — the silent platform blindness is exactly the ops\ncomplaint.\n\n## Debrief\nDeliver the intended boundary-comparison flaw vs the candidate's actual path, what\nthey did well, where signal was lost, and exactly ONE drill (at-most-vs-strictly\nboundary reasoning if the SCOPE pass was weak; adapt-vs-rewrite if PHASE2 was weak).\n",
+  "bugLocation": "src/session_rollup.py — count_sessions(): `elif event[\"epoch\"] - previous_epoch >= GAP_SECONDS:`",
+  "bugSummary": "The inactivity-gap test starts a new session when the gap reaches the window instead of only when it strictly exceeds it, so a user whose events are exactly one window apart has a single session split into two.",
+  "minimalFix": "Make the comparison strict so a gap equal to the window stays in the same session: `elif event[\"epoch\"] - previous_epoch > GAP_SECONDS:`",
+  "survivalStory": "The `>=` reads like a plausible English rule ('a gap of thirty minutes or more starts a new session') and is correct for every gap that is comfortably inside or outside the window, so the happy-path data (gaps of a few minutes or over an hour) never exposed it; it only splits a session when two consecutive events land exactly GAP_SECONDS apart, an alignment the reviewers' examples never hit.",
+  "redHerrings": [
     {
-      location:
-        'src/session_rollup.py — count_sessions(): sorted(user_events, key=lambda event: event["ts_text"])',
-      looksWrongBecause:
-        "it sorts by the raw ISO-8601 string rather than the parsed epoch, and that order drives every gap in the session count, so a lexical sort looks like it could misorder timestamps and fabricate or hide a gap",
-      provablyInnocentBecause:
-        "the contract fixes the timestamps as fixed-width UTC strings with a constant Z offset, so lexical order equals chronological order; it is reachable because the fixture delivers alice, bob, and dan out of order, so the sort actually reorders their rows",
+      "location": "src/session_rollup.py — count_sessions(): sorted(user_events, key=lambda event: event[\"ts_text\"])",
+      "looksWrongBecause": "it sorts by the raw ISO-8601 string rather than the parsed epoch, and that order drives every gap in the session count, so a lexical sort looks like it could misorder timestamps and fabricate or hide a gap",
+      "provablyInnocentBecause": "the contract fixes the timestamps as fixed-width UTC strings with a constant Z offset, so lexical order equals chronological order; it is reachable because the fixture delivers alice, bob, and dan out of order, so the sort actually reorders their rows"
     },
     {
-      location: "src/session_rollup.py — dedupe(): keying only on event_id",
-      looksWrongBecause:
-        "deduping on a single field looks under-specified and like it could drop a legitimate repeated event",
-      provablyInnocentBecause:
-        "the contract says the bus is at-least-once and an event_id identifies exactly one event, so the repeated ed2 line is a genuine redelivery with identical fields; it is count-neutral because a duplicate lands at the same timestamp inside the same session, so it cannot inflate a total",
-    },
+      "location": "src/session_rollup.py — dedupe(): keying only on event_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified and like it could drop a legitimate repeated event",
+      "provablyInnocentBecause": "the contract says the bus is at-least-once and an event_id identifies exactly one event, so the repeated ed2 line is a genuine redelivery with identical fields; it is count-neutral because a duplicate lands at the same timestamp inside the same session, so it cannot inflate a total"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n log n)",
-    space: "O(n)",
-    dominantCost:
-      "the per-user timestamp sort dominates at O(n log n); parsing, dedup, grouping, and the linear session scan are each O(n), and output order is an explicit sorted() over the keys with no set or hash iteration",
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the per-user timestamp sort dominates at O(n log n); parsing, dedup, grouping, and the linear session scan are each O(n), and output order is an explicit sorted() over the keys with no set or hash iteration"
   },
-  phase2: {
-    specPatch:
-      "Ops now wants the session counts split by platform, because a user active on web and on mobile in the same minutes is really two concurrent sessions, not one. Print each row as `user/platform: <sessions>` and keep the rows sorted. The platform column is already in the feed today.",
-    fixturePatch: "2026-03-02T09:05:00Z,alice,ea5,mobile\n2026-03-02T10:35:00Z,alice,ea6,mobile\n",
-    expectedOutputV2:
-      "=== sessions per user and platform (gap 1800s) ===\nalice/mobile: 2\nalice/web: 2\nbob/web: 1\ncarol/web: 1\ndan/web: 2\n",
+  "phase2": {
+    "specPatch": "Ops now wants the session counts split by platform, because a user active on web and on mobile in the same minutes is really two concurrent sessions, not one. Print each row as `user/platform: <sessions>` and keep the rows sorted. The platform column is already in the feed today.",
+    "fixturePatch": "2026-03-02T09:05:00Z,alice,ea5,mobile\n2026-03-02T10:35:00Z,alice,ea6,mobile\n",
+    "expectedOutputV2": "=== sessions per user and platform (gap 1800s) ===\nalice/mobile: 2\nalice/web: 2\nbob/web: 1\ncarol/web: 1\ndan/web: 2\n"
   },
-  buggyOutput: "=== sessions per user (gap 1800s) ===\nalice: 2\nbob: 2\ncarol: 1\ndan: 2\n",
-  debriefRubric: [
+  "buggyOutput": "=== sessions per user (gap 1800s) ===\nalice: 2\nbob: 2\ncarol: 1\ndan: 2\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the inflated value to the bob row and named the exact-boundary gap (08:00:00 to 08:30:00, 1800s apart) being split into two sessions as the cause, in one sentence.",
     "Shipped a minimal fix (make the gap comparison strictly greater than the window) rather than rewriting count_sessions.",
     "Tested the ts_text string sort against the fixed-width-timestamp contract and cleared it instead of chasing it.",
     "Complexity: identified the per-user sort as the O(n log n) dominant cost and noted the output uses an explicit sort rather than hash order.",
     "Phase-2: adapted by keying the grouping on (user_id, platform), recognizing the platform field was already parsed and thrown away, instead of rewriting.",
-    "Recommend exactly one drill: for a weak scoping pass, an at-most-vs-strictly boundary drill; for a weak phase-2, an adapt-vs-rewrite drill.",
-  ],
+    "Recommend exactly one drill: for a weak scoping pass, an at-most-vs-strictly boundary drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
 }

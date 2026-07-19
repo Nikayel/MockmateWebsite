@@ -6,50 +6,38 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "stripe-webhook-idempotency",
-  bugClass: "wrong-dedup-key",
-  solutionMd:
-    '# SEALED — solution for stripe-webhook-idempotency\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/stripe-webhook-idempotency.server.ts`.\n\n## Bug (src/main.py, in `dedupe()`, the `key = ...` line)\nThe idempotency key is built from `(merchant, type, amount)` instead of the event\'s\nown `event_id`. That key is not unique per event: two distinct events for the same\nmerchant that share a type and an amount collapse to one key, so the second one is\ndiscarded as if it were a redelivery.\n\n## Minimal fix\nKey the dedupe on the event identity:\n\n```python\nkey = event["event_id"]\n```\n\n## Why the symptom presents as it does\nOnly `orbit_goods` has two genuinely distinct charges of the same amount (`evt-4` and\n`evt-5`, both 2500). Under the shipped key they share `(orbit_goods, charge, 2500)`, so\none is dropped and orbit_goods reports 2000 instead of 4500, under-credited by a full\n2500-cent charge. Every other merchant\'s same-key collisions are true redeliveries\n(`evt-1`, `evt-7`), which SHOULD collapse to one, so keying on `event_id` still drops\nthose correctly and the rest of the table is unchanged. That is the partial wrongness:\none merchant off, three correct.\n\n## Red herring (reachable, provably innocent)\n`in_arrival_order()` sorts every event by its `received_at` ISO-8601 string before the\ndedupe runs. It looks suspect on two counts: sorting timestamps as plain strings, and\nfeeding a keep-first-seen dedupe from a reordered list so the "kept" record depends on\norder. It is innocent because a net balance is an order-independent sum of charges\nminus refunds, and every set of colliding records carries an identical amount, so\nwhichever record the dedupe keeps contributes the same number. No printed value can\nchange with the sort under the documented contract.\n\n## Complexity\nParse is O(n). The dominant cost is the `sorted()` in `in_arrival_order` (and the\n`sorted(balances)` for output), so time is O(n log n); dedupe and balance accumulation\nare O(n). Space O(n) for the event list and the seen-set.\n\n## Phase-2 adaptation path\nFinance adds `dispute` (chargeback) events that must subtract from the merchant\'s\nbalance like a refund, deduplicated by event_id. The dispute rows already flow through\n`parse_events` and `dedupe`; only `compute_balances` discards them, because `dispute`\nis neither in `CREDIT_TYPES` nor `DEBIT_TYPES`. The adaptation is one line: add\n`"dispute"` to `DEBIT_TYPES`. Combined with the event_id fix, disputes are deduped by\nidentity, so the redelivered `evt-11` counts once: luna_labs 5400 -> 400,\ndelta_foods 8000 -> 4700, orbit_goods stays 4500 (the fix still holds), pine_market\nunchanged. Running the shipped (unadapted) code on the phase-2 fixture leaves v1 output\nuntouched, which is exactly the silent data loss finance is complaining about.\n\n## Debrief\nDeliver the intended defect vs the candidate\'s actual path, what they did well, where\nsignal was lost, and exactly ONE drill: a dedup-key drill if the scoping pass to the\nidempotency key was weak; an adapt-vs-rewrite drill if they rebuilt `compute_balances`\nin phase-2 instead of recognizing the dispute data was already parsed and discarded.\n',
-  bugLocation:
-    'src/main.py — dedupe(): `key = (event["merchant"], event["type"], event["amount"])`',
-  bugSummary:
-    "the idempotency key is built from (merchant, type, amount) instead of the event_id, so a merchant's two distinct charges of the same amount collapse into one and that merchant is under-credited by a full charge",
-  minimalFix: 'Key the dedupe on event identity: `key = event["event_id"]`',
-  survivalStory:
-    "The dedupe reads correctly in isolation and passes on every happy-path feed where each merchant's charges have distinct amounts; it only drops a legitimate event for the rare merchant who charges the same amount twice, so it looks like a working idempotency guard that even collapses real redeliveries correctly.",
-  redHerrings: [
+  "packId": "stripe-webhook-idempotency",
+  "bugClass": "wrong-dedup-key",
+  "solutionMd": "# SEALED — solution for stripe-webhook-idempotency\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/stripe-webhook-idempotency.server.ts`.\n\n## Bug (src/main.py, in `dedupe()`, the `key = ...` line)\nThe idempotency key is built from `(merchant, type, amount)` instead of the event's\nown `event_id`. That key is not unique per event: two distinct events for the same\nmerchant that share a type and an amount collapse to one key, so the second one is\ndiscarded as if it were a redelivery.\n\n## Minimal fix\nKey the dedupe on the event identity:\n\n```python\nkey = event[\"event_id\"]\n```\n\n## Why the symptom presents as it does\nOnly `orbit_goods` has two genuinely distinct charges of the same amount (`evt-4` and\n`evt-5`, both 2500). Under the shipped key they share `(orbit_goods, charge, 2500)`, so\none is dropped and orbit_goods reports 2000 instead of 4500, under-credited by a full\n2500-cent charge. Every other merchant's same-key collisions are true redeliveries\n(`evt-1`, `evt-7`), which SHOULD collapse to one, so keying on `event_id` still drops\nthose correctly and the rest of the table is unchanged. That is the partial wrongness:\none merchant off, three correct.\n\n## Red herring (reachable, provably innocent)\n`in_arrival_order()` sorts every event by its `received_at` ISO-8601 string before the\ndedupe runs. It looks suspect on two counts: sorting timestamps as plain strings, and\nfeeding a keep-first-seen dedupe from a reordered list so the \"kept\" record depends on\norder. It is innocent because a net balance is an order-independent sum of charges\nminus refunds, and every set of colliding records carries an identical amount, so\nwhichever record the dedupe keeps contributes the same number. No printed value can\nchange with the sort under the documented contract.\n\n## Complexity\nParse is O(n). The dominant cost is the `sorted()` in `in_arrival_order` (and the\n`sorted(balances)` for output), so time is O(n log n); dedupe and balance accumulation\nare O(n). Space O(n) for the event list and the seen-set.\n\n## Phase-2 adaptation path\nFinance adds `dispute` (chargeback) events that must subtract from the merchant's\nbalance like a refund, deduplicated by event_id. The dispute rows already flow through\n`parse_events` and `dedupe`; only `compute_balances` discards them, because `dispute`\nis neither in `CREDIT_TYPES` nor `DEBIT_TYPES`. The adaptation is one line: add\n`\"dispute\"` to `DEBIT_TYPES`. Combined with the event_id fix, disputes are deduped by\nidentity, so the redelivered `evt-11` counts once: luna_labs 5400 -> 400,\ndelta_foods 8000 -> 4700, orbit_goods stays 4500 (the fix still holds), pine_market\nunchanged. Running the shipped (unadapted) code on the phase-2 fixture leaves v1 output\nuntouched, which is exactly the silent data loss finance is complaining about.\n\n## Debrief\nDeliver the intended defect vs the candidate's actual path, what they did well, where\nsignal was lost, and exactly ONE drill: a dedup-key drill if the scoping pass to the\nidempotency key was weak; an adapt-vs-rewrite drill if they rebuilt `compute_balances`\nin phase-2 instead of recognizing the dispute data was already parsed and discarded.\n",
+  "bugLocation": "src/main.py — dedupe(): `key = (event[\"merchant\"], event[\"type\"], event[\"amount\"])`",
+  "bugSummary": "the idempotency key is built from (merchant, type, amount) instead of the event_id, so a merchant's two distinct charges of the same amount collapse into one and that merchant is under-credited by a full charge",
+  "minimalFix": "Key the dedupe on event identity: `key = event[\"event_id\"]`",
+  "survivalStory": "The dedupe reads correctly in isolation and passes on every happy-path feed where each merchant's charges have distinct amounts; it only drops a legitimate event for the rare merchant who charges the same amount twice, so it looks like a working idempotency guard that even collapses real redeliveries correctly.",
+  "redHerrings": [
     {
-      location:
-        'src/main.py — in_arrival_order(): sorted(events, key=lambda event: event["received_at"])',
-      looksWrongBecause:
-        "it sorts ISO-8601 timestamps as plain strings and feeds a keep-first-seen dedupe from a reordered list, so the kept record appears to depend on ordering",
-      provablyInnocentBecause:
-        "a net balance is an order-independent sum of charges minus refunds and every set of colliding records carries an identical amount, so whichever record the dedupe keeps contributes the same number and no printed value can change with the sort",
-    },
+      "location": "src/main.py — in_arrival_order(): sorted(events, key=lambda event: event[\"received_at\"])",
+      "looksWrongBecause": "it sorts ISO-8601 timestamps as plain strings and feeds a keep-first-seen dedupe from a reordered list, so the kept record appears to depend on ordering",
+      "provablyInnocentBecause": "a net balance is an order-independent sum of charges minus refunds and every set of colliding records carries an identical amount, so whichever record the dedupe keeps contributes the same number and no printed value can change with the sort"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n log n)",
-    space: "O(n)",
-    dominantCost:
-      "the sorted() in in_arrival_order (and sorted(balances) for output ordering); parse, dedupe, and balance accumulation are each O(n)",
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() in in_arrival_order (and sorted(balances) for output ordering); parse, dedupe, and balance accumulation are each O(n)"
   },
-  phase2: {
-    specPatch:
-      "Finance also needs chargebacks folded in. A `dispute` event means the funds were pulled back from the merchant, so it must subtract its amount from that merchant's net balance, deduplicated by event_id the same way a redelivered charge is: a dispute that arrives more than once is still one dispute.",
-    fixturePatch:
-      "evt-11,dispute,luna_labs,5000,2026-03-02T09:00:00Z\nevt-11,dispute,luna_labs,5000,2026-03-02T09:00:04Z\nevt-13,dispute,delta_foods,3300,2026-03-02T12:30:00Z\n",
-    expectedOutputV2:
-      "=== Net balance (cents) by merchant ===\ndelta_foods: 4700\nluna_labs: 400\norbit_goods: 4500\npine_market: 8400\n",
+  "phase2": {
+    "specPatch": "Finance also needs chargebacks folded in. A `dispute` event means the funds were pulled back from the merchant, so it must subtract its amount from that merchant's net balance, deduplicated by event_id the same way a redelivered charge is: a dispute that arrives more than once is still one dispute.",
+    "fixturePatch": "evt-11,dispute,luna_labs,5000,2026-03-02T09:00:00Z\nevt-11,dispute,luna_labs,5000,2026-03-02T09:00:04Z\nevt-13,dispute,delta_foods,3300,2026-03-02T12:30:00Z\n",
+    "expectedOutputV2": "=== Net balance (cents) by merchant ===\ndelta_foods: 4700\nluna_labs: 400\norbit_goods: 4500\npine_market: 8400\n"
   },
-  buggyOutput:
-    "=== Net balance (cents) by merchant ===\ndelta_foods: 8000\nluna_labs: 5400\norbit_goods: 2000\npine_market: 8400\n",
-  debriefRubric: [
+  "buggyOutput": "=== Net balance (cents) by merchant ===\ndelta_foods: 8000\nluna_labs: 5400\norbit_goods: 2000\npine_market: 8400\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the low value to the orbit_goods row and named the two distinct same-amount charges (evt-4 and evt-5) collapsing under an under-specified key as the cause, in one sentence.",
     "Shipped a minimal fix (dedupe on event_id) rather than rewriting dedupe() or compute_balances().",
     "Tested the timestamp sort instead of assuming it was the fault, and could explain why the net-balance sum is order-independent.",
     "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the loops.",
     "Phase-2: added dispute as a debit type instead of rewriting, recognizing the dispute events were already parsed and deduped and only discarded at the balance step.",
-    "Recommend exactly one drill: a dedup-key drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2.",
-  ],
+    "Recommend exactly one drill: a dedup-key drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2."
+  ]
 }

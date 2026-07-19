@@ -1,4 +1,4 @@
-# Ontology link report — active links per object type
+# Ontology link report: active links per object type
 
 ## Who reads this
 A data-quality reviewer runs this report before signing off on the ontology. This

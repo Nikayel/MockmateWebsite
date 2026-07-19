@@ -1,4 +1,4 @@
-# Foundry usage rollup — nightly compute-seconds bill
+# Foundry usage rollup: nightly compute-seconds bill
 
 ## Who reads this
 The FinOps on-call runs this rollup every night to bill each account for the
@@ -10,7 +10,7 @@ higher than the metering dashboard shows, and billing is paused until it is trus
 
 Each account's usage is delivered on two replica streams for durability: `primary`
 and `backup`. The bus is at-least-once, so the SAME event (identified by its
-`event_id`) can arrive more than once, including once on each replica — those are the
+`event_id`) can arrive more than once, including once on each replica. Those are the
 same event, not two.
 
 ## Data contract (all of this is intended; the correct output tolerates it)

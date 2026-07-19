@@ -1,4 +1,4 @@
-# Monitor status board — per-series OK / ALERT / NO DATA for one window
+# Monitor status board: per-series OK / ALERT / NO DATA for one window
 
 ## Who reads this
 On-call keeps this status board open during an incident. For every monitored

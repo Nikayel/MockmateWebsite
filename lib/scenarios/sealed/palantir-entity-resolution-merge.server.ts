@@ -6,53 +6,42 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "palantir-entity-resolution-merge",
-  bugClass: "wrong-dedup-key",
-  solutionMd:
-    '# SEALED — solution for palantir-entity-resolution-merge\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/palantir-entity-resolution-merge.server.ts`.\n\n## Bug (src/resolve_entities.py, in `entity_key()`)\n`entity_key(namespace, name)` returns `name` alone and never uses `namespace`.\nThe merge/dedup key that decides whether two records are the same entity is\ntherefore keyed on name only. Two genuinely different entities that share a name\nin different tenants (`commercial/acme` and `gov/acme`) collapse into one count\nbucket, and every `(namespace, name)` row that shares that name reads the merged\ntotal.\n\n## Minimal fix\nKey the entity on the full identity:\n\n```python\ndef entity_key(namespace, name):\n    return (namespace, name)\n```\n\nOne line. `count_links` and `print_report` both route through `entity_key`, so\nthey stay consistent automatically.\n\n## Why the symptom presents as it does\nOnly the name `acme` occurs in two namespaces (`commercial` and `gov`), so only\nthe two acme rows read the merged bucket — both print 5 (3 + 2) instead of 3 and\n2. `globex`, `initech`, and `umbrella` each own a name unique to a single\nnamespace, so `counts[name]` already equals the correct per-entity count and the\nrest of the report is right. Partial wrongness, and the two identical acme counts\nare the tell.\n\n## Red herrings (both reachable, both provably innocent)\n1. `normalize_name` (`raw.strip().lower()`) — looks like it could merge two\n   different entities by folding case, but the contract declares entity names\n   case-insensitive, so `Acme ` and `acme` are the same entity by design\n   (fixture row `commercial,Acme ,L-1003` is the same entity as\n   `commercial,acme`). The normalization is correct.\n2. `dedupe_links` keying only on `link_id` — looks under-specified, as though it\n   could drop a link that legitimately repeats. But the contract says the bus is\n   at-least-once and a `link_id` identifies exactly one resolution, so the\n   redelivered `commercial,acme,L-1002` line is a true duplicate and dropping it\n   is correct.\n\n## Complexity\nParse, dedupe, and count are each O(n) in the number of link rows. The dominant\ncost is `sorted()` over the distinct entities when building the report. Time\nO(n log n), space O(n).\n\n## Phase-2 adaptation path\nOps onboards a new tenant namespace, `research`. Those rows already flow through\n`parse_line`, which parses the namespace and then discards the row because\n`research` is not in `REGISTERED_NAMESPACES`. Add `"research"` to\n`REGISTERED_NAMESPACES` — an adaptation of the existing filter, not a rewrite.\nThe research fixture includes `research/acme`, which shares the name `acme` with\nthe two existing acme entities, so the fixed `(namespace, name)` key must still\nhold: `research/acme` stays 1 and the acme rows stay separate. If the merge key\nwere still name-only, all three acme entities would collapse again.\n\n## Debrief\nDeliver the intended bug vs the candidate\'s actual path, what they did well, where\nsignal was lost, and exactly ONE drill (dedup-key scoping if the SCOPE pass was\nweak; adapt-vs-rewrite if PHASE2 was weak).\n',
-  bugLocation: "src/resolve_entities.py — entity_key(): `return name`",
-  bugSummary:
-    "entity_key ignores the namespace and keys only on name, so two entities that share a name in different namespaces are merged into one count bucket and each of their rows shows the combined link count",
-  minimalFix:
-    "Key the entity on its full identity: `return (namespace, name)`. Both count_links and print_report route through entity_key, so they stay consistent.",
-  survivalStory:
-    "entity_key names both namespace and name in its signature and reads like the full identity, so it looks right in isolation; it only merges entities for a name that exists in more than one namespace, which the happy-path data (each name owned by a single tenant) never exercised, so the name-only return survived review.",
-  redHerrings: [
+  "packId": "palantir-entity-resolution-merge",
+  "bugClass": "wrong-dedup-key",
+  "solutionMd": "# SEALED — solution for palantir-entity-resolution-merge\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/palantir-entity-resolution-merge.server.ts`.\n\n## Bug (src/resolve_entities.py, in `entity_key()`)\n`entity_key(namespace, name)` returns `name` alone and never uses `namespace`.\nThe merge/dedup key that decides whether two records are the same entity is\ntherefore keyed on name only. Two genuinely different entities that share a name\nin different tenants (`commercial/acme` and `gov/acme`) collapse into one count\nbucket, and every `(namespace, name)` row that shares that name reads the merged\ntotal.\n\n## Minimal fix\nKey the entity on the full identity:\n\n```python\ndef entity_key(namespace, name):\n    return (namespace, name)\n```\n\nOne line. `count_links` and `print_report` both route through `entity_key`, so\nthey stay consistent automatically.\n\n## Why the symptom presents as it does\nOnly the name `acme` occurs in two namespaces (`commercial` and `gov`), so only\nthe two acme rows read the merged bucket — both print 5 (3 + 2) instead of 3 and\n2. `globex`, `initech`, and `umbrella` each own a name unique to a single\nnamespace, so `counts[name]` already equals the correct per-entity count and the\nrest of the report is right. Partial wrongness, and the two identical acme counts\nare the tell.\n\n## Red herrings (both reachable, both provably innocent)\n1. `normalize_name` (`raw.strip().lower()`) — looks like it could merge two\n   different entities by folding case, but the contract declares entity names\n   case-insensitive, so `Acme ` and `acme` are the same entity by design\n   (fixture row `commercial,Acme ,L-1003` is the same entity as\n   `commercial,acme`). The normalization is correct.\n2. `dedupe_links` keying only on `link_id` — looks under-specified, as though it\n   could drop a link that legitimately repeats. But the contract says the bus is\n   at-least-once and a `link_id` identifies exactly one resolution, so the\n   redelivered `commercial,acme,L-1002` line is a true duplicate and dropping it\n   is correct.\n\n## Complexity\nParse, dedupe, and count are each O(n) in the number of link rows. The dominant\ncost is `sorted()` over the distinct entities when building the report. Time\nO(n log n), space O(n).\n\n## Phase-2 adaptation path\nOps onboards a new tenant namespace, `research`. Those rows already flow through\n`parse_line`, which parses the namespace and then discards the row because\n`research` is not in `REGISTERED_NAMESPACES`. Add `\"research\"` to\n`REGISTERED_NAMESPACES` — an adaptation of the existing filter, not a rewrite.\nThe research fixture includes `research/acme`, which shares the name `acme` with\nthe two existing acme entities, so the fixed `(namespace, name)` key must still\nhold: `research/acme` stays 1 and the acme rows stay separate. If the merge key\nwere still name-only, all three acme entities would collapse again.\n\n## Debrief\nDeliver the intended bug vs the candidate's actual path, what they did well, where\nsignal was lost, and exactly ONE drill (dedup-key scoping if the SCOPE pass was\nweak; adapt-vs-rewrite if PHASE2 was weak).\n",
+  "bugLocation": "src/resolve_entities.py — entity_key(): `return name`",
+  "bugSummary": "entity_key ignores the namespace and keys only on name, so two entities that share a name in different namespaces are merged into one count bucket and each of their rows shows the combined link count",
+  "minimalFix": "Key the entity on its full identity: `return (namespace, name)`. Both count_links and print_report route through entity_key, so they stay consistent.",
+  "survivalStory": "entity_key names both namespace and name in its signature and reads like the full identity, so it looks right in isolation; it only merges entities for a name that exists in more than one namespace, which the happy-path data (each name owned by a single tenant) never exercised, so the name-only return survived review.",
+  "redHerrings": [
     {
-      location: "src/resolve_entities.py — normalize_name(): raw.strip().lower()",
-      looksWrongBecause: "folding case and whitespace could merge two different entities into one",
-      provablyInnocentBecause:
-        "the data contract declares entity names case-insensitive, so `Acme ` and `acme` are the same entity by design and the fixture proves it with commercial,Acme ,L-1003",
+      "location": "src/resolve_entities.py — normalize_name(): raw.strip().lower()",
+      "looksWrongBecause": "folding case and whitespace could merge two different entities into one",
+      "provablyInnocentBecause": "the data contract declares entity names case-insensitive, so `Acme ` and `acme` are the same entity by design and the fixture proves it with commercial,Acme ,L-1003"
     },
     {
-      location: "src/resolve_entities.py — dedupe_links(): keying only on link_id",
-      looksWrongBecause:
-        "deduping on a single field looks under-specified, as if it could drop a link that legitimately repeats",
-      provablyInnocentBecause:
-        "the contract says the bus is at-least-once and a link_id identifies exactly one resolution, so the redelivered L-1002 line is a genuine duplicate and dropping it is correct",
-    },
+      "location": "src/resolve_entities.py — dedupe_links(): keying only on link_id",
+      "looksWrongBecause": "deduping on a single field looks under-specified, as if it could drop a link that legitimately repeats",
+      "provablyInnocentBecause": "the contract says the bus is at-least-once and a link_id identifies exactly one resolution, so the redelivered L-1002 line is a genuine duplicate and dropping it is correct"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n log n)",
-    space: "O(n)",
-    dominantCost:
-      "the sorted() over the distinct entities for output ordering; parse, dedupe, and count are each O(n) in the number of link rows",
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() over the distinct entities for output ordering; parse, dedupe, and count are each O(n) in the number of link rows"
   },
-  phase2: {
-    specPatch:
-      "Ops onboarded a new tenant namespace, `research`, and its links must be folded into the same per-entity report. A `research` entity that shares a name with a `commercial` or `gov` entity is still a different entity — namespaces stay distinct.",
-    fixturePatch: "research,acme,L-4001\nresearch,globex,L-4002\nresearch,globex,L-4003\n",
-    expectedOutputV2:
-      "=== Links resolved per entity ===\ncommercial/acme: 3\ngov/acme: 2\nresearch/acme: 1\ncommercial/globex: 4\nresearch/globex: 2\ncommercial/initech: 2\ngov/umbrella: 1\n",
+  "phase2": {
+    "specPatch": "Ops onboarded a new tenant namespace, `research`, and its links must be folded into the same per-entity report. A `research` entity that shares a name with a `commercial` or `gov` entity is still a different entity. Namespaces stay distinct.",
+    "fixturePatch": "research,acme,L-4001\nresearch,globex,L-4002\nresearch,globex,L-4003\n",
+    "expectedOutputV2": "=== Links resolved per entity ===\ncommercial/acme: 3\ngov/acme: 2\nresearch/acme: 1\ncommercial/globex: 4\nresearch/globex: 2\ncommercial/initech: 2\ngov/umbrella: 1\n"
   },
-  buggyOutput:
-    "=== Links resolved per entity ===\ncommercial/acme: 5\ngov/acme: 5\ncommercial/globex: 4\ncommercial/initech: 2\ngov/umbrella: 1\n",
-  debriefRubric: [
+  "buggyOutput": "=== Links resolved per entity ===\ncommercial/acme: 5\ngov/acme: 5\ncommercial/globex: 4\ncommercial/initech: 2\ngov/umbrella: 1\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the inflated counts to the two acme rows and named the shared name across the commercial and gov namespaces as the cause, in one sentence.",
     "Shipped a minimal fix (key the entity on namespace and name together) rather than rewriting the count or report path.",
     "Complexity: identified the sort over distinct entities as the dominant O(n log n) cost rather than pattern-matching the parse loops.",
     "Phase-2: adapted the existing namespace filter to admit research instead of rewriting, and recognized the research rows were already parsed and dropped by REGISTERED_NAMESPACES.",
-    "Recommend exactly one drill: for a weak scoping pass, a dedup-key drill; for a weak phase-2, an adapt-vs-rewrite drill.",
-  ],
+    "Recommend exactly one drill: for a weak scoping pass, a dedup-key drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
 }

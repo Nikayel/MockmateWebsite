@@ -6,58 +6,43 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "stripe-ledger-double-post",
-  bugClass: "double-count",
-  solutionMd:
-    "# SEALED — solution for stripe-ledger-double-post\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/stripe-ledger-double-post.server.ts`.\n\n## Bug (src/post_ledger.py, in `post()`, the `for batch_id in batches:` accumulation)\nDeduplication is scoped per batch: each batch is deduped on its own with\n`posted.extend(dedupe(batches[batch_id]))`, and the deduped batches are then\nconcatenated and summed without a second dedup across batches. A transaction that\nwas re-sent in an overlapping settlement window therefore survives once in each\nbatch's deduped list, so it is posted twice for that account. The correct code\ndeduplicates by `txn_id` across ALL batches before summing.\n\n## Minimal fix\nDeduplicate the combined, already-per-batch-deduped list once more before posting:\n\n```python\n    for txn in dedupe(posted):\n        apply_transaction(balances, txn)\n```\n\n## Why the symptom presents as it does\nOnly `atlas_market` has transactions that land in two batches: `t-2001` (4200) and\n`t-2002` (1800) appear in B1 and are re-sent in B2's overlapping window. Under the\nper-batch dedup, B1 keeps one copy of each and B2 keeps another copy of each, so\natlas_market is credited 2 * (4200 + 1800) = 12000 instead of 6000, over-credited by\na full window. Every other account's repeated `txn_id` is a WITHIN-batch redelivery\n(`cedar_books` `t-2003` twice in B1), which per-batch dedup already collapses\ncorrectly, so keying a single dedup across the combined list still collapses those\nand leaves the rest of the table unchanged. That is the partial wrongness: one\naccount over by 6000, three correct.\n\n## Red herrings (both reachable, both provably innocent)\n\n1. `to_cents()` builds cents as `int(whole) * 100 + int(frac)`. It looks lossy\n   because it concatenates the fractional part as cents with no scaling, which would\n   misread a single-decimal amount like `42.5` as 4205 rather than 4250. It is\n   innocent because the data contract guarantees every `amount` carries exactly two\n   decimal places, so `frac` is always a two-digit cents value and the conversion is\n   exact for every row in the fixture.\n2. `in_posting_order()` sorts every transaction by its `posted_at` ISO-8601 string\n   before posting. It looks suspect on two counts: sorting timestamps as plain\n   strings, and feeding a keep-first-seen dedup from a reordered list so the \"kept\"\n   record appears to depend on order. It is innocent because a balance is an\n   order-independent sum of charges minus refunds, and every set of colliding\n   `txn_id` records (a redelivery or a re-sent window) carries an identical amount,\n   so whichever record the dedup keeps contributes the same number. No printed value\n   can change with the sort under the documented contract.\n\n## Complexity\nParse is O(n). The dominant cost is the `sorted()` in `in_posting_order` (and the\n`sorted(balances)` for output ordering), so time is O(n log n); grouping, dedup, and\nbalance accumulation are each O(n). Space is O(n) for the transaction list, the\nper-batch grouping, and the seen-set.\n\n## Phase-2 adaptation path\nFinance adds `reversal` transactions that must subtract from the account's balance\nlike a refund, deduplicated by `txn_id`. The reversal rows already flow through\n`parse_transactions`, `in_posting_order`, `group_by_batch`, and `dedupe`; only\n`apply_transaction` discards them, because `reversal` is in neither `CREDIT_TYPES`\nnor `DEBIT_TYPES`. The adaptation is one line: add `\"reversal\"` to `DEBIT_TYPES`.\nCombined with the across-batch dedup fix, a reversal re-sent in two batches\n(`t-2009` on B2 and B3) is counted once: atlas_market 6000 -> 4000, cedar_books\n2000 -> 1700, nimbus_cafe 4500 -> 3500 (the reversal `t-2007` that was already in\nthe v1 feed and silently dropped), vertex_gym unchanged. Running the shipped\n(unadapted) code on the phase-2 fixture leaves v1 output untouched, which is exactly\nthe silent data loss finance is complaining about; running the across-batch fix\nwithout the reversal adaptation also leaves v1 output untouched, because the reversal\nrows are still discarded at posting.\n\n## Debrief\nDeliver the intended defect vs the candidate's actual path, what they did well, where\nsignal was lost, and exactly ONE drill: a scoping drill (where does the dedup key\nneed to hold?) if the pass from the high atlas_market row to the per-batch dedup was\nweak; an adapt-vs-rewrite drill if they rebuilt `apply_transaction` or `post` in\nphase-2 instead of recognizing the reversal data was already parsed and discarded.\n",
-  bugLocation:
-    "src/post_ledger.py — post(): the `for batch_id in batches: posted.extend(dedupe(batches[batch_id]))` accumulation, which dedups within each batch but never across batches before summing",
-  bugSummary:
-    "dedup is scoped per batch, so a transaction re-sent in an overlapping settlement window survives once in each batch's deduped list and is posted twice, over-crediting the one account whose transactions land in two batches",
-  minimalFix:
-    "Deduplicate the combined per-batch-deduped list once more before posting: `for txn in dedupe(posted):`",
-  survivalStory:
-    "Each batch is correctly deduplicated in isolation, so reading post() on its own looks right and even collapses the within-batch redeliveries; it only over-posts for the rare account whose transaction is re-sent in a second batch's overlap window, which the happy-path feeds (one batch per transaction) never exercised.",
-  redHerrings: [
+  "packId": "stripe-ledger-double-post",
+  "bugClass": "double-count",
+  "solutionMd": "# SEALED — solution for stripe-ledger-double-post\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/stripe-ledger-double-post.server.ts`.\n\n## Bug (src/post_ledger.py, in `post()`, the `for batch_id in batches:` accumulation)\nDeduplication is scoped per batch: each batch is deduped on its own with\n`posted.extend(dedupe(batches[batch_id]))`, and the deduped batches are then\nconcatenated and summed without a second dedup across batches. A transaction that\nwas re-sent in an overlapping settlement window therefore survives once in each\nbatch's deduped list, so it is posted twice for that account. The correct code\ndeduplicates by `txn_id` across ALL batches before summing.\n\n## Minimal fix\nDeduplicate the combined, already-per-batch-deduped list once more before posting:\n\n```python\n    for txn in dedupe(posted):\n        apply_transaction(balances, txn)\n```\n\n## Why the symptom presents as it does\nOnly `atlas_market` has transactions that land in two batches: `t-2001` (4200) and\n`t-2002` (1800) appear in B1 and are re-sent in B2's overlapping window. Under the\nper-batch dedup, B1 keeps one copy of each and B2 keeps another copy of each, so\natlas_market is credited 2 * (4200 + 1800) = 12000 instead of 6000, over-credited by\na full window. Every other account's repeated `txn_id` is a WITHIN-batch redelivery\n(`cedar_books` `t-2003` twice in B1), which per-batch dedup already collapses\ncorrectly, so keying a single dedup across the combined list still collapses those\nand leaves the rest of the table unchanged. That is the partial wrongness: one\naccount over by 6000, three correct.\n\n## Red herrings (both reachable, both provably innocent)\n\n1. `to_cents()` builds cents as `int(whole) * 100 + int(frac)`. It looks lossy\n   because it concatenates the fractional part as cents with no scaling, which would\n   misread a single-decimal amount like `42.5` as 4205 rather than 4250. It is\n   innocent because the data contract guarantees every `amount` carries exactly two\n   decimal places, so `frac` is always a two-digit cents value and the conversion is\n   exact for every row in the fixture.\n2. `in_posting_order()` sorts every transaction by its `posted_at` ISO-8601 string\n   before posting. It looks suspect on two counts: sorting timestamps as plain\n   strings, and feeding a keep-first-seen dedup from a reordered list so the \"kept\"\n   record appears to depend on order. It is innocent because a balance is an\n   order-independent sum of charges minus refunds, and every set of colliding\n   `txn_id` records (a redelivery or a re-sent window) carries an identical amount,\n   so whichever record the dedup keeps contributes the same number. No printed value\n   can change with the sort under the documented contract.\n\n## Complexity\nParse is O(n). The dominant cost is the `sorted()` in `in_posting_order` (and the\n`sorted(balances)` for output ordering), so time is O(n log n); grouping, dedup, and\nbalance accumulation are each O(n). Space is O(n) for the transaction list, the\nper-batch grouping, and the seen-set.\n\n## Phase-2 adaptation path\nFinance adds `reversal` transactions that must subtract from the account's balance\nlike a refund, deduplicated by `txn_id`. The reversal rows already flow through\n`parse_transactions`, `in_posting_order`, `group_by_batch`, and `dedupe`; only\n`apply_transaction` discards them, because `reversal` is in neither `CREDIT_TYPES`\nnor `DEBIT_TYPES`. The adaptation is one line: add `\"reversal\"` to `DEBIT_TYPES`.\nCombined with the across-batch dedup fix, a reversal re-sent in two batches\n(`t-2009` on B2 and B3) is counted once: atlas_market 6000 -> 4000, cedar_books\n2000 -> 1700, nimbus_cafe 4500 -> 3500 (the reversal `t-2007` that was already in\nthe v1 feed and silently dropped), vertex_gym unchanged. Running the shipped\n(unadapted) code on the phase-2 fixture leaves v1 output untouched, which is exactly\nthe silent data loss finance is complaining about; running the across-batch fix\nwithout the reversal adaptation also leaves v1 output untouched, because the reversal\nrows are still discarded at posting.\n\n## Debrief\nDeliver the intended defect vs the candidate's actual path, what they did well, where\nsignal was lost, and exactly ONE drill: a scoping drill (where does the dedup key\nneed to hold?) if the pass from the high atlas_market row to the per-batch dedup was\nweak; an adapt-vs-rewrite drill if they rebuilt `apply_transaction` or `post` in\nphase-2 instead of recognizing the reversal data was already parsed and discarded.\n",
+  "bugLocation": "src/post_ledger.py — post(): the `for batch_id in batches: posted.extend(dedupe(batches[batch_id]))` accumulation, which dedups within each batch but never across batches before summing",
+  "bugSummary": "dedup is scoped per batch, so a transaction re-sent in an overlapping settlement window survives once in each batch's deduped list and is posted twice, over-crediting the one account whose transactions land in two batches",
+  "minimalFix": "Deduplicate the combined per-batch-deduped list once more before posting: `for txn in dedupe(posted):`",
+  "survivalStory": "Each batch is correctly deduplicated in isolation, so reading post() on its own looks right and even collapses the within-batch redeliveries; it only over-posts for the rare account whose transaction is re-sent in a second batch's overlap window, which the happy-path feeds (one batch per transaction) never exercised.",
+  "redHerrings": [
     {
-      location: "src/post_ledger.py — to_cents(): `int(whole) * 100 + int(frac)`",
-      looksWrongBecause:
-        "it concatenates the fractional part as cents with no scaling, which would misread a single-decimal amount like 42.5 as 4205 instead of 4250",
-      provablyInnocentBecause:
-        "the data contract guarantees every amount carries exactly two decimal places, so frac is always a two-digit cents value and the conversion is exact for every row in the fixture",
+      "location": "src/post_ledger.py — to_cents(): `int(whole) * 100 + int(frac)`",
+      "looksWrongBecause": "it concatenates the fractional part as cents with no scaling, which would misread a single-decimal amount like 42.5 as 4205 instead of 4250",
+      "provablyInnocentBecause": "the data contract guarantees every amount carries exactly two decimal places, so frac is always a two-digit cents value and the conversion is exact for every row in the fixture"
     },
     {
-      location:
-        'src/post_ledger.py — in_posting_order(): sorted(transactions, key=lambda txn: txn["posted_at"])',
-      looksWrongBecause:
-        "it sorts ISO-8601 timestamps as plain strings and feeds a keep-first-seen dedup from a reordered list, so the kept record appears to depend on ordering",
-      provablyInnocentBecause:
-        "a balance is an order-independent sum of charges minus refunds and every set of colliding txn_id records carries an identical amount, so whichever record the dedup keeps contributes the same number and no printed value can change with the sort",
-    },
+      "location": "src/post_ledger.py — in_posting_order(): sorted(transactions, key=lambda txn: txn[\"posted_at\"])",
+      "looksWrongBecause": "it sorts ISO-8601 timestamps as plain strings and feeds a keep-first-seen dedup from a reordered list, so the kept record appears to depend on ordering",
+      "provablyInnocentBecause": "a balance is an order-independent sum of charges minus refunds and every set of colliding txn_id records carries an identical amount, so whichever record the dedup keeps contributes the same number and no printed value can change with the sort"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n log n)",
-    space: "O(n)",
-    dominantCost:
-      "the sorted() in in_posting_order (and sorted(balances) for output ordering); parse, grouping, dedup, and balance accumulation are each O(n)",
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() in in_posting_order (and sorted(balances) for output ordering); parse, grouping, dedup, and balance accumulation are each O(n)"
   },
-  phase2: {
-    specPatch:
-      "Finance also needs reversals folded in. A `reversal` transaction means the funds were pulled back from the account, so it must subtract its amount from that account's balance, deduplicated by txn_id the same way a re-sent charge is: a reversal that arrives in two batches is still one reversal.",
-    fixturePatch:
-      "B2,t-2009,atlas_market,reversal,20.00,2026-03-02T09:00:00Z\nB3,t-2009,atlas_market,reversal,20.00,2026-03-02T09:05:00Z\nB2,t-2010,cedar_books,reversal,3.00,2026-03-02T09:10:00Z\n",
-    expectedOutputV2:
-      "=== Ledger balance (cents) by account ===\natlas_market: 4000\ncedar_books: 1700\nnimbus_cafe: 3500\nvertex_gym: 6000\n",
+  "phase2": {
+    "specPatch": "Finance also needs reversals folded in. A `reversal` transaction means the funds were pulled back from the account, so it must subtract its amount from that account's balance, deduplicated by txn_id the same way a re-sent charge is: a reversal that arrives in two batches is still one reversal.",
+    "fixturePatch": "B2,t-2009,atlas_market,reversal,20.00,2026-03-02T09:00:00Z\nB3,t-2009,atlas_market,reversal,20.00,2026-03-02T09:05:00Z\nB2,t-2010,cedar_books,reversal,3.00,2026-03-02T09:10:00Z\n",
+    "expectedOutputV2": "=== Ledger balance (cents) by account ===\natlas_market: 4000\ncedar_books: 1700\nnimbus_cafe: 3500\nvertex_gym: 6000\n"
   },
-  buggyOutput:
-    "=== Ledger balance (cents) by account ===\natlas_market: 12000\ncedar_books: 2000\nnimbus_cafe: 4500\nvertex_gym: 6000\n",
-  debriefRubric: [
+  "buggyOutput": "=== Ledger balance (cents) by account ===\natlas_market: 12000\ncedar_books: 2000\nnimbus_cafe: 4500\nvertex_gym: 6000\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the high value to the atlas_market row and named the transactions re-sent across two batches (t-2001 and t-2002 on B1 and B2) collapsing only within each batch as the cause, in one sentence.",
     "Shipped a minimal fix (dedup the combined list across batches) rather than rewriting post() or apply_transaction().",
     "Tested the to_cents concatenation and the posted_at sort instead of assuming either was the fault, and could explain why each is exact/order-independent under the contract.",
     "Complexity: identified the sort as the dominant O(n log n) cost rather than pattern-matching the grouping and dedup loops.",
     "Phase-2: added reversal as a debit type instead of rewriting, recognizing the reversal transactions were already parsed and deduped and only discarded at the posting step.",
-    "Recommend exactly one drill: a dedup-scoping drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2.",
-  ],
+    "Recommend exactly one drill: a dedup-scoping drill for a weak scoping pass; an adapt-vs-rewrite drill for a weak phase-2."
+  ]
 }

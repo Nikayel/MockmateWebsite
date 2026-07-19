@@ -1,4 +1,4 @@
-# Metric window rollup — per-minute web.5xx count and sum
+# Metric window rollup: per-minute web.5xx count and sum
 
 ## Who reads this
 The on-call SRE keeps this rollup open during an incident. It buckets raw

@@ -1,4 +1,4 @@
-# Foundry transform reconciliation — records materialized per pipeline
+# Foundry transform reconciliation: records materialized per pipeline
 
 ## Who reads this
 The FinOps on-call runs this reconciliation job every night. It replays the

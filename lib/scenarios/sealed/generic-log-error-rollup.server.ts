@@ -6,50 +6,38 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "generic-log-error-rollup",
-  bugClass: "accumulator-wrong-scope",
-  solutionMd:
-    "# SEALED — solution for generic-log-error-rollup\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/generic-log-error-rollup.server.ts`.\n\n## Bug (src/report.py, in `build_report()`)\n`error_count` is initialized ONCE before the `for service in grouped` loop instead of\ninside it, so it is never reset between services. Each service's stored count is the\nrunning total of every ERROR line seen up to and including that service, so a service\nthat is processed after another service's errors is credited with those earlier errors.\n\n## Minimal fix\nMove the reset inside the per-service loop so the accumulator starts at zero for each\nservice:\n\n```python\n    report = {}\n    for service in grouped:\n        error_count = 0\n        for level in grouped[service]:\n            if level == ERROR_LEVEL:\n                error_count += 1\n        report[service] = error_count\n    return report\n```\n\n## Why the symptom presents as it does\nServices are processed in first-seen order: `gateway`, `catalog`, `payments`,\n`notifications`. `gateway` and `catalog` log no ERROR lines, so the accumulator is\nstill 0 when `payments` is reached — `payments` correctly reads 3. Only\n`notifications`, processed after `payments`, carries the leftover 3 and reports\n5 instead of its own 2. Every other row is already correct — partial wrongness, and\nthe inflated row is the only one that follows a service that had errors.\n\n## Red herrings (reachable, provably innocent)\n1. `level.strip().upper()` in `parse_line()` — looks like it could miscount by folding\n   levels together, and it is load-bearing (the lowercase `error` line for `payments`\n   is only counted because of it). It is innocent: the data contract declares levels\n   case-insensitive, `error`/`Error`/`ERROR` are the same level by design, and `WARN`\n   and `INFO` never normalize to `ERROR`. Removing it would UNDER-count payments, which\n   is the opposite of the observed symptom, so it cannot be the cause.\n\n## Complexity\nParsing and grouping are O(n) in the number of lines; `build_report` is O(n) over the\ngrouped levels. Output is emitted in dict insertion order (no sort). Time O(n),\nspace O(n) for the grouped levels.\n\n## Phase-2 adaptation path\nOps also wants each service's WARN count. The WARN levels ALREADY flow into\n`group_by_service` and sit in each service's level list — `build_report` simply\ndiscards everything that is not `ERROR`. Adapt (do not rewrite): add a second\nper-service accumulator `warn_count` next to the now-correctly-scoped `error_count`,\nincrement it on `WARN`, and change the print to `service: errors=<e> warns=<w>`. The\nphase-2 fixture only adds WARN lines to services already present, so unadapted code\n(which ignores WARN and gains no new service or ERROR) prints the v1 report unchanged —\nthe silent data loss is exactly the ops complaint.\n\n## Debrief\nDeliver the intended accumulator-scope flaw vs the candidate's actual path, what they\ndid well, where signal was lost, and exactly ONE drill (accumulator-scoping if the\nSCOPE pass was weak; adapt-vs-rewrite if PHASE2 was weak).\n",
-  bugLocation:
-    "src/report.py — build_report(): `error_count = 0` sits above `for service in grouped`",
-  bugSummary:
-    "The accumulator is initialized one scope too high, so it is never reset between services and each service is credited with the ERROR lines of every service processed before it.",
-  minimalFix:
-    "Move `error_count = 0` inside the `for service in grouped` loop so each service starts its count at zero.",
-  survivalStory:
-    "build_report reads correctly for the first service that has errors and for every service with no earlier errors, so the happy-path fixtures (leading services with zero errors) never exposed it; it only inflates a service that is processed after another service already logged errors, and the count is a running total that still looks like a plausible per-service number.",
-  redHerrings: [
+  "packId": "generic-log-error-rollup",
+  "bugClass": "accumulator-wrong-scope",
+  "solutionMd": "# SEALED — solution for generic-log-error-rollup\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/generic-log-error-rollup.server.ts`.\n\n## Bug (src/report.py, in `build_report()`)\n`error_count` is initialized ONCE before the `for service in grouped` loop instead of\ninside it, so it is never reset between services. Each service's stored count is the\nrunning total of every ERROR line seen up to and including that service, so a service\nthat is processed after another service's errors is credited with those earlier errors.\n\n## Minimal fix\nMove the reset inside the per-service loop so the accumulator starts at zero for each\nservice:\n\n```python\n    report = {}\n    for service in grouped:\n        error_count = 0\n        for level in grouped[service]:\n            if level == ERROR_LEVEL:\n                error_count += 1\n        report[service] = error_count\n    return report\n```\n\n## Why the symptom presents as it does\nServices are processed in first-seen order: `gateway`, `catalog`, `payments`,\n`notifications`. `gateway` and `catalog` log no ERROR lines, so the accumulator is\nstill 0 when `payments` is reached — `payments` correctly reads 3. Only\n`notifications`, processed after `payments`, carries the leftover 3 and reports\n5 instead of its own 2. Every other row is already correct — partial wrongness, and\nthe inflated row is the only one that follows a service that had errors.\n\n## Red herrings (reachable, provably innocent)\n1. `level.strip().upper()` in `parse_line()` — looks like it could miscount by folding\n   levels together, and it is load-bearing (the lowercase `error` line for `payments`\n   is only counted because of it). It is innocent: the data contract declares levels\n   case-insensitive, `error`/`Error`/`ERROR` are the same level by design, and `WARN`\n   and `INFO` never normalize to `ERROR`. Removing it would UNDER-count payments, which\n   is the opposite of the observed symptom, so it cannot be the cause.\n\n## Complexity\nParsing and grouping are O(n) in the number of lines; `build_report` is O(n) over the\ngrouped levels. Output is emitted in dict insertion order (no sort). Time O(n),\nspace O(n) for the grouped levels.\n\n## Phase-2 adaptation path\nOps also wants each service's WARN count. The WARN levels ALREADY flow into\n`group_by_service` and sit in each service's level list — `build_report` simply\ndiscards everything that is not `ERROR`. Adapt (do not rewrite): add a second\nper-service accumulator `warn_count` next to the now-correctly-scoped `error_count`,\nincrement it on `WARN`, and change the print to `service: errors=<e> warns=<w>`. The\nphase-2 fixture only adds WARN lines to services already present, so unadapted code\n(which ignores WARN and gains no new service or ERROR) prints the v1 report unchanged —\nthe silent data loss is exactly the ops complaint.\n\n## Debrief\nDeliver the intended accumulator-scope flaw vs the candidate's actual path, what they\ndid well, where signal was lost, and exactly ONE drill (accumulator-scoping if the\nSCOPE pass was weak; adapt-vs-rewrite if PHASE2 was weak).\n",
+  "bugLocation": "src/report.py — build_report(): `error_count = 0` sits above `for service in grouped`",
+  "bugSummary": "The accumulator is initialized one scope too high, so it is never reset between services and each service is credited with the ERROR lines of every service processed before it.",
+  "minimalFix": "Move `error_count = 0` inside the `for service in grouped` loop so each service starts its count at zero.",
+  "survivalStory": "build_report reads correctly for the first service that has errors and for every service with no earlier errors, so the happy-path fixtures (leading services with zero errors) never exposed it; it only inflates a service that is processed after another service already logged errors, and the count is a running total that still looks like a plausible per-service number.",
+  "redHerrings": [
     {
-      location: "src/report.py — parse_line(): level.strip().upper()",
-      looksWrongBecause:
-        "normalizing the level string could fold levels together or drop the count for oddly-cased lines",
-      provablyInnocentBecause:
-        "the data contract declares levels case-insensitive, so error/Error/ERROR are the same level by design and WARN/INFO never normalize to ERROR; it is load-bearing (the lowercase `error` line is only counted because of it) and removing it would under-count, the opposite of the observed inflation",
-    },
+      "location": "src/report.py — parse_line(): level.strip().upper()",
+      "looksWrongBecause": "normalizing the level string could fold levels together or drop the count for oddly-cased lines",
+      "provablyInnocentBecause": "the data contract declares levels case-insensitive, so error/Error/ERROR are the same level by design and WARN/INFO never normalize to ERROR; it is load-bearing (the lowercase `error` line is only counted because of it) and removing it would under-count, the opposite of the observed inflation"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n)",
-    space: "O(n)",
-    dominantCost:
-      "a single linear pass to parse and group the n log lines, then a linear pass over the grouped levels; output is in dict insertion order with no sort",
+  "complexityAnswer": {
+    "time": "O(n)",
+    "space": "O(n)",
+    "dominantCost": "a single linear pass to parse and group the n log lines, then a linear pass over the grouped levels; output is in dict insertion order with no sort"
   },
-  phase2: {
-    specPatch:
-      "Ops also wants each service's WARN count, because a rise in warnings tends to precede incidents. Keep the same header line, but print each row as `service: errors=<e> warns=<w>`. The WARN lines are already in the feed today.",
-    fixturePatch:
-      "2026-07-14T10:05:01Z gateway WARN upstream latency 903ms\n2026-07-14T10:05:04Z payments WARN retrying charge in 4s\n2026-07-14T10:05:06Z payments WARN retrying charge in 8s\n",
-    expectedOutputV2:
-      "=== ERROR lines by service ===\ngateway: errors=0 warns=2\ncatalog: errors=0 warns=1\npayments: errors=3 warns=3\nnotifications: errors=2 warns=1\n",
+  "phase2": {
+    "specPatch": "Ops also wants each service's WARN count, because a rise in warnings tends to precede incidents. Keep the same header line, but print each row as `service: errors=<e> warns=<w>`. The WARN lines are already in the feed today.",
+    "fixturePatch": "2026-07-14T10:05:01Z gateway WARN upstream latency 903ms\n2026-07-14T10:05:04Z payments WARN retrying charge in 4s\n2026-07-14T10:05:06Z payments WARN retrying charge in 8s\n",
+    "expectedOutputV2": "=== ERROR lines by service ===\ngateway: errors=0 warns=2\ncatalog: errors=0 warns=1\npayments: errors=3 warns=3\nnotifications: errors=2 warns=1\n"
   },
-  buggyOutput:
-    "=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 5\n",
-  debriefRubric: [
+  "buggyOutput": "=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 5\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the inflated value to the notifications row and named the un-reset accumulator (error_count carried from payments) as the cause, in one sentence.",
     "Shipped a minimal fix (reset error_count inside the per-service loop) rather than rewriting build_report.",
     "Tested the level.strip().upper() normalization against the contract and cleared it instead of chasing it.",
     "Complexity: identified the two linear passes as O(n) and noted there is no sort in the output path.",
     "Phase-2: adapted the loop to also count WARN using a second correctly-scoped accumulator, recognizing the WARN levels were already grouped and thrown away, instead of rewriting.",
-    "Recommend exactly one drill: for a weak scoping pass, an accumulator-scoping drill; for a weak phase-2, an adapt-vs-rewrite drill.",
-  ],
+    "Recommend exactly one drill: for a weak scoping pass, an accumulator-scoping drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
 }

@@ -1,4 +1,4 @@
-# Cache eviction report — live entries per namespace
+# Cache eviction report: live entries per namespace
 
 ## Who reads this
 The capacity-planning on-call reads this report every morning. It replays the

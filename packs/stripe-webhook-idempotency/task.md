@@ -1,4 +1,4 @@
-# Webhook replay — nightly net-balance report
+# Webhook replay: nightly net-balance report
 
 ## Who reads this
 The payments on-call replays the webhook event log every night to compute each

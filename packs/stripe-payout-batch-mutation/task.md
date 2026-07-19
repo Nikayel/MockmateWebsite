@@ -1,4 +1,4 @@
-# Nightly payout batching — scheduled-total report
+# Nightly payout batching: scheduled-total report
 
 ## Who reads this
 The payments on-call runs the settlement job every night to decide how much money

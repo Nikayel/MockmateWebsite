@@ -1,4 +1,4 @@
-# Ontology reconciliation — links resolved per entity
+# Ontology reconciliation: links resolved per entity
 
 ## Who reads this
 The registry team runs this reconciliation report every morning after the

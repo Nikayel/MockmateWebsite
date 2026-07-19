@@ -1,4 +1,4 @@
-# Session rollup — click sessions per user
+# Session rollup: click sessions per user
 
 ## Who reads this
 The Growth analyst reads this rollup every morning. It groups each user's raw

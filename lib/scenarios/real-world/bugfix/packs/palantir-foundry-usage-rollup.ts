@@ -3,40 +3,37 @@ import type { BugfixPack } from "@/lib/bugfix/packs/types"
 import { packToScenario } from "@/lib/bugfix/packs/scenario"
 
 export const palantirFoundryUsageRollupPack: BugfixPack = {
-  id: "palantir-foundry-usage-rollup",
-  title: "Foundry usage rollup bills one account too much",
-  summary:
-    "The nightly Foundry usage rollup reports higher compute-seconds than the dashboard for one account, and billing is paused until it is trusted.",
-  task: "Bill each account for the compute-seconds it used tonight, so the nightly total matches the metering dashboard finance reconciles against.",
-  company: {
-    tag: "palantir-fdse",
-    roundName: "Re-engineering / debugging round",
-    confidence: "styled",
+  "id": "palantir-foundry-usage-rollup",
+  "title": "Foundry usage rollup bills one account too much",
+  "summary": "The nightly Foundry usage rollup reports higher compute-seconds than the dashboard for one account, and billing is paused until it is trusted.",
+  "task": "Bill each account for the compute-seconds it used tonight, so the nightly total matches the metering dashboard finance reconciles against.",
+  "company": {
+    "tag": "palantir-fdse",
+    "roundName": "Re-engineering / debugging round",
+    "confidence": "styled"
   },
-  companies: ["Palantir"],
-  domain: "data-pipeline",
-  language: "python",
-  difficulty: 2,
-  estMinutes: 45,
-  taskMd:
-    '# Foundry usage rollup — nightly compute-seconds bill\n\n## Who reads this\nThe FinOps on-call runs this rollup every night to bill each account for the\ncompute-seconds it used. This morning they flagged that one account\'s total looks\nhigher than the metering dashboard shows, and billing is paused until it is trusted.\n\n## The program\n`rollup.py` reads a usage feed and prints total compute-seconds per account.\n\nEach account\'s usage is delivered on two replica streams for durability: `primary`\nand `backup`. The bus is at-least-once, so the SAME event (identified by its\n`event_id`) can arrive more than once, including once on each replica — those are the\nsame event, not two.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments.\n- Columns are `stream,account_id,event_id,compute_seconds`.\n- `account_id` is case-insensitive; "Umbrella" and "umbrella" are the same account.\n- A line that is truncated or has a non-numeric `compute_seconds` is malformed and is\n  skipped.\n- Streams other than `primary`/`backup` are ignored.\n\n## Run it\n```\npython3 src/rollup.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Compute-seconds by account ===\nacme: 42\nglobex: 22\ninitech: 30\numbrella: 12\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n',
-  srcFiles: [
-    {
-      path: "src/rollup.py",
-      content:
-        'import sys\n\nVALID_STREAMS = ("primary", "backup")\n\n\ndef parse_events(path):\n    events = []\n    with open(path) as handle:\n        for raw in handle:\n            line = raw.rstrip("\\n")\n            if not line or line.startswith("#"):\n                continue\n            parts = line.split(",")\n            if len(parts) != 4:\n                continue\n            stream, account_id, event_id, seconds = (part.strip() for part in parts)\n            if stream not in VALID_STREAMS:\n                continue\n            if seconds == "":\n                continue\n            try:\n                seconds_value = int(seconds)\n            except ValueError:\n                continue\n            events.append(\n                {\n                    "stream": stream,\n                    "account_id": account_id.lower(),\n                    "event_id": event_id,\n                    "seconds": seconds_value,\n                }\n            )\n    return events\n\n\ndef dedupe(events):\n    seen = set()\n    unique = []\n    for event in events:\n        if event["event_id"] in seen:\n            continue\n        seen.add(event["event_id"])\n        unique.append(event)\n    return unique\n\n\ndef rollup(events):\n    totals = {}\n    primary = dedupe([event for event in events if event["stream"] == "primary"])\n    backup = dedupe([event for event in events if event["stream"] == "backup"])\n    for event in primary + backup:\n        totals[event["account_id"]] = totals.get(event["account_id"], 0) + event["seconds"]\n    return totals\n\n\ndef main():\n    events = parse_events(sys.argv[1])\n    totals = rollup(events)\n    print("=== Compute-seconds by account ===")\n    for account_id in sorted(totals):\n        print(account_id + ": " + str(totals[account_id]))\n\n\nif __name__ == "__main__":\n    main()\n',
-    },
+  "companies": [
+    "Palantir"
   ],
-  fixtures: [
+  "domain": "data-pipeline",
+  "language": "python",
+  "difficulty": 2,
+  "estMinutes": 45,
+  "taskMd": "# Foundry usage rollup: nightly compute-seconds bill\n\n## Who reads this\nThe FinOps on-call runs this rollup every night to bill each account for the\ncompute-seconds it used. This morning they flagged that one account's total looks\nhigher than the metering dashboard shows, and billing is paused until it is trusted.\n\n## The program\n`rollup.py` reads a usage feed and prints total compute-seconds per account.\n\nEach account's usage is delivered on two replica streams for durability: `primary`\nand `backup`. The bus is at-least-once, so the SAME event (identified by its\n`event_id`) can arrive more than once, including once on each replica. Those are the\nsame event, not two.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments.\n- Columns are `stream,account_id,event_id,compute_seconds`.\n- `account_id` is case-insensitive; \"Umbrella\" and \"umbrella\" are the same account.\n- A line that is truncated or has a non-numeric `compute_seconds` is malformed and is\n  skipped.\n- Streams other than `primary`/`backup` are ignored.\n\n## Run it\n```\npython3 src/rollup.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== Compute-seconds by account ===\nacme: 42\nglobex: 22\ninitech: 30\numbrella: 12\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
+  "srcFiles": [
     {
-      path: "fixtures/input.txt",
-      content:
-        "# stream,account_id,event_id,compute_seconds\nprimary,acme,evt-1,40\nprimary,acme,evt-2,2\nbackup,acme,evt-1,40\nprimary,globex,evt-3,17\nbackup,globex,evt-4,5\nprimary,initech,evt-5,30\nprimary,initech,evt-5,30\nbackup,Umbrella,evt-6,12\n# truncated row below is skipped by contract\nbackup,globex,evt-9\nbackup,acme,evt-7,\n",
-    },
+      "path": "src/rollup.py",
+      "content": "import sys\n\nVALID_STREAMS = (\"primary\", \"backup\")\n\n\ndef parse_events(path):\n    events = []\n    with open(path) as handle:\n        for raw in handle:\n            line = raw.rstrip(\"\\n\")\n            if not line or line.startswith(\"#\"):\n                continue\n            parts = line.split(\",\")\n            if len(parts) != 4:\n                continue\n            stream, account_id, event_id, seconds = (part.strip() for part in parts)\n            if stream not in VALID_STREAMS:\n                continue\n            if seconds == \"\":\n                continue\n            try:\n                seconds_value = int(seconds)\n            except ValueError:\n                continue\n            events.append(\n                {\n                    \"stream\": stream,\n                    \"account_id\": account_id.lower(),\n                    \"event_id\": event_id,\n                    \"seconds\": seconds_value,\n                }\n            )\n    return events\n\n\ndef dedupe(events):\n    seen = set()\n    unique = []\n    for event in events:\n        if event[\"event_id\"] in seen:\n            continue\n        seen.add(event[\"event_id\"])\n        unique.append(event)\n    return unique\n\n\ndef rollup(events):\n    totals = {}\n    primary = dedupe([event for event in events if event[\"stream\"] == \"primary\"])\n    backup = dedupe([event for event in events if event[\"stream\"] == \"backup\"])\n    for event in primary + backup:\n        totals[event[\"account_id\"]] = totals.get(event[\"account_id\"], 0) + event[\"seconds\"]\n    return totals\n\n\ndef main():\n    events = parse_events(sys.argv[1])\n    totals = rollup(events)\n    print(\"=== Compute-seconds by account ===\")\n    for account_id in sorted(totals):\n        print(account_id + \": \" + str(totals[account_id]))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    }
   ],
-  runCmd: "python3 src/rollup.py fixtures/input.txt",
-  expectedOutput:
-    "=== Compute-seconds by account ===\nacme: 42\nglobex: 22\ninitech: 30\numbrella: 12\n",
+  "fixtures": [
+    {
+      "path": "fixtures/input.txt",
+      "content": "# stream,account_id,event_id,compute_seconds\nprimary,acme,evt-1,40\nprimary,acme,evt-2,2\nbackup,acme,evt-1,40\nprimary,globex,evt-3,17\nbackup,globex,evt-4,5\nprimary,initech,evt-5,30\nprimary,initech,evt-5,30\nbackup,Umbrella,evt-6,12\n# truncated row below is skipped by contract\nbackup,globex,evt-9\nbackup,acme,evt-7,\n"
+    }
+  ],
+  "runCmd": "python3 src/rollup.py fixtures/input.txt",
+  "expectedOutput": "=== Compute-seconds by account ===\nacme: 42\nglobex: 22\ninitech: 30\numbrella: 12\n"
 }
 
 export const palantirFoundryUsageRollupScenario = packToScenario(palantirFoundryUsageRollupPack)

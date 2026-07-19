@@ -6,48 +6,37 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "datadog-endpoint-latency-peak",
-  bugClass: "accumulator-wrong-scope",
-  solutionMd:
-    "# SEALED — solution for datadog-endpoint-latency-peak\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/datadog-endpoint-latency-peak.server.ts`.\n\n## Bug (src/latency_rollup.py, in `build_report()`)\n`peak = 0` is initialized above the `for endpoint in grouped` loop, so it is never\nreset between endpoints. Each endpoint's reported peak can only ever rise to the\nhighest latency seen in any earlier endpoint, so an endpoint whose true peak is lower\nthan a preceding endpoint's peak is overstated.\n\n## Minimal fix\nMove `peak = 0` inside the `for endpoint in grouped` loop.\n\n## Why the symptom presents as it does\n`/login` peaks at 200 (correct, first). `/search`'s true peak is 60, but the leaked\n`peak` is already 200, so it prints 200. `/checkout`'s true peak is 900, which exceeds\nthe leaked 200, so it is correct. Only `/search` is wrong — partial wrongness.\n\n## Red herring (reachable, provably innocent)\n`kind != COUNTED_KIND` (the request-only filter) looks like it silently drops latency\ndata, but the contract says only request latencies are metered, so the `health`/`ping`\nevent is correctly excluded.\n\n## Complexity\nOne pass to group events, then one pass over each endpoint's events. Time O(n), space\nO(n) for the grouping dict. (It is linear, not the O(n^2) the nested loops resemble.)\n\n## Phase-2 adaptation path\nOps now meters `internal` service-to-service calls too. Those events already flow\nthrough `parse_events` but are dropped by the `kind != COUNTED_KIND` filter. Widen the\nfilter to include `internal` (`COUNTED_KINDS = (\"request\", \"internal\")`) — an\nadaptation of the same filter, not a rewrite. The phase-2 fixture adds internal calls\nthat v1 silently drops, so v1 output is unchanged until the filter is widened; after\nthe fix + adaptation, `/search` peaks at 500 (internal) over 4 and `/checkout` counts 3.\n\n## Debrief\nIntended bug vs the candidate's actual path, what they did well, where signal was\nlost, and exactly ONE drill (accumulator-scope if the scoping pass was weak;\nadapt-vs-rewrite if PHASE2 was weak).\n",
-  bugLocation:
-    "src/latency_rollup.py — build_report(): `peak = 0` sits above `for endpoint in grouped`",
-  bugSummary:
-    "the peak accumulator is initialized above the per-endpoint loop instead of inside it, so it is never reset between endpoints and each endpoint's peak can only ever rise to the highest value seen in any earlier endpoint",
-  minimalFix:
-    "Move `peak = 0` inside the `for endpoint in grouped` loop so each endpoint starts its peak at zero.",
-  survivalStory:
-    "A peak/max accumulator reads correctly for the first endpoint and for any endpoint whose own peak is the highest so far, so a spot check of the slowest endpoints looks right; it only overstates an endpoint whose true peak is lower than a preceding endpoint's peak.",
-  redHerrings: [
+  "packId": "datadog-endpoint-latency-peak",
+  "bugClass": "accumulator-wrong-scope",
+  "solutionMd": "# SEALED — solution for datadog-endpoint-latency-peak\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/datadog-endpoint-latency-peak.server.ts`.\n\n## Bug (src/latency_rollup.py, in `build_report()`)\n`peak = 0` is initialized above the `for endpoint in grouped` loop, so it is never\nreset between endpoints. Each endpoint's reported peak can only ever rise to the\nhighest latency seen in any earlier endpoint, so an endpoint whose true peak is lower\nthan a preceding endpoint's peak is overstated.\n\n## Minimal fix\nMove `peak = 0` inside the `for endpoint in grouped` loop.\n\n## Why the symptom presents as it does\n`/login` peaks at 200 (correct, first). `/search`'s true peak is 60, but the leaked\n`peak` is already 200, so it prints 200. `/checkout`'s true peak is 900, which exceeds\nthe leaked 200, so it is correct. Only `/search` is wrong — partial wrongness.\n\n## Red herring (reachable, provably innocent)\n`kind != COUNTED_KIND` (the request-only filter) looks like it silently drops latency\ndata, but the contract says only request latencies are metered, so the `health`/`ping`\nevent is correctly excluded.\n\n## Complexity\nOne pass to group events, then one pass over each endpoint's events. Time O(n), space\nO(n) for the grouping dict. (It is linear, not the O(n^2) the nested loops resemble.)\n\n## Phase-2 adaptation path\nOps now meters `internal` service-to-service calls too. Those events already flow\nthrough `parse_events` but are dropped by the `kind != COUNTED_KIND` filter. Widen the\nfilter to include `internal` (`COUNTED_KINDS = (\"request\", \"internal\")`) — an\nadaptation of the same filter, not a rewrite. The phase-2 fixture adds internal calls\nthat v1 silently drops, so v1 output is unchanged until the filter is widened; after\nthe fix + adaptation, `/search` peaks at 500 (internal) over 4 and `/checkout` counts 3.\n\n## Debrief\nIntended bug vs the candidate's actual path, what they did well, where signal was\nlost, and exactly ONE drill (accumulator-scope if the scoping pass was weak;\nadapt-vs-rewrite if PHASE2 was weak).\n",
+  "bugLocation": "src/latency_rollup.py — build_report(): `peak = 0` sits above `for endpoint in grouped`",
+  "bugSummary": "the peak accumulator is initialized above the per-endpoint loop instead of inside it, so it is never reset between endpoints and each endpoint's peak can only ever rise to the highest value seen in any earlier endpoint",
+  "minimalFix": "Move `peak = 0` inside the `for endpoint in grouped` loop so each endpoint starts its peak at zero.",
+  "survivalStory": "A peak/max accumulator reads correctly for the first endpoint and for any endpoint whose own peak is the highest so far, so a spot check of the slowest endpoints looks right; it only overstates an endpoint whose true peak is lower than a preceding endpoint's peak.",
+  "redHerrings": [
     {
-      location: "src/latency_rollup.py — parse_events(): kind != COUNTED_KIND",
-      looksWrongBecause:
-        "filtering out non-request events looks like it silently drops latency data",
-      provablyInnocentBecause:
-        "the contract says only request latencies are metered in this report, so the health/ping event is correctly excluded",
-    },
+      "location": "src/latency_rollup.py — parse_events(): kind != COUNTED_KIND",
+      "looksWrongBecause": "filtering out non-request events looks like it silently drops latency data",
+      "provablyInnocentBecause": "the contract says only request latencies are metered in this report, so the health/ping event is correctly excluded"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n)",
-    space: "O(n)",
-    dominantCost:
-      "a single pass to group events plus one pass per endpoint's events; the grouping dict dominates space",
+  "complexityAnswer": {
+    "time": "O(n)",
+    "space": "O(n)",
+    "dominantCost": "a single pass to group events plus one pass per endpoint's events; the grouping dict dominates space"
   },
-  phase2: {
-    specPatch:
-      "Ops now also meters 'internal' service-to-service calls, not just external requests. Fold internal calls into each endpoint's peak latency and request count the same way.",
-    fixturePatch: "internal,/search,r20,500\ninternal,/checkout,r21,120\n",
-    expectedOutputV2:
-      "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=500ms over 4\n/checkout: peak=900ms over 3\n",
+  "phase2": {
+    "specPatch": "Ops now also meters 'internal' service-to-service calls, not just external requests. Fold internal calls into each endpoint's peak latency and request count the same way.",
+    "fixturePatch": "internal,/search,r20,500\ninternal,/checkout,r21,120\n",
+    "expectedOutputV2": "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=500ms over 4\n/checkout: peak=900ms over 3\n"
   },
-  buggyOutput:
-    "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=200ms over 3\n/checkout: peak=900ms over 2\n",
-  debriefRubric: [
+  "buggyOutput": "=== Peak latency by endpoint ===\n/login: peak=200ms over 2\n/search: peak=200ms over 3\n/checkout: peak=900ms over 2\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the overstatement to the /search row and named the un-reset peak as the cause, in one sentence.",
     "Shipped a minimal fix (reset peak per endpoint) rather than reworking the report.",
     "Complexity: recognized the rollup is linear, not the nested-loop O(n^2) it resembles.",
     "Phase-2: adapted the kind filter to include internal calls instead of rewriting; recognized the internal events were already parsed and filtered out.",
-    "Recommend exactly one drill: for a weak scoping pass, an accumulator-scope drill; for a weak phase-2, an adapt-vs-rewrite drill.",
-  ],
+    "Recommend exactly one drill: for a weak scoping pass, an accumulator-scope drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
 }

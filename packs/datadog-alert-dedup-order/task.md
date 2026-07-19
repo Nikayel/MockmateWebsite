@@ -1,4 +1,4 @@
-# Alert-incident rollup — distinct incidents per monitor
+# Alert-incident rollup: distinct incidents per monitor
 
 ## Who reads this
 The on-call engineer reads this rollup at the start of a shift to see how many

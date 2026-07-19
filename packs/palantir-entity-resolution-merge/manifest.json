@@ -19,7 +19,7 @@
   "buggy_output": "=== Links resolved per entity ===\ncommercial/acme: 5\ngov/acme: 5\ncommercial/globex: 4\ncommercial/initech: 2\ngov/umbrella: 1\n",
   "bug_class": "wrong-dedup-key",
   "phase2": {
-    "spec_patch": "Ops onboarded a new tenant namespace, `research`, and its links must be folded into the same per-entity report. A `research` entity that shares a name with a `commercial` or `gov` entity is still a different entity — namespaces stay distinct.",
+    "spec_patch": "Ops onboarded a new tenant namespace, `research`, and its links must be folded into the same per-entity report. A `research` entity that shares a name with a `commercial` or `gov` entity is still a different entity. Namespaces stay distinct.",
     "fixture_patch": "research,acme,L-4001\nresearch,globex,L-4002\nresearch,globex,L-4003\n",
     "expected_output_v2": "=== Links resolved per entity ===\ncommercial/acme: 3\ngov/acme: 2\nresearch/acme: 1\ncommercial/globex: 4\nresearch/globex: 2\ncommercial/initech: 2\ngov/umbrella: 1\n"
   }

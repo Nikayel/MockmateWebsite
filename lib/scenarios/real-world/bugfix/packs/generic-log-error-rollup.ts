@@ -3,40 +3,37 @@ import type { BugfixPack } from "@/lib/bugfix/packs/types"
 import { packToScenario } from "@/lib/bugfix/packs/scenario"
 
 export const genericLogErrorRollupPack: BugfixPack = {
-  id: "generic-log-error-rollup",
-  title: "Reliability rollup over-reports one service's ERROR count",
-  summary:
-    "The nightly per-service ERROR-line rollup reports more errors for one service than the metering dashboard, so the on-call engineer cannot trust it.",
-  task: "From the overnight log feed, report how many ERROR lines each service logged, so the on-call engineer knows which services to follow up on.",
-  company: {
-    tag: "generic-fdse",
-    roundName: "Debugging round",
-    confidence: "styled",
+  "id": "generic-log-error-rollup",
+  "title": "Reliability rollup over-reports one service's ERROR count",
+  "summary": "The nightly per-service ERROR-line rollup reports more errors for one service than the metering dashboard, so the on-call engineer cannot trust it.",
+  "task": "From the overnight log feed, report how many ERROR lines each service logged, so the on-call engineer knows which services to follow up on.",
+  "company": {
+    "tag": "generic-fdse",
+    "roundName": "Debugging round",
+    "confidence": "styled"
   },
-  companies: ["Generic"],
-  domain: "log-ingestion",
-  language: "python",
-  difficulty: 1,
-  estMinutes: 30,
-  taskMd:
-    "# Reliability rollup — nightly ERROR count per service\n\n## Who reads this\nThe on-call engineer reads this rollup every morning. It counts, for each service,\nhow many ERROR lines that service logged overnight, so they know which services to\nfollow up on. This morning one service's total reads higher than the metering\ndashboard shows, and the rollup is not trusted until the two agree.\n\n## The program\n`report.py` reads an application log feed and prints the ERROR-line count for each\nservice, in the order each service first appears in the feed.\n\nEach log line has the layout `timestamp service level message`, separated by\nwhitespace. The feed is delivered at-least-once, so a line may arrive more than\nonce, and a single service's lines are not always contiguous.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments and are ignored.\n- Fields are whitespace-separated: `timestamp service level message`.\n- Levels are compared case-insensitively; `error`, `Error`, and `ERROR` are the\n  same level. Only ERROR lines are counted; INFO and WARN lines are not.\n- A line with fewer than four fields is truncated/malformed and is skipped.\n- The same line may be delivered more than once (at-least-once feed); the report\n  counts ERROR lines as they arrive and does not deduplicate.\n- A service may appear, then reappear later after other services; all of its lines\n  belong to that one service.\n\n## Run it\n```\npython3 src/report.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 2\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
-  srcFiles: [
-    {
-      path: "src/report.py",
-      content:
-        '"""Nightly reliability rollup.\n\nReads an application log feed and reports, for each service, how many\nERROR lines it emitted during the window. The on-call engineer reads this\nevery morning to decide which services to follow up on.\n\nField layout per line: timestamp service level message\n"""\n\nimport sys\n\nERROR_LEVEL = "ERROR"\nFIELD_COUNT = 4\n\n\ndef parse_line(raw):\n    """Return {service, level} for a usable line, or None to skip it."""\n    line = raw.rstrip("\\n")\n    if not line or line.startswith("#"):\n        return None\n    parts = line.split(None, FIELD_COUNT - 1)\n    if len(parts) < FIELD_COUNT:\n        return None\n    timestamp, service, level, message = parts\n    return {\n        "service": service,\n        "level": level.strip().upper(),\n    }\n\n\ndef read_events(path):\n    """Load every usable line from the feed in arrival order."""\n    events = []\n    with open(path) as handle:\n        for raw in handle:\n            event = parse_line(raw)\n            if event is not None:\n                events.append(event)\n    return events\n\n\ndef group_by_service(events):\n    """Bucket levels under each service, keeping first-seen order."""\n    grouped = {}\n    for event in events:\n        service = event["service"]\n        if service not in grouped:\n            grouped[service] = []\n        grouped[service].append(event["level"])\n    return grouped\n\n\ndef build_report(grouped):\n    """Count ERROR lines for each service."""\n    report = {}\n    error_count = 0\n    for service in grouped:\n        for level in grouped[service]:\n            if level == ERROR_LEVEL:\n                error_count += 1\n        report[service] = error_count\n    return report\n\n\ndef main():\n    events = read_events(sys.argv[1])\n    grouped = group_by_service(events)\n    report = build_report(grouped)\n    print("=== ERROR lines by service ===")\n    for service in report:\n        print(service + ": " + str(report[service]))\n\n\nif __name__ == "__main__":\n    main()\n',
-    },
+  "companies": [
+    "Generic"
   ],
-  fixtures: [
+  "domain": "log-ingestion",
+  "language": "python",
+  "difficulty": 1,
+  "estMinutes": 30,
+  "taskMd": "# Reliability rollup: nightly ERROR count per service\n\n## Who reads this\nThe on-call engineer reads this rollup every morning. It counts, for each service,\nhow many ERROR lines that service logged overnight, so they know which services to\nfollow up on. This morning one service's total reads higher than the metering\ndashboard shows, and the rollup is not trusted until the two agree.\n\n## The program\n`report.py` reads an application log feed and prints the ERROR-line count for each\nservice, in the order each service first appears in the feed.\n\nEach log line has the layout `timestamp service level message`, separated by\nwhitespace. The feed is delivered at-least-once, so a line may arrive more than\nonce, and a single service's lines are not always contiguous.\n\n## Data contract (all of this is intended; the correct output tolerates it)\n- Lines starting with `#` are comments and are ignored.\n- Fields are whitespace-separated: `timestamp service level message`.\n- Levels are compared case-insensitively; `error`, `Error`, and `ERROR` are the\n  same level. Only ERROR lines are counted; INFO and WARN lines are not.\n- A line with fewer than four fields is truncated/malformed and is skipped.\n- The same line may be delivered more than once (at-least-once feed); the report\n  counts ERROR lines as they arrive and does not deduplicate.\n- A service may appear, then reappear later after other services; all of its lines\n  belong to that one service.\n\n## Run it\n```\npython3 src/report.py fixtures/input.txt\n```\n\n## Expected output\n```\n=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 2\n```\n\n`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.\n",
+  "srcFiles": [
     {
-      path: "fixtures/input.txt",
-      content:
-        "# app log digest — fields: timestamp service level message\n2026-07-14T10:00:01Z gateway INFO accepted connection from 10.2.0.4\n2026-07-14T10:00:01Z gateway INFO accepted connection from 10.2.0.4\n2026-07-14T10:00:05Z gateway WARN upstream latency 812ms\n2026-07-14T10:00:12Z catalog INFO served product 4471\n2026-07-14T10:00:18Z catalog WARN cache miss for product 4471\n2026-07-14T10:00:31Z payments ERROR gateway declined card ending 4242\n2026-07-14T10:00:33Z payments WARN retrying charge in 2s\n2026-07-14T10:00:37Z payments error gateway declined card ending 1188\n2026-07-14T10:01:02Z notifications ERROR smtp connection refused\n2026-07-14T10:01:04Z notifications WARN queue depth 51\n2026-07-14T10:01:09Z notifications ERROR smtp auth failed for relay 7\n2026-07-14T10:03:41Z payments\n2026-07-14T10:03:59Z payments ERROR reconciliation mismatch for batch 90\n2026-07-14T10:04:10Z catalog INFO served product 5567\n",
-    },
+      "path": "src/report.py",
+      "content": "\"\"\"Nightly reliability rollup.\n\nReads an application log feed and reports, for each service, how many\nERROR lines it emitted during the window. The on-call engineer reads this\nevery morning to decide which services to follow up on.\n\nField layout per line: timestamp service level message\n\"\"\"\n\nimport sys\n\nERROR_LEVEL = \"ERROR\"\nFIELD_COUNT = 4\n\n\ndef parse_line(raw):\n    \"\"\"Return {service, level} for a usable line, or None to skip it.\"\"\"\n    line = raw.rstrip(\"\\n\")\n    if not line or line.startswith(\"#\"):\n        return None\n    parts = line.split(None, FIELD_COUNT - 1)\n    if len(parts) < FIELD_COUNT:\n        return None\n    timestamp, service, level, message = parts\n    return {\n        \"service\": service,\n        \"level\": level.strip().upper(),\n    }\n\n\ndef read_events(path):\n    \"\"\"Load every usable line from the feed in arrival order.\"\"\"\n    events = []\n    with open(path) as handle:\n        for raw in handle:\n            event = parse_line(raw)\n            if event is not None:\n                events.append(event)\n    return events\n\n\ndef group_by_service(events):\n    \"\"\"Bucket levels under each service, keeping first-seen order.\"\"\"\n    grouped = {}\n    for event in events:\n        service = event[\"service\"]\n        if service not in grouped:\n            grouped[service] = []\n        grouped[service].append(event[\"level\"])\n    return grouped\n\n\ndef build_report(grouped):\n    \"\"\"Count ERROR lines for each service.\"\"\"\n    report = {}\n    error_count = 0\n    for service in grouped:\n        for level in grouped[service]:\n            if level == ERROR_LEVEL:\n                error_count += 1\n        report[service] = error_count\n    return report\n\n\ndef main():\n    events = read_events(sys.argv[1])\n    grouped = group_by_service(events)\n    report = build_report(grouped)\n    print(\"=== ERROR lines by service ===\")\n    for service in report:\n        print(service + \": \" + str(report[service]))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    }
   ],
-  runCmd: "python3 src/report.py fixtures/input.txt",
-  expectedOutput:
-    "=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 2\n",
+  "fixtures": [
+    {
+      "path": "fixtures/input.txt",
+      "content": "# app log digest — fields: timestamp service level message\n2026-07-14T10:00:01Z gateway INFO accepted connection from 10.2.0.4\n2026-07-14T10:00:01Z gateway INFO accepted connection from 10.2.0.4\n2026-07-14T10:00:05Z gateway WARN upstream latency 812ms\n2026-07-14T10:00:12Z catalog INFO served product 4471\n2026-07-14T10:00:18Z catalog WARN cache miss for product 4471\n2026-07-14T10:00:31Z payments ERROR gateway declined card ending 4242\n2026-07-14T10:00:33Z payments WARN retrying charge in 2s\n2026-07-14T10:00:37Z payments error gateway declined card ending 1188\n2026-07-14T10:01:02Z notifications ERROR smtp connection refused\n2026-07-14T10:01:04Z notifications WARN queue depth 51\n2026-07-14T10:01:09Z notifications ERROR smtp auth failed for relay 7\n2026-07-14T10:03:41Z payments\n2026-07-14T10:03:59Z payments ERROR reconciliation mismatch for batch 90\n2026-07-14T10:04:10Z catalog INFO served product 5567\n"
+    }
+  ],
+  "runCmd": "python3 src/report.py fixtures/input.txt",
+  "expectedOutput": "=== ERROR lines by service ===\ngateway: 0\ncatalog: 0\npayments: 3\nnotifications: 2\n"
 }
 
 export const genericLogErrorRollupScenario = packToScenario(genericLogErrorRollupPack)

@@ -6,45 +6,37 @@ if (typeof window !== "undefined") {
 }
 
 export const sealed: SealedPackContent = {
-  packId: "palantir-ontology-link-rollup",
-  bugClass: "silent-boundary",
-  solutionMd:
-    '# SEALED — solution for palantir-ontology-link-rollup\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/palantir-ontology-link-rollup.server.ts`.\n\n## Bug (src/link_rollup.py, in `parse_links()`)\n`next(handle, None)` discards the first line before the loop, on the assumption that\nit is a header row. There is no header — the first line is a real link — so the object\ntype on the first line is undercounted by one.\n\n## Minimal fix\nDelete the `next(handle, None)` (and its comment); read the first record like any other.\n\n## Why the symptom presents as it does\nThe first line is `graph,Asset,link-1,active`, so only `Asset` loses a link (3 -> 2).\nEvery other object type is counted correctly, which is why a spot check of Dataset and\nSensor looks fine — partial wrongness.\n\n## Red herring (reachable, provably innocent)\n`source_system != COUNTED_SOURCE` (the graph-only filter) looks like it silently drops\nlegitimate links, but the data contract says only graph-sourced links are counted in\nthis report, so excluding the `warehouse` link is correct.\n\n## Complexity\nParse and aggregate are O(n) in the number of links; the dominant cost is\n`sorted(totals)` over the object types. Time O(n log n), space O(n).\n\n## Phase-2 adaptation path\nGovernance now wants `pending` links counted too. The pending links already flow\nthrough `parse_links` but are filtered out by `status != "active"`. Widen the status\ncheck to include `pending` (`COUNTED_STATUSES = ("active", "pending")`) — an adaptation\nof the same filter, not a rewrite. The phase-2 fixture adds pending links that v1 drops\nsilently, so v1 output is unchanged until the filter is widened.\n\n## Debrief\nDeliver the intended bug vs the candidate\'s actual path, what they did well, where\nsignal was lost, and exactly ONE drill (first/last-element boundary if the boundary\npass was weak; adapt-vs-rewrite if PHASE2 was weak).\n',
-  bugLocation: "src/link_rollup.py — parse_links(): next(handle, None)",
-  bugSummary:
-    "the loop discards the first record before reading, so the object type of the very first line is undercounted by one",
-  minimalFix:
-    "Remove the next(handle, None) that skips the first line; there is no header row, so the first record must be read like the rest.",
-  survivalStory:
-    "Skipping a header row is such a common CSV habit that it reads as correct in isolation; it only loses one link, and only for whichever object type happens to appear on the first line, so a spot check of the other types looks fine.",
-  redHerrings: [
+  "packId": "palantir-ontology-link-rollup",
+  "bugClass": "silent-boundary",
+  "solutionMd": "# SEALED — solution for palantir-ontology-link-rollup\n\nNever candidate-visible. Compiles into `lib/scenarios/sealed/palantir-ontology-link-rollup.server.ts`.\n\n## Bug (src/link_rollup.py, in `parse_links()`)\n`next(handle, None)` discards the first line before the loop, on the assumption that\nit is a header row. There is no header — the first line is a real link — so the object\ntype on the first line is undercounted by one.\n\n## Minimal fix\nDelete the `next(handle, None)` (and its comment); read the first record like any other.\n\n## Why the symptom presents as it does\nThe first line is `graph,Asset,link-1,active`, so only `Asset` loses a link (3 -> 2).\nEvery other object type is counted correctly, which is why a spot check of Dataset and\nSensor looks fine — partial wrongness.\n\n## Red herring (reachable, provably innocent)\n`source_system != COUNTED_SOURCE` (the graph-only filter) looks like it silently drops\nlegitimate links, but the data contract says only graph-sourced links are counted in\nthis report, so excluding the `warehouse` link is correct.\n\n## Complexity\nParse and aggregate are O(n) in the number of links; the dominant cost is\n`sorted(totals)` over the object types. Time O(n log n), space O(n).\n\n## Phase-2 adaptation path\nGovernance now wants `pending` links counted too. The pending links already flow\nthrough `parse_links` but are filtered out by `status != \"active\"`. Widen the status\ncheck to include `pending` (`COUNTED_STATUSES = (\"active\", \"pending\")`) — an adaptation\nof the same filter, not a rewrite. The phase-2 fixture adds pending links that v1 drops\nsilently, so v1 output is unchanged until the filter is widened.\n\n## Debrief\nDeliver the intended bug vs the candidate's actual path, what they did well, where\nsignal was lost, and exactly ONE drill (first/last-element boundary if the boundary\npass was weak; adapt-vs-rewrite if PHASE2 was weak).\n",
+  "bugLocation": "src/link_rollup.py — parse_links(): next(handle, None)",
+  "bugSummary": "the loop discards the first record before reading, so the object type of the very first line is undercounted by one",
+  "minimalFix": "Remove the next(handle, None) that skips the first line; there is no header row, so the first record must be read like the rest.",
+  "survivalStory": "Skipping a header row is such a common CSV habit that it reads as correct in isolation; it only loses one link, and only for whichever object type happens to appear on the first line, so a spot check of the other types looks fine.",
+  "redHerrings": [
     {
-      location: "src/link_rollup.py — rollup(): source_system != COUNTED_SOURCE",
-      looksWrongBecause:
-        "filtering out non-graph sources looks like it silently drops legitimate links",
-      provablyInnocentBecause:
-        "the data contract says only graph-sourced links are counted in this report, so the warehouse link is correctly excluded",
-    },
+      "location": "src/link_rollup.py — rollup(): source_system != COUNTED_SOURCE",
+      "looksWrongBecause": "filtering out non-graph sources looks like it silently drops legitimate links",
+      "provablyInnocentBecause": "the data contract says only graph-sourced links are counted in this report, so the warehouse link is correctly excluded"
+    }
   ],
-  complexityAnswer: {
-    time: "O(n log n)",
-    space: "O(n)",
-    dominantCost:
-      "the sorted() over the object types for output ordering; parse and aggregate are O(n)",
+  "complexityAnswer": {
+    "time": "O(n log n)",
+    "space": "O(n)",
+    "dominantCost": "the sorted() over the object types for output ordering; parse and aggregate are O(n)"
   },
-  phase2: {
-    specPatch:
-      "Data governance now also wants 'pending' links counted, not just active ones. A pending link is still a real link on the object; it should be included in each object type's count.",
-    fixturePatch: "graph,Dataset,link-20,pending\ngraph,Sensor,link-21,pending\n",
-    expectedOutputV2: "=== Active links by object type ===\nAsset: 3\nDataset: 3\nSensor: 2\n",
+  "phase2": {
+    "specPatch": "Data governance now also wants 'pending' links counted, not just active ones. A pending link is still a real link on the object; it should be included in each object type's count.",
+    "fixturePatch": "graph,Dataset,link-20,pending\ngraph,Sensor,link-21,pending\n",
+    "expectedOutputV2": "=== Active links by object type ===\nAsset: 3\nDataset: 3\nSensor: 2\n"
   },
-  buggyOutput: "=== Active links by object type ===\nAsset: 2\nDataset: 2\nSensor: 1\n",
-  debriefRubric: [
+  "buggyOutput": "=== Active links by object type ===\nAsset: 2\nDataset: 2\nSensor: 1\n",
+  "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
     "Localized the shortfall to the Asset row and named the discarded first record as the cause, in one sentence.",
     "Shipped a minimal fix (stop skipping the first line) rather than reworking the parser.",
     "Complexity: identified the sort as the dominant O(n log n) cost.",
     "Phase-2: adapted the status filter to include pending instead of rewriting; recognized the pending links were already parsed and filtered out.",
-    "Recommend exactly one drill: for a weak boundary pass, a first/last-element boundary drill; for a weak phase-2, an adapt-vs-rewrite drill.",
-  ],
+    "Recommend exactly one drill: for a weak boundary pass, a first/last-element boundary drill; for a weak phase-2, an adapt-vs-rewrite drill."
+  ]
 }

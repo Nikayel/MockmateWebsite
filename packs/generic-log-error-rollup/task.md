@@ -1,4 +1,4 @@
-# Reliability rollup — nightly ERROR count per service
+# Reliability rollup: nightly ERROR count per service
 
 ## Who reads this
 The on-call engineer reads this rollup every morning. It counts, for each service,
