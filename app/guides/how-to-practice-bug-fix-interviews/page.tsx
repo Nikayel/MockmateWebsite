@@ -1,10 +1,14 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "How to Practice Bug-Fix Interviews | CodeSparring Guide",
+  title: "How to Practice Bug-Fix Interviews",
   description:
     "A complete guide to passing bug-fix and debugging interview rounds. Learn how to systematically trace errors, communicate root causes, and deploy fixes.",
+  alternates: {
+    canonical: "/guides/how-to-practice-bug-fix-interviews",
+  },
 }
 
 export default function BugFixGuidePage() {
@@ -63,11 +67,13 @@ export default function BugFixGuidePage() {
           <p>
             You can't practice this on LeetCode. You need realistic, messy environments.
             CodeSparring offers dedicated Bug-Fix mock interviews where you are dropped into a real
-            React or Node environment with a failing test and an AI Tech Lead.
+            JavaScript or Python environment with a failing test and an AI Tech Lead.
           </p>
           <p>
             Practicing in this environment forces you to hone your code comprehension speed and your
-            ability to articulate your hypotheses out loud.
+            ability to articulate your hypotheses out loud. Ready to try one? Head to{" "}
+            <Link href="/bug-fix-interview-practice">bug-fix interview practice</Link> to start a
+            scenario.
           </p>
         </>
       ),
