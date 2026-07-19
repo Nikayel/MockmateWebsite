@@ -22,34 +22,6 @@ def recommend_responders(incident, responders, top_k=3):
     return []
 `
 
-const reference = `from src.geo import distance
-
-STALE_THRESHOLD = 300
-
-def recommend_responders(incident, responders, top_k=3):
-    if not incident or "location" not in incident:
-        return []
-
-    required = incident.get("type")
-    valid = []
-    for r in responders:
-        if r.get("status") != "available":
-            continue
-        if required not in r.get("capabilities", []):
-            continue
-        if r.get("last_update", 0) > STALE_THRESHOLD:
-            continue
-        dist = distance(incident["location"], r["location"])
-        valid.append({
-            "id": r["id"],
-            "distance": dist,
-            "explanation": f"Available {required} unit, {dist:.2f} units away.",
-        })
-
-    valid.sort(key=lambda x: x["distance"])
-    return valid[:top_k]
-`
-
 const serviceStarter = `from src.dispatch import recommend_responders
 
 def recommend_response(incident, responders, top_k=3):
@@ -58,16 +30,9 @@ def recommend_response(incident, responders, top_k=3):
     return {"recommendations": recommendations}
 `
 
-const serviceReference = `from src.dispatch import recommend_responders
-
-def recommend_response(incident, responders, top_k=3):
-    recommendations = recommend_responders(incident, responders, top_k)
-    return {"count": len(recommendations), "recommendations": recommendations}
-`
-
 export const dispatch911Scenario: AddFunctionalityScenario = {
   id: "palantir-911-dispatch-build",
-  title: "911 Dispatch — Responder Recommender",
+  title: "911 Dispatch: Responder Recommender",
   type: "add-functionality",
   executionMode: "workspace",
   difficulty: "medium",
@@ -109,7 +74,7 @@ The geo helper is read-only; implement \`recommend_responders\` and wire the ser
   hints: [
     "Filter first (status, capability, stale GPS), then rank by distance.",
     "Use the read-only distance(a, b) helper; don't recompute geometry.",
-    "Failing open is dangerous — return an empty list when nothing qualifies.",
+    "Failing open is dangerous. Return an empty list when nothing qualifies.",
   ],
   testCases: [
     {
@@ -258,20 +223,6 @@ test_dispatch_hidden.run_tests(record_factory("hidden dispatch"))
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 `,
         description: "Hidden workspace runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "src/dispatch.py",
-        role: "editable",
-        language: "python",
-        content: reference,
-      },
-      {
-        path: "src/dispatch_service.py",
-        role: "editable",
-        language: "python",
-        content: serviceReference,
       },
     ],
   },

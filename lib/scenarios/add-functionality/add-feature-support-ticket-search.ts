@@ -5,38 +5,6 @@ const starter = `def search_tickets(tickets, query=None, status=None, priority=N
     return tickets
 `
 
-const reference = `def search_tickets(tickets, query=None, status=None, priority=None):
-    normalized_query = (query or "").strip().lower()
-    results = []
-
-    for ticket in tickets:
-        if status and ticket.get("status") != status:
-            continue
-        if priority and ticket.get("priority") != priority:
-            continue
-
-        haystack = " ".join([
-            ticket.get("title", ""),
-            ticket.get("body", ""),
-            " ".join(ticket.get("tags", [])),
-        ]).lower()
-        if normalized_query and normalized_query not in haystack:
-            continue
-
-        score = 0
-        if normalized_query:
-            if normalized_query in ticket.get("title", "").lower():
-                score += 5
-            if normalized_query in " ".join(ticket.get("tags", [])).lower():
-                score += 3
-            if normalized_query in ticket.get("body", "").lower():
-                score += 1
-        score += {"urgent": 3, "high": 2, "normal": 1, "low": 0}.get(ticket.get("priority"), 0)
-        results.append({**ticket, "score": score})
-
-    return sorted(results, key=lambda ticket: (-ticket["score"], ticket["id"]))
-`
-
 export const supportTicketSearchScenario: AddFunctionalityScenario = {
   id: "add-feature-support-ticket-search",
   title: "Add Ranked Support Ticket Search",
@@ -209,42 +177,6 @@ test_support_search_hidden.run_tests(record_factory("hidden support search"))
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 `,
         description: "Hidden workspace runner",
-      },
-    ],
-    referenceFiles: [
-      {
-        path: "src/search_service.py",
-        role: "editable",
-        language: "python",
-        content: reference,
-      },
-      {
-        path: "src/api.py",
-        role: "editable",
-        language: "python",
-        content: `from src.repository import list_tickets
-from src.search_service import search_tickets
-
-def handle_ticket_search(params):
-    results = search_tickets(
-        list_tickets(),
-        query=params.get("query"),
-        status=params.get("status"),
-        priority=params.get("priority"),
-    )
-    return {
-        "tickets": [
-            {
-                "id": ticket["id"],
-                "title": ticket["title"],
-                "status": ticket["status"],
-                "priority": ticket["priority"],
-                "score": ticket["score"],
-            }
-            for ticket in results
-        ]
-    }
-`,
       },
     ],
   },
