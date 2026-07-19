@@ -7,7 +7,6 @@ import { trackEvent } from "@/lib/analytics"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { analyzeCodeEfficiency } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
-import type { BugFixScenario } from "@/lib/scenarios/types"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import type { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
@@ -288,14 +287,9 @@ export function useInterviewFeedback(
             elapsedTimeSeconds: opts.elapsedTime,
             bugfixEvidenceEvents: bugfixEvidencePayload,
             bugfixExpectedTouchedFiles,
-            bugfixRootCauseRubric:
-              opts.selectedScenario?.type === "bugfix"
-                ? (opts.selectedScenario as BugFixScenario).rootCauseRubric
-                : [],
-            bugfixGroundTruth:
-              opts.selectedScenario?.type === "bugfix"
-                ? (opts.selectedScenario as BugFixScenario).bugDescription
-                : "",
+            // The root-cause rubric and ground truth are NOT posted from the client:
+            // they are answer content and now live only in the sealed legacy registry.
+            // The feedback stream route sources them server-side for scoring.
           }
 
           // Start streaming feedback - scores come first, then rich feedback
