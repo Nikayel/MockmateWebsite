@@ -30,7 +30,7 @@ export function mapResultRow(row: RawResultRow): TestResult {
       actual: row.passed ? "pass" : "fail",
       error: row.passed
         ? null
-        : "A hidden test failed — your code didn't satisfy a requirement that isn't shown here.",
+        : "A hidden test failed. Your code didn't satisfy a requirement that isn't shown here.",
     }
   }
 
