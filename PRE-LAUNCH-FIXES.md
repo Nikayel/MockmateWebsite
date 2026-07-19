@@ -143,7 +143,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 - **Verify:** `pnpm typecheck`; confirm the hints route pattern is copied faithfully.
 - **Commit:** `security(api): rate-limit agent recommendation routes`
 
-### API-VALID-1 — spaced-repetition / nps: weak numeric validation, no rate limit — **MEDIUM**
+### API-VALID-1 — spaced-repetition / nps: weak numeric validation, no rate limit — **MEDIUM** — **FIXED 2026-07-19** (zod + per-IP rate limit on all 3 routes; NPS scans replaced by a count() aggregate; 33 route tests)
 - **Files:** `app/api/spaced-repetition/complete/route.ts` (validates only `problem_id` /
   `performance_score`; `mastery_score`, `time_spent_minutes`, `hints_used`,
   `test_cases_*` taken as-is), `app/api/nps/route.ts` (two full `interview_sessions`
@@ -156,7 +156,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
 - **Verify:** `pnpm typecheck`; add a unit test asserting out-of-range inputs are rejected.
 - **Commit:** `security(api): validate + rate-limit spaced-repetition/nps writes`
 
-### API-LEAK-1 — 5xx responses leak `error.message` / stack — **LOW**
+### API-LEAK-1 — 5xx responses leak `error.message` / stack — **LOW** — **FIXED 2026-07-19** (4 files made generic + the 2 SR routes; the other 4 spec files no longer exist — resolved by deletion)
 - **Files:** `app/api/debug-promo-code/route.ts:125` (`error.stack`),
   `app/api/create-checkout/route.ts:286`, `app/api/customer-portal/route.ts:323`,
   `app/api/sync-subscription/route.ts:50`, `app/api/promo-code/route.ts:180`,
