@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { feedbackRateLimit } from "@/lib/rate-limit"
-import { enforceQuota } from "@/lib/quota-enforcement"
-import {
-  checkRateLimit,
-  startRequestTracking,
-  endRequestTracking,
-  buildRateLimitResponse,
-  type RateLimitTier,
-} from "@/lib/rate-limiter"
+import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
+import { endRequestTracking } from "@/lib/rate-limiter"
 import { generateFeedbackResponse } from "@/lib/ai-providers"
 import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 import { embedAndStoreSolution } from "@/lib/rag"
@@ -69,33 +63,15 @@ import {
 import { buildFeedbackSystemInstruction } from "@/lib/feedback/system-instructions"
 
 export async function POST(request: NextRequest) {
-  // Apply IP-based rate limiting (first layer)
-  const rateLimitResponse = await feedbackRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
+  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  const metered = await enforceMeteredAiRequest(request, {
+    estimatedTokens: 2000, // Feedback uses ~2000 tokens
+    ipLimiter: feedbackRateLimit,
+  })
+  if (metered.response) {
+    return metered.response
   }
-
-  // Enforce quota limits (session & budget) and get user tier.
-  // requireAuth: feedback generation runs paid LLM calls — signed-out callers
-  // are rejected with 401 "please sign in".
-  const quotaResult = await enforceQuota(request, { requireAuth: true })
-  if (!quotaResult.allowed && quotaResult.response) {
-    return quotaResult.response
-  }
-
-  // Apply tier-based rate limiting (second layer)
-  const tier = (quotaResult.tier || "free") as RateLimitTier
-  const rateLimitUserId = quotaResult.userId || "anonymous"
-  let trackingStarted = false
-
-  if (rateLimitUserId !== "anonymous") {
-    const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 2000) // Feedback uses ~2000 tokens
-    if (!tierRateCheck.allowed) {
-      return buildRateLimitResponse(tierRateCheck)
-    }
-    await startRequestTracking(rateLimitUserId, 2000)
-    trackingStarted = true
-  }
+  const { userId: rateLimitUserId, trackingStarted } = metered
 
   const startTime = Date.now()
 
