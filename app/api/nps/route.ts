@@ -2,6 +2,10 @@
  * NPS API
  *
  * User-facing endpoint for submitting NPS responses.
+ *
+ * UNWIRED: no NPS survey UI currently renders or posts to this endpoint, so the
+ * admin/nps dashboard reads an always-empty dataset. Keep-vs-delete is a product
+ * decision deferred to the owner; do not build on this until a survey surface exists.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
