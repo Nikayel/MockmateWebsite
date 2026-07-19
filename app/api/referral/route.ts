@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { getUserReferralCode, getUserReferralStats, recordReferral } from "@/lib/referrals"
 import { promoCodeRateLimit } from "@/lib/rate-limit"
+import { getAppBaseUrl } from "@/lib/site-url"
 import { logger } from "@/lib/logger"
 
 /**
@@ -24,8 +25,9 @@ export async function GET(request: NextRequest) {
   try {
     const stats = await getUserReferralStats(authResult.userId)
 
-    // Generate shareable URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mockmate.dev"
+    // Generate shareable URL from the canonical site base so a missing/renamed
+    // env var can't send referrals to a dead domain.
+    const baseUrl = getAppBaseUrl()
     const shareUrl = `${baseUrl}?ref=${stats.referralCode}`
 
     return NextResponse.json({
