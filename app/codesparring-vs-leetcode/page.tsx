@@ -1,10 +1,14 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
   title: "CodeSparring vs LeetCode: Which is Better for Interview Prep?",
   description:
     "Compare CodeSparring and LeetCode for technical interview prep. See why practicing communication with an AI beats silently passing test cases.",
+  alternates: {
+    canonical: "/codesparring-vs-leetcode",
+  },
 }
 
 export default function VsLeetCodePage() {
@@ -45,7 +49,7 @@ export default function VsLeetCodePage() {
             </li>
             <li>
               <strong>Holistic Scoring:</strong> Get graded on your communication, problem-solving,
-              code efficiency, and verification skills—not just whether your code compiles.
+              code efficiency, and verification skills, not just whether your code compiles.
             </li>
           </ul>
         </>
@@ -56,9 +60,11 @@ export default function VsLeetCodePage() {
       content: (
         <>
           <p>
-            <strong>Use LeetCode to learn the patterns.</strong> If you don't know what a hash map
-            or a sliding window is, LeetCode's discussion forums and raw volume of questions are
-            unbeatable.
+            <strong>Build your fundamentals for free on CodeSparring.</strong> Our free{" "}
+            <Link href="/learn/python">Python</Link>, <Link href="/learn/sql">SQL</Link>, and{" "}
+            <Link href="/learn/system-design">System Design</Link> tracks teach the core concepts
+            with graded exercises that run in your browser, so you don't have to outsource the
+            basics to a separate problem grinder.
           </p>
           <p>
             <strong>Use CodeSparring to prepare for the interview.</strong> Once you know the
