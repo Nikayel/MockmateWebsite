@@ -97,6 +97,15 @@ describe("Sealing test 2 — sealed content is imported only by server routes", 
     "app/api/interview/pack/advance/route.ts",
   ])
 
+  // The sealed LEGACY registry (10 legacy bugfix + 4 add-functionality reference
+  // solutions) is server-only too. Its loaders reach the feedback scorer, the admin
+  // release audit, and the RAG vectorization job; nothing client-side may import it.
+  const ALLOWED_LEGACY_IMPORTERS = new Set([
+    "app/api/feedback/stream/route.ts",
+    "app/api/admin/bugfix-quality/route.ts",
+    "lib/rag/vectorization/jobs/vectorize-bugfix.ts",
+  ])
+
   function grepImporters(pattern: string): string[] {
     try {
       const out = execSync(
@@ -121,12 +130,26 @@ describe("Sealing test 2 — sealed content is imported only by server routes", 
     }
   })
 
+  it("only the whitelisted server routes import the sealed legacy registry loader", () => {
+    const importers = grepImporters("scenarios/sealed/legacy-registry.server").filter(
+      (path) => !path.includes("__tests__") && !path.startsWith("lib/scenarios/sealed/")
+    )
+    for (const importer of importers) {
+      expect(
+        ALLOWED_LEGACY_IMPORTERS.has(importer),
+        `${importer} imports the sealed legacy registry`
+      ).toBe(true)
+    }
+  })
+
   it("no client component imports any sealed module (alias OR relative path)", () => {
     // Match any import of a sealed .server module regardless of prefix — the alias
     // (@/lib/scenarios/sealed/x.server), a cross-dir relative (../../scenarios/sealed/x.server),
     // or a sibling relative (../sealed/x.server). The old check matched only the alias, so a
     // relative import could smuggle sealed string literals into a client bundle undetected.
-    const importers = grepImporters("sealed/[a-zA-Z0-9_-]+\\.server").filter(
+    // The optional `legacy/` segment also catches the nested per-scenario sealed modules
+    // (sealed/legacy/<id>.server), not just the registries and per-pack modules.
+    const importers = grepImporters("sealed/(legacy/)?[a-zA-Z0-9_-]+\\.server").filter(
       (path) => !path.includes("__tests__") && !path.startsWith("lib/scenarios/sealed/")
     )
     for (const importer of importers) {
