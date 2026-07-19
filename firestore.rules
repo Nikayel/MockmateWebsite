@@ -137,32 +137,15 @@ service cloud.firestore {
                   && documentExists()
                   && resource.data.user_id == request.auth.uid;
 
-      // Users can create their own quota records if set to 0 sessions and 0 free opens
-      allow create: if isAuthenticated()
-                    && request.resource.data.user_id == request.auth.uid
-                    && request.resource.data.sessions_used == 0
-                    && request.resource.data.free_opens_remaining == 0;
-
-      // Users can only update their own quota via the exact state transitions of recordSessionStart
-      allow update: if isAuthenticated()
-                    && documentExists()
-                    && resource.data.user_id == request.auth.uid
-                    && request.resource.data.user_id == request.auth.uid
-                    && request.resource.data.user_id == resource.data.user_id
-                    && request.resource.data.sessions_limit == resource.data.sessions_limit
-                    && request.resource.data.period_start == resource.data.period_start
-                    && request.resource.data.period_end == resource.data.period_end
-                    && (
-                      // Transition 1: Decrement free_opens_remaining by 1
-                      (request.resource.data.free_opens_remaining == resource.data.free_opens_remaining - 1
-                       && request.resource.data.sessions_used == resource.data.sessions_used)
-                      ||
-                      // Transition 2: Increment sessions_used by 1 and grant 10 free opens
-                      (request.resource.data.sessions_used == resource.data.sessions_used + 1
-                       && request.resource.data.free_opens_remaining == 10
-                       && resource.data.free_opens_remaining == 0
-                       && request.resource.data.sessions_used <= resource.data.sessions_limit)
-                    );
+      // QUOTA-1: profile_quota is SERVER-AUTHORITATIVE. All mutations go
+      // through the Admin SDK (POST /api/usage/session-start for session
+      // starts; lib/stripe-helpers for billing resets), which bypasses these
+      // rules. Client writes — including the old zero-usage create and the
+      // recordSessionStart state transitions — are disabled entirely.
+      // DEPLOY ORDER: ship the app (API route + client flip) BEFORE deploying
+      // these rules, or older client bundles fail to start sessions.
+      allow create: if false;
+      allow update: if false;
 
       // Users cannot delete quota records (immutable history)
       allow delete: if false;
