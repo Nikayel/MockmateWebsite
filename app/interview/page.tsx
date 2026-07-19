@@ -17,7 +17,7 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { type Scenario } from "@/lib/scenarios"
-import type { PackRunView } from "@/lib/workspace-execution"
+import { prewarmPythonRuntime, type PackRunView } from "@/lib/workspace-execution"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
 // Interview phase tracking
@@ -757,6 +757,30 @@ function InterviewPageContent() {
       setCode(initialCode)
     }
   }, [selectedScenario, isInterviewStarted, selectedLanguage, code])
+
+  // Pre-warm the Python runtime (worker + Pyodide WASM) as soon as a Python scenario's workspace
+  // is on screen, so the user's first Run doesn't stall on the multi-second cold boot. Scheduled
+  // at idle to stay off the critical render path; the prewarm itself is idempotent, queues safely
+  // against real runs, and swallows failures (a real Run boots and surfaces errors on its own).
+  useEffect(() => {
+    if (!selectedScenario) return
+    const executesPython = isWorkspaceScenario(selectedScenario)
+      ? selectedScenario.workspace.language === "python"
+      : selectedScenario.type !== "system-design" &&
+        selectedLanguage === "python" &&
+        "testCases" in selectedScenario &&
+        Array.isArray(selectedScenario.testCases) &&
+        selectedScenario.testCases.length > 0
+    if (!executesPython) return
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(() => prewarmPythonRuntime(), { timeout: 2000 })
+      return () => window.cancelIdleCallback(idleId)
+    }
+    // Safari has no requestIdleCallback; a short delay keeps the warm-up off the initial render.
+    const timeoutId = window.setTimeout(() => prewarmPythonRuntime(), 1500)
+    return () => window.clearTimeout(timeoutId)
+  }, [selectedScenario, selectedLanguage])
 
   // Update code and workspace files when language changes during interview
   useEffect(() => {
