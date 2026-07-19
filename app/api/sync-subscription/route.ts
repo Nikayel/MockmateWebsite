@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Sync subscription error", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to sync subscription" },
+      { error: "Failed to sync subscription" },
       { status: 500 }
     )
   }

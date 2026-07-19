@@ -331,7 +331,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to create portal session",
+        error: "Failed to create portal session",
         message:
           "An error occurred while opening the subscription portal. Please try again or contact support.",
       },

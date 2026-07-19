@@ -334,10 +334,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     cronLogger.error("Fatal error in subscription expiry cron", { error })
     return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown",
-      },
+      { error: "Internal server error" },
       { status: 500 }
     )
   }
