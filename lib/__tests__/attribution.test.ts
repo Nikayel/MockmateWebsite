@@ -52,8 +52,51 @@ describe("attribution", () => {
     expect(getAttribution()?.source).toBe("reddit")
   })
 
-  it("does nothing when there are no utm params", () => {
-    installDom("?ref=somethingelse")
+  it("captures a ?ref= referral code as first-touch attribution", () => {
+    installDom("?ref=FRIEND123")
+    captureAttribution()
+    expect(getAttribution()).toMatchObject({
+      source: "referral",
+      campaign: "FRIEND123",
+    })
+  })
+
+  it("captures a ?src= campus link with medium campaign", () => {
+    installDom("?src=campus_qr")
+    captureAttribution()
+    expect(getAttribution()).toMatchObject({
+      source: "campus_qr",
+      medium: "campaign",
+    })
+  })
+
+  it("lets explicit utm_source win over ?ref= on the same landing", () => {
+    installDom("?ref=FRIEND123&utm_source=reddit")
+    captureAttribution()
+    expect(getAttribution()?.source).toBe("reddit")
+  })
+
+  it("src and ref landings do not overwrite an existing first touch", () => {
+    const store = installDom("?src=flyer")
+    captureAttribution()
+    // A later referral landing reuses the same storage.
+    vi.stubGlobal("window", {
+      location: { search: "?ref=CODE9", pathname: "/" },
+      localStorage: {
+        getItem: (k: string) => (k in store ? store[k] : null),
+        setItem: (k: string, v: string) => {
+          store[k] = v
+        },
+        removeItem: () => {},
+        clear: () => {},
+      },
+    })
+    captureAttribution()
+    expect(getAttribution()?.source).toBe("flyer")
+  })
+
+  it("does nothing when there are no attribution params", () => {
+    installDom("?page=2&sort=asc")
     captureAttribution()
     expect(getAttribution()).toBeNull()
   })
