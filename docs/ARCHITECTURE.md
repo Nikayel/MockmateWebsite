@@ -292,7 +292,7 @@ Wrapper code adds many lines before user code. Constants such as `PYTHON_WRAPPER
 
 ### Related route
 
-- **`/api/execute/ast`** — Additional execution path for AST-related analysis (see `app/api/execute/ast/route.ts`).
+- **`/api/execute`** — Property-based code execution and validation (see `app/api/execute/route.ts`).
 
 ---
 

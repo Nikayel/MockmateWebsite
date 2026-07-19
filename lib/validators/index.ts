@@ -9,7 +9,6 @@
  *
  * Primary exports (currently used):
  *   import { validateResultEnhanced, Normalizers } from '@/lib/validators'
- *   import { extractSignature, validateWithAST } from '@/lib/validators'
  *
  * For scenarios with explicit validators:
  *   import { PropertyBuilders, type ValidatorConfig } from '@/lib/validators'
@@ -22,14 +21,6 @@
 // Used by app/api/execute/route.ts
 export { validateResultEnhanced } from "./runner"
 export { Normalizers } from "./types"
-
-// Used by app/api/execute/ast/route.ts
-export {
-  extractSignature,
-  generateInputsFromSignature,
-  validateWithAST,
-  type FunctionSignature,
-} from "./ast-parser"
 
 // ============================================
 // AVAILABLE FOR FUTURE USE

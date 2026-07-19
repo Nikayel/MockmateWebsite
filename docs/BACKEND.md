@@ -55,7 +55,7 @@ Routes are grouped under `app/api/`. The following mirrors the product domains; 
 | Area | Example routes | Core libraries |
 |------|----------------|----------------|
 | Chat / interviewer | `chat/` | `lib/ai-providers.ts`, `lib/interview/`, `lib/rag/` |
-| Code execution | `execute/`, `execute/ast/` | `lib/piston.ts`, validators |
+| Code execution | `execute/` | `lib/piston.ts`, validators |
 | Feedback | `generate-feedback/`, `feedback/*` | `lib/feedback/` |
 | Hints & agents | `agents/hints/`, `agents/recommendations/` | `lib/agents/` |
 | RAG | `rag/`, `rag/v2/`, `rag/health/` | `lib/rag/` |
