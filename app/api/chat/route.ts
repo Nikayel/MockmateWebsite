@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { chatRateLimit } from "@/lib/rate-limit"
-import { enforceQuota } from "@/lib/quota-enforcement"
-import {
-  checkRateLimit,
-  startRequestTracking,
-  endRequestTracking,
-  buildRateLimitResponse,
-  type RateLimitTier,
-} from "@/lib/rate-limiter"
+import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
+import { endRequestTracking } from "@/lib/rate-limiter"
 import {
   generateAIResponse,
   validateResponseRelevance,
@@ -143,34 +137,15 @@ function runConversationExtractionAfterResponse(job: ConversationExtractionJob |
 }
 
 export async function POST(request: NextRequest) {
-  // Apply IP-based rate limiting (first layer - prevents abuse)
-  const rateLimitResponse = await chatRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
+  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  const metered = await enforceMeteredAiRequest(request, {
+    estimatedTokens: 1000, // ~1000 tokens per chat
+    ipLimiter: chatRateLimit,
+  })
+  if (metered.response) {
+    return metered.response
   }
-
-  // Enforce quota limits (session & budget) and get user tier.
-  // requireAuth: chat hits a paid LLM — signed-out callers are rejected with
-  // 401 "please sign in" before any model call.
-  const quotaResult = await enforceQuota(request, { requireAuth: true })
-  if (!quotaResult.allowed && quotaResult.response) {
-    return quotaResult.response
-  }
-
-  // Apply tier-based rate limiting (second layer - per-user limits)
-  const tier = (quotaResult.tier || "free") as RateLimitTier
-  const rateLimitUserId = quotaResult.userId || "anonymous"
-  let trackingStarted = false
-
-  if (rateLimitUserId !== "anonymous") {
-    const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 1000) // ~1000 tokens per chat
-    if (!tierRateCheck.allowed) {
-      return buildRateLimitResponse(tierRateCheck)
-    }
-    // Track request start for concurrent limiting
-    await startRequestTracking(rateLimitUserId, 1000)
-    trackingStarted = true
-  }
+  const { userId: rateLimitUserId, trackingStarted } = metered
 
   const startTime = Date.now()
 
