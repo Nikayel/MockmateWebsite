@@ -463,14 +463,6 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "selectedLanguage",
       "testResults",
     ],
-    [
-      "chatMessages",
-      "code",
-      "elapsedTime",
-      "interviewerMessages",
-      "selectedLanguage",
-      "testResults",
-    ],
   ],
 }
 `;
