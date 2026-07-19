@@ -1682,7 +1682,7 @@ export const sqlLevel1: SqlLevel = {
   tagline:
     "SELECT, WHERE, ORDER BY, types: querying raw source tables the way a DE does on day one.",
   defaultExecutionMode: "single-file",
-  estimatedHours: 4,
+  estimatedHours: 3,
   modules: [
     {
       id: "sql-l1-projecting",
