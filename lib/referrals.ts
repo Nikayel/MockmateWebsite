@@ -42,6 +42,9 @@ const MIN_ACCOUNT_AGE_DAYS = 7 // Account must be 7 days old for payout
 const MAX_REFERRALS_PER_MONTH = 10 // Cap referrals per user per month
 const REWARD_EXPIRY_DAYS = 90 // Pending rewards expire after 90 days
 const REFUND_CLAWBACK_DAYS = 14 // Void rewards if refund within 14 days
+// Cap the referred user's sessions we scan when counting completed rounds, so a
+// single-field user_id query stays cheap and needs no completed_at composite index.
+const SESSION_LOOKUP_LIMIT = 20
 
 export interface ReferralRecord {
   referrerId: string
@@ -602,19 +605,27 @@ export async function checkRewardEligibility(rewardId: string): Promise<{
       return { eligible: false, reason: `${daysRemaining} days until eligible` }
     }
 
-    // For signup credit rewards, check if referred user completed a session
+    // For signup credit rewards, check if referred user completed a session.
+    // Real rounds live in interview_sessions keyed by user_id with a completed_at
+    // timestamp; the old sessions/userId/status collection this used to query is
+    // never written, so every signup reward was permanently ineligible. Fetch a
+    // small page and count completed rounds in memory to avoid a completed_at
+    // "!= null" composite index.
     if (data.type === "signup_credit") {
       const sessionsSnapshot = await adminDb
-        .collection("sessions")
-        .where("userId", "==", data.referredUserId)
-        .where("status", "==", "completed")
-        .limit(MIN_SESSIONS_FOR_REWARD)
+        .collection("interview_sessions")
+        .where("user_id", "==", data.referredUserId)
+        .limit(SESSION_LOOKUP_LIMIT)
         .get()
 
-      if (sessionsSnapshot.size < MIN_SESSIONS_FOR_REWARD) {
+      const completedSessions = sessionsSnapshot.docs.filter(
+        (sessionDoc) => sessionDoc.data().completed_at
+      ).length
+
+      if (completedSessions < MIN_SESSIONS_FOR_REWARD) {
         return {
           eligible: false,
-          reason: `Referred user needs ${MIN_SESSIONS_FOR_REWARD - sessionsSnapshot.size} more session(s)`,
+          reason: `Referred user needs ${MIN_SESSIONS_FOR_REWARD - completedSessions} more session(s)`,
         }
       }
     }
