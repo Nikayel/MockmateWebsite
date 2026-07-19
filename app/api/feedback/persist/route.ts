@@ -7,7 +7,7 @@
  *
  * Also calculates and saves:
  * - mastery_score (for spaced repetition)
- * - technical_score (average of understanding, problemSolving, codeQuality)
+ * - technical_score (the mastery score; Technical = Mastery unification)
  *
  * NOTE: Silent notes should be passed from client (generated in Edge streaming
  * endpoint). We don't generate them here to avoid Vercel Hobby 10s timeout.
@@ -178,10 +178,11 @@ export async function POST(request: NextRequest) {
     const masteryResult = calculateMasteryScore(masteryInput)
     const masteryScore = masteryResult.masteryScore
 
-    // Technical score = average of understanding, problemSolving, codeQuality (excludes communication)
-    const technicalScore = Math.round(
-      (scores.understanding + scores.problemSolving + scores.codeQuality) / 3
-    )
+    // Technical = Mastery: the persisted technical_score is the mastery score (test pass rate,
+    // time, and independence), the single technical signal shared with spaced repetition. This
+    // replaces the earlier flat (u + ps + cq) / 3 average. calculateTechnicalScoreFromBreakdown
+    // (60/25/15) survives only as the read-time fallback for legacy docs (see firestore-helpers).
+    const technicalScore = masteryScore
 
     // Guided bug-fix labs are scaffolded teaching runs. The interview-style score
     // is not a valid debugging-skill measure for them, so we detect the run
