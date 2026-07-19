@@ -176,7 +176,7 @@ ${complexity ? `OPTIMAL: Time=${complexity.time || "?"}, Space=${complexity.spac
 Return JSON only:
 {
   "approachExplained": true/false,
-  "approachQuality": "none"|"partial"|"good"|"excellent",
+  "approachQuality": "none"|"poor"|"basic"|"good"|"excellent",
   "complexityDiscussed": true/false,
   "complexityAccurate": true/false,
   "edgeCasesConsidered": true/false,
@@ -208,7 +208,8 @@ Return JSON only:
       return {
         ...defaultResult,
         approachExplained,
-        approachQuality: parsed.approachQuality ?? "none",
+        approachQuality:
+          parsed.approachQuality === "partial" ? "basic" : (parsed.approachQuality ?? "none"),
         complexityDiscussed,
         complexityAccurate,
         edgeCasesConsidered,
