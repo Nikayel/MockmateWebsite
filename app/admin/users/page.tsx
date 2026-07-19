@@ -38,6 +38,8 @@ interface UserProfile {
   updated_at?: string
   onboarding_completed?: boolean
   stripe_customer_id?: string | null
+  // Computed server-side from the non-public protected-admin list (DISCLOSE-1).
+  is_protected?: boolean
 }
 
 export default function UsersPage() {
@@ -56,13 +58,6 @@ export default function UsersPage() {
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [authToken, setAuthToken] = useState<string | null>(null)
-
-  // Protected emails - these users cannot be deleted
-  // SECURITY: Load from environment variable (UI check only - real protection is server-side)
-  const PROTECTED_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_PROTECTED_EMAILS || "")
-    .split(",")
-    .map((email: string) => email.trim().toLowerCase())
-    .filter((email: string) => email.length > 0)
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return
@@ -159,8 +154,6 @@ export default function UsersPage() {
       setDeleting(false)
     }
   }
-
-  const isProtected = (email: string) => PROTECTED_EMAILS.includes(email.toLowerCase())
 
   if (loading) {
     return (
@@ -368,7 +361,7 @@ export default function UsersPage() {
                 </thead>
                 <tbody>
                   {users.map((user: UserProfile) => {
-                    const protectedUser = isProtected(user.email)
+                    const protectedUser = !!user.is_protected
                     return (
                       <tr
                         key={user.id}
