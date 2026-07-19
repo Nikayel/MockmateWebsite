@@ -117,9 +117,13 @@ export async function GET(request: NextRequest) {
       const profile = profileMap.get(authUser.uid)
       const createdAt =
         authUser.metadata?.creationTime || profile?.created_at || new Date().toISOString()
+      const email = authUser.email || profile?.email || ""
       return {
         id: authUser.uid,
-        email: authUser.email || profile?.email || "",
+        email,
+        // Computed server-side from the non-public ADMIN_PROTECTED_EMAILS so
+        // the client never ships the protected-admin list (DISCLOSE-1).
+        is_protected: !!email && PROTECTED_EMAILS.includes(email.toLowerCase()),
         full_name: authUser.displayName || profile?.full_name || "",
         auth_provider: getAuthProvider(authUser),
         subscription_tier: profile?.subscription_tier || "free",
