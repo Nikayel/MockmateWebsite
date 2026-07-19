@@ -123,7 +123,7 @@ export function SoftwareApplicationJsonLd() {
         priceCurrency: "USD",
         billingDuration: "P1M",
         description:
-          "350+ problems/month, spaced repetition scheduling, personalized study roadmap, company-specific prep for FAANG and top tech companies. 29% cheaper than LeetCode Premium.",
+          "35 interview sessions/month, spaced repetition scheduling, personalized study roadmap, company-specific prep for FAANG and top tech companies. 29% cheaper than LeetCode Premium.",
       },
       {
         "@type": "Offer",
@@ -140,14 +140,14 @@ export function SoftwareApplicationJsonLd() {
       "Voice-enabled mock interviews - practice speaking your solution out loud like real interviews",
       "AI interviewer available 24/7 - no scheduling needed unlike Interviewing.io or Pramp",
       "Real-time feedback on communication, problem-solving, and code quality",
-      "Spaced repetition system (SM-2 algorithm) for long-term retention",
+      "Spaced repetition system for long-term retention",
       // Comparison points
       "45x cheaper than human mock interviews ($25/month vs $1,125 for 5 sessions)",
       "29% cheaper than LeetCode Premium with interview simulation included",
       "Consistent quality unlike peer-to-peer platforms where quality varies",
       // Technical features
-      "15 DSA patterns covered with mastery tracking",
-      "Company-specific prep for Google, Meta, Amazon, Apple, Netflix, Stripe, and 60+ companies",
+      "15+ DSA patterns covered with mastery tracking",
+      "Company-specific prep for Google, Meta, Amazon, Apple, Netflix, Stripe, and 35+ companies",
       "System design interviews and real-world coding scenarios",
       "Performance analytics across 40+ metrics",
     ],
@@ -506,7 +506,7 @@ export function HomepagePositioningFAQJsonLd() {
     {
       question: "How much does CodeSparring cost compared to mock interview services?",
       answer:
-        "CodeSparring Pro costs $25/month for unlimited AI mock interviews. Human mock interview services like Interviewing.io charge $225 per session. Research shows 5 mock interviews doubles your pass rate, which would cost $1,125 with human interviewers. With CodeSparring, you get the same skill-building for $25/month - that's 45x less expensive.",
+        "CodeSparring Pro costs $25/month for 35 AI mock interview sessions a month. Human mock interview services like Interviewing.io charge $225 per session. Research shows 5 mock interviews doubles your pass rate, which would cost $1,125 with human interviewers. With CodeSparring, you get the same skill-building for $25/month - that's 45x less expensive.",
     },
     {
       question: "Can I practice coding interviews with voice on CodeSparring?",
@@ -516,17 +516,17 @@ export function HomepagePositioningFAQJsonLd() {
     {
       question: "What companies can I prepare for on CodeSparring?",
       answer:
-        "CodeSparring offers company-specific preparation for 70+ tech companies including Google, Meta (Facebook), Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and more. Each company track includes patterns and question styles commonly seen in their interviews.",
+        "CodeSparring offers company-specific preparation for 35+ tech companies including Google, Meta (Facebook), Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and more. Each company track includes patterns and question styles commonly seen in their interviews.",
     },
     {
       question: "Does CodeSparring use spaced repetition?",
       answer:
-        "Yes, CodeSparring uses the SM-2 spaced repetition algorithm to schedule your practice at scientifically optimal intervals for long-term retention. Research shows spaced repetition improves retention by 10-30% compared to cramming. This means you remember patterns when it matters - during your actual interview.",
+        "Yes, CodeSparring uses a spaced repetition system to schedule your practice at scientifically optimal intervals for long-term retention. Research shows spaced repetition improves retention by 10-30% compared to cramming. This means you remember patterns when it matters - during your actual interview.",
     },
     {
       question: "Is there a free trial for CodeSparring?",
       answer:
-        "Yes, CodeSparring offers a generous free tier with 20+ problems and unlimited practice. You can complete full mock interviews with AI feedback without signing up or providing a credit card. This lets you experience the platform before upgrading to Pro.",
+        "Yes, CodeSparring offers a generous free tier with 20+ problems and unlimited practice. You can complete full mock interviews with AI feedback using a free account, no credit card required. This lets you experience the platform before upgrading to Pro.",
     },
   ]
 
