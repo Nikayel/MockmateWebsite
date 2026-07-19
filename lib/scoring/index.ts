@@ -41,7 +41,7 @@ export {
   getTechnicalScoreContribution,
 } from "./technical-score"
 
-// Score Persistence (atomic Firestore operations)
+// Score read helpers (user_stats aggregates + problem_mastery stats)
 export {
   getUserScoreStats,
   getMasteryStatistics,
