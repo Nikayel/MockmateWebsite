@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { chatRateLimit } from "@/lib/rate-limit"
-import { enforceQuota } from "@/lib/quota-enforcement"
-import {
-  checkRateLimit,
-  startRequestTracking,
-  endRequestTracking,
-  buildRateLimitResponse,
-  type RateLimitTier,
-} from "@/lib/rate-limiter"
+import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
+import { endRequestTracking } from "@/lib/rate-limiter"
 import { logger } from "@/lib/logger"
 import { generateCaseLabChatReply } from "@/lib/labs/case-lab-chat"
 
@@ -51,32 +45,15 @@ const bodySchema = z.object({
  * the VERIFIED uid from the token, never a body field.
  */
 export async function POST(request: NextRequest) {
-  // Layer 1: IP-based rate limiting (prevents raw abuse before any auth work).
-  const rateLimitResponse = await chatRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
+  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  const metered = await enforceMeteredAiRequest(request, {
+    estimatedTokens: 1000, // ~1000 tokens per reply
+    ipLimiter: chatRateLimit,
+  })
+  if (metered.response) {
+    return metered.response
   }
-
-  // Layer 2: quota + auth. requireAuth rejects signed-out callers with 401
-  // before any model call, and yields the verified uid + plan tier.
-  const quotaResult = await enforceQuota(request, { requireAuth: true })
-  if (!quotaResult.allowed && quotaResult.response) {
-    return quotaResult.response
-  }
-
-  const tier = (quotaResult.tier || "free") as RateLimitTier
-  const userId = quotaResult.userId || "anonymous"
-  let trackingStarted = false
-
-  // Layer 3: per-user tier rate limit + concurrent-request tracking.
-  if (userId !== "anonymous") {
-    const tierRateCheck = await checkRateLimit(userId, tier, 1000) // ~1000 tokens per reply
-    if (!tierRateCheck.allowed) {
-      return buildRateLimitResponse(tierRateCheck)
-    }
-    await startRequestTracking(userId, 1000)
-    trackingStarted = true
-  }
+  const { userId, trackingStarted } = metered
 
   try {
     const parsed = bodySchema.safeParse(await request.json())

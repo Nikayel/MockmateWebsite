@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { feedbackRateLimit } from "@/lib/rate-limit"
-import { enforceQuota } from "@/lib/quota-enforcement"
-import {
-  checkRateLimit,
-  startRequestTracking,
-  endRequestTracking,
-  buildRateLimitResponse,
-  type RateLimitTier,
-} from "@/lib/rate-limiter"
+import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
+import { endRequestTracking } from "@/lib/rate-limiter"
 import { logger } from "@/lib/logger"
 import { getCaseLabRun, upsertCaseLabRun } from "@/lib/labs/case-lab-runs"
 import { generateCaseLabFeedback } from "@/lib/labs/case-lab-feedback"
@@ -27,31 +21,15 @@ export const dynamic = "force-dynamic"
  * is attributed to the VERIFIED uid from the token, never the body.
  */
 export async function POST(request: NextRequest) {
-  // Layer 1: IP-based rate limiting.
-  const rateLimitResponse = await feedbackRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
+  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  const metered = await enforceMeteredAiRequest(request, {
+    estimatedTokens: 2000, // feedback ~2000 tokens
+    ipLimiter: feedbackRateLimit,
+  })
+  if (metered.response) {
+    return metered.response
   }
-
-  // Layer 2: quota + auth. requireAuth rejects signed-out callers with 401.
-  const quotaResult = await enforceQuota(request, { requireAuth: true })
-  if (!quotaResult.allowed && quotaResult.response) {
-    return quotaResult.response
-  }
-
-  const tier = (quotaResult.tier || "free") as RateLimitTier
-  const userId = quotaResult.userId || "anonymous"
-  let trackingStarted = false
-
-  // Layer 3: per-user tier rate limit + concurrent-request tracking.
-  if (userId !== "anonymous") {
-    const tierRateCheck = await checkRateLimit(userId, tier, 2000) // feedback ~2000 tokens
-    if (!tierRateCheck.allowed) {
-      return buildRateLimitResponse(tierRateCheck)
-    }
-    await startRequestTracking(userId, 2000)
-    trackingStarted = true
-  }
+  const { userId, trackingStarted } = metered
 
   try {
     const parsed = z.object({ runId: z.string().min(1) }).safeParse(await request.json())
