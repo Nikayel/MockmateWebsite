@@ -85,23 +85,28 @@ export function SystemDesignLessonPlayer({
   const markPassed = (section: LessonSection) =>
     setPassedSections((prev) => ({ ...prev, [section]: true }))
 
-  // Resume the learner's own saved answer for the Design exercise. Best-effort: a signed-out or failed
-  // fetch just leaves the starter text. Never clobber an in-progress draft (the learner may type before
-  // the fetch resolves), mirroring the progress sync's `hasLoaded` discipline.
+  // Resume the learner's own saved answer for the Design exercise. A signed-out user (null) resolves the
+  // load and just keeps the starter text; a real load FAILURE keeps answerLoading true so the editor
+  // stays gated and Save can't clobber the unread server answer, mirroring the progress sync's
+  // `hasLoaded` discipline. Never clobber an in-progress draft (the learner may type before it resolves).
   useEffect(() => {
     let cancelled = false
     setAnswerLoading(true)
     fetchDesignAnswer(designExercise.id)
       .then((saved) => {
-        if (cancelled || !saved) return
-        setSavedAnswerByExercise((prev) => ({ ...prev, [designExercise.id]: saved.answer }))
-        if (!answerTouched.current) {
-          setAnswerByExercise((prev) => ({ ...prev, [designExercise.id]: saved.answer }))
+        if (cancelled) return
+        if (saved) {
+          setSavedAnswerByExercise((prev) => ({ ...prev, [designExercise.id]: saved.answer }))
+          if (!answerTouched.current) {
+            setAnswerByExercise((prev) => ({ ...prev, [designExercise.id]: saved.answer }))
+          }
         }
+        // Only a resolved load (a saved answer or a genuine none) opens the editor.
+        setAnswerLoading(false)
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setAnswerLoading(false)
+      .catch(() => {
+        // Leave answerLoading true: a failed load must NOT expose the editor, or a Save would overwrite
+        // the unread saved answer with a reset draft.
       })
     return () => {
       cancelled = true
