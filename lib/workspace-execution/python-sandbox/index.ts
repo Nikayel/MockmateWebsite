@@ -9,4 +9,4 @@ export {
 } from "./pack-oracle-runner"
 export type { PackOracleRunResult } from "./pack-oracle-runner"
 export { runPythonInWorker } from "./worker-runner"
-export { isPythonRuntimeWarm, markPythonRuntimeWarm } from "./warm-state"
+export { isPythonRuntimeWarm, markPythonRuntimeWarm, prewarmPythonRuntime } from "./warm-state"

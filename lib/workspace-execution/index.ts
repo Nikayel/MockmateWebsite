@@ -18,6 +18,7 @@ export {
   runPythonInWorker,
   isPythonRuntimeWarm,
   markPythonRuntimeWarm,
+  prewarmPythonRuntime,
 } from "./python-sandbox"
 export type { PackOracleRunResult } from "./python-sandbox"
 export {
