@@ -63,6 +63,46 @@ export function toLevelListModel(level: TutorialLevel<unknown>): LevelListModel 
   }
 }
 
+// ---- lean Path-landing summary (Level selector / preview / resume) ----
+
+/** One lesson projected to only what the Path landing reads: id (completion + nav) + skills (chips). */
+export interface PathLessonSummary {
+  id: string
+  skills: string[]
+}
+
+/**
+ * A level projected to only what the Path landing renders (LevelSelector, LevelPreviewPanel,
+ * LevelCard, ResumeLearning): identity, tagline, hour estimate, and a flat lesson list carrying just
+ * the completion/nav id + the preview chip skills. Deliberately drops `modules` and every exercise
+ * payload (starter code, reference solutions, tests) so the full authored `PythonLevel[]` never
+ * serializes to the client.
+ */
+export interface PathLevelSummary<Id extends TutorialLevelId = TutorialLevelId> {
+  id: Id
+  slug: string
+  title: string
+  tagline: string
+  estimatedHours: number
+  lessons: PathLessonSummary[]
+}
+
+/** Project an authored level onto the lean Path summary (drops modules + exercise payloads). */
+export function toPathLevelSummary<Id extends TutorialLevelId>(
+  level: TutorialLevel<unknown, Id>
+): PathLevelSummary<Id> {
+  return {
+    id: level.id,
+    slug: level.slug,
+    title: level.title,
+    tagline: level.tagline,
+    estimatedHours: level.estimatedHours,
+    lessons: level.modules.flatMap((mod) =>
+      mod.lessons.map((lesson) => ({ id: lesson.id, skills: lesson.skills }))
+    ),
+  }
+}
+
 // ---- computed path model (list model + the user's completion overlay) ----
 
 /**
