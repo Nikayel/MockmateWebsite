@@ -43,11 +43,7 @@ export {
 
 // Score Persistence (atomic Firestore operations)
 export {
-  persistSessionScores,
-  isSessionAlreadyCompleted,
-  getExistingSessionScores,
   getUserScoreStats,
   getMasteryStatistics,
   getMasteredProblems,
-  updateProblemMasteryLevel,
 } from "./score-persistence"
