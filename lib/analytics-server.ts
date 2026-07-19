@@ -56,8 +56,19 @@ export async function trackAIChatServer(params: {
   messageLength: number
   responseTimeMs?: number
   provider?: string // Track which AI provider was used
+  /** Provider-REPORTED token usage. Omitted from the event when unavailable — never estimated. */
+  tokensIn?: number
+  tokensOut?: number
 }) {
-  await trackEventServer("ai_chat", params)
+  const { tokensIn, tokensOut, ...rest } = params
+  await trackEventServer("ai_chat", {
+    ...rest,
+    // Firestore rejects undefined values, and absent usage must stay absent
+    // (measured-margin reporting must not see guessed zeros) — attach the
+    // token fields only when the provider actually reported them.
+    ...(tokensIn !== undefined ? { tokensIn } : {}),
+    ...(tokensOut !== undefined ? { tokensOut } : {}),
+  })
 }
 
 /**
@@ -82,6 +93,15 @@ export async function trackFeedbackGenerationServer(params: {
   scenarioType: string
   performanceScore: number
   durationMinutes: number
+  /** Provider-REPORTED token usage of the narrative feedback call. Omitted when unavailable — never estimated. */
+  tokensIn?: number
+  tokensOut?: number
 }) {
-  await trackEventServer("feedback_generated", params)
+  const { tokensIn, tokensOut, ...rest } = params
+  await trackEventServer("feedback_generated", {
+    ...rest,
+    // Same contract as ai_chat: only measured counts, never guessed values.
+    ...(tokensIn !== undefined ? { tokensIn } : {}),
+    ...(tokensOut !== undefined ? { tokensOut } : {}),
+  })
 }

@@ -42,6 +42,26 @@ export interface AIResponse {
   provider: AIProvider
   tokensUsed?: number
   latencyMs: number
+  /**
+   * Provider-REPORTED token usage (Gemini usageMetadata, OpenAI-compatible
+   * usage, Anthropic usage). Absent when the provider returned no usage data —
+   * consumers must omit the fields rather than estimate. `tokensUsed` above
+   * remains the legacy 4-chars-per-token estimate feeding the cost pipeline.
+   */
+  tokensIn?: number
+  tokensOut?: number
+}
+
+/** Provider-reported usage for one completed call. Never estimated. */
+interface ProviderTokenUsage {
+  inputTokens: number
+  outputTokens: number
+}
+
+/** Text plus (when the provider exposes it) measured token usage. */
+interface ProviderCallResult {
+  text: string
+  usage?: ProviderTokenUsage
 }
 
 // Provider configuration
@@ -166,7 +186,7 @@ async function callGemini(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig
-): Promise<string> {
+): Promise<ProviderCallResult> {
   try {
     const genAI = new GoogleGenerativeAI(config.apiKey || "")
 
@@ -213,7 +233,18 @@ async function callGemini(
 
     const result = await chat.sendMessage(userMessage)
     const response = await result.response
-    return response.text()
+    // Gemini reports measured usage on the response; thread it up so events
+    // can carry real token counts (omitted when the SDK returns none).
+    const usageMetadata = response.usageMetadata
+    const usage: ProviderTokenUsage | undefined =
+      typeof usageMetadata?.promptTokenCount === "number" &&
+      typeof usageMetadata?.candidatesTokenCount === "number"
+        ? {
+            inputTokens: usageMetadata.promptTokenCount,
+            outputTokens: usageMetadata.candidatesTokenCount,
+          }
+        : undefined
+    return { text: response.text(), usage }
   } catch (error: any) {
     // Extract error message from Gemini SDK error structure
     const errorMessage = error?.message || error?.toString() || "Unknown error"
@@ -258,7 +289,7 @@ async function callDeepseek(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig
-): Promise<string> {
+): Promise<ProviderCallResult> {
   try {
     if (!config.apiKey) {
       throw new Error("DeepSeek API key is not configured")
@@ -325,7 +356,13 @@ async function callDeepseek(
     }
 
     logger.debug("[DeepSeek] Success", { responseLength: content.length })
-    return content
+    // OpenAI-compatible responses carry measured usage; omit when absent.
+    const usage: ProviderTokenUsage | undefined =
+      typeof data.usage?.prompt_tokens === "number" &&
+      typeof data.usage?.completion_tokens === "number"
+        ? { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
+        : undefined
+    return { text: content, usage }
   } catch (error: any) {
     // Re-throw with better context
     if (error.status) {
@@ -347,7 +384,7 @@ async function callClaude(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig
-): Promise<string> {
+): Promise<ProviderCallResult> {
   const messages = [
     ...history.map((msg) => ({
       role: msg.role === "model" ? ("assistant" as const) : ("user" as const),
@@ -377,7 +414,12 @@ async function callClaude(
   }
 
   const data = await response.json()
-  return data.content[0]?.text || ""
+  // Anthropic responses carry measured usage; omit when absent.
+  const usage: ProviderTokenUsage | undefined =
+    typeof data.usage?.input_tokens === "number" && typeof data.usage?.output_tokens === "number"
+      ? { inputTokens: data.usage.input_tokens, outputTokens: data.usage.output_tokens }
+      : undefined
+  return { text: data.content[0]?.text || "", usage }
 }
 
 /**
@@ -389,7 +431,7 @@ async function callProvider(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   temperatureOverride?: number
-): Promise<string> {
+): Promise<ProviderCallResult> {
   const config = { ...PROVIDERS[provider] }
 
   // Apply temperature override if provided
@@ -569,7 +611,13 @@ export async function generateAIResponse(
           })
         }
 
-        const text = await callProvider(provider, systemPrompt, userMessage, history, temperature)
+        const { text, usage: providerUsage } = await callProvider(
+          provider,
+          systemPrompt,
+          userMessage,
+          history,
+          temperature
+        )
 
         const latencyMs = Date.now() - startTime
 
@@ -650,6 +698,11 @@ export async function generateAIResponse(
           provider,
           latencyMs,
           tokensUsed: totalTokens,
+          // Measured, provider-reported usage — omitted entirely when the
+          // provider gave none so downstream events never carry estimates.
+          ...(providerUsage
+            ? { tokensIn: providerUsage.inputTokens, tokensOut: providerUsage.outputTokens }
+            : {}),
         }
       } catch (error: any) {
         lastError = error

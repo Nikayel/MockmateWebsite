@@ -830,6 +830,10 @@ Generate a compliant response NOW:`
         messageLength: message?.length || 0,
         responseTimeMs,
         provider: aiResponse.provider, // Track which provider was used
+        // Measured provider-reported usage of the primary call (regeneration
+        // retries are logged separately); omitted when the provider gave none.
+        tokensIn: aiResponse.tokensIn,
+        tokensOut: aiResponse.tokensOut,
       }).catch((err) => {
         // COST TRACKING: Log with high severity - costs won't be recorded if this fails
         logger.error("CRITICAL: Analytics tracking failed - usage costs may not be recorded", {

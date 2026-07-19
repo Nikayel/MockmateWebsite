@@ -1046,6 +1046,11 @@ CRITICAL INSTRUCTIONS:
         scenarioType: scenarioType || "unknown",
         performanceScore: scores.overall,
         durationMinutes,
+        // Measured provider-reported usage of the narrative feedback call
+        // (auxiliary critique/validation calls are tracked via usage events);
+        // omitted when the provider gave none.
+        tokensIn: aiResponse.tokensIn,
+        tokensOut: aiResponse.tokensOut,
       }).catch((err) => logger.error("Analytics tracking error", { error: err }))
     }
 
