@@ -34,11 +34,15 @@ export async function GET(request: NextRequest) {
   }
 
   // Minting unavailable (no keys:write scope or the project could not be
-  // resolved). Fall back to the account key so voice keeps working, and log so
-  // this degraded path is visible in production.
-  logger.warn(
-    "[Voice Token] Ephemeral Deepgram key unavailable; returning account key. " +
-      "Grant the DEEPGRAM_API_KEY keys:write scope (optionally set DEEPGRAM_PROJECT_ID) to enable scoped ephemeral keys."
+  // resolved). Refuse rather than hand the long-lived account key to the
+  // browser: voice degrades to a visible client error while the credential
+  // stays server-side.
+  logger.error(
+    "[Voice Token] Ephemeral Deepgram key unavailable; refusing to serve voice. " +
+      "Grant the DEEPGRAM_API_KEY keys:write scope (optionally set DEEPGRAM_PROJECT_ID) to restore voice transcription."
   )
-  return NextResponse.json({ apiKey: accountKey })
+  return NextResponse.json(
+    { error: "Voice transcription temporarily unavailable" },
+    { status: 503 }
+  )
 }
