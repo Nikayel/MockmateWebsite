@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { timingSafeEqual } from "crypto"
+import { verifyCronRequest } from "@/lib/cron-auth"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 import { calculateBillingPeriod } from "@/lib/firestore-helpers"
@@ -19,8 +19,6 @@ import { logger } from "@/lib/logger"
 
 // Create a child logger for subscription expiry cron
 const cronLogger = logger.child({ service: "cron-subscription-expiry" })
-
-const CRON_SECRET = process.env.CRON_SECRET
 
 // Update quota when downgrading
 async function updateQuotaToFree(
@@ -124,21 +122,12 @@ async function resetYearlySubscriberQuota(
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify authorization
-    const authHeader = request.headers.get("authorization")
-    if (!CRON_SECRET) {
-      cronLogger.error("CRON_SECRET not configured")
-      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
-    }
-    // SECURITY: Use timing-safe comparison to prevent timing attacks
-    const expectedToken = `Bearer ${CRON_SECRET}`
-    const headerValue = authHeader || ""
-    const isValidLength = headerValue.length === expectedToken.length
-    const isValid =
-      isValidLength && timingSafeEqual(Buffer.from(headerValue), Buffer.from(expectedToken))
-
-    if (!isValid) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = verifyCronRequest(request)
+    if (!auth.ok) {
+      if (auth.status === 500) {
+        cronLogger.error("CRON_SECRET not configured")
+      }
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
     const now = new Date()
