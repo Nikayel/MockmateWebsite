@@ -273,3 +273,31 @@ describe('Rate Limiting', () => {
     })
   })
 })
+
+describe('parseGuestSessionLimit (event-window override)', () => {
+  it('defaults to 3 when the env var is unset or empty', async () => {
+    const { parseGuestSessionLimit } = await import('../rate-limit')
+    expect(parseGuestSessionLimit(undefined)).toBe(3)
+    expect(parseGuestSessionLimit('')).toBe(3)
+  })
+
+  it('accepts a valid in-range integer (event mode)', async () => {
+    const { parseGuestSessionLimit } = await import('../rate-limit')
+    expect(parseGuestSessionLimit('50')).toBe(50)
+    expect(parseGuestSessionLimit('1')).toBe(1)
+    expect(parseGuestSessionLimit('1000')).toBe(1000)
+  })
+
+  it('falls back to the default on zero, negative, or out-of-range values', async () => {
+    const { parseGuestSessionLimit } = await import('../rate-limit')
+    expect(parseGuestSessionLimit('0')).toBe(3)
+    expect(parseGuestSessionLimit('-2')).toBe(3)
+    expect(parseGuestSessionLimit('5000')).toBe(3)
+  })
+
+  it('falls back to the default on non-numeric or non-integer values', async () => {
+    const { parseGuestSessionLimit } = await import('../rate-limit')
+    expect(parseGuestSessionLimit('abc')).toBe(3)
+    expect(parseGuestSessionLimit('12.5')).toBe(3)
+  })
+})
