@@ -26,8 +26,6 @@ import type {
   AddFunctionalityScenario,
   ScenarioMeta,
   ScenarioType,
-  DifficultyLevel,
-  Company,
 } from "./types"
 import { DSAPattern } from "../types/dsa-patterns"
 
@@ -46,56 +44,8 @@ export type { ScenarioType, DifficultyLevel, Company, RoleTag } from "./types"
 // This allows: import { scenarios } from '@/lib/scenarios/index'
 export { scenarios, getScenarioById as getScenarioByIdSync, filterScenarios } from "../scenarios"
 
-// Scenario metadata registry (lightweight, loaded immediately)
-// This allows UI to display scenario lists without loading full content
-const scenarioRegistry: Map<string, ScenarioMeta> = new Map()
-
 // Cache for loaded scenario modules
 const loadedModules: Map<string, Scenario[]> = new Map()
-
-/**
- * Register scenario metadata for quick lookups
- */
-export function registerScenarioMeta(meta: ScenarioMeta): void {
-  scenarioRegistry.set(meta.id, meta)
-}
-
-/**
- * Get all scenario metadata (for listing pages)
- */
-export function getAllScenarioMeta(): ScenarioMeta[] {
-  return Array.from(scenarioRegistry.values())
-}
-
-/**
- * Get scenario metadata by ID
- */
-export function getScenarioMeta(id: string): ScenarioMeta | undefined {
-  return scenarioRegistry.get(id)
-}
-
-/**
- * Get scenario metadata filtered by type
- */
-export function getScenarioMetaByType(type: ScenarioType): ScenarioMeta[] {
-  return Array.from(scenarioRegistry.values()).filter((meta) => meta.type === type)
-}
-
-/**
- * Get scenario metadata filtered by difficulty
- */
-export function getScenarioMetaByDifficulty(difficulty: DifficultyLevel): ScenarioMeta[] {
-  return Array.from(scenarioRegistry.values()).filter((meta) => meta.difficulty === difficulty)
-}
-
-/**
- * Get scenario metadata filtered by pattern (DSA only)
- */
-export function getScenarioMetaByPattern(pattern: DSAPattern): ScenarioMeta[] {
-  return Array.from(scenarioRegistry.values()).filter(
-    (meta) => meta.type === "dsa" && meta.pattern === pattern
-  )
-}
 
 /**
  * Lazy load DSA scenarios by pattern
@@ -228,38 +178,9 @@ async function loadSystemDesignScenarios(): Promise<SystemDesignScenario[]> {
  * Get a scenario by ID (lazy loads appropriate module)
  */
 export async function getScenarioById(id: string): Promise<Scenario | undefined> {
-  const meta = scenarioRegistry.get(id)
-
-  // Fast path: when the metadata registry is populated it tells us exactly which
-  // lazy module to load, so we only fetch that one pattern/type.
-  if (meta) {
-    let scenarios: Scenario[] = []
-
-    switch (meta.type) {
-      case "dsa":
-        if (meta.pattern) {
-          scenarios = await loadDSAByPattern(meta.pattern)
-        }
-        break
-      case "bugfix":
-        scenarios = await loadBugFixScenarios()
-        break
-      case "system-design":
-        scenarios = await loadSystemDesignScenarios()
-        break
-      default:
-        const addFunctionality = await import("./add-functionality")
-        scenarios = addFunctionality.addFunctionalityScenarios as unknown as Scenario[]
-    }
-
-    const fromMeta = scenarios.find((s) => s.id === id)
-    if (fromMeta) return fromMeta
-  }
-
-  // Fallback: the metadata registry is only populated when initializeScenarioRegistry
-  // runs, which does not happen on every entry point. Resolve the id by lazily
-  // scanning each scenario type. Every load below is a dynamic import, so this stays
-  // out of the initial bundle and each module is cached after its first load.
+  // Resolve the id by lazily scanning each scenario type. Every load below is a
+  // dynamic import, so this stays out of the initial bundle and each module is
+  // cached after its first load.
   const scenarioTypes: ScenarioType[] = ["dsa", "bugfix", "system-design", "add-functionality"]
   for (const scenarioType of scenarioTypes) {
     const scenarios = await getScenariosByType(scenarioType)
@@ -315,14 +236,4 @@ export async function getScenariosByType(type: ScenarioType): Promise<Scenario[]
     default:
       return []
   }
-}
-
-/**
- * Initialize scenario registry from metadata
- * Call this once at app startup
- */
-export async function initializeScenarioRegistry(): Promise<void> {
-  // Load metadata from the metadata file (lightweight)
-  const { scenarioMetadata } = await import("./metadata")
-  scenarioMetadata.forEach((meta) => registerScenarioMeta(meta))
 }
