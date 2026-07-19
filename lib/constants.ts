@@ -347,6 +347,24 @@ export function getLetterGrade(score: number): LetterGrade {
 }
 
 /**
+ * Tailwind text-color class per letter grade. One owner so the practice score surfaces
+ * (ScoreDisplay, PracticeFeedback) render the exact same grade colors.
+ */
+export const GRADE_COLOR_CLASS: Record<LetterGrade, string> = {
+  "A+": "text-emerald-400",
+  A: "text-emerald-400",
+  "A-": "text-emerald-400",
+  "B+": "text-sky-400",
+  B: "text-sky-400",
+  "B-": "text-sky-400",
+  "C+": "text-amber-400",
+  C: "text-amber-400",
+  "C-": "text-amber-400",
+  D: "text-orange-400",
+  F: "text-red-400",
+}
+
+/**
  * Get performance level from numeric score (0-100)
  * Uses thresholds defined in SCORING.PERFORMANCE_LEVELS
  */

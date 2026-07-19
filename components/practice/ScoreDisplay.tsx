@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Progress } from "@/components/ui/progress"
+import { getLetterGrade, GRADE_COLOR_CLASS } from "@/lib/constants"
 import {
   Lightbulb,
   Zap,
@@ -54,20 +55,6 @@ interface ScoreDisplayProps {
     codeQuality: number
     communication: number
   }
-}
-
-function getLetterGrade(score: number) {
-  if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
-  if (score >= 90) return { grade: "A", color: "text-emerald-400" }
-  if (score >= 85) return { grade: "A-", color: "text-emerald-400" }
-  if (score >= 80) return { grade: "B+", color: "text-sky-400" }
-  if (score >= 75) return { grade: "B", color: "text-sky-400" }
-  if (score >= 70) return { grade: "B-", color: "text-sky-400" }
-  if (score >= 65) return { grade: "C+", color: "text-amber-400" }
-  if (score >= 60) return { grade: "C", color: "text-amber-400" }
-  if (score >= 55) return { grade: "C-", color: "text-amber-400" }
-  if (score >= 50) return { grade: "D", color: "text-orange-400" }
-  return { grade: "F", color: "text-red-400" }
 }
 
 function formatTime(seconds: number) {
@@ -209,7 +196,8 @@ export function ScoreDisplay({
 
   // Use technical or overall score based on toggle
   const displayScore = showTechnicalOnly ? technicalScore : overallScore
-  const { grade, color } = getLetterGrade(displayScore)
+  const grade = getLetterGrade(displayScore)
+  const color = GRADE_COLOR_CLASS[grade]
 
   // Score items config based on problem type
   const scoreItems =
