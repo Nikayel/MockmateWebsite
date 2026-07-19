@@ -560,7 +560,7 @@ sorted(words, key=len)              # ['a', 'bb', 'ccc']  (shortest first)
 sorted(words, key=lambda w: w[-1])  # sort by last character
 \`\`\`
 
-You can pass a built-in like \`len\` directly, or write a \`lambda\` for a custom rule. This is exactly what the Apply asks for.
+You can pass a built-in like \`len\` directly, or write a \`lambda\` for a custom rule. Add \`reverse=True\` to sort largest-first without touching your \`key\`, so \`sorted(words, key=len, reverse=True)\` puts the longest word first. This is exactly what the Apply asks for.
 
 ### map and filter
 
@@ -2020,9 +2020,9 @@ const collectionsToolkitLesson: PythonLesson = {
 
 When you tally, group, or queue, a plain \`dict\` or \`list\` works, but it forces you to write boilerplate that hides bugs. The \`collections\` module ships three focused upgrades that name your intent and delete that boilerplate: \`Counter\` for frequencies, \`defaultdict\` for grouping, and \`deque\` for queues. In interviews and in real data pipelines, reaching for the right one signals you know the standard library, and it usually cuts genuine complexity, not just line count.
 
-### \`Counter\`: frequencies in one call
+### \`Counter\`: build on the intro
 
-\`Counter\` is a \`dict\` subclass whose values are counts. Feed it any iterable and it tallies:
+The Modules, imports and the standard library lesson already introduced \`Counter\` and \`most_common(k)\`. Here it earns its place next to \`defaultdict\` and \`deque\`, so focus on the two properties you lean on when tallying:
 
 \`\`\`python
 from collections import Counter
@@ -2030,10 +2030,9 @@ from collections import Counter
 c = Counter(["a", "b", "a", "c", "a"])   # Counter({'a': 3, 'b': 1, 'c': 1})
 c["a"]                                    # 3
 c["z"]                                    # 0, not a KeyError
-c.most_common(2)                          # [('a', 3), ('b', 1)]
 \`\`\`
 
-Two behaviors matter. A missing key returns \`0\` instead of raising, so you never guard a read. And both the \`repr\` and \`most_common()\` are ordered by count descending, with ties broken by first-seen order (\`b\` before \`c\` above). Because it is a \`dict\` subclass, \`Counter(words) == {"a": 2, "b": 1}\` is \`True\`, so for the Apply exercise you can return the \`Counter\` directly, or wrap it in \`dict(...)\` if a caller insists on a plain \`dict\`.
+A missing key returns \`0\` instead of raising, so you never guard a read. And because \`Counter\` is a \`dict\` subclass, \`Counter(words) == {"a": 2, "b": 1}\` is \`True\`, so for the Apply exercise you can return the \`Counter\` directly, or wrap it in \`dict(...)\` if a caller insists on a plain \`dict\`.
 
 ### \`defaultdict\`: group without the missing-key dance
 
@@ -2146,10 +2145,10 @@ def group_by_first(words):
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
-  title: "Level 2: Apply",
-  tagline: "Read a concept, then write it yourself with an instant check.",
+  title: "Level 2: Idioms",
+  tagline: "Comprehensions, generators, classes, dataclasses, decorators, and standard-library idioms.",
   defaultExecutionMode: "single-file",
-  estimatedHours: 5,
+  estimatedHours: 3,
   modules: [
     {
       id: "py-l2-comprehensions-generators",
