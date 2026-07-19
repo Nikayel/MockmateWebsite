@@ -195,7 +195,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
   `lib/interview/llm-complexity-analysis.ts:90`.
 - **Commit:** `security(api): server-build analyze-complexity prompt`
 
-### API-ABUSE-1 — `announcements` unauthenticated dismissal increment — **LOW**
+### API-ABUSE-1 — `announcements` unauthenticated dismissal increment — **LOW** — **FIXED 2026-07-19** (per-IP apiRateLimit on the dismissal POST)
 - **File:** `app/api/announcements/route.ts:240–291` (`FieldValue.increment(1)`).
 - **Problem:** Anyone can inflate dismissal counters (analytics skew only).
 - **Fix spec:** Require auth or debounce/rate-limit per IP with `apiRateLimit`.
@@ -217,7 +217,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
   path for these (search for client-SDK `setDoc`/`updateDoc` to these collections first).
 - **Commit:** `security(rules): make progress records server-authoritative`
 
-### AUTH-GATE-1 — proxy `/learn/python` gate is spoofable — **MEDIUM (mislabeled as hard gate)**
+### AUTH-GATE-1 — proxy `/learn/python` gate is spoofable — **MEDIUM (mislabeled as hard gate)** — **FIXED 2026-07-19 via option (b)** (comments now state the presence-check truth + name the real boundaries; lesson content is intentionally free; zero behavior change)
 - **File:** `proxy.ts` (`hasAuthToken` L31–52; `PROTECTED_ROUTES` L19).
 - **Problem:** `hasAuthToken` returns true for **any** value of the `__session` /
   `firebase-auth-token` cookie or any `Authorization` header — no verification. The comment
@@ -234,7 +234,7 @@ verify safely, it is marked **NEEDS-STAGING** — do not ship it blind.
   content (b).
 - **Commit:** `security(auth): stop treating spoofable cookie as a hard gate`
 
-### DISCLOSE-1 — admin emails in the client bundle — **LOW**
+### DISCLOSE-1 — admin emails in the client bundle — **LOW** — **FIXED 2026-07-19** (server-computed is_protected per row; NEXT_PUBLIC var removed from code — also delete it in Vercel)
 - **File:** `app/admin/users/page.tsx:62` (`NEXT_PUBLIC_ADMIN_PROTECTED_EMAILS`).
 - **Problem:** The protected-admin email list is inlined into client JS (the server route
   correctly uses non-public `ADMIN_PROTECTED_EMAILS` at `app/api/admin/users/route.ts:39`).
