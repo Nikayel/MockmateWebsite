@@ -8,33 +8,18 @@
  * Authorization: Bearer ${CRON_SECRET}
  */
 
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { verifyCronRequest } from "@/lib/cron-auth"
 import { aggregateCostAverages } from "@/lib/cost-anomaly-detection"
 import { logger } from "@/lib/logger"
 
-const CRON_SECRET = process.env.CRON_SECRET
-
-function isAuthorized(request: NextRequest): boolean {
-  if (!CRON_SECRET) return false
-
-  const authHeader = request.headers.get("authorization") || ""
-  const expectedToken = `Bearer ${CRON_SECRET}`
-
-  return (
-    authHeader.length === expectedToken.length &&
-    timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedToken))
-  )
-}
-
 async function handleAggregateUsage(request: NextRequest) {
-  if (!CRON_SECRET) {
-    logger.error("[Cron Aggregate Usage] CRON_SECRET not configured")
-    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
-  }
-
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = verifyCronRequest(request)
+  if (!auth.ok) {
+    if (auth.status === 500) {
+      logger.error("[Cron Aggregate Usage] CRON_SECRET not configured")
+    }
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
   try {
