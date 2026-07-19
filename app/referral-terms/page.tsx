@@ -5,8 +5,11 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Gift, DollarSign, Clock, Shield, XCircle } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "Referral Program Terms | Mockmate",
-  description: "Terms and conditions for the Mockmate referral program",
+  title: "Referral Program Terms",
+  description: "Terms and conditions for the CodeSparring referral program",
+  alternates: {
+    canonical: "/referral-terms",
+  },
 }
 
 export default function ReferralTermsPage() {
@@ -184,7 +187,7 @@ export default function ReferralTermsPage() {
             <CardTitle className="text-white">Rights Reserved</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-gray-300">
-            <p>Mockmate reserves the right to:</p>
+            <p>CodeSparring reserves the right to:</p>
             <ul className="space-y-2">
               <li className="flex items-start gap-2">
                 <span className="text-gray-500">•</span>

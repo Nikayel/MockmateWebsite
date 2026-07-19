@@ -86,8 +86,8 @@ export function ReferralWidget() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Try Mockmate - AI Interview Practice",
-          text: "I've been using Mockmate to prep for coding interviews. Use my link to sign up!",
+          title: "Try CodeSparring - AI Interview Practice",
+          text: "I've been using CodeSparring to prep for coding interviews. Use my link to sign up!",
           url: stats.shareUrl,
         })
       } catch {
