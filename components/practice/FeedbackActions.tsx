@@ -34,7 +34,7 @@ async function generatePDF(
 
   doc.setFontSize(20)
   doc.setFont("helvetica", "bold")
-  doc.text("MockMate - Interview Feedback", margin, y)
+  doc.text("CodeSparring - Interview Feedback", margin, y)
   y += 12
 
   doc.setFontSize(10)
@@ -77,7 +77,7 @@ async function generatePDF(
     })
   }
 
-  doc.save(`mockmate-feedback-${Date.now()}.pdf`)
+  doc.save(`codesparring-feedback-${Date.now()}.pdf`)
 }
 
 export function FeedbackActions({

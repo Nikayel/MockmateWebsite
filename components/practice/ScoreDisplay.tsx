@@ -306,7 +306,7 @@ export function ScoreDisplay({
 
         doc.setFontSize(20)
         doc.setFont("helvetica", "bold")
-        doc.text("MockMate - Interview Feedback", margin, y)
+        doc.text("CodeSparring - Interview Feedback", margin, y)
         y += 12
 
         doc.setFontSize(10)
@@ -337,7 +337,7 @@ export function ScoreDisplay({
           y += 6
         })
 
-        doc.save(`mockmate-feedback-${Date.now()}.pdf`)
+        doc.save(`codesparring-feedback-${Date.now()}.pdf`)
       }
     } catch (error) {
       console.error("Failed to export PDF:", error)
