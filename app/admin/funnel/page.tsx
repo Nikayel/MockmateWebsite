@@ -18,6 +18,18 @@ interface FunnelData {
     overallConversion: number
   }
   trend?: Array<{ date: string; signups: number; sessions: number; completed: number }>
+  scoredCompletions?: number
+  registeredSessions?: number
+  registeredCompletedSessions?: number
+  registeredScoredCompletions?: number
+  guestSessions?: number
+  guestCompletedSessions?: number
+  registeredConversionRates?: {
+    signupToSession: number
+    sessionToComplete: number
+    sessionToScored: number
+  }
+  signupsBySource?: Record<string, number>
 }
 
 interface CohortData {
@@ -164,6 +176,64 @@ export default function FunnelPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Registered-only conversion (guest trials excluded) — the honest rates to quote in a pitch. */}
+      {funnel?.registeredConversionRates && (
+        <div>
+          <h2 className="text-xl font-bold text-white mb-1">Registered users only</h2>
+          <p className="text-gray-400 text-sm mb-3">
+            Guest trials are excluded, so these are the real registered-user conversion rates.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              { label: "Guest sessions", value: funnel.guestSessions ?? 0, isCount: true },
+              { label: "Registered sessions", value: funnel.registeredSessions ?? 0, isCount: true },
+              { label: "Signup → Session", value: funnel.registeredConversionRates.signupToSession },
+              { label: "Session → Complete", value: funnel.registeredConversionRates.sessionToComplete },
+              {
+                label: "Session → Scored",
+                value: funnel.registeredConversionRates.sessionToScored,
+                highlight: true,
+              },
+            ].map((rate) => (
+              <Card
+                key={rate.label}
+                className={`border-gray-800 ${rate.highlight ? "bg-[#c4703f]/10 border-[#c4703f]/30" : "bg-gray-900/50"}`}
+              >
+                <CardContent className="p-4 text-center">
+                  <div
+                    className={`text-2xl font-bold ${rate.highlight ? "text-[#c4703f]" : "text-white"}`}
+                  >
+                    {rate.isCount ? rate.value.toLocaleString() : `${rate.value.toFixed(1)}%`}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{rate.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Signups by acquisition source (first-touch src/ref) — measures which channels drive signups. */}
+      {funnel?.signupsBySource && Object.keys(funnel.signupsBySource).length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold text-white mb-3">Signups by source</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(funnel.signupsBySource)
+              .sort(([, a], [, b]) => b - a)
+              .map(([source, count]) => (
+                <Card key={source} className="bg-gray-900/50 border-gray-800">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-white">{count.toLocaleString()}</div>
+                    <p className="text-xs text-gray-400 mt-1 truncate" title={source}>
+                      {source}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
         </div>
       )}
 
