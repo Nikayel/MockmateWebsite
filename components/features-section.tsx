@@ -24,7 +24,7 @@ const interviewTypes = [
   {
     title: "DSA Patterns",
     description:
-      "Master 15 core algorithmic patterns. From Sliding Windows to Advanced Graphs, learn to recognize patterns rather than memorizing problems.",
+      "Master 15+ core algorithmic patterns. From Sliding Windows to Advanced Graphs, learn to recognize patterns rather than memorizing problems.",
     icon: Workflow,
     glowColor: "rgba(56, 189, 248, 0.4)", // Sky
     textColor: "text-sky-400",
@@ -87,13 +87,13 @@ const interviewTypes = [
     ],
   },
   {
-    title: "Security",
+    title: "Guided Learning",
     description:
-      "Assess code quality and safety. Identify critical vulnerabilities, prevent injections, and harden the system against attacks.",
+      "Build the fundamentals with graded exercises that run right in your browser. Work through Python, SQL, and System Design tracks with instant feedback on every answer.",
     icon: Lock,
     glowColor: "rgba(250, 204, 21, 0.4)", // Yellow
     textColor: "text-yellow-400",
-    features: ["OWASP top 10 vulnerabilities", "Authentication flaws", "Secure data handling"],
+    features: ["Python and SQL curricula", "System Design fundamentals", "Graded, in-browser exercises"],
   },
 ]
 
@@ -102,7 +102,7 @@ const practiceJourneyData = [
     id: 1,
     title: "Learn Patterns",
     date: "Week 1",
-    content: "Build intuition for the 15 core algorithmic patterns used in every FAANG interview.",
+    content: "Build intuition for the 15+ core algorithmic patterns used in every FAANG interview.",
     category: "Foundation",
     icon: Brain,
     relatedIds: [2, 3],
@@ -207,7 +207,7 @@ export function FeaturesSection() {
             Every format. One feedback loop.
           </h2>
           <p className="text-muted-foreground mx-auto mt-4 max-w-xl text-[clamp(0.9rem,1.4vw,1.05rem)] leading-relaxed font-medium">
-            From raw algorithm optimization to full FAANG loops — click any node to explore the
+            From raw algorithm optimization to full FAANG loops. Click any node to explore the
             journey, then drill into each format below.
           </p>
         </motion.div>
