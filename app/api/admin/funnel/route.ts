@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
+import { summarizeSessionFunnelCounts } from "@/lib/firestore-helpers"
 
 interface FunnelStage {
   name: string
@@ -49,8 +50,10 @@ export async function GET(request: NextRequest) {
     const profilesSnapshot = await adminDb.collection("profiles").get()
     const totalProfiles = profilesSnapshot.size
 
-    // Get signups (users with created_at in time range)
+    // Get signups (users with created_at in time range), broken down by the
+    // persisted first-touch acquisition source so channels are a plain query.
     let signups = 0
+    const signupsBySource: Record<string, number> = {}
     profilesSnapshot.docs.forEach((doc) => {
       const profile = doc.data()
       const createdAt = profile.created_at || profile.createdAt
@@ -62,6 +65,11 @@ export async function GET(request: NextRequest) {
 
         if (!startDate || date >= startDate) {
           signups++
+          const source =
+            typeof profile.acquisition_source === "string" && profile.acquisition_source
+              ? profile.acquisition_source
+              : "direct"
+          signupsBySource[source] = (signupsBySource[source] || 0) + 1
         }
       }
     })
@@ -74,13 +82,14 @@ export async function GET(request: NextRequest) {
     const sessionsSnapshot = await sessionsQuery.get()
     const totalSessions = sessionsSnapshot.size
 
-    // Get completed sessions
-    let completedSessions = 0
-    sessionsSnapshot.docs.forEach((doc) => {
-      if (doc.data().completed_at) {
-        completedSessions++
-      }
-    })
+    // Partition sessions into guest vs registered + count scored completions.
+    // The "Completed Session" stage below keeps the guest-inclusive completed
+    // count so the funnel renders identically; the guest/registered/scored splits
+    // are additive fields the UI opts into.
+    const sessionCounts = summarizeSessionFunnelCounts(
+      sessionsSnapshot.docs.map((doc) => doc.data())
+    )
+    const completedSessions = sessionCounts.completed
 
     // Get subscriptions (pro + enterprise users)
     let subscribers = 0
@@ -140,6 +149,13 @@ export async function GET(request: NextRequest) {
       overallConversion: safeDiv(stages[4].value, stages[0].value),
     }
 
+    // Guest-excluded conversion so a pitch can quote real registered-user rates.
+    const registeredConversionRates = {
+      signupToSession: safeDiv(sessionCounts.registered, stages[1].value),
+      sessionToComplete: safeDiv(sessionCounts.registeredCompleted, sessionCounts.registered),
+      sessionToScored: safeDiv(sessionCounts.registeredScored, sessionCounts.registered),
+    }
+
     // Also return daily funnel data for trends
     const funnelTrend = await generateFunnelTrend(profilesSnapshot, sessionsSnapshot, startDate, timeRange)
 
@@ -151,6 +167,17 @@ export async function GET(request: NextRequest) {
         conversionRates,
         trend: funnelTrend,
         pageViewsEstimated, // Flag indicating if page views are estimated
+        // Additive metrics (admin UI opts in): scored completions separated from
+        // completed_at-only, guest volume as its own input, guest-excluded
+        // registered conversion, and signups broken down by acquisition source.
+        scoredCompletions: sessionCounts.scored,
+        registeredSessions: sessionCounts.registered,
+        registeredCompletedSessions: sessionCounts.registeredCompleted,
+        registeredScoredCompletions: sessionCounts.registeredScored,
+        guestSessions: sessionCounts.guest,
+        guestCompletedSessions: sessionCounts.guestCompleted,
+        registeredConversionRates,
+        signupsBySource,
       },
     })
   } catch (error) {
