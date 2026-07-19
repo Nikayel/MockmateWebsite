@@ -1,5 +1,5 @@
 /**
- * System Design — Level 11: Modern & Specialized Systems (the final level).
+ * System Design — Level 11: Specialized & Frontier Systems (the final level).
  *
  * Authored by AGENT-2 from `docs/system-design-curriculum/content/sd-l11-m*.md` with lesson ids
  * verbatim from `docs/system-design-curriculum/curriculum-map.json` §L11. 15 lessons across 4
@@ -174,7 +174,7 @@ Instruct the model to say "I do not know" when context is weak, and verify citat
 const vectorDbAnnTeach = `
 ## ANN trades a little recall for orders-of-magnitude speed
 
-A vector database stores high-dimensional embeddings (typically 384 to 3072 floats) and answers "find the k vectors most similar to this query vector" fast. Exact nearest-neighbor search compares the query against every stored vector, which is O(N) per query. At 1B vectors that is billions of distance computations per query, hopelessly slow. So production uses Approximate Nearest Neighbor (ANN) search, which trades a small amount of recall for orders-of-magnitude speedup. The entire discipline is choosing where on the recall / latency / memory / cost surface you want to sit.
+Level 2's "Vector Databases & Embeddings" lesson introduced embeddings and similarity search; this lesson credits that first pass and goes deep on the ANN index families and the operational surface. A vector database stores high-dimensional embeddings (typically 384 to 3072 floats) and answers "find the k vectors most similar to this query vector" fast. Exact nearest-neighbor search compares the query against every stored vector, which is O(N) per query. At 1B vectors that is billions of distance computations per query, hopelessly slow. So production uses Approximate Nearest Neighbor (ANN) search, which trades a small amount of recall for orders-of-magnitude speedup. The entire discipline is choosing where on the recall / latency / memory / cost surface you want to sit.
 
 ## The ANN index families
 
@@ -458,7 +458,7 @@ Control flows the other way via a **device shadow / digital twin**: a cloud-side
 const timeSeriesStorageTeach = `
 ## A lopsided workload a general DB handles badly
 
-A time-series database (TSDB) is specialized because time-series workloads have a lopsided shape a general-purpose DB handles badly: writes are almost entirely **appends** at the current timestamp (you rarely update the past), the write rate is enormous (millions of points/sec), reads are **time-range scans over a filtered set of series** ("CPU for these hosts over the last 6 hours"), and old data is queried less and less over time. A B-tree row store like Postgres chokes here because random-position index maintenance under a pure-append firehose is wasted work.
+Level 2's "Time-Series Databases" lesson introduced the TSDB and its append-heavy workload; this lesson credits that first pass and goes deep on cardinality, compression, and lifecycle. A time-series database (TSDB) is specialized because time-series workloads have a lopsided shape a general-purpose DB handles badly: writes are almost entirely **appends** at the current timestamp (you rarely update the past), the write rate is enormous (millions of points/sec), reads are **time-range scans over a filtered set of series** ("CPU for these hosts over the last 6 hours"), and old data is queried less and less over time. A B-tree row store like Postgres chokes here because random-position index maintenance under a pure-append firehose is wasted work.
 
 ## Cardinality is the dominant failure mode
 
@@ -493,7 +493,7 @@ Query patterns you must support: time-range scans, tag filters (served by an inv
 export const systemDesignLevel11: DesignLevel = {
   id: 11,
   slug: "specialized-systems",
-  title: "Level 11: Modern & Specialized Systems",
+  title: "Level 11: Specialized & Frontier Systems",
   tagline:
     "The frontier: ML systems, LLM and GenAI infrastructure, real-time analytics and globally consistent data, and IoT, edge, and time-series.",
   estimatedHours: 8,
