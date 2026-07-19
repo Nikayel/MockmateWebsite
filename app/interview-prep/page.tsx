@@ -11,7 +11,7 @@ import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 export const metadata: Metadata = {
   title: "Interview Prep Guides by Company | Google, Meta, Amazon & More",
   description:
-    "Free interview preparation guides for top tech companies. Learn company-specific patterns, difficulty distributions, must-know questions, and interview tips for Google, Meta, Amazon, Apple, Netflix, Microsoft, and 13 more companies.",
+    "Free interview preparation guides for top tech companies. Learn company-specific patterns, difficulty distributions, must-know questions, and interview tips for Google, Meta, Amazon, Apple, Netflix, Microsoft, and 32 more companies.",
   keywords: [
     "Google interview prep",
     "Meta interview preparation",
@@ -27,10 +27,13 @@ export const metadata: Metadata = {
     "Uber interview prep",
     "Airbnb coding interview",
   ],
+  alternates: {
+    canonical: "/interview-prep",
+  },
   openGraph: {
     title: "Company Interview Prep Guides | CodeSparring",
     description:
-      "Free interview guides for 19 top tech companies. Company-specific patterns, questions, and tips.",
+      "Free interview guides for 38 top tech companies. Company-specific patterns, questions, and tips.",
     type: "website",
   },
 }
