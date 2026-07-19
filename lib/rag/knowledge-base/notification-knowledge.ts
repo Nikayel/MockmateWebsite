@@ -465,7 +465,7 @@ export const NOTIFICATION_KNOWLEDGE: NotificationKnowledge[] = [
       {
         tone: "celebratory",
         template:
-          "🔥 {problemCount} problems solved! You're in the top {percentile}% of Mockmate users. Keep crushing it!",
+          "🔥 {problemCount} problems solved! You're in the top {percentile}% of CodeSparring users. Keep crushing it!",
         variables: ["problemCount", "percentile"],
       },
       {

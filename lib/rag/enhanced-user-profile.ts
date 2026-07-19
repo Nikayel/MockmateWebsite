@@ -1148,7 +1148,7 @@ export class EnhancedProfileService {
           id: "insight-welcome",
           type: "opportunity",
           icon: "👋",
-          title: "Welcome to Mockmate!",
+          title: "Welcome to CodeSparring!",
           description: "Complete a few practice sessions to unlock personalized insights.",
           actionable: true,
           action: "Start your first practice",
