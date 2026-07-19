@@ -13,6 +13,7 @@ import type {
 import type { InterviewLevel } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 import { buildPackStatePrompt } from "@/lib/bugfix/packs/prompt"
 import type { PackState } from "@/lib/bugfix/packs/machine"
+import { getFlag } from "@/lib/feature-flags"
 
 export interface CompanyPromptContext {
   companyStyle: ReturnType<typeof getCompanyStyle>
@@ -427,7 +428,9 @@ GUIDED LAB STATE:
 
   // Stdout-oracle pack sessions run the 10-state machine, not the generic phase model.
   // The state-scoped block carries only the current state goal + persona + hint level.
-  if (isBugFix && pack) {
+  // Quarantined behind PACK_INTERVIEWER (off by default): the pack runtime is unwired, so
+  // this block stays dormant until the post-launch wire work flips the flag.
+  if (isBugFix && pack && getFlag("PACK_INTERVIEWER")) {
     bugFixContext += `\n${buildPackStatePrompt(pack.state, pack.hintLevel ?? 0)}\n`
   }
 

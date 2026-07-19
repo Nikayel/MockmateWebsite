@@ -24,6 +24,11 @@ export const FLAGS = {
 
   // Debug mode: Run both old and new, compare results
   SHADOW_MODE: false,
+
+  // Pack interviewer 10-state machine. UNWIRED and quarantined OFF: no client drives the
+  // pack runtime yet, so the state-scoped prompt block stays dormant until the post-launch
+  // wire work. Flip via FEATURE_FLAG_PACK_INTERVIEWER=true only once a client is wired.
+  PACK_INTERVIEWER: false,
 } as const
 
 export type FlagName = keyof typeof FLAGS
