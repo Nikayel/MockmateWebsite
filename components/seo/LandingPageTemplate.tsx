@@ -85,7 +85,8 @@ export function LandingPageTemplate({
             Ready to master the {primaryKeyword}?
           </h2>
           <p className="mb-8 text-xl text-gray-400">
-            Join thousands of engineers who used CodeSparring to land offers at top tech companies.
+            Train the way real interviews actually run, with an AI interviewer that reacts as you
+            work and grades every round.
           </p>
           <div className="mb-10 grid grid-cols-1 gap-6 text-left md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black p-6">
