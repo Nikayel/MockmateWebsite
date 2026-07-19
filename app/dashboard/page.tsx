@@ -814,7 +814,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium text-amber-400">Running low on sessions</p>
                   <p className="text-muted-foreground mt-0.5 text-xs">
-                    Upgrade to Pro for unlimited access
+                    Upgrade to Pro for 35 sessions a month
                   </p>
                 </div>
                 <Link href="/upgrade">

@@ -287,7 +287,7 @@ function UpgradePageContent() {
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />
-                    350+ problems/month
+                    35 sessions/month
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />

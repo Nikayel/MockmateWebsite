@@ -39,8 +39,8 @@ export default function VsInterviewingIoPage() {
             doing 1 or 2 mock interviews before their real onsite.
           </p>
           <p>
-            CodeSparring offers unlimited AI mock interviews for a fraction of the cost of a single
-            human session. This allows you to practice <em>every day</em>, building the muscle
+            CodeSparring offers 35 AI mock interview sessions a month for a fraction of the cost of a
+            single human session. This allows you to practice <em>often</em>, building the muscle
             memory needed to cure interview anxiety completely.
           </p>
         </>
