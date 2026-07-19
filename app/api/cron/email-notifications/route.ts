@@ -19,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { timingSafeEqual } from "crypto"
+import { verifyCronRequest } from "@/lib/cron-auth"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import {
@@ -42,9 +42,6 @@ import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/typ
 import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications"
 
 const db = adminDb
-
-// Verify cron secret to prevent unauthorized access
-const CRON_SECRET = process.env.CRON_SECRET
 
 /**
  * Check if we can send an email to a user based on their timezone
@@ -85,21 +82,12 @@ function canSendToUserTimezone(profile: Profile): {
 export async function GET(request: NextRequest) {
   try {
     // Verify the request is from Vercel Cron - ALWAYS require secret
-    const authHeader = request.headers.get("authorization")
-    if (!CRON_SECRET) {
-      logger.error("[Cron Email] CRON_SECRET not configured - rejecting request")
-      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 })
-    }
-
-    // SECURITY: Use timing-safe comparison to prevent timing attacks
-    const expectedToken = `Bearer ${CRON_SECRET}`
-    const headerValue = authHeader || ""
-    const isValidLength = headerValue.length === expectedToken.length
-    const isValid =
-      isValidLength && timingSafeEqual(Buffer.from(headerValue), Buffer.from(expectedToken))
-
-    if (!isValid) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = verifyCronRequest(request)
+    if (!auth.ok) {
+      if (auth.status === 500) {
+        logger.error("[Cron Email] CRON_SECRET not configured - rejecting request")
+      }
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
     const results = {
