@@ -48,13 +48,24 @@ describe("buildPackStatePrompt", () => {
 })
 
 describe("buildBugFixContext pack branch", () => {
-  it("injects the pack state block only when a pack context is supplied", () => {
+  it("injects the pack state block only when a pack context is supplied and PACK_INTERVIEWER is enabled", () => {
     const withoutPack = buildBugFixContext("bugfix")
     expect(withoutPack.bugFixContext).not.toContain("STATE-SCOPED CONTROL")
 
-    const withPack = buildBugFixContext("bugfix", undefined, { state: "REPRODUCE", hintLevel: 0 })
-    expect(withPack.bugFixContext).toContain("PACK DEBUGGING SESSION")
-    expect(withPack.bugFixContext).toContain("Current state: REPRODUCE.")
+    // Quarantined: while PACK_INTERVIEWER is off (the default), a pack context alone does not
+    // inject the state block, because the pack runtime is unwired.
+    const quarantined = buildBugFixContext("bugfix", undefined, { state: "REPRODUCE", hintLevel: 0 })
+    expect(quarantined.bugFixContext).not.toContain("PACK DEBUGGING SESSION")
+
+    // With the flag on (the post-launch wire work), the pack state block is injected.
+    process.env.FEATURE_FLAG_PACK_INTERVIEWER = "true"
+    try {
+      const withPack = buildBugFixContext("bugfix", undefined, { state: "REPRODUCE", hintLevel: 0 })
+      expect(withPack.bugFixContext).toContain("PACK DEBUGGING SESSION")
+      expect(withPack.bugFixContext).toContain("Current state: REPRODUCE.")
+    } finally {
+      delete process.env.FEATURE_FLAG_PACK_INTERVIEWER
+    }
   })
 
   it("does not inject the pack block for non-bugfix scenarios", () => {
