@@ -93,17 +93,19 @@ async function checkStripe(): Promise<{ status: "pass" | "fail" | "warn"; latenc
  * SECURITY: Never expose which environment variables are missing to prevent information disclosure
  */
 function checkEnvironment(): { status: "pass" | "fail" | "warn"; message?: string } {
-  const requiredEnvVars = [
-    "FIREBASE_ADMIN_PROJECT_ID",
-    "FIREBASE_ADMIN_CLIENT_EMAIL",
-    "FIREBASE_ADMIN_PRIVATE_KEY",
-  ]
+  // The credentials this codebase actually reads (lib/firebase-admin.ts): one
+  // service-account JSON blob + the public project id. The old FIREBASE_ADMIN_*
+  // trio belonged to a naming scheme never used here, so this check reported
+  // "unhealthy" permanently while the functional Firebase check passed.
+  const requiredEnvVars = ["FIREBASE_SERVICE_ACCOUNT_KEY", "NEXT_PUBLIC_FIREBASE_PROJECT_ID"]
 
   const optionalEnvVars = [
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "BREVO_API_KEY",
     "GEMINI_API_KEY",
+    // The AI fallback vendor: missing means a Gemini outage has no net.
+    "DEEPSEEK_API_KEY",
   ]
 
   const missingRequiredCount = requiredEnvVars.filter((v) => !process.env[v]).length
