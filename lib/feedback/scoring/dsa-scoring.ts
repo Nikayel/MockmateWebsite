@@ -5,6 +5,11 @@ import type { ExtractedEvidence } from "../structured-extraction"
 import type { ConversationValidation, PreScreenResult, ScoreResult } from "../types"
 import { calculateBugFixScores } from "./bugfix-scoring"
 import { calculateSystemDesignScores } from "./system-design-scoring"
+import {
+  assessCommunicationEvidence,
+  capSubscoresForCommunicationEvidence,
+  capOverallForCommunicationEvidence,
+} from "./communication-gate"
 
 /**
  * Calculate final scores using algorithmic signals, validated conversation signals,
@@ -255,6 +260,21 @@ export function calculateValidatedScores(
     }
   }
 
+  // Communication-evidence gate: a silent (or nearly silent) session cannot earn
+  // Understanding/Problem-Solving from pass rate alone — the interviewer never saw
+  // the thinking. codeQuality stays earned; the code is real evidence.
+  const commEvidenceLevel = assessCommunicationEvidence({
+    candidateMessageCount: preScreen.candidateMessageCount,
+    approachExplained: aiValidation.approachExplained,
+    complexityDiscussed: aiValidation.complexityDiscussed,
+  })
+  const gated = capSubscoresForCommunicationEvidence(
+    { understanding, problemSolving },
+    commEvidenceLevel
+  )
+  understanding = gated.understanding
+  problemSolving = gated.problemSolving
+
   const w = SCORING.PERFORMANCE_WEIGHTS
   let overall = Math.round(
     understanding * w.UNDERSTANDING +
@@ -266,6 +286,8 @@ export function calculateValidatedScores(
   if (isIncompleteSolution || hasOnlyBaseCasePassing) {
     overall = Math.min(28, overall)
   }
+
+  overall = capOverallForCommunicationEvidence(overall, commEvidenceLevel)
 
   return {
     understanding: clampScore(understanding),

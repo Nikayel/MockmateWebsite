@@ -1,12 +1,17 @@
 import { SCORING, clampScore } from "@/lib/constants"
 import type { ConversationValidation, PreScreenResult, ScoreResult } from "../types"
+import {
+  assessCommunicationEvidence,
+  capSubscoresForCommunicationEvidence,
+  capOverallForCommunicationEvidence,
+} from "./communication-gate"
 
 /**
  * Bug fix scoring emphasizes debugging process and root-cause analysis.
  */
 export function calculateBugFixScores(
   passRate: number,
-  _preScreen: PreScreenResult,
+  preScreen: PreScreenResult,
   aiValidation: ConversationValidation
 ): ScoreResult {
   let understanding = 20
@@ -51,12 +56,30 @@ export function calculateBugFixScores(
     }
   }
 
+  // Communication-evidence gate: a bugfix round scored without the evidence
+  // pipeline leans on pass rate; if the candidate also never talked through
+  // their debugging, Understanding/Problem-Solving cannot be earned from it.
+  const commEvidenceLevel = assessCommunicationEvidence({
+    candidateMessageCount: preScreen.candidateMessageCount,
+    approachExplained: aiValidation.approachExplained,
+    complexityDiscussed: aiValidation.complexityDiscussed,
+  })
+  const gated = capSubscoresForCommunicationEvidence(
+    { understanding, problemSolving },
+    commEvidenceLevel
+  )
+  understanding = gated.understanding
+  problemSolving = gated.problemSolving
+
   const bfw = SCORING.BUG_FIX_WEIGHTS
-  const overall = Math.round(
-    understanding * bfw.UNDERSTANDING +
-      problemSolving * bfw.PROBLEM_SOLVING +
-      codeQuality * bfw.CODE_QUALITY +
-      communication * bfw.COMMUNICATION
+  const overall = capOverallForCommunicationEvidence(
+    Math.round(
+      understanding * bfw.UNDERSTANDING +
+        problemSolving * bfw.PROBLEM_SOLVING +
+        codeQuality * bfw.CODE_QUALITY +
+        communication * bfw.COMMUNICATION
+    ),
+    commEvidenceLevel
   )
 
   return {

@@ -46,13 +46,20 @@ export function applyScoreFloors(
   }
 
   if (passRate >= 100) {
-    understanding = Math.max(60, understanding)
-    problemSolving = Math.max(65, problemSolving)
+    // Understanding/Problem-Solving floors are interview credit: they require the
+    // candidate to have actually shown their thinking. A silent perfect solution
+    // keeps the communication-gate caps; only the code itself (codeQuality) floors.
+    if (explainedApproach) {
+      understanding = Math.max(60, understanding)
+      problemSolving = Math.max(65, problemSolving)
+    }
     codeQuality = Math.max(70, codeQuality)
 
     if (isOptimal) {
-      understanding = Math.max(70, understanding)
-      problemSolving = Math.max(75, problemSolving)
+      if (explainedApproach) {
+        understanding = Math.max(70, understanding)
+        problemSolving = Math.max(75, problemSolving)
+      }
       codeQuality = Math.max(80, codeQuality)
     }
 
@@ -65,8 +72,10 @@ export function applyScoreFloors(
     )
     overall = Math.max(overall, newOverall)
   } else if (passRate >= 80) {
-    understanding = Math.max(50, understanding)
-    problemSolving = Math.max(55, problemSolving)
+    if (explainedApproach) {
+      understanding = Math.max(50, understanding)
+      problemSolving = Math.max(55, problemSolving)
+    }
     codeQuality = Math.max(55, codeQuality)
   }
 
