@@ -9,6 +9,11 @@
 
 import type { ConversationValidation, PreScreenResult, ExtendedScoreResult } from "./types"
 import { SCORING, clampScore } from "../constants"
+import {
+  assessCommunicationEvidence,
+  capSubscoresForCommunicationEvidence,
+  capOverallForCommunicationEvidence,
+} from "./scoring/communication-gate"
 
 // ============================================================================
 // EXTRACTED EVIDENCE TYPE (duplicated to avoid import chain)
@@ -274,6 +279,21 @@ export function calculateValidatedScores(
   codeQuality = clampScore(codeQuality)
   communication = clampScore(communication)
 
+  // Communication-evidence gate: pass rate alone cannot earn Understanding or
+  // Problem-Solving when the candidate said (nearly) nothing. Same rule as the
+  // instant accumulator and the Node scorers, so instant and refined agree.
+  const commEvidenceLevel = assessCommunicationEvidence({
+    candidateMessageCount: preScreen.candidateMessageCount,
+    approachExplained: aiValidation.approachExplained,
+    complexityDiscussed: aiValidation.complexityDiscussed,
+  })
+  const gated = capSubscoresForCommunicationEvidence(
+    { understanding, problemSolving },
+    commEvidenceLevel
+  )
+  understanding = gated.understanding
+  problemSolving = gated.problemSolving
+
   // Calculate overall based on scenario type
   let overall: number
   if (scenarioType === "system-design") {
@@ -286,13 +306,15 @@ export function calculateValidatedScores(
     overall = understanding * 0.25 + problemSolving * 0.25 + codeQuality * 0.3 + communication * 0.2
   }
 
+  overall = capOverallForCommunicationEvidence(overall, commEvidenceLevel)
+
   return {
     understanding: Math.round(understanding),
     problemSolving: Math.round(problemSolving),
     codeQuality: Math.round(codeQuality),
     communication: Math.round(communication),
     overall: Math.round(overall),
-    silentSolution: false,
+    silentSolution: commEvidenceLevel === "none" && passRate >= 70,
   }
 }
 
@@ -307,11 +329,15 @@ export function applyScoreFloors(
 ): ExtendedScoreResult {
   const result = { ...scores }
 
-  // All tests passing = minimum 70 overall
+  // All tests passing = minimum 70 overall — but ONLY when the candidate actually
+  // interviewed. Silent perfect solutions keep the communication-gate caps; the
+  // code itself is still credited via the codeQuality floor below.
   if (passRate >= 100) {
-    result.overall = Math.max(result.overall, 70)
+    if (aiValidation.approachExplained || aiValidation.complexityDiscussed) {
+      result.overall = Math.max(result.overall, 70)
+      result.problemSolving = Math.max(result.problemSolving, 70)
+    }
     result.codeQuality = Math.max(result.codeQuality, 75)
-    result.problemSolving = Math.max(result.problemSolving, 70)
   }
 
   // High efficiency = minimum code quality
