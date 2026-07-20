@@ -13,12 +13,25 @@ export const BugfixSemanticScoreSchema = z.object({
 
 export type BugfixSemanticScores = z.infer<typeof BugfixSemanticScoreSchema>
 
-// Safe fallback — never throws, returns neutral scores on any failure
+// Safe fallback — never throws, returns neutral scores on any failure.
+// NEUTRAL means "the scorer could not judge" (AI call failed / bad output): the
+// candidate spoke, we lost the signal, so we refuse to punish them for our outage.
 export const BUGFIX_SEMANTIC_NEUTRAL: BugfixSemanticScores = {
   hypothesisQuality: 50,
   rootCauseAccuracy: 50,
   preventionQuality: 50,
   communicationScore: 50,
+}
+
+// SILENT is different: the transcript provably contains no candidate turn, so the
+// hypothesis / root cause / prevention were genuinely never stated. That is earned
+// evidence of absence, not missing signal — score it low, never the neutral 50
+// (which used to hand silent sessions an unearned 50 on 28% of the total).
+export const BUGFIX_SEMANTIC_SILENT: BugfixSemanticScores = {
+  hypothesisQuality: 10,
+  rootCauseAccuracy: 10,
+  preventionQuality: 10,
+  communicationScore: 5,
 }
 
 export interface BugfixSemanticScorerInput {
@@ -66,12 +79,19 @@ export async function scoreBugfixSemantics(
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return BUGFIX_SEMANTIC_NEUTRAL
+    if (!jsonMatch) {
+      console.warn("[Bugfix Semantic Scorer] No JSON in model reply; using neutral scores")
+      return BUGFIX_SEMANTIC_NEUTRAL
+    }
 
     const parsed = JSON.parse(jsonMatch[0])
     const result = BugfixSemanticScoreSchema.safeParse(parsed)
+    if (!result.success) {
+      console.warn("[Bugfix Semantic Scorer] Reply failed schema; using neutral scores")
+    }
     return result.success ? result.data : BUGFIX_SEMANTIC_NEUTRAL
-  } catch {
+  } catch (error) {
+    console.warn("[Bugfix Semantic Scorer] Scoring call failed; using neutral scores", error)
     return BUGFIX_SEMANTIC_NEUTRAL
   }
 }

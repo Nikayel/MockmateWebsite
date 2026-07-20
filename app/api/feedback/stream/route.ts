@@ -44,6 +44,7 @@ import {
   scoreBugfixSemantics,
   fitTranscript,
   BUGFIX_SEMANTIC_NEUTRAL,
+  BUGFIX_SEMANTIC_SILENT,
 } from "@/lib/bugfix/semantic-scorer"
 import { loadSealedPack } from "@/lib/scenarios/sealed/registry.server"
 import { loadSealedLegacyBugfix } from "@/lib/scenarios/sealed/legacy-registry.server"
@@ -337,7 +338,14 @@ export async function POST(request: NextRequest) {
                     .join("\n\n")
                 ),
               }).catch(() => BUGFIX_SEMANTIC_NEUTRAL)
-            : Promise.resolve(BUGFIX_SEMANTIC_NEUTRAL),
+            : // No candidate turn is EARNED silence (hypothesis/root cause/prevention
+              // provably never stated) — score those dimensions low. NEUTRAL stays
+              // reserved for "the scorer itself was unavailable".
+              Promise.resolve(
+                scenarioType === "bugfix" && bugfixEvidenceSummary && !hasCandidateTurn
+                  ? BUGFIX_SEMANTIC_SILENT
+                  : BUGFIX_SEMANTIC_NEUTRAL
+              ),
         ])
 
       // Use generated silent notes or existing ones
