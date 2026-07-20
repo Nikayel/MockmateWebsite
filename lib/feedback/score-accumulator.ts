@@ -13,6 +13,11 @@
  */
 
 import { SCORING } from "@/lib/constants"
+import {
+  assessCommunicationEvidence,
+  capSubscoresForCommunicationEvidence,
+  capOverallForCommunicationEvidence,
+} from "./scoring/communication-gate"
 
 export interface ScoreSignals {
   // Test results
@@ -207,6 +212,24 @@ export function calculateInstantScores(signals: ScoreSignals): AccumulatedScores
   }
 
   // ============================================
+  // COMMUNICATION-EVIDENCE GATE
+  // Understanding and Problem-Solving are interview judgments: without verbal
+  // evidence (no approach, no complexity, near-zero messages) they cannot be
+  // earned from pass rate alone, no matter how clean the code is.
+  // ============================================
+  const commEvidenceLevel = assessCommunicationEvidence({
+    candidateMessageCount: signals.candidateMessageCount,
+    approachExplained: signals.approachExplained,
+    complexityDiscussed: signals.complexityDiscussed,
+  })
+  if (commEvidenceLevel !== "adequate") {
+    const capped = capSubscoresForCommunicationEvidence({ understanding, problemSolving }, commEvidenceLevel)
+    understanding = capped.understanding
+    problemSolving = capped.problemSolving
+    signalsUsed.push(`commGate:${commEvidenceLevel}`)
+  }
+
+  // ============================================
   // OVERALL SCORE
   // Weighted average with scenario adjustments.
   // Weights come from the canonical SCORING.*_WEIGHTS so the instant score
@@ -251,6 +274,8 @@ export function calculateInstantScores(signals: ScoreSignals): AccumulatedScores
     overall = Math.max(0, overall - 5)
     signalsUsed.push("easyPenalty")
   }
+
+  overall = capOverallForCommunicationEvidence(overall, commEvidenceLevel)
 
   // Clamp all scores
   understanding = clamp(understanding)
