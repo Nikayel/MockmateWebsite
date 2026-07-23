@@ -1658,6 +1658,29 @@ Sagas and event-driven systems depend on a step that looks trivial and is not: "
 *and* publish an event." Doing both is the **dual-write problem**, and it has no atomic solution
 across two independent systems without a distributed transaction.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your service writes the order row to Postgres and the commit succeeds. It then crashes before publishing 'OrderCreated' to Kafka. What is the lasting damage?",
+  "options": [
+    {
+      "label": "Nothing lasting: Kafka notices the missing event and requests it",
+      "feedback": "Tempting, but Kafka has no idea an event was ever intended. A broker only knows about records that producers actually send it."
+    },
+    {
+      "label": "The order exists but downstream systems never hear about it",
+      "correct": true,
+      "feedback": "Right. This is the lost event. Flip the ordering (publish first, then commit) and you get the opposite failure, a phantom event for an order that never committed. The next paragraph walks both orderings."
+    },
+    {
+      "label": "Postgres rolls back the order because the publish failed",
+      "feedback": "Tempting, but the transaction already committed and Postgres knows nothing about Kafka. There is no atomic transaction spanning two systems with separate logs."
+    }
+  ]
+}
+\`\`\`
+
 Consider the naive code: write the order row to Postgres, then publish \`OrderCreated\` to Kafka. Two
 failure orderings break you. If the service crashes *after* the DB commit but *before* the Kafka
 publish, the order exists but no event was ever sent: downstream systems never hear about it, a
@@ -1679,6 +1702,29 @@ COMMIT;                                              -- both or neither
 The order row and the "there is an event to publish" fact commit atomically, in one local transaction
 in one database. A separate **relay** process reads unpublished outbox rows and publishes them to
 Kafka, marking them sent after the broker acknowledges.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The relay publishes an outbox row, Kafka acknowledges it, and the relay crashes before marking the row sent. After the relay restarts, what does a consumer see?",
+  "options": [
+    {
+      "label": "Exactly one copy of the event, because the outbox made delivery exactly-once",
+      "feedback": "This is the classic outbox misconception. The outbox makes the write plus the intent to publish atomic, but the relay itself is at-least-once: on restart it finds a row that still looks unsent and publishes it again."
+    },
+    {
+      "label": "The same event twice",
+      "correct": true,
+      "feedback": "Right. The unmarked row gets republished on restart. Duplicates are the price of at-least-once, and the next section shows how the consumer-side inbox absorbs them."
+    },
+    {
+      "label": "Nothing, the crash lost the event",
+      "feedback": "Tempting to assume a crash means loss, but here it is the opposite. The unmarked row survives in the database, so the relay retries. The failure mode is duplication, not loss."
+    }
+  ]
+}
+\`\`\`
 
 Two ways to run the relay:
 
@@ -1707,6 +1753,41 @@ Recap: writing the DB then publishing to Kafka is not atomic and either loses or
 so write the event into an outbox table in the same local transaction and let a relay (polling or
 Debezium CDC) publish it at least once, with a consumer-side inbox/dedup table making the end-to-end
 result effectively-once.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each failure by which part of the pattern neutralizes it.",
+  "buckets": [
+    "The outbox transaction",
+    "The consumer inbox"
+  ],
+  "items": [
+    {
+      "label": "Crash after the DB commit but before the Kafka publish (lost event)",
+      "bucket": "The outbox transaction",
+      "feedback": "The event row commits with the order in one local transaction, so the intent to publish can never be lost."
+    },
+    {
+      "label": "A failed DB commit after the event already went out (phantom event)",
+      "bucket": "The outbox transaction",
+      "feedback": "Nothing is published until the transaction commits, so a rollback means no outbox row and no event."
+    },
+    {
+      "label": "Relay crash after the broker ack but before marking the row sent (duplicate)",
+      "bucket": "The consumer inbox",
+      "feedback": "The relay republishes, and the inbox/dedup table skips an event id it has already recorded."
+    },
+    {
+      "label": "The same event id redelivered to a consumer after a restart",
+      "bucket": "The consumer inbox",
+      "feedback": "Same defense: the dedup check and the side effect share one transaction, so a repeated id is a no-op."
+    }
+  ],
+  "reveal": "The outbox turns an impossible atomic dual write into one local transaction, the relay is deliberately at-least-once, and the inbox turns duplicates into no-ops. In your design write, name all three parts and claim effectively-once, never exactly-once delivery."
+}
+\`\`\`
 `.trim()
 
 const deliveryIdempotencyTeach = `
