@@ -961,12 +961,50 @@ empty state, you land in exactly the same final state, every time, on every mach
 whole trick. If you can get N replicas to apply the **same sequence of commands in the same order**,
 they will all hold identical state, with no further coordination needed.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The command 'SET x = now()' enters the replicated log. Every replica applies the exact same log in the exact same order. Do the replicas end up with identical state?",
+  "options": [
+    {
+      "label": "Yes: same commands in the same order always produce the same state",
+      "feedback": "Tempting, that is the SMR promise you just read. But the promise only holds when apply is deterministic, and 'now()' evaluates differently on every replica's clock, so their states diverge even though the log matches."
+    },
+    {
+      "label": "No: each replica evaluates 'now()' on its own clock, so they silently diverge",
+      "correct": true,
+      "feedback": "Right. The log looks perfectly healthy while the replicas quietly disagree. Keep reading for the fix: nondeterminism has to be resolved before the command enters the log."
+    }
+  ]
+}
+\`\`\`
+
 So the replication problem reduces to one thing: getting every replica to agree on a single ordered
 log of commands. This ordering primitive has a name, **total-order broadcast** (atomic broadcast):
 every correct node delivers the same set of messages in the same order. The deep result:
 **total-order broadcast is equivalent to consensus**. You can build one from the other. This is why
 "how do I keep my replicas consistent" and "I need a consensus algorithm" are the same question
 wearing different clothes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your team has a working total-order broadcast primitive. A teammate insists you still need to bolt on a separate consensus algorithm to agree on values. Do you?",
+  "options": [
+    {
+      "label": "Yes: broadcast just delivers messages, agreement on a value is a harder problem",
+      "feedback": "Tempting, because 'broadcast' sounds like plain messaging. But total-order broadcast already forces every node to deliver the same messages in the same order, and that order is agreement in disguise."
+    },
+    {
+      "label": "No: to decide a value, every node broadcasts its proposal and adopts the first one delivered",
+      "correct": true,
+      "feedback": "Right. Identical delivery order means every node adopts the same first proposal, which is consensus. The reduction runs both ways, which is why the two problems are equivalent in power."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
   clients ->  [ append ]  ->  replicated ordered log
@@ -1000,6 +1038,46 @@ for log growth. That framing signals you understand the primitive rather than a 
 Recap: identical replicas come from applying the same deterministic commands in the same order,
 achieving that order is total-order broadcast which is equivalent to consensus, nondeterministic
 apply is the classic silent-divergence bug, and snapshots bound otherwise-unbounded log growth.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are about to design a replicated key-value store on an ordered log. Sort each behavior.",
+  "buckets": [
+    "Breaks SMR",
+    "Safe in SMR"
+  ],
+  "items": [
+    {
+      "label": "The apply function reads the local wall clock",
+      "bucket": "Breaks SMR",
+      "feedback": "Every replica sees a different time, so identical logs produce divergent state while the log looks healthy."
+    },
+    {
+      "label": "The leader stamps the timestamp or random seed into the log entry",
+      "bucket": "Safe in SMR",
+      "feedback": "This is the standard fix: every replica applies the recorded value, so determinism is preserved."
+    },
+    {
+      "label": "Replaying the last log entry after a crash, with the last-applied index tracked durably",
+      "bucket": "Safe in SMR",
+      "feedback": "Idempotent replay is the second precondition; tracking the applied index makes a double apply harmless."
+    },
+    {
+      "label": "Apply iterates a hash map whose iteration order varies between runs",
+      "bucket": "Breaks SMR",
+      "feedback": "Iteration order is hidden nondeterminism: same log, different state, and nothing in the log reveals it."
+    },
+    {
+      "label": "Truncating log entries already covered by a persisted snapshot",
+      "bucket": "Safe in SMR",
+      "feedback": "That is log compaction working as intended: the snapshot plus the remaining tail reconstructs the full state."
+    }
+  ],
+  "reveal": "Your design write hinges on two rules: deterministic apply, with all nondeterminism pushed into the log entry, and idempotent replay, plus snapshots to bound the log. Get the ordered log right and consistency falls out for free."
+}
+\`\`\`
 `.trim()
 
 const raftPaxosTeach = `
