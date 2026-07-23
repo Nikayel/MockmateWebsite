@@ -684,6 +684,29 @@ receive, set your counter to \`max(local, received) + 1\`. The guarantee: if A -
 \`L(A) < L(B)\`. This gives a **total order** (break ties by node id) that never contradicts
 causality: enough to agree on a single order for a replicated log.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Event A has Lamport timestamp 4 and event B has timestamp 9, on different nodes. What do the stamps prove?",
+  "options": [
+    {
+      "label": "A happened before B",
+      "feedback": "Tempting: the guarantee reads that way, but it only runs in one direction. Causality forces the timestamps; the timestamps do not prove causality."
+    },
+    {
+      "label": "Nothing about causality: A and B may be concurrent",
+      "correct": true,
+      "feedback": "Right. Two concurrent events on different nodes can carry any pair of Lamport values, so 4 versus 9 says nothing about whether either influenced the other."
+    },
+    {
+      "label": "B happened before A, since larger stamps mean later on the wall clock",
+      "feedback": "Lamport counters are not wall clocks. A causally earlier event can never carry the larger stamp, but these two events may simply be unrelated."
+    }
+  ]
+}
+\`\`\`
+
 The catch, and the single most-probed point here: the implication only goes one way. \`L(A) < L(B)\`
 does **not** imply A -> B. Two concurrent events on different nodes can have any Lamport values, so a
 smaller timestamp tells you nothing about causation. **Lamport clocks cannot detect concurrency.**
@@ -699,6 +722,29 @@ Compare two vectors:
 - V(A) < V(B) (every element <=, at least one <) means **A -> B**.
 - V(B) < V(A) means B -> A.
 - Neither dominates means **A || B, concurrent**, and if they touched the same key, a **conflict**.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "V(A) is [2,1,0] and V(B) is [1,2,0]. What is the relationship?",
+  "options": [
+    {
+      "label": "A happened before B, because A leads in the first slot",
+      "feedback": "Dominance must hold element-wise: every slot less-or-equal and at least one strictly less. B leads in the second slot, so A does not dominate."
+    },
+    {
+      "label": "B happened before A, because B leads in the second slot",
+      "feedback": "The same trap mirrored: A leads in the first slot, so B does not dominate either."
+    },
+    {
+      "label": "Neither dominates: they are concurrent, and a conflict if they touched the same key",
+      "correct": true,
+      "feedback": "Right. Each vector leads somewhere, so no causal order exists between them. This detection is exactly what Lamport clocks cannot do."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
 node A: [1,0,0] --send--> node B receives, takes max, bumps self -> [1,1,0]
@@ -720,6 +766,41 @@ false-concurrent readings.
 Recap: Lamport clocks give a causality-respecting total order but cannot detect concurrency;
 vector/version clocks do detect concurrency and let leaderless stores surface conflict siblings, at
 O(N) size and a real garbage-collection problem when actors churn.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Last pass before the design write: which clock does each job describe?",
+  "buckets": [
+    "Lamport clock",
+    "Vector clock"
+  ],
+  "items": [
+    {
+      "label": "Agree on one total order of entries for a replicated log",
+      "bucket": "Lamport clock",
+      "feedback": "A single integer plus a node-id tiebreak yields a total order that never contradicts causality, which is all a log needs."
+    },
+    {
+      "label": "Detect that two writes to a key were concurrent and surface both as siblings",
+      "bucket": "Vector clock",
+      "feedback": "Only element-wise comparison can prove concurrency, which is why Dynamo-style stores use version vectors instead of silently dropping a write."
+    },
+    {
+      "label": "Stay constant-size no matter how many writers show up",
+      "bucket": "Lamport clock",
+      "feedback": "One counter per node, one integer per stamp. The price is blindness to concurrency."
+    },
+    {
+      "label": "Risks unbounded growth, and false concurrency if old entries are pruned",
+      "bucket": "Vector clock",
+      "feedback": "One slot per participant means churny writers grow the vector without bound, the GC problem that pushes systems to key vectors on a small fixed replica set."
+    }
+  ],
+  "reveal": "In the design write, pick the clock by the question you must answer: 'give me one order' is Lamport territory, while 'tell me whether these conflicted' demands a vector, paid for in O(N) size and GC care."
+}
+\`\`\`
 `.trim()
 
 const physicalTimeHlcTeach = `
