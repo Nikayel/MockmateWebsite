@@ -442,7 +442,8 @@ Fast, credible estimation rests on a small set of memorized constants. If you qu
 round trip as 50 ms or a memory read as 1 ms, every downstream number is wrong by orders of magnitude
 and the interviewer stops trusting your math. This lesson is the cheat-sheet.
 
-### The latency ladder
+<details>
+<summary>The latency ladder</summary>
 
 Rounded, order-of-magnitude, the numbers that matter:
 
@@ -457,6 +458,8 @@ Disk (HDD) seek               ~10 ms
 Round trip cross-region       ~50-150 ms     (e.g. US-EU)
 \`\`\`
 
+</details>
+
 The key ratios to internalize: memory is roughly 1,000x faster than an SSD random read, an SSD is
 roughly 100x faster than an HDD seek, a same-datacenter round trip (~0.5 ms) is roughly 100x to 300x
 faster than a cross-region round trip. These ratios are why you cache in memory, why you avoid random
@@ -467,7 +470,8 @@ design consequence. "Cross-region is ~100 ms, so a synchronous read-your-writes 
 feel slow; I will serve reads from a regional replica and replicate asynchronously" is the sentence
 that earns the point.
 
-### Units, time, and object sizes
+<details>
+<summary>Units, time, and object sizes</summary>
 
 \`\`\`
 1 KB ~= 10^3 bytes      1 MB ~= 10^6      1 GB ~= 10^9      1 TB ~= 10^12
@@ -483,7 +487,10 @@ a photo (post-compression)  ~ 1-2 MB
 a minute of video (SD/HD)   ~ 5-15 MB
 \`\`\`
 
-### Single-machine ceilings
+</details>
+
+<details>
+<summary>Single-machine ceilings</summary>
 
 The rough capacities you assume before proving otherwise:
 
@@ -493,6 +500,8 @@ Redis / in-memory cache node   ~ 100k+ ops/sec
 Single relational DB primary   ~ few k writes/sec, tens of k reads/sec
 One server's live connections  ~ 100k+ WebSockets (tuned)
 \`\`\`
+
+</details>
 
 These ceilings turn a QPS number into a server count in one step: 30k peak read QPS at ~10k QPS/server
 means 3 to 4 servers plus headroom; 1M write QPS against a ~5k-writes/sec DB node means you need ~200
@@ -785,7 +794,8 @@ Under interview pressure, working memory shrinks. The fix is a one-page template
 so well you can reproduce it in the first 60 seconds of any round, without it sounding like a recited
 script. The template is a backbone you hang the specific prompt on, not a monologue you deliver.
 
-### The phase backbone (45-minute budget)
+<details>
+<summary>The phase backbone (45-minute budget)</summary>
 
 \`\`\`
 1. Scope & requirements      ~5 min   functional + non-functional, clarify
@@ -796,23 +806,44 @@ script. The template is a backbone you hang the specific prompt on, not a monolo
 6. Bottlenecks & wrap-up     ~3 min   scale, failure, tradeoffs, what next
 \`\`\`
 
-**Stock clarifying and NFR prompts** to open with: who are the users and how many, read-heavy or
-write-heavy, what is the consistency requirement, what latency is acceptable, what is the scale (DAU,
-QPS), and what is explicitly out of scope. Asking these is problem navigation points on the rubric.
+</details>
 
-**An estimation checklist** so you never freeze on numbers: DAU to QPS (DAU x actions/day / 86,400,
-then x2 or x3 for peak), storage (records/day x bytes/record x retention), bandwidth (QPS x payload
-size), cache size (hot set, often the 20% that serves 80%), and server count (QPS / per-box
-throughput).
+<details>
+<summary>Stock clarifying and NFR prompts</summary>
 
-**A component palette** you can pull from without inventing: load balancer, API gateway, app/service
-tier, cache (Redis), message queue (Kafka), CDN, object store (S3), search index (Elasticsearch), and
-database with replicas and shards. When you need a box, it is almost always one of these.
+Open with: who are the users and how many, read-heavy or write-heavy, what is the consistency
+requirement, what latency is acceptable, what is the scale (DAU, QPS), and what is explicitly out of
+scope. Asking these is problem navigation points on the rubric.
 
-**Trade-off lenses** to reach for: CAP/PACELC, push vs pull, sync vs async, SQL vs NoSQL, normalize vs
-denormalize.
+</details>
 
-### The top pitfalls, each with its counter
+<details>
+<summary>The estimation checklist</summary>
+
+So you never freeze on numbers: DAU to QPS (DAU x actions/day / 86,400, then x2 or x3 for peak),
+storage (records/day x bytes/record x retention), bandwidth (QPS x payload size), cache size (hot
+set, often the 20% that serves 80%), and server count (QPS / per-box throughput).
+
+</details>
+
+<details>
+<summary>The component palette</summary>
+
+Pull from these without inventing: load balancer, API gateway, app/service tier, cache (Redis),
+message queue (Kafka), CDN, object store (S3), search index (Elasticsearch), and database with
+replicas and shards. When you need a box, it is almost always one of these.
+
+</details>
+
+<details>
+<summary>Trade-off lenses</summary>
+
+Reach for: CAP/PACELC, push vs pull, sync vs async, SQL vs NoSQL, normalize vs denormalize.
+
+</details>
+
+<details>
+<summary>The top pitfalls, each with its counter</summary>
 
 - **Solutioning before scoping**: naming Kafka before you know the requirements. Counter: spend the
   first 5 minutes on requirements, always.
@@ -823,6 +854,8 @@ denormalize.
 - **Designing in silence**: thinking without narrating. Counter: talk continuously.
 - **No wrap-up**: running out of time with no summary. Counter: reserve the last 2 to 3 minutes to name
   bottlenecks and next steps.
+
+</details>
 
 **Interview nuance:** The template must bend to the prompt. If the interviewer says "assume you know
 the requirements, go straight to the storage design," skip phases 1 and 2 and say so. Rigidly marching
