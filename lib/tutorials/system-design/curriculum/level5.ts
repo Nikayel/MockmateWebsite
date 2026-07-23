@@ -1252,6 +1252,25 @@ set a write touched must **overlap in at least one node** (pigeonhole: two subse
 sum to more than N cannot be disjoint). That overlapping node has seen the latest write, so a read is
 guaranteed to observe at least one copy of the freshest value.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "N=3, R=2, W=2, so 'R + W > N' holds and every read set overlaps every acknowledged write set. Does this configuration give you strong consistency (linearizability)?",
+  "options": [
+    {
+      "label": "Yes: guaranteed overlap means every read sees the latest write, and that is strong consistency",
+      "feedback": "This is the number-one trap. Overlap only guarantees the read touches at least one fresh replica. Concurrent writes can land on different quorums and conflict, and a read racing an in-flight write can return old or new depending on timing."
+    },
+    {
+      "label": "No: you get quorum consistency, which is weaker; conflicts and ordering still need version vectors, LWW, or real consensus",
+      "correct": true,
+      "feedback": "Right. Overlap says a read sees at least one copy of the latest acknowledged write, and nothing about how concurrent writes resolve or what order clients observe events in. Linearizability requires consensus, not quorums."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
   N=3 nodes: [1][2][3]
   W=2 write acked by {1,2}
@@ -1284,6 +1303,40 @@ nodes on the ring even if they are not the key's usual owners, storing a **hint*
 holders forward the data back once the rightful replicas recover. Writes stay accepted during
 partitions at the cost of a window where a strict-quorum read might miss the value.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each behavior by which quorum flavor produces it.",
+  "buckets": [
+    "Strict quorum",
+    "Sloppy quorum plus hinted handoff"
+  ],
+  "items": [
+    {
+      "label": "A write fails when the key's W home replicas are unreachable",
+      "bucket": "Strict quorum",
+      "feedback": "Strict quorums only count the key's real owners, so a partition that hides them fails the write. Consistency kept, availability sacrificed."
+    },
+    {
+      "label": "Writes keep succeeding during a partition, accepted by stand-in nodes on the ring",
+      "bucket": "Sloppy quorum plus hinted handoff",
+      "feedback": "The next W healthy nodes take the write and store a hint so they can forward it home once the rightful replicas recover."
+    },
+    {
+      "label": "A window where a read can miss a write that was already acknowledged",
+      "bucket": "Sloppy quorum plus hinted handoff",
+      "feedback": "Until handoff delivers the data back to the real owners, the write may live entirely on stand-ins that a strict-quorum read never consults."
+    },
+    {
+      "label": "The 'R + W > N' overlap guarantee actually holds",
+      "bucket": "Strict quorum",
+      "feedback": "The pigeonhole argument assumes reads and writes draw from the same fixed set of N owners; sloppy quorums break that assumption for availability's sake."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance, map numbers to intent:** W=N maximizes durability but breaks writes if any
 replica is down. R=1, W=N gives fast reads and slow fragile writes. R=N, W=1 the reverse. W=1, R=1 is
 fastest and weakest (no overlap). Also mention **flexible quorums** (write and read sets defined to
@@ -1294,6 +1347,46 @@ Recap: N/R/W is a per-operation dial, R+W>N forces read/write overlap so a read 
 acknowledged write, but that is quorum consistency not linearizability, quorum latency tracks the
 slowest node in the set, and sloppy quorum plus hinted handoff buy availability during partitions at
 the cost of consistency.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Last pass before you pick your own N, R, and W: sort what quorum overlap actually buys you.",
+  "buckets": [
+    "Guaranteed by R + W > N",
+    "Not guaranteed, needs more machinery"
+  ],
+  "items": [
+    {
+      "label": "A read sees at least one copy of the latest acknowledged write",
+      "bucket": "Guaranteed by R + W > N",
+      "feedback": "This is the pigeonhole overlap at work: two subsets of N whose sizes sum past N must share a node."
+    },
+    {
+      "label": "Concurrent writes to different quorums resolve to one agreed value",
+      "bucket": "Not guaranteed, needs more machinery",
+      "feedback": "Conflicting versions need version vectors with sibling reconciliation, or LWW, which silently drops a loser."
+    },
+    {
+      "label": "All clients observe writes in the same order",
+      "bucket": "Not guaranteed, needs more machinery",
+      "feedback": "Ordering guarantees are linearizability territory, and that takes consensus like Raft or Paxos, not quorum overlap."
+    },
+    {
+      "label": "Overlap still holds while a sloppy quorum is accepting writes on stand-in nodes",
+      "bucket": "Not guaranteed, needs more machinery",
+      "feedback": "Sloppy quorums deliberately trade the overlap guarantee for availability until hinted handoff completes."
+    },
+    {
+      "label": "Read latency tracks the slowest replica in the read set",
+      "bucket": "Guaranteed by R + W > N",
+      "feedback": "Comes with the territory: waiting for R responses means the Rth-fastest node sets your latency, so raising R drags reads toward the tail. Hedged reads mitigate."
+    }
+  ],
+  "reveal": "In the design write, state your N, R, W and then name exactly what you get: quorum consistency. If the requirement is linearizability, say consensus. If availability under partition matters, name the sloppy-quorum window you are accepting."
+}
+\`\`\`
 `.trim()
 
 const twoPcThreePcTeach = `
