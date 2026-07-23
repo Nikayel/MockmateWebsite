@@ -22,6 +22,25 @@ Without it you get the classic bug: 100 dollars leaves account A and never arriv
 because the second write failed. The invariant "total money is conserved" only holds if both writes
 commit together or neither does.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your bank schema declares no CHECK constraints and no foreign keys. A transfer transaction runs on a fully ACID database. Does the C in ACID still guarantee that money is never created or destroyed?",
+  "options": [
+    {
+      "label": "Yes. Consistency is one of the four guarantees, so the database enforces it automatically.",
+      "feedback": "Tempting, because C sits right there in the acronym. But the database can only enforce constraints you declared. With none declared, it has no idea what a valid state even is."
+    },
+    {
+      "label": "No. Consistency means the database upholds the constraints and invariants YOU defined; with none declared, conserving money rests entirely on your transaction logic.",
+      "correct": true,
+      "feedback": "Right. Consistency is the outcome. Atomicity, isolation, and the constraints you write are the mechanism that produces it."
+    }
+  ]
+}
+\`\`\`
+
 **Consistency** in ACID is not a free property the database grants you. It means the database moves
 from one valid state to another valid state as defined by your constraints and your application
 logic. The database enforces the part you declared: \`CHECK (balance >= 0)\`, \`NOT NULL\`, foreign
@@ -61,6 +80,42 @@ COMMIT   -- atomic: both or neither; durable: fsync'd WAL before ack
 Recap: ACID is four concrete guarantees; atomicity makes debit+credit all-or-nothing, durability
 means fsync'd to the WAL not just memory, and consistency is your invariant enforced by constraints
 plus isolation, not a free lunch.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are about to design a money-transfer feature. Match each failure to the ACID guarantee that prevents it.",
+  "buckets": [
+    "Atomicity",
+    "Isolation",
+    "Durability"
+  ],
+  "items": [
+    {
+      "label": "A crash between the debit and the credit leaves 100 dollars missing",
+      "bucket": "Atomicity",
+      "feedback": "All-or-nothing: the half-finished transfer rolls back to the state before the transaction started."
+    },
+    {
+      "label": "Power loss one second after the client saw 'committed' erases the transfer",
+      "bucket": "Durability",
+      "feedback": "Commit means the change was fsync'd to the WAL on durable storage before the acknowledgment, so it survives the crash."
+    },
+    {
+      "label": "Two concurrent transfers read the same 100 dollar balance and both withdraw it",
+      "bucket": "Isolation",
+      "feedback": "Concurrent transactions seeing each other's half-finished work is exactly what isolation controls."
+    },
+    {
+      "label": "A constraint failure on the credit leaves the debit already applied",
+      "bucket": "Atomicity",
+      "feedback": "Any failure inside the transaction, including a constraint violation, rolls back every write in it."
+    }
+  ],
+  "reveal": "In your design write, do not say 'use ACID' as a buzzword. Name the invariant (money is conserved), then name which guarantee plus which declared constraint upholds it, and what must be fsync'd before commit returns."
+}
+\`\`\`
 `.trim()
 
 const isolationLevelsTeach = `
