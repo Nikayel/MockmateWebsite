@@ -1053,6 +1053,29 @@ const ddosRateAbuseTeach = `
 
 The mistake juniors make is treating "DDoS" as one problem with one fix. It is at least two problems that live at different layers and need different defenses.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 400 Gbps UDP reflection flood is aimed at your API. You have a well-tuned WAF and generous rate limits at the origin. Are you protected?",
+  "options": [
+    {
+      "label": "Yes. The WAF inspects and drops the malicious traffic before it reaches the app.",
+      "feedback": "Tempting, but a WAF works on HTTP requests and this flood never becomes HTTP. It saturates your network pipes upstream of anything you run, so your origin defenses never even see it."
+    },
+    {
+      "label": "No. The flood saturates the pipes before any origin defense runs; you need anycast and upstream scrubbing.",
+      "correct": true,
+      "feedback": "Right. Volumetric L3/L4 attacks are won or lost in the network: spread the load across hundreds of edge PoPs and filter in scrubbing centers before it ever converges on you."
+    },
+    {
+      "label": "Yes, as long as autoscaling adds instances fast enough.",
+      "feedback": "More instances do not widen the network links in front of them. And scaling into an attack is its own trap, which this lesson names later: denial of wallet."
+    }
+  ]
+}
+\`\`\`
+
 ## L3/L4 volumetric attacks
 
 These try to saturate your pipes or your connection tables: UDP reflection/amplification (DNS, NTP, memcached, giving 50x to 50000x amplification), SYN floods, ACK floods. Measured in Gbps and Mpps (millions of packets per second), a large one is hundreds of Gbps to multiple Tbps. You cannot absorb that on your origin. The defense is upstream and distributed: **anycast** advertises the same IP from hundreds of edge PoPs so an attack is split across the whole global network instead of hitting one datacenter, a **CDN/scrubbing center** (Cloudflare, AWS Shield Advanced, Akamai) filters malformed and reflected packets before they reach you, and for on-prem you can use **BGP flowspec** or a scrubbing provider to divert and clean traffic. SYN floods are handled with SYN cookies so no state is allocated until the handshake completes.
@@ -1060,6 +1083,50 @@ These try to saturate your pipes or your connection tables: UDP reflection/ampli
 ## L7 application floods
 
 The sneaky ones: valid-looking HTTP requests that each cost you a database query or an expensive render. A few thousand well-chosen requests per second to a search endpoint can take you down while looking like normal traffic at the network layer. Here you need a **WAF** (rule and signature matching, OWASP core ruleset), **behavioral rate limits** per identity, IP reputation and ASN blocking, and a **graduated challenge**: suspicious clients get a JS challenge or a managed CAPTCHA, and truly abusive ones get proof-of-work (make the client burn CPU before you spend a query). The graduated response matters because you do not want to CAPTCHA your real users.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each defense by the attack layer it actually addresses.",
+  "buckets": [
+    "L3/L4 volumetric flood",
+    "L7 application flood"
+  ],
+  "items": [
+    {
+      "label": "Anycast spreading one IP across hundreds of PoPs",
+      "bucket": "L3/L4 volumetric flood",
+      "feedback": "Anycast dilutes raw packet volume across the globe; it does nothing about requests that are cheap to deliver but expensive to serve."
+    },
+    {
+      "label": "SYN cookies",
+      "bucket": "L3/L4 volumetric flood",
+      "feedback": "SYN cookies stop connection-table exhaustion during SYN floods, a transport-layer problem."
+    },
+    {
+      "label": "WAF with the OWASP core ruleset",
+      "bucket": "L7 application flood",
+      "feedback": "A WAF reads HTTP, so it only helps once traffic is well-formed enough to parse."
+    },
+    {
+      "label": "Graduated JS challenge, then CAPTCHA, then proof-of-work",
+      "bucket": "L7 application flood",
+      "feedback": "Challenges make each request cost the client something, which matters when single requests are cheap for the attacker and expensive for you."
+    },
+    {
+      "label": "BGP flowspec diversion to a scrubbing center",
+      "bucket": "L3/L4 volumetric flood",
+      "feedback": "Diverting and cleaning traffic upstream is how on-prem networks survive floods bigger than their own pipes."
+    },
+    {
+      "label": "Behavioral rate limits per API key and per user",
+      "bucket": "L7 application flood",
+      "feedback": "Per-identity limits catch valid-looking requests arriving faster than any human would send them."
+    }
+  ]
+}
+\`\`\`
 
 ## Rate-limiting algorithms
 
@@ -1078,6 +1145,30 @@ If your Redis limiter store is down, do you allow all traffic (fail-open, availa
 **Interview nuance:** name **economic denial-of-service (denial of wallet)**. If your response to load is to autoscale, an attacker who cannot take you down can still make you spend: they drive traffic, you scale to 500 instances, and the bill (or your serverless invocation count) explodes. Cap autoscaling, put a cache/CDN in front to shed load cheaply, and set billing alarms.
 
 **Recap:** split defenses into L3/L4 volumetric (anycast, CDN/scrubbing, SYN cookies, BGP) and L7 application (WAF, behavioral limits, graduated challenges); rate-limit with token bucket on multiple dimensions and tiered quotas in Redis; return 429 with Retry-After; decide fail-open vs fail-closed per endpoint; and cap autoscaling so you do not denial-of-wallet yourself.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your API sits behind a big CDN with anycast, a WAF, and aggressive autoscaling. An attacker concedes they cannot take you down. Is the design finished?",
+  "options": [
+    {
+      "label": "Yes. Availability is protected at both layers, which is the goal of DDoS defense.",
+      "feedback": "Tempting, because the availability story really is solid. But an attacker who cannot cause an outage can still make you pay for one: drive load, watch you autoscale, and let the invoice do the damage."
+    },
+    {
+      "label": "No. Uncapped autoscaling turns the attack into denial of wallet; cap scaling, shed load cheaply at the CDN, and set billing alarms.",
+      "correct": true,
+      "feedback": "Right. Economic denial of service is the attack that survives good availability engineering. Scaling caps, cheap shedding at the cache, and billing alarms close the loop."
+    },
+    {
+      "label": "No. You still need to fail-closed everywhere so no attack traffic ever gets through.",
+      "feedback": "Fail-closed everywhere is a self-inflicted outage waiting for a Redis blip. The lesson's answer is per-endpoint judgment: fail-open with a local fallback for public reads, fail-closed for login and payments."
+    }
+  ],
+  "reveal": "The design write wants the full split: name the layer (L3/L4 vs L7), pick the matching defense, choose token bucket with limits on multiple dimensions and tiered quotas, decide fail-open vs fail-closed per endpoint, and close with the denial-of-wallet cap. Interviewers listen for that last part because juniors stop at 'we autoscale'."
+}
+\`\`\`
 `.trim()
 
 const botFraudAtoTeach = `
