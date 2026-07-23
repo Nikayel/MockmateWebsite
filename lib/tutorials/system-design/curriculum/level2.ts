@@ -1544,6 +1544,29 @@ actually forces the issue, **when the tables live on different shards**: a cross
 scatter-gather across the network, and that does not scale. Once your data is sharded, you must
 co-locate or denormalize.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate opens a schema review with: 'Joins are slow, so I denormalized the whole schema up front for performance.' What is the strongest objection?",
+  "options": [
+    {
+      "label": "None. Reads usually dominate, so removing joins everywhere is a safe default.",
+      "feedback": "Tempting because reads often do dominate, but indexed, bounded joins already run in single-digit milliseconds. Blanket denormalization buys an unmeasured read win while making every write a fan-out with anomaly risk."
+    },
+    {
+      "label": "Which query is hot? Without a named read path and a real read/write ratio, you are paying guaranteed write-time costs for a read win nobody measured.",
+      "correct": true,
+      "feedback": "Right. Denormalization is a targeted trade: name the specific query, its read/write ratio, and the scale trigger (like a cross-shard join). Copy facts for that one path, not for the whole schema."
+    },
+    {
+      "label": "Denormalization is never acceptable; third normal form is the rule.",
+      "feedback": "Tempting as a purity rule, but wrong in the other direction: a hot read path, especially one that would otherwise scatter-gather across shards, is exactly when deliberately copying a fact is correct."
+    }
+  ]
+}
+\`\`\`
+
 ### Denormalization: pay at write time, on purpose
 
 Denormalization means deliberately storing a copy of a fact where it is read, to avoid a join or a
@@ -1580,6 +1603,30 @@ normalized (write-optimized)        denormalized (read-optimized)
 Recap: normalize by default for write integrity, denormalize only for a specific hot read path with a
 real read/write ratio and scale trigger (especially to dodge cross-shard joins), and reach for
 materialized views when you want join-free reads without hand-maintaining the copies.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your order-history page renders 20k times per second; product names change a few times a day. You want join-free reads but do not want to hand-write fan-out sync code. Which design fits?",
+  "options": [
+    {
+      "label": "Fully denormalize and update every copy by hand inside the product-rename transaction.",
+      "feedback": "Tempting because it keeps every copy perfectly fresh, but you are hand-maintaining exactly the fan-out logic you wanted to avoid, and renames get slower and riskier as copies multiply."
+    },
+    {
+      "label": "Keep the normalized schema as the source of truth and maintain a materialized view (or summary table) for the page.",
+      "correct": true,
+      "feedback": "Right. The read path becomes a join-free scan, the write path stays anomaly-proof, and the database or pipeline owns keeping the copy fresh, at the cost of brief staleness on a slow-changing cosmetic field."
+    },
+    {
+      "label": "Stay fully normalized; a three-table indexed join can serve 20k reads per second.",
+      "feedback": "Often true on a single node, which makes it tempting, but the moment orders shard that join becomes a cross-shard scatter-gather, and 20k reads/sec against a few writes/day is exactly the ratio that justifies a maintained copy."
+    }
+  ],
+  "reveal": "This is the whole lever: normalize by default for write integrity, denormalize one named hot path when the read/write ratio and a scale trigger justify it, and prefer a managed copy (materialized view or CDC pipeline) over hand-rolled sync. In the design exercise, say the ratio out loud before you copy a single field."
+}
+\`\`\`
 `.trim()
 
 const accessPatternModelingTeach = `
