@@ -816,6 +816,29 @@ few milliseconds to tens or even hundreds of milliseconds, and NTP can step a cl
 it corrects. **PTP** does better (sub-microsecond in a datacenter) but needs special hardware. So at
 any instant, two nodes can disagree about "now" by tens of milliseconds.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Node A's clock runs 50 ms ahead of node B's. A user writes a fresh value on node B at real time T. A stale retry of an older write then lands on node A. Under last-writer-wins on wall-clock timestamps, which write survives?",
+  "options": [
+    {
+      "label": "Node B's write: it happened later in real time, so LWW keeps it",
+      "feedback": "Tempting, because LWW is supposed to keep the latest write. But LWW compares timestamps, not real time: node A stamps the stale retry T plus 50 ms, which is higher than B's stamp."
+    },
+    {
+      "label": "Node A's stale retry: its timestamp reads T plus 50 ms, so it wins and B's newer write is discarded",
+      "correct": true,
+      "feedback": "Right. The skewed clock hands the older write the higher timestamp, and LWW drops the genuinely newer value with no error and no log entry. Clock skew is a correctness input, not just a dashboard metric."
+    },
+    {
+      "label": "Neither: LWW detects the conflict and keeps both versions",
+      "feedback": "Keeping both versions is what version vectors and sibling values do. Plain LWW detects nothing: it keeps the higher timestamp and silently throws the other write away."
+    }
+  ]
+}
+\`\`\`
+
 **Now run last-writer-wins on wall-clock timestamps.** Node A's clock is 50 ms ahead. A user writes X
 on node B (correct value, real time T). A stale retry lands on node A, whose clock reads T+50 ms even
 though it happened *first* in real causal terms. LWW keeps the higher timestamp, so node A's write
@@ -833,6 +856,29 @@ time (human-meaningful, roughly sortable), and they *also* guarantee that if A -
 HLC(A) < HLC(B), which pure wall clocks do not. HLC needs **no special hardware**, just NTP, which is
 why **CockroachDB and MongoDB use it**. Its limit: HLC gives causal ordering and monotonicity, but it
 cannot by itself give *external* (linearizable) consistency across nodes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Google built TrueTime on GPS receivers and atomic clocks in every datacenter. When Spanner asks TrueTime for the current time, what does the API return?",
+  "options": [
+    {
+      "label": "A single exact timestamp: atomic clocks engineer the uncertainty away",
+      "feedback": "Tempting, because the hardware is exotic. But no clock infrastructure can eliminate uncertainty, it can only shrink it, and pretending it is zero would reintroduce the LWW bug at a smaller scale."
+    },
+    {
+      "label": "An interval from earliest to latest that is guaranteed to contain the true time",
+      "correct": true,
+      "feedback": "Right. TrueTime is honest about uncertainty: it returns a bounded interval a few milliseconds wide, and Spanner turns that bound into a safety guarantee by waiting it out before acknowledging commits."
+    },
+    {
+      "label": "A physical timestamp plus a logical counter for breaking ties",
+      "feedback": "That is HLC, the commodity-hardware approach. TrueTime does not need a logical counter because it exposes uncertainty directly as an interval and handles it with commit-wait."
+    }
+  ]
+}
+\`\`\`
 
 ### Google TrueTime
 
@@ -863,6 +909,42 @@ Recap: NTP/PTP drift is tens of milliseconds and real, LWW on wall-clock timesta
 writes under skew, HLC gives causal + monotonic timestamps on plain NTP hardware, and TrueTime's
 bounded interval plus commit-wait buys global external consistency at the cost of GPS/atomic-clock
 infrastructure and a few ms per commit.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Before you design timestamp ordering for the multi-region database, match each property to the approach it describes.",
+  "buckets": [
+    "Wall-clock LWW",
+    "HLC",
+    "TrueTime plus commit-wait"
+  ],
+  "items": [
+    {
+      "label": "Can silently discard a newer write when one clock runs tens of ms ahead",
+      "bucket": "Wall-clock LWW",
+      "feedback": "Under skew the older write carries the higher timestamp, so the newer value is dropped with no error."
+    },
+    {
+      "label": "Causal, monotonic timestamps on plain NTP hardware, nothing special to install",
+      "bucket": "HLC",
+      "feedback": "The physical part tracks NTP and the logical counter preserves causality, which is why CockroachDB and MongoDB use it."
+    },
+    {
+      "label": "Global external consistency, paid for with GPS and atomic clocks plus a few ms of commit latency",
+      "bucket": "TrueTime plus commit-wait",
+      "feedback": "Waiting out epsilon before acknowledging guarantees every later transaction gets a strictly higher timestamp."
+    },
+    {
+      "label": "Preserves causal order but cannot alone guarantee external consistency across nodes",
+      "bucket": "HLC",
+      "feedback": "Two causally unrelated writes can still order in a surprising way; linearizability needs an extra coordination step on top."
+    }
+  ],
+  "reveal": "This is your decision axis for the design write: HLC by default on commodity cloud, a TrueTime-style bounded interval plus commit-wait when you own the hardware and need global external consistency, and never bare wall-clock LWW."
+}
+\`\`\`
 `.trim()
 
 const smrTotalOrderTeach = `
