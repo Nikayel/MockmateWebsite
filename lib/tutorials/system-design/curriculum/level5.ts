@@ -2077,6 +2077,29 @@ A dead node and a node that is merely slow (GC pause, network blip, overloaded N
 from the outside: both go quiet. This is the **impossibility at the heart of failure detection**, and
 it forces a tradeoff you must be able to name.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You tune the heartbeat timeout to 500ms for fast detection. A healthy node then takes a routine 800ms GC pause. What does your detector do?",
+  "options": [
+    {
+      "label": "Nothing: the detector can tell a GC pause from a crash",
+      "feedback": "Tempting, but from the outside both are identical: silence. No signal distinguishes paused from dead."
+    },
+    {
+      "label": "Declares the node dead and triggers a needless failover",
+      "correct": true,
+      "feedback": "Right. This is flapping: an aggressive threshold buys fast detection at the price of falsely evicting slow-but-alive nodes, and re-replication storms follow."
+    },
+    {
+      "label": "Waits for the pause to end before deciding",
+      "feedback": "It has no way to know the silence is a pause that will end. Waiting longer is just a bigger timeout, which trades this false positive for carrying real crashes longer."
+    }
+  ]
+}
+\`\`\`
+
 That tradeoff is **completeness vs accuracy**. Completeness means you eventually detect every real
 crash. Accuracy means you never wrongly declare a live node dead. You cannot maximize both. Set your
 timeout aggressively (500ms) and you detect crashes fast but you **flap**: a routine 800ms GC pause
@@ -2098,6 +2121,29 @@ heartbeat this late is still normal for *this* link. A link that normally jitter
 huge phi at a 2-second gap; a normally-bursty link yields a modest one. You act at a threshold (phi >
 8 is roughly a 1-in-10^8 chance this is normal). The win: it adapts to each link's actual behavior
 with no hand-tuning.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two links go quiet for exactly 2 seconds. Link A normally jitters by about 50ms; link B routinely bursts to a full second. Which one does phi-accrual suspect more?",
+  "options": [
+    {
+      "label": "Link A, by far",
+      "correct": true,
+      "feedback": "Right. Phi measures how abnormal this gap is for this link's own history. Two seconds is wildly out of character for A and only mildly unusual for B, so A's phi is far higher."
+    },
+    {
+      "label": "Both equally, since 2 seconds is 2 seconds",
+      "feedback": "That is fixed-timeout thinking. Phi-accrual's whole point is that the same gap means different things on different links, judged against each link's inter-arrival distribution."
+    },
+    {
+      "label": "Link B, because it was already the unreliable one",
+      "feedback": "Tempting, but backwards: B's history says long gaps are normal there, so a 2-second gap barely raises suspicion on B."
+    }
+  ]
+}
+\`\`\`
 
 ### SWIM: membership at scale
 
@@ -2125,6 +2171,46 @@ cluster grows.
 Recap: dead and slow are indistinguishable, so failure detection is a completeness-vs-accuracy
 tradeoff; use phi-accrual to adapt the threshold per link, a suspicion window to cut false positives,
 and SWIM's random direct/indirect probes plus infection-style gossip to keep per-node load O(1).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Each mechanism in this lesson mainly buys one of two things. Sort them.",
+  "buckets": [
+    "Accuracy: fewer false evictions",
+    "Scalability: flat per-node load"
+  ],
+  "items": [
+    {
+      "label": "Asking k other members to probe a silent node indirectly",
+      "bucket": "Accuracy: fewer false evictions",
+      "feedback": "If any indirect probe succeeds, the target was fine and only the direct path was congested."
+    },
+    {
+      "label": "Marking a node suspect and giving it a window to refute",
+      "bucket": "Accuracy: fewer false evictions",
+      "feedback": "The refutation window absorbs GC pauses and transient blips before any eviction happens."
+    },
+    {
+      "label": "Each node probing just one random peer per period",
+      "bucket": "Scalability: flat per-node load",
+      "feedback": "O(1) probes per node, versus roughly 250,000 messages per interval for all-to-all heartbeats at 500 nodes."
+    },
+    {
+      "label": "Piggybacking membership updates on existing probe traffic",
+      "bucket": "Scalability: flat per-node load",
+      "feedback": "No separate broadcast channel: updates spread infection-style and reach the cluster in O(log n) rounds."
+    },
+    {
+      "label": "Replacing the fixed timeout with a per-link phi threshold",
+      "bucket": "Accuracy: fewer false evictions",
+      "feedback": "The threshold adapts to each link's real behavior, so latency rising under load stops causing flapping."
+    }
+  ],
+  "reveal": "The strong design answer stacks all of these: phi-accrual for the adaptive threshold, suspicion plus indirect probes to buy accuracy, and SWIM's probe-and-gossip structure so detection load stays O(1) as the cluster grows. Name the completeness-vs-accuracy tradeoff explicitly when you write yours."
+}
+\`\`\`
 `.trim()
 
 const leaderElectionFencingTeach = `
