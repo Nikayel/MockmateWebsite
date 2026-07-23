@@ -460,6 +460,41 @@ network partition**. Anything stronger forces you to block or reject writes when
 stale reads, reordered updates, and (without conflict handling) lost writes. Cheapest to run, highest
 availability: shopping-cart-scale and like-count-scale systems live here.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the weakest model that is still correct for each piece of data.",
+  "buckets": [
+    "Linearizable",
+    "Causal",
+    "Eventual"
+  ],
+  "items": [
+    {
+      "label": "Claiming a unique username at signup",
+      "bucket": "Linearizable",
+      "feedback": "'Did anyone already take this?' needs a single global answer, and only the strong end provides one."
+    },
+    {
+      "label": "A reply must never appear before the comment it answers",
+      "bucket": "Causal",
+      "feedback": "Reading a comment and replying is a causal link, and causal is the strongest model that stays available under partition, so paying more here buys nothing."
+    },
+    {
+      "label": "A like count that may lag a few seconds behind",
+      "bucket": "Eventual",
+      "feedback": "Nobody can verify a like count is instantaneously right, so convergence is enough and buys the highest availability."
+    },
+    {
+      "label": "A distributed lock guarding a migration job",
+      "bucket": "Linearizable",
+      "feedback": "Two holders of one lock is a correctness disaster, so this needs the single-copy illusion with real-time order."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
 strong <--------------------------------------------------> weak
 linearizable   sequential   causal   |   eventual
@@ -472,6 +507,25 @@ linearizable   sequential   causal   |   eventual
 leaders, quorums, or waiting, which costs latency and availability. The design skill is picking the
 *weakest* model that is still correct for the specific data.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Spanner advertises serializable transactions. Does that alone tell you its replicas never serve stale reads?",
+  "options": [
+    {
+      "label": "Yes: serializable is the strongest level, so reads must be fresh too",
+      "feedback": "Tempting because both sound like 'the strongest', but serializability is an isolation property about how concurrent transactions interleave. By itself it says nothing about replica freshness."
+    },
+    {
+      "label": "No: transaction isolation and replication consistency are different axes",
+      "correct": true,
+      "feedback": "Right. One axis governs interleaving transactions, the other governs how up-to-date the copies are. Spanner happens to provide both, but neither implies the other."
+    }
+  ]
+}
+\`\`\`
+
 One more axis people conflate. **Replication consistency** (this spectrum: how up-to-date are the
 copies) is *not* the same as **ACID isolation** (serializable, snapshot, read-committed: how
 concurrent transactions interleave). Spanner is linearizable *and* serializable; a system can be one
@@ -480,6 +534,30 @@ without the other. Naming which axis you mean is a fast credibility signal.
 Recap: name the specific model (linearizable, sequential, causal, eventual) and its coordination
 cost, remember causal is the strongest model available under partition, keep replication consistency
 separate from ACID isolation, and always reach for the weakest model that is still correct.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A candidate designs every data path in their system as linearizable 'to be safe'. What is the main flaw?",
+  "options": [
+    {
+      "label": "Nothing: stronger is always safer",
+      "feedback": "Safer against staleness, but every operation now pays leader or quorum coordination in latency and availability, including data like counters that never needed it."
+    },
+    {
+      "label": "Every operation pays coordination it may not need, and availability drops under partition",
+      "correct": true,
+      "feedback": "Right. Coordination cost rises monotonically toward the strong end, and anything stronger than causal must block or reject during a partition. The graded skill is matching each piece of data to the weakest model that keeps it correct."
+    },
+    {
+      "label": "Linearizability cannot actually be built in practice",
+      "feedback": "It can, and systems like Spanner and etcd do. The objection is cost and blast radius, not feasibility."
+    }
+  ],
+  "reveal": "In the design write, name the exact point per data item: linearizable for the uniqueness check or lock, causal for reply threads, eventual for counters, and say which axis, replication consistency or ACID isolation, each claim lives on."
+}
+\`\`\`
 `.trim()
 
 const sessionGuaranteesTeach = `
