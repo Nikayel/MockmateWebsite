@@ -860,6 +860,29 @@ related entity large or independently accessed?** An author appears on many post
 copy into every post duplicates data and means updating the author's name touches thousands of
 documents. Reference the author. Third, **how big and how unbounded is it?** This is the killer.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A blog post document embeds its full comments array so one read returns everything. The post goes viral and comments never stop arriving. What eventually happens in MongoDB?",
+  "options": [
+    {
+      "label": "Reads get gradually slower but everything keeps working",
+      "feedback": "Tempting, and reads do bloat first: every fetch drags the whole array. But bloat is not the end state. There is a hard ceiling waiting."
+    },
+    {
+      "label": "Writes to the post fail when the document hits the 16MB cap",
+      "correct": true,
+      "feedback": "Right. MongoDB caps a document at 16MB, so an unbounded embedded array is a time bomb: one day the append is rejected. Unbounded growth is the strongest signal to reference instead of embed."
+    },
+    {
+      "label": "MongoDB automatically splits the document across shards",
+      "feedback": "Sharding distributes a collection across servers by shard key. A single document is never split; it must fit inside the cap on its own."
+    }
+  ]
+}
+\`\`\`
+
 **Document size limits.** MongoDB caps a single document at **16MB**. A post with an unbounded,
 ever-growing comments array will eventually hit that ceiling and the write fails. So the real pattern
 is hybrid: **embed a bounded, frequently-read subset** (the latest 20 comments, denormalized author
@@ -894,6 +917,41 @@ comments (collection)                    <- full unbounded history, referenced
 Recap: Model to the access pattern, embed bounded read-together data and reference large or unbounded
 entities, respect the 16MB document cap, and treat per-document atomicity as a design constraint
 rather than assuming relational multi-row transactions.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are about to model a blog platform in a document store. Place each piece of the post page where the lesson's decision rule puts it.",
+  "buckets": [
+    "Embed in the post document",
+    "Reference in its own collection"
+  ],
+  "items": [
+    {
+      "label": "The latest 20 comments with each author's display name",
+      "bucket": "Embed in the post document",
+      "feedback": "Read together on every page view and bounded at 20, so embedding buys a one-read first render without risking the size cap."
+    },
+    {
+      "label": "The full comment history",
+      "bucket": "Reference in its own collection",
+      "feedback": "Unbounded, so it lives in a comments collection keyed by post id. Embedding it is the 16MB time bomb from earlier."
+    },
+    {
+      "label": "The comment count shown next to the title",
+      "bucket": "Embed in the post document",
+      "feedback": "Keeping the counter inside the post means adding a comment and bumping the count can ride one atomic per-document write, no multi-document transaction needed."
+    },
+    {
+      "label": "The author's complete profile with bio and settings",
+      "bucket": "Reference in its own collection",
+      "feedback": "Large, independently accessed, and shown on many posts. Embed only the display fields (name, avatar) and reference the rest, or a name change touches thousands of documents."
+    }
+  ],
+  "reveal": "That is the hybrid pattern: embed the bounded read-together subset, reference the unbounded or shared remainder, and lean on per-document atomicity instead of multi-document transactions. Carry it straight into the design exercise, and stamp a schemaVersion so tomorrow's shape changes migrate lazily."
+}
+\`\`\`
 `.trim()
 
 const wideColumnTeach = `
