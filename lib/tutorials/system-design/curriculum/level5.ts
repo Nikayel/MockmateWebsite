@@ -1108,6 +1108,29 @@ quorums work because any two majorities of N nodes must **overlap in at least on
 overlapping node carries committed entries forward into any future leader's election, so committed
 data is never lost.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A Raft leader appends an entry to its own log, crashes before replicating it to anyone, and no client was told it committed. After a new leader is elected, what happens to that entry?",
+  "options": [
+    {
+      "label": "It must be recovered: Raft never loses log entries",
+      "feedback": "Tempting, but Raft's durability promise covers committed entries only. This entry never reached a majority, so no promise about it was ever made to anyone."
+    },
+    {
+      "label": "It can be overwritten, and that is safe because it was never committed",
+      "correct": true,
+      "feedback": "Right. No majority stored it and no client was acknowledged, so discarding it breaks nothing. Commitment, not mere appending, is what makes an entry immortal."
+    },
+    {
+      "label": "The cluster stalls until the crashed leader returns with the entry",
+      "feedback": "One crashed node stalling everyone would be terrible availability. The surviving majority elects a new leader and moves on without the uncommitted entry."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
   5-node cluster, leader crashes:
     term 4 leader (S1) dies
@@ -1132,6 +1155,29 @@ uncommitted tail. **Membership changes** use **joint consensus** (a transitional
 requiring majorities of both old and new sets) so two disjoint majorities can never exist
 mid-reconfiguration.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your 3-node Raft cluster tolerates 1 node failure. You get budget for a 4th node. How many failures does the 4-node cluster tolerate?",
+  "options": [
+    {
+      "label": "2: more nodes means more failure tolerance",
+      "feedback": "Tempting, but the majority of 4 is 3, so losing 2 nodes leaves only 2, short of a quorum. You paid for an extra machine and an extra vote to collect without gaining any tolerance."
+    },
+    {
+      "label": "Still 1: the majority of 4 is 3, the same tolerance as 3 nodes",
+      "correct": true,
+      "feedback": "Right. Tolerance only steps up at odd sizes: 3 nodes tolerate 1 failure, 5 tolerate 2. An even cluster buys a bigger quorum, not more safety."
+    },
+    {
+      "label": "0: even-sized clusters cannot elect a leader",
+      "feedback": "A healthy even cluster works fine; 3 votes out of 4 is a valid majority. The problem is subtler: it tolerates no more failures than the odd size below it."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance on cluster size:** always use an **odd** number. A 5-node cluster tolerates 2
 failures (majority 3); a 4-node cluster *also* tolerates only 1 failure (majority still 3) while
 costing an extra machine and an extra vote to collect. The classic wrong turn is a 2-node cluster:
@@ -1147,6 +1193,46 @@ which randomized timeouts operationalize.
 Recap: Raft splits consensus into randomized-timeout leader election, majority-quorum log replication
 with commit-on-majority, and four safety properties that make committed entries immortal; minority
 partitions stall safely, membership changes use joint consensus, and clusters should be odd-sized.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Before you walk a 5-node cluster through a leader crash, sort what Raft's safety properties allow.",
+  "buckets": [
+    "Can happen in Raft",
+    "Cannot happen in Raft"
+  ],
+  "items": [
+    {
+      "label": "Two leaders elected in the same term",
+      "bucket": "Cannot happen in Raft",
+      "feedback": "Election safety: winning needs a majority of votes for that term, and two majorities would have to overlap in a node that voted twice."
+    },
+    {
+      "label": "A committed entry disappears after a leader change",
+      "bucket": "Cannot happen in Raft",
+      "feedback": "Leader completeness: any two majorities overlap, so some voter carries every committed entry forward, and stale-logged candidates cannot win."
+    },
+    {
+      "label": "An uncommitted entry on the crashed leader gets overwritten",
+      "bucket": "Can happen in Raft",
+      "feedback": "Safe and correct: the entry never reached a majority and no client was ever acknowledged."
+    },
+    {
+      "label": "An old leader stranded in a 2-of-5 partition keeps appending entries locally",
+      "bucket": "Can happen in Raft",
+      "feedback": "It can append but never commit, since committing needs a majority. On heal it sees a higher term, steps down, and discards its uncommitted tail."
+    },
+    {
+      "label": "A node with a stale log wins an election",
+      "bucket": "Cannot happen in Raft",
+      "feedback": "Nodes only grant votes to candidates whose log is at least as up to date as their own, so a stale node cannot gather a majority."
+    }
+  ],
+  "reveal": "This is exactly the apply exercise: election with randomized timeouts and the up-to-date-log rule, commit on majority, and the fate of the uncommitted entry. Committed means immortal; merely appended means expendable."
+}
+\`\`\`
 `.trim()
 
 const quorumsTunableTeach = `
