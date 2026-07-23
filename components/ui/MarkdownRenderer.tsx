@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
-import { preprocessAsciiArt, markdownComponents, remarkNoIndentedCode } from "@/lib/markdown"
+import { preprocessAsciiArt, markdownComponents, lessonRemarkPlugins } from "@/lib/markdown"
 
 interface MarkdownRendererProps {
   content: string
@@ -77,12 +77,16 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
     }
   }, [processedContent, mathPlugins])
 
-  // Plugin order matches the original pipeline: gfm, then math (when loaded),
-  // then remarkNoIndentedCode. When math is absent the KaTeX plugins are omitted,
-  // which is a no-op for math-free content, so the rendered output is unchanged.
+  // The canonical lesson plugin list (gfm, details-cards, no-indented-code) comes
+  // from lib/markdown so tests replicating this pipeline cannot drift. Math, when
+  // loaded, splices in before remarkNoIndentedCode, matching the original order.
   const remarkPlugins = mathPlugins
-    ? [remarkGfm, mathPlugins.remarkMath, remarkNoIndentedCode as unknown as MarkdownPlugin]
-    : [remarkGfm, remarkNoIndentedCode as unknown as MarkdownPlugin]
+    ? [
+        ...lessonRemarkPlugins.slice(0, -1),
+        mathPlugins.remarkMath,
+        lessonRemarkPlugins[lessonRemarkPlugins.length - 1],
+      ]
+    : lessonRemarkPlugins
   const rehypePlugins: MarkdownPlugin[] = mathPlugins ? [mathPlugins.rehypeKatex] : []
 
   return (

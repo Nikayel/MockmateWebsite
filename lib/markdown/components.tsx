@@ -1,5 +1,6 @@
 import { isValidElement } from "react"
 import { Components } from "react-markdown"
+import { ChevronRight } from "lucide-react"
 import { CsDiagram } from "@/components/tutorials/diagrams/CsDiagram"
 import { CsWidget } from "@/components/tutorials/widgets/CsWidget"
 
@@ -25,8 +26,14 @@ function isRenderedFenceChild(children: React.ReactNode): boolean {
 /**
  * Custom React Markdown components for consistent styling across the app.
  * Handles code blocks, tables, blockquotes, and other markdown elements.
+ *
+ * `details-card` is not a real HTML tag: `remarkDetailsCards` rewrites the
+ * whitelisted <details>/<summary> markdown shape into it, and this map renders it
+ * as a NATIVE details/summary card — keyboard and screen-reader semantics for free,
+ * no JS state, instant toggle (nothing to degrade under prefers-reduced-motion; the
+ * chevron transition is disabled there explicitly).
  */
-export const markdownComponents: Components = {
+export const markdownComponents = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   li: ({ children }) => <li>{children}</li>,
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
@@ -148,4 +155,19 @@ export const markdownComponents: Components = {
       {children}
     </a>
   ),
-}
+
+  // Reference-sheet accordion card (see remarkDetailsCards). Native disclosure element:
+  // Enter/Space toggle, focus ring, and open/closed state all come from the platform.
+  "details-card": ({ title, children }: { title?: string; children?: React.ReactNode }) => (
+    <details className="border-border bg-card/40 group my-3 overflow-hidden rounded-lg border">
+      <summary className="text-foreground hover:bg-muted/40 focus-visible:ring-accent/50 flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold select-none focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          aria-hidden="true"
+          className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+        />
+        {title}
+      </summary>
+      <div className="border-border/60 border-t px-4 pt-3 pb-2">{children}</div>
+    </details>
+  ),
+} as Components
