@@ -606,6 +606,51 @@ Multi-tenancy is running many customers (tenants) on one platform. The whole gam
 
 The senior move is **tiered isolation**: pool your thousands of small self-serve SMB customers for cost efficiency, and silo your regulated enterprise customers (health, finance, government, data-residency requirements) into dedicated databases or accounts. One product, two isolation postures, sold as a premium tier.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Silo, bridge, or pool? Match each statement to the tenancy model it describes.",
+  "buckets": [
+    "Silo",
+    "Bridge",
+    "Pool"
+  ],
+  "items": [
+    {
+      "label": "Every tenant's rows share one table, told apart by a tenant_id column",
+      "bucket": "Pool",
+      "feedback": "One schema for everyone: cheapest and most scalable, with isolation living entirely in your code and queries."
+    },
+    {
+      "label": "Each tenant gets a dedicated database, sometimes a whole cloud account",
+      "bucket": "Silo",
+      "feedback": "Strongest isolation and the simplest compliance story, paid for in cost and in operating N databases."
+    },
+    {
+      "label": "One shared database with a separate schema per tenant",
+      "bucket": "Bridge",
+      "feedback": "The middle ground: more isolation than pool, cheaper than silo."
+    },
+    {
+      "label": "Cheapest to run, and one missing WHERE clause leaks everyone",
+      "bucket": "Pool",
+      "feedback": "Pool's isolation is code-enforced, which is exactly why the next section pushes enforcement down into the data layer."
+    },
+    {
+      "label": "The premium tier you sell to regulated enterprise customers",
+      "bucket": "Silo",
+      "feedback": "Tiered isolation in action: dedicated infrastructure is the easy answer to health, finance, and data-residency requirements."
+    },
+    {
+      "label": "Migrations start to hurt at a few thousand tenants",
+      "bucket": "Bridge",
+      "feedback": "Schema-per-tenant means running every migration once per schema, which stops scaling around a few thousand tenants."
+    }
+  ]
+}
+\`\`\`
+
 ## Enforce at the data layer, resolve context early
 
 Wherever tenants share, isolation must be **enforced at the data layer, not just the app layer**, because app-layer checks are one forgotten \`WHERE\` clause from a breach. **Postgres Row-Level Security (RLS)** is the workhorse: you set \`current_setting('app.tenant_id')\` at the start of each request's transaction, and a policy \`USING (tenant_id = current_setting('app.tenant_id')::uuid)\` makes the database itself refuse to return other tenants' rows even if application SQL forgets the filter. Combine with per-tenant encryption keys (crypto-isolation) and connection/schema routing where the tenant maps to a database.
@@ -616,6 +661,29 @@ Wherever tenants share, isolation must be **enforced at the data layer, not just
 
 The part that separates a strong answer is where real multi-tenant breaches happen even when the primary DB path is perfect:
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your database isolation is airtight: RLS on every table, verified. The app also caches rendered profiles under the key 'user:profile:42'. Tenant A requests profile 42. Where is the leak?",
+  "options": [
+    {
+      "label": "There is no leak: RLS filtered the data before it was cached",
+      "feedback": "Tempting because the data really was tenant-scoped when it was written, but ids collide across tenants and cache reads never touch the database, so RLS gets no vote on the way out."
+    },
+    {
+      "label": "The cache key has no tenant prefix, so tenant A can be served tenant B's cached object",
+      "correct": true,
+      "feedback": "Right. A shared cache is a second data path with none of your database's guarantees. Every key needs the tenant id, and the same logic applies to search indexes, job payloads, and logs."
+    },
+    {
+      "label": "Only if the cache is replicated across regions",
+      "feedback": "Tempting to blame topology, but geography is irrelevant: any shared cache with unprefixed keys leaks, even a single in-process one."
+    }
+  ]
+}
+\`\`\`
+
 - **Caches:** a cache key of \`user:profile:42\` with no tenant prefix serves tenant B's cached object to tenant A. Every cache key must include \`tenant_id\`.
 - **Search indexes:** Elasticsearch/OpenSearch queries need a tenant filter (or per-tenant index); a global search that forgets it returns everyone's documents.
 - **Background jobs / async workers:** a job dequeued without its tenant context runs with ambient or wrong tenant, and RLS silently returns nothing or the wrong rows. Carry \`tenant_id\` in the job payload and re-establish context on pickup.
@@ -625,6 +693,30 @@ The part that separates a strong answer is where real multi-tenant breaches happ
 Finally, shared infra creates the **noisy neighbor** problem: one tenant's traffic spike starves everyone. Enforce **per-tenant quotas and rate limits** so tenants get fair-share isolation of *capacity*, not just data.
 
 **Recap:** choose silo/pool/bridge per the cost-versus-isolation tradeoff (tier it: pool SMB, silo regulated); resolve tenant context from a trusted source on every request and propagate \`tenant_id\` everywhere; enforce at the data layer with Postgres RLS or per-tenant keys/routing; add per-tenant quotas for noisy neighbors; and hunt the non-obvious leaks in caches, search indexes, async jobs, ids, and logs.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Final design decision: where does the tenant id come from on each request, and what enforces the isolation?",
+  "options": [
+    {
+      "label": "A tenantId field in the request body, with each handler adding its own WHERE clause",
+      "feedback": "Tempting because it is the easiest thing to wire, but the client controls the body, so any caller can claim any tenant, and hand-written WHERE discipline is one forgotten clause away from a cross-tenant breach."
+    },
+    {
+      "label": "A trusted source (the JWT claim or the subdomain), resolved before any business logic runs, with the database enforcing isolation via RLS",
+      "correct": true,
+      "feedback": "Right. Trusted context is established once per request and propagated into the DB session variable, cache keys, job payloads, and log fields, with the data layer as the backstop when application code forgets."
+    },
+    {
+      "label": "The connection string: every tenant has their own database, so context is implicit",
+      "feedback": "Tempting because it is genuinely true in silo, but your SMB tier is pooled; the pooled path still needs trusted context plus data-layer enforcement, and even silo needs tenant-aware caches and queues."
+    }
+  ],
+  "reveal": "Your design write should walk the whole surface: silo/pool/bridge tiered by customer segment, tenant context from a trusted source on every request, RLS as the data-layer backstop, per-tenant quotas for noisy neighbors, and a sweep of the non-obvious leaks in caches, search indexes, async jobs, ids, and logs."
+}
+\`\`\`
 `.trim()
 
 const encryptionTransitMtlsTeach = `
