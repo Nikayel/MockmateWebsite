@@ -1242,6 +1242,29 @@ policies** plus **rollups** keep raw data for, say, 7 days, 1-minute aggregates 
 1-hour aggregates for 2 years. A dashboard showing last-year trends reads the cheap hourly rollup,
 not billions of raw points.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A dashboard charts one year of CPU usage for a whole fleet. In a well-configured TSDB, which data does that query actually read?",
+  "options": [
+    {
+      "label": "The raw per-second points; anything else would be inaccurate",
+      "feedback": "Tempting, but the retention policy already dropped raw points after about a week, and a year of per-second data is billions of points no chart could render anyway. A year-view pixel is far wider than an hour."
+    },
+    {
+      "label": "The 1-hour rollups, touching only the chunks in the query range",
+      "correct": true,
+      "feedback": "Right. Rollups mean the query reads a few thousand pre-aggregated points instead of billions, and time-partitioned chunks mean it never even opens data outside the range."
+    },
+    {
+      "label": "A full scan of every chunk, filtered down to the requested year",
+      "feedback": "Time-partitioned storage exists precisely to avoid this: the engine prunes to the chunks overlapping the range before reading anything. A full scan is the row-store behavior the TSDB was built to escape."
+    }
+  ]
+}
+\`\`\`
+
 ### The signature failure mode: cardinality explosion
 
 This is the single thing interviewers test. A time series is identified by its metric name plus its
@@ -1252,6 +1275,50 @@ multiply your series count into the millions or billions. Each distinct series n
 entry and storage stream, so cardinality explosion blows up index memory, slows every query, and can
 OOM the database. Prometheus falling over because someone added a \`user_id\` label is a real, common
 outage.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are labeling the metric 'http_requests'. Sort each candidate label before the pager does it for you.",
+  "buckets": [
+    "Safe: bounded cardinality",
+    "Cardinality bomb"
+  ],
+  "items": [
+    {
+      "label": "'status' (HTTP status code)",
+      "bucket": "Safe: bounded cardinality",
+      "feedback": "A few dozen possible values at most. Multiplying series count by a small constant is what labels are for."
+    },
+    {
+      "label": "'region' (deployment region)",
+      "bucket": "Safe: bounded cardinality",
+      "feedback": "You run a handful of regions and the set changes rarely. Bounded and operator-controlled: safe."
+    },
+    {
+      "label": "'endpoint' as a route template like '/users/:id'",
+      "bucket": "Safe: bounded cardinality",
+      "feedback": "The template collapses every user's URL onto one value, so cardinality equals your route count. This is the safe way to get per-endpoint metrics."
+    },
+    {
+      "label": "'url' as the raw path with query parameters",
+      "bucket": "Cardinality bomb",
+      "feedback": "Tempting because it looks like just 'more detailed endpoint', but every distinct id and query string mints a brand-new series. Unbounded by construction."
+    },
+    {
+      "label": "'user_id'",
+      "bucket": "Cardinality bomb",
+      "feedback": "Millions of values, each multiplying against every other label. This is the label that famously OOMs Prometheus; per-user analytics belongs in an OLAP store or logs."
+    },
+    {
+      "label": "'request_id'",
+      "bucket": "Cardinality bomb",
+      "feedback": "One new series per request, the worst possible case: infinite cardinality and every series has exactly one point. That is a log line wearing a metric costume."
+    }
+  ]
+}
+\`\`\`
 
 **Controlling cardinality** is the core design skill: keep labels **low-cardinality and bounded**
 (host, region, status code, endpoint template), never put unbounded identifiers (user id, request id,
@@ -1268,6 +1335,30 @@ analytics where you need arbitrary group-bys that would kill a label-indexed TSD
 Recap: TSDBs exploit append-only, time-ordered, columnar data with delta-of-delta and Gorilla
 compression, time-partitioning, retention tiers, and downsampling to make metrics affordable, and the
 failure mode you must design against is cardinality explosion from unbounded tags.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Product asks for per-user request latency, and a teammate proposes adding a 'user_id' label to the existing Prometheus latency metric. What is the senior counter-proposal?",
+  "options": [
+    {
+      "label": "Accept it; delta-of-delta and XOR compression will absorb the extra data",
+      "feedback": "Tempting because the lesson just praised TSDB compression, but compression shrinks points within one series. The label multiplies the number of series, and it is the per-series index entries that blow up memory."
+    },
+    {
+      "label": "Keep metric labels bounded and route per-user analytics to an OLAP store or logs",
+      "correct": true,
+      "feedback": "Right. Metrics answer 'how is the system doing' with bounded labels like endpoint template and status; per-user questions are high-cardinality analytics, which is ClickHouse or log territory. Two tools, each doing what it is built for."
+    },
+    {
+      "label": "Add the label but cut retention to 24 hours so the data stays small",
+      "feedback": "Retention bounds time, not series count. The index must hold every active series regardless of how quickly old points expire, so the memory blow-up arrives on day one."
+    }
+  ],
+  "reveal": "This is the whole lesson in one decision: TSDBs win through append-only columnar storage, compression, chunked retention, and rollups, but only while the series count stays bounded. In the design exercise, name your labels explicitly and defend the cardinality of each one."
+}
+\`\`\`
 `.trim()
 
 const vectorEmbeddingsTeach = `
