@@ -68,3 +68,19 @@ describe("details-card accordion", () => {
     expect(html).not.toContain("<script")
   })
 })
+
+describe("reference-sheet lessons render as accordions (Iteration 3 exit criteria)", () => {
+  it.each([
+    { lessonId: "sd-l0-latency-numbers", minCards: 3 },
+    { lessonId: "sd-l0-template-pitfalls", minCards: 6 },
+  ])("$lessonId renders at least $minCards cards", async ({ lessonId, minCards }) => {
+    const { getSystemDesignLesson } = await import("@/lib/tutorials/system-design/registry")
+    const lesson = getSystemDesignLesson(lessonId)
+    expect(lesson).toBeDefined()
+    const html = render(lesson!.teach.markdown)
+    expect(html.match(/<details/g)?.length ?? 0).toBeGreaterThanOrEqual(minCards)
+    // No half-rendered leftovers: the raw tags were all consumed by the transform.
+    expect(html).not.toContain("&lt;details&gt;")
+    expect(html).not.toContain("&lt;/details&gt;")
+  })
+})
