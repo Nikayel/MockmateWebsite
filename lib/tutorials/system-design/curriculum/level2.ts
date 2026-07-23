@@ -981,6 +981,29 @@ single partition read. If you have two query shapes, you write the data twice in
 feels wasteful to a relational mind and is completely normal here; storage is cheap, and
 denormalization is the price of linear-scale reads and writes.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your messages table is partitioned by 'conversation_id'. A new screen needs 'all messages sent by user X'. What is the idiomatic Cassandra move?",
+  "options": [
+    {
+      "label": "Add a secondary index on the sender column",
+      "feedback": "The natural SQL reflex, which is exactly why interviewers ask it. A Cassandra secondary index fans the query out to every partition across the cluster, a scatter-gather that does not scale and is an anti-pattern for high-cardinality columns like user id."
+    },
+    {
+      "label": "Write each message twice, into a second table partitioned by sender",
+      "correct": true,
+      "feedback": "Right. One denormalized table per access pattern: 'messages_by_sender' keyed on the sender serves the new query from a single partition. Double-writing feels wasteful to a relational mind and is completely normal here."
+    },
+    {
+      "label": "Run the query with a full scan and filter on the sender in the app",
+      "feedback": "Tempting because it works in development on a tiny dataset. In production it reads every partition on every request, which is the same scatter-gather problem with even less help from the database."
+    }
+  ]
+}
+\`\`\`
+
 The **partition key** decides which node owns the data and must both spread load evenly and gather
 everything a query needs into one partition. The **clustering columns** decide the sort order inside
 the partition, so a "most recent first" query becomes a contiguous slice. For message history:
@@ -998,6 +1021,40 @@ partition by \`conversation_id\` so all of a conversation's messages live togeth
    owning that partition. Mitigate with **sub-partitioning**: add a bucket to the key
    (\`(conversation_id, bucket)\` where bucket is 0..N) to spread a hot entity across N partitions,
    at the cost of a scatter-gather read.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Diagnose each situation as one of the two lethal partition failure modes.",
+  "buckets": [
+    "Unbounded partition: time-bucket it",
+    "Hot partition: sub-partition it"
+  ],
+  "items": [
+    {
+      "label": "A years-old group chat partitioned only by 'conversation_id' keeps growing",
+      "bucket": "Unbounded partition: time-bucket it",
+      "feedback": "Size is the problem, not traffic. A composite key like (conversation_id, month) bounds each partition and lets old buckets age out."
+    },
+    {
+      "label": "A celebrity AMA thread is read by millions of users at once",
+      "bucket": "Hot partition: sub-partition it",
+      "feedback": "Traffic is the problem: one node owns the partition and takes the whole load. Adding a bucket 0..N to the key spreads it across N partitions, paying a scatter-gather on read."
+    },
+    {
+      "label": "An IoT sensor appends readings forever to a partition keyed by 'device_id'",
+      "bucket": "Unbounded partition: time-bucket it",
+      "feedback": "Classic unbounded growth: steady per-device traffic, but the partition swells past the roughly 100MB and 100k-row comfort zone. Bucket by day or month."
+    },
+    {
+      "label": "Every like on a viral post increments counters in one post partition",
+      "bucket": "Hot partition: sub-partition it",
+      "feedback": "The partition may stay small, but write traffic concentrates on the single owning node. Spread the counters across sub-partition buckets and sum on read."
+    }
+  ]
+}
+\`\`\`
 
 **Consistency is tunable per query.** Cassandra is a Dynamo-style AP system with **tunable
 consistency**: you choose how many replicas must acknowledge. \`ONE\` (fast, may read stale),
@@ -1024,6 +1081,30 @@ Recap: Wide-column stores are LSM-based write machines; model one denormalized t
 choose a partition key that spreads load and co-locates the query, cluster to serve the sort, always
 bound partitions with time-bucketing, sub-partition hot keys, and tune quorum for the consistency you
 need.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Time to design chat message history yourself. Which primary key serves 'latest 50 messages in a conversation' fast and stays healthy for years?",
+  "options": [
+    {
+      "label": "PRIMARY KEY (conversation_id) with messages clustered by 'created_at' ascending",
+      "feedback": "Close: one partition per conversation does co-locate the query. But it is unbounded, so a chatty conversation eventually blows past partition limits, and ascending order puts the latest messages at the wrong end of the slice."
+    },
+    {
+      "label": "PRIMARY KEY ((conversation_id, month)) with 'created_at' descending as the clustering column",
+      "correct": true,
+      "feedback": "Right. The month bucket bounds every partition, hashing on the composite key spreads load, and descending order makes 'latest 50' the first 50 rows of the current bucket: one contiguous slice on one node."
+    },
+    {
+      "label": "PRIMARY KEY (created_at) with 'conversation_id' as the clustering column",
+      "feedback": "Tempting because time feels like the natural axis, but this scatters each conversation across the cluster and funnels all current writes into the single partition owning 'now', a hot partition by construction."
+    }
+  ],
+  "reveal": "That key is the whole method compressed: query first, partition key that spreads load and gathers the read, clustering that serves the sort, time-bucket for bounds, sub-partition if a conversation goes viral. In the design write, state the query, then the key, then which quorum settings you accept and why."
+}
+\`\`\`
 `.trim()
 
 const graphTeach = `
