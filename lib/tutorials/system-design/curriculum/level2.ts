@@ -1950,6 +1950,29 @@ Object stores give you flat key-value semantics (a key maps to an immutable obje
 effectively unlimited capacity, and roughly **eleven nines of durability** (99.999999999 percent),
 achieved by replicating each object across multiple facilities.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A user uploads a 200 MB video. Which path should the bytes take?",
+  "options": [
+    {
+      "label": "Client to your app server, which checks permissions and then writes the file to the bucket.",
+      "feedback": "Tempting because the server does need to authorize the upload, but streaming file bodies through the app tier makes your small server fleet the bottleneck for all transfer. Authorize the request, not the bytes."
+    },
+    {
+      "label": "Base64 the file into a JSON column so everything lives in one database.",
+      "feedback": "Tempting for simplicity, but blobs bloat the table, wreck the buffer cache, and stretch backups and replication. Databases are tuned for small, structured, frequently-queried rows."
+    },
+    {
+      "label": "Client asks your server for permission, receives a short-lived signed URL, and sends the bytes directly to object storage.",
+      "correct": true,
+      "feedback": "Right. Your app only mints a capability token; the bytes never touch it. That split is what lets a tiny fleet of app servers support petabytes of transfer."
+    }
+  ]
+}
+\`\`\`
+
 ### Presigned URLs: keep bytes off your servers
 
 When a client wants to upload, it asks your app server for permission. The app authorizes the user,
@@ -1988,6 +2011,47 @@ on your database or app tier.
 Recap: Keep bytes in object storage with eleven-nines durability and only the key plus metadata in
 the DB, move files with presigned URLs and multipart upload so they bypass your servers, and control
 cost and latency with lifecycle tiering and a CDN.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Your photo-sharing feature ships. Where does each piece live?",
+  "buckets": [
+    "Database row",
+    "Object storage bucket",
+    "CDN edge cache"
+  ],
+  "items": [
+    {
+      "label": "The 4 MB JPEG bytes",
+      "bucket": "Object storage bucket",
+      "feedback": "Big, opaque, write-once, read-many: exactly what object storage is built for, with eleven nines of durability."
+    },
+    {
+      "label": "owner_id, caption, width, height, content_type",
+      "bucket": "Database row",
+      "feedback": "Small, structured, queryable metadata is what the database is for; it stays fast because the bytes live elsewhere."
+    },
+    {
+      "label": "The object key, like 'photos/2026/u123/abc.jpg'",
+      "bucket": "Database row",
+      "feedback": "The pointer is the glue: the row records where in the bucket the bytes live."
+    },
+    {
+      "label": "The hot copy of a viral photo being served to millions of viewers",
+      "bucket": "CDN edge cache",
+      "feedback": "Popular reads are served from edge PoPs near users, so the origin bucket sees only a fraction of the traffic."
+    },
+    {
+      "label": "A three-year-old photo nobody has opened in a year",
+      "bucket": "Object storage bucket",
+      "feedback": "Still in the bucket, but a lifecycle policy should have tiered it down to infrequent-access or archive to cut cost."
+    }
+  ],
+  "reveal": "That split is the whole lesson: bytes in object storage, metadata plus the key in the database, presigned URLs and multipart upload so file bodies bypass your servers, lifecycle tiering for cost, and a CDN in front for read latency. Walk that path end to end in the design exercise."
+}
+\`\`\`
 `.trim()
 
 const choosingDbPolyglotTeach = `
