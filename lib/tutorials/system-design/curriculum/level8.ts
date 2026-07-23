@@ -1450,6 +1450,29 @@ PCI-DSS     cardholder data       Isolate/encrypt PAN, network segmentation, sco
 
 Encryption in transit (TLS 1.2+) and at rest (AES-256 with KMS-managed keys), least-privilege access control (RBAC/ABAC with MFA), centralized logging and monitoring, tested backups and DR, vendor/processor management, and change management show up in all four. Build those once and you have cleared most of the surface area. Then you layer the framework-specific non-negotiables: GDPR needs a lawful basis and honored data-subject rights; HIPAA needs a signed BAA (Business Associate Agreement) with every subprocessor that touches PHI; PCI needs network segmentation isolating the cardholder data environment; SOC 2 needs the controls to demonstrably operate over a period, not just exist on audit day.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your EU users live in a globally-replicated database table, and your CDN terminates TLS and writes access logs in the US. The privacy policy promises that EU data stays in the EU. Where does GDPR residency actually stand?",
+  "options": [
+    {
+      "label": "Compliant: the privacy policy plus Standard Contractual Clauses cover the transfers",
+      "feedback": "Tempting, because SCCs are a real transfer mechanism. But a legal mechanism only works when the architecture can keep data regional, and a globally-replicated table has already copied EU rows to US regions before any clause applies."
+    },
+    {
+      "label": "Broken: the architecture is silently exporting EU personal data no matter what the policy says",
+      "correct": true,
+      "feedback": "Right. Residency is a sharding decision, not a checkbox. A global table and a US-terminating CDN scatter EU data across continents, and no policy document undoes that."
+    },
+    {
+      "label": "Compliant as long as the data is encrypted in transit and at rest",
+      "feedback": "Encryption is part of the shared baseline, but it changes who can read the data, not where it lives. Encrypted EU data sitting in us-east-1 is still exported EU data."
+    }
+  ]
+}
+\`\`\`
+
 ## Data residency is the load-bearing requirement
 
 The single most architecturally load-bearing requirement is **data residency**. GDPR restricts moving EU personal data outside approved regions. This is not a config checkbox, it is a sharding decision. It forces you to region-pin storage and processing so EU user data lives in eu-central-1 and never silently replicates to us-east-1. Cross-border transfer needs a legal mechanism (Standard Contractual Clauses, or an adequacy decision like the EU-US Data Privacy Framework), and that legal mechanism only works if your architecture can actually keep the data regional. Teams that treat residency as a checkbox discover it late, when a global DynamoDB table or a CDN log has already scattered EU data across continents.
@@ -1459,6 +1482,51 @@ The single most architecturally load-bearing requirement is **data residency**. 
 Rounding it out: DPAs (Data Processing Agreements) govern each processor, DPIAs (Data Protection Impact Assessments) are required before high-risk processing, and SOC 2 evidence means access reviews, change tickets, and log retention you can produce on demand.
 
 **Recap:** build the shared baseline (encryption, access control, logging, backups) once, layer framework-specific non-negotiables on top, treat data residency as a regional-sharding driver rather than a checkbox, and use tokenization to pull whole systems out of PCI/PHI scope.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are about to design for GDPR, SOC 2, HIPAA, and PCI at once. Sort each control: part of the shared baseline you build once, or a framework-specific add-on you layer on top?",
+  "buckets": [
+    "Shared baseline, build once",
+    "Framework-specific add-on"
+  ],
+  "items": [
+    {
+      "label": "TLS everywhere plus AES-256 at rest with KMS-managed keys",
+      "bucket": "Shared baseline, build once",
+      "feedback": "Every framework demands encryption, so it belongs in the one control set that clears surface area for all four."
+    },
+    {
+      "label": "Centralized logging, monitoring, and tested backups",
+      "bucket": "Shared baseline, build once",
+      "feedback": "All four regimes expect these to exist and to keep operating, so build them once."
+    },
+    {
+      "label": "A signed BAA with every subprocessor that touches PHI",
+      "bucket": "Framework-specific add-on",
+      "feedback": "That is HIPAA's non-negotiable; the other frameworks do not ask for it."
+    },
+    {
+      "label": "DSAR and erasure workflows for data-subject rights",
+      "bucket": "Framework-specific add-on",
+      "feedback": "Data-subject rights are the GDPR layer on top of the baseline."
+    },
+    {
+      "label": "Network segmentation isolating the cardholder data environment",
+      "bucket": "Framework-specific add-on",
+      "feedback": "This is PCI's demand, and tokenization can shrink how much of your system it touches."
+    },
+    {
+      "label": "RBAC/ABAC with MFA and least privilege",
+      "bucket": "Shared baseline, build once",
+      "feedback": "Access control shows up in all four frameworks, so it is baseline."
+    }
+  ],
+  "reveal": "The pattern for your design answer: one shared baseline satisfies most of every framework, then GDPR adds rights and residency, HIPAA adds BAAs, PCI adds segmentation that tokenization can mostly scope away, and SOC 2 adds evidence that the controls operate over time. Structure your write-up as build-once, then layer."
+}
+\`\`\`
 `.trim()
 
 const piiDsarPrivacyTeach = `
