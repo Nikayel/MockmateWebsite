@@ -1135,6 +1135,29 @@ on a social graph with average degree 200+, intermediate rows explode into the b
 optimizer chokes. The graph engine instead walks outward from the start node, visiting only reachable
 nodes, deduplicating as it goes.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your app's only relationship query is 'show this user's direct friends', one hop, millions of times a day. Which store fits?",
+  "options": [
+    {
+      "label": "A graph database; friendships are literally a graph",
+      "feedback": "Tempting: the data is graph-shaped. But tool choice follows query depth, not data shape. One hop never triggers the join explosion, so you would be adopting a new datastore and its operational burden for no win."
+    },
+    {
+      "label": "An indexed friendships table in the SQL database you already run",
+      "correct": true,
+      "feedback": "Right. A one-hop lookup is a single indexed query on an adjacency table. The graph engine earns its place only when traversals get deep or variable-length."
+    },
+    {
+      "label": "Either one; they perform about the same at any depth",
+      "feedback": "They do perform similarly at 1 or 2 hops, and that is precisely the argument for the simpler SQL option. The gap opens at depth 3 and beyond, where intermediate join results explode."
+    }
+  ]
+}
+\`\`\`
+
 **Query languages.** Neo4j uses **Cypher**, an ASCII-art pattern language:
 \`MATCH (me:User {id:1})-[:FRIEND*1..2]-(fof) RETURN DISTINCT fof\` finds everyone 1 to 2 hops away.
 Gremlin (Apache TinkerPop) is the imperative traversal alternative, and GQL is the emerging standard.
@@ -1161,6 +1184,30 @@ Recap: Graph databases win when relationships are first-class and traversals are
 index-free adjacency that keeps traversal cost local; recursive SQL joins explode at depth, but a
 1-to-2-hop adjacency table in SQL is often the right, simpler choice, and the graph engine's weakness
 is horizontal scaling.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A fraud team needs 'rings of accounts connected through shared devices and payment methods, up to 5 hops out'. Query volume is modest. What do you propose, and what caveat do you name unprompted?",
+  "options": [
+    {
+      "label": "A graph database, with the caveat that sharding it is hard because partitions cut edges",
+      "correct": true,
+      "feedback": "Right on both counts. Deep, variable-length traversal is exactly what index-free adjacency is for, and the honest caveat is that a traversal crossing shard boundaries pays a network hop per edge, so graph stores often scale up rather than out."
+    },
+    {
+      "label": "Recursive SQL joins; five self-joins on an indexed table are fine",
+      "feedback": "Tempting because 1-hop and 2-hop worked fine in SQL. But intermediate results grow roughly with average degree raised to the depth, so at 5 hops on a well-connected graph the rows explode into the billions."
+    },
+    {
+      "label": "Cassandra, because fraud checks need internet-scale write throughput",
+      "feedback": "Cassandra is the write-scale champion, but it has no traversal primitive at all: every hop is another round-trip query, and 5-hop ring detection becomes application-side join code. Wrong axis of scale for this problem."
+    }
+  ],
+  "reveal": "That is the full judgment this lesson builds: match the tool to traversal depth, name index-free adjacency as the reason deep queries stay local, and volunteer the sharding weakness before the interviewer asks. Use exactly that structure in the design write."
+}
+\`\`\`
 `.trim()
 
 const timeSeriesTeach = `
