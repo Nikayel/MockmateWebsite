@@ -28,6 +28,29 @@ the timer expires, and **A cannot tell which**:
 3. B is just slow (GC pause, overloaded, 200ms of queueing) and the response is still coming.
 4. B crashed before, during, or after the work.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Service A sent 'charge 20 dollars' to B and its timer just expired. Which of the four outcomes can A rule out from its side?",
+  "options": [
+    {
+      "label": "Outcome 3: B is just slow, because the timer already expired",
+      "feedback": "Tempting, but a timer expiring is exactly what a slow B looks like. The response may still be in flight, and a retry could land right alongside the original."
+    },
+    {
+      "label": "Outcome 2: B did the work, because no response arrived",
+      "feedback": "A missing response does not mean missing work. The response itself can be lost after B commits the charge, which is the outcome that makes blind retries dangerous."
+    },
+    {
+      "label": "None of them",
+      "correct": true,
+      "feedback": "Right. All four outcomes look identical from A: silence. Whatever reaction A picks has to be safe under all four at once."
+    }
+  ]
+}
+\`\`\`
+
 A timeout is not "B failed." It is "I have no idea what B did." If A retries after case 2, B performs
 the side effect twice. If A gives up after case 1 when the write actually needed to happen, data is
 lost.
@@ -45,6 +68,36 @@ Theory pins this down. In a fully **asynchronous** model (unbounded message dela
 cannot even reliably tell a dead node from a slow one, which is why consensus is impossible there
 (FLP). Real systems assume **partial synchrony**: delays are usually bounded but occasionally are
 not, and clocks drift. That "occasionally not" is exactly where split-brain and lost writes hide.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "A postmortem describes each incident below. Match each one to the fallacy the design believed.",
+  "buckets": [
+    "The network is reliable",
+    "Latency is zero",
+    "Topology is static"
+  ],
+  "items": [
+    {
+      "label": "Checkout falls over when a flaky link starts dropping 3 percent of requests",
+      "bucket": "The network is reliable",
+      "feedback": "The design assumed sends always arrive, so there was no retry or idempotency plan for lost messages."
+    },
+    {
+      "label": "A cross-region call budgeted at 5ms actually takes 120ms and blows the SLO",
+      "bucket": "Latency is zero",
+      "feedback": "Cross-region round trips run 60 to 150ms. A 5ms budget was written for a network with no latency, which does not exist."
+    },
+    {
+      "label": "Hardcoded replica addresses break when autoscaling replaces the instances",
+      "bucket": "Topology is static",
+      "feedback": "Nodes and routes change constantly. Anything pinned to a specific address will eventually point at nothing."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the single most common junior mistake is treating a timeout as a definite
 failure and re-issuing a side effect, causing a double charge or duplicate order. The senior answer:
@@ -68,6 +121,30 @@ Recap: partial failure means parts fail independently with no global off switch,
 fundamentally ambiguous (lost request, lost response, slow peer, or dead peer), the fallacies of
 distributed computing are the false assumptions that ignore this, and the fix is to design every call
 for retries, reordering, duplication, and stale reads, made safe by idempotency.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are about to write the failure-mode analysis for A calling B. A retry policy is only safe if one property holds. Which one?",
+  "options": [
+    {
+      "label": "The network guarantees exactly-once delivery",
+      "feedback": "No network can promise that. Exactly-once behavior is built at the application layer, not the transport, which is why the burden falls on how B processes requests."
+    },
+    {
+      "label": "Timeouts are tuned long enough that slow responses always arrive",
+      "feedback": "Tempting, but no timeout value removes the ambiguity. However long you wait, silence still collapses lost request, lost response, slow peer, and dead peer into one observation."
+    },
+    {
+      "label": "The operation is idempotent, so a duplicate attempt changes nothing",
+      "correct": true,
+      "feedback": "Right. With an idempotency key and dedup on the receiver, a retry is a no-op if the first attempt succeeded and does the work if it did not. Safe under all four outcomes."
+    }
+  ],
+  "reveal": "Carry this into the write-up: enumerate the four timeout outcomes, show why A cannot tell them apart from its side, and make idempotent retry the one reaction that is correct under every outcome."
+}
+\`\`\`
 `.trim()
 
 const capCorrectTeach = `
