@@ -1192,13 +1192,100 @@ Attackers take username/password pairs leaked from other breaches (billions are 
 
 **Card testing** on checkout: fraudsters validate stolen card numbers by running many tiny authorizations. Defend with velocity limits per card/BIN/device, 3-D Secure step-up, and blocking the classic "many $1 auths, high decline rate" pattern.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each traffic pattern to the abuse it signals.",
+  "buckets": [
+    "Credential stuffing / ATO",
+    "Sybil / fake accounts",
+    "Card testing"
+  ],
+  "items": [
+    {
+      "label": "Failed logins across 5000 different accounts from one IP in a minute",
+      "bucket": "Credential stuffing / ATO",
+      "feedback": "One source replaying leaked username/password pairs across many accounts is the stuffing signature."
+    },
+    {
+      "label": "Login from New York, then London 20 minutes later",
+      "bucket": "Credential stuffing / ATO",
+      "feedback": "Impossible travel: the account is probably being driven by a hijacker, not its owner."
+    },
+    {
+      "label": "Hundreds of signups from one device fingerprint chasing a referral bonus",
+      "bucket": "Sybil / fake accounts",
+      "feedback": "One attacker, many identities. Per-device velocity limits and phone verification raise the cost of each fake."
+    },
+    {
+      "label": "A wave of disposable-email accounts that post spam on day one",
+      "bucket": "Sybil / fake accounts",
+      "feedback": "New, unaged, throwaway identities acting at scale is the fake-account pattern; reputation and account aging limit their value."
+    },
+    {
+      "label": "Many tiny authorizations on different cards with a high decline rate",
+      "bucket": "Card testing",
+      "feedback": "Fraudsters validating stolen numbers make many small auths and eat the declines. Velocity limits per card and BIN plus 3-D Secure step-up break it."
+    }
+  ]
+}
+\`\`\`
+
 ## Graduated, risk-based response
 
 The unifying idea is that every event gets a risk score from a pipeline of **features + rules + ML**. Low risk passes silently. Medium risk triggers **step-up auth** (MFA challenge, email verification, 3DS). High risk gets blocked or sent to a **manual-review queue**. Make every action **auditable and reversible** (you will have false positives and must be able to unblock a real user fast) and build a **feedback loop** so confirmed fraud and confirmed false positives retrain the model.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Team A hard-blocks every signup and login their model scores above low risk. Team B sends that ambiguous middle a step-up challenge instead. Six months later, what do you expect?",
+  "options": [
+    {
+      "label": "Team A has less fraud and roughly the same signups, since real users rarely look suspicious.",
+      "feedback": "Tempting, but real users trip risk signals constantly: VPNs, shared devices, travel, privacy browsers. Hard-blocking the ambiguous middle blocks them too."
+    },
+    {
+      "label": "Team A killed conversion and drowned support in false-positive tickets; Team B caught comparable fraud with a fraction of the damage.",
+      "correct": true,
+      "feedback": "Right. The ambiguous middle is mostly legitimate. Step-up friction lets real users through with one extra step while still stopping automation, which is why the metric is fraud caught per unit of legitimate-user friction."
+    },
+    {
+      "label": "Team B gets overrun, because challenged bots simply solve the challenge and continue.",
+      "feedback": "Some do, which is why challenges are one rung on a ladder that ends in hard blocks and manual review for high-confidence abuse. But treating every medium score as high-confidence abuse is the costlier error."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the tradeoff to name explicitly is **friction versus conversion**. A hard block on anything suspicious kills signups and revenue and generates support tickets from real users. The senior move is graduated friction: invisible checks for the 95% who are clearly fine, a light challenge for the ambiguous middle, hard action only for high-confidence abuse. State the metric: you are optimizing fraud caught per unit of legitimate-user friction, not fraud caught in isolation.
 
 **Recap:** layer breached-password checks, MFA, and velocity/impossible-travel against credential stuffing and ATO; use fingerprinting, behavioral signals, and invisible challenges for bots; raise cost and lower value (phone verification, per-device limits, reputation) against Sybil/fake accounts; score every event with features+rules+ML and respond with graduated, auditable, reversible step-up friction instead of blunt blocks.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You get one control to cut account takeover the most before your design review. Which do you pick?",
+  "options": [
+    {
+      "label": "CAPTCHA on every login",
+      "feedback": "Tempting and common, but it taxes every real user on every login, and stuffing operations farm CAPTCHAs out cheaply. It is one rung of graduated friction, not the backbone."
+    },
+    {
+      "label": "Phishing-resistant MFA such as passkeys",
+      "correct": true,
+      "feedback": "Right. MFA is the single highest-leverage ATO control: a replayed breach password stops working without the second factor, and WebAuthn passkeys resist phishing too."
+    },
+    {
+      "label": "Blocklists of known bad IPs",
+      "feedback": "Attackers rotate through residential proxies faster than lists update. IP reputation is a useful feature in the risk score, not a control that stands alone."
+    }
+  ],
+  "reveal": "Now stack the rest for the design write: breached-password checks, velocity and impossible-travel signals, and device fingerprinting feed a features-plus-rules-plus-ML risk score, and the response is graduated, auditable, and reversible. Say the tradeoff out loud: you optimize fraud caught per unit of legitimate-user friction, not fraud caught in isolation."
+}
+\`\`\`
 `.trim()
 
 const threatModelingZerotrustTeach = `
