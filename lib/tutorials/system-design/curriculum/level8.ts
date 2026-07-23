@@ -244,6 +244,29 @@ OAuth and OIDC are the most commonly muddled pair in interviews, so nail the dis
 
 The four roles: the resource owner (the user), the client (the app requesting access), the authorization server or AS (issues tokens, e.g. Google's identity service), and the resource server or RS (the API that accepts the token). Keep these straight and the flows make sense.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate says: users sign in with Google, so we use OAuth for login. What is off about that sentence?",
+  "options": [
+    {
+      "label": "Nothing. OAuth issues tokens, and presenting a token proves who you are",
+      "feedback": "Tempting because an access token feels like identity, but it only says what an app may do on someone's behalf; it does not prove who the user is. That proof is the OIDC ID token's job."
+    },
+    {
+      "label": "Login is authentication, which is OIDC's ID token; OAuth by itself only authorizes",
+      "correct": true,
+      "feedback": "Right. OAuth answers 'may this app do X', OIDC answers 'who is this user'. Sign in with Google is OIDC layered on top of OAuth."
+    },
+    {
+      "label": "It should say SAML, because OAuth is only for mobile apps",
+      "feedback": "Tempting because SAML also does sign-in, but SAML is simply the older enterprise equivalent of OIDC; the real imprecision here is confusing authorization with authentication, not the protocol vintage."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** saying "we use OAuth to log users in" is imprecise and interviewers notice. OAuth alone authorizes; you log users in with OIDC's ID token. And never say "we use OAuth" without naming a grant, that is the tell of someone who has not implemented it.
 
 ## OAuth 2.1 removed the footguns
@@ -258,6 +281,46 @@ The four roles: the resource owner (the user), the client (the app requesting ac
 - Web apps, single-page apps, and mobile/native apps: Authorization Code + PKCE. SPAs and mobile are public clients (they cannot hold a secret), so PKCE is what protects them.
 - Machine-to-machine (a backend service calling an API with no user present): Client Credentials grant. The service authenticates with its own client ID and secret (or mTLS) and gets a token representing itself.
 - Input-constrained devices (smart TVs, CLIs, IoT): Device Authorization grant. The device shows a code and URL, the user approves on their phone, and the device polls for the token.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Grant selection is the part interviewers check. Match each client to the grant it should use.",
+  "buckets": [
+    "Authorization Code + PKCE",
+    "Client Credentials",
+    "Device Authorization"
+  ],
+  "items": [
+    {
+      "label": "A single-page app signing a user in",
+      "bucket": "Authorization Code + PKCE",
+      "feedback": "A SPA is a public client that cannot hold a secret, which is exactly the gap PKCE closes."
+    },
+    {
+      "label": "A native mobile app acting for a user",
+      "bucket": "Authorization Code + PKCE",
+      "feedback": "Mobile apps are public clients too; auth code plus PKCE is the one user-facing flow OAuth 2.1 keeps."
+    },
+    {
+      "label": "A nightly backend job calling a partner API with no user in the loop",
+      "bucket": "Client Credentials",
+      "feedback": "No resource owner is present, so the service authenticates as itself with its own client ID and secret or mTLS."
+    },
+    {
+      "label": "A smart TV where typing a password with a remote is painful",
+      "bucket": "Device Authorization",
+      "feedback": "The TV shows a short code and URL, the user approves on their phone, and the TV polls for the token."
+    },
+    {
+      "label": "A CLI tool authorizing against your SaaS from a terminal",
+      "bucket": "Device Authorization",
+      "feedback": "Input-constrained is not just TVs: CLIs use the same show-a-code, approve-elsewhere, poll-for-token dance."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
 Authorization Code + PKCE (SPA/mobile/web):
@@ -277,6 +340,30 @@ Bearer vs sender-constrained tokens. A bearer token is like cash: whoever holds 
 Enterprise SSO: SAML is the older XML-based standard still dominant in enterprise; OIDC is the modern JSON/JWT equivalent and is preferred for new integrations. Pair either with SCIM for automated user provisioning and deprovisioning so that when HR offboards someone, access is revoked everywhere.
 
 **Recap:** OAuth authorizes and OIDC (ID token) authenticates, OAuth 2.1 makes Authorization Code + PKCE mandatory and deletes implicit and password grants, you pick auth-code+PKCE for user apps, client-credentials for M2M, and device flow for TVs/CLIs, and you harden tokens with scopes, audience, state/nonce, and optionally DPoP/mTLS.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A plain bearer access token for a high-value API leaks into a log an attacker can read. What is true?",
+  "options": [
+    {
+      "label": "It is useless without the user's session cookie",
+      "feedback": "Tempting because it feels like the token must be tied to a session somewhere, but bearer means exactly what it says: whoever holds the token can spend it, like cash. Nothing else is checked."
+    },
+    {
+      "label": "It is harmless as long as it was scoped with least privilege",
+      "feedback": "Tempting because scope really does bound the blast radius, but the attacker can still do everything the scope allows until expiry. Scope narrows the damage; it does not prevent use."
+    },
+    {
+      "label": "It works for anyone who presents it until it expires; sender-constrained tokens (DPoP or mTLS-bound) are what make a stolen token useless",
+      "correct": true,
+      "feedback": "Right. Binding the token to a key the client holds means a thief has the token but cannot produce the per-request proof, which is why high-value APIs prefer sender-constrained tokens."
+    }
+  ],
+  "reveal": "In the design write, be the candidate who names things: the four roles, a specific grant per client type (auth code plus PKCE for user apps, client credentials for M2M, device flow for TVs and CLIs), and the hardening set of scope, audience, state and nonce, exact redirect URIs, and DPoP or mTLS for high-value tokens."
+}
+\`\`\`
 `.trim()
 
 const sessionsTokensTeach = `
