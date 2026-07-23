@@ -1950,6 +1950,29 @@ harmless. Together these mean you can deliver updates in any order, duplicated, 
 network, and every replica lands in the same state. Merge is often a mathematical **join** on a
 lattice (for a counter, element-wise max; for a set, union).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two replicas of a CRDT counter receive the same set of updates in opposite orders, and one replica also gets a duplicate copy of an update through a second gossip path. Do they end up identical?",
+  "options": [
+    {
+      "label": "Yes, byte-for-byte",
+      "correct": true,
+      "feedback": "Right. Commutativity makes order irrelevant, associativity makes grouping irrelevant, and idempotence makes the duplicate a no-op. Those three properties are the whole trick."
+    },
+    {
+      "label": "Only if a coordinator replays the updates in one agreed order",
+      "feedback": "Tempting, because ordered replay is how state machine replication works. CRDTs are built so that no agreed order is needed: the merge itself absorbs reordering."
+    },
+    {
+      "label": "No, the duplicate inflates one replica's count",
+      "feedback": "It would if merge were addition, which is exactly why merge is element-wise max per replica slot. Max applied twice gives the same answer: idempotent."
+    }
+  ]
+}
+\`\`\`
+
 ### The workhorse types
 
 - **G-Counter / PN-Counter**: a grow-only counter is a vector of per-replica counts; the value is the
@@ -1966,6 +1989,25 @@ tombstones grow, so you need **garbage collection**, which itself needs some coo
 causal-stability threshold. And CRDTs **cannot enforce global invariants**: "this username is
 globally unique" or "the balance never goes negative" require agreement, and agreement is exactly
 what CRDTs avoid. For invariants you need consensus.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A partition heals. Replica A accepted writes during the partition that replica B never saw. Both hold a correct CRDT. Do they now converge on their own?",
+  "options": [
+    {
+      "label": "Yes, convergence is exactly what the CRDT guarantees",
+      "feedback": "Tempting, but the guarantee is conditional: replicas that have seen the same set of updates are identical. B has not seen A's updates, and nothing in the data type itself ships them across."
+    },
+    {
+      "label": "Only once some mechanism delivers B the writes it missed",
+      "correct": true,
+      "feedback": "Right. A CRDT is a safe merge function, not a delivery system. The next section covers anti-entropy: gossip, Merkle trees, read repair, and hinted handoff, the machinery that actually moves the missed updates."
+    }
+  ]
+}
+\`\`\`
 
 ### Anti-entropy: the part people forget
 
@@ -1985,6 +2027,47 @@ updates to merge*.
 Recap: CRDTs give Strong Eventual Consistency because their merges are commutative, associative, and
 idempotent, they cost metadata and tombstones and cannot enforce global invariants, and they only
 converge if paired with anti-entropy (gossip, Merkle trees, read repair, hinted handoff).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Your design write will need all three layers. Sort each requirement by what satisfies it.",
+  "buckets": [
+    "The CRDT merge",
+    "Anti-entropy",
+    "Consensus"
+  ],
+  "items": [
+    {
+      "label": "Concurrent increments from two offline devices both survive",
+      "bucket": "The CRDT merge",
+      "feedback": "Per-replica slots merged with element-wise max mean neither device's increments are lost, unlike last-write-wins."
+    },
+    {
+      "label": "A concurrent add and remove of the same element resolves deterministically",
+      "bucket": "The CRDT merge",
+      "feedback": "OR-Set add-wins semantics: the new add carries a unique tag the remover never observed."
+    },
+    {
+      "label": "A replica that was partitioned away actually receives the writes it missed",
+      "bucket": "Anti-entropy",
+      "feedback": "Gossip spreads updates epidemically, and Merkle trees find the divergent key ranges in log time."
+    },
+    {
+      "label": "Usernames are globally unique",
+      "bucket": "Consensus",
+      "feedback": "A global invariant needs agreement before acting, which is exactly the coordination CRDTs give up."
+    },
+    {
+      "label": "An account balance never goes negative",
+      "bucket": "Consensus",
+      "feedback": "Two replicas can each accept a withdrawal that is only invalid once merged. Enforcing the invariant requires agreement, not a cleverer merge."
+    }
+  ],
+  "reveal": "CRDTs give you a safe merge, anti-entropy delivers the updates to merge, and consensus is the escape hatch for global invariants. A design answer that names all three layers, plus tombstone garbage collection as the cost, is the complete one."
+}
+\`\`\`
 `.trim()
 
 const failureDetectionTeach = `
