@@ -145,6 +145,29 @@ Defaults matter and differ: **Postgres defaults to Read Committed**, **MySQL Inn
 Repeatable Read**. So the same application code can behave differently on the two databases under
 load, which is a real production trap.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two doctors run the on-call transactions under snapshot isolation (what Postgres calls Repeatable Read). Each reads a consistent snapshot showing the other still on call, then removes itself. Can both commit, leaving zero doctors on call?",
+  "options": [
+    {
+      "label": "No. Repeatable Read gives each transaction a consistent snapshot, so this anomaly is prevented.",
+      "feedback": "Tempting, because snapshot isolation really does kill dirty, non-repeatable, and phantom reads. But each transaction validated the invariant against a snapshot that cannot see the other's uncommitted write."
+    },
+    {
+      "label": "Yes. Both commit, and the on-call invariant is violated.",
+      "correct": true,
+      "feedback": "Right. This is write skew: each transaction was individually consistent against its stale snapshot, and snapshot isolation never checks their combined effect."
+    },
+    {
+      "label": "Only if one transaction happened to start before the other.",
+      "feedback": "Timing does not save you. Any overlap where each snapshot predates the other's commit produces the skew."
+    }
+  ]
+}
+\`\`\`
+
 ### The most-probed subtlety: snapshot isolation and write skew
 
 **Snapshot isolation** (what Postgres calls Repeatable Read, and what many systems mean by
@@ -172,9 +195,63 @@ the whole game.
 - **Unique constraint**: sometimes the cleanest fix. If "one seat per booking" must hold, a unique
   index enforces it regardless of isolation level.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the surgical fix for each concurrency bug, without turning on global Serializable.",
+  "buckets": [
+    "'SELECT ... FOR UPDATE'",
+    "Optimistic version column",
+    "Unique constraint"
+  ],
+  "items": [
+    {
+      "label": "Flash-sale oversell on the last unit in stock; concurrent buyers must queue on that row",
+      "bucket": "'SELECT ... FOR UPDATE'",
+      "feedback": "High contention on known rows is the pessimistic lock's home turf: writers line up instead of both reading stale stock."
+    },
+    {
+      "label": "Two admins occasionally edit the same record and one save silently overwrites the other",
+      "bucket": "Optimistic version column",
+      "feedback": "A lost update under low contention: a version check makes the late writer's UPDATE match zero rows, so it retries cheaply."
+    },
+    {
+      "label": "Exactly one booking per seat must hold no matter what any application code does",
+      "bucket": "Unique constraint",
+      "feedback": "A unique index enforces the invariant at the data layer, independent of isolation level or app discipline. Often the cleanest fix of all."
+    }
+  ]
+}
+\`\`\`
+
 Recap: pick the isolation level (or explicit lock) by naming the exact anomaly; snapshot isolation
 stops dirty, non-repeatable, and phantom reads but still allows write skew, which only true
 Serializable or targeted locking prevents.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate proposes ending all concurrency bugs by running the whole database at Serializable. What is the sharpest objection?",
+  "options": [
+    {
+      "label": "Serializable still allows write skew, so it would not even work.",
+      "feedback": "Tempting to overcorrect after learning snapshot isolation's gap, but true Serializable (SSI or strict 2PL) is exactly the level that does forbid write skew."
+    },
+    {
+      "label": "It works, but every transaction pays abort-and-retry churn or lock waits, when naming the exact anomaly usually yields a surgical fix: a row lock, a version column, or a unique constraint.",
+      "correct": true,
+      "feedback": "Right. Serializable is correct but globally expensive. Diagnose the anomaly first; most bugs fall to a targeted mechanism with far less throughput cost."
+    },
+    {
+      "label": "Postgres does not offer a Serializable level, so it is not an option.",
+      "feedback": "Postgres implements true Serializable via SSI. The objection is cost and precision, not availability."
+    }
+  ],
+  "reveal": "In your design write, name the anomaly before naming the fix: 'this is a lost update, so I lock the row' or 'this is write skew, so snapshot isolation is not enough.' Never just 'use transactions.'"
+}
+\`\`\`
 `.trim()
 
 const mvccLockingTeach = `
