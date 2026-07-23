@@ -2060,6 +2060,29 @@ const choosingDbPolyglotTeach = `
 This is the synthesis lesson. Strong candidates do not memorize "use NoSQL for scale." They reason
 from **decision drivers** to a **storage family**, then defend against the runner-up.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Asked where to store orders for a new marketplace, a candidate opens with: 'NoSQL, because we need scale.' What is the interviewer listening for instead?",
+  "options": [
+    {
+      "label": "Numbers and access patterns first: QPS now and in two years, query shape, consistency needs. Only then a family.",
+      "correct": true,
+      "feedback": "Right. 'Scale' without a number is not a driver. A single well-indexed relational box serves tens of thousands of QPS, so the burden of proof is on leaving it."
+    },
+    {
+      "label": "Which NoSQL product to name: MongoDB versus DynamoDB is the real decision.",
+      "feedback": "Tempting because product names sound concrete, but picking within a family before establishing the drivers is the same mistake one level down."
+    },
+    {
+      "label": "Nothing is missing: relational databases do not scale, so the instinct is correct.",
+      "feedback": "This is the exact myth. Tens of thousands of QPS on one well-indexed Postgres box is routine, which is why relational is the correct default for most features."
+    }
+  ]
+}
+\`\`\`
+
 The drivers, roughly in the order they decide things: **access patterns** (what queries do you
 actually run, and by what key), **read/write ratio and volume** (QPS now and in two years),
 **consistency needs** (does a stale read cause a real bug or just a cosmetic one), **scale** (does
@@ -2085,6 +2108,46 @@ multi-row ACID).
 - **Vector (pgvector, Pinecone, Milvus):** nearest-neighbor search over embeddings.
 - **Columnar / OLAP (Snowflake, BigQuery, ClickHouse):** large analytical scans and aggregations,
   kept separate from your OLTP store.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Read each workload's drivers and pick the storage family they point to.",
+  "buckets": [
+    "Relational (Postgres)",
+    "Key-value (Redis / DynamoDB)",
+    "Columnar OLAP (ClickHouse / BigQuery)"
+  ],
+  "items": [
+    {
+      "label": "Checkout: multi-row ACID transactions plus ad hoc reporting joins",
+      "bucket": "Relational (Postgres)",
+      "feedback": "Transactions plus rich, evolving queries are the relational sweet spot."
+    },
+    {
+      "label": "Session lookup by token at single-digit milliseconds, millions of ops per second",
+      "bucket": "Key-value (Redis / DynamoDB)",
+      "feedback": "Always accessed by a known key with a tight latency budget: the key-value signature."
+    },
+    {
+      "label": "A weekly revenue dashboard scanning a year of events",
+      "bucket": "Columnar OLAP (ClickHouse / BigQuery)",
+      "feedback": "Large analytical scans and aggregations belong in a columnar store, kept separate from OLTP."
+    },
+    {
+      "label": "Feature flags read by key on every request",
+      "bucket": "Key-value (Redis / DynamoDB)",
+      "feedback": "Tiny values, known key, extreme read volume: classic key-value."
+    },
+    {
+      "label": "A new CRUD feature whose future queries are still unclear",
+      "bucket": "Relational (Postgres)",
+      "feedback": "Unknown query shapes are the strongest argument for the flexible, boring default. Tempting to reach for something specialized, but you would be optimizing for patterns you cannot yet name."
+    }
+  ]
+}
+\`\`\`
 
 ### NewSQL: the family people miss
 
@@ -2112,6 +2175,30 @@ Recap: Drive from access pattern, consistency, scale, and query shape to a famil
 well-indexed relational, reach for NewSQL only when you have outgrown one node yet still need SQL and
 ACID (versus hand-rolled sharding), and treat polyglot persistence as a justified set of specialized
 stores, not a collection.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You close your storage defense with: 'CAP says pick two; we picked availability, done.' Why does that under-answer the question?",
+  "options": [
+    {
+      "label": "It does not: CAP fully describes a distributed store's trade space.",
+      "feedback": "Tempting because CAP is the famous acronym, but CAP only describes behavior during a partition, which is rare. It says nothing about the trade you make the rest of the time."
+    },
+    {
+      "label": "CAP covers only partition behavior. PACELC adds that even with no partition you trade latency against consistency, and that is the trade you live with every day.",
+      "correct": true,
+      "feedback": "Right. Spanner pays latency for consistency; Dynamo-style stores pay consistency for latency and availability. Naming the everyday else-case is what defending against the runner-up sounds like."
+    },
+    {
+      "label": "The problem is choosing availability; correct systems always choose consistency.",
+      "feedback": "Tempting as a safety instinct, but plenty of features tolerate staleness happily. The flaw in the answer is the missing else-case reasoning, not the letter chosen."
+    }
+  ],
+  "reveal": "The synthesis for the design exercise: name the drivers with numbers, map them to a family, default to boring well-indexed relational, escalate to NewSQL only when you have outgrown one node yet still need SQL and ACID (the alternative is hand-rolled app-level sharding), justify every extra store in a polyglot setup, and reason about consistency with PACELC rather than a CAP one-liner."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel2: DesignLevel = {
