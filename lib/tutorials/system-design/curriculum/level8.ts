@@ -941,6 +941,29 @@ Secrets (DB passwords, API keys, signing keys, TLS private keys) are the credent
 
 A **KMS** is a managed key service with an API for encrypt/decrypt/sign where keys never leave the service. An **HSM** is the tamper-resistant hardware (often **FIPS 140-2 Level 3** certified) that actually holds the root keys; managed KMS is usually HSM-backed. The pattern is a **key hierarchy** with a hardware-backed **root of trust**: the HSM holds the root KEK, which wraps intermediate keys, which wrap DEKs. Nothing sensitive exists in plaintext outside the hardware boundary, and you get a single audited choke point for every key operation.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Time to rotate the production DB password. The plan: change it in the database, update the secret store, restart services as they notice. Predict what happens.",
+  "options": [
+    {
+      "label": "Nothing dramatic. Clients fail one request, re-fetch the secret, and recover.",
+      "feedback": "Tempting, but only true if every client re-fetches on failure and does so instantly. In practice connection pools and cached configs keep presenting the dead credential, and errors pile up until every consumer restarts."
+    },
+    {
+      "label": "An outage window: every consumer still holding the old password fails until it picks up the new one.",
+      "correct": true,
+      "feedback": "Right. The old credential dies before all clients switch, so rotation becomes a synchronized-restart event. The fix, coming next, is versioned secrets with an overlap window where old and new both work."
+    },
+    {
+      "label": "The secret store blocks the rotation because consumers are still attached.",
+      "feedback": "Secret stores do not track live consumers of a static password; nothing stops you from cutting the credential out from under them."
+    }
+  ]
+}
+\`\`\`
+
 ## Rotation without downtime
 
 Naive rotation ("change the password, restart everything") causes an outage the moment the old credential dies before every client picks up the new one. The fix is **versioned secrets with a dual-secret (overlap) window**: create version N+1 while N still works, roll consumers over gradually, confirm nothing uses N, then revoke N. For encryption keys, decrypt with old-or-new during the window and re-encrypt lazily. This turns rotation from a risky event into a routine, reversible rollout.
@@ -948,6 +971,40 @@ Naive rotation ("change the password, restart everything") causes an outage the 
 ## The "secret zero" problem
 
 If every secret lives in Vault, the app needs a credential to authenticate to Vault, so what protects *that* credential? Bootstrapping trust with a long-lived static token just moves the problem and recreates the thing you were avoiding. The modern answer is **workload identity**: the platform vouches for the workload so no pre-placed secret is needed.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Which bootstrap approaches actually solve secret zero, and which just move it?",
+  "buckets": [
+    "Recreates secret zero",
+    "Solves it with workload identity"
+  ],
+  "items": [
+    {
+      "label": "A long-lived Vault token baked into the container image",
+      "bucket": "Recreates secret zero",
+      "feedback": "Anyone who pulls the image has the token. You have rebuilt a static pre-placed secret, now with wider distribution."
+    },
+    {
+      "label": "A Vault token injected as an env var by the CI pipeline",
+      "bucket": "Recreates secret zero",
+      "feedback": "Env vars leak through crash dumps, logs, and process inspection, and now CI holds the secret that protects all secrets."
+    },
+    {
+      "label": "The pod's Kubernetes ServiceAccount JWT, verified against the cluster's OIDC issuer",
+      "bucket": "Solves it with workload identity",
+      "feedback": "The platform itself vouches for the workload with a short-lived signed token; nothing static is ever placed on the box."
+    },
+    {
+      "label": "A SPIFFE/SPIRE SVID attesting the workload's identity",
+      "bucket": "Solves it with workload identity",
+      "feedback": "Same principle: a cryptographic identity issued by attestation, not a pre-placed credential."
+    }
+  ]
+}
+\`\`\`
 
 - On Kubernetes / cloud, the workload gets a **short-lived OIDC/JWT identity token** from the platform (IRSA on EKS, GKE Workload Identity), and the secret store trusts that issuer. No static credential is ever placed on the box.
 - **SPIFFE/SPIRE** issues a cryptographic **SVID** (an X.509 cert or JWT) that attests the workload's identity, which Vault or a mesh accepts.
@@ -965,6 +1022,30 @@ The workload then fetches **dynamic, short-lived secrets**: instead of a shared 
 **Interview nuance:** rotation and dynamic secrets are useless without **least-privilege policies and per-access audit logging**. Every secret read should be logged (who, which workload, when) so a leak has a blast-radius answer, and policies should scope each workload to only the secrets it needs. Pair this with **leaked-credential scanning** (pre-commit hooks, GitHub secret scanning) to catch the static keys that inevitably slip through, and auto-revoke on detection.
 
 **Recap:** put secrets in a dedicated store rooted in an HSM-backed KMS, rotate with versioned dual-secret windows so there is no downtime, solve secret zero with platform-issued workload identity that hands out short-lived dynamic secrets, and log every access under least-privilege policies.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An interviewer probes your secrets platform: 'A dynamic DB credential just leaked from one pod. Walk me through the blast radius.' What is the strong answer?",
+  "options": [
+    {
+      "label": "Treat it like any DB password leak: rotate everything and audit every service.",
+      "feedback": "Tempting, because that is the right playbook for a shared static password. But it throws away exactly what dynamic secrets bought you: per-workload uniqueness and self-expiry."
+    },
+    {
+      "label": "Bounded and traceable: the credential dies within its 1-hour TTL, it is unique to that one pod, and the per-access audit log pins down exactly what it touched.",
+      "correct": true,
+      "feedback": "Right. Short TTL limits the window, per-workload uniqueness limits the scope, and audit logging answers the blast-radius question in minutes. Revoke early and move on."
+    },
+    {
+      "label": "Zero impact: dynamic secrets cannot be abused from outside the cluster.",
+      "feedback": "A leaked credential works from wherever the database is reachable until it expires or is revoked. Dynamic secrets shrink the damage window; they do not make leaks harmless."
+    }
+  ],
+  "reveal": "That answer strings the whole lesson together: a dedicated store rooted in an HSM-backed KMS, workload identity instead of secret zero, dynamic short-lived credentials, dual-secret rotation windows, least-privilege policies, and per-access audit. Your design write should walk the same chain and say what breaks if any link is missing."
+}
+\`\`\`
 `.trim()
 
 const ddosRateAbuseTeach = `
