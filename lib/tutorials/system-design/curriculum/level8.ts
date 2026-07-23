@@ -371,6 +371,29 @@ const sessionsTokensTeach = `
 
 Once a user has authenticated, you need to remember them across requests without re-checking their password every time. That remembered state is a session, and the whole design question is a tradeoff between scale and revocation: how cheaply can you check a session, versus how fast can you kill one when a token leaks.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An attacker steals a user's stateless signed token (a JWT) with 45 minutes left before expiry. The user notices and clicks logout. What happens when the attacker keeps using the token?",
+  "options": [
+    {
+      "label": "It is rejected: logout invalidated it",
+      "feedback": "Tempting because that is exactly how opaque server-side sessions behave, but a stateless JWT is verified by signature alone with no lookup; there is no server-side record for logout to delete."
+    },
+    {
+      "label": "It keeps working for 45 minutes. A pure stateless JWT cannot be un-issued",
+      "correct": true,
+      "feedback": "Right. The token stays valid until 'exp' no matter what the server wishes. That is the revocation half of the scale-versus-revocation tradeoff this lesson resolves."
+    },
+    {
+      "label": "It works only from the victim's original IP address",
+      "feedback": "Tempting because binding to the client sounds like a sane default, but a plain JWT carries no such binding; whoever presents it wins. That is what bearer means."
+    }
+  ]
+}
+\`\`\`
+
 Two ends of the spectrum. A stateful (opaque) session is a random ID stored server-side (in Redis or a database) and handed to the client in a cookie. Every request looks it up. Revocation is trivial: delete the row and the session is dead instantly. The cost is a lookup per request and shared session storage, though Redis makes that a sub-millisecond hop. A stateless JWT carries the claims (user ID, roles, expiry) signed by the server, so any service can verify it with the public key and no lookup. That scales beautifully across many services, but it has a fatal weakness: you cannot un-issue it. A JWT is valid until it expires, so a stolen JWT with a 1-hour TTL is usable for up to an hour no matter what you do.
 
 ## The hybrid: short JWT + revocable refresh token
@@ -378,6 +401,29 @@ Two ends of the spectrum. A stateful (opaque) session is a random ID stored serv
 The standard resolution is a hybrid: a short-lived access token (JWT, 5 to 15 minutes) plus a long-lived refresh token (opaque, stored server-side). Services validate the JWT statelessly for speed; the short TTL bounds the blast radius of a leak; and the refresh token, which is stateful, gives you a revocation and rotation point. When the access token expires, the client exchanges the refresh token for a new one.
 
 Refresh-token rotation with reuse detection is the key mechanism. Each time a refresh token is used, the server issues a new refresh token and invalidates the old one. The tokens form a "family" descended from the original login. If an old, already-used refresh token is ever presented again, that means someone has a copy they should not, so the server invalidates the entire family, forcing re-authentication. This detects token theft: the attacker and the legitimate user cannot both keep rotating; the second use of a spent token trips the alarm.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An attacker steals refresh token RT2 and uses it before the real user does. Later the real user presents RT2. What should the server do?",
+  "options": [
+    {
+      "label": "Accept it: the legitimate user should not be punished for the theft",
+      "feedback": "Tempting because the honest user is standing right there, but the server cannot tell attacker from owner at this moment, and honoring the replay leaves the attacker's stolen chain alive."
+    },
+    {
+      "label": "Reject just this stale token and move on",
+      "feedback": "Tempting as the minimal response, but the attacker already rotated onward and is holding a live RT3; rejecting one spent token does nothing to that branch."
+    },
+    {
+      "label": "Treat reuse of a spent token as proof of theft and invalidate the whole family, forcing re-login",
+      "correct": true,
+      "feedback": "Right. Two parties cannot both keep rotating one family, so a second use of a spent token is the alarm. Killing the family cuts off the attacker, and the real user just signs in again."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
 login -> RT1
@@ -395,6 +441,30 @@ Store session/refresh tokens in HttpOnly, Secure, SameSite cookies. HttpOnly mea
 JWT validation hygiene: verify the signature and pin the algorithm, explicitly rejecting \`alg: none\` and preventing algorithm confusion (an attacker swapping RS256 for HS256 to sign with the public key). Check \`aud\` (this token is for me), \`iss\`, and \`exp\`. Rotate signing keys and publish them via JWKS so verifiers pick up new keys without a deploy. For logout and revocation, either rely on the short TTL plus refresh revocation, or maintain a denylist of revoked token IDs (jti) with entries expiring at the token's natural expiry so the list stays small.
 
 **Recap:** pick opaque sessions when instant revocation matters and stateless JWTs when cross-service scale matters, then use the hybrid (short JWT + revocable refresh token) with rotation and reuse detection to kill stolen tokens, keep tokens in HttpOnly/Secure/SameSite cookies or a BFF (never localStorage), and validate JWTs strictly (no alg:none, check aud/iss/exp, rotate via JWKS).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Last call before the design write: your SPA needs somewhere to keep tokens, and a teammate proposes localStorage because cookies feel old. What is the strong answer?",
+  "options": [
+    {
+      "label": "localStorage is fine if the access token only lives 10 minutes",
+      "feedback": "Tempting because a short TTL really does bound each individual leak, but a live XSS script reads every fresh token as it arrives, refresh flow included. TTL does not fix script-readable storage."
+    },
+    {
+      "label": "Either works as long as the site is HTTPS everywhere",
+      "feedback": "Tempting because TLS is necessary, but it only protects the wire; XSS runs inside the page after TLS ends, where localStorage is an open drawer for any injected script."
+    },
+    {
+      "label": "HttpOnly, Secure, SameSite cookies, or a BFF that keeps tokens out of the browser entirely; never localStorage",
+      "correct": true,
+      "feedback": "Right. HttpOnly puts the token beyond the reach of injected script, SameSite plus an anti-CSRF token covers cross-site requests, and a BFF removes the question by keeping OAuth tokens server-side."
+    }
+  ],
+  "reveal": "Your design write should state the hybrid explicitly: 5 to 15 minute JWTs verified statelessly, an opaque rotating refresh token with reuse detection as the kill switch, cookie or BFF storage, and strict validation: pin the algorithm, reject 'alg: none', and check 'aud', 'iss', and 'exp'."
+}
+\`\`\`
 `.trim()
 
 const authzRbacRebacTeach = `
