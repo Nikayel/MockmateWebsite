@@ -270,6 +270,29 @@ versions were committed as of its start. So a long analytical read sees a frozen
 writers keep creating new versions alongside it, and neither waits on the other. This is what makes
 snapshot isolation cheap and is why read-heavy systems love it.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An analytics connection opens a transaction and then sits idle for an hour while writers keep updating the table. MVCC means readers do not block writers, so is the idle transaction harmless?",
+  "options": [
+    {
+      "label": "Yes. Nobody waits on it, so nothing degrades.",
+      "feedback": "Tempting, because it is true that no writer blocks on it. The damage is not blocking; it is what the database is forbidden to clean up while that old snapshot stays alive."
+    },
+    {
+      "label": "No. Its old snapshot pins version cleanup, so dead row versions accumulate as bloat and performance sinks.",
+      "correct": true,
+      "feedback": "Right. Vacuum cannot reclaim any version newer than the oldest snapshot, so one forgotten transaction can bloat a table to many times its live size."
+    },
+    {
+      "label": "No, but only because the database automatically kills any transaction after a few minutes.",
+      "feedback": "Not by default. You must configure something like 'idle_in_transaction_session_timeout'; out of the box the transaction pins the vacuum horizon indefinitely."
+    }
+  ]
+}
+\`\`\`
+
 The cost of MVCC is that old row versions pile up and must be reclaimed. In Postgres this is
 **VACUUM** (and autovacuum); in InnoDB it is the purge thread cleaning the undo log. The dangerous
 failure mode is a **long-running transaction**: it holds an old snapshot, so the database cannot
@@ -299,6 +322,29 @@ OCC wins when contention is genuinely low, because it skips all lock overhead. I
 high contention, because the abort-and-retry rate explodes and you burn CPU redoing work. So the
 rule is: **optimistic under low contention, pessimistic under high contention.**
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A viral post's like counter takes thousands of increments per second, all on one row. Contention could not be higher. Applying the rule you just read, is a pessimistic row lock the right design?",
+  "options": [
+    {
+      "label": "Yes. High contention means pessimistic, so lock the row for each increment.",
+      "feedback": "Tempting, because the rule literally says pessimistic under high contention. But that rule picks between control schemes for a workload you keep as-is. One hot row behind a lock serializes every writer to one-at-a-time."
+    },
+    {
+      "label": "No. When contention concentrates on one row, restructure the write path: shard the counter, batch increments, or use one atomic in-database increment.",
+      "correct": true,
+      "feedback": "Right. Heavy locking is the worst possible choice for a hot key. Spreading writes across N shards (sum on read) or batching turns a serialization point into parallel work."
+    },
+    {
+      "label": "No. Use optimistic version checks instead, since they skip lock overhead.",
+      "feedback": "OCC is even worse on a hot row: nearly every transaction fails its version check and retries, burning CPU in an abort storm."
+    }
+  ]
+}
+\`\`\`
+
 ### The hot key
 
 For a hot key specifically (a viral post's like counter taking thousands of increments per second on
@@ -317,6 +363,37 @@ Hot counter: 1 row, all writers -- LOCK --> serialized (bad)
 Recap: MVCC makes readers and writers not block each other by versioning rows, at the cost of vacuum
 and bloat from long transactions; choose optimistic control under low contention and pessimistic
 under high, and for a hot key shard the counter instead of serializing writers behind one lock.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "For each workload, pick the concurrency approach you would defend in a design review.",
+  "buckets": [
+    "Optimistic version check",
+    "Pessimistic row lock",
+    "Restructure the writes"
+  ],
+  "items": [
+    {
+      "label": "User profile edits, where two writers hitting the same row is rare",
+      "bucket": "Optimistic version check",
+      "feedback": "Low contention is OCC territory: zero lock overhead, and the rare conflict costs one cheap retry."
+    },
+    {
+      "label": "Withdrawals against a specific account row that several concurrent transfers target",
+      "bucket": "Pessimistic row lock",
+      "feedback": "Real contention on known rows: 'SELECT ... FOR UPDATE' queues the writers, and locking accounts in a consistent order (lower id first) avoids deadlocks."
+    },
+    {
+      "label": "A trending video's view counter absorbing thousands of writes per second on one row",
+      "bucket": "Restructure the writes",
+      "feedback": "Neither locks nor version checks survive a hot key: locks serialize writers and OCC melts into retries. Shard the counter into N sub-rows or batch and flush."
+    }
+  ],
+  "reveal": "In your design write, state the contention level first, then the mechanism: low contention gets a version check, high contention on known rows gets a short row lock taken in consistent order, and a hot key gets restructured, never serialized."
+}
+\`\`\`
 `.trim()
 
 const btreeVsLsmTeach = `
