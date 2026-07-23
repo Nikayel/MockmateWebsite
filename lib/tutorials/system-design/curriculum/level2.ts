@@ -1660,10 +1660,67 @@ or read independently, reference them: give them their own partition and store j
 many-to-many is handled with an adjacency-list pattern or a global secondary index that lets you
 query the relationship from both directions.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Same partition or its own partition? Decide by how the related data is read and whether it is bounded.",
+  "buckets": [
+    "Embed: same partition as the parent",
+    "Reference: own partition, store an id"
+  ],
+  "items": [
+    {
+      "label": "Order line items: bounded, always rendered with the order",
+      "bucket": "Embed: same partition as the parent",
+      "feedback": "Read with the parent and bounded: both embedding conditions hold, so co-locate them under the order's partition key."
+    },
+    {
+      "label": "A user's clickstream events, accumulating forever",
+      "bucket": "Reference: own partition, store an id",
+      "feedback": "Unbounded growth would eventually blow past what one partition should hold; give events their own partitions."
+    },
+    {
+      "label": "Product reviews that load on their own page, independent of the product",
+      "bucket": "Reference: own partition, store an id",
+      "feedback": "Read independently means reviews need their own access path, not a ride-along inside the product's partition."
+    },
+    {
+      "label": "A conversation's participant list: a handful of members, always shown with the thread",
+      "bucket": "Embed: same partition as the parent",
+      "feedback": "Small, bounded, and always read with the parent: the classic embed case."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the tell of a weak NoSQL answer is designing a users table, a conversations
 table, and a messages table that mirror a relational schema, then discovering you cannot list a
 user's conversations without a scan. The strong answer often puts multiple entity types in **one
 table** (single-table design), keyed so each access pattern hits one partition.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A tasks table uses partition key 'status'. Every new task is written with status ACTIVE. Writes start throttling, so you provision 10x more total table capacity. What happens?",
+  "options": [
+    {
+      "label": "Throttling stops: capacity was the ceiling and you just raised it.",
+      "feedback": "Tempting because provisioned capacity sounds like one global pool, but the ceiling that matters is per partition. Total table capacity does nothing for a single overloaded key."
+    },
+    {
+      "label": "Still throttles: every write targets the one ACTIVE partition, and a single partition has its own fixed throughput ceiling.",
+      "correct": true,
+      "feedback": "Right. The partition key routes to a physical node with a hard cap, so a low-cardinality key concentrates all the heat on one node no matter how much capacity you buy."
+    },
+    {
+      "label": "The database automatically splits the ACTIVE partition across more nodes.",
+      "feedback": "Tempting because these systems do split data by key range, but they cannot split a single partition-key value. Only a higher-cardinality key or write sharding spreads this load."
+    }
+  ]
+}
+\`\`\`
 
 ### Hot partitions and secondary indexes
 
@@ -1686,6 +1743,30 @@ Recap: enumerate access patterns first, turn each into a single-partition lookup
 partition and sort keys, choose embedding versus referencing by how the related data is read, design
 the partition key to avoid hot partitions, and add secondary indexes only to serve a named additional
 access pattern.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are about to model a chat app on DynamoDB. What is the first artifact you write down?",
+  "options": [
+    {
+      "label": "An entity-relationship diagram: users, conversations, messages.",
+      "feedback": "Tempting because that is exactly right for relational design, but with no joins and no flexible planner, entities-first is the tell of a weak answer: you discover too late that a query you need requires a full scan."
+    },
+    {
+      "label": "The complete list of access patterns as concrete sentences, each of which must become one query against one partition.",
+      "correct": true,
+      "feedback": "Right. Partition and sort keys, embed-vs-reference choices, single-table layout, and secondary indexes are all derived from that list, never the other way around."
+    },
+    {
+      "label": "The set of global secondary indexes you will need.",
+      "feedback": "Tempting because GSIs do buy extra access patterns, but they are eventually consistent and cost write capacity, so they are added last, one per named pattern the base keys cannot serve."
+    }
+  ],
+  "reveal": "The order of operations for the design exercise: list every access pattern, shape composite keys so each is a single-partition lookup, choose embed vs reference by read pattern and boundedness, check each key for hot-partition risk (write-shard the known-heavy ones), and only then add a GSI or LSI for patterns the base keys cannot serve."
+}
+\`\`\`
 `.trim()
 
 const keysIdsConstraintsTeach = `
