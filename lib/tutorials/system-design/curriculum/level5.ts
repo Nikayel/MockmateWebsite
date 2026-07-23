@@ -167,6 +167,29 @@ permanent three-way menu.
 - **P (Partition tolerance)** means the system keeps operating when the network drops or delays
   messages between nodes.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A vendor pitches a two-region database as CA: consistent and available, they simply did not choose partition tolerance. What should you conclude?",
+  "options": [
+    {
+      "label": "Reasonable: CAP says pick two, and they picked C and A",
+      "feedback": "That is the folklore version. P is not a menu item you can decline: the network between two regions will partition whether the vendor likes it or not."
+    },
+    {
+      "label": "It can work if they buy a very reliable inter-region link",
+      "feedback": "Tempting, but no link is partition-proof. Cables get cut, switches reboot, routes flap. Reliability lowers the frequency; it does not remove the forced choice."
+    },
+    {
+      "label": "The claim is a red flag: for a multi-node system, CA is not a real operating point",
+      "correct": true,
+      "feedback": "Right. Partitions are a fact of nature for anything spanning a network, so the only honest question is what the system does, CP or AP, when one happens."
+    }
+  ]
+}
+\`\`\`
+
 Here is why "pick 2" is nonsense: **P is not optional.** Networks partition. Cables get cut, switches
 reboot, a cross-region link saturates. You do not get to choose a world without partitions, so you
 cannot "give up P" to keep C and A. That means **CA is not a real operating point** for any system
@@ -193,6 +216,40 @@ consistency level ONE (AP-ish) or QUORUM/ALL (CP-ish) on each query. DynamoDB of
 consistent reads (cheap) or strongly consistent reads (a leader round trip). So "is X CP or AP?" is
 often the wrong question; the right one is "what does X do to *this* operation during a partition?"
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "A partition splits a cluster and writes keep arriving on both sides. Classify each behavior.",
+  "buckets": [
+    "CP behavior",
+    "AP behavior"
+  ],
+  "items": [
+    {
+      "label": "The minority side returns errors for writes it cannot coordinate",
+      "bucket": "CP behavior",
+      "feedback": "Refusing the write keeps the copies from diverging. Availability is sacrificed on that side to preserve linearizability."
+    },
+    {
+      "label": "Both sides accept the write and reconcile siblings after healing",
+      "bucket": "AP behavior",
+      "feedback": "Every non-failing node keeps answering, and the price is divergent copies that must be merged later."
+    },
+    {
+      "label": "ZooKeeper rejecting requests after losing quorum",
+      "bucket": "CP behavior",
+      "feedback": "Coordination stores choose consistency: a node that cannot reach a majority steps back rather than serve possibly stale answers."
+    },
+    {
+      "label": "A Cassandra query at consistency level ONE succeeding on either side",
+      "bucket": "AP behavior",
+      "feedback": "At level ONE a single replica suffices, so both sides keep taking writes. The same cluster at QUORUM would act CP-ish for that query, which is the tunability point."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
              partition!
    client -> [ node1 ] --X-- [ node2 ] <- client
@@ -206,6 +263,30 @@ Recap: CAP is a forced choice **only during a partition** between linearizable c
 availability, P is non-negotiable so CA is not a real operating point, C means linearizability and A
 means every non-failing node answers, and most production systems are tunable per operation rather
 than globally CP or AP.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The design write asks you to pick partition behavior for a cross-region shopping cart. What shape should a strong answer take?",
+  "options": [
+    {
+      "label": "Declare the whole product CP: carts are user data, so never risk inconsistency",
+      "feedback": "Sounds rigorous, but it means 'add to cart' returns errors during a partition, trading real conversions to protect data that can safely merge later."
+    },
+    {
+      "label": "Declare it CA and argue partitions are too rare to design for",
+      "feedback": "CA is the one answer that sinks the interview. Cross-region partitions are guaranteed eventually, so the choice cannot be dodged."
+    },
+    {
+      "label": "Choose per operation: keep cart edits available and reconcile, make checkout consistent",
+      "correct": true,
+      "feedback": "Right. Real systems tune the choice per operation. The cart tolerates divergence and merging; the payment path is where you refuse to proceed without coordination."
+    }
+  ],
+  "reveal": "In your write-up, define C as linearizability and A as every non-failing node answering, rule out CA explicitly, then defend the per-operation split by naming the user-visible consequence of each side."
+}
+\`\`\`
 `.trim()
 
 const pacelcTeach = `
