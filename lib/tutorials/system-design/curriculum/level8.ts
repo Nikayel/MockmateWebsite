@@ -132,6 +132,29 @@ During registration (WebAuthn \`navigator.credentials.create\`), the authenticat
 
 **Interview nuance:** "Breach-proof on the server" is the phrase that lands. A stolen user table full of public keys is worthless to an attacker, because a public key cannot be used to authenticate, only to verify. Compare that to a password hash dump, which is crackable offline. There is simply nothing secret to steal on the server side.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An attacker runs a perfect real-time phishing proxy: the victim interacts with a fake login page and every message is relayed instantly to the real site. This reliably defeats TOTP codes. Does it defeat a passkey?",
+  "options": [
+    {
+      "label": "Yes. If the proxy relays everything, it can relay the passkey exchange too",
+      "feedback": "Tempting because instant relay beats every code-based factor, but the browser will not even offer the credential on the wrong origin, so there is nothing for the proxy to relay."
+    },
+    {
+      "label": "Yes, as long as the victim approves with Face ID on the fake page",
+      "feedback": "Tempting because the user gesture happens locally either way, but the gesture only unlocks a credential the browser is willing to use, and the browser refuses to use the real site's credential on any other origin."
+    },
+    {
+      "label": "No. The credential is bound to the exact origin, and the browser refuses to use it anywhere else",
+      "correct": true,
+      "feedback": "Right. Origin binding means the fake domain never sees a signature at all, and any signature is over a challenge tied to a specific origin, so it cannot be replayed. This is what phishing-resistant actually means."
+    }
+  ]
+}
+\`\`\`
+
 ## Phishing resistance from origin binding
 
 The credential is cryptographically tied to the exact origin (say \`accounts.google.com\`). The browser will only offer and use that credential for that origin. If a victim lands on \`accounts-google.evil.com\`, the browser refuses to produce the credential, so there is nothing to phish. Contrast this with a TOTP code or an SMS OTP: those are just numbers the user reads and can be tricked into typing into a fake site, and a real-time phishing proxy relays them to the real site within the 30-second window. Passkeys close that hole because the signed challenge is bound to the origin and cannot be replayed elsewhere.
@@ -149,11 +172,69 @@ Login:         server --challenge--> device
 
 Platform authenticators are built into the device (Touch ID, Windows Hello). Roaming authenticators are removable (USB/NFC security keys) and work across machines. Modern passkeys are usually synced: Apple's iCloud Keychain and Google Password Manager back the private key up to the cloud (end-to-end encrypted) and sync it across your devices, so losing one phone does not lose the passkey. Device-bound passkeys (typically on hardware keys) never leave that device, which is more secure but has no built-in recovery. For consumer products, synced passkeys win on usability; for high-assurance enterprise, device-bound keys plus attestation are common. Attestation is an optional signed statement about what kind of authenticator was used, letting an enterprise require, say, only certified hardware keys. Most consumer sites skip attestation to avoid a privacy and friction cost.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Synced or device-bound? Match each property to the passkey flavor it belongs to.",
+  "buckets": [
+    "Synced passkey",
+    "Device-bound passkey"
+  ],
+  "items": [
+    {
+      "label": "Losing your phone does not lose the credential",
+      "bucket": "Synced passkey",
+      "feedback": "iCloud Keychain or Google Password Manager backs the private key up end-to-end encrypted and restores it on a new device."
+    },
+    {
+      "label": "The private key can never exist anywhere but one authenticator",
+      "bucket": "Device-bound passkey",
+      "feedback": "Typical of hardware keys: stronger assurance, but no built-in recovery if the key is lost, so users must enroll a backup."
+    },
+    {
+      "label": "The right default for a consumer product",
+      "bucket": "Synced passkey",
+      "feedback": "Consumers lose and replace devices constantly, so recovery through sync wins on usability."
+    },
+    {
+      "label": "Pairs with attestation when an enterprise requires certified hardware",
+      "bucket": "Device-bound passkey",
+      "feedback": "Attestation proves what kind of authenticator produced the credential, which matters exactly when policy demands certified device-bound hardware."
+    }
+  ]
+}
+\`\`\`
+
 ## Device loss and coexistence
 
 If a passkey is device-bound and the device is gone, the user is locked out unless they enrolled a second authenticator. Practical designs require enrolling at least two passkeys (phone plus a backup key), or fall back to another enrolled factor. Rolling out passkeys onto an existing password base uses progressive enrollment: keep passwords working, prompt users to add a passkey after a successful login, and over time let passkey-only users disable their password. Do not force a hard cutover; you will lock out the users whose only device just broke.
 
 **Recap:** passkeys replace shared secrets with a device-held private key so the server stores only a useless-to-steal public key, origin binding makes them phishing-resistant where OTP and SMS are not, synced passkeys solve device loss for consumers while device-bound plus attestation suits enterprise, and you roll them out via progressive enrollment alongside passwords.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are adding passkeys to a site with 20M existing password users. Which rollout do you write down?",
+  "options": [
+    {
+      "label": "Hard cutover: passwords stop working the day passkeys launch",
+      "feedback": "Tempting because the password is the weak link you want dead, but a hard cutover locks out every user whose only device just broke or who never enrolled; device loss needs a second enrolled authenticator or a fallback factor first."
+    },
+    {
+      "label": "Progressive enrollment: prompt users to add a passkey after a successful login, keep passwords working, and let passkey-only users disable their password later",
+      "correct": true,
+      "feedback": "Right. Enrollment rides on an already-authenticated session, nobody gets stranded, and the phishable credential is retired account by account instead of all at once."
+    },
+    {
+      "label": "Keep the password as the primary credential and use the passkey only as a second factor forever",
+      "feedback": "Tempting because layering feels safest, but it keeps a phishable shared secret as the anchor credential forever; the point of passkeys is to replace the password, not decorate it."
+    }
+  ],
+  "reveal": "In the design write, name the moving parts: public-key credentials so the server holds nothing stealable, origin binding for phishing resistance, synced passkeys plus a required second authenticator for device loss, and progressive enrollment as the migration path off passwords."
+}
+\`\`\`
 `.trim()
 
 const oauthOidcTeach = `
