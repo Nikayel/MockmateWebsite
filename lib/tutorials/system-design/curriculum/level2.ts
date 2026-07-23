@@ -634,6 +634,29 @@ variant). Writes modify the page **in the buffer pool**, marking it **dirty**. D
 written to their data-file home immediately; they are flushed later, in batches, at a **checkpoint**.
 This is what lets a database absorb many writes to the same hot page as one eventual disk write.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A transaction commits and the client receives success. At that moment, has the updated data page reached its home in the data file on disk?",
+  "options": [
+    {
+      "label": "Yes. Commit means the data is on disk; that is the whole point of durability.",
+      "feedback": "Tempting, and half right: something did reach disk before the acknowledgment. But it is not the data page, which is still sitting dirty in the buffer pool waiting for a checkpoint."
+    },
+    {
+      "label": "Usually not. The page is still dirty in the buffer pool, so something else must be providing the durability.",
+      "correct": true,
+      "feedback": "Right. Data pages flush lazily at checkpoints. Keep reading: the durability gap you just spotted is exactly what the write-ahead log closes."
+    },
+    {
+      "label": "Yes, because the database called 'write()' on the data file.",
+      "feedback": "Even after 'write()', the bytes can sit in the volatile OS page cache, which power loss wipes. Only an explicit fsync is durable, and the data page has not even gotten that far."
+    }
+  ]
+}
+\`\`\`
+
 Which raises the durability problem: if a committed change lives only as a dirty page in volatile
 memory, a crash loses it. The fix is the **write-ahead log (WAL)**.
 
@@ -673,6 +696,30 @@ INSERT ... COMMIT
 Recap: writes land in in-memory pages in the buffer pool and are flushed lazily at checkpoints, while
 a sequentially-written, fsync'd WAL provides the actual durability and crash recovery, all of it
 shaped by the ~100x gap between sequential and random I/O.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Power dies after the commit acknowledgment but before any checkpoint flushed the dirty page. On restart, what happens to that committed transaction?",
+  "options": [
+    {
+      "label": "It is lost: the data page never reached disk, so there is nothing to recover from.",
+      "feedback": "Tempting, because the page really did live only in RAM. But durability never depended on the page. The commit's redo record was fsync'd to the WAL before the acknowledgment went out."
+    },
+    {
+      "label": "It survives: recovery replays WAL records from the last checkpoint and rebuilds the lost page.",
+      "correct": true,
+      "feedback": "Right. Log before data: the sequential, fsync'd WAL is the durability point, and checkpoints are just an optimization that bounds how much replay recovery needs."
+    },
+    {
+      "label": "It survives only if the OS page cache happened to flush in time.",
+      "feedback": "The OS page cache is volatile and is exactly why 'write()' alone is not durability. The guarantee comes from the explicit fsync of the WAL, not from cache luck."
+    }
+  ],
+  "reveal": "In your design write, when you claim a write is durable, name the mechanism: redo record fsync'd to the WAL before the acknowledgment, group commit to amortize the fsync, and checkpoint-plus-replay on crash. That chain is your answer to 'what happens if the box dies.'"
+}
+\`\`\`
 `.trim()
 
 const keyValueTeach = `
