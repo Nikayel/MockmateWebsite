@@ -14,6 +14,29 @@ const authCredentialsTeach = `
 
 Authentication answers one question: who is this request from? Keep it strictly separate from authorization (what may they do), because conflating them is how systems end up trusting a valid-but-under-privileged token to do admin work. This lesson is about proving identity and, critically, about what your storage looks like the morning after an attacker copies your entire user table.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An attacker copies your entire 100M-row user table, backups included. Which way of storing passwords leaves them with nothing usable?",
+  "options": [
+    {
+      "label": "Encrypt each password with AES under a strong key",
+      "feedback": "Tempting because encryption sounds like the serious option, but encryption is reversible by design and the key usually lives near the data. You never need to read a password back, so reversibility is pure downside."
+    },
+    {
+      "label": "Hash each password with SHA-256, since hashes cannot be reversed",
+      "feedback": "Tempting because SHA-256 really is one-way, but it is built for speed: GPUs test hundreds of billions of SHA-256 guesses per second, so the dumped table is crackable offline in days."
+    },
+    {
+      "label": "Hash with a slow, memory-hard KDF like argon2id plus a unique per-user salt",
+      "correct": true,
+      "feedback": "Right. A KDF tuned to cost 50 to 100 ms per guess makes offline cracking economically hopeless, and per-user salts kill precomputed tables. Add a pepper held in a KMS and the dump alone can never be cracked."
+    }
+  ]
+}
+\`\`\`
+
 ## Store a verifier you cannot reverse
 
 The core rule: never store a password, store a verifier you cannot reverse. Use a memory-hard key derivation function: argon2id (preferred today), scrypt, or bcrypt. These are slow and memory-heavy on purpose so an attacker with your hashes cannot brute force billions of guesses per second on a GPU. A fast hash like MD5 or SHA-256 is the classic disqualifying answer: SHA-256 is designed to be fast, so a leaked SHA-256 table of 100M users is cracked at hundreds of billions of guesses per second. Tune argon2id to something like 19 MiB memory, 2 iterations, parallelism 1, then raise it until a single verify costs roughly 50 to 100 ms on your hardware. That latency is invisible per login but murders offline cracking.
@@ -26,6 +49,45 @@ Every password gets a unique random per-user salt, stored alongside the hash. Sa
 
 MFA adds a second factor so a leaked password alone is not enough. Ranked by strength: hardware security keys and passkeys (phishing-resistant) > TOTP authenticator apps (RFC 6238, 30-second codes) > push approvals (watch for MFA-fatigue bombing) > SMS one-time codes. SMS is the weak one: SIM-swap attacks let an attacker port the victim's number and receive the code. Offer TOTP or keys as the default and treat SMS as a last resort. Use risk-based step-up: do not prompt MFA on a known device from a known location, do prompt on a new device, a new country, or a sensitive action like changing the recovery email.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort these second factors: which ones survive a determined phishing attempt, and which can still be captured or coerced out of the user?",
+  "buckets": [
+    "Phishing-resistant",
+    "Still stealable"
+  ],
+  "items": [
+    {
+      "label": "Hardware security key",
+      "bucket": "Phishing-resistant",
+      "feedback": "The credential is origin-bound cryptography; there is no code for a fake site to capture."
+    },
+    {
+      "label": "Passkey",
+      "bucket": "Phishing-resistant",
+      "feedback": "Same public-key model as a hardware key: nothing readable crosses the wire, so there is nothing to relay to a fake site."
+    },
+    {
+      "label": "TOTP authenticator app code",
+      "bucket": "Still stealable",
+      "feedback": "Tempting to rank it with keys because there is no SMS to intercept, but it is still a number the user can type into a fake site, and a real-time proxy relays it within the 30-second window."
+    },
+    {
+      "label": "SMS one-time code",
+      "bucket": "Still stealable",
+      "feedback": "Weakest of all: SIM-swap lets an attacker receive it directly, and it is phishable like any typed code."
+    },
+    {
+      "label": "Push approval tap",
+      "bucket": "Still stealable",
+      "feedback": "MFA-fatigue bombing works precisely because a tired user can be pushed into tapping approve; nothing binds the tap to the real login attempt."
+    }
+  ]
+}
+\`\`\`
+
 The uncomfortable truth: account recovery is the real attack surface. Attackers rarely crack a good hash; they take over the reset flow. A "forgot password" email link, an SMS code, or a support agent who can be socially engineered is often weaker than the login itself. Recovery must be as strong as the primary factor: signed single-use tokens with short expiry, rate limits, and re-verification of a second factor before letting anyone change the password or MFA settings.
 
 ## Stop credential stuffing without leaking who exists
@@ -33,6 +95,30 @@ The uncomfortable truth: account recovery is the real attack surface. Attackers 
 Defend against credential stuffing (attackers replaying passwords leaked from other sites) without leaking who exists. Check new passwords against known-breached lists using the Have I Been Pwned k-anonymity API (send a 5-char hash prefix, never the password). Throttle and add exponential backoff per account and per IP, add CAPTCHA on suspicious volume, and return the exact same generic error and timing for "wrong password" and "no such user." Any difference in message, status code, or response time is a user-enumeration oracle. Use a constant-time comparison for tokens and codes so timing does not leak how many characters matched.
 
 **Recap:** hash passwords with a memory-hard KDF plus per-user salt (and a KMS pepper) so a DB dump is useless, layer MFA with SMS as the weak factor, harden account recovery because it is the real attack surface, and stop credential stuffing with breach checks and throttling while never revealing whether an account exists.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are about to design the login service. A login request arrives for an email that has no account. What should the response be?",
+  "options": [
+    {
+      "label": "A clear 'no account with that email' message, because it is better UX",
+      "feedback": "Tempting because it genuinely helps confused users, but it hands attackers an oracle for which emails have accounts, feeding credential-stuffing lists and targeted phishing."
+    },
+    {
+      "label": "A 404 for missing accounts and a 401 for wrong passwords",
+      "feedback": "Tempting because distinct status codes feel like clean API design, but different codes are the loudest enumeration oracle of all; a script does not even need to parse the body."
+    },
+    {
+      "label": "The exact same generic error, status code, and near-identical timing as a wrong password",
+      "correct": true,
+      "feedback": "Right. Any observable difference in message, code, or timing tells an attacker whether the account exists. Pair this with per-account and per-IP throttling and breached-password checks."
+    }
+  ],
+  "reveal": "In your design write, cover the full survivability stack the recap names: argon2id with per-user salt and a KMS pepper so the dump is dead, phishing-resistant MFA with SMS demoted to last resort, recovery flows as strong as the login itself, and enumeration-safe errors with throttling and breach checks."
+}
+\`\`\`
 `.trim()
 
 const passkeysWebauthnTeach = `
