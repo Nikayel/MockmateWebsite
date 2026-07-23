@@ -1534,6 +1534,29 @@ const piiDsarPrivacyTeach = `
 
 GDPR gives users the right to see their data and the right to be forgotten. Honoring the second one, erasure within 30 days across every store, is one of the hardest data-engineering problems most companies quietly fail at, because a user's PII is never in one place.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An erasure request arrives. You run 'DELETE FROM users WHERE id = 123' on the primary database and close the ticket. Is user 123 erased?",
+  "options": [
+    {
+      "label": "Yes: the primary is the system of record, so deleting there is deletion",
+      "feedback": "Tempting, because the primary is authoritative for reads and writes. But the user still exists in read replicas, caches, search indexes, the analytics lake, queues, logs, backups, and at third-party processors."
+    },
+    {
+      "label": "No: copies survive in replicas, caches, search, the lake, logs, backups, and vendors",
+      "correct": true,
+      "feedback": "Right. PII is never in one place, which is why erasure is an orchestration problem across every store, not a single SQL statement."
+    },
+    {
+      "label": "Mostly: only encrypted backups remain, and encryption makes those not count",
+      "feedback": "Backups are one gap, but far from the only one, and ordinary encryption does not neutralize them because the company still holds the key. Something stronger is needed there, as this lesson shows."
+    }
+  ]
+}
+\`\`\`
+
 ## Step one: know where it lives
 
 You cannot delete what you cannot find. This demands a data inventory and classification: a catalog (DataHub, Amundsen, AWS Glue Data Catalog, or a home-grown registry) that tags every field as PII, sensitive, or non-sensitive, and records which datastore, table, and column holds it. Without this, "delete the user" is a guess. Mature teams enforce classification at write time so new PII columns cannot appear uncatalogued.
@@ -1545,6 +1568,29 @@ Beyond access (DSAR) and erasure, GDPR grants rectification (fix wrong data), po
 ## Step three: delete every copy (the hard part)
 
 A single user lives in the primary DB, read replicas, Redis caches, an Elasticsearch/OpenSearch index, the analytics lake (S3/Parquet), message queues, application logs, and third-party processors (Stripe, Segment, your email provider). Erasure has to reach all of them. Live stores you delete directly. Search indexes you re-index or delete by query. Third parties you call their deletion API and record the confirmation.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Live stores are handled. Now the three-week-old Postgres backup snapshot: how do you erase user 123 from it?",
+  "options": [
+    {
+      "label": "Restore the snapshot, delete the rows, and back it up again",
+      "feedback": "Tempting, but you cannot surgically edit immutable snapshots, and rewriting every backup for every erasure request never scales past a handful of users."
+    },
+    {
+      "label": "Delete the whole backup",
+      "feedback": "That erases the user, but it also destroys your disaster-recovery and ransomware protection for every other user. Immutable backups exist for a reason."
+    },
+    {
+      "label": "Destroy the user's per-user encryption key so the backup copy becomes unrecoverable",
+      "correct": true,
+      "feedback": "Right. This is crypto-shredding: encrypt each user's data with a per-user key, and erase by destroying that key. The ciphertext frozen in old backups becomes noise, which regulators accept as effective erasure."
+    }
+  ]
+}
+\`\`\`
 
 Backups are the killer. You cannot surgically edit a Postgres snapshot from three weeks ago, and you should not (immutable backups are a ransomware defense). The answer is **crypto-shredding**: encrypt each user's data with a per-user data key, store those keys in a KMS, and to "erase" the user, destroy their key. The ciphertext still sits in old backups but is now unrecoverable noise, which regulators accept as effective erasure. This is the single most important pattern in this lesson.
 
@@ -1563,6 +1609,47 @@ Erasure request(user_id)
 **Interview nuance:** know the three de-identification tiers precisely. **Anonymization** is irreversible: strip identifiers so no one can re-link (truly anonymized data leaves GDPR scope). **Pseudonymization** replaces identifiers with a reversible token, key held separately, still personal data under GDPR. **Tokenization** is a form of pseudonymization for a specific field. For sharing analytics safely, add **k-anonymity** (each row indistinguishable from at least k-1 others) or **differential privacy** (inject calibrated noise so no individual's presence changes an aggregate). Aggregates alone are not safe: a single-row group re-identifies instantly.
 
 **Recap:** catalog every copy first, orchestrate rights on a stable user_id, delete across all live stores plus third parties, crypto-shred to handle backups, resolve retention conflicts per-field, and pick anonymization vs pseudonymization deliberately with k-anonymity or differential privacy for shared analytics.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "One user, one 30-day clock. For each copy of their data, pick the move that actually completes the erasure.",
+  "buckets": [
+    "Delete or evict directly",
+    "Crypto-shred the per-user key",
+    "Retain with a documented lawful basis"
+  ],
+  "items": [
+    {
+      "label": "Rows in the primary database and its read replicas",
+      "bucket": "Delete or evict directly",
+      "feedback": "Live stores you delete directly, and you verify replication carried the delete through."
+    },
+    {
+      "label": "Cached entries in Redis and documents in OpenSearch",
+      "bucket": "Delete or evict directly",
+      "feedback": "Evict the keys and delete by query; both are live stores you control."
+    },
+    {
+      "label": "The user's data frozen inside immutable backup snapshots",
+      "bucket": "Crypto-shred the per-user key",
+      "feedback": "You cannot edit immutable backups and should not delete them; destroying the per-user key makes those copies unrecoverable."
+    },
+    {
+      "label": "Seven years of transaction records that tax law requires you to keep",
+      "bucket": "Retain with a documented lawful basis",
+      "feedback": "Retention conflicts are resolved per-field: keep the legally mandated financial record, often pseudonymized, and document why."
+    },
+    {
+      "label": "Copies held by Stripe, Segment, and your email provider",
+      "bucket": "Delete or evict directly",
+      "feedback": "Call each vendor's deletion API and store the confirmation receipt; third-party processors are inside your erasure obligation."
+    }
+  ],
+  "reveal": "This is the shape of your design answer: a catalog so you can find every copy, an orchestrator keyed on user_id fanning out to live stores and vendors, crypto-shredding for backups, and per-field retention for legal conflicts. Reach for k-anonymity or differential privacy when the ask is sharing analytics rather than erasing."
+}
+\`\`\`
 `.trim()
 
 const auditSupplychainTeach = `
