@@ -425,6 +425,40 @@ latency. **Bloom filters** (a small probabilistic set per SSTable) let a read sk
 definitely does not contain the key. **Compaction** merges SSTables in the background, discarding
 overwritten and deleted (tombstoned) rows, which bounds how many files a read must touch.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Which engine family does each statement describe?",
+  "buckets": [
+    "B+tree",
+    "LSM-tree"
+  ],
+  "items": [
+    {
+      "label": "A range scan walks linked, sorted leaf pages sequentially",
+      "bucket": "B+tree",
+      "feedback": "Sorted leaves linked in order are the B+tree signature, and why it owns 'created_at between X and Y' queries."
+    },
+    {
+      "label": "A write is an append to a memtable plus a sequential log, never an in-place page edit",
+      "bucket": "LSM-tree",
+      "feedback": "Append-only sequential writes are why LSM engines sustain very high, SSD-friendly write throughput."
+    },
+    {
+      "label": "A read may need to consult several on-disk files, so each file carries a bloom filter",
+      "bucket": "LSM-tree",
+      "feedback": "The key could live in the memtable or any SSTable; bloom filters let a read skip files that definitely do not contain it."
+    },
+    {
+      "label": "Changing one 200 byte row can force rewriting an entire 8KB page",
+      "bucket": "B+tree",
+      "feedback": "In-place page updates mean small logical writes become full page writes: the B+tree's flavor of write amplification."
+    }
+  ]
+}
+\`\`\`
+
 ### The three amplifications
 
 - **Write amplification:** bytes written to disk per byte of logical write. B-tree pays it via
@@ -453,6 +487,30 @@ B+TREE (read/update-heavy OLTP)     LSM-TREE (write-heavy ingest)
 Recap: B-tree updates pages in place for fast reads and range scans at the cost of write
 amplification; LSM appends to a memtable then compacts immutable SSTables for high write throughput,
 using bloom filters and compaction to keep reads sane.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate says: 'Cassandra benchmarks faster than Postgres, so we should use an LSM engine for everything.' What is the accurate correction?",
+  "options": [
+    {
+      "label": "LSM is faster at writes because they are sequential appends, but it pays with read amplification and background compaction that spikes latency; a read-heavy or range-scan-heavy workload still favors a B+tree.",
+      "correct": true,
+      "feedback": "Right. Neither engine is simply faster. You are choosing where to pay: LSM shifts cost onto reads and compaction, a B+tree shifts it onto writes."
+    },
+    {
+      "label": "They are right: append-only writes make LSM faster across the board.",
+      "feedback": "Tempting, because the write path really is faster. But every overwrite lives in multiple SSTables until compaction merges them, so reads fan out across files, and compaction competes for disk exactly when you are busiest."
+    },
+    {
+      "label": "B+trees are always faster because mature SQL engines are better optimized.",
+      "feedback": "Maturity is not the axis. A write-heavy ingest workload genuinely overwhelms in-place page updates, which is exactly the problem LSM engines were built to solve."
+    }
+  ],
+  "reveal": "In your design write, lead with the workload's read/write mix, then name the engine and the amplification you accept: 'write-heavy ingest, so LSM, and I will watch compaction' beats naming a database brand."
+}
+\`\`\`
 `.trim()
 
 const indexingCostTeach = `
