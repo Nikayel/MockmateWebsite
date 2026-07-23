@@ -298,6 +298,29 @@ hole. Read it as: **if Partition (P), choose Availability or Consistency (A/C); 
 Latency or Consistency (L/C).** The first half is just CAP. The second half, the **ELC** part, is the
 one that actually shapes your latency budget day to day.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 3-region store promises linearizable writes. The network is perfectly healthy this week, not a partition in sight. What does each write cost?",
+  "options": [
+    {
+      "label": "Nothing extra: the consistency price is only paid during a partition",
+      "feedback": "That is CAP-only thinking, the exact junior tell this lesson names. The coordination that makes a write linearizable happens on every write, healthy network or not."
+    },
+    {
+      "label": "A round trip to a quorum of regions before the write is acknowledged, tens of milliseconds",
+      "correct": true,
+      "feedback": "Right. The write waits on the second-fastest region every single time. That steady-state tax is the ELC half of PACELC."
+    },
+    {
+      "label": "Only reads pay a cost; writes commit locally and replicate in the background",
+      "feedback": "Backwards for linearizability: a write acknowledged before reaching a quorum could be lost or invisible to the next reader, so writes are precisely what must wait for coordination."
+    }
+  ]
+}
+\`\`\`
+
 ### The else-case insight: strong consistency is never free
 
 To guarantee a linearizable read or write, a system must coordinate, and coordination is round trips:
@@ -328,6 +351,40 @@ tail-latency cost, not a philosophical one.
 - **PA/EC** also exists (some tunable stores): available under partition but preferring consistency
   when healthy.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Place each behavior on the PACELC spectrum.",
+  "buckets": [
+    "PA/EL",
+    "PC/EC"
+  ],
+  "items": [
+    {
+      "label": "DynamoDB default reads served from the nearest copy, possibly stale",
+      "bucket": "PA/EL",
+      "feedback": "Available under partition, latency-first when healthy. The opt-in strongly consistent read is the per-operation lever toward EC."
+    },
+    {
+      "label": "Cassandra at consistency level ONE",
+      "bucket": "PA/EL",
+      "feedback": "One replica answers: fastest, possibly stale. Cranking the same query to QUORUM or ALL pushes it toward EC, one cluster spanning the spectrum."
+    },
+    {
+      "label": "Spanner paying a Paxos quorum plus TrueTime commit-wait on every commit",
+      "bucket": "PC/EC",
+      "feedback": "Consistent during partitions, and it still pays coordination when healthy. That is why Spanner writes cost tens of milliseconds on a perfect network."
+    },
+    {
+      "label": "CockroachDB waiting on a Raft quorum ack for the range",
+      "bucket": "PC/EC",
+      "feedback": "Same posture as Spanner with different plumbing: Raft per range and hybrid logical clocks instead of atomic-clock hardware."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the mistake that reads as junior is reasoning **only about partitions**. If you
 say "we'll use strong consistency, partitions are rare so it's cheap," you have missed that strong
 consistency taxes **every** request. The staff-level move ties it to an **SLO**: "our read p99 budget
@@ -348,6 +405,30 @@ Recap: PACELC extends CAP with the else-case, the latency-vs-consistency tax pai
 even with no partition, because linearizable reads and writes need leader or quorum round trips;
 DynamoDB and Cassandra are PA/EL while Spanner and CockroachDB are PC/EC, and the senior move is
 tying the L-vs-C choice to a concrete latency SLO.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your feed serves three regions with a 20ms read p99 SLO, and the US-to-EU round trip alone is about 80ms. Which posture can hit the SLO on the hot read path?",
+  "options": [
+    {
+      "label": "EC with quorum reads, since correctness comes first",
+      "feedback": "Physically impossible: one cross-region round trip already blows the 20ms budget four times over. An SLO is a constraint the consistency choice must obey."
+    },
+    {
+      "label": "EL nearest-replica reads, with session guarantees patching the cases that need read-your-writes",
+      "correct": true,
+      "feedback": "Right. Serve locally in single-digit milliseconds, accept eventual consistency, and cure the one staleness users notice with a targeted guarantee instead of global coordination."
+    },
+    {
+      "label": "EC, but only switched on when a partition is detected",
+      "feedback": "This inverts PACELC: EC is the else case, the price paid when the network is healthy. Partitions are where the PA-versus-PC half applies instead."
+    }
+  ],
+  "reveal": "That is the staff-level move to reuse in the design write: place each store on the spectrum, name the round trips behind its posture, and tie the L-versus-C choice to a concrete latency number."
+}
+\`\`\`
 `.trim()
 
 const consistencySpectrumTeach = `
