@@ -576,6 +576,36 @@ lags the primary, and each guarantee cures one symptom of that lag):
 - **Monotonic writes:** your writes are applied in the order you issued them.
 - **Writes-follow-reads:** if you read X and then write Y in response, everyone sees X before Y.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each bug report to the session guarantee it violates.",
+  "buckets": [
+    "Read-your-writes",
+    "Monotonic reads",
+    "Writes-follow-reads"
+  ],
+  "items": [
+    {
+      "label": "You save a new bio, refresh, and the old bio is back",
+      "bucket": "Read-your-writes",
+      "feedback": "Your own later read returned something older than your own write: the refresh hit a replica lagging the primary."
+    },
+    {
+      "label": "A thread shows 10 comments, then a refresh shows 8",
+      "bucket": "Monotonic reads",
+      "feedback": "You saw a state and a later read showed an earlier one. Time went backwards because the second read hit a staler replica than the first."
+    },
+    {
+      "label": "Some users see your answer to a question before the question itself",
+      "bucket": "Writes-follow-reads",
+      "feedback": "You read the question and wrote the answer in response, so everyone should observe them in that order. This one constrains what other observers see of your causal chain."
+    }
+  ]
+}
+\`\`\`
+
 Implementation was covered in depth in Level 3, so one line here: pin a user's reads to the primary or
 a caught-up replica for a short window after a write (**sticky routing**, single-device), or return a
 **logical version token** (an LSN or commit timestamp) that later reads carry so the read path waits
@@ -607,6 +637,30 @@ Recap: session guarantees are the client-centric cut of the consistency spectrum
 causal because they bind only one client's own view (though the four together give per-client causal);
 implement them with sticky routing or version tokens (Level 3 has the depth), and prefer them over
 linearizability for user-facing reads, escalating only for truly global invariants.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The stale-bio bug must be fixed cross-device: the user edits on their phone, then reads on their laptop. Which fix actually works?",
+  "options": [
+    {
+      "label": "Sticky routing: pin the user's reads to the primary via a session cookie",
+      "feedback": "Tempting, and it works single-device, but a cookie-scoped sticky session does not travel from the phone to the laptop. The laptop's read path never learns a write happened."
+    },
+    {
+      "label": "A logical version token from the write that the user's later reads carry",
+      "correct": true,
+      "feedback": "Right. The token travels with the user's account rather than one device, so the laptop's read can wait for a replica caught up past that commit point."
+    },
+    {
+      "label": "Make all reads linearizable so staleness is impossible",
+      "feedback": "It would fix the bug, but at global coordination cost on every read for every user, to cure a per-client symptom. That is exactly the escalation this lesson tells you to refuse."
+    }
+  ],
+  "reveal": "That is the frame to carry into the design write: session guarantees are per-client promises, cheaper than any global model, so spend them on user-facing reads and reserve linearizability for genuinely global invariants like uniqueness checks and locks."
+}
+\`\`\`
 `.trim()
 
 const logicalClocksTeach = `
