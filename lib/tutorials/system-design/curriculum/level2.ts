@@ -528,6 +528,29 @@ B-tree that maps indexed columns to a row locator (the primary key in InnoDB, or
 pointer in Postgres, whose tables are unordered "heaps"). This matters because in a heap table, a
 secondary index match still needs a second read to fetch the row from the heap.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A table has one composite index on (a, b, c). A query filters 'WHERE b = 5' with no condition on a. Can the index serve that query efficiently?",
+  "options": [
+    {
+      "label": "Yes. b is one of the indexed columns, so the database can seek straight to b = 5.",
+      "feedback": "Tempting, and it is the most common indexing mistake in practice. The index is sorted by a first, so rows with b = 5 are scattered across every a group and there is no single place to seek."
+    },
+    {
+      "label": "No. The index is sorted by a first, so b is only ordered within each a group, and a lone b filter has no efficient path.",
+      "correct": true,
+      "feedback": "Right. An index on (a, b, c) serves prefixes: a alone, a and b, or all three. b alone cannot use the sort order."
+    },
+    {
+      "label": "Yes, but only if the query also sorts by c.",
+      "feedback": "Adding a sort on c does not help. Without pinning a, the entries for b = 5 are still spread across the whole index."
+    }
+  ]
+}
+\`\`\`
+
 ### The leftmost-prefix rule
 
 The single most tested idea: an index on (a, b, c) is sorted first by a, then by b within equal a,
@@ -562,6 +585,30 @@ full-text, and geospatial).
 Recap: pick the index by the query, order composite columns as equality-then-sort per the
 leftmost-prefix rule, make it covering when a hot query justifies the width, and remember every index
 taxes every write.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your hot query is 'WHERE user_id = ? AND status = ? ORDER BY created_at DESC' on a write-heavy table. What do you build?",
+  "options": [
+    {
+      "label": "One composite index on (user_id, status, created_at): equality columns first, sort column last.",
+      "correct": true,
+      "feedback": "Right. The equality prefix pins a contiguous slice, and created_at is already in order inside that slice, so no separate sort step. And it is a single index to maintain on every write."
+    },
+    {
+      "label": "Three single-column indexes on user_id, status, and created_at, so the planner can combine them.",
+      "feedback": "Tempting, because it feels flexible. The planner can sometimes bitmap-AND the filters, but it can never get the sort order from combined indexes, and you now pay three index maintenance writes on every insert."
+    },
+    {
+      "label": "One composite index on (created_at, user_id, status), since the query sorts by created_at.",
+      "feedback": "Sort-column-first breaks the leftmost-prefix rule for the equality filters: your user's rows are scattered across every created_at value, so the index cannot pin them."
+    }
+  ],
+  "reveal": "In your design write, justify each index by the query it serves and the writes it taxes: name the column order and why (equality then sort), say whether it is covering, and name the index you deliberately did not add."
+}
+\`\`\`
 `.trim()
 
 const physicalStorageWalTeach = `
