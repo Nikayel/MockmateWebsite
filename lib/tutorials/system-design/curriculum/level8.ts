@@ -1308,9 +1308,72 @@ You draw a **data-flow diagram** with **trust boundaries** (where data crosses f
 
 Each STRIDE category maps to a defense property, so the exercise systematically surfaces gaps instead of relying on whoever remembers to think about security. You prioritize the resulting threats (likelihood x impact, or DREAD) and only mitigate what matters.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are walking a data-flow diagram. Classify each threat by its STRIDE category, which tells you the defense it demands.",
+  "buckets": [
+    "Spoofing (authentication)",
+    "Tampering (integrity)",
+    "Elevation of privilege (authorization)"
+  ],
+  "items": [
+    {
+      "label": "A client replays another user's session token",
+      "bucket": "Spoofing (authentication)",
+      "feedback": "Pretending to be a different identity is spoofing; the mapped defense is stronger authentication and token binding."
+    },
+    {
+      "label": "A price field is modified between the cart service and checkout",
+      "bucket": "Tampering (integrity)",
+      "feedback": "Data changed in transit is tampering; the answer is TLS on the hop plus signing or hashing the payload."
+    },
+    {
+      "label": "A regular user calls an admin-only endpoint and it works",
+      "bucket": "Elevation of privilege (authorization)",
+      "feedback": "Gaining rights you should not have is elevation; the defense is authorization checks and least privilege on every path."
+    },
+    {
+      "label": "A service presents a forged internal identity certificate",
+      "bucket": "Spoofing (authentication)",
+      "feedback": "Workload impersonation is spoofing at a service boundary, which is exactly what CA-verified mTLS identities prevent."
+    },
+    {
+      "label": "An attacker edits a stored invoice record they were only meant to read",
+      "bucket": "Tampering (integrity)",
+      "feedback": "Modification at rest is still tampering; integrity controls like signatures and append-only audit records catch it."
+    }
+  ]
+}
+\`\`\`
+
 ## Secure-design principles
 
 The principles you apply to the mitigations: **least privilege** (each component gets the minimum access it needs), **defense in depth** (layered controls so one failure is not fatal), **fail secure** (on error, deny rather than allow), **complete mediation** (check authorization on every access, not once at the start), **secure defaults** (safe out of the box, opt into risk), and **assume breach** (design as if the attacker is already inside).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An employee laptop connects through the corporate VPN and then gets phished. In the classic perimeter model, what can the attacker now reach?",
+  "options": [
+    {
+      "label": "Just that laptop and the handful of internal apps the employee uses.",
+      "feedback": "Tempting, because that is what the model promises on paper. But the perimeter model authenticates once at the edge and then trusts network location, so nothing re-checks the attacker on the inside."
+    },
+    {
+      "label": "Essentially the whole internal network, moving laterally from the laptop's trusted position.",
+      "correct": true,
+      "feedback": "Right. Hard perimeter, soft interior: once inside, traffic is implicitly trusted, so one phished laptop becomes a beachhead and the blast radius is the entire flat network."
+    },
+    {
+      "label": "Nothing extra: the firewall still filters everything the laptop sends.",
+      "feedback": "The firewall guards the boundary between inside and outside. The laptop is already inside, which is precisely the case perimeter defenses do not cover."
+    }
+  ]
+}
+\`\`\`
 
 ## Zero-trust
 
@@ -1323,6 +1386,51 @@ The payoff is **blast-radius containment**. If one service is compromised, it ho
 **Interview nuance:** the classic wrong turn is **bolting security on at the end** ("we will add auth before launch"). Threat modeling is valuable precisely because it is done at design time, when changing a trust boundary is a diagram edit rather than a rewrite. And the classic zero-trust misconception is that it is a product you buy; it is an architecture principle (verify every request, no implicit network trust) that mTLS, identity-aware proxies, and micro-segmentation implement.
 
 **Recap:** STRIDE walks a data-flow diagram's trust boundaries to surface spoofing/tampering/repudiation/info-disclosure/DoS/elevation threats, each mapping to a defense; apply least privilege, defense in depth, fail secure, complete mediation, secure defaults, and assume-breach; and implement zero-trust (never trust, always verify) with workload identity, mTLS via a service mesh, identity-aware proxies replacing VPNs, and micro-segmentation to contain lateral movement and blast radius.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Last pass before your design write: which model does each statement describe?",
+  "buckets": [
+    "Perimeter model",
+    "Zero-trust"
+  ],
+  "items": [
+    {
+      "label": "Trust derives from network location: inside means trusted",
+      "bucket": "Perimeter model",
+      "feedback": "That implicit trust is the core failure: it makes lateral movement free."
+    },
+    {
+      "label": "Every east-west call presents a verified workload identity over mTLS",
+      "bucket": "Zero-trust",
+      "feedback": "Never trust, always verify, applied to service-to-service traffic via SPIFFE identities and a mesh."
+    },
+    {
+      "label": "A VPN login grants broad reach to internal apps",
+      "bucket": "Perimeter model",
+      "feedback": "One credential at the edge unlocking everything inside is the pattern identity-aware proxies replace."
+    },
+    {
+      "label": "Default-deny networking: each service reaches only its explicit dependencies",
+      "bucket": "Zero-trust",
+      "feedback": "Micro-segmentation is least privilege at the network layer, so a compromised service cannot scan the subnet."
+    },
+    {
+      "label": "A single compromised host makes lateral movement fast and silent",
+      "bucket": "Perimeter model",
+      "feedback": "With no internal verification, nothing slows the attacker down or logs their movement."
+    },
+    {
+      "label": "A compromised service stays bounded, and every call it attempts is authenticated and logged",
+      "bucket": "Zero-trust",
+      "feedback": "Blast-radius containment: movement becomes slow, loud, and bounded."
+    }
+  ],
+  "reveal": "In the design write, do these in order: draw the data-flow diagram, mark the trust boundaries, run STRIDE at each crossing, then justify the zero-trust controls (workload identity, mTLS, identity-aware proxy, micro-segmentation) as mitigations for the threats you found. And dodge the two trap answers: security bolted on at the end, and zero-trust as a product you buy."
+}
+\`\`\`
 `.trim()
 
 const complianceFrameworksTeach = `
