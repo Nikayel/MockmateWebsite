@@ -724,6 +724,29 @@ const encryptionTransitMtlsTeach = `
 
 Encryption in transit protects data on every network hop against eavesdropping (confidentiality) and silent modification (integrity). The baseline is **TLS 1.3**. It matters because it dropped the insecure cruft that plagued TLS 1.2: no RSA key exchange, no static Diffie-Hellman, no CBC-mode ciphers, no renegotiation. Every 1.3 handshake uses ephemeral (Elliptic-Curve) Diffie-Hellman, which gives **forward secrecy**: even if an attacker records ciphertext today and steals your server private key next year, past sessions stay unreadable because the session keys were ephemeral and thrown away. The 1.3 handshake is also one round trip instead of two, which cuts connection latency noticeably at p99.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An attacker quietly records your TLS 1.3 traffic for a year, then steals the server's private key. Can they now decrypt the recorded sessions?",
+  "options": [
+    {
+      "label": "Yes. With the private key they can decrypt anything that was encrypted to it.",
+      "feedback": "Tempting, and it was true under the old RSA key exchange in TLS 1.2 and earlier. In TLS 1.3 the server key only authenticates the handshake; session keys come from ephemeral Diffie-Hellman and are thrown away, so recorded ciphertext stays unreadable."
+    },
+    {
+      "label": "No. Forward secrecy means the past session keys were ephemeral and are gone.",
+      "correct": true,
+      "feedback": "Right. Every TLS 1.3 handshake uses ephemeral Diffie-Hellman, so the stolen long-term key cannot reconstruct past session keys. Only future sessions are at risk, until the cert rotates."
+    },
+    {
+      "label": "Only sessions from the last 90 days, matching the cert lifetime.",
+      "feedback": "Cert lifetime bounds how long a stolen key is useful going forward, not what it unlocks backward. Forward secrecy protects all past sessions regardless of the cert's lifetime."
+    }
+  ]
+}
+\`\`\`
+
 On top of the protocol you need cert hygiene. Serve a modern cipher suite only (AES-GCM or ChaCha20-Poly1305, both authenticated), send **HSTS** so browsers refuse to downgrade to plaintext HTTP, and automate issuance and rotation with **ACME** (Let's Encrypt or an internal ACME CA). Manual cert renewal is how you get a 3 a.m. outage when a wildcard expires. Short lifetimes (90 days publicly, hours internally) shrink the damage window of a leaked key.
 
 ## mTLS gives every workload an identity
@@ -745,6 +768,46 @@ Terminating TLS at the edge load balancer or CDN lets it inspect, route, and cac
 **Interview nuance:** revocation is the hard part of PKI. OCSP and CRLs scale poorly and can fail open, so the industry answer is **short-lived certificates** (expire before revocation would matter) rather than relying on revocation lists. Certificate pinning stops a rogue CA but is operationally brittle: pin the wrong cert or forget to rotate the pin and you brick your own clients, which is why mobile teams pin to a CA or backup key, not a single leaf.
 
 **Recap:** baseline on TLS 1.3 for forward secrecy and downgrade protection, automate cert issuance and rotation, and use mTLS with short-lived certs to give every service a verifiable identity so you never trust the network alone.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each design element into the traffic plane it belongs to.",
+  "buckets": [
+    "North-south (client to edge)",
+    "East-west (service to service)"
+  ],
+  "items": [
+    {
+      "label": "ACME-automated public certs with 90-day lifetimes",
+      "bucket": "North-south (client to edge)",
+      "feedback": "Public browser-facing certs come from an ACME CA like Let's Encrypt and renew automatically, so no 3 a.m. expiry outage."
+    },
+    {
+      "label": "Both sides present certificates and verify against the CA",
+      "bucket": "East-west (service to service)",
+      "feedback": "That is mTLS: mutual proof of identity for internal service-to-service calls."
+    },
+    {
+      "label": "HSTS so browsers refuse to downgrade to plaintext",
+      "bucket": "North-south (client to edge)",
+      "feedback": "HSTS is an instruction to browsers, so it only makes sense on the public edge."
+    },
+    {
+      "label": "Short-lived SPIFFE certs rotated by the mesh every 24 hours",
+      "bucket": "East-west (service to service)",
+      "feedback": "Mesh-issued workload certs are the internal identity story, expiring faster than revocation could ever catch up."
+    },
+    {
+      "label": "Terminate at the edge, then re-encrypt to the origin",
+      "bucket": "North-south (client to edge)",
+      "feedback": "Termination lets the edge inspect, route, and cache; re-encrypting keeps the edge-to-origin hop off plaintext."
+    }
+  ],
+  "reveal": "When you write your design, cover both planes explicitly: TLS 1.3 with HSTS and automated ACME certs for north-south, and mesh-issued short-lived mTLS identities for east-west. Then name the PKI tradeoff you are committing to: short lifetimes instead of revocation lists."
+}
+\`\`\`
 `.trim()
 
 const encryptionRestFieldTeach = `
