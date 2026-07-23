@@ -1405,6 +1405,29 @@ if you tell me to, even if I crash and restart." Phase 2 (commit/abort): if all 
 coordinator writes a commit record and tells everyone to commit; if any voted no, it broadcasts
 abort. This guarantees atomicity: all commit or all abort.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 2PC participant voted yes, and then the coordinator goes silent. The participant is holding row locks. Can it just time out and abort to free them?",
+  "options": [
+    {
+      "label": "Yes: timing out and aborting is the safe default",
+      "feedback": "Tempting, that is how ordinary RPC timeouts are handled. But the coordinator may already have told other participants to commit; if this one aborts, atomicity breaks with some committed and some aborted."
+    },
+    {
+      "label": "Yes, but it should commit: it already voted yes, so commit must be the outcome",
+      "feedback": "Voting yes only means 'I am able to commit.' Another participant may have voted no, making the decision abort. Committing unilaterally risks the mirror-image atomicity violation."
+    },
+    {
+      "label": "No: it can neither commit nor abort on its own, it must hold its locks and wait",
+      "correct": true,
+      "feedback": "Right. The yes vote was a binding promise, and either unilateral choice can break atomicity. This is 2PC's in-doubt window, and it lasts exactly as long as the coordinator stays down."
+    }
+  ]
+}
+\`\`\`
+
 ### The fatal flaw: blocking
 
 Between voting yes and hearing the decision, a participant holds locks and cannot unilaterally
@@ -1428,6 +1451,29 @@ round trips plus disk forces. A single-node commit holds a lock for microseconds
 for milliseconds to seconds across the fleet. Contended rows serialize behind it, so 2PC caps
 concurrency hard. This is why it does not survive at internet scale.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "3PC adds a pre-commit phase so participants can time out and make progress when the coordinator vanishes. Why is it almost never used in production?",
+  "options": [
+    {
+      "label": "It assumes bounded message delays; under a real network partition it can violate atomicity",
+      "correct": true,
+      "feedback": "Right. Timeout-based progress only works if silence reliably means crash. In a partition, the two sides can time out independently and decide differently, with some committing and some aborting."
+    },
+    {
+      "label": "It is strictly slower than 2PC, and nobody accepts the extra round trip",
+      "feedback": "Tempting, and the extra phase does cost latency, but latency alone would not disqualify it. The real problem is safety: a partition can split the decision."
+    },
+    {
+      "label": "It cannot express aborts, only commits",
+      "feedback": "3PC handles aborts fine. Its weakness is the synchrony assumption: real networks partition, and then different sides can reach different outcomes."
+    }
+  ]
+}
+\`\`\`
+
 **3PC** inserts a pre-commit phase so participants can time out and make progress if the coordinator
 vanishes, reducing blocking. But it assumes a synchronous network with bounded delays; under a real
 partition it can violate atomicity (different sides decide differently), so it is almost never used
@@ -1444,6 +1490,30 @@ Recap: 2PC guarantees cross-participant atomicity via prepare-then-commit, but a
 after the vote leaves participants blocked holding locks, and lock-holding across the whole protocol
 throttles throughput, so at scale you either replicate the coordinator with consensus or switch to
 sagas.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Spanner and CockroachDB still run 2PC across shards at serious scale. What makes it survivable for them?",
+  "options": [
+    {
+      "label": "They replicate the coordinator's state with Paxos or Raft, so a coordinator crash is just a failover and the in-doubt window closes in seconds",
+      "correct": true,
+      "feedback": "Right. The fatal flaw was a single coordinator dying while holding the decision. Make the decision itself replicated and blocking shrinks to the length of a failover."
+    },
+    {
+      "label": "They quietly switched to 3PC internally",
+      "feedback": "Tempting, since 3PC was designed for exactly this failure. But 3PC can violate atomicity under partitions, which a database cannot accept. Hardening the coordinator keeps 2PC's safety intact."
+    },
+    {
+      "label": "They skip the prepare phase to shorten how long locks are held",
+      "feedback": "Prepare is what turns a yes vote into a durable, binding promise; skipping it forfeits atomicity. They keep both phases and attack the coordinator's fragility instead."
+    }
+  ],
+  "reveal": "For the design write: inside one cluster or trust domain with an HA coordinator, hardened 2PC is legitimate. Across independently deployed microservices it is a poor fit, and the answer is usually a saga, the next lesson's tool."
+}
+\`\`\`
 `.trim()
 
 const sagasTeach = `
