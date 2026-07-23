@@ -1657,6 +1657,29 @@ const auditSupplychainTeach = `
 
 Three defenses that share a theme: prove what happened, block the obvious attacks, and trust nothing you did not build yourself.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An attacker gains an admin credential. Your audit events live in the same log cluster as application logs, writable and deletable by that same admin role. What are those audit logs worth in the investigation?",
+  "options": [
+    {
+      "label": "Full value: the attacker's actions were logged as they happened",
+      "feedback": "They were logged, but an admin who can rewrite or delete entries can erase their own trail afterward. Evidence you cannot trust is not evidence."
+    },
+    {
+      "label": "Little to none: an admin-level attacker can quietly rewrite the history you would investigate with",
+      "correct": true,
+      "feedback": "Right. The whole value of an audit log is that nobody, including an insider with admin, can silently alter it. That is why it must be separate from application logs and tamper-evident."
+    },
+    {
+      "label": "Full value as long as the log entries are encrypted",
+      "feedback": "Encryption stops reading, not rewriting or deleting. Tamper evidence takes different machinery, which this lesson covers next."
+    }
+  ]
+}
+\`\`\`
+
 ## Tamper-evident audit logging
 
 An audit log records who did what to which resource when, and its whole value is that it cannot be quietly altered after the fact, including by an insider or an attacker who gained admin. So it must be separate from application logs and tamper-evident. Two techniques: **hash chaining**, where each entry stores a hash of its contents plus the previous entry's hash, so altering or removing any record breaks the chain and is detectable (the same idea a blockchain uses); and **WORM storage** (write-once-read-many, for example S3 Object Lock in compliance mode), which the storage layer itself refuses to overwrite or delete before a retention date. Combine them: write to WORM and chain the hashes.
@@ -1674,6 +1697,29 @@ The OWASP API Security Top 10 is the standard checklist. The one interviewers ha
 
 **Interview nuance:** BOLA is the number-one API risk precisely because it is invisible in a happy-path demo. It only appears when you ask "what if I change the ID in the URL to someone else's?" Say that sentence in an interview.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A service authenticates every caller at the gateway, validates schemas, rate limits, and uses parameterized queries everywhere. You log in as tenant A and request '/api/invoices/789', an invoice that belongs to tenant B. What comes back?",
+  "options": [
+    {
+      "label": "A 403: the gateway's authentication layer blocks cross-tenant access",
+      "feedback": "Tempting, because auth at the gateway feels like the access check. But authentication proves who you are, not what you own, and the gateway does not know invoice ownership."
+    },
+    {
+      "label": "Nothing: parameterized queries prevent this class of attack",
+      "feedback": "Parameterized queries stop SQL injection. This request is perfectly well-formed; the flaw is missing authorization, not malicious input."
+    },
+    {
+      "label": "Tenant B's invoice, unless the service itself checks that the caller owns object 789",
+      "correct": true,
+      "feedback": "Right. This is BOLA, the number-one API risk, and the happy-path demo looks secure. Object-level ownership checks have to live in the service that knows who owns what."
+    }
+  ]
+}
+\`\`\`
+
 ## Supply-chain security
 
 Most of your running code is dependencies, so you must secure what you did not write. **SBOM** (Software Bill of Materials, SPDX or CycloneDX) inventories every component so when the next Log4Shell drops you can answer "are we affected?" in minutes. **SCA scanning** flags known-vulnerable dependencies in CI. **Artifact/image signing** with Sigstore/cosign lets deploys verify an image was built by your pipeline, not swapped by an attacker, and **SLSA provenance** attests how and from what source an artifact was built.
@@ -1681,6 +1727,52 @@ Most of your running code is dependencies, so you must secure what you did not w
 **Workload identity kills long-lived secrets.** Instead of a static API key in an env var (which leaks, never rotates, and grants standing access), services get short-lived credentials from their identity. **SPIFFE/SPIRE** issues cryptographic service identities, and cloud **OIDC federation** lets a GitHub Actions job or a pod exchange its identity for a 15-minute cloud credential. No static key to steal.
 
 **Recap:** make audit logs separate, append-only, hash-chained and WORM-stored with actor/action/resource but no PII; defend BOLA/injection/SSRF/mass-assignment (BOLA first); and secure the supply chain with SBOM, SCA, signing, SLSA provenance, and workload identity for short-lived creds.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Final pass before you design: match each control to the defense layer it belongs to.",
+  "buckets": [
+    "Tamper-evident audit trail",
+    "OWASP request defense",
+    "Supply-chain security"
+  ],
+  "items": [
+    {
+      "label": "Hash-chained events written to S3 Object Lock in compliance mode",
+      "bucket": "Tamper-evident audit trail",
+      "feedback": "Chaining makes tampering detectable and WORM storage makes rewriting impossible; use both together."
+    },
+    {
+      "label": "Keeping PII and secrets out of widely-readable, long-retention logs",
+      "bucket": "Tamper-evident audit trail",
+      "feedback": "A password or SSN in a log retained for years is a second breach waiting to happen."
+    },
+    {
+      "label": "An ownership check on every object access, never trusting an ID from the client",
+      "bucket": "OWASP request defense",
+      "feedback": "That is the BOLA fix, and it lives in the service, not the gateway."
+    },
+    {
+      "label": "Allowlisting every URL the server fetches on a client's behalf",
+      "bucket": "OWASP request defense",
+      "feedback": "That blocks SSRF pivots toward your cloud metadata endpoint."
+    },
+    {
+      "label": "SBOM generation and SCA scanning on every CI build",
+      "bucket": "Supply-chain security",
+      "feedback": "The inventory that answers 'are we affected?' in minutes when the next Log4Shell lands."
+    },
+    {
+      "label": "Cosign signatures plus SLSA provenance verified by the admission controller",
+      "bucket": "Supply-chain security",
+      "feedback": "Deploys refuse any image your pipeline did not verifiably build, so a swapped image cannot run."
+    }
+  ],
+  "reveal": "Your design write should show all three layers: an audit service that proves what happened, object-level authorization that blocks the obvious, and a signed, attested pipeline with workload identity so there is no standing secret to steal."
+}
+\`\`\`
 `.trim()
 
 const incidentBreachResponseTeach = `
