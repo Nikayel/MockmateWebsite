@@ -2227,6 +2227,29 @@ until T+10s") it must renew. If renewals stop, the lease expires and a new elect
 no per-request coordination, but they carry a hidden assumption: **bounded clocks and bounded
 pauses**.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Leader L holds a valid 10-second lease and is mid-write when a 15-second stop-the-world GC pause hits. The lease expires and L2 is elected. What does L do the instant it wakes?",
+  "options": [
+    {
+      "label": "Notices its lease expired and steps down",
+      "feedback": "Tempting, but L does not know time passed. Any lease check is code that runs after the wake-up, and the in-flight write can complete before such a check ever runs."
+    },
+    {
+      "label": "Completes its in-flight write as if it were still leader",
+      "correct": true,
+      "feedback": "Right. L's view of 'I hold the lease' is stale, and nothing on L's side can reliably fix that. Two leaders have now both written: split-brain from a perfectly legal pause."
+    },
+    {
+      "label": "It cannot act: the lease system suspends a paused holder's pending writes",
+      "feedback": "No such mechanism exists. The lease is just a timestamped grant in a coordination service; it has no power over a paused process's in-flight operations."
+    }
+  ]
+}
+\`\`\`
+
 ### The canonical failure
 
 Leader L holds a 10-second lease and is mid-write. L suffers a **stop-the-world GC pause** (or the VM
@@ -2235,6 +2258,29 @@ expired, and a new leader L2 was elected and started writing. Then L **wakes up*
 time passed. It believes it still holds the lease and completes its in-flight write. Now **two
 leaders** have both written: split-brain, and the data is corrupted. No clock was "wrong" and no bug
 was hit; a legal pause alone produced two active leaders.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Where must the defense live so that the woken leader's stale write actually fails?",
+  "options": [
+    {
+      "label": "In the leader: re-check the lease immediately before every write",
+      "feedback": "Tempting, but the process can pause again between the check and the write. Any client-side check leaves the same gap it is trying to close."
+    },
+    {
+      "label": "In the coordinator: use much shorter leases",
+      "feedback": "Shorter leases shrink the window and add renewal load, but a pause longer than any lease still reproduces the failure. The window never fully closes."
+    },
+    {
+      "label": "At the storage layer: reject writes carrying a stale token",
+      "correct": true,
+      "feedback": "Right. Only the resource being written sees every write, so only it can enforce the rule. A monotonic fencing token plus a highest-seen check makes the zombie write bounce."
+    }
+  ]
+}
+\`\`\`
 
 ### Fencing tokens: enforce at the resource
 
@@ -2272,6 +2318,41 @@ pause?"
 Recap: elect one leader via consensus and a lease, but because a GC pause can briefly create two
 leaders, enforce fencing tokens (monotonic numbers the storage rejects if stale); on a 3-2 split the
 majority stays writable (CP) or both sides reconcile (AP), and either way the minority is fenced.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "A 5-node cluster splits 3-2. Sort each behavior by which side of the partition it belongs to.",
+  "buckets": [
+    "Majority side (3 nodes)",
+    "Minority side (2 nodes)"
+  ],
+  "items": [
+    {
+      "label": "Keeps or elects the leader and stays writable",
+      "bucket": "Majority side (3 nodes)",
+      "feedback": "Three of five is a quorum, so consensus proceeds. This is the CP choice."
+    },
+    {
+      "label": "Cannot reach quorum and steps down",
+      "bucket": "Minority side (2 nodes)",
+      "feedback": "Two of five can never form a majority, so it must refuse writes rather than risk a second leader."
+    },
+    {
+      "label": "Its late writes bounce off the highest-token rule after the partition heals",
+      "bucket": "Minority side (2 nodes)",
+      "feedback": "Fencing is the backstop: even a node that still thinks it leads cannot affect shared state with a stale token."
+    },
+    {
+      "label": "Hands out the next, higher fencing token with the new leadership grant",
+      "bucket": "Majority side (3 nodes)",
+      "feedback": "Each new grant carries a larger monotonic number, which is what makes storage-side rejection possible."
+    }
+  ],
+  "reveal": "The complete design answer names both halves: consensus plus a lease decides who leads, and a monotonic fencing token enforced at the storage layer decides whose writes count. State the 3-2 behavior explicitly: majority writable, minority fenced."
+}
+\`\`\`
 `.trim()
 
 const byzantineFaultToleranceTeach = `
