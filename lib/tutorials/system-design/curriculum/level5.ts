@@ -2363,6 +2363,29 @@ the protocol correctly or halts. It never *lies*. Under that model, **Raft and P
 failures with **2f+1** nodes, because any two majority quorums of f+1 overlap in at least one node
 carrying the committed truth forward.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Tolerating one crashed node takes 3 nodes under Raft. How many nodes does it take to tolerate one node that can lie?",
+  "options": [
+    {
+      "label": "3: a fault is a fault, and the majority still outvotes it",
+      "feedback": "Tempting, but a liar does not go silent. It keeps voting and can tell different stories to different peers, so with only 3 nodes the sole overlap between two quorums can be the liar itself."
+    },
+    {
+      "label": "4",
+      "correct": true,
+      "feedback": "Right. Lies force 3f+1 nodes, so f equal to 1 needs 4 with quorums of 3. The next section unpacks why the extra node is unavoidable."
+    },
+    {
+      "label": "2: just cross-check the pair against each other",
+      "feedback": "With two nodes and one liar you have one honest report against one dishonest one and no way to break the tie."
+    }
+  ]
+}
+\`\`\`
+
 The **Byzantine** model drops the honesty assumption. A Byzantine node can send **wrong** values,
 **equivocate** (tell node A "the value is X" and node B "the value is Y" in the same round), forge or
 replay messages, selectively drop, or **collude** with other faulty nodes. The name comes from the
@@ -2378,6 +2401,29 @@ and (b) is large enough that the honest members of any two quorums overlap despi
 quorums share at least one honest node, and honest nodes always **outvote** the f liars. Concretely:
 tolerating 1 Byzantine node needs **4** nodes, not 3; tolerating 2 needs **7**. You pay f extra nodes
 purely to survive lies rather than silence.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 4-node BFT cluster (f equal to 1) commits with quorums of 3. Two decisions are approved by two different quorums. What stops them from committing contradictory values?",
+  "options": [
+    {
+      "label": "Any two quorums of 3 out of 4 overlap in at least 2 nodes, so at least 1 is honest and will not endorse both",
+      "correct": true,
+      "feedback": "Right. That guaranteed honest overlap is the entire point of the 3f+1 sizing: the liar can never be the only bridge between two quorums."
+    },
+    {
+      "label": "The primary serializes all decisions, so contradiction is impossible",
+      "feedback": "Tempting, but the primary can itself be the liar, equivocating to different quorums. That is exactly why PBFT includes a view-change to depose a faulty primary."
+    },
+    {
+      "label": "Digital signatures prevent any node from voting for two values",
+      "feedback": "Signatures stop a node from forging others' messages, but a Byzantine node can validly sign two contradictory votes of its own. Quorum overlap, not signatures, prevents the split decision."
+    }
+  ]
+}
+\`\`\`
 
 The other cost is **messages**. Because a node cannot trust a single report, classic BFT makes
 everyone cross-check everyone: **O(n^2)** messages per decision, versus Raft's near-linear cost.
@@ -2407,6 +2453,41 @@ Recap: crash-stop consensus (2f+1) assumes nodes may halt but never lie; the Byz
 lying, equivocation, and collusion, forcing 3f+1 nodes and often O(n^2) messages (PBFT, or linear
 HotStuff); use BFT only across real trust boundaries and Raft plus checksums/TLS/auth inside one
 trusted operator.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Robustness is not free: BFT costs extra nodes and heavier messaging. For each system, pick the right tool.",
+  "buckets": [
+    "BFT (real trust boundary)",
+    "Raft plus checksums, TLS, auth"
+  ],
+  "items": [
+    {
+      "label": "Ten competing banks each running one node of a settlement ledger",
+      "bucket": "BFT (real trust boundary)",
+      "feedback": "Mutually distrusting participants by construction: any node might equivocate, so honesty cannot be assumed."
+    },
+    {
+      "label": "A 500-node cluster in one datacenter under one operator",
+      "bucket": "Raft plus checksums, TLS, auth",
+      "feedback": "The realistic failures are crashes, disk faults, and partitions. Paying 3f+1 nodes and O(n^2) messages to defend against your own insiders is over-engineering."
+    },
+    {
+      "label": "Public blockchain validators run by anonymous strangers",
+      "bucket": "BFT (real trust boundary)",
+      "feedback": "The canonical Byzantine setting: participants are unknown and possibly adversarial."
+    },
+    {
+      "label": "Silent disk corruption flipping bits on a trusted replica",
+      "bucket": "Raft plus checksums, TLS, auth",
+      "feedback": "Tempting to call corrupted data a lie, but checksums catch bit rot at a tiny fraction of BFT's cost. No adversary means no BFT."
+    }
+  ],
+  "reveal": "The sophisticated answer is a threat-model call, not a robustness ranking: name the participants, ask whether any could be adversarial, and only then choose. Across a real trust boundary, BFT (HotStuff for scale); inside one trusted operator, Raft plus checksums, TLS, and authentication."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel5: DesignLevel = {
