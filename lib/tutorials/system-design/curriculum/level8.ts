@@ -472,6 +472,29 @@ const authzRbacRebacTeach = `
 
 Authentication answers "who are you"; authorization answers "are you allowed to do this to *this specific object*." Getting authorization wrong is the number one item on the OWASP API Security Top 10 (Broken Object Level Authorization, aka BOLA/IDOR), so interviewers probe it hard. The first decision is which model expresses your permissions.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A logged-in user edits the URL from '/docs/4821' to '/docs/4822'. The route checks that they are authenticated, then the handler fetches the doc by id. What happens?",
+  "options": [
+    {
+      "label": "The auth middleware blocks it",
+      "feedback": "Tempting because middleware really did verify the user, but authentication only established who they are; nothing anywhere asked whether this user may see that particular document."
+    },
+    {
+      "label": "It fails because document ids are not guessable",
+      "feedback": "Tempting when ids look random, but sequential and enumerable ids are everywhere, and obscurity is not access control; this exact pattern is trivially scripted."
+    },
+    {
+      "label": "They read someone else's document. Authenticated is not authorized",
+      "correct": true,
+      "feedback": "Right. This is IDOR/BOLA, the number one item on the OWASP API Top 10. The fix is a per-object check on every access, not a login gate at the front door."
+    }
+  ]
+}
+\`\`\`
+
 ## RBAC, ABAC, ReBAC
 
 **RBAC (Role-Based Access Control)** assigns users to roles (admin, editor, viewer) and roles to permissions. It is simple, auditable, and correct for coarse, org-wide access. Its failure mode is **role explosion**: the moment permissions depend on *which* object, you start minting roles like \`editor-of-folder-4821\`, and a company with a million folders needs a million roles. RBAC has no notion of "editor of *that* document."
@@ -481,6 +504,51 @@ Authentication answers "who are you"; authorization answers "are you allowed to 
 **ReBAC (Relationship-Based Access Control)** models permissions as a graph of relationships between objects and users. This is what Google's **Zanzibar** paper formalized and what powers Drive, Docs, Calendar, and YouTube. Permissions are stored as **relation tuples**: \`object#relation@user\`, for example \`doc:readme#viewer@user:alice\` or \`doc:readme#parent@folder:eng\`. Relations compose: a folder's \`viewer\` can be *inherited* by every child doc via a userset rewrite ("a doc's viewer = its own viewers UNION its parent folder's viewers"). Groups are just more tuples: \`group:eng#member@user:alice\`, and \`doc:readme#viewer@group:eng#member\` grants the whole group. This naturally expresses sharing, nested folders, and org roles without role explosion. Open-source implementations are **OpenFGA**, **SpiceDB** (both Zanzibar-modeled), and AWS **Cedar**.
 
 A Zanzibar-style system answers two query shapes: **Check** ("can alice view doc:readme?") walks the relationship graph, and **Expand / reverse-index** ("list every doc alice can view" or "list every user who can view this doc") which powers search filtering and share dialogs. It must return decisions in single-digit milliseconds because every request blocks on it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You just met three authorization models. Match each statement to its model.",
+  "buckets": [
+    "RBAC",
+    "ABAC",
+    "ReBAC"
+  ],
+  "items": [
+    {
+      "label": "Three org-wide roles: admin, editor, viewer",
+      "bucket": "RBAC",
+      "feedback": "Coarse, auditable, org-level access is exactly what roles are for."
+    },
+    {
+      "label": "Breaks down by minting a role per folder until roles explode",
+      "bucket": "RBAC",
+      "feedback": "Role explosion is RBAC's failure mode the moment permissions become per-object."
+    },
+    {
+      "label": "Allow if the user's department equals the document's department and it is before 18:00",
+      "bucket": "ABAC",
+      "feedback": "A rule over subject, resource, and environment attributes, evaluated at request time."
+    },
+    {
+      "label": "Struggles to answer 'who can see this doc' because nothing is stored, only a function",
+      "bucket": "ABAC",
+      "feedback": "With no stored relationships, the reverse question means evaluating the policy against every user, which is why ABAC is weak for share dialogs and search filtering."
+    },
+    {
+      "label": "A doc is viewable by anyone who can view its parent folder",
+      "bucket": "ReBAC",
+      "feedback": "That is a userset rewrite over relation tuples: inheritance expressed through the relationship graph."
+    },
+    {
+      "label": "What Google Drive sharing runs on, per the Zanzibar paper",
+      "bucket": "ReBAC",
+      "feedback": "Zanzibar stores relation tuples and walks the graph; OpenFGA and SpiceDB are the open-source implementations."
+    }
+  ]
+}
+\`\`\`
 
 ## Separate the PDP from the PEP
 
@@ -497,6 +565,30 @@ Non-negotiable enforcement principles: **deny by default**, **least privilege**,
 **Interview nuance:** the classic wrong turn is treating authz as a single gate. A route checks \`user.isLoggedIn\`, then the handler does \`SELECT * FROM docs WHERE id = :id\` with the id straight from the URL, never checking that *this* user may see *that* doc. That is IDOR/BOLA. The fix is a per-object check on every access: \`check(user, "view", doc)\` before returning it. Zanzibar also has a subtle consistency problem, the **"new enemy"** problem: if you remove someone's access and then change the object, a stale cache could let the just-removed user read the new content. Zanzibar solves it with **zookies**, opaque consistency tokens that pin a check to a snapshot at or after the ACL change.
 
 **Recap:** use RBAC for coarse org roles, ReBAC/Zanzibar (relation tuples, graph checks, reverse indexes via OpenFGA/SpiceDB) when permissions are per-object with sharing and nesting; split PDP from PEP, deny by default and fail closed, and enforce a per-object check on every request to kill IDOR.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your central policy decision point goes unreachable for 90 seconds. What should every enforcement point do with requests in that window?",
+  "options": [
+    {
+      "label": "Let requests through: a brief authz outage should not take the whole product down",
+      "feedback": "Tempting because failing closed looks like an outage amplifier, but waving requests through converts a hiccup into a platform-wide authorization bypass. Deny by default, fail closed."
+    },
+    {
+      "label": "Serve every decision from the local permissions cache, however old it is",
+      "feedback": "Tempting as a middle ground, but an unboundedly stale cache is exactly the new-enemy problem: a user whose access was just revoked keeps reading new content. Caches need consistency tokens like zookies, not blind trust."
+    },
+    {
+      "label": "Reject the requests: fail closed",
+      "correct": true,
+      "feedback": "Right. Availability of the authz path is an engineering problem you solve with replication and latency budgets, never by defaulting to allow."
+    }
+  ],
+  "reveal": "For the design write, pick the model by shape (RBAC for coarse org roles, ReBAC with relation tuples when permissions are per-object with sharing and nesting), split the PDP from the PEP so policy lives in one auditable place, and enforce check(user, action, object) on every single access so IDOR is structurally impossible."
+}
+\`\`\`
 `.trim()
 
 const multiTenancyTeach = `
