@@ -19,11 +19,10 @@ import { describe, it, expect } from "vitest"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import { PYTHON_LEVELS } from "@/lib/tutorials/curriculum"
 import { SQL_LEVELS } from "@/lib/tutorials/sql/curriculum"
 import { SYSTEM_DESIGN_LEVELS } from "@/lib/tutorials/system-design/curriculum"
-import { preprocessAsciiArt, markdownComponents, remarkNoIndentedCode } from "@/lib/markdown"
+import { preprocessAsciiArt, markdownComponents, lessonRemarkPlugins } from "@/lib/markdown"
 import { parseWidgetSpec } from "@/lib/tutorials/widgets/schema"
 import { parseDiagramSpec } from "../schema"
 import { extractCsDiagramSources, extractCsWidgetSources } from "../extract"
@@ -59,7 +58,7 @@ function renderLesson(markdown: string): string {
   return renderToStaticMarkup(
     createElement(
       ReactMarkdown,
-      { remarkPlugins: [remarkGfm, remarkNoIndentedCode] as never, components: markdownComponents },
+      { remarkPlugins: lessonRemarkPlugins as never, components: markdownComponents },
       preprocessAsciiArt(markdown)
     )
   )

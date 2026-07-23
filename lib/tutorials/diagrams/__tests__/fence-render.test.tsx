@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { preprocessAsciiArt, markdownComponents, remarkNoIndentedCode } from "@/lib/markdown"
+import { preprocessAsciiArt, markdownComponents, lessonRemarkPlugins } from "@/lib/markdown"
 
 /**
  * End-to-end guard for the ```csdiagram fence through the EXACT MarkdownRenderer
@@ -17,7 +16,7 @@ function render(content: string): string {
     createElement(
       ReactMarkdown,
       {
-        remarkPlugins: [remarkGfm, remarkNoIndentedCode] as never,
+        remarkPlugins: lessonRemarkPlugins as never,
         components: markdownComponents,
       },
       preprocessAsciiArt(content)
