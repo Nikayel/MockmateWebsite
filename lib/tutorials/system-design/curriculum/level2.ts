@@ -747,6 +747,29 @@ disproportionate share of traffic (a global counter, a celebrity's profile) beco
 whichever shard owns it. You fight this by sharding the key (\`counter:{shard}\` summed across N
 shards) or by fronting the hot key with a client-side or local cache.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your team stores login sessions in a Redis instance configured as a pure cache: no persistence, 'allkeys-lru' eviction. The node restarts. What do users experience?",
+  "options": [
+    {
+      "label": "Nothing changes; Redis reloads its data from disk on restart",
+      "feedback": "Tempting, because Redis CAN persist with AOF or RDB. But this instance is configured as a cache with persistence off, so there is nothing on disk to reload."
+    },
+    {
+      "label": "Every user is logged out; all session data is gone",
+      "correct": true,
+      "feedback": "Right. A non-persistent Redis is a cache, and a cache can vanish at any moment. If sessions have no other copy, you just built a system of record on a cache."
+    },
+    {
+      "label": "Only the sessions evicted by 'allkeys-lru' are lost",
+      "feedback": "Eviction is what happens under memory pressure while the process is running. A restart with no persistence wipes the entire keyspace at once, not just the least recently used keys."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** Interviewers probe "cache or source of truth?" Memcached and a Redis instance
 with no persistence are caches: if the box dies, the data is gone, and that is fine because you can
 recompute it from the real database. If you use a KV store as a durable source of truth (DynamoDB, or
@@ -774,6 +797,41 @@ durable, auto-sharded KV/document store with predictable single-digit-ms latency
 Recap: KV stores give O(1) opaque-blob lookups, so encode everything you query on into a namespaced
 key, guard against hot keys, always TTL cache data, and never treat a non-persistent cache as your
 source of truth.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are about to design a session store and rate limiter on Redis. Sort each piece of data by what losing it on a restart would mean.",
+  "buckets": [
+    "Cache: losing it is acceptable",
+    "Source of truth: needs persistence"
+  ],
+  "items": [
+    {
+      "label": "Live login sessions with no copy anywhere else",
+      "bucket": "Source of truth: needs persistence",
+      "feedback": "Losing these logs every user out. Run AOF persistence, a replica, and 'noeviction' so a full memory does not silently drop logged-in users."
+    },
+    {
+      "label": "Per-minute rate-limit counters",
+      "bucket": "Cache: losing it is acceptable",
+      "feedback": "A lost counter means a user briefly gets a few extra calls. That is a cheap failure, so persistence is optional and a TTL cleans up each minute bucket."
+    },
+    {
+      "label": "Cached results of an expensive database query",
+      "bucket": "Cache: losing it is acceptable",
+      "feedback": "The real database can recompute this. That recomputability is the definition of cache data: give it a TTL and let it go."
+    },
+    {
+      "label": "The only copy of a user's shopping cart",
+      "bucket": "Source of truth: needs persistence",
+      "feedback": "The word 'only' is the tell. If no other system can rebuild it, it is a source of truth no matter how cache-like it feels, so it needs durability and backups."
+    }
+  ],
+  "reveal": "This split drives every choice in the design exercise ahead: sessions get persistence, 'noeviction', and a reverse index for logout-everywhere; counters get bucketed keys with TTLs and can be lossy. Then encode everything you query on into the key, and shard any counter hot enough to melt one node."
+}
+\`\`\`
 `.trim()
 
 const documentTeach = `
