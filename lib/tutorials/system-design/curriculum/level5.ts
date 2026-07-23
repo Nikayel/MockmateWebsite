@@ -1796,6 +1796,29 @@ const deliveryIdempotencyTeach = `
 The correct mental model: **exactly-once delivery over an unreliable network is impossible;
 exactly-once *effect* is achievable by combining at-least-once delivery with idempotency.**
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A receiver processes a payment message, but its acknowledgement is lost on the way back. From the sender's point of view, what does this look like?",
+  "options": [
+    {
+      "label": "Exactly like the message never arriving at all",
+      "correct": true,
+      "feedback": "Right. A lost ack and a lost message are indistinguishable to the sender, so to avoid losing data it must retry, and the retry risks a duplicate. That ambiguity is why exactly-once delivery is impossible at the network layer."
+    },
+    {
+      "label": "The transport layer confirms delivery, so the sender knows it landed",
+      "feedback": "Tempting, but a transport-level ack only says packets arrived, not that the application processed the message and survived. The acknowledgement that matters is the one that got lost."
+    },
+    {
+      "label": "The receiver keeps resending the ack until the sender confirms receiving it",
+      "feedback": "That confirmation can be lost too, and so can the confirmation of the confirmation. No finite exchange over a lossy channel makes both sides certain: the two-generals problem."
+    }
+  ]
+}
+\`\`\`
+
 The three delivery semantics:
 
 - **At-most-once:** send and forget. No duplicates, but possible loss. Fine for a metric sample,
@@ -1819,6 +1842,29 @@ a TTL). On any retry with the same key, the server returns the stored result ins
 work. The effect happened exactly once even though the request arrived multiple times. The critical
 detail: recording the key and performing the side effect must be **atomic** (same transaction), or a
 crash between them reopens the double-execution window.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A server charges the card first, then records the idempotency key in a separate transaction. It crashes between the two steps. The client retries with the same key. What happens?",
+  "options": [
+    {
+      "label": "The key lookup finds the earlier attempt and returns the stored result",
+      "feedback": "Tempting, but the key was never recorded: the crash happened before that step. The lookup finds nothing."
+    },
+    {
+      "label": "The charge runs a second time",
+      "correct": true,
+      "feedback": "Right. With no key on record, the retry looks brand new and the card is charged twice. This is exactly why the key record and the side effect must commit in one transaction."
+    },
+    {
+      "label": "Reversing the order is safe: record the key first, then charge",
+      "feedback": "That ordering fails the other way. A crash after recording the key means the retry finds the key and returns success for a charge that never happened. Only atomicity fixes both orderings."
+    }
+  ]
+}
+\`\`\`
 
 Distinguish the operation types:
 
@@ -1850,6 +1896,41 @@ Recap: networks force at-most-once (may lose) or at-least-once (may duplicate); 
 *effect* with an idempotency key whose stored result is written atomically with the side effect; and
 fencing tokens separately reject stale writes from a superseded actor (Kafka's own EOS scoping is
 covered in Level 6's Kafka material).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Two defenses, two different failures. Sort each situation by which mechanism neutralizes it.",
+  "buckets": [
+    "Idempotency key",
+    "Fencing token"
+  ],
+  "items": [
+    {
+      "label": "A client times out and resends the same charge request",
+      "bucket": "Idempotency key",
+      "feedback": "A duplicate of the same intent: the server returns the stored result instead of redoing the work."
+    },
+    {
+      "label": "A GC-paused worker wakes up and issues a write from its superseded term",
+      "bucket": "Fencing token",
+      "feedback": "A stale actor, not a duplicate: storage rejects any token lower than the highest it has seen."
+    },
+    {
+      "label": "Two concurrent retries of one payment race to execute first",
+      "bucket": "Idempotency key",
+      "feedback": "The unique constraint on the key means exactly one wins; the other sees the in-flight record or the stored result."
+    },
+    {
+      "label": "A replaced leader tries to finish an in-flight operation after a new leader took over",
+      "bucket": "Fencing token",
+      "feedback": "The old leader's token is lower than the new leader's, so the resource refuses the zombie write."
+    }
+  ],
+  "reveal": "Idempotency keys dedupe repeats of the same intent; fencing tokens reject writes from a superseded actor. Different problems, both needed. In your design write, claim at-least-once delivery plus idempotent processing equals exactly-once effect, name where the dedup state lives, and say it commits atomically with the side effect."
+}
+\`\`\`
 `.trim()
 
 const crdtsTeach = `
