@@ -819,6 +819,29 @@ Encryption at rest exists to make stolen storage useless: a lost disk, a leaked 
 
 You do not encrypt terabytes directly with a master key. Instead a **Data Encryption Key (DEK)** encrypts the actual data, and a **Key Encryption Key (KEK)** living in a KMS or HSM wraps (encrypts) the DEK. You store the wrapped DEK next to the ciphertext; to read, you send the wrapped DEK to KMS, which unwraps it (the KEK never leaves the HSM), and you decrypt locally. This gives cheap key rotation (re-wrap DEKs, no data rewrite), a hardware-guarded root of trust, and per-tenant or per-record DEKs so one leaked DEK exposes one tenant, not everyone.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The wrapped DEK sits right next to the ciphertext it protects. An attacker steals the whole database snapshot. Do they have everything they need to decrypt?",
+  "options": [
+    {
+      "label": "Yes. The key is stored with the data, so the snapshot decrypts itself.",
+      "feedback": "Tempting, because storing a key next to data sounds like leaving the key in the lock. But the DEK is itself encrypted (wrapped) by the KEK, and the KEK never leaves the HSM, so the snapshot holds only ciphertext plus a locked key."
+    },
+    {
+      "label": "No. The DEK is wrapped by a KEK that exists only inside the KMS or HSM.",
+      "correct": true,
+      "feedback": "Right. Unwrapping requires a live, authorized call to the KMS, which a stolen snapshot cannot make. Ciphertext plus a wrapped DEK without the KEK is useless."
+    },
+    {
+      "label": "Only if the snapshot also includes the application servers.",
+      "feedback": "Close, but even the app does not hold the KEK. A running compromised app can ask KMS to unwrap DEKs, which is a real threat with a different fix, but the stolen snapshot alone stays unreadable."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
  plaintext --AES-256-GCM(DEK)--> ciphertext   [stored together]
      DEK --wrap(KEK in KMS/HSM)--> wrapped DEK  [stored together]
@@ -833,11 +856,80 @@ You do not encrypt terabytes directly with a master key. Instead a **Data Encryp
 - **Application / field-level encryption.** Your app encrypts specific columns (SSN, card number) before writing, so the DB only ever holds ciphertext. A stolen snapshot **and** a compromised DB both reveal nothing for those fields. The cost is **searchability**: you cannot do \`WHERE ssn = ?\` or range queries on a randomized-encrypted column.
 - **Client-side / end-to-end (E2EE).** The client encrypts so the server never sees plaintext at all (Signal, WhatsApp, 1Password). Maximum protection, maximum functional cost: the server cannot search, index, or process the data, and you must solve key distribution and recovery.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "For each threat, pick the weakest encryption tier that actually stops it.",
+  "buckets": [
+    "Full-disk or TDE is enough",
+    "Needs app field-level encryption",
+    "Only client-side E2EE stops it"
+  ],
+  "items": [
+    {
+      "label": "A drive is pulled out of the datacenter",
+      "bucket": "Full-disk or TDE is enough",
+      "feedback": "Physical theft of storage is exactly what disk-level encryption exists for."
+    },
+    {
+      "label": "A database backup file leaks from object storage",
+      "bucket": "Full-disk or TDE is enough",
+      "feedback": "TDE encrypts the data files and backups, so the leaked file is ciphertext."
+    },
+    {
+      "label": "A rogue DBA runs 'SELECT ssn FROM users'",
+      "bucket": "Needs app field-level encryption",
+      "feedback": "Disk encryption and TDE are transparent: any valid DB connection reads plaintext. Only ciphertext written by the app defeats an insider with query access."
+    },
+    {
+      "label": "An attacker with a live DB connection dumps query results",
+      "bucket": "Needs app field-level encryption",
+      "feedback": "Same transparency problem: the DB happily decrypts for anyone who can query it, so sensitive columns must arrive already encrypted."
+    },
+    {
+      "label": "A subpoena demands plaintext the server can produce",
+      "bucket": "Only client-side E2EE stops it",
+      "feedback": "If the server can ever see plaintext, it can be compelled to hand it over. Only client-held keys remove that ability."
+    },
+    {
+      "label": "Your own compromised app server reads what it stored",
+      "bucket": "Only client-side E2EE stops it",
+      "feedback": "App field-level encryption fails here because the compromised app holds or can request the keys. E2EE keeps plaintext off the server entirely."
+    }
+  ]
+}
+\`\`\`
+
 The searchability tradeoff has a nuance: **deterministic** encryption (same plaintext to same ciphertext) allows equality lookups and joins but leaks which rows share a value and enables frequency analysis; **randomized** encryption (fresh nonce each time, the AES-256-**GCM** default) leaks nothing but kills search. Real systems use randomized for most fields and reach for deterministic, blind indexes, or dedicated searchable-encryption schemes only where lookup is required, accepting the leakage.
 
 **Interview nuance:** "crypto-shredding" is how encryption meets **GDPR erasure and retention**. If each user's data is encrypted under a per-user DEK, deleting that one key makes all their data unrecoverable instantly, even copies sitting in backups, replicas, and archives you cannot practically hard-delete. So a per-tenant/per-user key hierarchy is not just breach isolation, it is your "right to be forgotten" mechanism. And remember to encrypt **backups and logs** too; a plaintext backup or a log line full of PII is the most commonly forgotten copy.
 
 **Recap:** use envelope encryption with per-tenant/per-user DEKs wrapped by an HSM-held KEK, pick granularity (disk, TDE, field, E2E) by how much breach exposure and searchability you can trade, and design keys so crypto-shredding gives you instant, backup-proof erasure.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A GDPR erasure request lands. The user's data lives in the primary DB, five replicas, a WAL archive, and 90 days of backups. What is the fastest complete erasure?",
+  "options": [
+    {
+      "label": "Hard-delete the rows everywhere, including restoring and scrubbing each backup.",
+      "feedback": "Tempting because it feels thorough, but rewriting immutable backups and archives is slow, error-prone, and often practically impossible. That gap is exactly what crypto-shredding closes."
+    },
+    {
+      "label": "Delete that user's per-user DEK.",
+      "correct": true,
+      "feedback": "Right. If everything of theirs was encrypted under one per-user DEK, destroying that key renders every copy unreadable at once: replicas, WAL, and backups included. The key hierarchy is the erasure mechanism."
+    },
+    {
+      "label": "Delete the KEK in the KMS.",
+      "feedback": "That shreds every user at once, not one. The KEK wraps all the DEKs, so destroying it is a platform-wide data-loss event, which is why erasure keys must be per-user."
+    }
+  ],
+  "reveal": "This is your design write in miniature: choose envelope encryption with per-user DEKs under an HSM-held KEK, push crown-jewel fields to app-level encryption, allow deterministic encryption or blind indexes only where lookup is required and you accept the leakage, and let key deletion carry your erasure story. State each choice and its searchability cost explicitly."
+}
+\`\`\`
 `.trim()
 
 const secretsKmsTeach = `
