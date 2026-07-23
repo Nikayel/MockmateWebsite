@@ -1541,6 +1541,29 @@ Rule of thumb: choose **orchestration** for anything with more than a couple of 
 compensation logic, or where on-call must be able to see "where is this order stuck?" Choose
 choreography only for short, simple, truly decoupled flows.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An order saga has finished step 1, reserve inventory, and is about to run step 2, charge the card. Right now another request reads that inventory row. What does it see?",
+  "options": [
+    {
+      "label": "Nothing unusual: the saga's intermediate state stays hidden until the whole saga completes",
+      "feedback": "That is ACID intuition, and it is exactly what sagas give up. Each step is a local transaction that commits immediately, so its effects are visible the moment the step finishes."
+    },
+    {
+      "label": "It sees the reservation: each step commits locally, so intermediate state is visible to everyone",
+      "correct": true,
+      "feedback": "Right. 'Reserved but unpaid' is observable, an anomaly a single ACID transaction would never expose. Sagas give atomicity of outcome, not isolation."
+    },
+    {
+      "label": "It blocks until the saga finishes, like waiting on a row lock",
+      "feedback": "There is no global lock; avoiding one is the whole reason to choose a saga over 2PC. Nothing holds other requests back from the committed intermediate state."
+    }
+  ]
+}
+\`\`\`
+
 ### The interview-critical property: no isolation
 
 Between steps, intermediate states are *visible* to other transactions. In an order saga, inventory
@@ -1554,6 +1577,25 @@ This is a real anomaly a single ACID transaction would never expose. Manage it w
   than absolute set).
 - **Reread / version check:** verify a version/state before compensating, so you compensate against
   current reality, not a stale snapshot.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A saga step shipped a package and emailed the customer a confirmation. A later step fails and compensation kicks in. What does compensating that step look like?",
+  "options": [
+    {
+      "label": "Reverse it exactly: recall the email and delete the shipment, restoring the previous state",
+      "feedback": "Tempting, because 'undo' sounds literal. But you cannot un-send an email or un-ship a box; some effects escape the system entirely, and compensation has to work anyway."
+    },
+    {
+      "label": "A semantic undo: start a return flow, restock on receipt, and send a correction email",
+      "correct": true,
+      "feedback": "Right. Compensations undo the business meaning, not the bytes. They must also be idempotent and can themselves fail, which is why you back them with retries, a dead-letter queue, and operator escalation."
+    }
+  ]
+}
+\`\`\`
 
 ### Compensations are their own hazard
 
@@ -1571,6 +1613,42 @@ Recap: a saga chains local transactions each with a compensating undo, coordinat
 (orchestration, preferred for anything non-trivial) or via events (choreography); it guarantees the
 outcome is all-or-nothing but exposes intermediate state, so you add semantic locks and version
 checks, and make compensations idempotent with retries, DLQ, and escalation.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Last check before you design your own saga: attribute each property.",
+  "buckets": [
+    "Orchestration",
+    "Choreography",
+    "Any saga"
+  ],
+  "items": [
+    {
+      "label": "The end-to-end flow lives in one place, and on-call can see exactly where an order is stuck",
+      "bucket": "Orchestration",
+      "feedback": "A central workflow, like Temporal or Step Functions, makes the flow explicit, traceable, and easy to extend with timeouts and retries."
+    },
+    {
+      "label": "Services react to each other's events with no central brain, and cyclic dependencies can sneak in",
+      "bucket": "Choreography",
+      "feedback": "Highly decoupled, but the flow is implicit and scattered across services, which is why it suits only short, simple flows."
+    },
+    {
+      "label": "Intermediate state is visible to other requests between steps",
+      "bucket": "Any saga",
+      "feedback": "No isolation is inherent to the pattern regardless of coordination style; contain it with semantic locks, commutative updates, and version checks."
+    },
+    {
+      "label": "Every step needs an idempotent compensating action that may itself fail",
+      "bucket": "Any saga",
+      "feedback": "Compensations are the pattern's price either way: retries with backoff, a dead-letter queue, and operator escalation are the safety net."
+    }
+  ],
+  "reveal": "In the design write, pick orchestration for anything non-trivial, name the reserved-but-unpaid anomaly and a countermeasure for it, and say what happens when a compensation fails. Those are the two things interviewers probe."
+}
+\`\`\`
 `.trim()
 
 const outboxMessagingTeach = `
