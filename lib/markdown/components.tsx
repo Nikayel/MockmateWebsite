@@ -1,6 +1,7 @@
 import { isValidElement } from "react"
 import { Components } from "react-markdown"
 import { CsDiagram } from "@/components/tutorials/diagrams/CsDiagram"
+import { CsWidget } from "@/components/tutorials/widgets/CsWidget"
 
 /** Flatten react-markdown code-fence children (string | string[]) to the raw fence text. */
 function fenceText(children: React.ReactNode): string {
@@ -9,12 +10,15 @@ function fenceText(children: React.ReactNode): string {
   return ""
 }
 
-/** True when a <pre>'s child is our ```csdiagram fence (so we skip the code-box shell). */
-function isCsDiagramChild(children: React.ReactNode): boolean {
+/** Fences we render as components (diagram/widget), not as code boxes. */
+const RENDERED_FENCE = /language-(csdiagram|cswidget)\b/
+
+/** True when a <pre>'s child is a rendered fence (csdiagram/cswidget), so we skip the code-box shell. */
+function isRenderedFenceChild(children: React.ReactNode): boolean {
   return (
     isValidElement(children) &&
     typeof (children.props as { className?: string })?.className === "string" &&
-    (children.props as { className?: string }).className!.includes("language-csdiagram")
+    RENDERED_FENCE.test((children.props as { className?: string }).className!)
   )
 }
 
@@ -28,11 +32,11 @@ export const markdownComponents: Components = {
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   em: ({ children }) => <em className="italic">{children}</em>,
 
-  // Code blocks (``` code ```) - for ASCII art diagrams. A ```csdiagram fence is a
-  // rendered diagram, not code, so it skips the monospace box entirely (the `code`
-  // handler below returns the diagram component as this child).
+  // Code blocks (``` code ```) - for ASCII art diagrams. A ```csdiagram or ```cswidget
+  // fence is a rendered component, not code, so it skips the monospace box entirely
+  // (the `code` handler below returns the diagram/widget component as this child).
   pre: ({ children }) =>
-    isCsDiagramChild(children) ? (
+    isRenderedFenceChild(children) ? (
       <>{children}</>
     ) : (
       <pre className="my-3 overflow-x-auto rounded-lg border border-gray-700/50 bg-gray-900/80 p-3 font-mono text-xs leading-relaxed text-gray-200">
@@ -45,6 +49,11 @@ export const markdownComponents: Components = {
     // A ```csdiagram fence is authored diagram data — parse + render it, never a code box.
     if (className?.includes("language-csdiagram")) {
       return <CsDiagram source={fenceText(children)} />
+    }
+
+    // A ```cswidget fence is an authored interactive widget spec — same treatment.
+    if (className?.includes("language-cswidget")) {
+      return <CsWidget source={fenceText(children)} />
     }
 
     // Check if this is a code block (inside pre) vs inline code
