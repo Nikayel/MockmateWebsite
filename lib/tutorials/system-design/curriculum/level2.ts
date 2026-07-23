@@ -1395,6 +1395,50 @@ bytes, a 96x reduction), slashing memory 10 to 100x at the cost of some recall. 
 deployments (what FAISS is known for). Rule of thumb: HNSW when recall and latency matter and you can
 afford RAM; IVF-PQ when scale and memory dominate.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each property or knob under the index family it belongs to.",
+  "buckets": [
+    "HNSW",
+    "IVF-PQ"
+  ],
+  "items": [
+    {
+      "label": "Highest recall at low latency, the default for most workloads",
+      "bucket": "HNSW",
+      "feedback": "The layered graph hops greedily toward the neighborhood, keeping recall high without scanning partitions."
+    },
+    {
+      "label": "Keeps a link graph and full vectors in RAM, pricey at billion scale",
+      "bucket": "HNSW",
+      "feedback": "Memory is the tax HNSW pays for its speed and recall; that is exactly what pushes billion-scale deployments elsewhere."
+    },
+    {
+      "label": "Compresses each vector into a short code, cutting memory 10 to 100x",
+      "bucket": "IVF-PQ",
+      "feedback": "That is the PQ half: a 6144-byte vector becomes roughly 64 bytes, trading a little recall for a huge memory win."
+    },
+    {
+      "label": "Tuned with 'M' and 'efSearch'",
+      "bucket": "HNSW",
+      "feedback": "Links per node and candidates explored: raising 'efSearch' buys recall with latency. These knobs move you along the recall-latency surface."
+    },
+    {
+      "label": "Tuned with 'nlist' and 'nprobe'",
+      "bucket": "IVF-PQ",
+      "feedback": "Number of k-means partitions and how many get probed per query: raising 'nprobe' buys recall with latency, the IVF version of the same tradeoff."
+    },
+    {
+      "label": "The go-to for billion-scale, memory-constrained deployments",
+      "bucket": "IVF-PQ",
+      "feedback": "Clustered partitions plus compressed codes is what FAISS is famous for when the corpus dwarfs your RAM."
+    }
+  ]
+}
+\`\`\`
+
 ### Two essentials beyond raw similarity
 
 **Metadata filtering.** Real queries are "similar chunks **from this user's documents, in English,
@@ -1402,6 +1446,29 @@ updated this year**." You store metadata alongside each vector and filter on it.
 **pre-filter vs post-filter**: post-filtering (find top-K by vector, then drop non-matching) can
 return too few results if the filter is selective; good systems do **filtered ANN** that respects the
 filter during traversal. Ask about this; it is a common gotcha.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You need the top 10 chunks similar to a query, restricted to one user who owns 0.1 percent of the corpus. The system fetches the global top 10 by similarity, then drops chunks the user does not own. What comes back?",
+  "options": [
+    {
+      "label": "The right 10 results, just computed slightly wastefully",
+      "feedback": "Tempting, and roughly true when the filter matches most of the corpus. But at 0.1 percent selectivity the odds that any of the global top 10 belong to this user are tiny."
+    },
+    {
+      "label": "Usually far fewer than 10 results, often zero",
+      "correct": true,
+      "feedback": "Right. Post-filtering starves on selective filters: the ANN search never knew about the constraint, so nearly everything it returns gets discarded. You need filtered ANN that respects the filter during traversal, or pre-filtering."
+    },
+    {
+      "label": "The database silently widens K until 10 matches survive",
+      "feedback": "Some systems do retry with a larger K as a workaround, but naive post-filtering does not, and even the retry loop gets brutally expensive as selectivity drops. Filtering during traversal is the real fix."
+    }
+  ]
+}
+\`\`\`
 
 **Hybrid search.** Pure vector search misses exact keyword matches (product codes, names, rare
 terms). **Hybrid search** combines vector similarity with a keyword/**BM25** lexical score, fused
@@ -1425,6 +1492,30 @@ Recap: Vector databases do approximate nearest-neighbor search over embeddings, 
 latency and memory; choose HNSW for recall at cost of RAM or IVF-PQ for billion-scale memory
 efficiency, always add metadata filtering and hybrid (vector + BM25) search, use pgvector until scale
 forces a dedicated store, and plan for re-embedding when the model changes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are designing RAG search over 200k support-doc chunks for a product that already runs Postgres. Which retrieval stack do you propose?",
+  "options": [
+    {
+      "label": "Pinecone with HNSW, because dedicated vector stores are best practice",
+      "feedback": "Tempting, because dedicated stores are the right answer at tens of millions of vectors. But 200k chunks is modest: you would be adding a whole new system, its ops burden, and a data sync path for scale you do not have."
+    },
+    {
+      "label": "pgvector next to the existing tables, with hybrid vector plus BM25 search and versioned embeddings",
+      "correct": true,
+      "feedback": "Right. At this scale pgvector is plenty, keeps vectors beside relational data and transactions, hybrid search catches the exact product codes and names pure similarity misses, and versioning makes the eventual re-embedding migration survivable."
+    },
+    {
+      "label": "pgvector with pure vector similarity; keyword search is what embeddings replace",
+      "feedback": "Half right: pgvector is the correct home. But pure vector search whiffs on exact tokens like error codes and SKU names, which support queries are full of. Production RAG almost always fuses BM25 with vector scores."
+    }
+  ],
+  "reveal": "That one decision exercises the whole lesson: ANN only when exact search stops scaling, index choice as a recall-latency-memory point, hybrid search for lexical precision, filtering that respects the query, and re-embedding as a planned migration. Walk the same checklist in the design write."
+}
+\`\`\`
 `.trim()
 
 const normalizationDenormTeach = `
