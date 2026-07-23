@@ -1792,7 +1792,53 @@ Lessons    -> blameless postmortem, fix root cause
 
 **Detection.** Feed everything into centralized logging or a SIEM (Splunk, Elastic, a cloud-native equivalent) and alert on anomalous key usage: geo-velocity impossibilities (the key signs from two continents a minute apart), unusual volume, or calls at odd hours. Seed **honeytokens** (a fake credential that should never be used, so any use is a certain intrusion signal). And plan for the humbling reality that an outside party (a researcher, a customer, law enforcement) often notifies you first, so build an intake path for external reports.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The SIEM confirms a signing-key compromise. Your on-call wants to wipe and reimage every affected host right now, to be safe. What does that decisiveness cost?",
+  "options": [
+    {
+      "label": "Nothing: removing the attacker fast is always the top priority",
+      "feedback": "Tempting, because eradication feels like the decisive move. But wiping first destroys the disk images and logs that tell you how the attacker got in and what they touched, and forensics cannot be redone."
+    },
+    {
+      "label": "The forensic evidence: you erase the record of the intrusion before anyone preserves it",
+      "correct": true,
+      "feedback": "Right. Containment comes before eradication precisely so you can isolate systems and snapshot evidence first. Wipe only after preservation."
+    },
+    {
+      "label": "A little time: you can reconstruct what happened later from backups",
+      "feedback": "Backups hold your data, not the attacker's artifacts. Memory, temp files, and recent logs on the compromised hosts vanish on reimage and cannot be reconstructed."
+    }
+  ]
+}
+\`\`\`
+
 **Containment without destroying evidence.** Isolate affected systems (pull them from the load balancer, cut network egress) and revoke active sessions, but do not wipe yet. This is the phase where the discipline matters most.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The compromised key signs every session token in the product. The fastest fix on the table: delete it from the key set immediately. What happens the moment you do?",
+  "options": [
+    {
+      "label": "Attacker-minted tokens die and legitimate sessions keep working",
+      "feedback": "Tempting, but verifiers cannot tell attacker-minted tokens from legitimate ones. Both were signed by the same key, and both fail verification the instant that key disappears."
+    },
+    {
+      "label": "Every user is logged out at once: you have added a self-inflicted outage to the breach",
+      "correct": true,
+      "feedback": "Right. A hard cutover invalidates every valid token simultaneously. The fix is overlapping validity: add the new key, flip signing, shrink TTLs so old tokens age out fast, then pull the compromised 'kid'."
+    },
+    {
+      "label": "Nothing changes until the tokens expire on their own",
+      "feedback": "Backwards: tokens are verified against the published key set on every request, so removing the key rejects them immediately, not at expiry."
+    }
+  ]
+}
+\`\`\`
 
 ## Rotate a widely-used key without downtime
 
@@ -1807,6 +1853,46 @@ The instant you suspect a breach, evidence preservation starts: snapshot affecte
 **Interview nuance:** the trap is optimizing for "fix it fast." Wiping and rebuilding immediately feels decisive but destroys forensics and, with a hard key cutover, causes a self-inflicted outage on top of the breach. The strong answer sequences containment before eradication, rotates keys via overlapping validity, and runs forensics and the 72-hour legal clock in parallel from the start.
 
 **Recap:** run detection, containment, eradication, recovery, lessons in order; rotate the compromised key via overlapping JWKS validity plus shortened TTLs so nobody is logged out; preserve evidence before cleanup with chain of custody; and start the GDPR 72-hour notification clock the moment you become aware.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Hour zero of a confirmed breach. Sort each action: does it start now, in parallel with everything else, or only after evidence is preserved?",
+  "buckets": [
+    "Start at hour zero, in parallel",
+    "Only after evidence is preserved"
+  ],
+  "items": [
+    {
+      "label": "Snapshot affected volumes and lock down the logs",
+      "bucket": "Start at hour zero, in parallel",
+      "feedback": "Evidence preservation starts the instant you suspect a breach, with chain of custody from the first snapshot."
+    },
+    {
+      "label": "Activate legal and start the GDPR 72-hour notification clock",
+      "bucket": "Start at hour zero, in parallel",
+      "feedback": "The clock starts when you become aware, not when the investigation finishes, so legal is a named hour-zero role."
+    },
+    {
+      "label": "Pull affected systems from the load balancer and cut egress",
+      "bucket": "Start at hour zero, in parallel",
+      "feedback": "That is containment: stop the bleeding without destroying anything."
+    },
+    {
+      "label": "Add the new signing key to the JWKS and shrink token TTLs",
+      "bucket": "Start at hour zero, in parallel",
+      "feedback": "Overlapping-validity rotation is safe to begin immediately and closes the attacker's window without logging anyone out."
+    },
+    {
+      "label": "Wipe compromised hosts and restore from known-good state",
+      "bucket": "Only after evidence is preserved",
+      "feedback": "Eradication and recovery are sequenced after containment and preservation, or you destroy the forensics."
+    }
+  ],
+  "reveal": "That ordering is the skeleton of your design answer: detect, contain, and preserve in parallel with the legal clock, rotate keys with overlapping validity so nobody is logged out, and only then eradicate and recover. Run the loop in order and the two panic mistakes never happen."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel8: DesignLevel = {
