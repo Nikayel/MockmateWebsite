@@ -1786,6 +1786,29 @@ monotonic, every insert lands on the same rightmost page and, worse, the same sh
 Auto-increment also leaks information (competitors count your order volume) and does not work cleanly
 across multiple write nodes that would collide on the next value.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "To fix the rightmost-page insert hotspot, you switch the clustered primary key from auto-increment to random UUIDv4. What happens to write performance on a large table?",
+  "options": [
+    {
+      "label": "It improves: inserts now spread across the whole B-tree instead of piling onto one page.",
+      "feedback": "This is exactly the tempting logic, and the spreading is real. The catch: every insert now touches a random page, so the hot working set becomes the entire index instead of one page."
+    },
+    {
+      "label": "It often gets worse: every insert lands on a random page, pages split constantly, the cache can no longer hold the working set, and the index fragments.",
+      "correct": true,
+      "feedback": "Right. You traded one hot page for touching all pages. On a large table this can multiply write cost and index size several-fold, which is why random UUIDv4 as a clustered key is such a common and expensive mistake."
+    },
+    {
+      "label": "Nothing changes: the key's value has no effect on where rows are stored.",
+      "feedback": "Tempting if you picture the primary key as just a lookup handle, but in a clustered index the key literally determines physical row placement. That is exactly why this column is so high-leverage."
+    }
+  ]
+}
+\`\`\`
+
 ### The random-UUID cure that causes a new disease
 
 The obvious fix is a random **UUIDv4**: 128 bits of randomness, generated anywhere with no
@@ -1805,6 +1828,46 @@ collision-free and generatable anywhere. **Snowflake** IDs (Twitter's scheme: ti
 + per-ms sequence, packed into 64 bits) give the same time-ordering plus an embedded shard/worker id,
 at the cost of needing worker-id coordination. Rule of thumb: default to ULID/UUIDv7 for distributed
 primary keys; use Snowflake when you want a compact 64-bit id and already have worker-id assignment.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each property to the ID scheme it describes.",
+  "buckets": [
+    "Auto-increment integer",
+    "Random UUIDv4",
+    "ULID / UUIDv7"
+  ],
+  "items": [
+    {
+      "label": "Every insert lands on the rightmost B-tree page, and on one shard",
+      "bucket": "Auto-increment integer",
+      "feedback": "Monotonic order gives perfect locality and a write hotspot: the same property is the gift and the curse."
+    },
+    {
+      "label": "Coordination-free generation, but fragments a clustered index",
+      "bucket": "Random UUIDv4",
+      "feedback": "Pure randomness scatters inserts across every page: no hotspot, but constant page splits and a bloated working set."
+    },
+    {
+      "label": "Timestamp prefix clusters new rows together; random tail stays collision-free",
+      "bucket": "ULID / UUIDv7",
+      "feedback": "The best of both: auto-increment-like locality from the time prefix, UUID-like coordination-free generation from the random suffix."
+    },
+    {
+      "label": "Lets a competitor estimate your order volume by comparing two IDs a week apart",
+      "bucket": "Auto-increment integer",
+      "feedback": "Sequential values leak counts; this is one of the non-performance reasons to avoid them for externally visible IDs."
+    },
+    {
+      "label": "The default recommendation for distributed primary keys",
+      "bucket": "ULID / UUIDv7",
+      "feedback": "Time-ordered for locality, random-tailed for distribution, coordination-free: the answer that ends the interviewer's line of questioning."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** if you propose random UUIDs, expect "what does that do to your clustered
 index," and if you propose auto-increment, expect "how does that shard." The answer that ends the
@@ -1838,6 +1901,34 @@ privacy-mandated erasure.
 Recap: avoid monotonic keys for hotspots and random UUIDv4 for fragmentation, default to ULID/UUIDv7
 (or Snowflake) for time-ordered distributed IDs, use surrogate keys with natural attributes as unique
 constraints, enforce invariants with DB constraints, and pick types that encode correctness.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are designing the orders table for a sharded, multi-writer system. Which primary key do you defend in the design exercise?",
+  "options": [
+    {
+      "label": "Auto-increment bigint: compact and naturally sorted.",
+      "feedback": "Tempting for its locality and small size, but multiple writers collide on the next value, all inserts hit one shard, and the sequence leaks your order volume."
+    },
+    {
+      "label": "The customer's email plus a timestamp: a real-world identity.",
+      "feedback": "Tempting because natural keys feel meaningful, but emails change and a primary key must be immutable as a foreign-key target. Keep email as a UNIQUE constraint, not the PK."
+    },
+    {
+      "label": "Random UUIDv4: collision-free and generatable anywhere.",
+      "feedback": "Coordination-free, yes, but as a clustered key it fragments the index. You would trade the hotspot disease for the fragmentation disease."
+    },
+    {
+      "label": "A ULID or UUIDv7 surrogate key, with natural attributes as UNIQUE constraints and invariants enforced by NOT NULL, FOREIGN KEY, and CHECK.",
+      "correct": true,
+      "feedback": "Right. Time-ordered for index locality, random-tailed for coordination-free generation across writers, immutable because it carries no business meaning, and the database enforces the invariants no service can write around."
+    }
+  ],
+  "reveal": "The full checklist for the design write: a surrogate, time-ordered ID (ULID/UUIDv7, or Snowflake if you need 64 bits and have worker-id assignment), natural attributes as UNIQUE constraints, invariants in the database via NOT NULL, FOREIGN KEY, and CHECK, money as integer cents, timezone-aware timestamps, and a deliberate soft-vs-hard delete decision."
+}
+\`\`\`
 `.trim()
 
 const blobObjectStorageTeach = `
