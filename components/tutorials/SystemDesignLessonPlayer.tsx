@@ -13,7 +13,7 @@ import {
 import type { LeanTutorialLevel, LessonNavModel } from "@/lib/tutorials/level-path"
 import { fetchDesignAnswer, saveDesignAnswer } from "@/lib/tutorials/design-answers-client"
 import { useCompletedLessons } from "./useCompletedLessons"
-import { TeachPanel } from "./TeachPanel"
+import { SegmentedTeachPanel } from "./SegmentedTeachPanel"
 import { DesignAnswerPanel } from "./DesignAnswerPanel"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonRail } from "./LessonRail"
@@ -29,7 +29,9 @@ import type { DesignLesson, LessonSection } from "@/lib/tutorials/types"
 /**
  * System-Design Lesson Player — a thin fork of `SqlLessonPlayer`. The graded core is REUSED:
  * `useTutorialProgressSync` (same `user_tutorial_progress` collection, `sd-`-namespaced ids), the
- * tutorial store, `TeachPanel`, `LessonRail`, `LessonHeader`, `SableTutor`, and `SectionDoneButton`.
+ * tutorial store, `LessonRail`, `LessonHeader`, `SableTutor`, and `SectionDoneButton`. The Read
+ * phase renders through `SegmentedTeachPanel` (progressive disclosure over the same
+ * MarkdownRenderer) instead of the code courses' `TeachPanel`.
  *
  * It differs from the code players in two ways:
  *  - There is NO runner. The `DesignAnswerPanel` (free-text write → Save → reveal model answer)
@@ -280,8 +282,10 @@ export function SystemDesignLessonPlayer({
               {isLoading && <LessonLoadingState />}
 
               {!isLoading && active === "teach" && (
-                <TeachPanel
+                <SegmentedTeachPanel
+                  lessonId={lesson.id}
                   teach={lesson.teach}
+                  teachCompleted={sections.teach === "completed"}
                   onContinue={() => {
                     completeTeach()
                     goToSection("apply")
