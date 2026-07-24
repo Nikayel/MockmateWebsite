@@ -1043,14 +1043,79 @@ is a full collection scan. And because there is no engine-enforced schema, plan 
 versioning**: stamp documents with a \`schemaVersion\`, migrate lazily on read or with a background
 job, and let your app handle multiple shapes during the transition.
 
-\`\`\`
-posts (collection)
-  { _id, title, body,
-    author: { id, name, avatar },        <- referenced id + denormalized display fields
-    recentComments: [ {..}, {..} x20 ],  <- embedded bounded subset
-    commentCount: 1423 }                 <- embedded for atomic increment
-comments (collection)                    <- full unbounded history, referenced
-  { _id, postId, authorId, body, createdAt }
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "posts",
+      "columns": [
+        {
+          "name": "_id",
+          "key": "pk"
+        },
+        {
+          "name": "title"
+        },
+        {
+          "name": "body"
+        },
+        {
+          "name": "author.id",
+          "key": "fk"
+        },
+        {
+          "name": "author.name",
+          "type": "denormalized copy"
+        },
+        {
+          "name": "author.avatar",
+          "type": "denormalized copy"
+        },
+        {
+          "name": "recentComments",
+          "type": "embedded, bounded x20"
+        },
+        {
+          "name": "commentCount",
+          "type": "embedded counter"
+        }
+      ]
+    },
+    {
+      "name": "comments",
+      "columns": [
+        {
+          "name": "_id",
+          "key": "pk"
+        },
+        {
+          "name": "postId",
+          "key": "fk"
+        },
+        {
+          "name": "authorId",
+          "key": "fk"
+        },
+        {
+          "name": "body"
+        },
+        {
+          "name": "createdAt"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "posts",
+      "to": "comments",
+      "kind": "1-n",
+      "label": "full unbounded history, referenced by postId"
+    }
+  ],
+  "caption": "The hybrid layout: the post embeds the bounded read-together subset (latest 20 comments, the author's display fields, the counter it increments atomically in the same write) and references the unbounded remainder, so one read renders the page and no document grows toward the 16MB cap."
+}
 \`\`\`
 
 Recap: Model to the access pattern, embed bounded read-together data and reference large or unbounded
