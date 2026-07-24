@@ -475,6 +475,29 @@ throughput on a fresh connection is low at first and climbs, and why short-lived
 reach full speed: they die in slow start before the window opens up. Reusing a warmed connection
 means you keep the opened window.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A mobile client 200ms away makes 30 sequential API calls, each on a brand new HTTPS connection. Every response is small. What dominates the total wait?",
+  "options": [
+    {
+      "label": "Bandwidth; 30 responses is a lot of bytes to move",
+      "feedback": "Tempting, but the responses are small. Bandwidth limits how fast bytes flow once they are flowing; it does nothing about the round trips you burn before any byte flows."
+    },
+    {
+      "label": "Setup ceremony; roughly 2 RTTs of handshake per call, around 12 seconds of pure setup",
+      "correct": true,
+      "feedback": "Right. TCP plus TLS 1.3 costs about 2 RTTs before the first request byte, times 30 calls at 200ms per RTT. Each fresh connection also restarts slow start, so none of them ever reaches full speed."
+    },
+    {
+      "label": "Server processing time; 30 requests is a real load",
+      "feedback": "The server is the usual suspect, which is what makes this tempting, but it could answer instantly and the user would still stare at many seconds of handshakes."
+    }
+  ]
+}
+\`\`\`
+
 ### The fixes for a chatty API
 
 If each of 30 API calls opens a new connection, you pay the handshake and restart slow start 30
@@ -508,6 +531,30 @@ optional at scale.
 Recap: the TCP handshake costs a round trip (plus TLS) before data and starts slow in congestion
 control, so reuse connections (keep-alive, pooling, HTTP/2) and move endpoints closer to cut RTTs;
 reach for UDP when late data is worthless and watch TIME_WAIT/port exhaustion under churn.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your design has an internal proxy opening a fresh connection per request to one backend at thousands of requests per second, all inside a datacenter. What breaks first?",
+  "options": [
+    {
+      "label": "Nothing; with sub-millisecond RTT, connections are effectively free",
+      "feedback": "The tiny RTT does hide the handshake cost, which is why this feels safe, but every closed connection sits in TIME_WAIT for about 60 seconds holding an ephemeral port, and each fresh connection restarts slow start."
+    },
+    {
+      "label": "The proxy exhausts its ~28k ephemeral ports as closed connections pile up in TIME_WAIT, and throughput never leaves slow start",
+      "correct": true,
+      "feedback": "Right. One source IP talking to one backend IP has a hard port budget, and 60-second TIME_WAIT holds burn through it fast at high churn. Connection pooling fixes the ports, the handshakes, and the slow-start ramp in one move."
+    },
+    {
+      "label": "The network link saturates from all the extra traffic",
+      "feedback": "Handshake packets are tiny, so bandwidth is rarely the first casualty. Port exhaustion and per-connection slow start arrive long before the wire fills up."
+    }
+  ],
+  "reveal": "Carry this into your design write: say where connections are pooled and kept warm, and where UDP or QUIC fits because late data is worthless. Pooling is not an optimization at scale; it is what keeps the system connecting at all."
+}
+\`\`\`
 `.trim()
 
 const tlsHttpsTeach = `
