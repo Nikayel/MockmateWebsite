@@ -694,6 +694,29 @@ each user to a nearby healthy region and, when a region catches fire, to pull al
 fast. There are two distinct mechanisms, and interviewers want you to know they operate at different
 layers.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A region dies and you flip its DNS record to point elsewhere. The record's TTL is 30 seconds. How long until the last client stops hammering the dead region?",
+  "options": [
+    {
+      "label": "About 30 seconds, the TTL is the bound",
+      "feedback": "Tempting, and it is the bound for well-behaved caches. But OS stub resolvers, browsers, and outright misbehaving resolvers ignore short TTLs, so a tail of clients lingers well past it."
+    },
+    {
+      "label": "Instantly, resolvers see the record change",
+      "feedback": "DNS is a pull-based caching system; nothing notifies resolvers that a record changed. They serve their cached answer until it expires."
+    },
+    {
+      "label": "A minute or more, and some clients longer still",
+      "correct": true,
+      "feedback": "Right. TTL plus resolver misbehavior means DNS failover is never instant, and that single fact is the most-probed point in this topic."
+    }
+  ]
+}
+\`\`\`
+
 **GeoDNS / DNS-based GSLB** steers at name resolution. When a client resolves \`api.example.com\`, an
 authoritative DNS service (Route 53, NS1, Akamai) returns different IPs based on the resolver's
 location or measured latency. You get **geo-routing**, **latency-based routing**, **weighted
@@ -712,6 +735,45 @@ out. **ECMP** spreads flows across equal-cost paths. The subtlety: plain ECMP re
 server set changes, which breaks in-flight connections. Production anycast load balancers (Google's
 **Maglev**, AWS **Hyperplane**) use **consistent hashing** so a backend change only remaps a small
 fraction of connections.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Two steering mechanisms, two layers. Sort each property.",
+  "buckets": [
+    "GeoDNS / DNS-based GSLB",
+    "Anycast + BGP"
+  ],
+  "items": [
+    {
+      "label": "Failover speed bounded by resolver caching",
+      "bucket": "GeoDNS / DNS-based GSLB",
+      "feedback": "Every DNS answer carries a TTL, and caches keep serving it after you flip the record."
+    },
+    {
+      "label": "Withdraw an announcement and traffic reconverges in seconds",
+      "bucket": "Anycast + BGP",
+      "feedback": "BGP reroutes to the next-nearest PoP with no client-side cache to wait out."
+    },
+    {
+      "label": "Weighted records sending 10 percent of users to a new region",
+      "bucket": "GeoDNS / DNS-based GSLB",
+      "feedback": "Canary-by-weight is a name-resolution feature."
+    },
+    {
+      "label": "The same IP address announced from many points of presence",
+      "bucket": "Anycast + BGP",
+      "feedback": "The routing fabric itself delivers each client to the topologically nearest PoP."
+    },
+    {
+      "label": "Needs Maglev-style consistent hashing so a backend change does not break in-flight connections",
+      "bucket": "Anycast + BGP",
+      "feedback": "Plain ECMP rehashes flows when the server set changes; consistent hashing keeps the remapped fraction small."
+    }
+  ]
+}
+\`\`\`
 
 The two combine in practice: anycast to the nearest edge/CDN PoP terminates TLS and absorbs the
 connection close to the user, then the edge forwards over warm long-haul connections to a healthy
@@ -739,6 +801,30 @@ failover.
 Recap: use GeoDNS for coarse region steering and anycast plus BGP for fast, cache-free failover, keep
 connections stable with Maglev-style consistent hashing, and never claim DNS failover is instant
 because resolver caching bounds it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Region us-east is failing and the interviewer wants traffic off it in under a minute without dropping in-flight requests. What is the strongest sequence?",
+  "options": [
+    {
+      "label": "Flip the DNS record to the surviving regions and declare it done",
+      "feedback": "Tempting because it is one API call, but resolver caching bounds it: some clients hammer the dead region for minutes, and the follow-up question 'how long until the last user leaves' is coming."
+    },
+    {
+      "label": "Withdraw the region's anycast announcement so traffic reconverges in seconds, let in-flight requests finish, then take it down",
+      "correct": true,
+      "feedback": "Right. BGP withdrawal is cache-free and fast, draining protects in-flight work, and it only holds up if the surviving regions run active-active with the headroom to absorb the shifted share."
+    },
+    {
+      "label": "Lower the DNS weight to zero and power the region down immediately",
+      "feedback": "Weight-zero is the right lever for a planned drain, but powering down immediately kills in-flight requests and everyone still holding a cached DNS answer."
+    }
+  ],
+  "reveal": "For the design write: steer coarsely with GeoDNS, fail fast with anycast plus BGP withdrawal, keep flows stable with Maglev-style consistent hashing, state your active-active headroom explicitly, and never claim DNS failover is instant."
+}
+\`\`\`
 `.trim()
 
 const apiGatewayBffTeach = `
