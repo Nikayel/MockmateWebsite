@@ -1134,6 +1134,40 @@ compacted tail is the current state of every key. A "current user profile" topic
 materializes the entire current state without a database: how Kafka Streams rebuilds a \`KTable\` and
 how CDC pipelines bootstrap read models.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the retention policy each topic needs.",
+  "buckets": [
+    "Delete retention (stream)",
+    "Compaction (table)"
+  ],
+  "items": [
+    {
+      "label": "Seven days of clickstream that analytics may replay within the window",
+      "bucket": "Delete retention (stream)",
+      "feedback": "A time-bounded immutable history is delete retention; the replay window is the retention window."
+    },
+    {
+      "label": "Current user profile keyed by user_id, rebuildable by any new consumer",
+      "bucket": "Compaction (table)",
+      "feedback": "Latest-value-per-key is exactly what compaction guarantees; reading from offset 0 materializes the current state."
+    },
+    {
+      "label": "An audit log where every historical event must survive within its window",
+      "bucket": "Delete retention (stream)",
+      "feedback": "Compaction garbage-collects superseded values, which would destroy the history an audit needs."
+    },
+    {
+      "label": "The changelog a Kafka Streams KTable restores its state store from",
+      "bucket": "Compaction (table)",
+      "feedback": "A KTable rebuild reads the compacted tail as the current state of every key."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
 Compacted topic keyed by user_id, before compaction:
   (u1,"A") (u2,"X") (u1,"B") (u3,"Q") (u1,"C") (u2,"Y")
@@ -1287,6 +1321,29 @@ pattern is **crypto-shredding**: encrypt per-subject data with a per-user key an
 render the data unrecoverable, rather than mutating the log. On a compacted topic, a tombstone plus
 compaction does the erasure directly.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A user invokes right-to-erasure against your immutable 7-year audit stream. What is the standard pattern?",
+  "options": [
+    {
+      "label": "Crypto-shredding: their data was encrypted with a per-user key, so deleting the key renders it unrecoverable without mutating the log",
+      "correct": true,
+      "feedback": "Right: you erase access, not bytes, which keeps the log immutable."
+    },
+    {
+      "label": "Rewrite the log with that user's records filtered out",
+      "feedback": "Rewriting seven years of an append-only stream breaks immutability and every consumer offset into it."
+    },
+    {
+      "label": "Nothing is needed: immutable logs are exempt from erasure",
+      "feedback": "Erasure still applies; crypto-shredding, or a tombstone on a compacted topic, is how immutable systems comply."
+    }
+  ]
+}
+\`\`\`
+
 **Tiered storage** (KIP-405, GA) decouples retention cost from broker disk: hot recent segments stay
 on local broker SSD; cold older segments offload to object storage (S3, GCS) transparently, and
 consumers reading old offsets fetch from object storage automatically. This makes cheap long or
@@ -1303,6 +1360,30 @@ the latest value per key and makes a topic a rebuildable table/changelog (with t
 deletes); tiered storage puts cold segments in object storage for cheap long retention; GDPR erasure
 on immutable logs uses crypto-shredding or tombstones; and the dedup window must be at least the
 replay window or replays double-apply.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A topic retains 7 days of events. The consumer's dedup store remembers processed ids for 24 hours. An incident forces a replay from 6 days back. What happens?",
+  "options": [
+    {
+      "label": "Day-6 events sail past the expired dedup memory and are applied a second time",
+      "correct": true,
+      "feedback": "Right: retention sets how far you can replay while the dedup window sets how far you are safe, so the dedup window must be at least the replay window."
+    },
+    {
+      "label": "Nothing: replayed records carry the same offsets, so the consumer knows it has seen them",
+      "feedback": "An offset is a position, not a processed-id memory; after a reset the consumer just reads forward and applies."
+    },
+    {
+      "label": "Kafka refuses to rewind further back than the dedup TTL",
+      "feedback": "Kafka knows nothing about your consumer's dedup store; it serves anything still inside retention."
+    }
+  ],
+  "reveal": "Retention gives you the replay window; idempotency gives you safety inside it. Size them together: a 7-day replay window with a 24-hour dedup memory is a double-apply waiting for its first incident."
+}
+\`\`\`
 `.trim()
 
 const deliverySemanticsTeach = `
