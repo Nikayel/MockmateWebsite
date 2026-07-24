@@ -2188,6 +2188,61 @@ error. This is exactly how AWS Route 53 isolates customers.
 
 \`\`\`cswidget
 {
+  "type": "calc",
+  "title": "Shuffle-shard overlap odds (2 workers per tenant)",
+  "predictPrompt": {
+    "question": "8 workers, each tenant assigned a random pair (28 possible pairs). You double the pool to 16 workers. What happens to the chance another tenant shares BOTH of your workers?",
+    "options": [
+      "It halves, from 1 in 28 to 1 in 56",
+      "It drops about 4x, from 1 in 28 to 1 in 120",
+      "It stays the same: there are just more tenants per worker"
+    ]
+  },
+  "workedExample": "Start with the lesson's numbers: 8 workers, each tenant on a random pair, 28 possible pairs. The chance a specific other tenant holds exactly your pair is 2/8 x 1/7 = 1/28, about 3.6 percent. With 1000 tenants in the pool, expect about 1000 x 1/28, roughly 36 tenants who fully share your pair and go down with you. Slide workers to 32 and the odds fall to 2/32 x 1/31 = 1/496, about 0.2 percent: roughly 2 of the same 1000 tenants.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "n",
+      "label": "Workers in the pool",
+      "min": 4,
+      "max": 32,
+      "step": 1,
+      "scale": "linear",
+      "initial": 8
+    },
+    {
+      "kind": "slider",
+      "id": "customers",
+      "label": "Tenants in the pool",
+      "min": 100,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 1000
+    }
+  ],
+  "outputs": [
+    {
+      "id": "pairProb",
+      "label": "Chance another tenant shares BOTH your workers",
+      "expr": "2 / n * (1 / (n - 1))",
+      "format": "percent"
+    },
+    {
+      "id": "expectedFullOverlap",
+      "label": "Expected tenants sharing your exact pair",
+      "expr": "customers * pairProb",
+      "format": "number",
+      "sparkline": {
+        "over": "n"
+      }
+    }
+  ],
+  "caption": "Full overlap shrinks with roughly n squared: doubling the pool roughly quarters the chance any two tenants share their whole pair."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "prompt": "8 workers serve many tenants, each tenant assigned to 2 workers. Plan A: 4 fixed shards of 2. Plan B: shuffle sharding, each tenant gets a random pair out of the 28 possible. One tenant floods its 2 workers. Compare which other tenants go fully down.",
