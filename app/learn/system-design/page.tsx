@@ -48,6 +48,40 @@ export default function LearnSystemDesignPage() {
           </div>
         </header>
 
+        {/* 60-second demo tour: one tap into each interactive kind (see
+            docs/system-design-curriculum/DEMO-PLAYLIST.md). Fully client-side lessons. */}
+        <nav
+          aria-label="Demo tour"
+          className="border-accent/30 bg-accent/[0.05] mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border px-4 py-3"
+        >
+          <span className="text-accent-strong text-xs font-semibold tracking-wide uppercase">
+            60-second tour
+          </span>
+          {[
+            {
+              href: "/learn/system-design/interview-method/sd-l0-fermi-estimation",
+              label: "Drive the QPS math",
+            },
+            {
+              href: "/learn/system-design/interview-method/sd-l0-clarify-scope",
+              label: "Predict, then reveal",
+            },
+            {
+              href: "/learn/system-design/scaling-data/sd-l3-consistent-hashing",
+              label: "Break a hash ring",
+            },
+          ].map((stop) => (
+            <Link
+              key={stop.href}
+              href={stop.href}
+              className="text-foreground/90 hover:text-accent-strong inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+            >
+              {stop.label}
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          ))}
+        </nav>
+
         <ol className="flex flex-col gap-4">
           {levels.map((level) => {
             const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
