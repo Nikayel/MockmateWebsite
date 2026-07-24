@@ -981,6 +981,37 @@ default inside a service mesh (Istio/Linkerd issue and rotate certs via sidecars
 production shape: TLS terminated at the edge for the public handshake, then re-encrypted with mTLS
 for the internal hop, giving both cheap edge offload and a zero-trust interior.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each statement to the TLS setup it describes.",
+  "buckets": [
+    "Edge termination only",
+    "End-to-end TLS",
+    "mTLS"
+  ],
+  "items": [
+    {
+      "label": "Backends never pay handshake CPU, but the internal hop is plaintext",
+      "bucket": "Edge termination only"
+    },
+    {
+      "label": "Every hop is encrypted, but services do not prove their identity to each other",
+      "bucket": "End-to-end TLS"
+    },
+    {
+      "label": "Both sides present certificates: the zero-trust default inside a mesh",
+      "bucket": "mTLS"
+    },
+    {
+      "label": "Sidecars issue and rotate its certificates automatically",
+      "bucket": "mTLS"
+    }
+  ]
+}
+\`\`\`
+
 **SNI and certificates at scale.** One IP/LB often fronts many hostnames. **SNI** (the client sends
 the target hostname in the ClientHello) lets the LB pick the right certificate per connection.
 Certificate **rotation** must be automated (ACME/Let's Encrypt, an internal CA); manual cert
@@ -993,6 +1024,29 @@ fresh connection per request will exhaust its ~64K ephemeral ports and burn CPU 
 fixes are **keep-alive** (reuse a connection for many requests) and **connection pooling** (a warm
 pool per backend, multiplexing requests over it), making backend connection counts a function of
 concurrency and pool size, not raw request rate.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A gRPC fleet behind an L7 load balancer scales from 5 pods to 15 during a spike. Existing clients each hold one long-lived HTTP/2 connection. Where do their RPCs land?",
+  "options": [
+    {
+      "label": "Spread across all 15 pods: balancing requests is what an L7 balancer is for",
+      "feedback": "Tempting, because an L7 LB does balance individual requests for HTTP/1.1. But it picks a backend when the connection is established, and gRPC multiplexes thousands of RPCs as streams over that one connection."
+    },
+    {
+      "label": "Still hammering the original 5 pods, while the 10 new ones sit idle",
+      "correct": true,
+      "feedback": "Right. Every stream is pinned to the backend chosen at connect time. You need per-stream balancing (Envoy), client-side load balancing, or max-connection-age cycling to move traffic onto new capacity."
+    },
+    {
+      "label": "Gradually migrating to the new pods as the balancer rebalances",
+      "feedback": "The balancer never revisits an established connection. Without connection-age limits or a scale-event drain, nothing ever forces existing clients to reconnect."
+    }
+  ]
+}
+\`\`\`
 
 ### The trap: multiplexed connections pin to one backend
 
@@ -1025,6 +1079,30 @@ Recap: terminate TLS at the edge and re-encrypt with mTLS for a zero-trust inter
 keep-alive connections to avoid handshake cost and port exhaustion, and remember that long-lived
 multiplexed H2/gRPC/WebSocket connections pin to one backend so you need client-side or per-request
 balancing to actually spread load.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You designed the front door: TLS terminates at the edge, mTLS inside, keep-alive pools to the backends. After a scale-up the new pods stay cold while the old pods run hot. Which choice is biting you?",
+  "options": [
+    {
+      "label": "Edge TLS termination: handshake cost keeps traffic on the warm pods",
+      "feedback": "Tempting because TLS placement is the flashiest decision, but termination decides where crypto happens, not which backend a request reaches."
+    },
+    {
+      "label": "The long-lived pooled connections: they were balanced once, at connect time, and are pinned to the old pods",
+      "correct": true,
+      "feedback": "Right. Multiplexed H2/gRPC connections pin to the backend picked at establishment. Add per-stream balancing at an Envoy-style proxy, client-side load balancing, or max-connection-age so clients re-resolve after scale events."
+    },
+    {
+      "label": "Internal mTLS: sidecar handshakes are throttling the new pods",
+      "feedback": "mTLS adds some CPU per new connection but does not steer traffic; the new pods would still receive their share of fresh connections if anything were reconnecting."
+    }
+  ],
+  "reveal": "In the design write, state where TLS terminates and why, how connections are pooled and kept alive, and name the pinning fix (per-stream Envoy balancing, client-side LB, or connection-age cycling) before the interviewer asks why your scale-up did nothing."
+}
+\`\`\`
 `.trim()
 
 const rateLimitAlgorithmsTeach = `
