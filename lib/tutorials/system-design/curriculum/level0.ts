@@ -1037,6 +1037,29 @@ metadata (id, owner, timestamps, storage key, caption). These belong in differen
 object store (S3), metadata in a sharded database. Estimating them together hides the fact that your
 database only needs to hold gigabytes while your object store holds petabytes.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your raw math says 12 TB of photos over the retention window, stored in a durable RF=3 object store. What number do you quote as provisioned storage?",
+  "options": [
+    {
+      "label": "12 TB, the number the formula gave",
+      "feedback": "Tempting because the formula really did produce it, but that is raw payload only. Durable stores keep 3 copies, so quoting 12 TB understates the real footprint by 3x."
+    },
+    {
+      "label": "About 36 TB, plus a bit more once index overhead is counted",
+      "correct": true,
+      "feedback": "Right. RF=3 triples raw storage, and on the database side secondary indexes and overhead add another 20 to 50 percent. Provisioned storage is raw times replication plus overhead."
+    },
+    {
+      "label": "About 120 TB, since replication is usually 10x",
+      "feedback": "Replication is expensive but not that expensive. Standard durable replication is 3 copies, and erasure coding for cold blobs pulls the multiplier down toward 1.3x to 1.5x, not up."
+    }
+  ]
+}
+\`\`\`
+
 Two multipliers people forget, both of which change the answer materially:
 
 - **Replication factor.** Durable stores keep 3 copies (RF=3), so multiply raw storage by 3. Erasure
@@ -1171,6 +1194,47 @@ hot 20% of reads -> cache size -> target hit rate -> read load removed
 Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply by
 replication factor and add index overhead, compute ingress and egress bandwidth separately (egress
 drives CDN), and size the cache from the hot ~20% against a target hit rate.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each piece of a media service's data into the tier where it belongs.",
+  "buckets": [
+    "Object store",
+    "Sharded database",
+    "Cache tier"
+  ],
+  "items": [
+    {
+      "label": "The 2 MB photo blobs themselves",
+      "bucket": "Object store",
+      "feedback": "Blobs live in S3-class object storage, never in database rows. This split is what keeps the database at gigabytes while the object store holds petabytes."
+    },
+    {
+      "label": "The 1 KB per-photo metadata rows",
+      "bucket": "Sharded database",
+      "feedback": "Metadata (id, owner, timestamps, storage key) is small and query-heavy, so it belongs in a sharded database."
+    },
+    {
+      "label": "The hot 20 percent of actively read data",
+      "bucket": "Cache tier",
+      "feedback": "The Pareto cut: the recent and the viral serve most reads, and this slice is what you size the cache from, against a target hit rate."
+    },
+    {
+      "label": "Secondary indexes and B-tree overhead",
+      "bucket": "Sharded database",
+      "feedback": "Index overhead adds 20 to 50 percent on top of raw row size, which is why it belongs in the database sizing, not the blob math."
+    },
+    {
+      "label": "Five-year-old blobs almost nobody opens",
+      "bucket": "Object store",
+      "feedback": "Cold blobs stay in the object store, ideally erasure coded at roughly 1.4x instead of RF=3, a real cost lever worth naming."
+    }
+  ],
+  "reveal": "In the design write, run the whole chain: objects x size x retention with metadata and blobs kept separate, multiply by replication and add index overhead, compute ingress and egress separately (egress is the CDN signal), then size the cache from the hot fraction against a target hit rate."
+}
+\`\`\`
 `.trim()
 
 const latencyNumbersTeach = `
