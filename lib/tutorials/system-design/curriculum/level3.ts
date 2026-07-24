@@ -1150,6 +1150,29 @@ misses from hammering the DB for absent keys.
 
 \`\`\`cswidget
 {
+  "type": "cache-sim",
+  "title": "TTL, eviction, and the hit ratio",
+  "predictPrompt": {
+    "question": "This stream is skewed: about half of all requests go to one hot key. The cache holds 6 of the 12 keys and every entry expires after 40 ticks. Where will the hit ratio settle?",
+    "options": [
+      "High: LRU keeps the hot key and a few warm keys resident, so most requests hit",
+      "About half: only half the keys fit in memory, so roughly half of all requests must miss",
+      "Near zero: TTL expiry keeps wiping entries before they are ever reused"
+    ]
+  },
+  "workedExample": "Start with the dials as given: 12 keys, room for 6, and a 40-tick TTL against a 6-tick rebuild. Because the stream is skewed toward one hot key, LRU keeps that key and the warm ones resident while the cold tail cycles out, so the hit ratio climbs well above what raw capacity suggests: eviction is doing exactly its job, discarding data that was barely re-read anyway. Expiries stay occasional because the TTL is long relative to the rebuild. Now shrink capacity and watch recency stop saving you, or pull the TTL down toward the rebuild time and watch misses start paying the rebuild latency again and again. The hit ratio is the number to defend: every point it loses lands directly on the database.",
+  "seed": "product-page-hot-set",
+  "keys": 12,
+  "ticks": 240,
+  "capacity": 6,
+  "ttl": 40,
+  "rebuildTicks": 6,
+  "caption": "Cache-aside against a skewed read stream. TTL decides how long entries stay honest, LRU decides what leaves when memory fills, and the hit ratio is the number the database feels."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "prompt": "Your cache runs at a 99% hit ratio and the DB comfortably handles the 1% of reads that miss. A deploy nudges the hit ratio down to 98%. What happens to DB read load?",
