@@ -646,6 +646,60 @@ accident**. The rule of thumb: equality-filtered columns first, then the column 
 range-scan on last, so that after the equality prefix pins a contiguous slice, the sort column is
 already in order inside that slice and no separate sort step is needed.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "user_id",
+    "status",
+    "created_at",
+    "why this entry is here"
+  ],
+  "rows": [
+    [
+      7,
+      "active",
+      "2026-06-30",
+      "different user: outside the slice"
+    ],
+    [
+      42,
+      "active",
+      "2026-06-01",
+      "slice starts: the equality prefix (42, active) pins a contiguous run"
+    ],
+    [
+      42,
+      "active",
+      "2026-06-09",
+      "still inside the run"
+    ],
+    [
+      42,
+      "active",
+      "2026-06-20",
+      "and created_at is already in order, so no separate sort step"
+    ],
+    [
+      42,
+      "inactive",
+      "2026-04-11",
+      "same user, different status: the run has ended"
+    ],
+    [
+      99,
+      "active",
+      "2026-06-03",
+      "status = 'active' alone is scattered across every user_id group"
+    ]
+  ],
+  "highlightCols": [
+    "created_at"
+  ],
+  "caption": "A composite index on (user_id, status, created_at) is one sorted entry list: WHERE user_id = 42 AND status = 'active' ORDER BY created_at seeks one contiguous slice, while a lone status filter has no single place to seek."
+}
+\`\`\`
+
 A **covering index** (index-only scan) is the next lever. If the index contains *every* column the
 query needs, in its keys or as included non-key columns (Postgres \`INCLUDE\`, SQL Server included
 columns), the database answers entirely from the index and never touches the table/heap. That removes
