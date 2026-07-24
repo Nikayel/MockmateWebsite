@@ -125,6 +125,53 @@ describe("calc fence through the markdown pipeline", () => {
   })
 })
 
+const hashRingSpec = {
+  type: "hash-ring",
+  title: "Add a node. How many keys move?",
+  predictPrompt: {
+    question:
+      "4 nodes own 48 keys via hash(key) mod 4. You add a fifth node. How many keys change owner?",
+    options: ["About 1 in 5", "About half", "Almost all of them"],
+  },
+  workedExample:
+    "This is the mod-N world: 48 keys colored by owner across 4 nodes. Add a node and watch the shatter, then switch to the ring and do it again.",
+  initialNodes: 4,
+  maxNodes: 7,
+  keys: 48,
+  initialMode: "modulo",
+  vnodeFactor: 16,
+}
+
+describe("hash-ring widget", () => {
+  it("parses, intercepts, and renders its predict phase server-side", () => {
+    const html = render(fence(hashRingSpec))
+    expect(html).toContain('data-cswidget="hash-ring"')
+    expect(html).not.toContain("language-cswidget")
+  })
+
+  it("rejects maxNodes <= initialNodes at spec time", () => {
+    const bad = { ...hashRingSpec, maxNodes: 4 }
+    const result = parseWidgetSpec(JSON.stringify(bad))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain("maxNodes")
+  })
+
+  it("server-renders the body without touching window, ramp intact", () => {
+    const parsed = parseWidgetSpec(JSON.stringify(hashRingSpec))
+    if (!parsed.ok) throw new Error(parsed.error)
+    const html = renderToStaticMarkup(createElement(WidgetBody, { spec: parsed.spec }))
+    expect(html).toContain("Hands-on: consistent hashing")
+    expect(html).toContain("Add a node. How many keys move?")
+    expect(html).toContain("Almost all of them")
+    // Predict-first: no ring SVG (its 240x240 viewBox), controls, or read-outs
+    // before the guess commits. (The frame's Reset icon is also an <svg>, so the
+    // assertion targets the ring specifically.)
+    expect(html).not.toContain('viewBox="0 0 240 240"')
+    expect(html).not.toContain("Add node")
+    expect(html).not.toContain("Last change remapped")
+  })
+})
+
 describe("widget components server-render (SSR safety)", () => {
   it("renders a calc body in its predict phase without touching window", async () => {
     const parsed = parseWidgetSpec(JSON.stringify(calcSpec))
