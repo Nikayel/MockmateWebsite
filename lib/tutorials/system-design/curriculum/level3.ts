@@ -1068,6 +1068,29 @@ write, update the DB and then delete (not update) the cache key, so the next rea
 the source of truth. Deleting rather than updating avoids a subtle race where two concurrent writers
 leave a stale value behind.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Suppose you had chosen update-on-write instead: after each DB write, the app also writes the new value into the cache. W1 writes value A, then W2 writes value B, but their two cache updates arrive in the order B then A. What does the cache serve afterwards?",
+  "options": [
+    {
+      "label": "B, the latest value: cache writes land in the same order as the DB commits",
+      "feedback": "Tempting, but nothing synchronizes the two paths. The DB serialized W1 before W2, while the network is free to deliver the cache updates in any order."
+    },
+    {
+      "label": "A, the stale value, until a TTL or the next delete rescues it",
+      "correct": true,
+      "feedback": "Right. The late-arriving A overwrites B and sticks. Deleting the key on write avoids the race entirely: the next read repopulates from the DB, the single source of truth."
+    },
+    {
+      "label": "This cannot happen, because the cache executes commands one at a time",
+      "feedback": "Tempting: a single-threaded cache does serialize execution, but it executes in arrival order, and arrival order is exactly what the race scrambles."
+    }
+  ]
+}
+\`\`\`
+
 ### Expiry, sizing, and the numbers
 
 Every entry gets a **TTL**, and you add **jitter** (say 300s plus or minus a random 30s) so a cohort
@@ -1077,6 +1100,29 @@ recency, **LFU** for frequency) decides what leaves when memory fills. The numbe
 DB load. Size the cache so the **hot working set** fits in memory; caching the long cold tail buys
 nothing. **Negative caching** (caching "this key does not exist" for a short TTL) stops repeated
 misses from hammering the DB for absent keys.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your cache runs at a 99% hit ratio and the DB comfortably handles the 1% of reads that miss. A deploy nudges the hit ratio down to 98%. What happens to DB read load?",
+  "options": [
+    {
+      "label": "It rises about 1%, barely noticeable",
+      "feedback": "Tempting because the hit ratio only moved one point, but the DB never sees the hits. It only sees misses, and the miss rate is what changed."
+    },
+    {
+      "label": "It doubles",
+      "correct": true,
+      "feedback": "Right. Misses went from 1% to 2% of all reads, so the DB sees twice the traffic. At high hit ratios, tiny hit-ratio drops are large miss-rate multipliers."
+    },
+    {
+      "label": "It halves",
+      "feedback": "Backwards: the hit ratio fell, so more reads fall through to the DB, not fewer."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** saying "add a cache" with no invalidation story is the fastest way to lose a
 senior interviewer. Always pair a write policy with how and when entries become stale, and name your
@@ -1093,6 +1139,42 @@ READ (cache-aside)                WRITE (invalidate-on-write)
 Recap: default to cache-aside reads plus invalidate-on-write, pick a write policy by its durability
 and latency tradeoff, and always attach a TTL-with-jitter and a stated consistency window so the
 cache is defensible, not just present.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are defending a cache in a design review. Match each requirement to the write pattern you would reach for.",
+  "buckets": [
+    "Cache-aside plus invalidate-on-write",
+    "Write-back",
+    "Write-around"
+  ],
+  "items": [
+    {
+      "label": "Product page that must reflect an edit on the very next read",
+      "bucket": "Cache-aside plus invalidate-on-write",
+      "feedback": "Deleting the key on write forces the next read to repopulate from the DB, so staleness ends at the write instead of waiting out a TTL."
+    },
+    {
+      "label": "View counter absorbing write bursts, where losing a few increments is acceptable",
+      "bucket": "Write-back",
+      "feedback": "Write-back acknowledges before the DB write happens, which is exactly the durability trade a lossy counter can afford."
+    },
+    {
+      "label": "Bulk import of rows that will rarely, if ever, be read",
+      "bucket": "Write-around",
+      "feedback": "Skipping the cache on write keeps write-once data from evicting your hot working set."
+    },
+    {
+      "label": "The sensible default when no requirement pushes you elsewhere",
+      "bucket": "Cache-aside plus invalidate-on-write",
+      "feedback": "It caches only requested data, degrades to slower DB reads if the cache dies, and keeps the DB the source of truth."
+    }
+  ],
+  "reveal": "In your design write, never say 'add a cache' alone: name the read pattern, the write policy, the TTL with jitter, and the consistency window you are promising the reader."
+}
+\`\`\`
 `.trim()
 
 const cacheStampedeHotkeyTeach = `
