@@ -1628,6 +1628,29 @@ binlog, or an application event) onto a stream, and an indexer applies them to E
 Because it is derivable, plan for **full reindexing**: mapping changes require building a fresh index
 and switching an **alias** over atomically, with zero downtime.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A crawler requests results 100,000 through 100,010 using a large 'from' offset. Compared to page one, what does this cost the cluster?",
+  "options": [
+    {
+      "label": "About the same: the index is sorted, so each shard seeks straight to the offset",
+      "feedback": "Tempting B-tree intuition, but relevance order is computed fresh per query. There is no precomputed position 100,000 to seek to."
+    },
+    {
+      "label": "Far more: every shard must rank its full 100,010-document prefix, so cost grows with the offset",
+      "correct": true,
+      "feedback": "Right. No shard can know which of its documents land in the global top 100,010, so each ranks and returns that many, and the coordinator merges them all. Use 'search_after' cursors and cap the page depth."
+    },
+    {
+      "label": "Slightly more: only the coordinating node pays, discarding rows after one merge",
+      "feedback": "Tempting, but the coordinator can only discard what the shards have already ranked and shipped. The work proportional to the offset happens on every shard first."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the classic trap is **deep pagination**. \`from: 100000, size: 10\` forces
 every shard to sort 100,010 docs and is O(offset). Use **\`search_after\`** (a cursor on the last
 sort value) for deep result sets, and cap the max page. Also be ready to say why you would not make
@@ -1637,6 +1660,51 @@ Recap: search runs on a dedicated tier built on an inverted index plus an analys
 with BM25 and boosting, separates scoring queries from cached filters, shards across primaries and
 replicas, stays in sync as an eventually-consistent derived store fed by CDC, and paginates deep sets
 with search_after, never large from offsets.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Final gut check before you design the search tier: sort each decision.",
+  "buckets": [
+    "Sound design",
+    "Trap"
+  ],
+  "items": [
+    {
+      "label": "Feed the index by CDC from the primary DB and accept a second or two of lag",
+      "bucket": "Sound design",
+      "feedback": "Search is a derived, rebuildable store; eventual consistency is the honest and standard contract."
+    },
+    {
+      "label": "Make Elasticsearch the system of record to remove a moving part",
+      "bucket": "Trap",
+      "feedback": "Tempting simplification, but it trades away durability, consistency, and transactions. The truth stays in the primary DB."
+    },
+    {
+      "label": "Express brand and price constraints as filters, not queries",
+      "bucket": "Sound design",
+      "feedback": "Filters do not score and are deterministic, so the engine caches them as bitsets and reuses them across requests."
+    },
+    {
+      "label": "Serve page 10,000 with a large 'from' offset",
+      "bucket": "Trap",
+      "feedback": "That is the deep-pagination trap you just predicted: cost grows with the offset on every shard. Use 'search_after' and cap depth."
+    },
+    {
+      "label": "Run one analyzer at index time and a different one at query time",
+      "bucket": "Trap",
+      "feedback": "Tempting to tune them separately, but the produced terms must match exactly; mismatched analyzers silently return nothing."
+    },
+    {
+      "label": "Plan for full reindexing with an atomic alias switch",
+      "bucket": "Sound design",
+      "feedback": "Mapping changes require a rebuild; because the index is derived, you build fresh and flip the alias with zero downtime."
+    }
+  ],
+  "reveal": "In your design write, present search as a dedicated derived tier: inverted index plus analysis pipeline, BM25 with boosting, cached filters, sharded primaries with replicas, CDC sync, alias-based reindexing, and cursor pagination."
+}
+\`\`\`
 `.trim()
 
 const vectorHybridSearchTeach = `
