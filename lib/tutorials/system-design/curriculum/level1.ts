@@ -1518,6 +1518,29 @@ const paginationErrorsTeach = `
 Two boring-looking API details, pagination and error shape, are where APIs quietly fall over at
 scale. Both have a correct answer.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A feed API serves page 5,000 with 'offset=100000&limit=20' on a table whose sort column is indexed. Compared with page 1, that query is:",
+  "options": [
+    {
+      "label": "About the same speed, since the index lets the database jump straight to row 100,000",
+      "feedback": "Tempting, but a B-tree index does not know row numbers. To honor the offset, the database walks and discards 100,000 rows first, on every request."
+    },
+    {
+      "label": "Linearly slower, because the database scans and throws away everything before the offset",
+      "correct": true,
+      "feedback": "Right. Offset is O(n) in depth, and it gets worse: inserts at the top shift every row between page fetches, so users see duplicates or skipped items."
+    },
+    {
+      "label": "Slower only because the sort column needs an index",
+      "feedback": "The index already covers the ordering; offset still forces the scan-and-discard walk. The real fix is to seek by position with a cursor rather than count rows."
+    }
+  ]
+}
+\`\`\`
+
 ### Pagination: offset is the trap
 
 The naive approach is offset/limit: \`?offset=100000&limit=20\`. Two problems. It is O(n) deep: to
@@ -1549,6 +1572,29 @@ debug. The standard shape is RFC 9457 Problem Details (the successor to RFC 7807
 \`type\` (a URI naming the error class), \`title\`, \`status\`, \`detail\`, and \`instance\`, plus a
 correlation id so a support ticket maps to a specific log line.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your client library just got an error response. Which errors should it automatically retry with backoff?",
+  "options": [
+    {
+      "label": "All of them, retrying is the safe default",
+      "feedback": "It feels robust, but most 4xx mean the request itself is wrong. Retrying a 400 returns the same 400 forever while amplifying load on a possibly struggling service."
+    },
+    {
+      "label": "5xx and 429 only, honoring 'Retry-After' when present",
+      "correct": true,
+      "feedback": "Right. Server faults and rate limits are transient, so back off and retry. Client-fault 4xx will fail identically on every attempt, so surface them to the caller instead."
+    },
+    {
+      "label": "4xx only, since those responses come back quickly",
+      "feedback": "Backwards: fast failure does not mean retryable. A 422 validation error answers instantly and fails on every retry no matter what."
+    }
+  ]
+}
+\`\`\`
+
 Status codes must be used precisely, because they drive client retry logic:
 
 - \`400\` malformed request, \`422\` well-formed but semantically invalid (validation).
@@ -1568,6 +1614,51 @@ stack traces to clients.
 Recap: use opaque cursor/keyset pagination with a bounded page size for O(1) stable paging, and
 return RFC 9457 structured errors with precise status codes so clients retry 5xx/429 but not other
 4xx.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each API habit by how it behaves once the table is large and the traffic is real.",
+  "buckets": [
+    "Scales cleanly",
+    "Trap at scale"
+  ],
+  "items": [
+    {
+      "label": "Offset/limit for arbitrarily deep pages",
+      "bucket": "Trap at scale",
+      "feedback": "O(n) in depth and unstable under inserts: both failure modes of the naive approach."
+    },
+    {
+      "label": "An opaque 'next_cursor' built from the last row's sort key",
+      "bucket": "Scales cleanly",
+      "feedback": "Keyset paging seeks the index directly, O(1) at any depth, and the opaque encoding leaves you free to change it later."
+    },
+    {
+      "label": "Returning an exact 'COUNT(*)' total with every page",
+      "bucket": "Trap at scale",
+      "feedback": "Feels helpful, but counting a large table is itself an expensive scan on every request. Prefer a 'has_more' boolean."
+    },
+    {
+      "label": "A server-side maximum page size",
+      "bucket": "Scales cleanly",
+      "feedback": "Without a cap, one client asking for a million rows becomes your outage."
+    },
+    {
+      "label": "Clients that blindly retry every 4xx",
+      "bucket": "Trap at scale",
+      "feedback": "Non-429 4xx fail identically on every attempt, so blind retries only multiply load."
+    },
+    {
+      "label": "RFC 9457 error bodies with a correlation id",
+      "bucket": "Scales cleanly",
+      "feedback": "Machine-readable errors let clients branch on retryability, and the correlation id turns a support ticket into a specific log line."
+    }
+  ],
+  "reveal": "For the design exercise, state both halves in one breath: cursor pagination with a bounded page size and 'has_more', plus structured errors whose status codes tell clients exactly what to retry."
+}
+\`\`\`
 `.trim()
 
 const realtimeCommsTeach = `
