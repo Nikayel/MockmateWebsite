@@ -1244,6 +1244,29 @@ Fast, credible estimation rests on a small set of memorized constants. If you qu
 round trip as 50 ms or a memory read as 1 ms, every downstream number is wrong by orders of magnitude
 and the interviewer stops trusting your math. This lesson is the cheat-sheet.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Before you open the ladder, commit to a number: roughly how long is a network round trip between two servers in the same datacenter?",
+  "options": [
+    {
+      "label": "About 0.5 ms",
+      "correct": true,
+      "feedback": "Right. Same-DC round trips cost about half a millisecond, which is why a handful of sequential in-region calls is cheap but a chatty sequence of dozens is not."
+    },
+    {
+      "label": "About 10 ms",
+      "feedback": "Tempting because 10 ms feels like a fair price for any network hop, but 10 ms is disk-seek territory. Same-DC networking is about 20x faster than that."
+    },
+    {
+      "label": "About 50 ms",
+      "feedback": "That is a cross-region round trip, like US to EU. Quoting it for same-DC inflates every downstream estimate by about 100x, and the interviewer stops trusting the math."
+    }
+  ]
+}
+\`\`\`
+
 <details>
 <summary>The latency ladder</summary>
 
@@ -1317,6 +1340,52 @@ otherwise good design.
 Recap: memorize the latency ladder (memory ~100 ns, SSD ~100 us, same-DC ~0.5 ms, cross-region ~50 to
 150 ms), the day/month-to-seconds conversions, typical object sizes, and single-machine ceilings, then
 always translate a number into a design decision.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "From memory, place each operation on its rung of the latency ladder.",
+  "buckets": [
+    "Nanoseconds",
+    "Microseconds",
+    "Milliseconds or more"
+  ],
+  "items": [
+    {
+      "label": "L1 cache reference",
+      "bucket": "Nanoseconds",
+      "feedback": "About 1 ns, the fastest rung on the ladder."
+    },
+    {
+      "label": "Main memory (RAM) read",
+      "bucket": "Nanoseconds",
+      "feedback": "About 100 ns. Memory is roughly 1,000x faster than an SSD random read, which is the entire case for in-memory caching."
+    },
+    {
+      "label": "SSD random read",
+      "bucket": "Microseconds",
+      "feedback": "About 100 us. It feels fast, but it is three orders of magnitude slower than RAM."
+    },
+    {
+      "label": "Read 1 MB sequentially from RAM",
+      "bucket": "Microseconds",
+      "feedback": "About 10 us. Sequential access is far cheaper than the same bytes fetched randomly."
+    },
+    {
+      "label": "Disk (HDD) seek",
+      "bucket": "Milliseconds or more",
+      "feedback": "About 10 ms per seek, which is why random disk access patterns are a design smell."
+    },
+    {
+      "label": "Cross-region round trip",
+      "bucket": "Milliseconds or more",
+      "feedback": "50 to 150 ms. This is the constant that rules out chatty synchronous cross-region calls and argues for regional replicas."
+    }
+  ],
+  "reveal": "In the design write, quote each constant within an order of magnitude and immediately convert it into a decision: cache hot reads in memory, avoid random seeks, keep chatty sequences inside one region, and turn QPS into a server or shard count using the single-machine ceilings."
+}
+\`\`\`
 `.trim()
 
 const phasedDeliveryClockTeach = `
