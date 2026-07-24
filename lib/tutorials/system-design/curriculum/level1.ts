@@ -263,6 +263,29 @@ provider **ALIAS/ANAME** records, which behave like a CNAME but are legal at the
 **Interview nuance:** "why can't I CNAME my apex to my load balancer?" is a real, common gotcha.
 Answer: the apex needs SOA/NS records that a CNAME would forbid coexisting with; use ALIAS/ANAME.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You set a 60 second TTL on 'api.example.com'. The primary region dies and you repoint the record to a healthy IP. When does traffic actually stop hitting the dead IP?",
+  "options": [
+    {
+      "label": "Within 60 seconds; that is what the TTL guarantees",
+      "feedback": "Tempting because that is the contract on paper, but resolvers you do not control clamp or ignore TTLs, and clients that already resolved keep using the stale IP until their own caches expire."
+    },
+    {
+      "label": "Within minutes, best effort, with some stragglers even later",
+      "correct": true,
+      "feedback": "Right. DNS failover is eventually consistent: misbehaving recursive resolvers, corporate caches, and already-resolved clients all outlive your TTL."
+    },
+    {
+      "label": "Almost instantly; the authoritative server pushes the change out to resolvers",
+      "feedback": "DNS has no push. Every cache in the chain waits out its own timer and re-queries; nothing you do invalidates them remotely."
+    }
+  ]
+}
+\`\`\`
+
 ### TTL: the core tradeoff
 
 A short TTL (say 60s) means clients re-query often, so a failover or IP change propagates fast, at
@@ -290,6 +313,30 @@ balancer takes over from there.
 Recap: DNS resolves through a cached recursive-to-authoritative chain, TTL trades failover speed for
 query load but never gives instant failover because of resolver caching, and GeoDNS/latency/weighted
 routing plus health checks steer users to the nearest healthy region before a real LB takes over.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your design needs region failover within 5 seconds of a health check failing. Can DNS routing alone, Geo or latency or weighted plus health checks, deliver that?",
+  "options": [
+    {
+      "label": "Yes; health checks make the authoritative server stop handing out the dead region's IP immediately",
+      "feedback": "Health checks do fix what new resolutions receive, which is real and valuable, but everyone who already resolved keeps the cached answer until it expires. New lookups heal fast; existing users do not."
+    },
+    {
+      "label": "No; DNS steers new lookups on the order of minutes, so seconds-level failover needs a load balancer or anycast layer below it",
+      "correct": true,
+      "feedback": "Right. DNS gets users to the right region eventually; per-request health, retries, and instant failover belong to the L4/L7 layer that takes over after resolution."
+    },
+    {
+      "label": "Yes, if you drop the TTL to 1 second",
+      "feedback": "Tempting arithmetic, but very low TTLs get clamped by many resolvers, multiply your query load, and make you dependent on your DNS provider's uptime, while already-resolved clients still hold stale answers."
+    }
+  ],
+  "reveal": "The division of labor to carry into your design write: DNS steers users to the nearest healthy region in minutes, best effort; a real load balancer handles per-request health and failover in milliseconds from there."
+}
+\`\`\`
 `.trim()
 
 const tcpUdpTeach = `
