@@ -709,6 +709,54 @@ time explode toward infinity (the \`1/(1-rho)\` term): going from 70% to 90% uti
 or triple your p99. Second, you need slack to absorb bursts and GC/pause jitter. So you target **50
 to 70% utilization**: 20 instances at a 70% target becomes \`20 / 0.7 = ~29\` instances.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "The utilization hockey stick",
+  "predictPrompt": {
+    "question": "Compared with a nearly idle system, how much longer does a request wait at 90% utilization?",
+    "options": [
+      "About 2x",
+      "About 5x",
+      "About 10x",
+      "About 100x"
+    ]
+  },
+  "workedExample": "At the lesson's 70% target, 'rho' = 0.7 gives a wait multiplier of 1 / (1 - 0.7) = about 3.3x the idle-system response time, leaving 30% headroom. Slide 'rho' to 0.9 and the multiplier jumps to 10x with only 10% headroom; at 0.95 it doubles again to 20x. Watch the sparkline stay almost flat until about 0.8, then turn vertical.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "rho",
+      "label": "Utilization (rho)",
+      "min": 0.1,
+      "max": 0.99,
+      "scale": "linear",
+      "step": 0.01,
+      "initial": 0.7
+    }
+  ],
+  "outputs": [
+    {
+      "id": "wait_multiplier",
+      "label": "Wait/response-time multiplier",
+      "expr": "1 / (1 - rho)",
+      "format": "number",
+      "unit": "x",
+      "sparkline": {
+        "over": "rho"
+      }
+    },
+    {
+      "id": "headroom",
+      "label": "Headroom",
+      "expr": "1 - rho",
+      "format": "percent"
+    }
+  ],
+  "caption": "Queueing delay grows as 1/(1-rho): gentle below 0.7, explosive past 0.8. This curve is why you size to 50 to 70%, never 100%."
+}
+\`\`\`
+
 ### Redundancy math
 
 You must survive failure of a whole **availability zone**, so you spread instances across (typically)
