@@ -785,6 +785,45 @@ reads and writes separately and take the ratio.
 The subtlety in feed-like systems is fan-out: one write can generate many logical reads, or one read
 can require merging many sources. This is the fan-out-on-write versus fan-out-on-read decision.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Before reading the comparison, commit: which delivery strategy does each property belong to?",
+  "buckets": [
+    "Fan-out on write (push)",
+    "Fan-out on read (pull)"
+  ],
+  "items": [
+    {
+      "label": "Reading a feed is one cheap cache lookup",
+      "bucket": "Fan-out on write (push)",
+      "feedback": "Push pays at write time so the read is precomputed: one cache GET and done."
+    },
+    {
+      "label": "One post triggers an insert into every follower's feed",
+      "bucket": "Fan-out on write (push)",
+      "feedback": "The cost side of push: the write amplifies by the follower count."
+    },
+    {
+      "label": "Posting is a single cheap append",
+      "bucket": "Fan-out on read (pull)",
+      "feedback": "Pull defers the work: the write path stays light because nobody's feed is touched yet."
+    },
+    {
+      "label": "Opening the feed means fetching from every followee and merging",
+      "bucket": "Fan-out on read (pull)",
+      "feedback": "The deferred cost lands here: N fetches plus a merge and sort at query time."
+    },
+    {
+      "label": "The better fit for a celebrity with 10 million followers",
+      "bucket": "Fan-out on read (pull)",
+      "feedback": "Tempting to say push since feed reads dominate, but pushing one celebrity post means 10 million inserts. Pulling their posts at read time caps the blast radius."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
 Fan-out on WRITE (precompute):        Fan-out on READ (merge at query time):
 user posts -> push into each              user opens feed -> pull recent posts
@@ -923,6 +962,29 @@ take a hugely disproportionate share of traffic. Your design must survive the ho
 average. A hot key can saturate a single cache node or shard even when the fleet-wide average looks
 fine, so you plan for replication of hot keys or request coalescing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your cache fleet averages 15% utilization with plenty of headroom. A post goes viral. Is the fleet safe?",
+  "options": [
+    {
+      "label": "Yes; 15% average leaves more than 6x headroom before saturation",
+      "feedback": "Tempting, the fleet-wide math checks out. But a viral post is one hot key living on one node: that single node can saturate while the average still reads 15%."
+    },
+    {
+      "label": "No; the one node that owns the hot key can saturate",
+      "correct": true,
+      "feedback": "Right. Access is Zipfian, so a few keys take a wildly disproportionate share. You survive it by replicating hot keys or coalescing requests, not by trusting the average."
+    },
+    {
+      "label": "Only if total traffic more than doubles",
+      "feedback": "Total volume barely needs to move: the danger is distribution, not volume. One key's share can crush its shard while fleet totals look calm."
+    }
+  ]
+}
+\`\`\`
+
 Finally, translate QPS into a first-order server count. If a tuned application server handles ~10k
 QPS, then 30k peak read QPS needs at least 3 to 4 app servers behind the load balancer plus headroom,
 and a cache handling 100k+ ops/sec covers the feed reads.
@@ -930,6 +992,30 @@ and a cache handling 100k+ ops/sec covers the feed reads.
 Recap: derive read and write QPS separately, take the ratio to decide read-optimized versus
 write-optimized, model where fan-out happens (write vs read, and a celebrity hybrid), and design for
 the hot key rather than the average.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your estimate says 40:1 read-heavy, and you chose push fan-out with an average of 200 followers per user. Which conclusion is right?",
+  "options": [
+    {
+      "label": "The write path is safe; put all your effort into the read path",
+      "feedback": "Tempting, 40:1 sounds decisive. But push multiplies every post by 200 followers: 250 QPS of posts becomes 50,000 QPS of feed inserts, and that amplified write load is now your biggest number."
+    },
+    {
+      "label": "Model the fan-out: effective feed-insert QPS is the post rate times followers, so the write side needs real design work",
+      "correct": true,
+      "feedback": "Right. The ratio alone is not enough; you must model where the fan-out happens. 250 x 200 is 50k inserts per second, larger than the 10k read QPS."
+    },
+    {
+      "label": "Switch everything to pull so the write amplification disappears",
+      "feedback": "Pull fixes the celebrity problem but gives every ordinary feed load N fetches and a merge. The senior answer is the hybrid: push for normal users, pull for celebrities."
+    }
+  ],
+  "reveal": "In your design write, derive read and write QPS separately, state the ratio, show where fan-out multiplies which path, name your push, pull, or hybrid choice, and say how you survive the hot key rather than the average."
+}
+\`\`\`
 `.trim()
 
 const storageBandwidthCacheTeach = `
