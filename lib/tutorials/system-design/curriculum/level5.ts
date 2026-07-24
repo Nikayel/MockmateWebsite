@@ -672,6 +672,37 @@ a caught-up replica for a short window after a write (**sticky routing**, single
 for a replica caught up past it (**version tokens**, the only option that survives the phone-write then
 laptop-read cross-device case, because a cookie-scoped sticky session does not travel).
 
+\`\`\`cswidget
+{
+  "type": "replication-lag",
+  "title": "Buying Session Guarantees: Token vs Stickiness",
+  "predictPrompt": {
+    "question": "The write commits on the primary during the burst and a later read lands on a lagging replica. Which mechanism honors read-your-writes while still letting a replica serve the read?",
+    "options": [
+      "Sticky routing, because the read is pinned to the primary",
+      "A version token, because the read waits for a replica caught up past the write",
+      "Neither, only linearizable reads can prevent the stale result"
+    ]
+  },
+  "workedExample": "One primary streams to two replicas, and the second lags noticeably once the burst begins. The user writes during the burst and reads moments later from that lagging replica, so with no guarantee in place their own write is missing. Each cure maps to a session guarantee. Sticky routing pins the session to the primary for a window after the write: read-your-writes for that one device, and because the session keeps reading a single non-regressing view, monotonic reads too. The version token is the write's commit position carried with later reads: the read path holds the read until the replica has applied past the token, and since the token travels with the user rather than with one cookie, it is the option that survives the phone-write then laptop-read case.",
+  "followers": 2,
+  "writeRate": 2,
+  "applyRate": 6,
+  "ticks": 200,
+  "burst": {
+    "from": 20,
+    "to": 50,
+    "multiplier": 5
+  },
+  "scenario": {
+    "writeTick": 30,
+    "readTick": 33,
+    "follower": 1
+  },
+  "caption": "Session guarantees are per-client promises bought cheaply: stickiness gives one device a single non-regressing view, the version token makes read-your-writes travel with the user, and neither costs anything close to linearizability."
+}
+\`\`\`
+
 ### Where they land, and why that is the point
 
 The previous lesson lined up the *global* models: linearizable, sequential, causal, eventual, ordered
