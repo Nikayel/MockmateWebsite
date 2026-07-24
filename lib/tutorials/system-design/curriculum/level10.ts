@@ -828,6 +828,255 @@ const collaborativeEditorTeach = `
 
 The whole problem of a collaborative editor is **convergence**: many people edit the same document concurrently, each edit is applied against a slightly different local state, and yet every replica must end up byte-for-byte identical, while preserving what each user intended. Last-write-wins on the whole document is the disqualifying answer: if Alice and Bob both type at the same moment, LWW throws one person's work away. There are two correct families: **Operational Transformation (OT)** and **CRDTs**.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Concurrent edits: clobber vs merge",
+  "frames": [
+    {
+      "note": "Alice and Bob start from identical replicas of the same document. Both are about to insert at the same moment, each against their own local copy.",
+      "rows": [
+        {
+          "label": "Alice's replica",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        },
+        {
+          "label": "Bob's replica",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Concurrent ops against the same base: Alice applies ins(5, x) locally, Bob applies ins(3, y) locally. The replicas have diverged, and each op's position only makes sense in its own local state.",
+      "rows": [
+        {
+          "label": "Alice: ins(5, x)",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "x",
+              "state": "new"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        },
+        {
+          "label": "Bob: ins(3, y)",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "y",
+              "state": "new"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The naive answer: last-write-wins on the whole document. Bob's version arrives last and overwrites, so Alice's x is simply gone. LWW when two people type at the same moment throws one person's work away: the disqualifying answer.",
+      "rows": [
+        {
+          "label": "LWW doc",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "y",
+              "state": "active"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        },
+        {
+          "label": "Alice's edit",
+          "cells": [
+            {
+              "text": "ins(5, x)",
+              "state": "dropped"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "OT transforms Alice's ins(5, x) against Bob's concurrent ins(3, y). Where does x land?",
+        "options": [
+          "Still at position 5",
+          "Shifted to position 6",
+          "Dropped as a conflict"
+        ]
+      }
+    },
+    {
+      "note": "The merge that keeps both: Bob inserted before position 5, so OT shifts Alice's op to ins(6, x). A CRDT reaches the same result by giving every character a unique id so concurrent inserts commute. Both replicas converge byte-for-byte, and both intents survive.",
+      "rows": [
+        {
+          "label": "transform",
+          "cells": [
+            {
+              "text": "ins(5, x)",
+              "state": "dropped"
+            },
+            {
+              "text": "ins(6, x)",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Alice's replica",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "y",
+              "state": "active"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "x",
+              "state": "active"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        },
+        {
+          "label": "Bob's replica",
+          "cells": [
+            {
+              "text": "a"
+            },
+            {
+              "text": "b"
+            },
+            {
+              "text": "c"
+            },
+            {
+              "text": "y",
+              "state": "active"
+            },
+            {
+              "text": "d"
+            },
+            {
+              "text": "e"
+            },
+            {
+              "text": "x",
+              "state": "active"
+            },
+            {
+              "text": "f"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Why convergence needs OT or CRDTs: whole-document LWW drops an edit, the transform keeps both."
+}
+\`\`\`
+
 ## Operational Transformation
 
 Edits are operations like \`insert(pos=5, "x")\` and \`delete(pos=8)\`. When two operations are made concurrently against the same base, applying them in different orders gives different results, so OT **transforms** an incoming operation against operations that were applied before it locally, adjusting indices so intent is preserved. If Alice inserts at position 5 and Bob concurrently inserts at position 3, Bob's op shifts Alice's effective position to 6. OT is what Google Docs uses. It is proven and compact, but the transformation functions are notoriously subtle, and classic OT relies on a **central server** to impose a single canonical order of operations.
