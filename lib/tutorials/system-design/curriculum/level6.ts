@@ -34,6 +34,32 @@ The price is eventual consistency. The moment you make a step async, the effect 
 decremented, email sent) happens after the response, so a follow-up read can observe a state where
 the effect has not landed yet. You must design for that gap.
 
+\`\`\`cswidget
+{
+  "type": "queue-sim",
+  "title": "The buffer absorbs the burst",
+  "predictPrompt": {
+    "question": "The consumer is slightly faster than the producer, but a sale spike triples arrivals for a stretch mid-run. What does queue depth do?",
+    "options": [
+      "It climbs while the spike lasts, then drains back toward zero once it ends",
+      "It stays flat because the consumer is faster on average",
+      "It keeps growing even after the spike ends"
+    ]
+  },
+  "workedExample": "The starting configuration is the healthy async shape: the consumer drains slightly faster than the producer fills, so depth hugs zero and every message is picked up almost as soon as it lands. When the burst window opens, arrivals triple and outrun the consumer, and the depth curve climbs steadily for as long as the spike lasts. Nothing times out and no caller is waiting; the broker is simply absorbing the excess. The moment the burst ends, the consumer's spare capacity takes over and the backlog drains back toward zero before the run finishes. That triangle in the depth chart is time decoupling: the same spike aimed at a synchronous downstream would have been failed requests instead of temporary lag.",
+  "producerRate": 2,
+  "consumerRate": 3,
+  "ticks": 200,
+  "capacity": 60,
+  "burst": {
+    "from": 60,
+    "to": 90,
+    "multiplier": 3
+  },
+  "caption": "Time decoupling in one chart: the spike becomes a temporary backlog that drains, not a wave of failed requests."
+}
+\`\`\`
+
 ### Command versus event
 
 A **command** ("ChargeCard") is an instruction to one specific handler that must succeed and often
