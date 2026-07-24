@@ -1747,9 +1747,67 @@ Batch processing sees a whole bounded dataset and computes an answer. Stream pro
 
 *Event time* is when the thing actually happened (stamped by the producing device). *Ingestion time* is when the broker received it. *Processing time* is when your operator sees it. These differ because of network delay, mobile clients going offline, retries, and partition skew. A phone can buffer events for 30 seconds in a tunnel, then flush them. If you aggregate by processing time, that burst lands in the wrong 5-minute bucket and your per-user counts are silently wrong. Correct real-time analytics almost always uses **event time**.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A phone buffers 30 seconds of events in a tunnel, then flushes them. Your per-user counts aggregate by processing time. What do the dashboards show?",
+  "options": [
+    {
+      "label": "The burst lands in the wrong 5-minute bucket, so the counts are silently wrong",
+      "correct": true,
+      "feedback": "Right: processing time stamps events with when your operator saw them, not when they happened, which is why correct analytics uses event time."
+    },
+    {
+      "label": "The events are rejected as late and the counts run low",
+      "feedback": "Nothing rejects them; processing-time windows happily accept the burst, they just file it under the wrong period."
+    },
+    {
+      "label": "The broker rewrites the timestamps at ingestion so the buckets stay correct",
+      "feedback": "Ingestion time is a third clock, not a fix; it still reflects arrival at the broker, not when the events actually happened."
+    }
+  ]
+}
+\`\`\`
+
 ## Windows
 
 You cut the infinite stream into finite chunks. *Tumbling* windows are fixed, non-overlapping (every event in exactly one 5-minute bucket). *Sliding* windows overlap (a 5-minute window advancing every 1 minute, so each event is in five windows: this is what you want for "rolling 5-minute rate"). *Session* windows group bursts separated by a gap of inactivity (great for user sessions, sized dynamically).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each requirement to the window type that fits it.",
+  "buckets": [
+    "Tumbling",
+    "Sliding",
+    "Session"
+  ],
+  "items": [
+    {
+      "label": "Every event counted in exactly one 5-minute bucket",
+      "bucket": "Tumbling",
+      "feedback": "Fixed, non-overlapping buckets are the tumbling definition."
+    },
+    {
+      "label": "A rolling 5-minute error rate refreshed every minute",
+      "bucket": "Sliding",
+      "feedback": "Overlap is the point: each event participates in five windows as the 5-minute window advances by 1 minute."
+    },
+    {
+      "label": "Group one user's burst of clicks, ended by 30 minutes of inactivity",
+      "bucket": "Session",
+      "feedback": "Session windows are sized dynamically by a gap of inactivity, so each burst becomes its own window."
+    },
+    {
+      "label": "Each event must appear in five overlapping windows",
+      "bucket": "Sliding",
+      "feedback": "Only overlapping windows put one event in multiple buckets; tumbling puts it in exactly one."
+    }
+  ]
+}
+\`\`\`
 
 ## Watermarks
 
@@ -1789,11 +1847,57 @@ A watermark is the engine's assertion "I believe I have now seen all events with
 
 Aggregations are stateful (a per-user counter lives somewhere). Flink keeps this in an embedded **RocksDB** state backend on each task's local disk, and periodically takes a **checkpoint**: a consistent snapshot of all operator state plus the source offsets, written to durable storage (S3/HDFS) using the Chandy-Lamport barrier algorithm. On failure it restores the last checkpoint and rewinds Kafka to the checkpointed offsets, giving **exactly-once** *state* semantics (each event affects state once, even though it may be reprocessed). Kafka Streams does the same idea with a compacted *changelog topic* backing each local store.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A Flink job crashes, restores its last checkpoint, rewinds Kafka to the checkpointed offsets, and reprocesses. Why do the per-user counters not double-count?",
+  "options": [
+    {
+      "label": "The checkpoint snapshots operator state and source offsets together, so replayed events apply to a state that has not seen them yet",
+      "correct": true,
+      "feedback": "Right: state and offsets rewind as one consistent snapshot, which is what exactly-once state semantics means despite reprocessing."
+    },
+    {
+      "label": "Kafka deduplicates redelivered records before the job sees them",
+      "feedback": "The broker happily redelivers; the exactly-once promise here lives in the checkpoint mechanism, not the transport."
+    },
+    {
+      "label": "RocksDB rejects a write whose key it has already stored",
+      "feedback": "RocksDB is just the local state backend; it applies whatever the operator tells it, including a double-count if state and offsets drifted apart."
+    }
+  ]
+}
+\`\`\`
+
 ## Engine choice
 
 *Flink*: richest event-time/state/CEP support, true exactly-once via checkpoints, best for complex low-latency work. *Kafka Streams*: a library (no cluster), great when you already live in Kafka and want per-partition local state. *Spark Structured Streaming*: micro-batch, best if you already run Spark and can tolerate slightly higher latency. Joins matter too: *stream-stream* joins need windowed state on both sides; *stream-table* joins enrich events against a materialized **KTable** (a changelog folded into current-value-per-key).
 
 **Recap:** aggregate by event time, use watermarks to bound lateness and fire windows, keep local state fault-tolerant via RocksDB plus checkpoints/changelogs for exactly-once, and never drop late data silently.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your 5-minute event-time windows fire with a tight 5-second lateness bound and zero allowed lateness. Backend-service metrics are perfect, but counts for mobile users on the subway run consistently low. What is happening?",
+  "options": [
+    {
+      "label": "The phones flush buffered events after the watermark already fired their window, and the stragglers are silently dropped",
+      "correct": true,
+      "feedback": "Right: event-time skew from offline clients meets a tight watermark bound; loosen the bound, keep allowed lateness for corrected results, or route late events to a side output."
+    },
+    {
+      "label": "Event time is the wrong clock for mobile traffic, so the windows misfile the burst",
+      "feedback": "Event time is exactly the right clock; the problem is the lateness bound dropping stragglers, not the bucket they would land in."
+    },
+    {
+      "label": "Checkpoints are restoring stale counters for mobile users",
+      "feedback": "Checkpoint restore affects all traffic equally and only after a failure; a consistent mobile-only undercount points at late data, not recovery."
+    }
+  ]
+}
+\`\`\`
 `.trim()
 
 const eventSourcingTeach = `
