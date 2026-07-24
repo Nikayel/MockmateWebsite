@@ -16,31 +16,37 @@ const PYTHON_BIN = process.env.PYTHON || "python3"
 describe("workspace scenario runners", () => {
   const scenarios = [...realWorldBugFixScenarios, ...addFunctionalityScenarios]
 
-  it("starter workspaces fail at least one test and reference workspaces pass", async () => {
-    for (const scenario of scenarios) {
-      expect(isWorkspaceScenario(scenario)).toBe(true)
-      if (!isWorkspaceScenario(scenario)) continue
+  // Spawns a python3 subprocess per scenario; under full-suite parallel load the
+  // 5s default flakes on process contention (passes in ~3s in isolation).
+  it(
+    "starter workspaces fail at least one test and reference workspaces pass",
+    { timeout: 60_000 },
+    async () => {
+      for (const scenario of scenarios) {
+        expect(isWorkspaceScenario(scenario)).toBe(true)
+        if (!isWorkspaceScenario(scenario)) continue
 
-      const starterResults = runWorkspace(scenario, scenario.workspace.files)
-      expect(
-        starterResults.some((result) => !result.passed),
-        `${scenario.id} starter`
-      ).toBe(true)
+        const starterResults = runWorkspace(scenario, scenario.workspace.files)
+        expect(
+          starterResults.some((result) => !result.passed),
+          `${scenario.id} starter`
+        ).toBe(true)
 
-      // The fixed reference solution is sealed server-side (moved out of the client
-      // module), so load it from the sealed legacy registry and apply it over the
-      // starter workspace before running the suite.
-      const sealedReferenceFiles = await loadSealedLegacyReferenceFiles(scenario.id)
-      expect(sealedReferenceFiles, `${scenario.id} sealed reference files`).toBeTruthy()
+        // The fixed reference solution is sealed server-side (moved out of the client
+        // module), so load it from the sealed legacy registry and apply it over the
+        // starter workspace before running the suite.
+        const sealedReferenceFiles = await loadSealedLegacyReferenceFiles(scenario.id)
+        expect(sealedReferenceFiles, `${scenario.id} sealed reference files`).toBeTruthy()
 
-      const referenceFiles = applyReferenceFiles(scenario, sealedReferenceFiles ?? [])
-      const referenceResults = runWorkspace(scenario, referenceFiles)
-      expect(
-        referenceResults.every((result) => result.passed),
-        `${scenario.id} reference`
-      ).toBe(true)
+        const referenceFiles = applyReferenceFiles(scenario, sealedReferenceFiles ?? [])
+        const referenceResults = runWorkspace(scenario, referenceFiles)
+        expect(
+          referenceResults.every((result) => result.passed),
+          `${scenario.id} reference`
+        ).toBe(true)
+      }
     }
-  })
+  )
 })
 
 function applyReferenceFiles(
