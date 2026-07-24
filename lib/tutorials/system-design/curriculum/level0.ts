@@ -618,6 +618,92 @@ absolute number like tens to low hundreds of GB. Verify the hit rate assumption:
 yields a 90%+ hit rate, you have removed 90% of read load from the datastore, which is what justifies
 the cache economically.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Storage, ingress, and the 80/20 cache in one chain",
+  "predictPrompt": {
+    "question": "50M records a day at 1 KB each, kept for 90 days. Roughly how much raw storage is that?",
+    "options": [
+      "About 45 GB",
+      "About 450 GB",
+      "About 4.5 TB",
+      "About 45 TB"
+    ]
+  },
+  "workedExample": "At the initial 50M records per day, 1,000 bytes each, and 90 days of retention, raw storage lands at 4.5 TB and ingress is a modest 500 KB/s, while the 80/20 cut sizes the hot cache at roughly 900 GB for the 80% hit target. Push bytes per record up to 2 MB (a photo instead of a row) and watch storage jump three orders of magnitude toward petabytes.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "records_per_day",
+      "label": "New records per day",
+      "min": 100000,
+      "max": 10000000000,
+      "scale": "log",
+      "initial": 50000000,
+      "unit": "records"
+    },
+    {
+      "kind": "slider",
+      "id": "bytes_per_record",
+      "label": "Bytes per record",
+      "min": 100,
+      "max": 10000000,
+      "scale": "log",
+      "initial": 1000,
+      "unit": "bytes"
+    },
+    {
+      "kind": "slider",
+      "id": "retention_days",
+      "label": "Retention",
+      "min": 1,
+      "max": 1825,
+      "scale": "linear",
+      "step": 1,
+      "initial": 90,
+      "unit": "days"
+    },
+    {
+      "kind": "slider",
+      "id": "cache_hit_target",
+      "label": "Cache hit target",
+      "min": 50,
+      "max": 99,
+      "scale": "linear",
+      "step": 1,
+      "initial": 80,
+      "unit": "%"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "storage_total",
+      "label": "Raw storage over retention",
+      "expr": "records_per_day * bytes_per_record * retention_days",
+      "format": "bytes",
+      "sparkline": {
+        "over": "retention_days"
+      }
+    },
+    {
+      "id": "ingress_bandwidth",
+      "label": "Ingress bandwidth",
+      "expr": "records_per_day * bytes_per_record / 100000",
+      "format": "bytes",
+      "unit": "/s"
+    },
+    {
+      "id": "cache_size",
+      "label": "Hot cache size (80/20 rule)",
+      "expr": "storage_total * 0.2 * cache_hit_target / 80",
+      "format": "bytes"
+    }
+  ],
+  "caption": "Raw storage before replication and index overhead; the hot 20% scales up as you chase a hit rate above 80."
+}
+\`\`\`
+
 **Interview nuance:** interviewers probe "how big is your cache and why that size." The winning answer
 ties cache size to a target hit rate and to the read load removed from the origin, not to a fraction of
 total storage pulled from thin air.
