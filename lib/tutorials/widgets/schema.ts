@@ -27,19 +27,26 @@
 import { z } from "zod"
 import { checkSpecSchema, addCheckIssues } from "./families/check"
 import { calcSpecSchema, addCalcIssues } from "./families/calc"
+import { hashRingSpecSchema, addHashRingIssues } from "./families/hash-ring"
 
 export type { CheckSpec } from "./families/check"
 export type { CalcSpec, CalcInput, CalcOutput } from "./families/calc"
+export type { HashRingSpec } from "./families/hash-ring"
 
 // Future families (sequence, sims, steps) append here — one schema file each,
 // composed into this union. Adding a member without wiring its renderer is a compile
 // error in components/tutorials/widgets/WidgetBody.tsx (exhaustive switch).
-const widgetSpecUnion = z.discriminatedUnion("type", [checkSpecSchema, calcSpecSchema])
+const widgetSpecUnion = z.discriminatedUnion("type", [
+  checkSpecSchema,
+  calcSpecSchema,
+  hashRingSpecSchema,
+])
 
 /** The union PLUS per-family cross-field integrity checks Zod field rules can't express. */
 export const widgetSpecSchema = widgetSpecUnion.superRefine((spec, ctx) => {
   if (spec.type === "check") addCheckIssues(spec, ctx)
   if (spec.type === "calc") addCalcIssues(spec, ctx)
+  if (spec.type === "hash-ring") addHashRingIssues(spec, ctx)
 })
 
 export type WidgetSpec = z.infer<typeof widgetSpecSchema>
