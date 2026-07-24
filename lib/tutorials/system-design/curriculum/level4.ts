@@ -1356,6 +1356,25 @@ legitimate demand simply exceeds your capacity, or a dependency slows and reques
 is blunt: at 150% of capacity, stay up and keep serving the most important traffic, instead of trying
 to serve everything and serving nothing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A service with an unbounded request queue takes sustained traffic at 150% of its capacity. What does its completed-work-per-second look like over the next few minutes?",
+  "options": [
+    {
+      "label": "It plateaus at 100% of capacity while the queue absorbs the extra 50%",
+      "feedback": "Tempting, and true for a short spike. But under sustained overload the queue grows without bound: every request waits longer, clients time out and retry, and the server spends capacity on work that is already dead."
+    },
+    {
+      "label": "It collapses toward zero",
+      "correct": true,
+      "feedback": "Right. Latency climbs past client timeouts, retries amplify load roughly 3x, memory fills with queued work, and the box GCs itself to death or OOMs. This is congestion collapse, and the unbounded queue is what enables it."
+    }
+  ]
+}
+\`\`\`
+
 Understand the failure mode first. A server has finite concurrency. When arrival rate exceeds
 completion rate, in-flight requests and queues grow, each request waits longer, latency climbs,
 clients hit timeouts and **retry** (often amplifying load 3x), memory for queued work grows, and
@@ -1371,6 +1390,42 @@ capacity you needed for good traffic. So you **shed before collapse**, at a thre
 you shed the **right** traffic. **Priority-aware shedding** classifies traffic (health checks and
 paying-customer writes are critical; bulk exports, retries, and best-effort reads are droppable) and
 drops low-priority first, so the checkout path survives while a recommendation call is dropped.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are past the shedding threshold. Sort the traffic.",
+  "buckets": [
+    "Shed first",
+    "Keep serving"
+  ],
+  "items": [
+    {
+      "label": "Bulk data export job",
+      "bucket": "Shed first"
+    },
+    {
+      "label": "Paying-customer checkout write",
+      "bucket": "Keep serving"
+    },
+    {
+      "label": "Health checks from the load balancer",
+      "bucket": "Keep serving",
+      "feedback": "Drop these and the balancer marks you dead, converting an overload into an outage."
+    },
+    {
+      "label": "Recommendation carousel call",
+      "bucket": "Shed first"
+    },
+    {
+      "label": "Retried requests from clients that already timed out",
+      "bucket": "Shed first",
+      "feedback": "Retries are the fuel of the death spiral, so they are among the first candidates to drop."
+    }
+  ]
+}
+\`\`\`
 
 ### Adaptive concurrency limits
 
@@ -1407,6 +1462,30 @@ demand ---> [ admission: shed low-priority first if over threshold ]
 Recap: shed early and by priority, replace static thresholds with adaptive concurrency limits derived
 from Little's Law, bound every queue and drop past-deadline work so latency cannot explode, and brown
 out optional features rather than failing everything: never an unbounded queue.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your dependency's latency just jumped from 50ms to 500ms and demand is running at 150% of capacity. Which pair of defenses keeps the service up?",
+  "options": [
+    {
+      "label": "Raise the static max-concurrency limit and let clients retry",
+      "feedback": "Tempting, because more concurrency feels like more capacity. But at 500ms per call the old static limit is already 10x too high, and retries amplify the overload roughly 3x."
+    },
+    {
+      "label": "Adaptive concurrency limits plus priority shedding and brownout",
+      "correct": true,
+      "feedback": "Right. The Little's Law probe (concurrency equals throughput times latency) shrinks the limit as the dependency slows, shedding drops droppable traffic at the door, and brownout serves cached or partial responses instead of failing everything."
+    },
+    {
+      "label": "A much bigger queue in front of the worker pool",
+      "feedback": "A bigger queue just hides overload for longer: it adds latency, feeds timeouts and retries, and eats memory. Queues must be bounded and reject fast when full."
+    }
+  ],
+  "reveal": "In the design write, walk the admission path explicitly: priority-aware shedding at the door, bounded queues returning fast 503s, deadline propagation that drops already-dead work, adaptive concurrency at the worker pool, and a named brownout behavior for the features you sacrifice first."
+}
+\`\`\`
 `.trim()
 
 const autoscalingTeach = `
