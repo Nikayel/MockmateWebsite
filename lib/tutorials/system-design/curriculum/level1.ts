@@ -1437,6 +1437,29 @@ The client generates a unique key (a UUID) for the logical operation and sends i
 response* keyed by that key with a TTL (24 hours is a common window). On any retry with the same key,
 the server does not reprocess; it returns the stored response.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A server dedupes payments by storing a boolean 'seen this key' flag. The original request and its retry arrive at the same instant. What happens?",
+  "options": [
+    {
+      "label": "The retry sees the flag and safely gets the same answer",
+      "feedback": "That is what the flag was meant to do, but both requests can check the flag before either has set it, so neither sees it. And even without the race, a bare flag has no charge id or status to give back to the retry."
+    },
+    {
+      "label": "Both requests can pass the flag check, both do the work, and you double-charge",
+      "correct": true,
+      "feedback": "Right. Check-then-set is a race. The fix is to claim the key with a unique-constraint insert (a unique DB row or 'SETNX') before doing any work, so one request wins and the other waits for the winner's stored response."
+    },
+    {
+      "label": "The database serializes them automatically",
+      "feedback": "Tempting, but two independent read-then-write sequences are not serialized unless you make them contend on something, which is exactly what the unique-constraint insert provides."
+    }
+  ]
+}
+\`\`\`
+
 The subtle, commonly-missed detail: store the response, not just a boolean "seen it" flag. Two things
 force this. First, the retry must get the actual result (the charge id, the status), not just "yes."
 Second, concurrency: the original request and the retry can arrive at the same instant. You need a
@@ -1463,6 +1486,30 @@ the one that passes.
 Recap: give mutating requests a client-generated idempotency key, store the full response behind a
 unique constraint with a TTL, and return it on any retry so at-least-once delivery becomes
 effectively-once and nobody double-charges.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A payments team says their API guarantees exactly-once charging over the public internet. If it really works, what are they actually running?",
+  "options": [
+    {
+      "label": "True exactly-once delivery at the network layer",
+      "feedback": "No protocol can promise that: the request, the response, or the ack can always be lost, which is the two-generals problem. Anyone claiming wire-level exactly-once is hiding a retry somewhere."
+    },
+    {
+      "label": "At-least-once delivery plus idempotent handling keyed on an idempotency key",
+      "correct": true,
+      "feedback": "Right. Retries make delivery at-least-once, and dedupe on the key with a stored full response makes processing effectively-once. Behaviorally that is the exactly-once the customer experiences."
+    },
+    {
+      "label": "At-most-once delivery: never retry, so nothing can duplicate",
+      "feedback": "That trades double-charging for silently dropped payments whenever a response is lost. Giving up on retries is not safety, it is a different failure mode."
+    }
+  ],
+  "reveal": "The design-exercise checklist: client-generated key on every mutating request, claim the key with a unique-constraint insert before doing work, store the full response with a TTL, return it on any retry, and dedupe webhooks and queue consumers with the same pattern."
+}
+\`\`\`
 `.trim()
 
 const paginationErrorsTeach = `
