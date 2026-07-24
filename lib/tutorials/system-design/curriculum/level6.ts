@@ -648,10 +648,124 @@ Reads and writes have opposite pressures. A product catalog might take 50 writes
 
 The write side, on committing a command, emits an event ("ProductPublished"). Projection handlers *consume* those events and update the read models. You can have *many* projections off one event stream: an Elasticsearch index for search, a Redis hash for the product detail page, a Postgres rollup for the admin dashboard, each a different shape for a different query. Handlers must be **idempotent** (processing the same event twice yields the same result), because at-least-once delivery will redeliver. Store the last processed event offset/version per projection so replays are safe.
 
-\`\`\`
-Command --> [Write model]      event      [Read model: ES index ]  <-- query
-            (Postgres,     ----------->   [Read model: Redis view]  <-- query
-             validation)      stream      [Read model: PG rollup ]  <-- query
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "CQRS: one write model, many read models",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "writer",
+      "label": "Client (command)",
+      "kind": "client"
+    },
+    {
+      "id": "write_model",
+      "label": "Write model (Postgres, validation)",
+      "kind": "db"
+    },
+    {
+      "id": "events",
+      "label": "Event stream",
+      "kind": "queue"
+    },
+    {
+      "id": "es_index",
+      "label": "ES index (search)",
+      "kind": "db"
+    },
+    {
+      "id": "redis_view",
+      "label": "Redis view (product page)",
+      "kind": "cache"
+    },
+    {
+      "id": "pg_rollup",
+      "label": "PG rollup (admin dashboard)",
+      "kind": "db"
+    },
+    {
+      "id": "reader",
+      "label": "Client (query)",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "writer",
+      "to": "write_model",
+      "kind": "sync",
+      "label": "PublishProduct"
+    },
+    {
+      "from": "write_model",
+      "to": "events",
+      "kind": "async",
+      "label": "ProductPublished"
+    },
+    {
+      "from": "events",
+      "to": "es_index",
+      "kind": "async",
+      "label": "projection handler"
+    },
+    {
+      "from": "events",
+      "to": "redis_view",
+      "kind": "async",
+      "label": "projection handler"
+    },
+    {
+      "from": "events",
+      "to": "pg_rollup",
+      "kind": "async",
+      "label": "projection handler"
+    },
+    {
+      "from": "reader",
+      "to": "es_index",
+      "kind": "sync",
+      "label": "search"
+    },
+    {
+      "from": "reader",
+      "to": "redis_view",
+      "kind": "sync",
+      "label": "detail page"
+    },
+    {
+      "from": "reader",
+      "to": "pg_rollup",
+      "kind": "sync",
+      "label": "dashboard"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "writer",
+        "write_model"
+      ],
+      "note": "Commands like PublishProduct carry intent to change state; the write model runs pricing, category, and inventory validation and owns the authoritative data at about 50 writes/sec."
+    },
+    {
+      "adds": [
+        "events"
+      ],
+      "note": "On committing a command the write side emits ProductPublished; delivery is at-least-once, so every projection handler must be idempotent and store its last processed offset."
+    },
+    {
+      "adds": [
+        "es_index",
+        "redis_view",
+        "pg_rollup",
+        "reader"
+      ],
+      "note": "500k reads/sec against 50 writes/sec justifies denormalized projections, each shaped for one query and rebuildable by replaying the stream from offset 0."
+    }
+  ],
+  "caption": "Projections update after the commit, so reads can lag by milliseconds to seconds; handle read-your-writes explicitly with client echo, versioned reads, or a short window of reading from the write model."
+}
 \`\`\`
 
 ## The consistency cost: eventual consistency
