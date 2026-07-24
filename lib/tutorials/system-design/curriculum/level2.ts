@@ -1208,12 +1208,58 @@ Answer: Cassandra secondary indexes query across all partitions (a scatter-gathe
 scale) and are an anti-pattern for high-cardinality columns; the idiomatic solution is a second
 denormalized table, not an index.
 
-\`\`\`
-messages_by_conversation
-  PRIMARY KEY ((conversation_id, month), created_at)
-                 ^partition key^         ^clustering, DESC
-  -> "latest 50 in conversation" = first 50 rows of current-month partition, one node
-  -> month bucket bounds partition size; hot convo adds a sub-partition bucket
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "partition key (conversation_id, month)",
+    "owning node",
+    "row",
+    "created_at (clustering, DESC)",
+    "what it shows"
+  ],
+  "rows": [
+    [
+      "(conv_42, 2026-07)",
+      "node B",
+      1,
+      "07-23 09:14",
+      "newest message: 'latest 50' starts here"
+    ],
+    [
+      "(conv_42, 2026-07)",
+      "node B",
+      2,
+      "07-23 08:57",
+      "rows are pre-sorted; the slice just reads forward"
+    ],
+    [
+      "(conv_42, 2026-07)",
+      "node B",
+      3,
+      "07-22 18:03",
+      "still the same partition on the same node"
+    ],
+    [
+      "(conv_42, 2026-06)",
+      "node D",
+      1,
+      "06-30 23:59",
+      "month bucket bounds partition size; old buckets age out"
+    ],
+    [
+      "(conv_7, 2026-07)",
+      "node A",
+      1,
+      "07-21 11:02",
+      "a different conversation hashes to a different node"
+    ]
+  ],
+  "highlightCols": [
+    "created_at (clustering, DESC)"
+  ],
+  "caption": "PRIMARY KEY ((conversation_id, month), created_at DESC) laid out physically: the partition key picks the owning node and gathers the conversation, the clustering column pre-sorts it, so 'load the latest 50' is the first 50 rows of the current-month partition, one contiguous slice on one node."
+}
 \`\`\`
 
 Recap: Wide-column stores are LSM-based write machines; model one denormalized table per query,
