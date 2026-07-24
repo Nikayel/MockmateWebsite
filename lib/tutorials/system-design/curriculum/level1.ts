@@ -2753,6 +2753,29 @@ looks like it is absorbing the spike, but it is really accumulating latency (a r
 seconds in a queue is useless, the user left) and memory, until the process runs out of heap and
 OOM-crashes, taking down everything including the in-flight work that was fine. Bound every queue.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two identical services have the same average service time. One runs at 70% utilization, the other at 99%. How do their average latencies compare?",
+  "options": [
+    {
+      "label": "About 40% higher at 99%, roughly in line with the extra load",
+      "feedback": "Tempting, because it assumes latency grows linearly with load. Queueing does not work that way: wait time scales like '1 / (1 - rho)', which blows up as utilization approaches 100%."
+    },
+    {
+      "label": "Dramatically higher at 99%, tens of times worse, because wait time explodes near saturation",
+      "correct": true,
+      "feedback": "Right. With time in system scaling like '1 / (1 - rho)', 70% utilization costs roughly 3x the service time while 99% costs about 100x. The last few points of utilization are bought with unbounded latency."
+    },
+    {
+      "label": "Essentially identical, since neither service is over 100% capacity",
+      "feedback": "Under 100% the queue does not grow forever, but arrivals are bursty, so requests still queue, and the closer you run to saturation, the longer each one waits."
+    }
+  ]
+}
+\`\`\`
+
 ### Why you cannot run hot
 
 As utilization (rho) approaches 100%, queue length and wait time do not rise linearly, they explode.
@@ -2793,6 +2816,42 @@ Recap: Bound every queue and let backpressure propagate, run below saturation be
 explodes as utilization nears 100%, and when overloaded reject early with 429/503, prioritize
 critical traffic, and drop stale requests instead of letting an unbounded queue hide the overload
 until an OOM.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Your ingestion service is in the middle of a spike. Decide the fate of each request.",
+  "buckets": [
+    "Accept and process",
+    "Reject at admission with 429",
+    "Drop from the queue"
+  ],
+  "items": [
+    {
+      "label": "A critical write that arrives while you are under the in-flight cap",
+      "bucket": "Accept and process",
+      "feedback": "Within capacity, work flows normally. Overload controls should be invisible until you actually need them."
+    },
+    {
+      "label": "A free-tier batch upload that arrives while you are over the cap",
+      "bucket": "Reject at admission with 429",
+      "feedback": "Reject early, before investing any resources, and shed low-value traffic first so critical traffic survives."
+    },
+    {
+      "label": "A queued request whose deadline expired while it waited",
+      "bucket": "Drop from the queue",
+      "feedback": "The caller has already given up. Processing it burns capacity on work nobody will use, which is exactly how goodput collapses while throughput looks busy."
+    },
+    {
+      "label": "A request over the cap that you could park in an unbounded buffer instead",
+      "bucket": "Reject at admission with 429",
+      "feedback": "Tempting to queue and hope, but the unbounded buffer silently accumulates latency and heap until an OOM takes down everything. A fast 429 with a retry hint is kinder."
+    }
+  ],
+  "reveal": "In the design exercise, make these choices explicit: name the bound on every queue, the admission limit and exactly what gets a '429', the utilization you provision for and why, and which traffic classes you shed first when the spike hits."
+}
+\`\`\`
 `.trim()
 
 const concurrencyModelsTeach = `
