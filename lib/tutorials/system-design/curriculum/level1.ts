@@ -2883,6 +2883,29 @@ single event-loop process holds hundreds of thousands of mostly-idle connections
 what IO-bound fan-out needs: an API gateway waiting on 20 backends per request spends almost all its
 time waiting, and the event loop turns that waiting into near-free multiplexing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A Node.js server holds 5,000 open connections on one event loop. One request starts a synchronous image transcode that takes 800ms of pure CPU. What do the other 4,999 connections experience?",
+  "options": [
+    {
+      "label": "Nothing unusual; the loop keeps serving them while the transcode runs",
+      "feedback": "Tempting, because the event loop feels concurrent. But it is one thread: while the transcode holds the CPU, no other callback can run at all."
+    },
+    {
+      "label": "They all freeze for the full 800ms, because the single loop thread is busy computing",
+      "correct": true,
+      "feedback": "Right. The loop's concurrency comes from waiting cheaply, not from computing in parallel. One CPU-bound task serializes every connection behind it, which is why CPU work belongs in a worker pool."
+    },
+    {
+      "label": "Only connections hitting the same endpoint stall; the rest are unaffected",
+      "feedback": "The loop does not partition work by endpoint. Every callback shares the one thread, so one long task blocks all of them equally."
+    }
+  ]
+}
+\`\`\`
+
 But the event loop has one absolute rule: **never block the loop**. Because one thread drives
 everything, any single long operation (a synchronous CPU task, a blocking file read, a
 \`JSON.parse\` of a 50MB payload) freezes every other connection until it finishes. A CPU-heavy image
@@ -2917,6 +2940,41 @@ Recap: CPU-bound work wants a worker pool sized to cores, IO-bound fan-out wants
 multiplexing many connections via epoll/kqueue, never block the loop with CPU or blocking IO, and
 past ~10k connections you must raise fd limits, pool connections around the ephemeral-port ceiling,
 and avoid the per-thread memory wall.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the concurrency model each workload wants.",
+  "buckets": [
+    "Worker pool sized to cores",
+    "Event loop"
+  ],
+  "items": [
+    {
+      "label": "Video transcoding service where each request needs 500ms of CPU",
+      "bucket": "Worker pool sized to cores",
+      "feedback": "Pure compute has nothing to wait on, so async buys nothing. You want exactly one busy worker per core with a bounded queue in front."
+    },
+    {
+      "label": "API gateway that fans out to 20 backends and mostly waits on the network",
+      "bucket": "Event loop",
+      "feedback": "The work is almost entirely waiting, so multiplex thousands of in-flight requests on a few threads via 'epoll' instead of parking a 1MB-stack thread per blocking call."
+    },
+    {
+      "label": "Chat server holding 100,000 mostly idle WebSocket connections",
+      "bucket": "Event loop",
+      "feedback": "Idle connections should cost a file descriptor, not a thread. This is the C10k shape, and at this scale you also raise 'nofile' and 'fs.file-max'."
+    },
+    {
+      "label": "Endpoint that gzips a large report on every request",
+      "bucket": "Worker pool sized to cores",
+      "feedback": "Tempting to leave on the async server since it looks like just a library call, but synchronous compression is CPU work that would freeze the loop. Offload it to workers."
+    }
+  ],
+  "reveal": "In the design exercise, lead with the CPU-bound vs IO-bound call for each workload, then name the model, say why the other model fails for it, and list the OS limits (fd count, ephemeral ports, per-thread memory) you would tune past 10k connections."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel1: DesignLevel = {
