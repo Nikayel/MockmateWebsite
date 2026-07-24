@@ -1838,16 +1838,116 @@ on a schedule or incrementally. You get join-free reads without hand-writing fan
 cost of some staleness. Daily revenue rollups, leaderboards, and dashboard aggregates are the classic
 use.
 
-\`\`\`
-normalized (write-optimized)        denormalized (read-optimized)
-  orders                              order_history_rows
-    order_id, user_id, status          order_id, user_id, status,
-  order_items                          product_name, qty, line_total,
-    order_id, product_id, qty          created_at   <- copies, join-free
-  products                            trade: fan-out write on product change
-    product_id, name, price
-  join on read (indexed, ms)         source of truth stays normalized;
-                                     refresh via materialized view
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "key": "pk"
+        },
+        {
+          "name": "user_id"
+        },
+        {
+          "name": "status"
+        }
+      ]
+    },
+    {
+      "name": "order_items",
+      "columns": [
+        {
+          "name": "order_id",
+          "key": "fk"
+        },
+        {
+          "name": "product_id",
+          "key": "fk"
+        },
+        {
+          "name": "qty"
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "columns": [
+        {
+          "name": "product_id",
+          "key": "pk"
+        },
+        {
+          "name": "name"
+        },
+        {
+          "name": "price"
+        }
+      ]
+    },
+    {
+      "name": "order_history_rows",
+      "columns": [
+        {
+          "name": "order_id",
+          "key": "fk"
+        },
+        {
+          "name": "user_id"
+        },
+        {
+          "name": "status",
+          "type": "copy"
+        },
+        {
+          "name": "product_name",
+          "type": "copy"
+        },
+        {
+          "name": "qty",
+          "type": "copy"
+        },
+        {
+          "name": "line_total",
+          "type": "precomputed"
+        },
+        {
+          "name": "created_at"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "orders",
+      "to": "order_items",
+      "kind": "1-n",
+      "label": "join on read: indexed, single-digit ms"
+    },
+    {
+      "from": "products",
+      "to": "order_items",
+      "kind": "1-n",
+      "label": "each fact exactly once"
+    },
+    {
+      "from": "orders",
+      "to": "order_history_rows",
+      "kind": "1-n",
+      "label": "refreshed as a materialized view"
+    },
+    {
+      "from": "products",
+      "to": "order_history_rows",
+      "kind": "1-n",
+      "label": "rename = fan-out write to every copy"
+    }
+  ],
+  "caption": "The lever end to end: the three normalized tables store each fact exactly once, so writes stay cheap and update anomalies are structurally impossible; order_history_rows is the deliberate read model, join-free for the query that runs 20k times per second, paying with a fan-out write (or a materialized view refresh) when a product changes."
+}
 \`\`\`
 
 Recap: normalize by default for write integrity, denormalize only for a specific hot read path with a
