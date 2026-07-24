@@ -1945,6 +1945,29 @@ Under interview pressure, working memory shrinks. The fix is a one-page template
 so well you can reproduce it in the first 60 seconds of any round, without it sounding like a recited
 script. The template is a backbone you hang the specific prompt on, not a monologue you deliver.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You know your template cold. The interviewer opens with: 'Assume requirements are known, go straight to the storage design.' What do you do?",
+  "options": [
+    {
+      "label": "Run a quick version of the scoping and estimation phases anyway, since skipping steps looks undisciplined",
+      "feedback": "Tempting, because the phases exist for good reasons. But marching through a memorized order the prompt just waved off reads as not listening, and that is its own red flag."
+    },
+    {
+      "label": "Skip the first two phases, say out loud that you are skipping them, and start at storage",
+      "correct": true,
+      "feedback": "Right. The template is a backbone you hang the prompt on, not a script. Bending it visibly shows the interviewer you own the structure rather than recite it."
+    },
+    {
+      "label": "Drop the template for this round, since it clearly does not apply",
+      "feedback": "You still need the later phases: high-level design, the deep dive, the wrap-up. One skipped phase does not invalidate the backbone."
+    }
+  ]
+}
+\`\`\`
+
 <details>
 <summary>The phase backbone (45-minute budget)</summary>
 
@@ -2012,9 +2035,73 @@ Reach for: CAP/PACELC, push vs pull, sync vs async, SQL vs NoSQL, normalize vs d
 the requirements, go straight to the storage design," skip phases 1 and 2 and say so. Rigidly marching
 through a memorized order when the prompt does not want it is itself a red flag.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Each snippet is from a real round. Which classic pitfall is the candidate committing?",
+  "buckets": [
+    "Solutioning before scoping",
+    "Generic NFRs",
+    "Designing in silence"
+  ],
+  "items": [
+    {
+      "label": "'We will need Kafka here,' said forty seconds in, before a single requirement is on the board",
+      "bucket": "Solutioning before scoping",
+      "feedback": "Naming components before requirements is the classic opening mistake. The counter: force the first five minutes onto scope, always."
+    },
+    {
+      "label": "'It should be scalable and fast,' with no numbers attached",
+      "bucket": "Generic NFRs",
+      "feedback": "Scalable to what QPS, fast at which percentile? An NFR without a number cannot drive a single design decision."
+    },
+    {
+      "label": "Ninety seconds of drawing without a word while the interviewer watches",
+      "bucket": "Designing in silence",
+      "feedback": "Invisible thinking reads as being stuck. Narrate continuously, or at minimum announce the pause."
+    },
+    {
+      "label": "Picking a database because it is the one you know best, before asking about the read/write mix",
+      "bucket": "Solutioning before scoping",
+      "feedback": "The same pitfall in different clothes: the choice arrived before the requirement that should justify it."
+    },
+    {
+      "label": "'Latency should be good' offered as the entire performance requirement",
+      "bucket": "Generic NFRs",
+      "feedback": "Attach a number, like 'p99' under 200ms, or the requirement can neither be graded nor designed against."
+    }
+  ]
+}
+\`\`\`
+
 Recap: Carry a phase-and-time backbone, stock clarifying/NFR prompts, an estimation checklist, a
 component palette, and trade-off lenses, and actively counter the five classic pitfalls, adapting the
 template to the actual prompt.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Time to build your own one-page template. What makes it survive contact with a real prompt?",
+  "options": [
+    {
+      "label": "Word-for-word memorization, so you can deliver it identically in every round",
+      "feedback": "Tempting, because pressure rewards memorization. But a verbatim monologue is itself pitfall territory: it reads as not listening the moment the prompt deviates from your plan."
+    },
+    {
+      "label": "A backbone of phases, stock questions, and checklists that you adapt out loud to the prompt in front of you",
+      "correct": true,
+      "feedback": "Right. Internalize the structure until you can reproduce it in 60 seconds, then bend it visibly: skip phases when told to, and move the deep dive to wherever this specific prompt is hard."
+    },
+    {
+      "label": "No template at all; improvising every round keeps you flexible",
+      "feedback": "Under interview pressure working memory shrinks. With no backbone you will drop a phase, usually estimation or the wrap-up, and the rubric notices exactly those absences."
+    }
+  ],
+  "reveal": "Backbone plus adaptation. As you write your template in the exercise, mark which phases you would compress or skip when the prompt demands it, and pin a one-line counter next to each of the five pitfalls."
+}
+\`\`\`
 `.trim()
 
 const communicationWhiteboardingTeach = `
