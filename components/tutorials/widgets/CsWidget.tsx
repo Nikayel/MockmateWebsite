@@ -35,6 +35,9 @@ function estimateMinHeight(spec: WidgetSpec): number {
     case "hash-ring":
       // Predict phase renders first: title + question + option chips.
       return 150 + Math.ceil(spec.predictPrompt.options.length / 2) * 34
+    case "sequence":
+      // Lanes header + step rows (the diagram allocates all slots up front).
+      return 170 + Math.max(spec.steps.length, 2) * 40
     default:
       return 120
   }
