@@ -1491,9 +1491,88 @@ origin, holds the others, and fans the single response back out. On a burst the 
 of QPS instead of millions. Set \`stale-while-revalidate\` so the edge keeps serving the slightly
 stale object while one background fetch refreshes it.
 
-\`\`\`
-  users -> [ L1 edge PoPs ] -> [ L2 regional ] -> [ origin shield ] -> origin
-   millions of QPS            coalesced misses      ~1 fetch/object     protected
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Pull CDN hierarchy with an origin shield",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "users",
+      "label": "Users worldwide",
+      "kind": "client"
+    },
+    {
+      "id": "l1_edges",
+      "label": "L1 edge PoPs (~20 ms from users)",
+      "kind": "cdn"
+    },
+    {
+      "id": "l2_regional",
+      "label": "L2 regional PoPs",
+      "kind": "cdn"
+    },
+    {
+      "id": "shield",
+      "label": "Origin shield",
+      "kind": "cdn"
+    },
+    {
+      "id": "origin",
+      "label": "Origin (protected)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "users",
+      "to": "l1_edges",
+      "kind": "sync",
+      "label": "millions of QPS"
+    },
+    {
+      "from": "l1_edges",
+      "to": "l2_regional",
+      "kind": "sync",
+      "label": "L1 misses"
+    },
+    {
+      "from": "l2_regional",
+      "to": "shield",
+      "kind": "sync",
+      "label": "coalesced misses"
+    },
+    {
+      "from": "shield",
+      "to": "origin",
+      "kind": "sync",
+      "label": "~1 fetch per object"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "users",
+        "origin"
+      ],
+      "note": "Without a CDN, a Sydney user pays roughly 150 to 250 ms of round-trip time to a single us-east-1 origin, and the origin handles every request itself."
+    },
+    {
+      "adds": [
+        "l1_edges",
+        "l2_regional"
+      ],
+      "note": "Pull CDN: L1 edges about 20 ms from users cache an object on first miss and serve later hits locally; a smaller L2 regional tier absorbs the L1 misses."
+    },
+    {
+      "adds": [
+        "shield"
+      ],
+      "note": "When a popular object expires, thousands of edges could miss simultaneously; the shield lets one request through to origin, holds the others, and fans the single response back out, so the origin sees thousands of QPS instead of millions."
+    }
+  ],
+  "caption": "Each tier shrinks what the next tier sees; pair the shield with stale-while-revalidate so edges keep serving while one background fetch refreshes."
+}
 \`\`\`
 
 ### Invalidation and cache keys
