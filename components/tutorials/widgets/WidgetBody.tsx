@@ -4,6 +4,7 @@ import type { WidgetSpec } from "@/lib/tutorials/widgets/schema"
 import { WidgetErrorBoundary } from "./WidgetErrorBoundary"
 import { CheckWidget } from "./CheckWidget"
 import { CalcWidget } from "./CalcWidget"
+import { HashRingWidget } from "./HashRingWidget"
 
 /**
  * Dispatches a VALIDATED widget spec to its family component. This module (plus the
@@ -23,6 +24,8 @@ function renderSpec(spec: WidgetSpec) {
       return <CheckWidget spec={spec} />
     case "calc":
       return <CalcWidget spec={spec} />
+    case "hash-ring":
+      return <HashRingWidget spec={spec} />
     default: {
       // Exhaustiveness guard: adding a spec type without a case is a compile error here.
       const _exhaustive: never = spec

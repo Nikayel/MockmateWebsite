@@ -32,6 +32,7 @@ function estimateMinHeight(spec: WidgetSpec): number {
         ? 130 + (spec.options?.length ?? 0) * 42
         : 150 + (spec.items?.length ?? 0) * 46
     case "calc":
+    case "hash-ring":
       // Predict phase renders first: title + question + option chips.
       return 150 + Math.ceil(spec.predictPrompt.options.length / 2) * 34
     default:
