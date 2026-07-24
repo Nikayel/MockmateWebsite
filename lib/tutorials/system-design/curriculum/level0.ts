@@ -1397,6 +1397,29 @@ weak knowledge, it is pacing. They spend 15 minutes perfecting requirements, dra
 the timer ends before there is anything to deep-dive on. A repeatable phase structure with an explicit
 minute budget prevents that.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You have 45 minutes. How much of the clock do requirements plus estimation together deserve?",
+  "options": [
+    {
+      "label": "About 15 to 20 minutes, since a design built on wrong requirements is worthless",
+      "feedback": "Tempting, and it is exactly how strong engineers fail this round: 15 minutes of polished requirements leaves no time to design or dive. Requirements are the setup, not the main event."
+    },
+    {
+      "label": "About 5 to 7 minutes",
+      "correct": true,
+      "feedback": "Right. Phases 1 and 2 together get about 5 to 7 minutes: enough for the functional and non-functional reqs, the constraint that matters, and a QPS and storage number. The bulk of the clock goes to design and deep dives, which is what is actually scored."
+    },
+    {
+      "label": "Almost none, jump straight to the diagram",
+      "feedback": "Skipping scope entirely means designing the wrong system. You still need the requirements and the binding constraint before drawing, it just takes minutes, not a quarter of the round."
+    }
+  ]
+}
+\`\`\`
+
 ### The canonical 6-phase clock for a 45-minute round
 
 \`\`\`
@@ -1437,6 +1460,30 @@ candidates who self-correct pacing over ones who need rescuing.
 Recap: budget about 5 to 7 minutes for requirements and estimation, spend the bulk on design and deep
 dives, use an exit criterion to leave each phase, and narrate every transition so you visibly lead the
 round to a complete design.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Minute 25: your simple design satisfies every functional requirement, and you just spotted a clever caching optimization. What does the prime directive say to do?",
+  "options": [
+    {
+      "label": "Add the optimization now while it is fresh",
+      "feedback": "Tempting, but bolting on complexity before declaring completeness is how elaborate half-designs happen. The optimization is only worth considering once the plain version works end to end."
+    },
+    {
+      "label": "Narrate the transition, lock the complete design, then dive where the tightest NFR points",
+      "correct": true,
+      "feedback": "Right. A complete working design comes first. Then you say the phase change out loud and spend the depth budget where the NFRs point, which may or may not be that cache."
+    },
+    {
+      "label": "Go back and re-check the estimation numbers",
+      "feedback": "Estimation ended the moment you had a read/write QPS and a storage number. Re-refining numbers at minute 25 is drift, exactly what exit criteria exist to prevent."
+    }
+  ],
+  "reveal": "In the design write, budget the six phases before you start, name each exit criterion as you hit it, and narrate every transition so you visibly lead the round to a complete design plus one committed deep dive."
+}
+\`\`\`
 `.trim()
 
 const highLevelDataflowTeach = `
