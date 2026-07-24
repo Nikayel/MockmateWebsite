@@ -1160,11 +1160,121 @@ URL dedup: before adding a URL to the frontier, check whether you have seen it, 
 
 Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs from the frontier, with async I/O for high concurrency per box, DNS caching (DNS lookups are a real bottleneck at scale, cache aggressively), and connection reuse. Fetched pages go to a raw store (S3/HDFS) as the crawl corpus, a link-extraction stage parses out new URLs and feeds them back to the frontier (the loop), and the corpus feeds a downstream indexing pipeline that builds the inverted index.
 
-\`\`\`
-Frontier (front=priority, back=per-host politeness)
-   -> Fetchers (async I/O, DNS cache, robots check)
-   -> raw store (S3)  --> link extractor --> URL dedup (bloom) --> back to Frontier
-                      \\-> content dedup (simhash) --> Indexer (inverted index)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The crawl loop",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "frontier",
+      "label": "Frontier (front: priority, back: per-host politeness)",
+      "kind": "queue"
+    },
+    {
+      "id": "fetchers",
+      "label": "Fetchers (async I/O, DNS cache, robots check)",
+      "kind": "service"
+    },
+    {
+      "id": "raw_store",
+      "label": "Raw store (S3)",
+      "kind": "db"
+    },
+    {
+      "id": "link_extractor",
+      "label": "Link extractor",
+      "kind": "service"
+    },
+    {
+      "id": "url_dedup",
+      "label": "URL dedup (bloom filter)",
+      "kind": "service"
+    },
+    {
+      "id": "content_dedup",
+      "label": "Content dedup (simhash)",
+      "kind": "service"
+    },
+    {
+      "id": "indexer",
+      "label": "Indexer (inverted index)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "frontier",
+      "to": "fetchers",
+      "kind": "async",
+      "label": "due URLs (per-host timer)"
+    },
+    {
+      "from": "fetchers",
+      "to": "raw_store",
+      "kind": "sync",
+      "label": "fetched pages"
+    },
+    {
+      "from": "raw_store",
+      "to": "link_extractor",
+      "kind": "async"
+    },
+    {
+      "from": "link_extractor",
+      "to": "url_dedup",
+      "kind": "sync",
+      "label": "normalized URLs"
+    },
+    {
+      "from": "url_dedup",
+      "to": "frontier",
+      "kind": "async",
+      "label": "new URLs re-enter the loop"
+    },
+    {
+      "from": "raw_store",
+      "to": "content_dedup",
+      "kind": "async"
+    },
+    {
+      "from": "content_dedup",
+      "to": "indexer",
+      "kind": "async",
+      "label": "deduped corpus"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "frontier",
+        "fetchers"
+      ],
+      "note": "The heart is the frontier: front queues assign priority, each back queue holds one host, and a next-fetch-time heap enforces the per-host delay so you never hammer one small site. Distributed fetchers pull only the hosts that are due."
+    },
+    {
+      "adds": [
+        "raw_store"
+      ],
+      "note": "Fetched pages land in a raw store (S3/HDFS): the durable crawl corpus that feeds everything downstream."
+    },
+    {
+      "adds": [
+        "link_extractor",
+        "url_dedup"
+      ],
+      "note": "Link extraction closes the loop: new URLs are canonicalized and checked against a bloom filter (definitely new vs probably seen) backed by a durable seen-set, so billions of URLs stay affordable."
+    },
+    {
+      "adds": [
+        "content_dedup",
+        "indexer"
+      ],
+      "note": "Content dedup (simhash/MinHash) stops mirrors, session-id URLs, and crawler traps from being indexed a million times; the deduped corpus feeds the indexing pipeline that builds the inverted index."
+    }
+  ],
+  "caption": "A distributed producer-consumer loop: polite, deduplicated, and incrementally fresh."
+}
 \`\`\`
 
 Freshness needs incremental recrawl, not one-shot. Estimate change rates per page (news changes hourly, an archive never does) and schedule recrawls adaptively, using HTTP conditional GETs (If-Modified-Since / ETag) so unchanged pages cost a cheap 304 instead of a full refetch.
