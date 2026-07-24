@@ -1272,15 +1272,63 @@ and the interviewer stops trusting your math. This lesson is the cheat-sheet.
 
 Rounded, order-of-magnitude, the numbers that matter:
 
-\`\`\`
-L1 cache reference            ~1 ns
-Main memory (RAM) read        ~100 ns        (0.1 us)
-Read 1 MB sequentially/RAM    ~10 us
-SSD random read              ~100 us        (0.1 ms)
-Round trip within same DC     ~0.5 ms
-Read 1 MB from SSD            ~1 ms
-Disk (HDD) seek               ~10 ms
-Round trip cross-region       ~50-150 ms     (e.g. US-EU)
+\`\`\`csdiagram
+{
+  "type": "ladder",
+  "title": "The latency ladder",
+  "scale": "log",
+  "bands": [
+    {
+      "label": "L1 cache reference",
+      "value": 1,
+      "display": "~1 ns",
+      "note": "The baseline every other number on this ladder is measured against."
+    },
+    {
+      "label": "Main memory (RAM) read",
+      "value": 100,
+      "display": "~100 ns",
+      "note": "Roughly 1,000x faster than an SSD random read: this ratio is why you cache in memory."
+    },
+    {
+      "label": "Read 1 MB sequentially from RAM",
+      "value": 10000,
+      "display": "~10 us",
+      "note": "Sequential RAM reads stay in the microseconds even for a full megabyte."
+    },
+    {
+      "label": "SSD random read",
+      "value": 100000,
+      "display": "~100 us",
+      "note": "0.1 ms per random read; memory is about 1,000x faster, so hot data does not belong here."
+    },
+    {
+      "label": "Round trip within same DC",
+      "value": 500000,
+      "display": "~0.5 ms",
+      "note": "A network hop inside one datacenter costs about half a millisecond."
+    },
+    {
+      "label": "Read 1 MB from SSD",
+      "value": 1000000,
+      "display": "~1 ms",
+      "note": "Bulk sequential SSD reads land at about a millisecond per megabyte."
+    },
+    {
+      "label": "Disk (HDD) seek",
+      "value": 10000000,
+      "display": "~10 ms",
+      "note": "An SSD is roughly 100x faster than this seek: why you avoid random disk seeks."
+    },
+    {
+      "label": "Round trip cross-region",
+      "value": 100000000,
+      "display": "~50-150 ms",
+      "note": "US-EU territory: 100x to 300x slower than a same-DC round trip, so chatty request sequences stay within one region."
+    }
+  ],
+  "caption": "Rounded, order-of-magnitude constants. Quote them within 10x and always convert a rung into a design decision: cache here, avoid the seek there, keep the sequence in one region."
+}
 \`\`\`
 
 </details>
