@@ -119,3 +119,25 @@ JSON), and asserts byte-identical double-render — unseeded randomness fails CI
 Schema-level rejections live in `lib/tutorials/widgets/__tests__/schema.test.ts`; the
 pipeline and SSR-safety guards in `components/tutorials/widgets/__tests__/`. Run
 `pnpm test` after authoring.
+
+## The sim families (`calc`, `hash-ring`, `sequence`)
+
+All three are hands-on interactives dispatched through the same fence. Field-level
+truth is `lib/tutorials/widgets/families/*.ts`; the binding pedagogy ramp:
+
+- **`calc`** (formula sliders): mandatory `predictPrompt` (2-4 one-tap options, no
+  marked answer) and `workedExample` narrating arithmetically correct initial
+  values. Inputs unlock one at a time; expressions use the whitelisted mini-grammar
+  (`+ - * / ^`, parens, `ceil floor round sqrt log10 min max pow`) over input ids
+  and PRIOR output ids; at most one sparkline. `percent` outputs emit fractions.
+- **`hash-ring`** (consistent hashing): mandatory ramp fields; `maxNodes` must
+  exceed `initialNodes`; everything is seeded, so the same spec renders the same
+  ring. Open in `modulo` mode so the shatter story plays before the ring fixes it.
+- **`sequence`** (stepped timelines): actors 2-6, steps 2-30, max 3 failure
+  toggles. A step's `when` ("drop" / "!drop") carries happy and failure paths in
+  one spec; with all toggles OFF at least 2 steps must remain. request/response/
+  event steps need `to`; only timer/note are single-actor. Keep labels under 30
+  chars; use `state` maps when a counter or race is the story; 1-2 `predict` steps
+  at the pivotal moment.
+
+Density cap reminder: at most ONE sim or animated widget per lesson, plus checks.
