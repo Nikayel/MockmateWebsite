@@ -2609,6 +2609,29 @@ is already spent, the next hop should be told it has 100ms left, not handed a fr
 deadlines and context propagation do this for you; without it, downstreams do work for a client that
 already gave up.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A popular service hiccups for two seconds and comes back up. Thousands of clients had a request fail, and every client retries the instant its call errors, with no delay. What happens to the recovering service?",
+  "options": [
+    {
+      "label": "It recovers normally; the retries simply succeed on the second attempt",
+      "feedback": "Tempting, because each individual retry looks harmless and usually would succeed. But every client retrying at the same instant multiplies load at the exact moment the service is weakest."
+    },
+    {
+      "label": "It gets hit by a synchronized wave of retries and may be knocked right back down",
+      "correct": true,
+      "feedback": "Right. This is a retry storm: lockstep retries multiply load onto a recovering service and can keep it down. That is why retries need exponential backoff, jitter to break the synchronization, and a retry budget."
+    },
+    {
+      "label": "Retries have no effect on the service either way",
+      "feedback": "Retries are real requests. Each one adds load, and thousands arriving in lockstep can double or triple traffic at the worst possible moment."
+    }
+  ]
+}
+\`\`\`
+
 ### Retries
 
 A retry can turn a transient blip into a success, but only under two conditions. First, the operation
@@ -2641,6 +2664,41 @@ dependency drowns only its own bulkhead instead of every thread in the process (
 named the Hystrix library). When a call fails fast, **degrade gracefully**: serve a cached value, a
 default, or a partial response rather than an error.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You have just met four primitives in quick succession. Match each situation to the one that addresses it.",
+  "buckets": [
+    "Timeout with a propagated deadline",
+    "Circuit breaker",
+    "Bulkhead"
+  ],
+  "items": [
+    {
+      "label": "A downstream stalls and your threads sit blocked waiting on it indefinitely",
+      "bucket": "Timeout with a propagated deadline",
+      "feedback": "A timeout frees the waiting thread, and the propagated deadline stops downstreams from doing work for a caller that already gave up."
+    },
+    {
+      "label": "A dependency is clearly down, yet every request still pays a full timeout before failing",
+      "bucket": "Circuit breaker",
+      "feedback": "An open breaker fails fast without touching the network, freeing your threads instantly and giving the dependency room to recover."
+    },
+    {
+      "label": "One slow dependency drains the shared connection pool that every other dependency uses",
+      "bucket": "Bulkhead",
+      "feedback": "Bulkheads give each dependency its own bounded pool, so a stall drowns only its own compartment instead of the whole process."
+    },
+    {
+      "label": "A request arrives at the next hop with only 40ms of its 300ms budget left",
+      "bucket": "Timeout with a propagated deadline",
+      "feedback": "Deadline propagation tells the next hop it has 40ms, so it fails fast instead of spending a fresh full timeout on work that will be discarded."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
 Closed --failures over threshold--> Open --cool-down--> Half-open --trial ok--> Closed
    ^                                                         |
@@ -2650,6 +2708,30 @@ Closed --failures over threshold--> Open --cool-down--> Half-open --trial ok--> 
 Recap: Give every call a propagated deadline, retry only idempotent errors with backoff, jitter, and
 a budget, trip a circuit breaker to fail fast when a dependency is down, and isolate with bulkheads
 so one slow dependency cannot drain the whole caller.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your team adds aggressive retries to every call but skips timeouts, jitter, and idempotency keys 'for now'. The payment downstream slows during a deploy. What is the most likely outcome?",
+  "options": [
+    {
+      "label": "Reliability improves, since each retry is another chance to succeed",
+      "feedback": "Tempting, and true for a single transient blip. But under a real slowdown, unguarded retries amplify load onto the struggling service, and retrying a non-idempotent payment can duplicate the charge."
+    },
+    {
+      "label": "Threads pile up behind the slow calls, retries multiply the load, and some customers get charged twice",
+      "correct": true,
+      "feedback": "Right. Without timeouts the pool drains behind the stalled calls, without backoff and a budget the retries amplify load, and without idempotency keys a retried charge can execute twice. The primitives only work as a set."
+    },
+    {
+      "label": "Nothing changes until the downstream fully crashes",
+      "feedback": "A slow dependency is often worse than a dead one: calls do not fail, they hang, quietly eating threads while the pool drains and healthy requests starve."
+    }
+  ],
+  "reveal": "Carry this into the design exercise: for the flaky dependency, state the timeout and propagated deadline first, then which errors you retry and with what backoff, jitter, and budget, then the breaker thresholds, and finally the bulkhead and the fallback you serve when calls fail fast."
+}
+\`\`\`
 `.trim()
 
 const backpressureSheddingTeach = `
