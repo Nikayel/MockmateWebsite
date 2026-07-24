@@ -58,10 +58,93 @@ Nano-services (one service per table or per endpoint) create chatty networks whe
 
 You rarely rewrite. The standard extraction pattern is the Strangler Fig. You put a routing layer (an API gateway or proxy) in front of the monolith, then peel off one capability at a time: stand up the new Payments service, route payment traffic to it, and leave everything else in the monolith. Over months you strangle the old code path until the monolith is gone or reduced to a small core. At each seam you place an anti-corruption layer, a translation shim that maps the monolith's messy legacy model to the new service's clean model, so the old design does not leak into and corrupt the new one.
 
-\`\`\`
-        [ Router / Gateway ] --> new Payments service (extracted)
-                            \\--> legacy Monolith (everything else)
-             anti-corruption layer translates at each seam
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Strangler Fig extraction, stage by stage",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "clients",
+      "label": "Clients",
+      "kind": "client"
+    },
+    {
+      "id": "gateway",
+      "label": "Router / Gateway",
+      "kind": "lb"
+    },
+    {
+      "id": "monolith",
+      "label": "Legacy monolith",
+      "kind": "service"
+    },
+    {
+      "id": "payments",
+      "label": "Payments service (new)",
+      "kind": "service"
+    },
+    {
+      "id": "acl",
+      "label": "Anti-corruption layer",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clients",
+      "to": "gateway",
+      "kind": "sync"
+    },
+    {
+      "from": "gateway",
+      "to": "monolith",
+      "kind": "sync",
+      "label": "everything else"
+    },
+    {
+      "from": "gateway",
+      "to": "payments",
+      "kind": "sync",
+      "label": "payment traffic"
+    },
+    {
+      "from": "payments",
+      "to": "acl",
+      "kind": "sync",
+      "label": "clean model"
+    },
+    {
+      "from": "acl",
+      "to": "monolith",
+      "kind": "sync",
+      "label": "legacy model"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "clients",
+        "gateway",
+        "monolith"
+      ],
+      "note": "You rarely rewrite. First move: put a routing layer (an API gateway or proxy) in front of the monolith. All traffic still flows to the legacy code, but you now own the seam."
+    },
+    {
+      "adds": [
+        "payments"
+      ],
+      "note": "Peel off one capability: stand up the new Payments service and route only payment traffic to it. Everything else stays in the monolith."
+    },
+    {
+      "adds": [
+        "acl"
+      ],
+      "note": "At the seam, an anti-corruption layer translates the monolith's messy legacy model into the new service's clean model, so the old design does not leak into and corrupt the new one."
+    }
+  ],
+  "caption": "Repeat per capability over months until the old code path is strangled and the monolith is gone or reduced to a small core."
+}
 \`\`\`
 
 **Recap:** cut along business capabilities and bounded contexts, give every service exclusive ownership of its data, size services to one team each, and extract incrementally with the Strangler Fig and an anti-corruption layer.
