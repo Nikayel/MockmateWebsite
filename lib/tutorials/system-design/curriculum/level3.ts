@@ -2094,6 +2094,29 @@ a read replica, an analytics warehouse), you have a sync problem. The naive solu
 write**: in your request handler, write to the DB, then write to the cache/index in the same code
 path.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The handler writes the DB, then the cache, then the search index. Each write succeeds 99.9 percent of the time, and you add retries on failure. Is the system safe from drift?",
+  "options": [
+    {
+      "label": "Yes: retries cover the rare failures, so the stores converge",
+      "feedback": "Tempting, and retries do narrow the window, but they cannot make three non-atomic writes atomic. A process that dies between writes never issues the retry, and a rolled-back DB transaction cannot un-write the cache."
+    },
+    {
+      "label": "No: the writes are not atomic, so crashes, rollbacks, and reordered concurrent writers still diverge the stores",
+      "correct": true,
+      "feedback": "Right. No transaction spans a database and a cache. Under load, partial failure is a steady drip of divergence, so the fix has to be structural, not more retries."
+    },
+    {
+      "label": "Yes, as long as you write the cache before the DB",
+      "feedback": "Reordering only changes which failure hurts: now a DB rollback leaves the cache holding a row the database never persisted."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
 handler:
   db.save(order)          # write 1
@@ -2125,6 +2148,40 @@ loader) subscribe and apply. The outbox is the right tool when you need domain e
 (\`OrderPlaced\`) rather than raw row diffs; CDC is the right tool when you want to mirror table
 state to derived stores with no application changes.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Outbox or CDC? Sort each statement under the tool it describes.",
+  "buckets": [
+    "Transactional outbox",
+    "Log-based CDC"
+  ],
+  "items": [
+    {
+      "label": "Emits rich domain events like 'OrderPlaced' that you shape by hand",
+      "bucket": "Transactional outbox",
+      "feedback": "You write the event payload yourself, so it carries domain meaning rather than raw column diffs."
+    },
+    {
+      "label": "Inserts the event row in the same transaction as the business write",
+      "bucket": "Transactional outbox",
+      "feedback": "That shared transaction is the whole trick: the change and the intent-to-publish commit together or not at all."
+    },
+    {
+      "label": "Tails Postgres logical decoding or the MySQL binlog with zero application changes",
+      "bucket": "Log-based CDC",
+      "feedback": "Debezium reads the log the database already writes, so the application code never changes."
+    },
+    {
+      "label": "Mirrors raw row state into a search index or warehouse",
+      "bucket": "Log-based CDC",
+      "feedback": "Row-level change streams are ideal when the goal is keeping derived table state in sync rather than publishing domain events."
+    }
+  ]
+}
+\`\`\`
+
 ### The honest delivery guarantee
 
 **Exactly-once end-to-end is a fantasy** across a broker and heterogeneous sinks: the relay can crash
@@ -2147,6 +2204,30 @@ Recap: never dual-write to a DB and a derived store; commit the change and its e
 transactional outbox, or tap the DB log with CDC (Debezium), publish through Kafka, and make
 consumers idempotent so at-least-once delivery is correct, while monitoring replication-slot lag and
 supporting snapshot backfills.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your relay crashes after publishing an event to Kafka but before marking the outbox row sent. On restart it publishes the same event again. What must be true downstream?",
+  "options": [
+    {
+      "label": "The broker deduplicates, so consumers see the event exactly once end to end",
+      "feedback": "Tempting because Kafka advertises exactly-once features, but they do not span heterogeneous sinks like Redis and Elasticsearch. Across the whole pipeline, exactly-once is a fantasy."
+    },
+    {
+      "label": "Consumers are idempotent and version-guarded, so the duplicate applies as a no-op",
+      "correct": true,
+      "feedback": "Right. At-least-once delivery plus idempotent consumers is the honest contract: key writes by primary id, guard with a version or LSN so an older duplicate never overwrites newer state, and a replay changes nothing."
+    },
+    {
+      "label": "The pipeline must halt and alert, because a duplicate would corrupt the derived stores",
+      "feedback": "If a duplicate could corrupt state, the consumer is the bug. Duplicates are routine in this architecture, so consumers are built to absorb them, not to page a human."
+    }
+  ],
+  "reveal": "The whole lesson in one line: make one atomic write (the business change plus its event, via outbox or the DB's own log), derive everything else from the ordered stream, and let idempotent, versioned consumers turn at-least-once delivery into correctness. In your design write, also cover the ops edges: snapshot backfills to bootstrap new sinks, and alerts on replication-slot and consumer lag before pinned WAL fills the primary's disk."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel3: DesignLevel = {
