@@ -36,6 +36,29 @@ the effect has not landed yet. You must design for that gap.
 
 \`\`\`cswidget
 {
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You move the inventory decrement behind a broker. The user gets a 200, then immediately loads a page that reads inventory. What can that read observe?",
+  "options": [
+    {
+      "label": "Stale state: the decrement may not have landed yet, and the design must tolerate that gap",
+      "correct": true,
+      "feedback": "Right: async means the effect happens after the response, so a follow-up read can arrive inside the eventual-consistency gap."
+    },
+    {
+      "label": "Always the decremented value, because the broker write is durable before the 200",
+      "feedback": "Durability is not visibility: the broker holds the message, but the consumer may not have applied it when the read arrives."
+    },
+    {
+      "label": "An error, because reads are blocked until the consumer finishes",
+      "feedback": "Nothing blocks the reader; non-blocking is the whole point of async, which is exactly why the stale window exists."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "queue-sim",
   "title": "The buffer absorbs the burst",
   "predictPrompt": {
@@ -74,6 +97,29 @@ with backoff, and after N failures the message lands in a dead-letter queue (DLQ
 policy, idempotent consumers (because retries duplicate), a DLQ, and monitoring on consumer lag and
 DLQ depth. The user already got a 200; nobody is watching the screen when the async step breaks.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The email consumer for OrderPlaced throws on every message tonight. Who notices the failure?",
+  "options": [
+    {
+      "label": "The buyer, whose checkout request returns a 5xx so they can retry",
+      "feedback": "The buyer already got a 200 before the consumer ever ran; async failure never reaches that response."
+    },
+    {
+      "label": "Nobody, unless you monitor retries, consumer lag, and DLQ depth",
+      "correct": true,
+      "feedback": "Right: async pushes failure into the background, so retry policy, a DLQ, and monitoring are mandatory, not optional."
+    },
+    {
+      "label": "The producer service, because the broker returns the consumer's error to it",
+      "feedback": "The producer finished when its write to the broker was acked; the broker does not propagate consumer errors back upstream."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the wrong turn is adding a broker to simple CRUD that needs a strong-consistency
 read right after the write. If a user saves a setting and immediately reads it back, an async write
 behind a queue gives them a stale read and a support ticket. Async pays off when the follow-up work
@@ -93,6 +139,46 @@ Async:  client -> [payment] -> 200
 Recap: async decouples in time, space, and synchronization, trading immediate consistency for
 throughput and availability; keep steps synchronous when the caller needs the result or a consistent
 read, and make independent side effects events.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Checkout involves several steps. Sort each one: keep it synchronous in the request, or make it an async event behind the broker.",
+  "buckets": [
+    "Keep synchronous",
+    "Async event"
+  ],
+  "items": [
+    {
+      "label": "ChargeCard, where a decline must be shown to the user before the response",
+      "bucket": "Keep synchronous",
+      "feedback": "A command whose result the caller needs must stay in the request path."
+    },
+    {
+      "label": "Save a notification setting the user immediately reads back on the next screen",
+      "bucket": "Keep synchronous",
+      "feedback": "A read right after the write would land in the eventual-consistency gap and look like a lost save."
+    },
+    {
+      "label": "Send the order confirmation email",
+      "bucket": "Async event",
+      "feedback": "An independent side effect: the response does not depend on it, so it belongs behind OrderPlaced."
+    },
+    {
+      "label": "Update the analytics counters for the order",
+      "bucket": "Async event",
+      "feedback": "Analytics never gates the response; one more consumer on the event costs the producer nothing."
+    },
+    {
+      "label": "Let a new fraud team react to orders without the checkout service changing",
+      "bucket": "Async event",
+      "feedback": "Space decoupling: events let consumers be added without touching the producer."
+    }
+  ],
+  "reveal": "The split is command versus event plus the consistency gap: keep a step synchronous when the caller needs the result or a consistent read right after, and publish independent side effects as events."
+}
+\`\`\`
 `.trim()
 
 const queuePubsubLogTeach = `
