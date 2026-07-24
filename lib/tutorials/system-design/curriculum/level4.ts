@@ -1507,11 +1507,66 @@ off external event sources: Kafka lag, SQS queue length, Redis list size, Promet
 worker fleet can even **scale to zero** when the queue is empty. This reacts to the *cause* (work
 arriving) rather than the *symptom* (CPU rising), buying precious lead time.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each autoscaling metric.",
+  "buckets": [
+    "Leading signal",
+    "Lagging signal"
+  ],
+  "items": [
+    {
+      "label": "CPU utilization",
+      "bucket": "Lagging signal",
+      "feedback": "By the time CPU is pegged, requests are already queuing and the p99 is already blown."
+    },
+    {
+      "label": "Kafka consumer lag",
+      "bucket": "Leading signal"
+    },
+    {
+      "label": "Requests per second per pod",
+      "bucket": "Leading signal"
+    },
+    {
+      "label": "Memory utilization",
+      "bucket": "Lagging signal"
+    },
+    {
+      "label": "SQS queue depth",
+      "bucket": "Leading signal",
+      "feedback": "A growing backlog is the cause of future overload; scaling on it buys lead time before any CPU number moves."
+    }
+  ]
+}
+\`\`\`
+
 Below the pod layer sits the **cluster/node autoscaler**. HPA asking for 40 more pods does nothing if
 there is no node to place them on; the Cluster Autoscaler (or Karpenter) provisions new VMs when pods
 are unschedulable. Separately, the **Vertical Pod Autoscaler (VPA)** right-sizes each pod's
 CPU/memory *requests*. HPA and VPA on the same metric fight each other, so keep them on different
 signals.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Traffic jumps 10x in 20 seconds. Your HPA targets 60% CPU with a 30-second scrape interval, and fresh nodes take about 90 seconds to provision. Does autoscaling save the burst?",
+  "options": [
+    {
+      "label": "Yes: the HPA reacts within a scrape interval or two, well under a minute",
+      "feedback": "Tempting, because the scaling decision itself is quick. But the decision is only the start: node provisioning, image pull, app boot, warmup, and health checks stack on top, typically 2 to 5 minutes end to end."
+    },
+    {
+      "label": "No: new capacity lands minutes after the burst, so only standing headroom or pre-scaled capacity absorbs it",
+      "correct": true,
+      "feedback": "Right. Reactive scaling always trails a fast burst. The fleet you already have, running at 60% instead of 95%, is what survives the first minutes while new capacity boots."
+    }
+  ]
+}
+\`\`\`
 
 ### Scaling lag: the concept that separates a senior answer
 
@@ -1541,6 +1596,30 @@ fleet absorbs the burst while new capacity boots.
 Recap: scale on leading signals (queue depth via KEDA, RPS) not just lagging CPU, layer HPA + cluster
 autoscaler + VPA, and because reactive scaling always trails a fast burst by 2 to 5 minutes of lag,
 hide that lag with warm pools, scheduled pre-scaling, and standing headroom.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your service 10x's every weekday at 9:00am sharp and also takes occasional unpredictable spikes. What is the strongest scaling setup?",
+  "options": [
+    {
+      "label": "An aggressive HPA on CPU with a short stabilization window",
+      "feedback": "Tempting, but CPU is a lagging signal and reactive scaling still pays the full 2 to 5 minute pipeline. Aggressive settings mostly add flapping, not speed."
+    },
+    {
+      "label": "Scheduled pre-scaling before 9am, queue-depth or RPS signals for the gradual ramps, and standing headroom for the surprises",
+      "correct": true,
+      "feedback": "Right. Predictable load gets capacity raised ahead of time, leading signals cut reaction lag on gradual changes, and headroom absorbs the bursts nothing can predict."
+    },
+    {
+      "label": "VPA, so every pod gets more CPU when the spike hits",
+      "feedback": "VPA right-sizes per-pod requests over time; it does not add replicas during a burst, and applying a new size typically restarts pods, the last thing you want mid-spike."
+    }
+  ],
+  "reveal": "In the design write, name the layers distinctly (HPA or event-driven scaling, cluster autoscaler, VPA on a separate signal), state the 2 to 5 minute scaling-lag number, and show how you hide it: scheduled pre-scaling for the 9am pattern, warm pools, and explicit headroom."
+}
+\`\`\`
 `.trim()
 
 const capacityPlanningTeach = `
