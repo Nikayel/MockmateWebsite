@@ -594,6 +594,32 @@ A consumer that calls anything flaky (a third-party API, a downstream service) w
 
 **Retries with backoff and jitter.** Transient failures (a 503, a timeout, a throttle) should be retried, but naively retrying immediately in a tight loop turns a downstream blip into a self-inflicted DDoS. Use **exponential backoff** (wait 1s, 2s, 4s, 8s) plus **jitter** (randomize the delay) so a fleet of consumers that all failed at once do not retry in a synchronized thundering herd. Cap the attempts (say 5) so a permanently broken message does not retry forever.
 
+\`\`\`cswidget
+{
+  "type": "queue-sim",
+  "title": "A retry storm is self-inflicted load",
+  "predictPrompt": {
+    "question": "A short downstream blip makes every failed call retry immediately, multiplying arrivals several times over, while the consumer barely outruns the normal producer rate. What does the unbounded queue look like after the blip ends?",
+    "options": [
+      "A large backlog that takes far longer to drain than the blip lasted",
+      "Depth returns to zero as soon as the downstream recovers",
+      "No backlog forms because retries replace messages instead of adding them"
+    ]
+  },
+  "workedExample": "The run starts healthy: the consumer has a little headroom over the producer, so depth stays near zero. Then the downstream blip hits and every failed call is retried immediately, so arrivals jump to several times the consumer's rate and the depth curve climbs steeply for the whole storm. Watch what happens after the blip ends: because the consumer's headroom over the normal producer rate is thin, the drain is a long shallow slope, and the backlog outlives the blip that caused it by a wide margin. Now flip to the bounded queue: depth stops at the cap and the overflow is shed or pushed back on the producer instead of accumulating, so the pipeline recovers soon after the storm passes. A bounded queue plus capped backoff with jitter is the defense; the storm itself was load you generated.",
+  "producerRate": 2,
+  "consumerRate": 2.5,
+  "ticks": 240,
+  "capacity": 40,
+  "burst": {
+    "from": 50,
+    "to": 100,
+    "multiplier": 4
+  },
+  "caption": "The blip is short; the backlog it leaves is not. Capped backoff with jitter and a bounded queue keep a retry storm from wedging the pipeline."
+}
+\`\`\`
+
 **Transient vs permanent errors.** Classify the failure. A timeout or 429 is transient: retry it. A 400 "malformed payload" or a schema violation is permanent: retrying will never succeed, so send it straight to the dead-letter queue instead of burning 5 attempts. Blindly retrying permanent errors wastes capacity and delays the DLQ signal.
 
 ## The dead-letter queue
