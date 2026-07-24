@@ -2001,6 +2001,29 @@ is on the hot path and a write is not.
   the reader follows and merge-sort them. Writes are O(1), but a read for someone following 5,000
   accounts is a large scatter-gather merge on the hot path.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Follower counts are power-law: the median user has a few hundred followers, the top accounts have 50 million. Which fan-out strategy do you ship?",
+  "options": [
+    {
+      "label": "Fan-out-on-write for everyone: reads must be fast, and list appends are cheap",
+      "feedback": "Tempting because it makes every feed read a single list lookup, but one celebrity post now triggers 50 million timeline writes: a storm that saturates the fan-out fleet and delays everyone's feed."
+    },
+    {
+      "label": "Fan-out-on-read for everyone: store each post once and merge at read time",
+      "feedback": "Writes become trivial, but a reader following 5,000 accounts now pays a scatter-gather merge on the hot read path, and reads outnumber writes by orders of magnitude. The cost moved to the worst possible place."
+    },
+    {
+      "label": "Push for normal accounts, but pull and merge celebrity posts at read time",
+      "correct": true,
+      "feedback": "Right. The hybrid caps write amplification at the celebrity threshold while keeping normal reads O(1); a reader follows only a handful of celebrities, so the read-time merge stays small and bounded."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`
  fan-out-on-write            fan-out-on-read
  Alice posts                 Bob opens feed
@@ -2025,6 +2048,42 @@ a duplicated author name) can drift, and now you own an invalidation or reconcil
 Recap: denormalize when reads dominate, using materialized/rollup views and approximate sketches to
 make reads O(1) lookups; for feeds, use a hybrid that precomputes normal-user feeds and merges
 celebrity posts at read time, and accept that you now own write amplification and copy consistency.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "For each product need, pick the precomputation tool this lesson gives you.",
+  "buckets": [
+    "Materialized rollup",
+    "Approximate sketch",
+    "Hybrid fan-out"
+  ],
+  "items": [
+    {
+      "label": "A dashboard shows daily orders by region without running a 'GROUP BY' per page load",
+      "bucket": "Materialized rollup",
+      "feedback": "A job or stream maintains the rollup table; the read becomes one indexed lookup."
+    },
+    {
+      "label": "Count unique monthly visitors within a percent, in kilobytes of memory",
+      "bucket": "Approximate sketch",
+      "feedback": "HyperLogLog: about 12 KB per counter at roughly 0.8 percent error beats storing every visitor id."
+    },
+    {
+      "label": "Top trending hashtags from a firehose, in fixed memory",
+      "bucket": "Approximate sketch",
+      "feedback": "Count-Min Sketch gives approximate frequencies without keeping a counter per key."
+    },
+    {
+      "label": "A home timeline that loads in under 100 ms for a user who follows two celebrities",
+      "bucket": "Hybrid fan-out",
+      "feedback": "Precompute normal-author feeds on write and merge the couple of celebrity streams at read time."
+    }
+  ],
+  "reveal": "Every tool here is the same move: pay at write time (amplification, staleness, a consistency job you now own) so the read path is an O(1) lookup. In your design write, quantify the read-to-write ratio, say the celebrity threshold out loud, and own the drift-and-invalidation cost of the copies you just created."
+}
+\`\`\`
 `.trim()
 
 const cdcDualWriteTeach = `
