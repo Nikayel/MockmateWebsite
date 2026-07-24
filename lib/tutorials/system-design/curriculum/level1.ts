@@ -47,6 +47,45 @@ a different ephemeral source port) and why a NAT gateway can multiplex thousands
 behind one public IP by rewriting ports. It is also why L4 load balancing has to keep a connection
 pinned to the same backend: the 4-tuple is the only identity it has.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "A request for '/checkout' arrives carrying a session cookie. Sort each piece of information by which kind of load balancer can act on it.",
+  "buckets": [
+    "An L4 LB can act on it",
+    "Only an L7 proxy can act on it"
+  ],
+  "items": [
+    {
+      "label": "The URL path '/checkout'",
+      "bucket": "Only an L7 proxy can act on it",
+      "feedback": "Paths live inside the HTTP request. An L4 LB forwards packets and connections without ever parsing HTTP."
+    },
+    {
+      "label": "The destination port, 443",
+      "bucket": "An L4 LB can act on it",
+      "feedback": "Ports are part of the 4-tuple, which is exactly what L4 sees."
+    },
+    {
+      "label": "The 'Host' header",
+      "bucket": "Only an L7 proxy can act on it",
+      "feedback": "Headers are HTTP content. Reading one means terminating the connection and parsing the request."
+    },
+    {
+      "label": "The client's source IP",
+      "bucket": "An L4 LB can act on it",
+      "feedback": "The source IP is in the 4-tuple, visible without touching a single HTTP byte."
+    },
+    {
+      "label": "A session cookie",
+      "bucket": "Only an L7 proxy can act on it",
+      "feedback": "Cookies ride in HTTP headers, invisible at L4. Cookie-based sticky sessions need an L7 proxy."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** interviewers probe whether you conflate an L4 LB with L7 routing. If you say
 "the load balancer routes \`/checkout\` to the payments service," you have quietly assumed an L7
 proxy. Say so, and note the cost: TLS termination and request parsing on every request.
@@ -56,6 +95,30 @@ Do not die on that hill. Say "TLS sits on top of TCP and below HTTP" and move on
 
 Recap: Reason in a practical 5-layer stack, remember IP routes packets and TCP/UDP address processes
 by port, and know that L4 sees only the 4-tuple while L7 can read and route on request content.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "In your design write you say 'the load balancer sends /api to the API pool and /images to the static pool'. What have you just committed to?",
+  "options": [
+    {
+      "label": "An L4 load balancer is enough; routing by path is a basic LB feature",
+      "feedback": "Tempting because 'load balancer' sounds like one thing, but path-based routing requires parsing the request, and L4 sees only the 4-tuple, never a URL."
+    },
+    {
+      "label": "An L7 proxy that terminates the connection and parses every request, paying CPU and latency for it",
+      "correct": true,
+      "feedback": "Right. Path routing quietly assumes an L7 proxy, and the honest version of the design names its cost: TLS termination and request parsing on every request."
+    },
+    {
+      "label": "Nothing extra; DNS can do this split before traffic reaches any LB",
+      "feedback": "DNS hands back an IP per hostname before any request exists. It never sees paths, so it cannot split '/api' from '/images'."
+    }
+  ],
+  "reveal": "Whenever a design routes on path, header, or cookie, an L7 proxy is doing it. In your design write, label each load balancer L4 or L7 on purpose and say why."
+}
+\`\`\`
 `.trim()
 
 const dnsTeach = `
