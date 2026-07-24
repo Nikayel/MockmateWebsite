@@ -384,6 +384,37 @@ a replica already past it) before serving. This bounds staleness precisely and w
 devices** if the token travels with the user (in a cookie, the session store, or the client). It is
 how you get read-your-writes without pinning everything to the leader.
 
+\`\`\`cswidget
+{
+  "type": "replication-lag",
+  "title": "The Vanishing Comment and Its Two Cures",
+  "predictPrompt": {
+    "question": "You post a comment during the write burst; your refresh a few ticks later is routed to the lagging follower with no cure in place. What do you see?",
+    "options": [
+      "The comment, because replicas apply writes within a tick or two",
+      "Your own comment is missing, a read-your-writes violation",
+      "An error, because the replica refuses to serve reads while it lags"
+    ]
+  },
+  "workedExample": "Two followers replicate from the leader; the second applies entries more slowly, so the burst opens a real gap between them. The comment lands on the leader mid-burst and the refresh reads the slower follower a few ticks later, before it has applied the write, so with no cure the comment vanishes. Then try the cures. Sticky routing sends this user's reads to the leader for a while after their write: the simplest read-your-writes fix, but per-session, and it gives up replica scaling for those reads. The version token carries the write's log position with the read, and the replica holds the read until it has applied past that position: staleness bounded precisely, the read still served by a replica, and it works across devices if the token travels with the user.",
+  "followers": 2,
+  "writeRate": 2,
+  "applyRate": 5,
+  "ticks": 180,
+  "burst": {
+    "from": 15,
+    "to": 45,
+    "multiplier": 4
+  },
+  "scenario": {
+    "writeTick": 25,
+    "readTick": 28,
+    "follower": 1
+  },
+  "caption": "Match the bug to its session guarantee, then buy just that guarantee: sticky routing to the leader is the simple single-device fix, and a version token that reads wait on delivers read-your-writes cross-device without pinning everything to the leader."
+}
+\`\`\`
+
 **Interview nuance:** be clear that these guarantees are **strictly weaker than linearizability**.
 Linearizability means a single, global, real-time order that every client agrees on; it is expensive
 (consensus, leader round trips, or reading from the leader with a read lease). Session guarantees
