@@ -253,6 +253,27 @@ records with the same key go to the same partition and are totally ordered relat
 Correctness reduces to one question: which events must be seen in order relative to each other?
 Whatever that set is, it must share a key.
 
+\`\`\`cswidget
+{
+  "type": "hash-ring",
+  "title": "Why partition counts are fixed up front",
+  "predictPrompt": {
+    "question": "A topic has 4 partitions chosen by hash(key) mod 4. You raise the count to 5. What happens to per-key ordering histories?",
+    "options": [
+      "Nothing, keys stay put",
+      "Only new keys are affected",
+      "Most keys change partition, splitting their histories"
+    ]
+  },
+  "workedExample": "Keys here are message keys; colors are partitions. In mod-N mode, add a partition and read the remap: most keys now hash to a different partition, so an account's history continues somewhere new and per-key order is broken across the change. That is why partition counts are chosen generously up front. The ring view shows what Dynamo-style stores do instead; Kafka deliberately does not.",
+  "initialNodes": 4,
+  "maxNodes": 6,
+  "keys": 48,
+  "initialMode": "modulo",
+  "vnodeFactor": 16
+}
+\`\`\`
+
 - Bank account: key by \`account_id\`, so deposit-then-withdraw for one account is never reordered
   into overdraft.
 - Order lifecycle: key by \`order_id\`, so \`created -> paid -> shipped\` stays monotonic.
