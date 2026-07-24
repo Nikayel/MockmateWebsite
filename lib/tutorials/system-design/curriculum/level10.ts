@@ -908,6 +908,42 @@ Networks time out, clients resubmit, and your own workers retry after crashes. E
 
 The ledger is the source of truth, and it must be double-entry and immutable. Instead of storing a mutable \`balance\` column you update in place, you append immutable journal entries: every movement of money is two entries that sum to zero (debit one account, credit another). A charge of $50 becomes a debit to the customer's funding account and a credit to the merchant's payable account. A balance is then a derived sum of entries, never an overwritten field. This gives you a complete audit trail, makes reconciliation with the bank statement mechanical, and makes bugs detectable (entries that do not sum to zero are corruption you can alarm on).
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "entry",
+    "account",
+    "side",
+    "amount"
+  ],
+  "rows": [
+    [
+      "jrnl-1",
+      "customer funding account",
+      "debit",
+      "-50.00"
+    ],
+    [
+      "jrnl-2",
+      "merchant payable account",
+      "credit",
+      "+50.00"
+    ],
+    [
+      "",
+      "sum of entries",
+      "",
+      "0.00"
+    ]
+  ],
+  "highlightCols": [
+    "amount"
+  ],
+  "caption": "The 50 dollar charge as two immutable journal entries that sum to zero. A balance is a derived SUM over an account's entries, never an overwritten column."
+}
+\`\`\`
+
 **Interview nuance:** the fastest way to fail this round is proposing \`UPDATE accounts SET balance = balance - 50\`. Say explicitly that you use an append-only double-entry ledger and derive balances, because mutable balances make audit and reconciliation impossible and hide bugs.
 
 ## Coordinating across systems with a saga
