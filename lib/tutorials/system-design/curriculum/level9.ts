@@ -577,6 +577,330 @@ Declare the desired infrastructure in **Terraform/OpenTofu or Pulumi**, keep it 
 
 For a **critical payments service** you want **canary with automated analysis and auto-rollback**. Tools: **Argo Rollouts** or **Flagger** shift traffic in steps, and between steps they **bake** (hold and observe) while querying Prometheus for your SLIs: error rate, p99 latency, and a business metric like payment-authorization-success-rate. If any metric breaches its threshold during the bake, the rollout **auto-aborts and shifts traffic back** to the stable version. No human in the loop at 3am. Blue-green is the alternative when you cannot tolerate two versions serving simultaneously (it flips atomically) but it costs double capacity during the window.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Canary with auto-rollback",
+  "frames": [
+    {
+      "note": "The payments service pool is all v1, serving 100% of traffic. Ship v2 to every pod at once and a regression takes an outage before you notice; Argo Rollouts will shift traffic to v2 in steps instead.",
+      "rows": [
+        {
+          "label": "pods",
+          "cells": [
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            }
+          ]
+        },
+        {
+          "label": "traffic",
+          "cells": [
+            {
+              "text": "v1 100%",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The canary starts: one pod runs v2 and takes 1% of traffic. The rollout now bakes, holding while it queries Prometheus for error rate, p99 latency, and payment-authorization-success-rate against thresholds.",
+      "rows": [
+        {
+          "label": "pods",
+          "cells": [
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "traffic",
+          "cells": [
+            {
+              "text": "v1 99%"
+            },
+            {
+              "text": "v2 1%",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "bake watches",
+          "cells": [
+            {
+              "text": "error rate"
+            },
+            {
+              "text": "p99 latency"
+            },
+            {
+              "text": "auth-success rate"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The bake passes at 1% and 5%, so Argo Rollouts steps up: a quarter of the pods run v2 and 25% of traffic flows to them. Between every step it holds and watches the same SLIs.",
+      "rows": [
+        {
+          "label": "pods",
+          "cells": [
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v2"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "traffic",
+          "cells": [
+            {
+              "text": "v1 75%"
+            },
+            {
+              "text": "v2 25%",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "steps",
+          "cells": [
+            {
+              "text": "1% ok",
+              "state": "dim"
+            },
+            {
+              "text": "5% ok",
+              "state": "dim"
+            },
+            {
+              "text": "25% baking",
+              "state": "active"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "Mid-bake at 25%, v2's error rate breaches its threshold. What happens at 3am?",
+        "options": [
+          "A human is paged to decide",
+          "Auto-abort: traffic shifts back to v1",
+          "It continues to 100% and fixes forward"
+        ]
+      }
+    },
+    {
+      "note": "Error rate breaches during the bake. The rollout auto-aborts and shifts traffic back to stable v1 with no human in the loop; the bad v2 never saw more than 25% of traffic.",
+      "rows": [
+        {
+          "label": "pods",
+          "cells": [
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v1"
+            },
+            {
+              "text": "v2",
+              "state": "dropped"
+            },
+            {
+              "text": "v2",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "traffic",
+          "cells": [
+            {
+              "text": "v1 100%",
+              "state": "new"
+            },
+            {
+              "text": "v2 25%",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "bake watches",
+          "cells": [
+            {
+              "text": "error rate BREACH",
+              "state": "active"
+            },
+            {
+              "text": "p99 latency",
+              "state": "dim"
+            },
+            {
+              "text": "auth-success rate",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "A fixed v2 walks the whole ladder and every bake passes: 1%, 5%, 25%, then 100%. All pods now run v2. Blue-green would have flipped atomically instead, at the price of double capacity during the window.",
+      "rows": [
+        {
+          "label": "pods",
+          "cells": [
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            },
+            {
+              "text": "v2",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "traffic",
+          "cells": [
+            {
+              "text": "v2 100%",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "steps",
+          "cells": [
+            {
+              "text": "1% ok",
+              "state": "dim"
+            },
+            {
+              "text": "5% ok",
+              "state": "dim"
+            },
+            {
+              "text": "25% ok",
+              "state": "dim"
+            },
+            {
+              "text": "100%",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Canary shifts traffic 1% -> 5% -> 25% -> 100% with a bake and automated metric analysis between steps; any breach auto-aborts and shifts traffic back to stable, no human at 3am."
+}
+\`\`\`
+
 **Feature flags decouple deploy from release.** Deploying code and releasing a feature become separate events: ship the code dark behind a flag (LaunchDarkly, Unleash, or a homegrown flag service), then turn it on for 1% of users independent of the deploy. This means you can roll back a *feature* instantly without redeploying, and you can deploy risky code safely because it is inert until flagged on.
 
 **Interview nuance:** database migrations are the trap in any progressive rollout. Canary assumes old and new code run simultaneously, so a **destructive migration in one deploy** (drop a column the old version still reads) breaks the stable version mid-canary. Use **expand/contract** (a.k.a. parallel-change): first expand (add the new column, write to both, backfill), deploy code reading the new shape, then in a later deploy contract (drop the old column) once nothing reads it. Migrations must be backward-compatible across at least one version.
