@@ -1126,6 +1126,25 @@ fixed rate, so downstream sees a perfectly steady stream. Use it when the thing 
 absorb bursts at all (a payment processor with a hard TPS ceiling). The cost is added latency and a
 queue to manage.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A limiter allows 100 requests per minute per key, counting in aligned one-minute windows that reset at :00. A client sends 100 requests at 11:00:59 and 100 more at 11:01:01. What gets through?",
+  "options": [
+    {
+      "label": "The second batch is rejected: the client already spent its 100 for the minute",
+      "feedback": "Tempting, because the stated limit is 100 per minute. But the counter reset at 11:01:00, so the second batch lands in a fresh window with a zeroed count."
+    },
+    {
+      "label": "All 200 pass: double the intended rate inside about two seconds",
+      "correct": true,
+      "feedback": "Right. This is the boundary spike, the classic fixed-window failure: full quota at the end of one window plus full quota at the start of the next. Sliding-window counters exist to kill exactly this."
+    }
+  ]
+}
+\`\`\`
+
 **Fixed window** counts requests per aligned interval and resets at the boundary. Trivially cheap
 (one integer per key per window), but it has the **boundary spike**: a client can send the full quota
 in the last second of one window and the full quota in the first second of the next, delivering 2x
@@ -1137,6 +1156,42 @@ but memory-heavy (1000 req/min = 1000 stored timestamps). The practical compromi
 one by how much still overlaps the trailing window
 (\`count = current + previous * overlap_fraction\`). It kills the boundary spike with roughly the
 memory of fixed window.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each property to the algorithm it belongs to.",
+  "buckets": [
+    "Token bucket",
+    "Leaky bucket",
+    "Sliding-window counter"
+  ],
+  "items": [
+    {
+      "label": "An idle client can fire a burst of B, then settles to rate R",
+      "bucket": "Token bucket"
+    },
+    {
+      "label": "Downstream sees a perfectly steady stream, at the cost of queueing latency",
+      "bucket": "Leaky bucket"
+    },
+    {
+      "label": "Weights the previous window by its overlap fraction to fix the boundary spike",
+      "bucket": "Sliding-window counter"
+    },
+    {
+      "label": "Stores just a token count and a last-refill timestamp per key",
+      "bucket": "Token bucket"
+    },
+    {
+      "label": "The right pick in front of a payment processor with a hard TPS ceiling",
+      "bucket": "Leaky bucket",
+      "feedback": "When the protected system cannot absorb bursts at all, you want smoothed output, not burst tolerance."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the response contract matters as much as the algorithm. On rejection return
 **HTTP 429 Too Many Requests** with a **Retry-After** header and the standard **RateLimit** headers
@@ -1156,6 +1211,30 @@ Recap: default to token bucket for burst-friendly per-key limits, use sliding-wi
 need window accuracy without the log's memory, avoid raw fixed window for anything abuse-sensitive,
 and always return 429 plus Retry-After and RateLimit headers with a stated fail-open or fail-closed
 policy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are designing per-key limits for a public API: clients burst naturally, sustained abuse must be capped, window-edge doubling is unacceptable, and the limiter's state store can go down. Which combination fits?",
+  "options": [
+    {
+      "label": "Fixed window for cheapness, failing closed when the store is down",
+      "feedback": "Tempting for its simplicity, but fixed window has the boundary spike, and failing closed turns a limiter-store outage into a full API outage."
+    },
+    {
+      "label": "Token bucket with a 429 plus Retry-After contract, failing open with downstream load shedding as the backstop",
+      "correct": true,
+      "feedback": "Right. Token bucket allows natural bursts while capping the sustained rate, the response contract lets well-behaved clients back off, and failing open keeps the limiter itself from becoming the outage."
+    },
+    {
+      "label": "Sliding-window log for exactness, failing open",
+      "feedback": "The log is exact but stores a timestamp per request, which is heavy at public-API scale. The sliding-window counter gives nearly the same accuracy at roughly fixed-window memory."
+    }
+  ],
+  "reveal": "In the design write, name the algorithm, the key dimension (per user, per API key, per endpoint), the exact rejection contract (429, Retry-After, the RateLimit headers), and your fail-open or fail-closed call. The contract earns as much credit as the algorithm."
+}
+\`\`\`
 `.trim()
 
 const distributedRateLimitingTeach = `
