@@ -57,6 +57,30 @@ an open question and waiting. Proposing assumptions is faster, and it signals se
 The two failure modes to avoid: **interrogating** the interviewer with a dozen questions until the
 clock is gone, and **jumping to boxes and arrows** before anyone has agreed on what the system is.
 Three to five questions, a restated scope, then draw.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The interviewer says 'design a photo-sharing app' and goes quiet. What is the strongest opening move?",
+  "options": [
+    {
+      "label": "Start drawing the load balancer and services so the whiteboard fills early",
+      "feedback": "Tempting, because momentum feels like progress. But you are now designing an unagreed system: this is the jumping-to-boxes failure mode the lesson names."
+    },
+    {
+      "label": "Ask a dozen clarifying questions until every requirement is pinned down",
+      "feedback": "Half right: clarifying matters, but interrogation burns the clock. The lesson's bar is three to five questions, not a checklist recital."
+    },
+    {
+      "label": "Propose scoped assumptions out loud (users, scale, read/write mix), get a nod, restate, then draw",
+      "correct": true,
+      "feedback": "Right. Proposing assumptions instead of open-ended asking is faster and signals seniority, and the restated scope becomes your shared contract."
+    }
+  ],
+  "reveal": "In your design write below, open exactly this way: propose the scale and consistency assumptions, restate the scope in one sentence, and only then name components."
+}
+\`\`\`
 `.trim()
 
 const functionalRequirementsTeach = `
