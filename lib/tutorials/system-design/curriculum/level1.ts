@@ -2166,6 +2166,45 @@ Apigee, and Envoy-plus-control-plane are typical. The value is that a request is
 rate-limited, and validated once at the door, so internal services can trust it and stay focused on
 business logic.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Your gateway authenticates every request before it reaches a service. A teammate now wants to move more logic to the edge since everything flows through it anyway. Sort each concern into where it belongs.",
+  "buckets": [
+    "Gateway work",
+    "Service work"
+  ],
+  "items": [
+    {
+      "label": "Validate the JWT and reject anonymous calls",
+      "bucket": "Gateway work",
+      "feedback": "Token validation is cross-cutting and request-shaped: every request needs the identical treatment, so do it once at the door."
+    },
+    {
+      "label": "Decide whether this user may edit this specific document",
+      "bucket": "Service work",
+      "feedback": "Tempting to bundle with auth at the edge, but fine-grained authorization needs domain data (owners, roles, sharing state) that the gateway should not own."
+    },
+    {
+      "label": "Enforce per-API-key rate limits",
+      "bucket": "Gateway work",
+      "feedback": "Quota enforcement is generic edge policy with the same shape for every service behind it."
+    },
+    {
+      "label": "Apply pricing and discount rules to an order",
+      "bucket": "Service work",
+      "feedback": "Pricing is pure business logic. Parking it at the gateway is the first step toward a gateway that every team must coordinate on."
+    },
+    {
+      "label": "Check that an order total matches its line items",
+      "bucket": "Service work",
+      "feedback": "Domain validation depends on business meaning, not request shape, so it lives in the owning service."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** The classic follow-up is "what belongs at the gateway versus in the service."
 The line: put *cross-cutting, request-shaped* concerns at the gateway (authn, coarse authz, rate
 limits, TLS, routing, WAF). Keep *business* concerns in the service (domain validation, fine-grained
@@ -2208,6 +2247,30 @@ Internet
 Recap: Push TLS, authn, rate limiting, and routing to a thin API gateway (north-south), handle
 service-to-service mTLS and retries in a mesh (east-west), use BFFs to shape per-client payloads,
 front it all with a WAF, and never let the gateway swell into a business-logic monolith.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate proposes adding discount pricing rules to the API gateway, arguing that every request already flows through it, so it is the natural home. If the team keeps saying yes to ideas like this, where does the architecture end up?",
+  "options": [
+    {
+      "label": "A well-organized shared layer, since the gateway exists to hold shared logic",
+      "feedback": "Tempting, the gateway does hold shared concerns, but only cross-cutting, request-shaped ones like TLS, authn, and rate limits. Business rules are not request-shaped."
+    },
+    {
+      "label": "A distributed monolith: one bottleneck every team must coordinate on and all traffic squeezes through",
+      "correct": true,
+      "feedback": "Right. Each business rule at the gateway couples another team to its release cycle and widens the blast radius of every gateway deploy. Keep it thin and generic; push domain logic into services."
+    },
+    {
+      "label": "No harm, the service mesh will absorb the extra logic",
+      "feedback": "The mesh handles east-west plumbing like mTLS, retries, and timeouts between services. It is not a home for business rules either."
+    }
+  ],
+  "reveal": "The edge tier in one line: WAF and DDoS filtering out front, a thin gateway doing TLS, authn, rate limiting, and routing (north-south), a mesh for service-to-service mTLS and retries (east-west), BFFs shaping per-client payloads, and all business logic down in the services. That layering is exactly what the design exercise asks you to draw and defend."
+}
+\`\`\`
 `.trim()
 
 const cdnCachingFoundationsTeach = `
