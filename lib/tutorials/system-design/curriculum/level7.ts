@@ -708,6 +708,41 @@ For **active-active** multi-region (both regions take writes), you now have two 
 - **Conflict resolution**: allow writes anywhere and reconcile. Last-writer-wins (simple, silently drops one update), vector clocks (detect conflicts, push resolution to the app), or **CRDTs** (conflict-free replicated data types that merge deterministically, great for counters/sets/carts, not for everything).
 - **Globally consistent stores** like Spanner or CockroachDB use synchronized clocks (TrueTime) and consensus to give strong consistency across regions, paying the latency, so you do not hand-roll conflict logic.
 
+\`\`\`cswidget
+{
+  "type": "partition-sim",
+  "title": "Active-active regions: one record, two writers",
+  "predictPrompt": {
+    "question": "The WAN link between us-east and eu-west is cut, and both regions accept a write to the same contact-email record. When the link heals and last-writer-wins reconciles, what does the record hold?",
+    "options": [
+      "Both updates, kept side by side as siblings",
+      "Only the update with the later timestamp; the other is silently dropped",
+      "Neither update; both regions roll back to the pre-partition value",
+      "The regions stall until an operator merges the two by hand"
+    ]
+  },
+  "workedExample": "Cut the link and you have a WAN partition between two active-active regions. Pick CP and one side must stop taking writes, which is what single-writer-region gives you: no conflict, but writes to a non-local record stall or forward. Pick AP and both regions keep accepting writes locally with async replication, so fire the writes: us-east sets the record one way, eu-west sets it another, and the two copies diverge. On heal, replication finally ships both versions and the store must reconcile. Last-writer-wins is the simple option and it does exactly what the lesson warns: it keeps whichever write carries the later timestamp and silently drops the other region's update. Switch to version vectors and the store instead detects that neither write saw the other, surfaces both as conflicting siblings, and pushes the resolution to the app. Neither choice is free consistency; that is the whole active-active problem.",
+  "kind": "register",
+  "writes": [
+    {
+      "side": "A",
+      "value": "ana@newmail.com",
+      "label": "us-east: a support agent updates the contact email"
+    },
+    {
+      "side": "B",
+      "value": "ana.k@corp.com",
+      "label": "eu-west: the customer updates the same contact email"
+    }
+  ],
+  "strategies": [
+    "lww",
+    "version-vector"
+  ],
+  "caption": "Two regions accepting writes to the same data is the whole problem: avoid conflicts with single-writer-region, resolve them (LWW silently drops one update, version vectors detect and push resolution to the app, CRDTs merge), or pay a Spanner-class store's latency."
+}
+\`\`\`
+
 Traffic steering sits on top: **GeoDNS** (route by client location, but DNS TTL caching makes failover slow), a **global load balancer / anycast** (AWS Global Accelerator, Cloudflare) that health-checks regions and shifts traffic in seconds. Health-based failover moves traffic off a dead region automatically.
 
 **Interview nuance:** two things separate strong answers. First, **cell-based and shuffle-sharding** thinking applies here: an active-active pair still shares a blast radius if a bad config or poison request replicates to both, so regions should fail independently and you must **test region evacuation** (actually drain a region) rather than assume it works. Second, do not claim multi-region gives strong consistency for free. It does not. You either pay cross-region latency (sync/Spanner) or accept eventual consistency and design conflict resolution. Saying "we go multi-region active-active and everything is consistent and fast" is the wrong turn interviewers wait for.
