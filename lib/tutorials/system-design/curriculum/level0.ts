@@ -42,11 +42,73 @@ Three facts change the architecture more than anything else you will ask:
 
 You are not gathering trivia. Each answer eliminates whole branches of the design tree.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You get three to five questions for 'Design Twitter'. Sort these candidates: which answers eliminate whole branches of the design tree, and which just burn the clock?",
+  "buckets": [
+    "Eliminates design branches",
+    "Burns the clock"
+  ],
+  "items": [
+    {
+      "label": "Roughly how many daily active users are we designing for?",
+      "bucket": "Eliminates design branches",
+      "feedback": "Scale decides one database versus a sharded fleet. Whole branches fall away with one answer."
+    },
+    {
+      "label": "Is the workload read-heavy or write-heavy?",
+      "bucket": "Eliminates design branches",
+      "feedback": "The read/write mix decides whether you reach for caches and fan-out or for write batching. Few answers move the design more."
+    },
+    {
+      "label": "Which cloud provider does the company prefer?",
+      "bucket": "Burns the clock",
+      "feedback": "Tempting because it sounds practical, but the architecture has the same shape on any provider. Nothing is eliminated."
+    },
+    {
+      "label": "Should search and ads be out of scope?",
+      "bucket": "Eliminates design branches",
+      "feedback": "Naming what you are not building is how you protect the time budget. A yes here shrinks the problem to something finishable."
+    },
+    {
+      "label": "What language will the services be written in?",
+      "bucket": "Burns the clock",
+      "feedback": "Feels like an engineering question, but no design branch in this round depends on the implementation language."
+    }
+  ]
+}
+\`\`\`
+
 ### 3. Restate, then commit
 
 Play the interviewer back their own problem in one sentence ("So: a home-timeline service for tens of
 millions of daily users, read-heavy, eventual consistency is fine for the feed"). If they agree, you
 have a shared contract and you move. If they correct you, you just avoided designing the wrong system.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You ask 'How many users should I design for?' and the interviewer shrugs: 'You tell me.' What is the strongest response?",
+  "options": [
+    {
+      "label": "Ask a narrower follow-up, like whether it is more or less than a million users",
+      "feedback": "Tempting, a narrower question feels safer. But you are still waiting for the oracle to hand you an answer, and the clock keeps running."
+    },
+    {
+      "label": "Propose a number out loud: 'I will assume 100 million DAU and a 100:1 read to write ratio, is that reasonable?'",
+      "correct": true,
+      "feedback": "Right. Treat the interviewer as a collaborator: a proposed assumption gets a yes or a correction in seconds, and either way it signals seniority."
+    },
+    {
+      "label": "Skip scale for now and start on the data model; you can size things later",
+      "feedback": "Tempting because it feels like progress, but scale decides one database versus a sharded fleet. Sizing later can mean redesigning later."
+    }
+  ]
+}
+\`\`\`
 
 ### The mindset that makes this work
 
