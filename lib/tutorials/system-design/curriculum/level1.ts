@@ -1318,6 +1318,45 @@ changing default behavior: breaking. If you design for additive change and your 
 readers (they ignore unknown fields and do not assume the response is exhaustive), the large majority
 of your evolution costs zero version bumps.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Your public API is at /v1 and your clients are tolerant readers. Sort each proposed change.",
+  "buckets": [
+    "Needs a /v2",
+    "Additive, no bump"
+  ],
+  "items": [
+    {
+      "label": "Add an optional 'gift_message' field to orders",
+      "bucket": "Additive, no bump",
+      "feedback": "Tolerant readers ignore unknown fields, so optional additions are the bread and butter of bump-free evolution."
+    },
+    {
+      "label": "Rename 'created' to 'created_at'",
+      "bucket": "Needs a /v2",
+      "feedback": "A rename removes the old name, so every client reading 'created' breaks. Better still: add the new field alongside and deprecate the old one, avoiding the bump entirely."
+    },
+    {
+      "label": "Add a new refunds endpoint",
+      "bucket": "Additive, no bump",
+      "feedback": "New endpoints cannot break clients that never call them."
+    },
+    {
+      "label": "Tighten validation to reject addresses you previously accepted",
+      "bucket": "Needs a /v2",
+      "feedback": "Tempting to treat as a bug fix, but requests that used to succeed now fail. Changing behavior under existing integrations is a true break."
+    },
+    {
+      "label": "Add a new value to the status enum",
+      "bucket": "Additive, no bump",
+      "feedback": "Safe only because your clients handle unknown enum values as tolerant readers. If they switch exhaustively on the enum, this one bites, so state the assumption."
+    }
+  ]
+}
+\`\`\`
+
 ### When you genuinely must break
 
 - **URL-path versioning** (\`/v1/orders\`, \`/v2/orders\`). Visible, trivial to route, trivial to
@@ -1350,6 +1389,30 @@ sequence. Jumping straight to "put v1 in the URL" misses that versioning is a la
 Recap: prefer additive change with tolerant readers so you rarely version, use visible /v1 path
 versioning for true public breaks, and retire old versions with a deprecate then warn then remove
 sequence.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You genuinely must break the public orders API. Which rollout avoids the angry-customer incident?",
+  "options": [
+    {
+      "label": "Announce a date, then hard-cut the existing endpoint to the new behavior",
+      "feedback": "Tempting because it is simple, but announcements get missed, and a cutover with no telemetry gate is exactly how the incident happens."
+    },
+    {
+      "label": "Ship /v2, deprecate /v1, warn with 'Deprecation' and 'Sunset' headers plus emails to top callers, and remove only after telemetry shows traffic drained",
+      "correct": true,
+      "feedback": "Right. Deprecate, warn, remove, with telemetry as the gate. The old version dies when the data says nobody needs it, not when the calendar says so."
+    },
+    {
+      "label": "Keep both versions forever so nothing ever breaks",
+      "feedback": "Every live version multiplies test, support, and security surface. Versions need a retirement path or they accumulate without bound."
+    }
+  ],
+  "reveal": "For the design exercise, lead with the posture: most changes should be additive and bump-free with tolerant readers on both sides, /v2 is a last resort for true breaks, and retirement is a sequenced deprecate, warn, remove migration."
+}
+\`\`\`
 `.trim()
 
 const idempotencyRetriesTeach = `
