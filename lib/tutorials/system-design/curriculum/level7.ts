@@ -30,6 +30,64 @@ Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthl
 
 **Serial dependencies multiply.** If your checkout calls auth, inventory, and payments in series and each is 99.9% available, your ceiling is 0.999^3 = 99.7%, worse than any single component. More hops means a lower ceiling. You cannot be more available than the product of everything you synchronously depend on.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Serial chain availability",
+  "predictPrompt": {
+    "question": "Your checkout calls 3 dependencies in series, each 99.9% available. How much monthly downtime does the chain allow compared to the ~44 minutes a single 99.9% component gets?",
+    "options": [
+      "Still about 44 minutes",
+      "About double",
+      "About triple, over 2 hours",
+      "More than a full day"
+    ]
+  },
+  "workedExample": "At the initial values, 3 serial components at 99.9% each give a chain availability of about 99.7%, which allows roughly 131 minutes of downtime in an average month instead of the 43.8 minutes one component gets on its own. Slide the component count up to 10 hops to watch the ceiling sink, then push per-component availability to 99.99% and see the chain recover.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "a",
+      "label": "Per-component availability",
+      "min": 0.99,
+      "max": 0.99999,
+      "scale": "linear",
+      "step": 1e-05,
+      "initial": 0.999
+    },
+    {
+      "kind": "slider",
+      "id": "n",
+      "label": "Serial components",
+      "min": 1,
+      "max": 20,
+      "scale": "linear",
+      "step": 1,
+      "initial": 3
+    }
+  ],
+  "outputs": [
+    {
+      "id": "chain_availability",
+      "label": "Chain availability",
+      "expr": "a ^ n",
+      "format": "percent",
+      "sparkline": {
+        "over": "n"
+      }
+    },
+    {
+      "id": "budget_minutes",
+      "label": "Monthly error budget",
+      "expr": "(1 - (a ^ n)) * 43800",
+      "format": "number",
+      "unit": "min"
+    }
+  ],
+  "caption": "Serial dependencies multiply: the chain can never be more available than the product of its hops."
+}
+\`\`\`
+
 **Redundancy adds availability.** Two independent replicas of a 99% component, where either can serve, fail only when both fail: 1 - (1 - 0.99)^2 = 99.99%. Parallel combines as 1 - (1 - a)^n. This is why the fix for a shaky dependency is often a second independent copy, not a more reliable single copy.
 
 ## Interview nuance: three different numbers
