@@ -2063,6 +2063,29 @@ draining**: the LB stops sending new requests to a node, waits for existing ones
 timeout), then removes it. Pair that with graceful shutdown in the app (stop accepting, finish work,
 exit).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You keep login sessions in each app server's memory and enable sticky sessions so the LB pins every user to one node. That node dies. What happens to its pinned users?",
+  "options": [
+    {
+      "label": "The LB re-pins them to a healthy node and they continue seamlessly",
+      "feedback": "The LB does re-route their traffic, but the sessions lived only in the dead node's memory. Re-pinning cannot recover state that no longer exists."
+    },
+    {
+      "label": "They are all logged out and lose their in-flight state",
+      "correct": true,
+      "feedback": "Right. Stickiness let state hide on one machine, so that machine's death takes every pinned user down with it. Stateless services with sessions in Redis let any node serve any user."
+    },
+    {
+      "label": "Nothing visible, health checks catch the node before users notice",
+      "feedback": "Tempting, health checks do pull the node from rotation quickly, but they only stop new traffic. They cannot resurrect session data that died with the node."
+    }
+  ]
+}
+\`\`\`
+
 Two traps. First, prefer **stateless** services so any node can serve any request; sticky sessions
 (pinning a user to one node) are a crutch that breaks when that node dies and complicates deploys.
 Push session state to Redis instead. Second, the load balancer itself is a **single point of
@@ -2081,6 +2104,41 @@ active-active pairs, or an anycast VIP fronting multiple LBs, with health-checke
 Recap: Pick L4 for raw speed or L7 for HTTP-aware routing and TLS, use least-connections when
 durations vary, combine active and passive health checks with connection draining, keep services
 stateless, and never leave the LB itself un-replicated.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are picking the balancer tier for a new system. Sort each requirement by the layer it forces you toward.",
+  "buckets": [
+    "L4 load balancer",
+    "L7 load balancer"
+  ],
+  "items": [
+    {
+      "label": "Terminate TLS at the edge and route '/api' and '/images' to different pools",
+      "bucket": "L7 load balancer",
+      "feedback": "Path routing and TLS termination require reading the HTTP request, which only L7 does."
+    },
+    {
+      "label": "Raw packet throughput for a non-HTTP game protocol",
+      "bucket": "L4 load balancer",
+      "feedback": "L4 forwards TCP/UDP without parsing anything, so it is the fast, cheap, content-blind choice, and the only one that handles non-HTTP traffic."
+    },
+    {
+      "label": "Transparently retry a failed request and inject a tracing header",
+      "bucket": "L7 load balancer",
+      "feedback": "Per-request features mean the balancer must understand and buffer requests, which is L7 work that costs CPU per request."
+    },
+    {
+      "label": "Pass TLS straight through so the backend does the handshake and the balancer never sees plaintext",
+      "bucket": "L4 load balancer",
+      "feedback": "Tempting to call TLS an L7 topic, but passthrough is the L4 mode: the encrypted stream flows to the backend untouched."
+    }
+  ],
+  "reveal": "Layer choice is the first decision in the design exercise. After it: least-connections when request durations vary, active plus passive health checks with connection draining on deploys, stateless nodes with session state in Redis, and a redundant balancer tier, because one LB in front of ten servers just moves the single point of failure up a layer."
+}
+\`\`\`
 `.trim()
 
 const reverseProxyGatewayTeach = `
