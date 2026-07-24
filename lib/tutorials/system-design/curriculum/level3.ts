@@ -433,6 +433,146 @@ Two patterns make sagas safe under real-world **at-least-once** delivery:
   publishes to Kafka, marking rows sent. Now the DB write and the intent-to-publish are atomic, and
   the relay retries publishing idempotently. This is how you drive a saga's next step reliably.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Cross-shard transfer: saga + outbox",
+  "actors": [
+    {
+      "id": "svc",
+      "label": "Transfer service"
+    },
+    {
+      "id": "shardA",
+      "label": "Shard A (account A)"
+    },
+    {
+      "id": "shardB",
+      "label": "Shard B (account B)"
+    },
+    {
+      "id": "relay",
+      "label": "Outbox relay"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "crashBetween",
+      "label": "Crash after debit",
+      "description": "the service dies after shard A commits and before shard B is credited"
+    }
+  ],
+  "steps": [
+    {
+      "from": "svc",
+      "to": "shardA",
+      "kind": "request",
+      "label": "debit A + outbox row (1 txn)"
+    },
+    {
+      "from": "shardA",
+      "to": "svc",
+      "kind": "response",
+      "label": "debit committed",
+      "state": {
+        "a": "done",
+        "b": "pending"
+      }
+    },
+    {
+      "from": "svc",
+      "to": "shardB",
+      "kind": "request",
+      "label": "credit B (idempotency key)",
+      "when": "!crashBetween"
+    },
+    {
+      "from": "shardB",
+      "to": "svc",
+      "kind": "response",
+      "label": "credit committed",
+      "when": "!crashBetween",
+      "state": {
+        "a": "done",
+        "b": "done"
+      }
+    },
+    {
+      "from": "svc",
+      "kind": "note",
+      "label": "transfer COMPLETED",
+      "when": "!crashBetween"
+    },
+    {
+      "from": "svc",
+      "kind": "note",
+      "label": "service crashes",
+      "status": "error",
+      "when": "crashBetween",
+      "state": {
+        "a": "done",
+        "b": "missing"
+      }
+    },
+    {
+      "from": "svc",
+      "to": "shardB",
+      "kind": "event",
+      "label": "credit B never sent",
+      "status": "lost",
+      "when": "crashBetween"
+    },
+    {
+      "from": "relay",
+      "to": "shardA",
+      "kind": "request",
+      "label": "poll outbox table",
+      "when": "crashBetween",
+      "predict": {
+        "question": "Shard A shows the debit, shard B was never told, and the service is dead. What saves the transfer?",
+        "options": [
+          "Nothing: the credit intent died with the service",
+          "Shard A rolls back the debit on its own after a timeout",
+          "The outbox row committed with the debit, so a relay replays the credit event"
+        ]
+      }
+    },
+    {
+      "from": "shardA",
+      "to": "relay",
+      "kind": "response",
+      "label": "credit-B event pending",
+      "when": "crashBetween"
+    },
+    {
+      "from": "relay",
+      "to": "shardB",
+      "kind": "request",
+      "label": "replay credit B (same key)",
+      "when": "crashBetween"
+    },
+    {
+      "from": "shardB",
+      "to": "relay",
+      "kind": "response",
+      "label": "committed, key recorded",
+      "when": "crashBetween",
+      "state": {
+        "a": "done",
+        "b": "done"
+      }
+    },
+    {
+      "from": "relay",
+      "kind": "note",
+      "label": "at-least-once made safe",
+      "when": "crashBetween"
+    }
+  ],
+  "caption": "The debit and its outbox row commit in one local transaction on shard A, so even when the service dies before crediting B, the relay replays the credit and the idempotency key makes the retry safe."
+}
+\`\`\`
+
 **Interview nuance:** the failure mode interviewers hunt for is hand-waving cross-shard joins and
 multi-key writes as if they were free. When the design crosses shards, say it: "this is now a
 distributed transaction; I will use a saga with compensations and idempotency keys, not 2PC on the
