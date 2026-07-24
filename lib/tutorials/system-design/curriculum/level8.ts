@@ -1503,6 +1503,95 @@ The old model was a hard perimeter with a soft interior: get past the VPN/firewa
 
 Concretely for microservices: give every workload a cryptographic **identity** (**SPIFFE/SPIRE**, or cloud IAM roles), and enforce **mTLS** for all service-to-service calls via a **service mesh** (Istio, Linkerd, Consul) so both sides prove who they are and traffic is encrypted and its identity is verified. Replace the VPN with an **identity-aware proxy** (BeyondCorp-style, or Cloudflare Access / Google IAP) that authenticates the user and device on every request to internal apps. Add **micro-segmentation**: default-deny network policy so service A can reach only the specific services it needs, not the whole subnet.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Zero-trust redesign: verify every hop, contain the blast radius",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "laptop",
+      "label": "Phished laptop",
+      "kind": "client"
+    },
+    {
+      "id": "iap",
+      "label": "Identity-aware proxy",
+      "kind": "lb"
+    },
+    {
+      "id": "svc_a",
+      "label": "Service A",
+      "kind": "service"
+    },
+    {
+      "id": "svc_b",
+      "label": "Service B",
+      "kind": "service"
+    },
+    {
+      "id": "payments_db",
+      "label": "Payments DB",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "laptop",
+      "to": "iap",
+      "kind": "sync",
+      "label": "user + device verified per request"
+    },
+    {
+      "from": "iap",
+      "to": "svc_a",
+      "kind": "sync",
+      "label": "authorized request"
+    },
+    {
+      "from": "svc_a",
+      "to": "svc_b",
+      "kind": "sync",
+      "label": "mTLS + workload identity"
+    },
+    {
+      "from": "svc_b",
+      "to": "payments_db",
+      "kind": "sync",
+      "label": "only allowed path (default-deny)"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "laptop"
+      ],
+      "note": "Start with the perimeter model's failure: one phished laptop behind the VPN was implicitly trusted, so lateral movement reached the whole flat network."
+    },
+    {
+      "adds": [
+        "iap"
+      ],
+      "note": "Never trust, always verify: an identity-aware proxy (BeyondCorp-style, Cloudflare Access or Google IAP) replaces the VPN and authenticates the user and device on every request. No privileged network location."
+    },
+    {
+      "adds": [
+        "svc_a",
+        "svc_b"
+      ],
+      "note": "Every workload gets a cryptographic identity (SPIFFE/SPIRE) and all east-west calls run over mTLS via the service mesh, so both sides prove who they are on every hop."
+    },
+    {
+      "adds": [
+        "payments_db"
+      ],
+      "note": "Micro-segmentation: default-deny policy means Service B alone reaches the payments database. A compromised Service A holds a narrow identity and every call it tries is authenticated and logged, so lateral movement is slow, loud, and bounded."
+    }
+  ],
+  "caption": "In the old flat network the phished laptop reached everything; here every hop re-verifies identity, so the blast radius stays contained."
+}
+\`\`\`
+
 The payoff is **blast-radius containment**. If one service is compromised, it holds a narrowly scoped identity, can reach only its explicit dependencies, and every call it tries is authenticated and logged, so lateral movement is slow, loud, and bounded instead of instant and silent.
 
 **Interview nuance:** the classic wrong turn is **bolting security on at the end** ("we will add auth before launch"). Threat modeling is valuable precisely because it is done at design time, when changing a trust boundary is a diagram edit rather than a rewrite. And the classic zero-trust misconception is that it is a product you buy; it is an architecture principle (verify every request, no implicit network trust) that mTLS, identity-aware proxies, and micro-segmentation implement.
