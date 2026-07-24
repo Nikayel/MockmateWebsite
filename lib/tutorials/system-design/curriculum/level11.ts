@@ -361,6 +361,34 @@ Producers write events to a partitioned, replayable log: Kafka or Kinesis. Parti
 
 A stream processor (Flink, or Spark Structured Streaming) consumes partitions and maintains windowed state. Windows come in three shapes: tumbling (fixed, non-overlapping, for per-minute counts), sliding (overlapping, for a trailing 5-minute top-K refreshed every 30s), and session (gap-defined, for user activity). The hard part is time. Event time (when it happened) differs from processing time (when you saw it). A phone offline for 10 minutes floods you with old events. Windows are keyed on event time, and a **watermark** is the engine's assertion that no event older than time T will still arrive. When the watermark passes a window's end, the window closes and emits. Late events past the watermark go to a side output or a small allowed-lateness update, never silently dropped.
 
+\`\`\`cswidget
+{
+  "type": "watermark-sim",
+  "title": "Watermarks Closing Event-Time Windows",
+  "predictPrompt": {
+    "question": "A phone comes back online and floods the pipeline with events whose event times belong to windows the watermark has already passed. What does the engine do with them?",
+    "options": [
+      "Counts them into the currently open window, since that is the only one still accepting events",
+      "Events within the allowed lateness update their closed window; anything later heads for a side output, never a silent drop",
+      "Holds the watermark back until every straggler arrives, so no window ever closes"
+    ]
+  },
+  "workedExample": "Events arrive stamped with when they happened, not when the pipeline saw them, and a seeded slice runs far behind its event time, the offline-phone flood from the lesson. Tumbling windows key on event time, and each closes the instant the watermark, which trails the newest event time seen by a set delay, crosses its end. At the initial allowed-lateness setting a few stragglers still update their already-closed window. Slide the lateness to zero and those events fall past the window toward side-output territory; slide it up and completeness improves while per-minute results take longer to finalize. That slider is the latency-versus-completeness trade at the heart of every streaming pipeline.",
+  "seed": "firehose-offline-phone",
+  "count": 90,
+  "horizon": 160,
+  "skew": 14,
+  "windowSize": 12,
+  "watermarkDelay": 6,
+  "allowedLateness": 5,
+  "maxLateness": 30,
+  "modes": [
+    "event-time"
+  ],
+  "caption": "The watermark asserts no older events remain; allowed lateness trades how fast a count finalizes against how complete it is."
+}
+\`\`\`
+
 **Delivery semantics.** At-least-once is cheap but double-counts on retry. Exactly-once needs the processor to checkpoint state and offsets atomically (Flink's distributed checkpoints) and sinks to be idempotent or transactional. For counts, exactly-once matters; for a fuzzy trending list, at-least-once with idempotent upserts is often enough.
 
 ## Approximate structures, the core insight
