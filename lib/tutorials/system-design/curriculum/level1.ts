@@ -2053,6 +2053,169 @@ naturally avoids piling long requests onto one node. **Weighted** variants let a
 traffic. **Consistent hashing** pins a given key (user id, cache key) to the same backend so you get
 cache affinity with minimal reshuffling when the pool changes.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Round robin vs least connections",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "lb",
+      "label": "Load balancer"
+    },
+    {
+      "id": "s1",
+      "label": "Server 1"
+    },
+    {
+      "id": "s2",
+      "label": "Server 2"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "leastConn",
+      "label": "Least connections",
+      "description": "Send each new request to the server with the fewest in-flight connections instead of rotating round robin."
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "lb",
+      "label": "request A (a 2 s search)",
+      "kind": "request",
+      "status": "ok"
+    },
+    {
+      "from": "lb",
+      "to": "s1",
+      "label": "send A to server 1",
+      "kind": "request",
+      "status": "ok",
+      "state": {
+        "s1 in-flight": "1",
+        "s2 in-flight": "0"
+      }
+    },
+    {
+      "from": "client",
+      "to": "lb",
+      "label": "request B (a 2 ms read)",
+      "kind": "request",
+      "status": "ok"
+    },
+    {
+      "from": "lb",
+      "to": "s2",
+      "label": "next in rotation: server 2",
+      "kind": "request",
+      "status": "ok",
+      "state": {
+        "s1 in-flight": "1",
+        "s2 in-flight": "1"
+      }
+    },
+    {
+      "from": "s2",
+      "to": "lb",
+      "label": "B done in 2 ms",
+      "kind": "response",
+      "status": "ok",
+      "state": {
+        "s1 in-flight": "1",
+        "s2 in-flight": "0"
+      }
+    },
+    {
+      "from": "client",
+      "to": "lb",
+      "label": "request C arrives",
+      "kind": "request",
+      "status": "ok",
+      "predict": {
+        "question": "Server 1 is still mid-search with A. Which server gets request C?",
+        "options": [
+          "Server 1: round robin says it is next in rotation",
+          "Server 2: least connections sees it is idle"
+        ]
+      }
+    },
+    {
+      "from": "lb",
+      "to": "s1",
+      "label": "rotation says server 1 again",
+      "kind": "request",
+      "status": "ok",
+      "when": "!leastConn",
+      "state": {
+        "s1 in-flight": "2",
+        "s2 in-flight": "0"
+      }
+    },
+    {
+      "from": "s1",
+      "to": "lb",
+      "label": "A finally done after 2 s",
+      "kind": "response",
+      "status": "late",
+      "when": "!leastConn",
+      "state": {
+        "s1 in-flight": "1",
+        "s2 in-flight": "0"
+      }
+    },
+    {
+      "from": "s1",
+      "to": "lb",
+      "label": "C late: queued behind A",
+      "kind": "response",
+      "status": "late",
+      "when": "!leastConn",
+      "state": {
+        "s1 in-flight": "0",
+        "s2 in-flight": "0"
+      }
+    },
+    {
+      "from": "lb",
+      "to": "s2",
+      "label": "fewest in-flight: server 2",
+      "kind": "request",
+      "status": "ok",
+      "when": "leastConn",
+      "state": {
+        "s1 in-flight": "1",
+        "s2 in-flight": "1"
+      }
+    },
+    {
+      "from": "s2",
+      "to": "lb",
+      "label": "C done in 2 ms",
+      "kind": "response",
+      "status": "ok",
+      "when": "leastConn",
+      "state": {
+        "s1 in-flight": "1",
+        "s2 in-flight": "0"
+      }
+    },
+    {
+      "from": "lb",
+      "label": "long A never piled onto C",
+      "kind": "note",
+      "status": "ok",
+      "when": "leastConn"
+    }
+  ],
+  "caption": "Round robin rotates evenly, so a node still busy with a 2 s search gets its turn anyway and fast requests queue behind it. Least connections tracks in-flight work and steers request C to the idle server 2."
+}
+\`\`\`
+
 ### Failure detection and draining
 
 **Active health checks** have the LB probe each backend on a schedule (\`GET /healthz\` every few
