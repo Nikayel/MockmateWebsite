@@ -276,6 +276,128 @@ The four roles: the resource owner (the user), the client (the app requesting ac
 - The Resource Owner Password Credentials grant (app collects the user's password) is removed. It defeats the entire point of delegation.
 - Exact redirect-URI string matching is required, closing open-redirect and token-theft holes.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Authorization Code + PKCE",
+  "actors": [
+    {
+      "id": "browser",
+      "label": "Browser"
+    },
+    {
+      "id": "app",
+      "label": "App (SPA)"
+    },
+    {
+      "id": "as",
+      "label": "Auth Server (AS)"
+    },
+    {
+      "id": "api",
+      "label": "Resource API"
+    },
+    {
+      "id": "attacker",
+      "label": "Attacker"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "stolenCode",
+      "label": "Attacker steals the code",
+      "description": "An attacker intercepts the authorization code from the redirect and replays it at the token endpoint."
+    }
+  ],
+  "steps": [
+    {
+      "from": "app",
+      "to": "browser",
+      "kind": "event",
+      "label": "Redirect to auth server"
+    },
+    {
+      "from": "browser",
+      "to": "as",
+      "kind": "request",
+      "label": "Authorize + 'code_challenge'"
+    },
+    {
+      "from": "browser",
+      "to": "as",
+      "kind": "event",
+      "label": "User logs in and consents"
+    },
+    {
+      "from": "as",
+      "to": "browser",
+      "kind": "response",
+      "label": "Code via exact redirect_uri"
+    },
+    {
+      "from": "attacker",
+      "kind": "note",
+      "label": "Snoops code off the wire",
+      "when": "stolenCode"
+    },
+    {
+      "from": "browser",
+      "to": "app",
+      "kind": "event",
+      "label": "Redirect delivers the code"
+    },
+    {
+      "from": "app",
+      "to": "as",
+      "kind": "request",
+      "label": "POST code + 'code_verifier'"
+    },
+    {
+      "from": "as",
+      "to": "app",
+      "kind": "response",
+      "label": "'access_token' + 'id_token'"
+    },
+    {
+      "from": "attacker",
+      "to": "as",
+      "kind": "request",
+      "label": "POST stolen code, no verifier",
+      "when": "stolenCode",
+      "predict": {
+        "question": "The attacker replays the intercepted code at the token endpoint. What does the AS do?",
+        "options": [
+          "Issues tokens: holding the code is enough",
+          "Rejects it: no 'code_verifier' matches the 'code_challenge'",
+          "Asks the user to log in and consent again"
+        ]
+      }
+    },
+    {
+      "from": "as",
+      "to": "attacker",
+      "kind": "response",
+      "label": "Error: no 'code_verifier'",
+      "status": "error",
+      "when": "stolenCode"
+    },
+    {
+      "from": "app",
+      "to": "api",
+      "kind": "request",
+      "label": "API call with access token"
+    },
+    {
+      "from": "api",
+      "to": "app",
+      "kind": "response",
+      "label": "200, scoped data"
+    }
+  ],
+  "caption": "PKCE binds the code to the client: the 'code_verifier' never crossed the wire, so an intercepted code is useless. Toggle the theft to watch the exchange fail."
+}
+\`\`\`
+
 ## Grant selection, the thing you must get right
 
 - Web apps, single-page apps, and mobile/native apps: Authorization Code + PKCE. SPAs and mobile are public clients (they cannot hold a secret), so PKCE is what protects them.
