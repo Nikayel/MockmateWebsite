@@ -240,6 +240,26 @@ decide the trade:
   accepted. With RF=3 and \`min.insync.replicas=2\`, a write needs the leader plus one follower, so
   you survive one broker loss with zero acknowledged-message loss and still accept writes.
 
+\`\`\`cswidget
+{
+  "type": "quorum",
+  "title": "Kafka durability: acks=all over the ISR",
+  "predictPrompt": {
+    "question": "acks=all with min.insync.replicas=1: followers have dropped out of the ISR, the leader alone acknowledges a write, and that broker dies right after the ack. Is the write safe?",
+    "options": [
+      "Yes, acks=all always waits for every replica",
+      "No, the ISR had shrunk to just the leader, so the ack meant one copy and it is gone",
+      "Yes, the followers replay it from the leader when it restarts"
+    ]
+  },
+  "workedExample": "Start from the configuration on screen: replication factor 3, so one leader and 2 followers, with min.insync.replicas=2. An acks=all write is accepted only while the ISR holds at least 2 members, so every acknowledged record sits on at least 2 of the 3 replicas. Kill one broker and read the outcome: the write survives on the remaining in-sync replica, which is exactly why RF=3 with min.insync.replicas=2 tolerates one broker loss with zero acknowledged-message loss and still accepts writes. Then drop min.insync.replicas to 1 and kill again: the ISR can shrink to just the leader, all ISR means one copy, and the kill read-out shows the acknowledged write lost. Durable is acks=all and min.insync.replicas>=2 and RF>=3, never acks=all alone.",
+  "preset": "kafka",
+  "n": 3,
+  "w": 2,
+  "caption": "RF=3 with min.insync.replicas=2: kill a broker and check whether an acknowledged write survives."
+}
+\`\`\`
+
 **Interview nuance:** \`acks=all\` alone is not durable. If \`min.insync.replicas=1\`, "all ISR" can
 mean "just the leader" after followers drop out, so a leader crash still loses acknowledged writes.
 The durable combination is \`acks=all\` **and** \`min.insync.replicas>=2\` **and** RF>=3.
