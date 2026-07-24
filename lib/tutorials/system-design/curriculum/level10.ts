@@ -527,6 +527,27 @@ A distributed cache is the workhorse that sits in front of your database and abs
 
 The naive approach is \`node = hash(key) % N\`. It works until you add or remove a node, at which point almost every key maps somewhere new and your hit rate collapses to near zero while the whole fleet stampedes the database. Consistent hashing fixes this: map both keys and nodes onto a fixed ring (say a 2^32 space), and a key belongs to the first node clockwise from its hash. Adding a node only steals keys from its immediate neighbor, so only about 1/N of keys move. Raw consistent hashing gives lumpy load because node positions are random, so use virtual nodes: give each physical node 100 to 200 points on the ring. Now load evens out and, when a node dies, its keys spread across many survivors instead of dumping onto one neighbor.
 
+\`\`\`cswidget
+{
+  "type": "hash-ring",
+  "title": "The cache fleet remap, live",
+  "predictPrompt": {
+    "question": "Your 4-node cache fleet loses a node under hash mod N placement. What happens to the hit rate?",
+    "options": [
+      "Dips by roughly that node's share",
+      "Collapses fleet-wide",
+      "Nothing changes"
+    ]
+  },
+  "workedExample": "In mod-N mode, remove a node and read the remap: most keys now live somewhere new, so almost every request misses and the fleet stampedes the database. Switch to the ring and repeat: only about 1/N move. Then turn on virtual nodes and remove a node again to spread the dead node's load across many survivors instead of one neighbor.",
+  "initialNodes": 4,
+  "maxNodes": 7,
+  "keys": 48,
+  "initialMode": "modulo",
+  "vnodeFactor": 16
+}
+\`\`\`
+
 **Interview nuance:** if you say "hash mod N" and do not immediately catch that adding a node reshuffles the world, that is a red flag. Lead with consistent hashing plus virtual nodes.
 
 ## Eviction and caching patterns
