@@ -1703,10 +1703,68 @@ of the fleet; to keep the surviving two AZs at or below target after a zone loss
 more, so \`2/3\` of the fleet still covers 100% of peak. So ~29 becomes ~44 instances (roughly 15 per
 AZ).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A fleet of 30 instances serves peak at a 65% utilization target, spread evenly across 3 AZs, with no extra AZ factor applied. One AZ fails at peak. What happens to the 20 survivors?",
+  "options": [
+    {
+      "label": "They are fine: the 35% headroom absorbs the loss",
+      "feedback": "Tempting, because 35% headroom sounds bigger than a 33% capacity loss. But the math runs the other way: the survivors now carry 3/2 of their old load, so utilization jumps from 65% to about 98%, deep inside the queueing blow-up."
+    },
+    {
+      "label": "Utilization jumps to about 98% and p99 explodes",
+      "correct": true,
+      "feedback": "Right. Work that needed 30 instances at 65% lands on 20, so utilization hits roughly 0.65 x 30 / 20 = 98%. The utilization target buys tail headroom in normal operation; surviving an AZ loss needs its own explicit N+1 factor on top."
+    },
+    {
+      "label": "The load balancer sheds a third of the traffic, so nothing changes",
+      "feedback": "Tempting, but a load balancer routes traffic, it does not create capacity. Unless you deliberately built load shedding, all of peak lands on the surviving two thirds of the fleet."
+    }
+  ]
+}
+\`\`\`
+
 Finally, **peak-to-average ratio** sets autoscaling bounds and the reserved-vs-on-demand mix. Buy
 **reserved/savings-plan** capacity for the always-on baseline (cheapest per hour), **on-demand** for
 the predictable daily peak, and **spot** for burst or batch (cheapest but pre-emptible). You do not
 reserve for peak, because peak is a small fraction of the day.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You have sized the fleet. Now match each slice of capacity to the purchase model that fits it.",
+  "buckets": [
+    "Reserved or savings plan",
+    "On-demand",
+    "Spot"
+  ],
+  "items": [
+    {
+      "label": "The always-on baseline that is still serving at 3am",
+      "bucket": "Reserved or savings plan",
+      "feedback": "It never turns off, so commit to it at the cheapest per-hour rate."
+    },
+    {
+      "label": "The predictable daily peak above the baseline",
+      "bucket": "On-demand",
+      "feedback": "It runs only part of the day, so a full-time commitment would sit idle most hours. On-demand covers exactly the hours it exists."
+    },
+    {
+      "label": "Interruptible nightly batch jobs",
+      "bucket": "Spot",
+      "feedback": "Restartable work tolerates pre-emption, so take the deepest discount."
+    },
+    {
+      "label": "The single busiest traffic hour of the year",
+      "bucket": "On-demand",
+      "feedback": "Tempting to reserve for the scariest number, but a reservation bills every hour of the year while that peak lasts one. You do not reserve for peak; you let autoscaling and on-demand carry it."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the fastest way to sound junior is to divide RPS by "requests per second per
 server" and stop. The fastest way to sound senior is to (1) convert to concurrency with Little's Law,
@@ -1717,6 +1775,30 @@ peak RPS. Interviewers grade the *method*, not the exact number.
 Recap: size with Little's Law (concurrency = RPS x latency), divide by a 50 to 70% utilization target
 because queues blow up near 100%, add N+1 AZ redundancy so losing a zone stays above peak, and split
 the resulting capacity across reserved/on-demand/spot by peak-to-average ratio.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Run the whole chain: 30,000 RPS at peak, each request spends 150ms in the system, one instance holds 300 concurrent requests before its tail degrades, 3 AZs. Which fleet size can you defend?",
+  "options": [
+    {
+      "label": "100 instances: 30000 RPS divided by 300",
+      "feedback": "This mixes a rate with a concurrency limit: 300 is how many requests an instance holds at once, not how many it serves per second. Dividing RPS by a per-server number and stopping is exactly the junior move the lesson warns about."
+    },
+    {
+      "label": "15 instances: 30000 x 0.15 = 4500 in flight, divided by 300",
+      "feedback": "The Little's Law step is right, but this sizes to 100% utilization with zero failover margin. The first burst pushes utilization toward 1 and the 1/(1-rho) blow-up wrecks p99, and an AZ loss is fatal."
+    },
+    {
+      "label": "About 35: 4500 in flight / 300 = 15, then / 0.65 for utilization = 23, then x 1.5 for N+1 across 3 AZs",
+      "correct": true,
+      "feedback": "Right. Concurrency first, then the utilization target with a reason (queues explode near 100%), then the AZ factor so losing a zone still covers peak. That is the defensible chain."
+    }
+  ],
+  "reveal": "In the design exercise, say the chain out loud: RPS x latency = concurrency, divide by per-instance concurrency, divide by a 50 to 70% utilization target, multiply by the N+1 AZ factor, then split the result across reserved, on-demand, and spot using the peak-to-average ratio. Interviewers grade the method, not the exact number."
+}
+\`\`\`
 `.trim()
 
 const cellShuffleShardingTeach = `
