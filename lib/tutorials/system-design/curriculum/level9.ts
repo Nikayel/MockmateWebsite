@@ -759,6 +759,35 @@ The reaction: delete the batch layer. There is **one streaming path**, and the d
 
 **Processing-time** is when your job sees an event; **event-time** is when it actually happened. A phone offline in a tunnel sends events with an event-time from 10 minutes ago. If you window by processing-time you put those events in the wrong bucket and your per-minute counts are wrong. So you window by **event-time**, and a **watermark** is the engine's assertion "I believe I have now seen all events up to time T," which lets it close the window for T and emit results. Late events arriving after the watermark are handled by policy: drop them, or emit an updated result (allowed lateness). Watermarks are the explicit tradeoff between latency (advance aggressively, emit fast, risk dropping late data) and completeness (wait longer, more correct, higher latency).
 
+\`\`\`cswidget
+{
+  "type": "watermark-sim",
+  "title": "Event-time vs processing-time windows",
+  "predictPrompt": {
+    "question": "A phone offline in a tunnel sends events stamped with an event-time from minutes ago. If the job windows by processing-time, where do those late events land?",
+    "options": [
+      "In the bucket for when they actually happened",
+      "In whatever bucket is open when they arrive, inflating it while the true bucket stays undercounted",
+      "Nowhere; the engine rejects timestamps that are too old"
+    ]
+  },
+  "workedExample": "The same stream runs under two clocks. In processing-time mode, an event counts toward whatever window is open when the job sees it, so a delayed burst lands in the wrong bucket: the interval it belongs to is undercounted and the current one is inflated, which is exactly how per-minute counts go wrong. Switch to event-time mode: each event is placed by when it actually happened, and the watermark, trailing the max event time seen, decides when a window is done and can emit. Then work the lateness slider, the explicit watermark tradeoff: advance aggressively and emit fast but risk dropping late data, or allow more lateness for completeness at higher latency.",
+  "seed": "l9-batch-streaming-clocks",
+  "count": 70,
+  "horizon": 140,
+  "skew": 14,
+  "windowSize": 20,
+  "watermarkDelay": 5,
+  "allowedLateness": 10,
+  "maxLateness": 40,
+  "modes": [
+    "event-time",
+    "processing-time"
+  ],
+  "caption": "Processing-time puts late events in the wrong bucket; event-time plus a watermark puts them where they belong, and the lateness bound is the latency-versus-completeness trade."
+}
+\`\`\`
+
 **Delivery semantics.** **At-least-once** can double-count; **exactly-once** requires the engine to coordinate checkpoints with idempotent/transactional sinks. Flink provides exactly-once via distributed checkpointing (Chandy-Lamport) plus two-phase-commit sinks. For a fraud counter or a financial total this matters; for a rough traffic dashboard at-least-once is fine.
 
 ## Streaming-into-lakehouse collapses the two paths
