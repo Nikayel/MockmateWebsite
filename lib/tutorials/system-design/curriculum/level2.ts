@@ -1884,6 +1884,54 @@ table, and a messages table that mirror a relational schema, then discovering yo
 user's conversations without a scan. The strong answer often puts multiple entity types in **one
 table** (single-table design), keyed so each access pattern hits one partition.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "partition key",
+    "sort key",
+    "item type",
+    "access pattern it serves"
+  ],
+  "rows": [
+    [
+      "USER#7",
+      "CONV#2026-07-23T09:14",
+      "conversation pointer",
+      "list user 7's conversations, most recent first: one Query on USER#7, descending"
+    ],
+    [
+      "USER#7",
+      "CONV#2026-07-21T11:02",
+      "conversation pointer",
+      "same slice, next row"
+    ],
+    [
+      "THREAD#123",
+      "MSG#2026-07-23T09:14",
+      "message",
+      "load the last 50 messages: Query THREAD#123, ScanIndexForward=false, Limit=50"
+    ],
+    [
+      "THREAD#123",
+      "MSG#2026-07-23T09:12",
+      "message",
+      "same partition, already sorted by the timestamp in the sort key"
+    ],
+    [
+      "THREAD#123",
+      "MEMBER#USER#7",
+      "participant",
+      "bounded and always read with the thread, so it is embedded in the same partition"
+    ]
+  ],
+  "highlightCols": [
+    "partition key"
+  ],
+  "caption": "Single-table design: three item types in one table, keyed so every access pattern on the list is one contiguous Query slice against one partition, never a scan."
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",
