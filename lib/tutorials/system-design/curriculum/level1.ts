@@ -73,6 +73,125 @@ returns the nameservers for \`.com\` (the TLD), the TLD returns the authoritativ
 record. Caching happens at every hop: the browser caches, the OS caches, the recursive resolver
 caches, each keyed by TTL. That is the whole point and the whole problem.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "DNS resolution: the cold walk vs a cache hit",
+  "actors": [
+    {
+      "id": "stub",
+      "label": "Browser / stub resolver"
+    },
+    {
+      "id": "recursive",
+      "label": "Recursive resolver"
+    },
+    {
+      "id": "root",
+      "label": "Root server"
+    },
+    {
+      "id": "tld",
+      "label": "'.com' TLD server"
+    },
+    {
+      "id": "auth",
+      "label": "Authoritative NS"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "cacheWarm",
+      "label": "Cached answer (TTL live)",
+      "description": "the recursive resolver still holds the record and its TTL has not expired"
+    }
+  ],
+  "steps": [
+    {
+      "from": "stub",
+      "to": "recursive",
+      "label": "A? for 'example.com'",
+      "kind": "request"
+    },
+    {
+      "from": "recursive",
+      "label": "no cached answer, walk it",
+      "kind": "note",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "recursive",
+      "to": "root",
+      "label": "who serves '.com'?",
+      "kind": "request",
+      "when": "!cacheWarm",
+      "predict": {
+        "question": "The recursive resolver has no cached answer. Who does it ask first?",
+        "options": [
+          "The root servers",
+          "The '.com' TLD servers",
+          "example.com's authoritative server"
+        ]
+      }
+    },
+    {
+      "from": "root",
+      "to": "recursive",
+      "label": "'.com' TLD nameservers",
+      "kind": "response",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "recursive",
+      "to": "tld",
+      "label": "NS for 'example.com'?",
+      "kind": "request",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "tld",
+      "to": "recursive",
+      "label": "authoritative nameservers",
+      "kind": "response",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "recursive",
+      "to": "auth",
+      "label": "give me the A record",
+      "kind": "request",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "auth",
+      "to": "recursive",
+      "label": "A record + TTL",
+      "kind": "response",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "recursive",
+      "label": "caches answer, keyed by TTL",
+      "kind": "note",
+      "when": "!cacheWarm"
+    },
+    {
+      "from": "recursive",
+      "label": "cache hit, TTL not expired",
+      "kind": "note",
+      "when": "cacheWarm"
+    },
+    {
+      "from": "recursive",
+      "to": "stub",
+      "label": "A record",
+      "kind": "response"
+    }
+  ],
+  "caption": "Caching happens at every hop and is keyed by TTL: flip the toggle and the whole hierarchy walk disappears. That same caching is why a DNS failover is never instant."
+}
+\`\`\`
+
 Record types you must know: **A** (name to IPv4), **AAAA** (name to IPv6), **CNAME** (alias one name
 to another, cannot exist at the zone apex or alongside other records), **NS** (delegation), and
 provider **ALIAS/ANAME** records, which behave like a CNAME but are legal at the apex
