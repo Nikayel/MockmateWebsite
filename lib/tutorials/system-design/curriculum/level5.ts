@@ -2603,6 +2603,25 @@ purely to survive lies rather than silence.
 
 \`\`\`cswidget
 {
+  "type": "quorum",
+  "title": "3f+1: four generals, how many traitors?",
+  "predictPrompt": {
+    "question": "Four generals must agree to attack or retreat, but a traitor can send contradictory orders to different generals. How many traitors can 4 generals tolerate and still agree?",
+    "options": [
+      "0: a single equivocating traitor can always split them",
+      "1: quorums of 3 out of 4 always share an honest general",
+      "2: loyal generals still hold a simple majority"
+    ]
+  },
+  "workedExample": "Start at n = 4. Solve 3f + 1 <= 4 for f: f = 1, so this cluster survives exactly one traitor. Decisions need a quorum of 2f + 1 = 3 generals, and any two quorums of 3 out of 4 overlap in at least 2 members, so even if the 1 traitor sits in the overlap, at least 1 shared member is honest and refuses to endorse two contradictory decisions. Slide n to 5 or 6 and f stays 1: the extra nodes buy nothing until n = 7, where f becomes 2.",
+  "preset": "bft",
+  "n": 4,
+  "caption": "Raise n and watch f: tolerance steps up only at the 3f + 1 sizes, 4 and then 7."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "prompt": "A 4-node BFT cluster (f equal to 1) commits with quorums of 3. Two decisions are approved by two different quorums. What stops them from committing contradictory values?",
