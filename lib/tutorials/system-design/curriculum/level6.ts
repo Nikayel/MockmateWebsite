@@ -638,12 +638,74 @@ This is not a limitation to work around; it is the direct cost of parallelism. T
 scales horizontally is that partitions are independent, so anything needing global order would need a
 single partition, capping you at one broker's throughput and one consumer.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A ledger consumer reads a 100-partition topic and applies events assuming chronological order across the whole topic. What happens under load?",
+  "options": [
+    {
+      "label": "It can silently apply a withdrawal before its deposit: order holds within a partition only, never across partitions",
+      "correct": true,
+      "feedback": "Right: 100 partitions are 100 independent sequences interleaved by wall-clock chance, and no cross-partition order is ever promised."
+    },
+    {
+      "label": "Nothing: record timestamps let the consumer reconstruct global order automatically",
+      "feedback": "There is no global clock and no global sequence; timestamps do not create an ordering guarantee."
+    },
+    {
+      "label": "The consumer crashes, because Kafka rejects out-of-order reads",
+      "feedback": "Kafka happily serves each partition in its own order; the reordering bug is silent, which is what makes it deadly."
+    }
+  ]
+}
+\`\`\`
+
 ### The key is correctness
 
 A producer computes the partition as \`hash(key) mod partition_count\` (default murmur2). So **all
 records with the same key go to the same partition and are totally ordered relative to each other.**
 Correctness reduces to one question: which events must be seen in order relative to each other?
 Whatever that set is, it must share a key.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Which pairs of events must share a message key to stay safe, and which can live under different keys?",
+  "buckets": [
+    "Must share a key",
+    "Different keys are fine"
+  ],
+  "items": [
+    {
+      "label": "A deposit and a withdrawal on the same bank account",
+      "bucket": "Must share a key",
+      "feedback": "Reordering them can invent an overdraft; co-key them by account_id."
+    },
+    {
+      "label": "created, paid, and shipped for one order",
+      "bucket": "Must share a key",
+      "feedback": "The lifecycle must stay monotonic, so key by order_id."
+    },
+    {
+      "label": "Two messages in the same chat room",
+      "bucket": "Must share a key",
+      "feedback": "A room's transcript must read in order; key by conversation_id."
+    },
+    {
+      "label": "Events for two different customers' orders",
+      "bucket": "Different keys are fine",
+      "feedback": "There is no causal relation across customers, so nothing requires their events to interleave in order."
+    },
+    {
+      "label": "One chat room's messages relative to another room's",
+      "bucket": "Different keys are fine",
+      "feedback": "Rooms may interleave freely; only the order within each room matters."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`cswidget
 {
@@ -706,6 +768,30 @@ related events must share a key; there is no global order; changing partition co
 breaks ordering, so partition count is fixed up front; and a hot key forces a choice between strict
 order (one partition, limited throughput) and salting/compound keys (more throughput, weaker
 ordering plus reassembly).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A celebrity account floods its partition, so you salt the key and its events spread across 8 partitions. What did you just trade away?",
+  "options": [
+    {
+      "label": "Strict per-account ordering: it now holds only within each salted sub-stream, and a downstream merge must re-establish order by sequence number",
+      "correct": true,
+      "feedback": "Right: every hot-key mitigation trades ordering scope for throughput, because order lives only inside a single partition."
+    },
+    {
+      "label": "Durability, because salted records skip replication",
+      "feedback": "Salting only changes which partition a record hashes to; replication is untouched."
+    },
+    {
+      "label": "Nothing, because Kafka reorders across partitions for you",
+      "feedback": "There is no cross-partition ordering to fall back on; that absence is exactly what the salt breaks for this account."
+    }
+  ],
+  "reveal": "The hot-key options and the ordering rule are the same lesson: strict single-stream order caps you at one partition's throughput, and any widening of the key downgrades the ordering scope and pushes reassembly downstream."
+}
+\`\`\`
 `.trim()
 
 const consumerGroupsTeach = `
