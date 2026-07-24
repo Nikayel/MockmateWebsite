@@ -852,6 +852,29 @@ handshake together for a faster (often 1-RTT, 0-RTT on resumption) setup, and su
 migration**: the connection is identified by a connection ID, not the 4-tuple, so a phone switching
 from Wi-Fi to cellular (new IP) keeps the same connection instead of re-handshaking.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "H3 removes TCP-level HOL blocking, folds the handshakes together, and survives network switches. Where do you roll it out first?",
+  "options": [
+    {
+      "label": "Everywhere at once; a better protocol is better on every link",
+      "feedback": "Tempting, but H3's wins come from loss and mobility. A stable low-loss datacenter link rarely triggers HOL blocking, some middleboxes throttle or block UDP, and QUIC's user-space stack can burn more CPU than kernel TCP."
+    },
+    {
+      "label": "The mobile-facing edge, where loss and network switches are common",
+      "correct": true,
+      "feedback": "Right. Per-stream recovery pays off exactly where packets get lost, and connection migration saves the Wi-Fi-to-cellular handoff. Stable internal links keep most of the benefit already via warm H2 connections."
+    },
+    {
+      "label": "The internal service-to-service links first, since you control both ends there",
+      "feedback": "Controlling both ends makes the rollout easy, which is the temptation, but the benefit is tiny: stable links rarely lose packets, and gRPC runs on HTTP/2 today anyway."
+    }
+  ]
+}
+\`\`\`
+
 When does H3 actually win? On **lossy and mobile networks** and paths with **many short
 connections**, where per-stream independence and connection migration matter most. On a stable,
 low-loss, high-bandwidth link (two datacenters), H3's advantage over H2 is marginal, and UDP can even
@@ -868,6 +891,47 @@ Recap: HOL blocking is the theme, H1 blocks per request and needs ~6 connections
 one TCP connection but still suffers TCP-level HOL blocking on loss, H3/QUIC removes it with
 per-stream reliability over UDP plus connection migration, so use H3 at the lossy/mobile edge and
 keep stable internal RPC on H2/gRPC.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "File each statement under the HTTP version it describes.",
+  "buckets": [
+    "HTTP/1.1",
+    "HTTP/2",
+    "HTTP/3"
+  ],
+  "items": [
+    {
+      "label": "One slow response blocks its whole connection, so browsers open about 6 per host",
+      "bucket": "HTTP/1.1",
+      "feedback": "Request-level HOL blocking: one request in flight per connection, and parallelism means more connections, more handshakes, more slow starts."
+    },
+    {
+      "label": "Streams share one TCP connection, and a single lost packet stalls all of them",
+      "bucket": "HTTP/2",
+      "feedback": "The interview catch: multiplexing killed request-level HOL blocking, but TCP's ordered delivery still makes every stream wait for one retransmission."
+    },
+    {
+      "label": "A lost packet stalls only its own stream",
+      "bucket": "HTTP/3",
+      "feedback": "QUIC rebuilds reliability per stream over UDP, so the head-of-line problem finally dissolves at the transport level."
+    },
+    {
+      "label": "The connection survives a phone switching from Wi-Fi to cellular",
+      "bucket": "HTTP/3",
+      "feedback": "QUIC identifies a connection by connection ID rather than the 4-tuple, so a new IP does not force a re-handshake."
+    },
+    {
+      "label": "What gRPC runs on today",
+      "bucket": "HTTP/2",
+      "feedback": "gRPC needs multiplexed streams and gets them from H2, which is why internal RPC is naturally H2."
+    }
+  ],
+  "reveal": "Each version pushed the head-of-line problem down one layer until QUIC dissolved it. The topology to carry into your design write: H3 with H2 fallback at the lossy mobile edge, H2/gRPC for stable internal RPC."
+}
+\`\`\`
 `.trim()
 
 const requestLifecycleTeach = `
