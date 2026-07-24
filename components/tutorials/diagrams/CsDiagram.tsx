@@ -12,6 +12,8 @@ import { PythonMemoryDiagram } from "./PythonMemoryDiagram"
 import { CallStackDiagram } from "./CallStackDiagram"
 import { ComprehensionDiagram } from "./ComprehensionDiagram"
 import { DiagramTable } from "./DiagramTable"
+import { LadderDiagram } from "./LadderDiagram"
+import { TopologyDiagram } from "./TopologyDiagram"
 
 /**
  * Renders a ```csdiagram fence body. This is the single entry point the Markdown
@@ -47,6 +49,10 @@ function renderSpec(spec: DiagramSpec) {
       return <ComprehensionDiagram spec={spec} />
     case "table":
       return <DiagramTable spec={spec} />
+    case "ladder":
+      return <LadderDiagram spec={spec} />
+    case "topology":
+      return <TopologyDiagram spec={spec} />
     default: {
       // Exhaustiveness guard: adding a spec type without a case is a compile error here.
       const _exhaustive: never = spec
