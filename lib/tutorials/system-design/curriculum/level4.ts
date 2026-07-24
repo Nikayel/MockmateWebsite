@@ -136,6 +136,45 @@ route on content (path, host header, cookie, method), which also unlocks **TLS t
 limiting**, request/response transformation, and rich per-route **observability**, at a higher
 per-request CPU and latency cost (AWS **ALB**, **Nginx**, **HAProxy**, **Envoy**).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are picking a balancer feature by feature. Which layer does each one need?",
+  "buckets": [
+    "L4 can do it",
+    "Needs L7"
+  ],
+  "items": [
+    {
+      "label": "Spreading raw TCP database connections",
+      "bucket": "L4 can do it",
+      "feedback": "L4 forwards packets by IP and port without parsing them, so any protocol works."
+    },
+    {
+      "label": "Routing '/api' and '/static' to different pools",
+      "bucket": "Needs L7",
+      "feedback": "The path lives inside the HTTP payload, which an L4 balancer never parses. This is the classic interview trap."
+    },
+    {
+      "label": "Terminating TLS",
+      "bucket": "Needs L7",
+      "feedback": "Termination means reading and re-encrypting the application byte stream, so it belongs to the layer that parses requests."
+    },
+    {
+      "label": "Extreme-throughput WebSocket pass-through with minimal features",
+      "bucket": "L4 can do it",
+      "feedback": "Content-blind forwarding is cheap, which is exactly why the fast path is L4."
+    },
+    {
+      "label": "Header-based canary routing and per-route rate limits",
+      "bucket": "Needs L7",
+      "feedback": "Headers, cookies, and per-route policy all require parsing the request first."
+    }
+  ]
+}
+\`\`\`
+
 ### Stack them
 
 Real architectures stack the layers: a thin **L4 layer at the edge** absorbs the raw connection
@@ -165,6 +204,30 @@ Recap: L4 balancers are fast, protocol-agnostic, and content-blind; L7 balancers
 route by path/header, terminate TLS, and rate-limit at a latency cost; production stacks L4 at the
 edge in front of an L7 fleet, and the LB tier itself must be made HA (active-active, floating IP, or
 anycast) so it is never a SPOF.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An interview system takes huge volumes of raw non-HTTP traffic and also serves an HTTP API that needs per-path routing and TLS termination. What shape do you draw?",
+  "options": [
+    {
+      "label": "One L7 fleet handling everything",
+      "feedback": "Tempting because L7 has every feature, but you would pay the per-request parsing cost on raw traffic that needs none of it, and an HTTP-parsing proxy is the wrong tool for arbitrary TCP streams."
+    },
+    {
+      "label": "One L4 tier handling everything",
+      "feedback": "Fast and protocol-agnostic, but content-blind: the per-path routing and TLS termination the API needs are impossible at L4."
+    },
+    {
+      "label": "A thin L4 edge absorbing connections, feeding an L7 proxy fleet where content routing is needed",
+      "correct": true,
+      "feedback": "Right, the production shape: NLB in front of ALB, or Maglev in front of Envoy. L4 gives cheap protocol-agnostic scale at the edge; L7 supplies features where the traffic actually needs them."
+    }
+  ],
+  "reveal": "In your design write, draw the stack explicitly and add one sentence on HA: the balancer tier itself runs active-active with a floating IP or anycast, because a lone balancer is a single point of failure no matter how healthy the fleet behind it is."
+}
+\`\`\`
 `.trim()
 
 const lbAlgorithmsTeach = `
