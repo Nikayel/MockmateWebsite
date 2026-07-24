@@ -415,6 +415,72 @@ rider request --> matching engine --> query index (cell + neighbor ring) --> ran
 
 The **dispatch/matching engine** does candidate generation (query the rider's H3 cell and its neighbor rings until it has enough drivers), then ranks by ETA (not raw distance, because a driver across a river is far by road), driver acceptance likelihood, and supply-demand balance. **Surge** is a pricing signal computed per cell from the ratio of open requests to available drivers. Once a driver accepts, a **trip state machine** (requested -> accepted -> arrived -> in-progress -> completed) becomes the source of truth, and this part **does** need durable, strongly consistent storage because it maps to money.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Cell resolution vs drivers per cell",
+  "predictPrompt": {
+    "question": "The matching engine drops to cells half as wide to tighten candidate ranking. What happens to the driver count in each cell?",
+    "options": [
+      "It halves",
+      "It drops to a quarter",
+      "It stays the same"
+    ]
+  },
+  "workedExample": "At 30 bits the interleaved key splits the 40075 km equator into 2 to the power 15, 32768 slices, so a cell is 40075 / 32768, about 1.2 km wide. Covering roughly 600 square km of a city like the lesson's Chicago takes 600 / (1.2 x 1.2), about 400 cells. With 200,000 drivers pinging every 4 to 5 seconds in that region, each cell's in-memory driver set holds about 200000 / 400 = 500 candidates, plenty for one cell-plus-neighbor-ring query. Slide bits up and the pool per cell thins fast, forcing candidate generation to expand its search rings before ranking by ETA.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "bits",
+      "label": "Interleaved bits in the cell key",
+      "min": 10,
+      "max": 50,
+      "scale": "linear",
+      "step": 2,
+      "initial": 30,
+      "unit": "bits"
+    },
+    {
+      "kind": "slider",
+      "id": "drivers",
+      "label": "Drivers in the city region",
+      "min": 10000,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 200000,
+      "unit": "drivers"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "cellWidthKm",
+      "label": "Cell width",
+      "expr": "40075 / pow(2, bits / 2)",
+      "format": "number",
+      "unit": "km"
+    },
+    {
+      "id": "cellsCovering",
+      "label": "Cells covering a 600 sq km city",
+      "expr": "600 / (cellWidthKm * cellWidthKm)",
+      "format": "number",
+      "unit": "cells"
+    },
+    {
+      "id": "driversPerCell",
+      "label": "Drivers per cell",
+      "expr": "drivers / cellsCovering",
+      "format": "number",
+      "unit": "drivers",
+      "sparkline": {
+        "over": "bits"
+      }
+    }
+  ],
+  "caption": "Surge reads this exact per-cell ratio: too-fine cells starve each cell of candidates, too-coarse cells hide the downtown hotspot inside one giant cell."
+}
+\`\`\`
+
 **Interview nuance:** the assignment must be exclusive. If you offer the same driver to two riders you double-book. Use a short lock or conditional write on the driver's state so only one match wins, and expire the offer if the driver does not accept in a few seconds so the driver returns to the pool. And hot cities (New Year's Eve downtown) concentrate load on one shard: degrade gracefully by lowering location-update frequency (QoS) and widening the matching radius under load rather than dropping updates blindly.
 
 **Recap:** index moving drivers with a space-filling spatial index (H3/S2/geohash) sharded by geography, keep locations in memory as overwrites, and rank matches by ETA under an exclusive-assignment lock, with the trip state machine as the one strongly consistent part.
