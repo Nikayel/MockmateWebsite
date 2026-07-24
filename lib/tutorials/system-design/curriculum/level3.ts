@@ -1259,6 +1259,29 @@ and its CPU goes to 100%. Worse, because the DB is now slow, each rebuild takes 
 requests pile up before the first one finishes, and the cache never gets re-populated. The system
 spirals.
 
+\`\`\`cswidget
+{
+  "type": "cache-sim",
+  "title": "The hot key expires under load",
+  "predictPrompt": {
+    "question": "About half of all requests land on one hot key. Its TTL runs out and the entry vanishes while the database rebuild takes 8 ticks. What happens during those 8 ticks?",
+    "options": [
+      "One miss: the first request rebuilds it and everyone else keeps hitting the cache",
+      "A dog-pile: every request for the hot key misses and launches its own duplicate rebuild until the first one finally lands",
+      "Nothing visible: the other keys keep hitting, so the overall picture barely moves"
+    ]
+  },
+  "workedExample": "With the starting dials the TTL is comfortably longer than the 8-tick rebuild, so expiries are rare and the hot key is almost always present: the cache looks healthy. Flip the stampede toggle to force the TTL below the rebuild time and the paragraph above plays out in front of you: the instant the hot key expires, every arriving request misses and starts its own rebuild, and the pile of in-flight queries grows faster than the first rebuild can finish. Then turn on coalescing: the first requester rebuilds, everyone else waits on that single flight, and the pile collapses to one rebuild per expiry. Same load, same TTL, one query instead of a stack of them.",
+  "seed": "hot-key-dogpile",
+  "keys": 10,
+  "ticks": 300,
+  "capacity": 8,
+  "ttl": 60,
+  "rebuildTicks": 8,
+  "caption": "The stampede is a race between request arrivals and one slow rebuild. Coalescing does not make the rebuild faster; it makes it singular."
+}
+\`\`\`
+
 Three families of defense exist, and a good design layers them rather than betting on one.
 
 ### Request coalescing (singleflight)
