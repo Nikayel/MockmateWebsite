@@ -496,6 +496,29 @@ socket without dragging them through the JVM heap. Add producer-side **batching 
 (lz4/zstd, batches keyed by \`linger.ms\` and \`batch.size\`) and one cluster handles millions of
 events per second.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Kafka sustains hundreds of MB/s per broker on ordinary disks. Which combination explains it?",
+  "options": [
+    {
+      "label": "Sequential appends, the OS page cache, zero-copy sendfile on reads, and producer batching with compression",
+      "correct": true,
+      "feedback": "Right: every trick avoids random I/O and user-space copying on the append-only log."
+    },
+    {
+      "label": "An in-heap JVM index that keeps all recent records in memory",
+      "feedback": "Kafka deliberately keeps data out of the JVM heap; the OS page cache serves recent data with no user-space copy."
+    },
+    {
+      "label": "Random-access B-tree storage tuned for SSDs",
+      "feedback": "The design is the opposite: appending to the end of a file is the one access pattern spinning disks and SSDs both love."
+    }
+  ]
+}
+\`\`\`
+
 ### Durability from replication
 
 Each partition has one **leader** and N-1 **followers** (replication factor typically 3). Followers
@@ -508,6 +531,29 @@ decide the trade:
 - **\`min.insync.replicas\`** on the broker: the minimum ISR size for an \`acks=all\` write to be
   accepted. With RF=3 and \`min.insync.replicas=2\`, a write needs the leader plus one follower, so
   you survive one broker loss with zero acknowledged-message loss and still accept writes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A producer uses acks=1. The leader persists the record and acks, then crashes before any follower replicates it. What happened to that acknowledged write?",
+  "options": [
+    {
+      "label": "It is lost: acks=1 means only the leader had it, and a new leader is elected without it",
+      "correct": true,
+      "feedback": "Right: leader-only acknowledgment leaves a window where an acked write dies with the leader."
+    },
+    {
+      "label": "It is safe, because an ack always means the full ISR had it",
+      "feedback": "That is acks=all; acks=1 returns as soon as the leader alone has persisted the record."
+    },
+    {
+      "label": "It is safe, because the crashed leader replays it to followers when it restarts",
+      "feedback": "The failed broker may never return, and the partition moves on under a new leader that never saw the write."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`cswidget
 {
@@ -552,6 +598,30 @@ Recap: Kafka is a partitioned append-only log; sequential writes, page cache, an
 its throughput; durability is leader/follower replication tuned by acks plus min.insync.replicas over
 the ISR (durable = acks=all + min.insync.replicas>=2 + RF3); retention, segments, compaction, and
 tiered storage govern cost and replay; and KRaft removed ZooKeeper by making metadata a Raft quorum.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "One design choice, the partitioned append-only commit log, explains both Kafka's throughput and its replay. How?",
+  "options": [
+    {
+      "label": "Appends are sequential disk writes served back through the page cache, and retained records mean a consumer can rewind its offset over the same bytes",
+      "correct": true,
+      "feedback": "Right: the same immutable log that makes writes disk-friendly is what leaves history in place for offsets to rewind."
+    },
+    {
+      "label": "The log lets the broker delete each record after delivery, keeping disks small and fast",
+      "feedback": "Delete-on-delivery is the queue model; Kafka retains records regardless of who has read them, which is exactly what makes replay possible."
+    },
+    {
+      "label": "The metadata quorum coordinates both the write path and replay",
+      "feedback": "KRaft manages cluster metadata; it has nothing to do with why appends are fast or why history can be reread."
+    }
+  ],
+  "reveal": "No per-message delete, no random insert, no in-place update: that one data model gives you the fast sequential write path and the retained, offset-addressable history at the same time."
+}
+\`\`\`
 `.trim()
 
 const partitioningOrderingTeach = `
