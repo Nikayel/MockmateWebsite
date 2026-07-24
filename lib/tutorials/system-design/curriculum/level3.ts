@@ -760,6 +760,29 @@ Sharding buys scale by breaking two things you took for granted on a single data
 **atomic multi-key writes**. Once related rows can live on different nodes, a query that spans them
 is a distributed operation, and a write that must change both is a distributed transaction.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Each of your 50 shards answers reads with a 'p99' of 10ms. A query fans out to all 50 shards and must wait for every one of them. About what fraction of these queries will see at least one shard running slower than its 'p99'?",
+  "options": [
+    {
+      "label": "About 1%, the same as a single shard",
+      "feedback": "Tempting: each shard individually is slow only 1% of the time. But the query waits for all 50, so the 1% risks add up across shards instead of staying at 1%."
+    },
+    {
+      "label": "Around 40%",
+      "correct": true,
+      "feedback": "Right. The chance that every shard is fast is 0.99 raised to the 50th power, about 60%, so roughly 40% of fan-out queries wait on at least one slow shard. Fan-out latency is bounded by the slowest shard, not the average."
+    },
+    {
+      "label": "Essentially 0%: slow responses are independent, so they cancel out",
+      "feedback": "Tempting but backwards. Independence makes it worse, not better: fifty independent 1% risks compound, they never cancel."
+    }
+  ]
+}
+\`\`\`
+
 ### Cross-shard reads (scatter-gather)
 
 A query that is not scoped to one shard key must fan out to every partition, and it is bounded by the
@@ -769,6 +792,29 @@ so the overall p99 is far worse than 10ms. Mitigations: avoid the fan-out by cho
 the query, **denormalize** so the data you need is co-located, cap the fan-out width, and use
 hedged/speculative requests to blunt single-shard tail latency. The senior instinct is to design most
 reads to touch one shard and treat scatter-gather as the rare, budgeted case.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You must atomically debit an account on shard A and credit an account on shard B. Two-phase commit gives exactly the atomicity you need. Should it be your default for this hot path?",
+  "options": [
+    {
+      "label": "Yes: 2PC exists precisely for atomic cross-node writes",
+      "feedback": "Tempting, and it is the textbook answer. But 2PC holds locks across network round trips and blocks indefinitely if the coordinator dies after prepare, which is fatal on a high-volume path."
+    },
+    {
+      "label": "No: use a saga of local transactions with compensations, and keep 2PC for rare must-be-atomic operations",
+      "correct": true,
+      "feedback": "Right. The next sections show how a saga trades isolation for the absence of distributed locks, and what machinery (idempotency keys, the outbox) keeps it correct under failures."
+    },
+    {
+      "label": "No: just do the two writes independently and retry whichever one fails",
+      "feedback": "Tempting because it avoids locks, but with no compensations and no dedup, a crash between the writes strands money and a retry can double-apply a step."
+    }
+  ]
+}
+\`\`\`
 
 ### Cross-shard writes: avoid 2PC on the hot path
 
@@ -950,6 +996,42 @@ Recap: sharding breaks joins (scatter-gather, bounded by the slowest shard) and 
 writes; avoid 2PC on the hot path because it locks and blocks on coordinator failure; use a saga of
 local transactions with compensating actions, make retries safe with idempotency keys, publish events
 atomically with the outbox pattern, and denormalize to avoid cross-shard joins.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Before you design the cross-shard money transfer, match each mechanism to the failure it exists to prevent.",
+  "buckets": [
+    "Prevents double-apply on retry",
+    "Prevents losing a step on crash",
+    "Prevents cross-shard locking and blocking"
+  ],
+  "items": [
+    {
+      "label": "Idempotency key recorded in a per-shard dedup table",
+      "bucket": "Prevents double-apply on retry",
+      "feedback": "At-least-once delivery means the same 'credit B' can arrive twice; the recorded key makes the second apply a no-op."
+    },
+    {
+      "label": "Outbox row committed in the same local transaction as the business write",
+      "bucket": "Prevents losing a step on crash",
+      "feedback": "The write and the intent-to-publish become atomic, so a crash between them cannot lose the event."
+    },
+    {
+      "label": "Relay that re-reads the outbox and republishes until acknowledged",
+      "bucket": "Prevents losing a step on crash",
+      "feedback": "The relay turns the committed intent into at-least-once delivery; the idempotency key absorbs the duplicates it creates."
+    },
+    {
+      "label": "Saga of local transactions with compensating actions",
+      "bucket": "Prevents cross-shard locking and blocking",
+      "feedback": "Each step commits on a single shard, so nothing holds locks across the network and no coordinator failure can strand them."
+    }
+  ],
+  "reveal": "In your design write, name all three together: a saga instead of 2PC on the hot path, the outbox to drive each next step reliably, and idempotency keys to make at-least-once delivery safe. That combination is the whole answer."
+}
+\`\`\`
 `.trim()
 
 const cachingPatternsTeach = `
