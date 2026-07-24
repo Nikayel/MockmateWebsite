@@ -15,6 +15,373 @@ const networkStackTeach = `
 The 7-layer OSI model is a reference diagram, not how real systems are built. In practice you reason
 about a 5-layer stack, and the only two layers you will argue about in interviews are L4 and L7.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Peeling POST /orders down the stack",
+  "frames": [
+    {
+      "note": "An HTTPS request is born at the top of the practical 5-layer stack: the app emits POST /orders with its Authorization header. Everything below is transport that has not been asked to work yet.",
+      "rows": [
+        {
+          "label": "L7 HTTP",
+          "cells": [
+            {
+              "text": "POST /orders",
+              "state": "active"
+            },
+            {
+              "text": "Auth: Bearer",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "L6 TLS",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L4 TCP",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L3 IP",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L2 Link",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "TLS secures the byte stream: the HTTP bytes are sealed inside encrypted TLS records, with SNI naming the server. From this layer down, nothing can read the path or the headers.",
+      "rows": [
+        {
+          "label": "L7 HTTP",
+          "cells": [
+            {
+              "text": "POST /orders",
+              "state": "dim"
+            },
+            {
+              "text": "Auth: Bearer",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L6 TLS",
+          "cells": [
+            {
+              "text": "TLS record",
+              "state": "active"
+            },
+            {
+              "text": "SNI",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "L4 TCP",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L3 IP",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L2 Link",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "TCP addresses a specific process by port and slices the records into segments. The connection's whole identity is its 4-tuple: source IP and ephemeral port, destination IP and port 443.",
+      "rows": [
+        {
+          "label": "L7 HTTP",
+          "cells": [
+            {
+              "text": "POST /orders",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L6 TLS",
+          "cells": [
+            {
+              "text": "TLS record",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L4 TCP",
+          "cells": [
+            {
+              "text": "TCP seg",
+              "state": "active"
+            },
+            {
+              "text": "src :51823",
+              "state": "new"
+            },
+            {
+              "text": "dst :443",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "L3 IP",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L2 Link",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "IP moves packets between hosts by address and decides routing hop by hop. It knows nothing about ports or requests; this is where the classic 1500-byte Ethernet MTU caps each packet.",
+      "rows": [
+        {
+          "label": "L7 HTTP",
+          "cells": [
+            {
+              "text": "POST /orders",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L6 TLS",
+          "cells": [
+            {
+              "text": "TLS record",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L4 TCP",
+          "cells": [
+            {
+              "text": "TCP seg",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L3 IP",
+          "cells": [
+            {
+              "text": "IP pkt",
+              "state": "active"
+            },
+            {
+              "text": "1500B MTU",
+              "state": "new"
+            },
+            {
+              "text": "hop by hop",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "L2 Link",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The link layer puts bytes on the wire: each packet rides in an Ethernet frame addressed by MAC to the next hop only. The peel is complete: HTTP inside TLS inside TCP inside IP inside Ethernet.",
+      "rows": [
+        {
+          "label": "L7 HTTP",
+          "cells": [
+            {
+              "text": "POST /orders",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L6 TLS",
+          "cells": [
+            {
+              "text": "TLS record",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L4 TCP",
+          "cells": [
+            {
+              "text": "TCP seg",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L3 IP",
+          "cells": [
+            {
+              "text": "IP pkt",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L2 Link",
+          "cells": [
+            {
+              "text": "eth frame",
+              "state": "active"
+            },
+            {
+              "text": "MAC addr",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "One frame carrying a TCP segment is lost mid-route. Which layer notices and retransmits?",
+        "options": [
+          "L2 Link resends the frame",
+          "L3 IP re-routes and resends",
+          "L4 TCP retransmits the segment",
+          "L7 HTTP retries the whole POST"
+        ]
+      },
+      "note": "TCP. Ethernet and IP are fire-and-forget with no memory of what they carried. TCP tracked the unacknowledged segment and resends it; that reliability is exactly what TCP adds at L4 and UDP declines to pay for.",
+      "rows": [
+        {
+          "label": "L7 HTTP",
+          "cells": [
+            {
+              "text": "POST /orders",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L6 TLS",
+          "cells": [
+            {
+              "text": "TLS record",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L4 TCP",
+          "cells": [
+            {
+              "text": "TCP seg",
+              "state": "dropped"
+            },
+            {
+              "text": "no ACK",
+              "state": "active"
+            },
+            {
+              "text": "resend seg",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "L3 IP",
+          "cells": [
+            {
+              "text": "IP pkt",
+              "state": "dim"
+            },
+            {
+              "text": "no memory",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "L2 Link",
+          "cells": [
+            {
+              "text": "eth frame",
+              "state": "dropped"
+            },
+            {
+              "text": "no memory",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Each layer has one job. When your design says 'the LB routes /checkout', you have quietly climbed to L7; say so, and name the cost."
+}
+\`\`\`
+
 Bottom to top, the practical stack:
 
 \`\`\`
