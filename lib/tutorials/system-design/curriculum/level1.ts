@@ -1943,6 +1943,29 @@ traffic). You also have to keep schemas evolvable when producers and consumers d
 - **zstd**: excellent ratio and speed with tunable levels, great for internal transfer where you
   control both ends.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your API serves two payloads: a 200-byte JSON health status and a 4 MB JPEG. A teammate proposes turning on gzip for every response. What is the actual effect?",
+  "options": [
+    {
+      "label": "Both shrink, so it is a pure win",
+      "feedback": "Tempting, because compression usually helps, but these two payloads are precisely the cases where it does not."
+    },
+    {
+      "label": "The JSON shrinks meaningfully, the JPEG barely changes",
+      "feedback": "Half right: JPEG is already compressed, so gzip just burns CPU. But 200 bytes has almost nothing to squeeze either; the CPU and framing overhead can exceed the bytes saved."
+    },
+    {
+      "label": "Neither payload is worth compressing",
+      "correct": true,
+      "feedback": "Right. Tiny payloads cost more CPU and latency than the bytes they save, and already-compressed media does not shrink again. Set a size threshold and skip media types that are already compressed."
+    }
+  ]
+}
+\`\`\`
+
 The tradeoff to state explicitly: compression and binary encoding cut bytes but add CPU, and
 aggressive compression can add tail latency on large responses (the compressor has to run before the
 first byte goes out). So set a payload-size threshold below which you do not compress (compressing a
@@ -1969,6 +1992,30 @@ surface.
 Recap: choose format and codec by bottleneck (JSON+Brotli for public/bandwidth, Protobuf+zstd for
 internal/CPU), never compress tiny or already-compressed payloads, and keep schemas evolvable by
 adding optional fields and never reusing field tags.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Mid rolling deploy, half your fleet runs new code and half runs old. A teammate deleted a Protobuf field last month and today reuses its tag number, 7, for a new field with a different type and meaning. What do the old consumers do with new messages?",
+  "options": [
+    {
+      "label": "Fail loudly with a schema mismatch error",
+      "feedback": "Tempting, but Protobuf has no runtime schema handshake to catch this. Tags are just numbers on the wire, so nothing detects the reuse."
+    },
+    {
+      "label": "Ignore field 7 because they do not recognize the new name",
+      "feedback": "Field names never travel on the wire; only tag numbers do. Old consumers still recognize tag 7 and read it as the deleted field."
+    },
+    {
+      "label": "Silently decode the new data as the old field, corrupting values",
+      "correct": true,
+      "feedback": "Right. The wire carries only tag numbers, so old readers interpret the new field's bytes as the old one. That is why removed tags get marked 'reserved' and evolution means adding optional fields only."
+    }
+  ],
+  "reveal": "Pulling the lesson together: choose format and codec by bottleneck (JSON plus Brotli where developers and browser bandwidth matter, Protobuf plus zstd on internal high-QPS paths), skip compressing tiny or already-compressed payloads, and protect rolling deploys by adding only optional fields and never reusing a tag. The design exercise asks you to defend exactly these choices, surface by surface."
+}
+\`\`\`
 `.trim()
 
 const loadBalancingTeach = `
