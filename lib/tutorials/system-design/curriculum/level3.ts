@@ -64,6 +64,37 @@ and stale reads are the source of the session-guarantee bugs covered later in th
 lag-sensitive reads (a user checking data they just wrote) to the leader or to a follower whose lag
 you have bounded.
 
+\`\`\`cswidget
+{
+  "type": "replication-lag",
+  "title": "Leader Ahead, Followers Behind",
+  "predictPrompt": {
+    "question": "A write burst hits the leader while each follower can only apply a fixed number of entries per tick. What happens?",
+    "options": [
+      "The leader slows its writes so every follower stays in sync",
+      "All followers fall behind by the same amount until the burst ends",
+      "Each follower falls behind at its own rate, and the slowest one serves the stalest reads"
+    ]
+  },
+  "workedExample": "One leader streams its change log to three followers. Follower 1 applies entries fastest and follower 3 slowest, so under the steady trickle of writes everyone stays caught up and lag sits near zero. Then the burst multiplies the write rate for a stretch: the leader pulls ahead immediately, and each follower falls behind in proportion to how fast it can apply. Mid-burst a user posts a comment to the leader, and a few ticks later their refresh is routed to follower 3, the laggiest one. Run the timeline and watch whether that follower has applied past the comment when the read lands, then watch how long each follower takes to drain its lag once the burst ends.",
+  "followers": 3,
+  "writeRate": 1,
+  "applyRate": 4,
+  "ticks": 240,
+  "burst": {
+    "from": 20,
+    "to": 50,
+    "multiplier": 6
+  },
+  "scenario": {
+    "writeTick": 30,
+    "readTick": 34,
+    "follower": 2
+  },
+  "caption": "Adding replicas buys read capacity, but lag is the tax: under a write burst the leader runs ahead, followers fall behind at different rates, and a read routed to a lagging follower is stale. Route lag-sensitive reads to the leader or to a follower whose lag you have bounded."
+}
+\`\`\`
+
 ### Adding capacity online
 
 Provision a new follower, let it restore from a snapshot and catch up from the leader's log, then add
