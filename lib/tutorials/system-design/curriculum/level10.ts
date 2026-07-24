@@ -1398,6 +1398,34 @@ The naive design fails immediately. If you just do \`counter++\` per event on an
 
 Clicks arrive late and out of order (a mobile device offline for an hour uploads its clicks later). You aggregate over windows (per-minute, per-hour tumbling windows per campaign), and you need watermarks to decide when a window is "done." A watermark is the stream's assertion that "no events older than T will still arrive," so the window can close and emit. You also configure allowed lateness: hold windows open a bit past the watermark to admit stragglers, and emit late updates for clicks arriving after close. Event time (when the click happened) not processing time (when you saw it) is what you window on, or your counts are wrong whenever ingestion lags.
 
+\`\`\`cswidget
+{
+  "type": "watermark-sim",
+  "title": "Late Clicks vs the Watermark",
+  "predictPrompt": {
+    "question": "A mobile device was offline and uploads a batch of old clicks after the watermark has passed their window's end. With some allowed lateness configured, what happens to those clicks?",
+    "options": [
+      "They are silently discarded, so the campaign count stays wrong forever",
+      "Clicks inside the allowed lateness land in the closed window and emit a late correction; only clicks beyond it are at risk",
+      "They are counted into whatever window is currently open, misattributing the revenue to the wrong minute"
+    ]
+  },
+  "workedExample": "The stream carries ad clicks stamped with the moment each click happened, and a seeded slice arrives well behind its event time, like the offline phone from the lesson uploading its clicks an hour later. Windows tumble at a fixed width per campaign and each closes once the watermark, trailing the newest event time seen by a small delay, passes its end. At the starting allowed-lateness setting, some stragglers still reach their closed window and fire a late update that corrects the count. Drag the lateness slider to zero and those same clicks miss entirely, silently undercounting revenue; raise it and the corrections return, at the cost of holding windows open longer before the number is final.",
+  "seed": "ad-clicks-offline-upload",
+  "count": 60,
+  "horizon": 120,
+  "skew": 12,
+  "windowSize": 10,
+  "watermarkDelay": 5,
+  "allowedLateness": 8,
+  "maxLateness": 30,
+  "modes": [
+    "event-time"
+  ],
+  "caption": "Windows close on the watermark; allowed lateness decides whether a late click becomes a count correction or a missing dollar."
+}
+\`\`\`
+
 ## Lambda / Kappa
 
 Real-time systems are approximate and can have gaps, so the industry pattern is Lambda or Kappa. Lambda runs two paths: a fast streaming path (Flink) that gives immediate, slightly-approximate counts for the advertiser dashboard, and a slow batch path (Spark over the raw event log in S3, run hourly/daily) that recomputes the exact, deduplicated, fraud-filtered numbers that billing uses. The batch layer is the source of truth and corrects any streaming drift. Kappa simplifies to one streaming engine with replay: the same Flink job can reprocess from the Kafka/log retention to recompute, avoiding two codebases.
