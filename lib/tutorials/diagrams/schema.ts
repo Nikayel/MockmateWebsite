@@ -193,6 +193,70 @@ export const tableSpecSchema = z.object({
   caption: captionField,
 })
 
+// ---- SD: staged ordered-levels ladder (triggered) ----
+
+export const ladderSpecSchema = z.object({
+  type: z.literal("ladder"),
+  title: z.string().optional(),
+  /** log scale gives each decade equal travel — the latency-ladder cliffs. */
+  scale: z.enum(["linear", "log"]).default("linear"),
+  /** Ordered smallest to largest; the staged reveal follows this order. */
+  bands: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        /** Magnitude driving the bar length (must be ascending across bands). */
+        value: z.number().positive(),
+        /** Shown at the bar end, e.g. "~100 ns" (defaults to the raw value). */
+        display: z.string().optional(),
+        /** Annotation revealed with this band's stage (what it costs/means). */
+        note: z.string().optional(),
+      })
+    )
+    .min(3)
+    .max(12),
+  caption: captionField,
+})
+
+// ---- SD: staged box-and-arrow topology (triggered) ----
+
+const topologyNodeSchema = z.object({
+  id: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/),
+  label: z.string().min(1),
+  kind: z.enum(["client", "lb", "service", "db", "cache", "queue", "cdn", "zone", "external"]),
+})
+
+export const topologySpecSchema = z.object({
+  type: z.literal("topology"),
+  title: z.string().optional(),
+  layout: z.enum(["lr", "tb"]).default("lr"),
+  /** Hard 16-node cap: the guard against the banned free-form graph re-entering. */
+  nodes: z.array(topologyNodeSchema).min(2).max(16),
+  edges: z
+    .array(
+      z.object({
+        from: z.string().min(1),
+        to: z.string().min(1),
+        kind: z.enum(["sync", "async", "replication"]).default("sync"),
+        label: z.string().optional(),
+      })
+    )
+    .min(1)
+    .max(24),
+  /** Staged reveal: every node appears in exactly one stage, with the justification
+   *  note that ties it to a requirement (the L0 dataflow discipline). */
+  stages: z
+    .array(
+      z.object({
+        adds: z.array(z.string().min(1)).min(1),
+        note: z.string().min(1),
+      })
+    )
+    .min(1)
+    .max(8),
+  caption: captionField,
+})
+
 // ---- discriminated union ----
 
 // The raw union. Members MUST stay pure z.object schemas — attaching .superRefine to a
@@ -208,6 +272,8 @@ const diagramSpecUnion = z.discriminatedUnion("type", [
   callStackSpecSchema,
   comprehensionSpecSchema,
   tableSpecSchema,
+  ladderSpecSchema,
+  topologySpecSchema,
 ])
 
 /**
@@ -252,6 +318,55 @@ export const diagramSpecSchema = diagramSpecUnion.superRefine((spec, ctx) => {
         })
     })
   }
+  if (spec.type === "ladder") {
+    for (let i = 1; i < spec.bands.length; i++)
+      if (spec.bands[i].value < spec.bands[i - 1].value)
+        ctx.addIssue({
+          code: custom,
+          path: ["bands", i, "value"],
+          message: "band values must ascend (the ladder tells an ordered story)",
+        })
+  }
+  if (spec.type === "topology") {
+    const nodeIds = new Set(spec.nodes.map((n) => n.id))
+    if (nodeIds.size !== spec.nodes.length)
+      ctx.addIssue({ code: custom, path: ["nodes"], message: "node ids must be unique" })
+    spec.edges.forEach((edge, i) => {
+      if (!nodeIds.has(edge.from))
+        ctx.addIssue({
+          code: custom,
+          path: ["edges", i, "from"],
+          message: `unknown node "${edge.from}"`,
+        })
+      if (!nodeIds.has(edge.to))
+        ctx.addIssue({
+          code: custom,
+          path: ["edges", i, "to"],
+          message: `unknown node "${edge.to}"`,
+        })
+    })
+    const staged = new Map<string, number>()
+    spec.stages.forEach((stage, i) => {
+      for (const id of stage.adds) {
+        if (!nodeIds.has(id))
+          ctx.addIssue({
+            code: custom,
+            path: ["stages", i, "adds"],
+            message: `unknown node "${id}"`,
+          })
+        staged.set(id, (staged.get(id) ?? 0) + 1)
+      }
+    })
+    for (const node of spec.nodes) {
+      const count = staged.get(node.id) ?? 0
+      if (count !== 1)
+        ctx.addIssue({
+          code: custom,
+          path: ["stages"],
+          message: `node "${node.id}" must appear in exactly one stage (found ${count})`,
+        })
+    }
+  }
   if (spec.type === "python-memory") {
     spec.steps.forEach((step, i) => {
       const objKeys = new Set(Object.keys(step.objects))
@@ -282,6 +397,8 @@ export type PythonMemorySpec = z.infer<typeof pythonMemorySpecSchema>
 export type CallStackSpec = z.infer<typeof callStackSpecSchema>
 export type ComprehensionSpec = z.infer<typeof comprehensionSpecSchema>
 export type TableSpec = z.infer<typeof tableSpecSchema>
+export type LadderSpec = z.infer<typeof ladderSpecSchema>
+export type TopologySpec = z.infer<typeof topologySpecSchema>
 
 export type DiagramParseResult = { ok: true; spec: DiagramSpec } | { ok: false; error: string }
 
