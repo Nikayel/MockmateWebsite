@@ -499,6 +499,280 @@ Instead of splitting a file into fixed 4MB blocks, CDC uses a rolling hash (Rabi
 
 Store each unique chunk hash exactly once in the object store. A file becomes a **manifest**: an ordered list of chunk hashes. If two files (or two users, with global dedup) share chunks, they share storage. **Delta sync** falls straight out: to sync a changed file the client computes the new manifest, sends only the hashes to the server, the server replies which hashes it already has, and the client uploads only the missing chunks.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Chunk dedup and delta sync",
+  "frames": [
+    {
+      "note": "Content-defined chunking cuts the 2GB file at rolling-hash boundaries into 4 variable chunks (about 4MB each). Each chunk is hashed with SHA-256; that hash is both its content address and its dedup key.",
+      "rows": [
+        {
+          "label": "file v1 (2GB)",
+          "cells": [
+            {
+              "text": "c1",
+              "state": "active"
+            },
+            {
+              "text": "c2",
+              "state": "active"
+            },
+            {
+              "text": "c3",
+              "state": "active"
+            },
+            {
+              "text": "c4",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "SHA-256",
+          "cells": [
+            {
+              "text": "h1"
+            },
+            {
+              "text": "h2"
+            },
+            {
+              "text": "h3"
+            },
+            {
+              "text": "h4"
+            }
+          ]
+        },
+        {
+          "label": "object store",
+          "cells": [
+            {
+              "text": "h1",
+              "state": "new"
+            },
+            {
+              "text": "h2",
+              "state": "new"
+            },
+            {
+              "text": "h3",
+              "state": "new"
+            },
+            {
+              "text": "h4",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The file is now a manifest: an ordered list of 4 chunk hashes. The object store keeps each unique chunk exactly once, and the metadata DB maps the file to manifest v1 and its version.",
+      "rows": [
+        {
+          "label": "manifest v1",
+          "cells": [
+            {
+              "text": "h1"
+            },
+            {
+              "text": "h2"
+            },
+            {
+              "text": "h3"
+            },
+            {
+              "text": "h4"
+            }
+          ]
+        },
+        {
+          "label": "object store",
+          "cells": [
+            {
+              "text": "h1",
+              "state": "dim"
+            },
+            {
+              "text": "h2",
+              "state": "dim"
+            },
+            {
+              "text": "h3",
+              "state": "dim"
+            },
+            {
+              "text": "h4",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The user edits bytes near the start. CDC boundaries are anchored to content, so only chunk c1 changes and rehashes to h1'. The client computes manifest v2 and sends just the 4 hashes to the server: kilobytes of network so far.",
+      "rows": [
+        {
+          "label": "file v2",
+          "cells": [
+            {
+              "text": "c1'",
+              "state": "active"
+            },
+            {
+              "text": "c2",
+              "state": "dim"
+            },
+            {
+              "text": "c3",
+              "state": "dim"
+            },
+            {
+              "text": "c4",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "manifest v2",
+          "cells": [
+            {
+              "text": "h1'",
+              "state": "new"
+            },
+            {
+              "text": "h2"
+            },
+            {
+              "text": "h3"
+            },
+            {
+              "text": "h4"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "The server compares manifest v2 against what it already stores. How much does the client upload?",
+        "options": [
+          "All 4 chunks, the full 2GB again",
+          "Only c1', about 4MB",
+          "Nothing, the server computes the delta itself"
+        ]
+      }
+    },
+    {
+      "note": "The have/need negotiation: the server already has h2, h3, h4 and asks only for h1'. One chunk of about 4MB crosses the network, not 2GB. The server could never compute this delta itself: it does not have the client's new bytes.",
+      "rows": [
+        {
+          "label": "server has",
+          "cells": [
+            {
+              "text": "h2",
+              "state": "dim"
+            },
+            {
+              "text": "h3",
+              "state": "dim"
+            },
+            {
+              "text": "h4",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "server needs",
+          "cells": [
+            {
+              "text": "h1'",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "upload",
+          "cells": [
+            {
+              "text": "h1' ~4MB",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Chunks land first, then metadata commits file v2 pointing at manifest v2. The store holds 5 unique chunks serving both versions: full history kept, shared chunks stored once, and the sync cost one chunk instead of the whole file.",
+      "rows": [
+        {
+          "label": "object store",
+          "cells": [
+            {
+              "text": "h1",
+              "state": "dim"
+            },
+            {
+              "text": "h1'",
+              "state": "new"
+            },
+            {
+              "text": "h2",
+              "state": "dim"
+            },
+            {
+              "text": "h3",
+              "state": "dim"
+            },
+            {
+              "text": "h4",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "manifest v1",
+          "cells": [
+            {
+              "text": "h1"
+            },
+            {
+              "text": "h2"
+            },
+            {
+              "text": "h3"
+            },
+            {
+              "text": "h4"
+            }
+          ]
+        },
+        {
+          "label": "manifest v2",
+          "cells": [
+            {
+              "text": "h1'",
+              "state": "active"
+            },
+            {
+              "text": "h2"
+            },
+            {
+              "text": "h3"
+            },
+            {
+              "text": "h4"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Edit near the start of a 2GB file: hashes negotiate, one 4MB chunk uploads, versions share storage."
+}
+\`\`\`
+
 \`\`\`
 file --CDC--> [c1][c2][c3][c4]   each chunk -> SHA-256 -> content address
 manifest = [h1, h2, h3, h4]
