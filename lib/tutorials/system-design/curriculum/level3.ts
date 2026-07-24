@@ -1337,6 +1337,40 @@ want a pure, multi-core, evict-freely cache of opaque values; pick Redis when yo
 structures, replication, persistence, or atomic operations (counters, rate limiters, leaderboards).
 Most systems reach for Redis and scale it horizontally by running many shards.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Which engine does each requirement point to?",
+  "buckets": [
+    "Redis",
+    "Memcached"
+  ],
+  "items": [
+    {
+      "label": "Atomic counters, rate limiters, and leaderboards",
+      "bucket": "Redis",
+      "feedback": "Rich data structures with atomic operations are the core Redis pitch."
+    },
+    {
+      "label": "A lean cache of opaque blobs squeezing every core of one big box",
+      "bucket": "Memcached",
+      "feedback": "Memcached is multithreaded within one instance, so a single process scales across cores; Redis executes commands on a single thread."
+    },
+    {
+      "label": "Built-in replication with automatic failover",
+      "bucket": "Redis",
+      "feedback": "Replication, Sentinel, and Cluster failover ship with Redis; Memcached leaves high availability to the client."
+    },
+    {
+      "label": "Surviving a restart with the cached data intact",
+      "bucket": "Redis",
+      "feedback": "RDB snapshots and the AOF log are Redis persistence options; Memcached is memory-only by design."
+    }
+  ]
+}
+\`\`\`
+
 **Sharding.** Redis Cluster divides the keyspace into **16,384 hash slots**; each key hashes (CRC16
 mod 16384) to a slot, and slots are assigned to shards, so adding a shard means moving some slots
 rather than rehashing everything. The important property is consistent-hashing-style behavior: a
@@ -1364,6 +1398,29 @@ scale-specific hazards: a **big key** (a huge value or a million-element collect
 single thread when accessed or deleted and unbalances shards, so split it; and a **hot key**
 saturates one shard, handled with L1 and key replication.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A region failover points 100% of traffic at a brand-new, completely empty Redis cluster. Normally the cache absorbs 95% of reads. In the first moments, what does the database see?",
+  "options": [
+    {
+      "label": "Roughly its normal 5%, refilling smoothly as each key misses once",
+      "feedback": "Tempting per-key reasoning, but the misses do not queue up politely: they happen at the same moment across the entire keyspace."
+    },
+    {
+      "label": "Close to 100% of the read volume at once, a 20x surge it was never sized for",
+      "correct": true,
+      "feedback": "Right. An empty cache passes everything through, and a DB sized for 5% of reads suddenly meets all of them. This is the flush trap the next paragraph names."
+    },
+    {
+      "label": "Only the hot keys' share of traffic until the tail warms up",
+      "feedback": "Tempting, but hot and cold keys alike miss on an empty cache, and the cold tail in aggregate is most of the volume."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance: the flush trap.** A **cold cache is not safe to bring online under load**,
 because every read misses and the full read volume hits the origin at once: the stampede across the
 whole keyspace. A cache restart, region failover, or \`FLUSHALL\` must be paired with cache warming
@@ -1384,6 +1441,30 @@ Recap: pick Redis for structures/persistence/replication or Memcached for a lean
 cache, shard by hash slots so topology changes move few keys, replicate each shard with failover,
 tier L1-near plus L2-remote, keep L2 consistent via invalidate-on-write or versioned keys, and never
 bring a cold cache online under full load.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A Redis primary dies mid-traffic. Sentinel promotes a replica, and because replication is asynchronous, the last few cached writes are simply gone. Before you write your design: is this a flaw you must engineer away?",
+  "options": [
+    {
+      "label": "Yes: add synchronous replication so the cache never loses a write",
+      "feedback": "Tempting, but you would pay a latency tax on every cache write to protect data that already lives safely in the database."
+    },
+    {
+      "label": "No: the cache is disposable; the DB is the source of truth and misses fall through to it",
+      "correct": true,
+      "feedback": "Right. Losing a cache node loses performance, never data. The principle is also a constraint: never let the cache hold the only copy of anything, which is exactly what write-back of authoritative data would do."
+    },
+    {
+      "label": "Only if AOF persistence was disabled",
+      "feedback": "Tempting, and persistence does narrow the window, but failover to an async replica can still drop acknowledged writes. The safety comes from the DB being the system of record, not from cache durability settings."
+    }
+  ],
+  "reveal": "In your design write, walk the tier top down: engine choice with a reason, hash-slot sharding, replicas with failover, L1 plus L2, an explicit invalidation story, and the cold-cache rule. The through-line is that the cache is disposable and the database is not."
+}
+\`\`\`
 `.trim()
 
 const cdnScaleTeach = `
