@@ -2805,6 +2805,34 @@ shed low-value traffic first (batch, retries, free tier) so critical traffic (ch
 health of the system) survives. And **drop stale work**: if a request has already exceeded its
 deadline while queued, discard it instead of processing it, because the caller has already given up.
 
+\`\`\`cswidget
+{
+  "type": "rate-limiter",
+  "title": "Admission control at the front door",
+  "predictPrompt": {
+    "question": "A burst of 16 requests hits the admission gate while the token bucket holds its full 10 tokens. What does the gate do?",
+    "options": [
+      "Spends its saved tokens: admits most of the burst instantly and sheds the rest with immediate 429s, no queue involved",
+      "Queues all 16 and drains them as tokens refill, so nothing is rejected",
+      "Rejects the whole burst, because a burst larger than the refill rate is over capacity"
+    ]
+  },
+  "workedExample": "The gate opens as a token bucket with capacity 10 refilling 1 token per tick, the same long-run budget as 10 requests per 10-tick window. The steady stream (40 requests over 60 ticks) never outruns the refill, so everything passes: the gate only bites when demand spikes. Toggle the burst: 16 requests slam tick 30, and the bucket spends its saved tokens plus refill to admit 12 while shedding 4 instantly with cheap 429s at the door, no queue involved. Flip to fixed window for contrast: its counter resets on the tick-30 boundary, so its worst 10-tick span swells to 17 against the stated limit of 10.",
+  "algorithms": [
+    "token-bucket",
+    "fixed-window"
+  ],
+  "limit": 10,
+  "windowSize": 10,
+  "seed": "admission-gate-l1",
+  "requests": 40,
+  "horizon": 60,
+  "burstAt": 30,
+  "burstSize": 16,
+  "caption": "Reject early is a real mechanism: every red request is a cheap 429 at admission, capacity the bounded queue and the workers never had to spend."
+}
+\`\`\`
+
 \`\`\`
 arrivals --> [admission control] --accept--> [bounded queue] --> workers
                     |                              |
