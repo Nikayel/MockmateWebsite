@@ -483,6 +483,150 @@ packet stalls TCP's ordered delivery, and every multiplexed stream waits for tha
 even streams whose data already arrived. On a clean network you never notice; on a lossy one, H2 can
 be worse than H1's separate connections.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Head-of-line blocking: H2 streams vs H1's ordered lane",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Browser"
+    },
+    {
+      "id": "server",
+      "label": "Server"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "h1",
+      "label": "HTTP/1.1 mode",
+      "description": "one connection, one request in flight at a time"
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "label": "H2: 3 streams, 1 connection",
+      "kind": "note",
+      "when": "!h1"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "stream 1: 'GET /report'",
+      "kind": "request",
+      "when": "!h1"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "stream 2: 'GET /styles.css'",
+      "kind": "request",
+      "when": "!h1"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "stream 3: 'GET /avatar.png'",
+      "kind": "request",
+      "when": "!h1"
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "stream 2 done first",
+      "kind": "response",
+      "when": "!h1",
+      "predict": {
+        "question": "Stream 1's report is slow to build. Which response arrives first?",
+        "options": [
+          "stream 1: responses follow request order",
+          "stream 2: each stream is independent"
+        ]
+      }
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "stream 3 done",
+      "kind": "response",
+      "when": "!h1"
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "stream 1 done, blocked nobody",
+      "kind": "response",
+      "when": "!h1"
+    },
+    {
+      "from": "client",
+      "label": "1 lost TCP packet stalls all 3",
+      "kind": "note",
+      "when": "!h1"
+    },
+    {
+      "from": "client",
+      "label": "H1: one request in flight",
+      "kind": "note",
+      "when": "h1"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "'GET /report' goes alone",
+      "kind": "request",
+      "when": "h1"
+    },
+    {
+      "from": "server",
+      "label": "slow report holds the lane",
+      "kind": "timer",
+      "when": "h1"
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "report done, lane reopens",
+      "kind": "response",
+      "when": "h1"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "'GET /styles.css' finally",
+      "kind": "request",
+      "when": "h1"
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "styles.css done, was queued",
+      "kind": "response",
+      "status": "late",
+      "when": "h1"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "'GET /avatar.png' last",
+      "kind": "request",
+      "when": "h1"
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "avatar done, queued behind",
+      "kind": "response",
+      "status": "late",
+      "when": "h1"
+    }
+  ],
+  "caption": "H2 interleaves streams over one warm connection so the slow report blocks nobody; in H1 mode everything queues behind it, which is why browsers opened about 6 connections per host. The note is the interview catch: all H2 streams ride one TCP connection, so a single lost packet stalls every stream."
+}
+\`\`\`
+
 ### HTTP/3 over QUIC
 
 QUIC is a new transport built on **UDP** that reimplements reliability, ordering, and congestion
