@@ -547,6 +547,29 @@ to the next node clockwise. Either way you move only about **1/N of the keys**, 
 adjacent nodes, instead of remapping the world. This is why Dynamo, Cassandra, Riak, and most
 distributed caches are built on it.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A plain consistent-hash ring with one token per node. One node dies. Where does its load go?",
+  "options": [
+    {
+      "label": "It spreads evenly across all surviving nodes",
+      "feedback": "Tempting, because even spreading is what hashing seems to promise. But ownership is 'first node clockwise', so the dead node's entire arc has exactly one inheritor. Keep reading: this is one of the two problems virtual nodes fix."
+    },
+    {
+      "label": "It all lands on the next node clockwise",
+      "correct": true,
+      "feedback": "Right. The single clockwise neighbor absorbs the whole arc, potentially doubling its load. Virtual nodes fix this by giving each machine many small arcs whose inheritors are many different nodes."
+    },
+    {
+      "label": "Those keys become unreachable until the node returns",
+      "feedback": "Tempting if you picture fixed assignments, but the ring rule always finds an owner: the keys simply resolve to the next node clockwise. Availability survives; balance is what suffers."
+    }
+  ]
+}
+\`\`\`
+
 Plain consistent hashing has two problems. First, with few nodes the ring is lumpy: random placement
 means some nodes own huge arcs and others tiny ones, so load is uneven (a 2x imbalance is easy).
 Second, when a node leaves, all its load dumps onto a single neighbor rather than spreading.
@@ -589,6 +612,30 @@ consistent hash ring (with vnodes):
 Recap: hash mod N remaps nearly every key on resize; consistent hashing moves only ~1/N and only
 between neighbors; virtual nodes smooth load, spread rebalancing, and enable weighting; bounded-load
 caps hotspots; and rendezvous hashing is a ring-free alternative for small replica-selection cases.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Interview question: 'Your 20-node cache cluster loses a machine. What happens?' Which answer earns the point?",
+  "options": [
+    {
+      "label": "Keys rehash across the cluster, so expect a brief global miss storm",
+      "feedback": "That is the 'hash mod N' failure you are supposed to design away. Describing it as expected behavior tells the interviewer you picked the wrong primitive."
+    },
+    {
+      "label": "With consistent hashing and vnodes, only about 1 in 20 keys move, absorbed by many nodes",
+      "correct": true,
+      "feedback": "Right. That is the phrase to earn: only about '1/N' of keys move, and because each machine holds many small arcs, the inherited load spreads across many neighbors instead of crushing one."
+    },
+    {
+      "label": "Nothing moves, because replicas already hold every key",
+      "feedback": "Tempting, since replication does mask the loss for reads. But ownership still transfers for about '1/N' of keys, and some node must absorb that traffic and re-warm its cache."
+    }
+  ],
+  "reveal": "You now have the full ladder: 'mod N' fails on any resize, the ring cuts movement to about 1/N, vnodes even out load and spread rebalancing, bounded-load caps hotspots, and rendezvous hashing covers small replica-selection jobs. In the design write, quantify the key movement when your system adds or loses a node."
+}
+\`\`\`
 `.trim()
 
 const shardKeyHotspotsTeach = `
