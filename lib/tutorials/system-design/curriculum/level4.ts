@@ -428,6 +428,29 @@ misses. Production uses both.
   **not ready**: still warming its cache, loading a model, filling connection pools, or temporarily
   shedding load. A not-ready node should be **pulled from the LB pool but not killed.**
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A new node needs 90 seconds to warm its cache. The platform uses one '/health' endpoint for both liveness and readiness, and it returns failure until the cache is warm. What happens on startup?",
+  "options": [
+    {
+      "label": "It receives no traffic until warm, then joins the pool",
+      "feedback": "Tempting, because that is exactly what a readiness failure alone would do. But the same failing endpoint is also the liveness check, and liveness failures trigger restarts."
+    },
+    {
+      "label": "It crash-loops: the orchestrator kills and restarts it before it ever finishes warming",
+      "correct": true,
+      "feedback": "Right. 'Not warm yet' read as 'dead' means the restart timer beats the warmup timer every time. Keeping liveness and readiness as separate questions is the fix."
+    },
+    {
+      "label": "The balancer slow-starts it on a reduced traffic share",
+      "feedback": "Slow-start ramps traffic after a node is admitted to the pool; a node failing its checks never gets admitted at all."
+    }
+  ]
+}
+\`\`\`
+
 Conflating them is a classic bug. If you treat "not warmed up yet" as a liveness failure, the
 orchestrator keeps killing and restarting perfectly good nodes in a crash loop. Gate a newly started
 node behind readiness until it is warm, then admit it.
@@ -441,6 +464,29 @@ node behind readiness until it is warm, then admit it.
 - **Slow-start / ramp:** a freshly joined node starts with zero warm cache and cold connection pools.
   If the LB immediately gives it a full 1/N share, it can fall over or spike latency. Slow-start
   ramps its traffic share up over some seconds.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A node's '/healthz' returns 200 whenever the web process is running. Its database connection pool is dead. What does the active health check conclude?",
+  "options": [
+    {
+      "label": "The node is healthy, so it keeps full traffic and fails every real request",
+      "correct": true,
+      "feedback": "Right. The probe asks 'is the process up' when the question that matters is 'can this node actually serve'. This is the shallow-check trap."
+    },
+    {
+      "label": "The probe fails after N attempts and the node is ejected",
+      "feedback": "Tempting, but the probe is succeeding: the endpoint honestly reports that the process is up. Nothing in a shallow check ever touches the database."
+    },
+    {
+      "label": "Nothing changes, because the balancer judges nodes on real traffic instead",
+      "feedback": "That is passive outlier detection, a different mechanism. Production pairs it with active probes precisely because a shallow active probe misses this failure."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance: deep vs shallow health checks.** A shallow check returns 200 as long as the web
 server is up, even if the database or a critical downstream is unreachable, so the node keeps
@@ -462,6 +508,30 @@ Recap: use active probes plus passive outlier ejection; keep liveness (restart) 
 readiness (pull from pool, do not kill); drain connections and slow-start new nodes so a rolling
 deploy drops nothing; and make checks deep enough to catch a broken downstream without letting one
 shared-dependency blip fail the whole fleet at once.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "After the shallow-check incident, every node's check is upgraded to deeply verify the shared database. The database then blips for ten seconds. What does the load balancer see?",
+  "options": [
+    {
+      "label": "A few unlucky nodes fail their checks",
+      "feedback": "Tempting, because failures usually look random. But every node shares this dependency, so their checks fail together, not independently."
+    },
+    {
+      "label": "Every node goes unhealthy at once and the pool empties: a total outage from a blip",
+      "correct": true,
+      "feedback": "Right. Correlated checks turn a shared-dependency blip into a fleet-wide eviction. The mature design is deep enough to catch a truly broken node, with hysteresis, and never coupled so tightly that one blip fails everyone."
+    },
+    {
+      "label": "Nothing, health checks hold their last result through short blips",
+      "feedback": "Checks run continuously on an interval with no such grace by default; hysteresis is something you must design in deliberately."
+    }
+  ],
+  "reveal": "Bringing the lesson together for your design write: active probes plus passive ejection, liveness (restart) kept separate from readiness (pull from pool, do not kill), draining and slow-start so a rolling deploy drops nothing, and a stated answer for how deep your check goes without letting one shared blip empty the pool."
+}
+\`\`\`
 `.trim()
 
 const serviceDiscoveryTeach = `
