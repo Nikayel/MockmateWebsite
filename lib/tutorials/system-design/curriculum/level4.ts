@@ -27,6 +27,29 @@ user. The user appears logged out. Worse, when node A dies, every session it hel
 balancer can only freely spread requests if **any node can serve any request**, which means nodes
 must be **stateless**.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your team keeps sessions in each node's memory and proposes sticky sessions: the balancer pins every user to the node that holds their session. That node dies mid-afternoon. What happens to its users?",
+  "options": [
+    {
+      "label": "The balancer reroutes them and they continue seamlessly",
+      "feedback": "Tempting, because rerouting is exactly what a balancer does for stateless nodes. But their sessions lived only in the dead node's memory, so the nodes they land on have never heard of them."
+    },
+    {
+      "label": "They are all logged out, and any state that node held is gone",
+      "correct": true,
+      "feedback": "Right. Stickiness hides the state problem instead of fixing it: the balancer can no longer spread load freely, and a single node death still wipes every session it held. The real fix is externalizing the state."
+    },
+    {
+      "label": "Nothing, sessions replicate between nodes automatically",
+      "feedback": "Tempting if you have seen session-replication features, but nothing replicates by default, and full replication reintroduces the coordination cost that statelessness exists to avoid."
+    }
+  ]
+}
+\`\`\`
+
 ### Externalizing state
 
 - **Sessions:** move them to Redis or Memcached, or make them stateless entirely with a signed
@@ -60,6 +83,41 @@ Recap: scale-out is the web-tier default because it beats the cost, ceiling, and
 single-failure-domain limits of scale-up, but it only works once nodes are stateless (session and
 file state externalized to Redis/JWT/S3), turning servers into interchangeable cattle; scale-up still
 wins for hard-to-shard stateful tiers until you are forced to shard.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each tier the way this lesson would scale it.",
+  "buckets": [
+    "Scale out: stateless fleet behind a balancer",
+    "Scale up first, shard only when forced"
+  ],
+  "items": [
+    {
+      "label": "API servers with sessions in Redis and uploads in S3",
+      "bucket": "Scale out: stateless fleet behind a balancer",
+      "feedback": "Externalized state makes these cattle: any node serves any request, so capacity grows linearly with node count."
+    },
+    {
+      "label": "A single-writer relational database",
+      "bucket": "Scale up first, shard only when forced",
+      "feedback": "Write ordering and the working set are hard to split across boxes, so buy the bigger box and defer sharding until write throughput truly forces it."
+    },
+    {
+      "label": "Image-resize workers reading from object storage",
+      "bucket": "Scale out: stateless fleet behind a balancer",
+      "feedback": "No local state at all: the textbook scale-out tier."
+    },
+    {
+      "label": "An in-memory analytics engine whose working set must be co-located",
+      "bucket": "Scale up first, shard only when forced",
+      "feedback": "Co-location requirements are exactly what makes scale-out painful; this is the honest scale-up case the interview nuance names."
+    }
+  ],
+  "reveal": "The split to carry into your design write: scale out the stateless web and app tier (sessions to Redis or a JWT, files to S3, nodes as disposable cattle) and scale up, then shard, the stateful data tier. Say which side of that split each box in your diagram sits on."
+}
+\`\`\`
 `.trim()
 
 const lbL4L7Teach = `
