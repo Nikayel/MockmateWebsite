@@ -1504,6 +1504,29 @@ URLs**: \`app.4f9c2a.js\` instead of \`app.js\`. A new deploy is a new URL, so y
 one forever (immutable) and never purge; the HTML that references it gets a short TTL. This sidesteps
 invalidation almost entirely.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate sets 'Vary: Cookie' on cached pages so that users with different cookies can never share an entry. What happens to the CDN hit rate?",
+  "options": [
+    {
+      "label": "Roughly unchanged: most users share the same few cookie values",
+      "feedback": "Tempting, but cookies carry per-user session ids and analytics values, so nearly every user presents a unique Cookie header."
+    },
+    {
+      "label": "It collapses toward zero: nearly every request becomes its own cache entry",
+      "correct": true,
+      "feedback": "Right. Varying on Cookie fragments the cache per user, which is barely a cache at all. Vary only on headers that truly change the response body, like 'Accept-Encoding'."
+    },
+    {
+      "label": "It improves: the cache stops serving wrong entries to the wrong users",
+      "feedback": "Tempting because correctness sounds like a win, but the right fix for personalized responses is to not cache them at a shared edge, not to fragment the whole cache by cookie."
+    }
+  ]
+}
+\`\`\`
+
 **Cache-key normalization** decides your hit rate. By default the key is the full URL including query
 string, so \`?utm_source=twitter\` and \`?utm_source=email\` are two cache entries for one image.
 Strip tracking params, normalize casing, and only \`Vary\` on headers that actually change the body
@@ -1519,6 +1542,42 @@ per-user fragment.
 Recap: use a pull CDN with an L1/L2/shield hierarchy so the shield coalesces misses down to ~1 fetch
 per object, prefer versioned URLs over purging, normalize cache keys, micro-cache semi-dynamic HTML
 with stale-while-revalidate, and never cache authenticated bodies at a shared edge.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "You are about to design the CDN layer. Sort each response by how the edge should treat it.",
+  "buckets": [
+    "Cache long or forever",
+    "Micro-cache for seconds",
+    "Never cache at a shared edge"
+  ],
+  "items": [
+    {
+      "label": "'app.4f9c2a.js', a content-hashed bundle",
+      "bucket": "Cache long or forever",
+      "feedback": "The hash makes it immutable: a new deploy is a new URL, so the old one never needs purging."
+    },
+    {
+      "label": "The public homepage during a traffic spike",
+      "bucket": "Micro-cache for seconds",
+      "feedback": "A 1 to 5 second TTL with stale-while-revalidate collapses a 100k QPS spike to a handful of origin fetches per second."
+    },
+    {
+      "label": "A logged-in user's account page body",
+      "bucket": "Never cache at a shared edge",
+      "feedback": "A shared entry here leaks one user's data to another. Assemble personalization with edge compute over a cached shell instead."
+    },
+    {
+      "label": "An API response keyed to an auth token",
+      "bucket": "Never cache at a shared edge",
+      "feedback": "Authenticated bodies are per-user by definition; caching them at a shared edge is a data leak waiting to happen."
+    }
+  ],
+  "reveal": "Your design write should name the hierarchy (edge PoPs, regional tier, origin shield coalescing misses), versioned URLs as the invalidation default, normalized cache keys, and a hard line between cacheable and never-cacheable responses."
+}
+\`\`\`
 `.trim()
 
 const searchInvertedIndexTeach = `
