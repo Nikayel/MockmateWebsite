@@ -37,6 +37,9 @@ function estimateMinHeight(spec: WidgetSpec): number {
     case "quorum":
     case "cache-sim":
     case "queue-sim":
+    case "partition-sim":
+    case "replication-lag":
+    case "watermark-sim":
       // Predict phase renders first: title + question + option chips.
       return 150 + Math.ceil(spec.predictPrompt.options.length / 2) * 34
     case "sequence":

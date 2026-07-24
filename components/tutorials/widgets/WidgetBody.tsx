@@ -10,6 +10,9 @@ import { RateLimiterWidget } from "./RateLimiterWidget"
 import { QuorumWidget } from "./QuorumWidget"
 import { CacheSimWidget } from "./CacheSimWidget"
 import { QueueSimWidget } from "./QueueSimWidget"
+import { PartitionSimWidget } from "./PartitionSimWidget"
+import { ReplicationLagWidget } from "./ReplicationLagWidget"
+import { WatermarkSimWidget } from "./WatermarkSimWidget"
 
 /**
  * Dispatches a VALIDATED widget spec to its family component. This module (plus the
@@ -41,6 +44,12 @@ function renderSpec(spec: WidgetSpec) {
       return <CacheSimWidget spec={spec} />
     case "queue-sim":
       return <QueueSimWidget spec={spec} />
+    case "partition-sim":
+      return <PartitionSimWidget spec={spec} />
+    case "replication-lag":
+      return <ReplicationLagWidget spec={spec} />
+    case "watermark-sim":
+      return <WatermarkSimWidget spec={spec} />
     default: {
       // Exhaustiveness guard: adding a spec type without a case is a compile error here.
       const _exhaustive: never = spec
