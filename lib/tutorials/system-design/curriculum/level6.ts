@@ -1915,6 +1915,29 @@ An *aggregate* (say Account #42) has a fold function: start from an empty state,
 
 \`\`\`cswidget
 {
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An auditor asks for Account #42's balance as of last Tuesday at 5pm. The event-sourced ledger folds events up to that timestamp and answers. Why can a mutate-in-place system not answer the same question?",
+  "options": [
+    {
+      "label": "Each UPDATE overwrote the previous balance, so the history is gone unless a separate audit table was kept",
+      "correct": true,
+      "feedback": "Right: in-place state throws history away; the event log retains every change as a first-class fact, which is the whole audit-and-time-travel win."
+    },
+    {
+      "label": "It can, by re-running the fold over its balance column",
+      "feedback": "There is nothing to fold: a single current-value column has no ordered events behind it."
+    },
+    {
+      "label": "It can, because the database keeps old row versions around indefinitely",
+      "feedback": "Old row versions exist for transaction isolation and get garbage-collected; they are not a queryable history."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "steps",
   "title": "Folding the event log into state",
   "frames": [
@@ -2111,11 +2134,57 @@ Two requests both read Account #42 at version 100 and both try to append. To pre
 
 **Interview nuance:** you never edit history. A wrong event is corrected by appending a *compensating* event ("Adjustment: -$30, reason: duplicate"), exactly like an accountant posts a correcting entry rather than erasing ink. Schema change over years is handled by **upcasting**: when you read an old event version, transform it on the fly into the current shape before applying it.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Last month's Deposited 100 event should have been 70. What is the event-sourced correction?",
+  "options": [
+    {
+      "label": "Append a compensating adjustment event of minus 30 with a reason; the fold makes current state right while history stays intact",
+      "correct": true,
+      "feedback": "Right: like an accountant's correcting entry, you never edit history; the log stays an honest record and replay stays deterministic."
+    },
+    {
+      "label": "Update the stored event in place; state is derived anyway, so nothing else changes",
+      "feedback": "Editing history breaks the audit trail and silently changes what every past replay and projection would compute."
+    },
+    {
+      "label": "Delete the bad event and replay the log to rebuild state",
+      "feedback": "The log is append-only and immutable; deleting an event is editing history with extra steps."
+    }
+  ]
+}
+\`\`\`
+
 ## When it is the wrong tool
 
 Event sourcing adds real complexity: eventual consistency in read models, replay tooling, schema/upcasting discipline, and a steeper mental model for the whole team. If an entity is simple CRUD with no audit or temporal need (a user's display-name preference), event sourcing is over-engineering. Reach for it where history *is* the product: ledgers, order lifecycles, inventory, anything audited.
 
 **Recap:** store immutable events as truth and fold them to derive state, bound replay with snapshots, guard writes with expected-version optimistic concurrency, correct by appending (never editing), and use it only where audit/temporal value justifies the complexity.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An operator accidentally deletes every snapshot for a 10-year-old account with 100k events. What is permanently lost?",
+  "options": [
+    {
+      "label": "Nothing: snapshots are a cache, so the deterministic fold rebuilds state from the log; you only pay replay time until new snapshots are taken",
+      "correct": true,
+      "feedback": "Right: this combines the two ideas: the log is the sole source of truth and the fold is deterministic, while snapshots merely bound replay cost."
+    },
+    {
+      "label": "The current balance: it lived in the latest snapshot",
+      "feedback": "The balance was never stored truth; it is derived, and the same events always fold to the same state."
+    },
+    {
+      "label": "All events older than the most recent snapshot",
+      "feedback": "Snapshots never replace log segments; every event is still in the append-only log."
+    }
+  ]
+}
+\`\`\`
 `.trim()
 
 const cqrsTeach = `
