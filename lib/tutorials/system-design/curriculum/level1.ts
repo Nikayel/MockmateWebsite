@@ -1114,6 +1114,29 @@ are real: HTTP caching mostly stops working because everything is a POST to \`/g
 add explicit query-cost limiting and depth limiting to stop a client from asking for the whole graph,
 and the resolver layer invites N+1 database calls unless you add DataLoader-style batching.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your team is designing a public API for external developers in dozens of languages. A teammate pushes for gRPC because it is faster and more modern. What should drive the decision instead?",
+  "options": [
+    {
+      "label": "Raw performance: gRPC's smaller payloads win, so use it",
+      "feedback": "Tempting, and the payload savings are real, but a public API's consumers are browsers and 'curl'-level integrators you do not control. gRPC needs grpc-web plus a proxy for browsers and defeats HTTP caching, so speed is not the deciding axis here."
+    },
+    {
+      "label": "Consumer shape: external developers need ubiquity, 'curl' debugging, and HTTP caching, which points to REST",
+      "correct": true,
+      "feedback": "Right. A paradigm is a bet about who the consumer is and what the traffic looks like. For a public developer API, ubiquity and the HTTP ecosystem outweigh binary-payload savings."
+    },
+    {
+      "label": "Whatever the biggest tech companies use",
+      "feedback": "Netflix, Uber, and Google run hybrids: REST or GraphQL at the edge and gRPC internally. Copying a logo without matching the consumer shape is how gRPC ends up on a browser-facing API."
+    }
+  ]
+}
+\`\`\`
+
 ### The real answer is usually hybrid
 
 Put REST or GraphQL at the edge where public or client-facing consumers live, and use gRPC between
@@ -1130,6 +1153,42 @@ query-cost limits" is a senior one.
 
 Recap: match paradigm to consumer and traffic (REST public, gRPC internal, GraphQL flexible clients),
 and expect the real answer to be a hybrid.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each consumer to the paradigm you would bet on.",
+  "buckets": [
+    "REST",
+    "gRPC",
+    "GraphQL"
+  ],
+  "items": [
+    {
+      "label": "Public developer API integrated from many languages",
+      "bucket": "REST",
+      "feedback": "Ubiquity, 'curl' debugging, HTTP caching, and OpenAPI docs matter most when you do not control the clients."
+    },
+    {
+      "label": "Internal fraud-scoring calls at 20k QPS between services you own",
+      "bucket": "gRPC",
+      "feedback": "You own both ends, so Protobuf's compact frames, HTTP/2 multiplexing, and generated stubs pay off at high QPS."
+    },
+    {
+      "label": "Mobile app whose screens each need different field combinations",
+      "bucket": "GraphQL",
+      "feedback": "Varied, evolving data needs across many screens is exactly the over/under-fetching problem GraphQL solves, provided you add cost limits and DataLoader-style batching."
+    },
+    {
+      "label": "Partner endpoint that support engineers debug by pasting a URL",
+      "bucket": "REST",
+      "feedback": "Human-debuggable request/response over plain HTTP is REST's home turf; a binary POST cannot be inspected that way."
+    }
+  ],
+  "reveal": "The pattern to carry into the design exercise: name the consumer and traffic shape first, then pick the paradigm, and expect a hybrid, with REST or GraphQL at the edge resolving into gRPC between your own services."
+}
+\`\`\`
 `.trim()
 
 const contractDesignTeach = `
