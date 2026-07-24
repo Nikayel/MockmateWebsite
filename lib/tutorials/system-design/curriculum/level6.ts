@@ -1511,9 +1511,55 @@ A unique constraint (or a Redis \`SET key value NX\`, or a DynamoDB conditional 
 
 **Store the result, not a boolean.** This is the detail the race turns on. If the dedup store keeps only a "seen" flag, two concurrent duplicates both find "not seen," both execute, and there is no stored answer to hand back. Save the outcome (the created order id, the HTTP response body) keyed by the idempotency key, and return it verbatim on any repeat.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two copies of the same request hit two servers at the same millisecond. The dedup store keeps only a seen flag per key, checked with a read-then-write. What happens?",
+  "options": [
+    {
+      "label": "Both requests pass the check, both execute, and there is no stored result to hand back on later retries",
+      "correct": true,
+      "feedback": "Right: the read-then-write race lets both pass, and a bare flag leaves nothing to return, which is why the fix is an atomic check-and-set that stores the result."
+    },
+    {
+      "label": "The second request finds the flag set and safely returns the first request's response",
+      "feedback": "A flag cannot return a response because no result was saved, and at the same millisecond the flag is not yet set when the second read happens."
+    },
+    {
+      "label": "The database serializes the two writes, so only one request executes",
+      "feedback": "Without a unique constraint or conditional write there is nothing to serialize on; the read and the write are separate steps and both reads pass."
+    }
+  ]
+}
+\`\`\`
+
 ## Sizing the dedup window
 
 The dedup store keeps keys for a TTL, and that TTL must be **at least as long as the longest window in which a duplicate can arrive.** Two windows matter: the client retry horizon (how long clients keep retrying, usually minutes) and the broker **replay/retention** window (Kafka can replay days of history during a reprocess or consumer reset). If your dedup TTL is 1 hour but you replay a 3-day-old topic, every replayed message looks new and re-applies. Size the TTL to cover the replay window, or use a permanent natural key so replays are inherently safe.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your dedup TTL is 1 hour and clients stop retrying after 5 minutes. An incident forces you to replay 3 days of a Kafka topic. What happens to the replayed messages?",
+  "options": [
+    {
+      "label": "Every replayed message looks new to the dedup store and re-applies its side effect",
+      "correct": true,
+      "feedback": "Right: the keys expired long ago, so the TTL must cover the broker replay window, not just the client retry horizon."
+    },
+    {
+      "label": "The dedup store still recognizes them because keys are only evicted under memory pressure",
+      "feedback": "The TTL is a hard expiry, not a memory-pressure heuristic; after 1 hour the keys are gone."
+    },
+    {
+      "label": "Kafka suppresses duplicates during replay so the dedup store never sees them",
+      "feedback": "Replay is the point of the log: the broker redelivers everything in the retention window and leaves dedup entirely to you."
+    }
+  ]
+}
+\`\`\`
 
 ## The idempotency toolkit
 
@@ -1526,6 +1572,29 @@ The dedup store is the general fallback, but two cheaper flavors come first when
 **Interview nuance:** distinguish the idempotency key's *scope*. A client-supplied key dedups client retries of the same logical request. An event-id key dedups broker redeliveries. They are different keys guarding different duplicate sources, and a robust design often uses both.
 
 **Recap:** past the L5 key mechanics, the two production hazards are the concurrent-duplicate race (resolve it with an atomic check-and-set on a unique constraint, storing the *result* not a flag) and the dedup window (size the TTL to cover both the client-retry and broker-replay horizons); prefer naturally idempotent operations or state-machine transitions before falling back to a dedup store.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 3-day replay hits two consumers. Consumer A runs SET status = shipped keyed by order id. Consumer B runs INCR balance guarded by a dedup store with a 1-hour TTL. Which one corrupts state, and why?",
+  "options": [
+    {
+      "label": "B: the increment is not naturally idempotent, and its dedup keys expired long before the replay window, so it re-applies",
+      "correct": true,
+      "feedback": "Right: this combines both hazards; INCR needs explicit protection and the TTL must cover the replay horizon, while A's SET lands in the same state every time."
+    },
+    {
+      "label": "A: repeated SETs push the order through its lifecycle again",
+      "feedback": "SET status = shipped keyed by a stable id lands in the same state however many times it runs; that is exactly what naturally idempotent means."
+    },
+    {
+      "label": "Both: any replayed message re-applies once the dedup TTL has passed",
+      "feedback": "The dedup window only matters for operations that need a dedup store; a naturally idempotent operation is safe with no store at all."
+    }
+  ]
+}
+\`\`\`
 `.trim()
 
 const retriesDlqBackpressureTeach = `
