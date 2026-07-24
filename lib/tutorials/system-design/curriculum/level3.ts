@@ -282,6 +282,41 @@ interaction actually needs. There are four, and matching a bug to its guarantee 
 - **Writes-follow-reads (causal):** if you read X and then write Y in reaction, everyone who sees Y
   also sees X (a reply never appears before the comment it replies to).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Each bug below violates one session guarantee. Match the symptom to the guarantee that would prevent it.",
+  "buckets": [
+    "Read-your-writes",
+    "Monotonic reads",
+    "Writes-follow-reads"
+  ],
+  "items": [
+    {
+      "label": "You post a comment, refresh, and your own comment is gone",
+      "bucket": "Read-your-writes",
+      "feedback": "The writer must always see their own write; nothing is promised about other users."
+    },
+    {
+      "label": "A comment appears, vanishes on the next refresh, then comes back",
+      "bucket": "Monotonic reads",
+      "feedback": "Successive reads hit replicas with different lag, so time appears to go backwards. Monotonic reads forbids that flicker."
+    },
+    {
+      "label": "A reply shows up before the comment it responds to",
+      "bucket": "Writes-follow-reads",
+      "feedback": "The reply was written in reaction to a read, so anyone who sees the reply must also see what it replies to. That is the causal guarantee."
+    },
+    {
+      "label": "You update your bio, then still see the old one on the profile page",
+      "bucket": "Read-your-writes",
+      "feedback": "Same shape as the vanishing comment: your read raced ahead to a replica that had not applied your own write yet."
+    }
+  ]
+}
+\`\`\`
+
 ### Two implementation techniques cover most cases
 
 **Sticky routing to the leader.** For a bounded window after a user writes (say 10 to 30 seconds, or
@@ -316,6 +351,30 @@ Recap: replication lag causes user-visible bugs, each violating a specific sessi
 implement them with sticky routing to the leader (simple, single-device) or version tokens that make
 reads wait for a replica to catch up (works cross-device), and remember these are weaker than
 linearizability but usually exactly what the product needs.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Requirement: a user who posts from their phone must see that post when they open their laptop seconds later. What do you reach for?",
+  "options": [
+    {
+      "label": "Linearizability across the system",
+      "feedback": "Tempting because it certainly works, but it makes every read pay consensus or leader-round-trip costs to fix one user-scoped bug. The product needs read-your-writes, not a global real-time order."
+    },
+    {
+      "label": "Sticky-route the writing session to the leader for a while",
+      "feedback": "Tempting, and it does fix the single-device case. But stickiness is per session: the laptop is a different session and still lands on a lagging replica."
+    },
+    {
+      "label": "A version token stored with the user that reads must catch up to",
+      "correct": true,
+      "feedback": "Right. The write returns an LSN-style token, the token travels with the user, and any device's reads wait for a replica at or past it. Cross-device read-your-writes at a fraction of linearizability's cost."
+    }
+  ],
+  "reveal": "The pattern to carry into the design write: name the exact session guarantee the user story needs, then buy just that guarantee with sticky routing or version tokens. Reserve linearizability for the rare operation that truly needs a global order, like claiming a unique username or a seat."
+}
+\`\`\`
 `.trim()
 
 const partitioningStrategiesTeach = `
