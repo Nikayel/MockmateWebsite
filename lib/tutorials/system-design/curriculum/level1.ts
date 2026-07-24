@@ -2363,6 +2363,29 @@ during a backend blip. Guard hot keys against a **cache stampede** (thundering h
 key expires and a thousand requests all miss and hit the DB at once, use request coalescing
 (single-flight), a short lock, or jittered TTLs so they do not all expire together.
 
+\`\`\`cswidget
+{
+  "type": "cache-sim",
+  "title": "TTL and hit ratio: the invalidation trade you just read",
+  "predictPrompt": {
+    "question": "The stream is skewed: about half of all requests go to one hot product key. If you cut the TTL from 40 ticks down to 5, what happens?",
+    "options": [
+      "Hit ratio barely moves; TTL only affects how stale entries are, not whether they hit",
+      "Hit ratio drops and the origin absorbs far more rebuilds, especially for the hot key",
+      "Hit ratio rises because fresher entries are more likely to be requested again"
+    ]
+  },
+  "workedExample": "Start with 12 distinct keys against an 8-slot LRU, a 40-tick TTL, and a 6-tick database rebuild on every miss. The hot key takes about half of all traffic, so once it is warm it keeps getting re-read long before its TTL runs out, and the hit ratio settles high. Shrink the TTL and you are trading staleness for misses: every expiry sends a request through the 6-tick rebuild, so the origin sees more traffic as the TTL falls. Now flip the stampede toggle: the TTL is forced below the rebuild time, so while the hot key is still rebuilding, more requests for it keep missing and pile extra rebuilds onto the database at once. That pile-up is the thundering herd from the paragraph above, and request coalescing caps the concurrent rebuilds for one key at a single flight.",
+  "seed": "cdn-invalidation-l1",
+  "keys": 12,
+  "ticks": 240,
+  "capacity": 8,
+  "ttl": 40,
+  "rebuildTicks": 6,
+  "caption": "TTL against staleness tolerance is the tuning knob the prose describes; the stampede toggle is why single-flight and jittered TTLs exist."
+}
+\`\`\`
+
 ### The CDN
 
 The CDN is the caching layer nearest the user: a network of **anycast POPs** worldwide that cache
