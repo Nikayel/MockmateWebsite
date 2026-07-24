@@ -606,6 +606,40 @@ Failover has to be *triggered* by something, and that something is health checki
 
 **Interview nuance:** the two failure modes interviewers probe are flapping and split-brain. Flapping is an instance that fails and recovers repeatedly, causing constant add/remove churn; you damp it with hysteresis (require N consecutive failures to eject, M consecutive successes to re-admit) and cooldowns. Split-brain is worse: during a network partition, a passive standby cannot tell "primary is dead" from "I just cannot reach the primary," promotes itself, and now you have two primaries taking writes. The fix is to never let a single node decide promotion. Use quorum-based leader election (Raft/Paxos, or a fencing token) so a minority side cannot win, and fence the old primary (STONITH, revoke its storage lease) before the new one takes over. Also plan failback: returning to the recovered primary is its own controlled operation, not automatic.
 
+\`\`\`cswidget
+{
+  "type": "partition-sim",
+  "title": "Split-brain: two primaries taking writes",
+  "predictPrompt": {
+    "question": "A network partition separates the primary from its passive standby. The standby cannot tell whether the primary is dead or just unreachable, so it promotes itself while the old primary keeps serving. What happens to writes?",
+    "options": [
+      "Both nodes accept writes and their copies of the data diverge",
+      "The old primary automatically demotes itself, so only one node writes",
+      "The promoted standby serves reads only, so nothing can diverge",
+      "Clients notice two primaries and refuse to write to either"
+    ]
+  },
+  "workedExample": "Cut the link and the passive standby loses contact with the primary. It cannot tell primary-is-dead from I-just-cannot-reach-the-primary, so it promotes itself, and now the old primary and the promoted standby are both live. Pick AP and both accept writes: fire them and watch the copies diverge as the old primary marks the order shipped while the new primary cancels it, each side committing confidently. On heal there is no good merge. Last-writer-wins keeps whichever write carries the later timestamp and silently discards the other primary's committed write, a loss no merge rule can honestly fix. Pick CP instead and you get what quorum-based leader election enforces: the minority side cannot win, so the isolated node stops accepting writes and a second primary never exists. That is why promotion must never be one lonely standby's decision.",
+  "kind": "register",
+  "writes": [
+    {
+      "side": "A",
+      "value": "shipped",
+      "label": "old primary: marks order 1042 shipped"
+    },
+    {
+      "side": "B",
+      "value": "cancelled",
+      "label": "promoted standby: cancels order 1042"
+    }
+  ],
+  "strategies": [
+    "lww"
+  ],
+  "caption": "The real fix is making dual-primary impossible, not merging after the fact: quorum-based leader election so a minority side cannot win, and fencing the old primary (STONITH, revoke its storage lease) before the new one takes over."
+}
+\`\`\`
+
 \`\`\`
         clients
            |
