@@ -152,6 +152,27 @@ death." If you reach for sticky sessions to compensate for not externalizing sta
 smell; if you reach for consistent hashing to keep a cache warm, that is sound engineering. Same
 mechanism, different justification.
 
+\`\`\`cswidget
+{
+  "type": "hash-ring",
+  "title": "Why a consistent-hash balancer keeps caches warm",
+  "predictPrompt": {
+    "question": "A hash-based balancer pins each session to a backend with hash mod N. One backend is drained for a deploy. How many sessions land on a cold node?",
+    "options": [
+      "Only the drained node's share",
+      "Most of them",
+      "None, sessions follow their backend"
+    ]
+  },
+  "workedExample": "The 36 keys here are sessions pinned by hash. In mod-N mode, remove a backend and most sessions reshuffle onto cold nodes: a fleet-wide warm-state loss. On the ring, only the drained backend's sessions move, straight to the clockwise neighbor. Try both, then re-read the crisp story above.",
+  "initialNodes": 4,
+  "maxNodes": 6,
+  "keys": 36,
+  "initialMode": "modulo",
+  "vnodeFactor": 16
+}
+\`\`\`
+
 \`\`\`
    variable durations:
    RR  -> buried node still gets its turn   (bad: hotspot)
