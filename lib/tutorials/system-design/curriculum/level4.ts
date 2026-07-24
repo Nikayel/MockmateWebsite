@@ -1819,6 +1819,29 @@ point is a **fault domain**: a bad deploy, a resource exhaustion, or a poison re
 cell 3 affects only cell 3's ~10% of users. This is how AWS runs many services and how Slack and
 Salesforce limit outage scope.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your fleet already spans 3 AZs with autoscaling. A release with a crashing bug ships through your normal global deploy. Who is affected?",
+  "options": [
+    {
+      "label": "About a third of users, because an AZ is a fault domain",
+      "feedback": "Tempting, because AZs really are fault domains, but only for infrastructure failures like a zone outage. A deploy pushes the same bad code to every AZ, so all three share the fault."
+    },
+    {
+      "label": "Everyone: all AZs run the same code version",
+      "correct": true,
+      "feedback": "Right. AZ spread protects against the building burning down, not against your own release. Only a boundary that splits code version and rollout, like a cell, can cap a bad deploy."
+    },
+    {
+      "label": "Almost no one: autoscaling replaces the crashing nodes",
+      "feedback": "Tempting, but every replacement boots the same bad version and crashes the same way. Capacity cannot fix a code fault."
+    }
+  ]
+}
+\`\`\`
+
 Routing to cells is done by a **thin, extremely simple, highly-available cell router**: it maps a
 tenant/user ID to a cell (a lookup table or a hash) and forwards. The router must be *dumb and
 rock-solid*, because it is the one shared component. You deploy changes **cell by cell**: canary cell
@@ -1850,6 +1873,29 @@ a worker, and *never* a tenant who shares zero workers. Combined with per-reques
 client retries on its other worker), the practical blast radius of one bad tenant drops to a rounding
 error. This is exactly how AWS Route 53 isolates customers.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "8 workers serve many tenants, each tenant assigned to 2 workers. Plan A: 4 fixed shards of 2. Plan B: shuffle sharding, each tenant gets a random pair out of the 28 possible. One tenant floods its 2 workers. Compare which other tenants go fully down.",
+  "options": [
+    {
+      "label": "The same either way: 2 workers are saturated in both plans",
+      "feedback": "Tempting, because the dead hardware is identical. But blast radius is about who depends on exactly that pair: in Plan A it is every tenant on the shard, in Plan B it is almost nobody."
+    },
+    {
+      "label": "Plan A: everyone on that shard, a full quarter of tenants. Plan B: only the roughly 1-in-28 tenants holding the exact same pair",
+      "correct": true,
+      "feedback": "Right. Fixed shards make shard-mates share total fate. With random pairs, a tenant who overlaps on just one worker still has a healthy worker and survives with a retry; only an identical pair means full loss."
+    },
+    {
+      "label": "Plan B is worse: random pairs spread the flood across more tenants",
+      "feedback": "Tempting, because random assignment does mean more tenants share one worker with the abuser. But sharing one worker is survivable via retry on the other; Plan A guarantees total loss for every shard-mate. Partial, survivable overlap beats concentrated, fatal overlap."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the tradeoffs are real and you must name them. Cells cause **capacity
 fragmentation**: each cell needs its own headroom, so ten cells cost more idle capacity than one big
 pool, and a hot cell cannot borrow a quiet cell's spare capacity without rebalancing. **Cross-cell
@@ -1862,6 +1908,52 @@ Recap: a cell is a self-contained stack serving a user subset behind a dumb HA r
 deploy or tenant is contained to one cell's ~10%, while shuffle sharding assigns each tenant a random
 worker subset so full overlap between any two tenants is rare; you pay with capacity fragmentation
 and harder cross-cell operations.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each statement by which mechanism delivers it, or whether it is part of the bill you agree to pay.",
+  "buckets": [
+    "Cells",
+    "Shuffle sharding",
+    "Cost you accept"
+  ],
+  "items": [
+    {
+      "label": "A bad deploy is caught at one canary slice instead of 100% of users",
+      "bucket": "Cells",
+      "feedback": "Cell-by-cell rollout means the blast radius of a bad release is one cell's share."
+    },
+    {
+      "label": "Two tenants fully share fate only about 1 time in 28",
+      "bucket": "Shuffle sharding",
+      "feedback": "Random worker subsets make complete overlap between any two tenants statistically rare."
+    },
+    {
+      "label": "A noisy tenant inside a shared pool degrades only the few tenants sharing a worker, never those sharing none",
+      "bucket": "Shuffle sharding",
+      "feedback": "This is the finer-grained, within-pool isolation that cells alone do not give."
+    },
+    {
+      "label": "Each stack needs its own idle headroom, and a hot one cannot borrow a quiet one's slack",
+      "bucket": "Cost you accept",
+      "feedback": "Capacity fragmentation: ten pools of headroom cost more than one, and rebalancing is a project."
+    },
+    {
+      "label": "Global queries and tenant migration need extra tooling",
+      "bucket": "Cost you accept",
+      "feedback": "Cross-cell operations get hard once cells share nothing at runtime."
+    },
+    {
+      "label": "One dumb, rock-solid router is the shared dependency you must obsess over",
+      "bucket": "Cost you accept",
+      "feedback": "The router is the price of having any shared entry point at all: keep it thin, stateless, and over-provisioned."
+    }
+  ],
+  "reveal": "In the design exercise, name the mechanism and its price in the same breath: cells cap any single failure at one cell's share of users, shuffle sharding makes full overlap between two tenants a rounding error, and you pay with fragmented headroom, harder cross-cell operations, and a router that must stay dumb and highly available."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel4: DesignLevel = {
