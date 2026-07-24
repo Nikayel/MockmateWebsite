@@ -544,6 +544,29 @@ a stale address keeps receiving traffic and callers get connection errors. **Ser
 a caller learn the **current set of healthy addresses**, and the second question is **who makes the
 balancing decision**: a central load balancer, or each client.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You publish instance IPs in DNS with a 60 second TTL and call it service discovery. An instance is terminated during scale-in. Where does its traffic go for the next minute?",
+  "options": [
+    {
+      "label": "Resolvers notice the connection failures and refetch immediately",
+      "feedback": "Tempting, but DNS has no feedback loop from failed connections; resolvers serve their cache until the TTL expires, and some ignore short TTLs entirely."
+    },
+    {
+      "label": "Callers holding the cached record keep dialing the dead address and get connection errors",
+      "correct": true,
+      "feedback": "Right. The record stays stale in every caller's cache for up to the TTL, and nothing pushes the update. That propagation gap is exactly what a registry with watch or push closes."
+    },
+    {
+      "label": "The terminated instance drains gracefully, so nothing is lost",
+      "feedback": "Draining protects in-flight work during a planned shutdown, but it cannot stop new connections from callers whose cached DNS answer still lists the dead address."
+    }
+  ]
+}
+\`\`\`
+
 ### The service registry
 
 - **Self-registration:** each instance **registers** itself on startup and sends periodic
@@ -575,6 +598,50 @@ A **service mesh** (Istio or Linkerd, Envoy sidecars) is the popular middle grou
 benefits (no central-LB hop, locality, per-request balancing, retries, mTLS) with **central
 configuration**. The price is real operational complexity (a control plane and a sidecar per pod).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each property by where the balancing decision lives.",
+  "buckets": [
+    "Server-side LB",
+    "Client-side LB or mesh"
+  ],
+  "items": [
+    {
+      "label": "Clients stay dumb and hit one stable VIP",
+      "bucket": "Server-side LB",
+      "feedback": "Central control with simple callers is the whole pitch of a dedicated balancer."
+    },
+    {
+      "label": "Every request pays an extra network hop",
+      "bucket": "Server-side LB",
+      "feedback": "The balancer sits in the path, and it is also a component you must scale and keep HA."
+    },
+    {
+      "label": "Prefer-same-zone and least-request decisions made with a local load view",
+      "bucket": "Client-side LB or mesh",
+      "feedback": "Smart locality-aware policy is what holding the instance list yourself unlocks."
+    },
+    {
+      "label": "Balancing complexity is pushed into every caller",
+      "bucket": "Client-side LB or mesh",
+      "feedback": "The cost side of client-side LB, which a mesh softens by moving it into a sidecar under central configuration."
+    },
+    {
+      "label": "One central choke point that can become the bottleneck",
+      "bucket": "Server-side LB",
+      "feedback": "The scaling and HA burden concentrates in the balancer tier."
+    },
+    {
+      "label": "A hard dependency on fast registry propagation",
+      "bucket": "Client-side LB or mesh",
+      "feedback": "Each caller's own list must stay fresh, or it keeps dialing terminated instances."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the discriminator is where you want complexity to live. Central LB = simple
 clients, extra hop, one scaling choke point. Client-side/mesh = no hop and smart routing, but
 complexity and propagation risk in every caller. A strong concrete answer: Kubernetes with a mesh for
@@ -593,6 +660,30 @@ Kubernetes Endpoints tied to readiness), unhealthy instances leave rotation in s
 LB keeps clients simple at the cost of a hop and a central component, client-side/mesh removes the
 hop and adds locality at the cost of per-client complexity, and the classic wrong turn is hardcoded
 IPs or long-TTL DNS that keeps sending traffic to terminated instances.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are designing discovery for an autoscaling gRPC fleet whose instance set changes every minute. Which shape keeps a dead instance's lingering traffic to seconds?",
+  "options": [
+    {
+      "label": "Short-TTL DNS records listing the instance IPs",
+      "feedback": "Tempting because short TTLs feel fast, but resolver and stub caching still stretch propagation to a minute or more, and nothing pushes updates to callers."
+    },
+    {
+      "label": "A registry with heartbeats and readiness, plus client-side LB watching it on short check intervals",
+      "correct": true,
+      "feedback": "Right. Watch or push propagation gets a terminated instance out of every caller's view in seconds, and readiness gates cold instances until they are warm. This is the gRPC-plus-etcd shape the lesson names."
+    },
+    {
+      "label": "Hardcoded instance addresses refreshed on each deploy",
+      "feedback": "Autoscaling changes the set between deploys, so every scale-in strands traffic on a dead address until someone ships new config."
+    }
+  ],
+  "reveal": "For the design write: name the registry, say where the balancing decision lives and why (simple clients plus a hop, versus locality plus per-caller complexity), and quote the number that matters: a bad instance leaves every caller's view in seconds, not minutes."
+}
+\`\`\`
 `.trim()
 
 const globalGslbTeach = `
