@@ -194,6 +194,29 @@ faster, and no two workers do the same job. The defining property is that the me
 gone. No replay, no second reader. RabbitMQ adds routing (exchanges, bindings) and per-message DLQs;
 SQS adds a visibility timeout so an un-acked message reappears for another worker after a crash.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Orders flow through an SQS queue that a worker pool drains. A second team asks to read the same messages for analytics. What do they find?",
+  "options": [
+    {
+      "label": "Nothing: each message was delivered to one worker and deleted on ack, so there is no second reader and no replay",
+      "correct": true,
+      "feedback": "Right: consumed-and-gone is the defining property of a point-to-point queue."
+    },
+    {
+      "label": "A full copy, because the broker keeps everything until every team has read it",
+      "feedback": "That describes a log with per-group offsets, not a queue that deletes on ack."
+    },
+    {
+      "label": "The last 30 days, as long as they start reading from offset zero",
+      "feedback": "Offsets and replay belong to the log model; a queue has no cursor to rewind."
+    }
+  ]
+}
+\`\`\`
+
 **Pub/sub** (Amazon SNS, Google Pub/Sub topics, RabbitMQ fanout). A producer publishes to a topic;
 every subscriber gets its own copy. This is fan-out: one \`OrderPlaced\` reaches email, analytics,
 and fraud independently. Classic pub/sub is often fire-and-forget: if a subscriber is down when the
@@ -255,6 +278,29 @@ log is pull-based: the consumer owns its offset, which is why one slow consumer 
 another and why replay is just "reset my offset." That consumer-owned-offset design is the whole
 reason a log scales to many independent readers and supports reprocessing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "On a Kafka topic, the analytics consumer group falls two days behind. What happens to the ranking group reading the same topic?",
+  "options": [
+    {
+      "label": "Nothing: each group owns its own offset, so one slow group cannot slow another",
+      "correct": true,
+      "feedback": "Right: consumer-owned cursors are the whole reason a log serves many independent readers."
+    },
+    {
+      "label": "It slows down too, because the broker tracks one delivery position for the topic",
+      "feedback": "Broker-tracked per-message state is the queue model; a log makes each group keep its own cursor."
+    },
+    {
+      "label": "It loses messages, because the broker deletes records once the slow group has read them",
+      "feedback": "A log retains by time or size regardless of who has read; consuming never deletes."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the classic wrong turn is choosing a queue when the requirement is "multiple
 independent teams, each reading the full stream, some needing to replay 30 days." A queue deletes on
 consume and serves one consumer per message. The moment you hear "replay," "reprocess," or "N
@@ -263,6 +309,47 @@ independent consumer groups over the same data," reach for a log.
 Recap: a queue distributes work and deletes on ack (no replay); pub/sub fans a copy to every
 subscriber; a log retains an ordered stream that many consumer groups read at their own offset and
 can replay.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Name the messaging model each requirement points to.",
+  "buckets": [
+    "Queue",
+    "Pub/sub",
+    "Log"
+  ],
+  "items": [
+    {
+      "label": "Thumbnail jobs where each job must be processed by exactly one worker, then disappear",
+      "bucket": "Queue",
+      "feedback": "Work distribution with delete-on-ack is exactly the point-to-point queue."
+    },
+    {
+      "label": "A new team must reprocess the last 30 days of the stream from offset zero",
+      "bucket": "Log",
+      "feedback": "Replay needs retention plus a consumer-owned offset to rewind; only the log has both."
+    },
+    {
+      "label": "Fan a copy of each message into every subscriber's own durable queue, with no need for history",
+      "bucket": "Pub/sub",
+      "feedback": "Per-subscriber copies without retained history is topic fan-out, the SNS-to-SQS pattern."
+    },
+    {
+      "label": "An un-acked message must reappear for another worker after a crash",
+      "bucket": "Queue",
+      "feedback": "The visibility timeout is the queue broker's redelivery mechanism for crashed workers."
+    },
+    {
+      "label": "Several independent reader groups over the same retained stream, each at its own cursor",
+      "bucket": "Log",
+      "feedback": "Independent groups each tracking their own offset is the log's defining read model."
+    }
+  ],
+  "reveal": "Two axes decide it: does consuming delete the message, and who tracks the position. Delete-on-ack with broker-tracked state is a queue, a copy per subscriber is pub/sub, and retained records with consumer-owned offsets is a log."
+}
+\`\`\`
 `.trim()
 
 const brokerSelectionTeach = `
