@@ -140,6 +140,180 @@ Typeahead is a latency problem wearing a data-structure costume. The user types 
 
 The core structure is a trie (prefix tree): each node is a character, and a path from the root spells a prefix. The naive trie lookup walks to the prefix node, then does a subtree traversal to find all completions and rank them, which is too slow for a hot prefix with thousands of descendants. The production trick is to cache the top-k completions at every node. When you reach the node for "ne", the 10 best completions ("netflix", "news", "nest", ...) are already stored right there, so serving is O(length of prefix), single-digit milliseconds, no subtree walk. This precomputation is done offline or incrementally, not per request.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Trie walk with cached top-k",
+  "frames": [
+    {
+      "note": "Each trie node is one character; the path from the root spells the prefix. The production trick: every node carries its precomputed top suggestions with scores baked in offline. Typing 'c' walks one hop and the ranked list is already sitting at the node.",
+      "rows": [
+        {
+          "label": "path",
+          "cells": [
+            {
+              "text": "root",
+              "state": "dim"
+            },
+            {
+              "text": "c",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "node 'c' top-k",
+          "cells": [
+            {
+              "text": "car 95"
+            },
+            {
+              "text": "cat 91"
+            },
+            {
+              "text": "code 88"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Keystroke 'a' extends the walk to the 'ca' node: two hops for a 2-char prefix, O(prefix length). Serving is just a read of that node's cached list, single-digit milliseconds, with zero ranking at request time.",
+      "rows": [
+        {
+          "label": "path",
+          "cells": [
+            {
+              "text": "root",
+              "state": "dim"
+            },
+            {
+              "text": "c",
+              "state": "dim"
+            },
+            {
+              "text": "a",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "node 'ca' top-k",
+          "cells": [
+            {
+              "text": "car 95"
+            },
+            {
+              "text": "cat 91"
+            },
+            {
+              "text": "cake 75"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Keystroke 't' lands on the 'cat' node with its own cached list. Every keystroke is one more hop down the active path; the cost never depends on how many completions live below the node.",
+      "rows": [
+        {
+          "label": "path",
+          "cells": [
+            {
+              "text": "root",
+              "state": "dim"
+            },
+            {
+              "text": "c",
+              "state": "dim"
+            },
+            {
+              "text": "a",
+              "state": "dim"
+            },
+            {
+              "text": "t",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "node 'cat' top-k",
+          "cells": [
+            {
+              "text": "cat 91"
+            },
+            {
+              "text": "catalog 64"
+            },
+            {
+              "text": "catering 52"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "Why store top-k at every node instead of computing it per query?",
+        "options": [
+          "A hot prefix has thousands of descendants; a subtree walk per keystroke blows the 100ms budget",
+          "The trie has no child pointers, so it cannot be walked downward",
+          "Per-node lists use less memory than the trie itself"
+        ]
+      }
+    },
+    {
+      "note": "The naive lookup walks the whole subtree under the prefix node and ranks thousands of completions on every keystroke: too slow for a hot prefix. Caching top-k per node moves that heap-selection into the offline build (nightly rebuild plus incremental updates for trending terms), so a query only ever reads a list.",
+      "rows": [
+        {
+          "label": "naive per query",
+          "cells": [
+            {
+              "text": "walk 1000s of nodes",
+              "state": "dropped"
+            },
+            {
+              "text": "rank at request time",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "cached top-k",
+          "cells": [
+            {
+              "text": "read k list",
+              "state": "active"
+            },
+            {
+              "text": "O(prefix), few ms",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "offline build",
+          "cells": [
+            {
+              "text": "heap over subtree",
+              "state": "new"
+            },
+            {
+              "text": "nightly rebuild",
+              "state": "new"
+            },
+            {
+              "text": "trending updates",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Typing 'ca' then 'cat': each keystroke is one hop, and the ranking was paid for offline."
+}
+\`\`\`
+
 **Interview nuance:** the single most common wrong turn is \`SELECT ... WHERE term LIKE 'prefix%'\` against a SQL table on every keystroke. Even with an index, ranking and the per-keystroke QPS blow the 100ms budget under load. Say why a prefix tree with cached top-k beats it, and mention that a search engine (Elasticsearch completion suggester, which is FST/trie-backed) is the buy-not-build version.
 
 ## Ranking and freshness
