@@ -1687,6 +1687,36 @@ proxies and CDNs easily. Limits: there is no client-to-server channel (the clien
 requests for that), and on HTTP/1.1 browsers cap concurrent connections per domain (about 6), which
 HTTP/2 multiplexing relieves.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Three HTTP-based delivery mechanisms so far. Match each workload to the cheapest one that fits.",
+  "buckets": [
+    "Short-poll",
+    "Long-poll",
+    "SSE"
+  ],
+  "items": [
+    {
+      "label": "An unread-count badge that can lag a few seconds",
+      "bucket": "Short-poll",
+      "feedback": "Low urgency tolerates the poll interval, and full statelessness keeps it trivially load-balanced."
+    },
+    {
+      "label": "Near-real-time updates through old proxies that break streaming responses",
+      "bucket": "Long-poll",
+      "feedback": "Each held request completes as an ordinary HTTP response, which is why long-polling is the universal-compatibility fallback."
+    },
+    {
+      "label": "Streaming LLM tokens to a browser as they generate",
+      "bucket": "SSE",
+      "feedback": "One-way server-to-client streaming with built-in reconnect and 'Last-Event-ID' resume: exactly what 'EventSource' was built for."
+    }
+  ]
+}
+\`\`\`
+
 **WebSocket**: after an HTTP upgrade you get a full-duplex TCP connection, so both sides can push at
 low latency. This is the right tool for genuinely bidirectional, low-latency work: chat, presence,
 collaborative editing, multiplayer. The costs are real: the connection is stateful, so scaling across
@@ -1697,6 +1727,33 @@ and reconnect/replay logic yourself.
 **Webhooks**: server-to-server HTTP callbacks. This is not browser delivery at all; it is how *your*
 server notifies *another* server of an event (Stripe calling your endpoint on \`payment.succeeded\`).
 Pair webhooks with retries, HMAC signing, and idempotency, because they will be redelivered.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You need a notifications feed: the server pushes to browsers with sub-second latency, and clients never send data back on that channel. Which mechanism?",
+  "options": [
+    {
+      "label": "WebSocket, it is the real-time tool",
+      "feedback": "The famous answer, and it would work, but you would pay for a stateful duplex connection used in one direction only: sticky sessions or a pub/sub backbone, heartbeats, and hand-rolled reconnect logic."
+    },
+    {
+      "label": "SSE",
+      "correct": true,
+      "feedback": "Right. One-directional flow is exactly SSE's shape: plain HTTP that proxies and CDNs pass through, automatic reconnection with 'Last-Event-ID' resume, and none of the duplex tax."
+    },
+    {
+      "label": "Webhooks",
+      "feedback": "Webhooks are server-to-server callbacks. A browser has no public endpoint to receive them, so they cannot deliver to a user's open tab."
+    },
+    {
+      "label": "Short-polling every 10 seconds",
+      "feedback": "Simple and stateless, but latency is capped at the poll interval, which fails the sub-second requirement here."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
 one-way, low urgency ....... short-poll
@@ -1712,6 +1769,30 @@ stateful-connection and sticky-session tax. Being able to say that out loud is t
 Recap: choose by direction, latency, per-connection cost, and delivery guarantee: short-poll for lazy
 counters, long-poll as the universal fallback, SSE for one-way streaming, WebSocket for true duplex,
 and webhooks for server-to-server async.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your WebSocket chat now runs on 10 server nodes. A user connected to node A sends a message to a user connected to node B. What makes delivery work?",
+  "options": [
+    {
+      "label": "Sticky sessions on the load balancer",
+      "feedback": "Tempting because sticky sessions do matter for keeping one user's connection pinned to a node, but they say nothing about how a message crosses from node A to node B."
+    },
+    {
+      "label": "A pub/sub backbone (Redis, NATS, Kafka) that every node subscribes to",
+      "correct": true,
+      "feedback": "Right. Node A publishes, node B is subscribed and pushes down its local socket. This is the price of stateful connections, and exactly the cost you skip when a one-way workload uses SSE instead."
+    },
+    {
+      "label": "Nothing extra, HTTP load balancing already routes messages to the right node",
+      "feedback": "Load balancers route incoming requests. A message bound for another user's open socket has to travel between nodes, which plain load balancing never does."
+    }
+  ],
+  "reveal": "The menu to carry into the design write: choose by direction, latency, per-connection cost, and delivery guarantee. Short-poll for lazy counters, long-poll as the universal fallback, SSE for one-way streaming, WebSocket for true duplex plus its pub/sub scaling tax, and webhooks for server-to-server with retries, HMAC signing, and dedupe."
+}
+\`\`\`
 `.trim()
 
 const httpSemanticsTeach = `
