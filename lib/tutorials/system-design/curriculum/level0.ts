@@ -280,6 +280,100 @@ Average is not what your capacity must survive. Real traffic is peaky: a diurnal
 spikes. A 2x to 3x peak multiplier over the daily average is the standard defensible assumption. So
 plan for roughly 15k peak read QPS and 1.5k peak write QPS.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Fermi engine: from assumptions to peak QPS",
+  "predictPrompt": {
+    "question": "50M users each do 10 reads per day. Roughly what average read QPS is that?",
+    "options": [
+      "About 50 QPS",
+      "About 500 QPS",
+      "About 5,000 QPS",
+      "About 50,000 QPS"
+    ]
+  },
+  "workedExample": "With the initial 50M DAU doing 10 reads and 1 write per user per day, the arithmetic gives 5,000 average read QPS and 500 average write QPS, and the 3x peak multiplier lifts those to 15,000 and 1,500. Drag DAU up to 500M and watch every number in the chain shift one power of ten.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "dau",
+      "label": "Daily active users",
+      "min": 100000,
+      "max": 1000000000,
+      "scale": "log",
+      "initial": 50000000,
+      "unit": "users"
+    },
+    {
+      "kind": "slider",
+      "id": "reads_per_user",
+      "label": "Reads per user per day",
+      "min": 1,
+      "max": 100,
+      "scale": "linear",
+      "step": 1,
+      "initial": 10
+    },
+    {
+      "kind": "slider",
+      "id": "writes_per_user",
+      "label": "Writes per user per day",
+      "min": 0.5,
+      "max": 20,
+      "scale": "linear",
+      "step": 0.5,
+      "initial": 1
+    },
+    {
+      "kind": "slider",
+      "id": "peak_multiplier",
+      "label": "Peak-to-average multiplier",
+      "min": 1,
+      "max": 5,
+      "scale": "linear",
+      "step": 0.5,
+      "initial": 3,
+      "unit": "x"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "avg_read_qps",
+      "label": "Average read QPS",
+      "expr": "dau * reads_per_user / 100000",
+      "format": "compact",
+      "unit": "QPS"
+    },
+    {
+      "id": "avg_write_qps",
+      "label": "Average write QPS",
+      "expr": "dau * writes_per_user / 100000",
+      "format": "compact",
+      "unit": "QPS"
+    },
+    {
+      "id": "peak_read_qps",
+      "label": "Peak read QPS",
+      "expr": "avg_read_qps * peak_multiplier",
+      "format": "compact",
+      "unit": "QPS",
+      "sparkline": {
+        "over": "dau"
+      }
+    },
+    {
+      "id": "peak_write_qps",
+      "label": "Peak write QPS",
+      "expr": "avg_write_qps * peak_multiplier",
+      "format": "compact",
+      "unit": "QPS"
+    }
+  ],
+  "caption": "The chain the lesson teaches: users x actions per day, divided by roughly 10^5 seconds per day, then converted from average to peak."
+}
+\`\`\`
+
 **Interview nuance:** interviewers do not care whether you land on 5,000 or 6,200 QPS. They care that
 you can defend the shape of the calculation and that you convert average to peak. Saying "I will assume
 a 3x peak multiplier because of the daily traffic curve" scores; a single unexplained number does not.
