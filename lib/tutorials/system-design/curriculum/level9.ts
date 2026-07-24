@@ -267,6 +267,126 @@ The 2024 to 2025 shift is meshes that cut this tax:
 
 The win is fewer proxies, lower per-Pod memory, and lower latency for the common L4 path, while keeping mTLS everywhere. Ambient/eBPF meshes reached GA maturity around 2025 and are the direction of new adoption. **Gateway API** is the converging standard for both north-south and (via GAMMA) east-west config, which lets you swap the underlying implementation with less lock-in than the older bespoke CRDs.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Sidecar vs ambient data paths",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "a_sidecar",
+      "label": "Service A (sidecar model)",
+      "kind": "service"
+    },
+    {
+      "id": "envoy_a",
+      "label": "Envoy sidecar in A's Pod",
+      "kind": "service"
+    },
+    {
+      "id": "envoy_b",
+      "label": "Envoy sidecar in B's Pod",
+      "kind": "service"
+    },
+    {
+      "id": "b_sidecar",
+      "label": "Service B (sidecar model)",
+      "kind": "service"
+    },
+    {
+      "id": "a_ambient",
+      "label": "Service A (ambient model)",
+      "kind": "service"
+    },
+    {
+      "id": "ztunnel",
+      "label": "ztunnel (per-node L4)",
+      "kind": "service"
+    },
+    {
+      "id": "waypoint",
+      "label": "Waypoint proxy (optional L7)",
+      "kind": "service"
+    },
+    {
+      "id": "b_ambient",
+      "label": "Service B (ambient model)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "a_sidecar",
+      "to": "envoy_a",
+      "kind": "sync",
+      "label": "proxy hop"
+    },
+    {
+      "from": "envoy_a",
+      "to": "envoy_b",
+      "kind": "sync",
+      "label": "mTLS"
+    },
+    {
+      "from": "envoy_b",
+      "to": "b_sidecar",
+      "kind": "sync",
+      "label": "proxy hop"
+    },
+    {
+      "from": "a_ambient",
+      "to": "ztunnel",
+      "kind": "sync",
+      "label": "mTLS at L4"
+    },
+    {
+      "from": "ztunnel",
+      "to": "b_ambient",
+      "kind": "sync",
+      "label": "plain L4 path"
+    },
+    {
+      "from": "ztunnel",
+      "to": "waypoint",
+      "kind": "sync",
+      "label": "only where L7 is needed"
+    },
+    {
+      "from": "waypoint",
+      "to": "b_ambient",
+      "kind": "sync",
+      "label": "retries, splitting"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "a_sidecar",
+        "envoy_a",
+        "envoy_b",
+        "b_sidecar"
+      ],
+      "note": "The classic sidecar model: an Envoy proxy injected into every Pod, all traffic app to local sidecar to remote sidecar to app. Every Pod pays memory (tens of MB each, GBs cluster-wide) and every hop adds 1 to several ms of proxy latency."
+    },
+    {
+      "adds": [
+        "a_ambient",
+        "ztunnel",
+        "b_ambient"
+      ],
+      "note": "Istio Ambient: a per-node L4 ztunnel handles mTLS for all Pods on the node, so most Pods pay no per-Pod proxy. Cilium pushes mTLS and L4 policy into the kernel via eBPF, avoiding the userspace hop for much of the work."
+    },
+    {
+      "adds": [
+        "waypoint"
+      ],
+      "note": "An optional per-namespace waypoint proxy adds L7 features (retries, traffic splitting) only where you need them, instead of taxing every Pod in the fleet."
+    }
+  ],
+  "caption": "Same guarantee (mTLS everywhere), different data paths: the sidecar tax is per Pod and per hop; ambient/eBPF pays per node and adds L7 only where needed."
+}
+\`\`\`
+
 ## A mesh is not always warranted
 
 For a handful of services, you can get mTLS from the platform, retries and timeouts from a shared client library, and metrics from your framework, without operating a mesh. Mesh adoption has actually declined for small fleets precisely because the operational cost outweighs the benefit until you have dozens of services in multiple languages where per-language libraries stop being viable.
