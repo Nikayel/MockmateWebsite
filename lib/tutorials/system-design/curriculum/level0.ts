@@ -700,6 +700,29 @@ plan for roughly 15k peak read QPS and 1.5k peak write QPS.
 you can defend the shape of the calculation and that you convert average to peak. Saying "I will assume
 a 3x peak multiplier because of the daily traffic curve" scores; a single unexplained number does not.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You have peak read and write QPS on the board and eight minutes of estimation time left. What do you do with it?",
+  "options": [
+    {
+      "label": "Derive storage, bandwidth, and memory for every entity to show rigor",
+      "feedback": "Tempting, thoroughness feels safe. But this is analysis paralysis: minutes spent on numbers that move no decision while the design goes untouched."
+    },
+    {
+      "label": "Compute a number only if it would change a design decision, then move to the design",
+      "correct": true,
+      "feedback": "Right. Peak write QPS tells you whether to shard; read QPS tells you whether you need a cache tier. If a calculation cannot move the architecture, skip it."
+    },
+    {
+      "label": "Recompute the QPS with exact seconds per day to tighten the estimate",
+      "feedback": "Precision is not the product: 86,400 versus 10^5 changes nothing you will decide. The interviewer cares about the shape of the calculation, not the third digit."
+    }
+  ]
+}
+\`\`\`
+
 ### Only compute what changes a decision
 
 The last rule is the one that separates a senior answer: only compute a number if it changes a
@@ -719,6 +742,30 @@ the next decision, then move.
 
 Recap: decompose into stated assumptions, label units, round to powers of ten, convert average to peak
 with a 2 to 3x multiplier, and compute only the numbers that change the architecture.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your Fermi chain lands on 5,000 average read QPS. The interviewer asks what the system must be built to survive. Your answer?",
+  "options": [
+    {
+      "label": "5,000 QPS; that is what the arithmetic says",
+      "feedback": "Tempting, it is the number you just derived. But it is a daily average, and real traffic is peaky: a system built to the mean falls over at the evening peak."
+    },
+    {
+      "label": "About 15,000 QPS, stating a 3x peak multiplier for the diurnal curve",
+      "correct": true,
+      "feedback": "Right. A stated 2 to 3x peak-to-average multiplier is the defensible move: the interviewer can challenge the multiplier instead of the whole result."
+    },
+    {
+      "label": "50,000 QPS, just to be safe",
+      "feedback": "An unexplained 10x is just a different unjustified number. What scores is the assumption said out loud, not the padding."
+    }
+  ],
+  "reveal": "In your design write, run this exact chain: state assumptions, label units, round to powers of ten, convert average to peak out loud, and let each number you compute justify one design decision."
+}
+\`\`\`
 `.trim()
 
 const qpsReadWriteTeach = `
