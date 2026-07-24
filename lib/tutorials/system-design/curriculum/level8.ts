@@ -1260,6 +1260,35 @@ The sneaky ones: valid-looking HTTP requests that each cost you a database query
 
 Token bucket is the usual default (bursty but bounded). Apply limits on multiple **dimensions**: per API key, per user, per IP, per endpoint, and offer **tiered quotas** (free 100 req/min, pro 10k req/min). Store counters in Redis with atomic Lua scripts so the check is one round trip.
 
+\`\`\`cswidget
+{
+  "type": "rate-limiter",
+  "title": "Attack wave at the window boundary",
+  "predictPrompt": {
+    "question": "Baseline traffic stays under the limit of 10 per 10-tick window. Then an L7 attack wave of 24 requests slams ticks 28 to 32, straddling the tick-30 window boundary. How many requests can the fixed-window limiter admit in a single 10-tick span?",
+    "options": [
+      "10, the limit always holds",
+      "About 19, nearly double the limit",
+      "All 24 attack requests get through",
+      "0, the wave is rejected outright"
+    ]
+  },
+  "workedExample": "At the initial settings the limiter is fixed window with the attack wave off: 30 legitimate requests spread over 60 ticks never exceed 10 in any 10-tick window, so all 30 are admitted and the worst trailing window holds exactly 10. Toggle the attack wave and 24 flood requests pile onto ticks 28 to 32, straddling the tick-30 boundary: fixed window admits 19 requests in a single trailing 10-tick span, nearly 2x the limit of 10, because the counter resets at tick 30 and each side of the boundary gets a fresh budget. Switch to sliding window and the worst span holds at exactly 10, shedding 20 of the 54 requests instead of fixed window's 12.",
+  "algorithms": [
+    "fixed-window",
+    "sliding-window"
+  ],
+  "limit": 10,
+  "windowSize": 10,
+  "seed": "flood-wave",
+  "requests": 30,
+  "horizon": 60,
+  "burstAt": 30,
+  "burstSize": 24,
+  "caption": "A scaled-down L7 flood against a behavioral per-identity limit. Fixed window is cheap but leaks about 2x through a window boundary; a sliding window holds the cap and the excess is shed with 429s before it costs you a database query."
+}
+\`\`\`
+
 ## Fail-open vs fail-closed
 
 If your Redis limiter store is down, do you allow all traffic (fail-open, availability first, risk letting an attack through) or block all traffic (fail-closed, safety first, risk a self-inflicted outage from a Redis blip)? For a general public API you usually fail-open with a conservative local fallback limit so a limiter outage does not become a total outage; for a login or payment endpoint you fail-closed because letting abuse through is worse.
