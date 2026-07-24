@@ -234,6 +234,36 @@ Elastic scaling, matching capacity to load automatically, is the core reason to 
 
 The most important senior point is that CPU is the default HPA metric and it is often wrong. For a web API, requests-per-second or p99 latency tracks user experience far better than CPU, which may sit low while the service is latency-bound on a downstream. For a queue consumer, the correct signal is **queue depth or consumer lag**: if 100,000 messages are backed up, you want to scale on that backlog directly, not on the CPU of the current workers (which may look fine while the backlog grows unbounded). Use custom or external metrics (via the metrics adapter or KEDA) and set a percentile target, for example keep p99 under 200 ms rather than average CPU at 70 percent.
 
+\`\`\`cswidget
+{
+  "type": "queue-sim",
+  "title": "Scale on the backlog, not the worker",
+  "predictPrompt": {
+    "question": "One consumer runs at a steady, comfortable pace while messages arrive about three times as fast. Judged by its own utilization the worker looks fine. What does the backlog do?",
+    "options": [
+      "It grows without limit even though the worker never looks distressed",
+      "It levels off once the worker settles into a rhythm",
+      "It stays small because the worker is never overloaded"
+    ]
+  },
+  "workedExample": "In the starting run a single consumer works at a steady rate while messages arrive about three times as fast. From the worker's own point of view nothing is wrong: it processes at the same pace every tick, the queue-consumer equivalent of CPU sitting comfortably at 40 percent. The backlog curve tells the real story, climbing from the first tick and steepening when the traffic spike hits mid-run. Now enable scale-on-backlog: once depth crosses the threshold, replicas are added, the fleet's combined rate overtakes arrivals, and the backlog drains, riding through the spike instead of drowning in it. That is the KEDA argument in one picture: the worker-local signal stays flat while the lag signal is the one that reflects user pain.",
+  "producerRate": 3,
+  "consumerRate": 1,
+  "ticks": 200,
+  "capacity": 150,
+  "burst": {
+    "from": 100,
+    "to": 140,
+    "multiplier": 2
+  },
+  "scaleOnBacklog": {
+    "threshold": 25,
+    "maxConsumers": 5
+  },
+  "caption": "CPU can sit low while lag grows unbounded. Scaling on queue depth is the signal that actually catches up."
+}
+\`\`\`
+
 ## Scale-to-zero and cold starts
 
 Scaling to zero saves money on spiky, event-driven work, but the first request after zero pays a cold start: pull image, boot process, warm caches, which can be hundreds of ms to seconds. Mitigations: keep a small **warm pool** (a floor of 1 to 2 replicas so you never fully cold-start on the user path), use **provisioned/pre-warmed concurrency**, and shrink the image and boot path. The decision is explicit: pure scale-to-zero for a nightly batch or a rare webhook, a warm floor for anything a user waits on synchronously.
