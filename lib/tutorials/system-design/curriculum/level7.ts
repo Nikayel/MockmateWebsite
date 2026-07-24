@@ -337,6 +337,183 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
 
 **Interview nuance:** the killer is **retry amplification**. If the gateway retries 3x, and it calls a service that also retries 3x, and that service calls a database client that also retries 3x, one user request can become 27 database calls. Retry at exactly one layer, usually the outermost one that owns the deadline, and let inner layers fail fast.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Retry storm: one request becomes 27 db calls",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "gateway",
+      "label": "Edge gateway"
+    },
+    {
+      "id": "service",
+      "label": "Service"
+    },
+    {
+      "id": "db",
+      "label": "Database"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "storm",
+      "label": "Retry storm",
+      "description": "The database turns slow; gateway, service, and db client each retry 3x"
+    },
+    {
+      "id": "jitter",
+      "label": "Full jitter",
+      "description": "Randomize each retry delay so the synchronized wave spreads out"
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "gateway",
+      "kind": "request",
+      "label": "GET /checkout",
+      "state": {
+        "attempts_at_db": "0"
+      }
+    },
+    {
+      "from": "gateway",
+      "to": "service",
+      "kind": "request",
+      "label": "call service"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "kind": "request",
+      "label": "query orders",
+      "state": {
+        "attempts_at_db": "1"
+      }
+    },
+    {
+      "from": "db",
+      "to": "service",
+      "kind": "response",
+      "label": "rows in 80 ms",
+      "when": "!storm"
+    },
+    {
+      "from": "service",
+      "to": "gateway",
+      "kind": "response",
+      "label": "200 OK",
+      "when": "!storm"
+    },
+    {
+      "from": "gateway",
+      "to": "client",
+      "kind": "response",
+      "label": "200 OK",
+      "when": "!storm"
+    },
+    {
+      "from": "db",
+      "kind": "timer",
+      "label": "db slow, no reply",
+      "status": "late",
+      "when": "storm"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "kind": "request",
+      "label": "db client retry 1 of 3",
+      "status": "error",
+      "when": "storm",
+      "state": {
+        "attempts_at_db": "2"
+      },
+      "predict": {
+        "question": "Gateway, service, and db client each try 3x. How many db calls can this one user request become?",
+        "options": [
+          "3",
+          "9",
+          "27"
+        ]
+      }
+    },
+    {
+      "from": "service",
+      "kind": "note",
+      "label": "db client tries 3x, all fail",
+      "when": "storm",
+      "state": {
+        "attempts_at_db": "3"
+      }
+    },
+    {
+      "from": "service",
+      "kind": "note",
+      "label": "service retry x3 redoes all",
+      "when": "storm",
+      "state": {
+        "attempts_at_db": "9"
+      }
+    },
+    {
+      "from": "service",
+      "to": "gateway",
+      "kind": "response",
+      "label": "error after 9 db calls",
+      "status": "error",
+      "when": "storm"
+    },
+    {
+      "from": "gateway",
+      "to": "service",
+      "kind": "request",
+      "label": "gateway retry 1 of 3",
+      "status": "error",
+      "when": "storm",
+      "state": {
+        "attempts_at_db": "18"
+      }
+    },
+    {
+      "from": "gateway",
+      "kind": "note",
+      "label": "gateway x3: 27 db calls",
+      "when": "storm",
+      "state": {
+        "attempts_at_db": "27"
+      }
+    },
+    {
+      "from": "gateway",
+      "to": "client",
+      "kind": "response",
+      "label": "504, request abandoned",
+      "status": "error",
+      "when": "storm"
+    },
+    {
+      "from": "service",
+      "kind": "timer",
+      "label": "wait rand(0, base * 2^n)",
+      "when": "jitter"
+    },
+    {
+      "from": "gateway",
+      "kind": "note",
+      "label": "retries spread, herd gone",
+      "when": "jitter"
+    }
+  ],
+  "caption": "Retry at exactly one layer, the outermost one that owns the deadline, and let inner layers fail fast."
+}
+\`\`\`
+
 **Recap:** connect plus request timeouts on every call, propagate a shrinking deadline down the chain, exponential backoff with full jitter, a retry budget capping retries to a small fraction of traffic, retry only idempotent operations, and retry at one layer to avoid multiplicative amplification.
 `.trim()
 
