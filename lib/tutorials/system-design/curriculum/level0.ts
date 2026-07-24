@@ -458,6 +458,29 @@ analytics and can never repoint the link. 302 (temporary) keeps every redirect f
 Most shorteners choose 302 to retain control and analytics, accepting the extra request. Knowing that
 tradeoff is the point.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A stakeholder pushes for 301 redirects on your shortener because browsers cache them and repeat visits get faster. What does that speed cost you?",
+  "options": [
+    {
+      "label": "Nothing; a permanent redirect is strictly better for a link that never changes",
+      "feedback": "Tempting, the latency win is real. But 'never changes' hides the catch: once browsers cache the 301 they stop calling you, so you can never repoint the link or count another click."
+    },
+    {
+      "label": "Click analytics and the ability to ever repoint the link",
+      "correct": true,
+      "feedback": "Right. Cached 301s mean requests stop flowing through your service. Most shorteners accept the extra request of a 302 to keep control and the click data."
+    },
+    {
+      "label": "A bit of extra storage for the cached entries",
+      "feedback": "Storage is not the issue: the browser holds the mapping, not you. The real loss is that traffic bypasses your service entirely."
+    }
+  ]
+}
+\`\`\`
+
 ### Choose the protocol deliberately
 
 REST over HTTP is the right default for a public-facing API: it is cacheable, universally understood,
@@ -466,6 +489,46 @@ ends and want lower latency and typed contracts (a Protobuf schema, binary frami
 multiplexing). Use a streaming protocol (WebSocket, Server-Sent Events, or gRPC streaming) when the
 server must push, like a live location feed or a chat. State which and why: "REST for the public create
 and redirect endpoints, gRPC between the API gateway and the internal link service."
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the right protocol for each call in a ride-sharing system.",
+  "buckets": [
+    "REST",
+    "gRPC",
+    "Streaming"
+  ],
+  "items": [
+    {
+      "label": "Public endpoint where a rider requests a trip",
+      "bucket": "REST",
+      "feedback": "Public-facing, cacheable, callable from any client: the REST default earns its place here."
+    },
+    {
+      "label": "API gateway calling the internal pricing service, both ends owned by you",
+      "bucket": "gRPC",
+      "feedback": "You control both ends, so typed Protobuf contracts, binary framing, and HTTP/2 multiplexing beat REST's universality."
+    },
+    {
+      "label": "Pushing the driver's live location to the rider's map every second",
+      "bucket": "Streaming",
+      "feedback": "The server must push without being asked: WebSocket, SSE, or gRPC streaming, not request-response polling."
+    },
+    {
+      "label": "A third-party partner API for booking trips from another app",
+      "bucket": "REST",
+      "feedback": "Tempting to reuse gRPC everywhere, but you do not control the partner's stack. REST is the universal boundary."
+    },
+    {
+      "label": "Trip-status updates like 'driver arriving' pushed to the rider",
+      "bucket": "Streaming",
+      "feedback": "Another server-push case: polling a REST endpoint would waste requests and still feel laggy."
+    }
+  ]
+}
+\`\`\`
 
 Two boundary concerns belong in the API sketch because they are easy to forget and interviewers look
 for them. **Idempotency:** for creates, an idempotency key makes retries safe (the client can retry a
@@ -477,6 +540,30 @@ real APIs, not just toy ones.
 Recap: Turn requirement nouns into entities with only the design-relevant fields, define one endpoint
 per requirement with concrete request/response shapes, choose REST vs gRPC vs streaming deliberately,
 and place idempotency, pagination, and auth at the boundary.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A client calls 'POST /links', the response times out, and the client retries. Without an idempotency key, what does your design risk?",
+  "options": [
+    {
+      "label": "Nothing; the second request fails because the URL already exists",
+      "feedback": "Tempting, but nothing in a plain 'POST /links' deduplicates. The server cannot tell the retry is the same logical request, so it happily creates a second code."
+    },
+    {
+      "label": "Two different short codes for the same long URL",
+      "correct": true,
+      "feedback": "Right. The timeout is ambiguous, so the first request may have succeeded. An idempotency key lets the server recognize the retry and return the original code."
+    },
+    {
+      "label": "The retry is rejected automatically because HTTP forbids duplicate POSTs",
+      "feedback": "HTTP has no such rule: POST is explicitly non-idempotent, which is exactly why the key must be designed in at the boundary."
+    }
+  ],
+  "reveal": "In your design write, name the entities with only their design-relevant fields, sketch one endpoint per requirement with concrete shapes, state your protocol choice with a reason, and mark where idempotency, pagination, and auth live."
+}
+\`\`\`
 `.trim()
 
 const fermiEstimationTeach = `
