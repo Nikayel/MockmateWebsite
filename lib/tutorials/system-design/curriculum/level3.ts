@@ -1427,14 +1427,98 @@ whole keyspace. A cache restart, region failover, or \`FLUSHALL\` must be paired
 or a gradual traffic ramp, with coalescing on. Treating a flush as free is the wrong turn
 interviewers listen for.
 
-\`\`\`
-app server                    app server
- [L1 near cache]               [L1 near cache]
-       \\                          /
-        \\----- L2: Redis Cluster ----/
-        slot 0..5460   5461..10922  10923..16383
-        shardA(P+R)    shardB(P+R)   shardC(P+R)   <- Sentinel/failover
-                     source of truth: DB (cache is disposable)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "L1 near cache, sharded L2, and the disposable-cache principle",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "app",
+      "label": "App servers",
+      "kind": "service"
+    },
+    {
+      "id": "l1_near",
+      "label": "L1 near cache (local LRU in each app process)",
+      "kind": "cache"
+    },
+    {
+      "id": "shard_a",
+      "label": "Shard A: primary + replica (slots 0-5460)",
+      "kind": "cache"
+    },
+    {
+      "id": "shard_b",
+      "label": "Shard B: primary + replica (slots 5461-10922)",
+      "kind": "cache"
+    },
+    {
+      "id": "shard_c",
+      "label": "Shard C: primary + replica (slots 10923-16383)",
+      "kind": "cache"
+    },
+    {
+      "id": "db",
+      "label": "DB: source of truth",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "app",
+      "to": "l1_near",
+      "kind": "sync",
+      "label": "hottest keys, no network hop"
+    },
+    {
+      "from": "l1_near",
+      "to": "shard_a",
+      "kind": "sync",
+      "label": "CRC16 mod 16384 -> slot"
+    },
+    {
+      "from": "l1_near",
+      "to": "shard_b",
+      "kind": "sync"
+    },
+    {
+      "from": "l1_near",
+      "to": "shard_c",
+      "kind": "sync"
+    },
+    {
+      "from": "app",
+      "to": "db",
+      "kind": "sync",
+      "label": "fall through on miss"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "app",
+        "db"
+      ],
+      "note": "The cache is disposable because the DB stays the source of truth: losing a cache node loses only performance, never data, as long as the app falls through to the DB on a miss."
+    },
+    {
+      "adds": [
+        "shard_a",
+        "shard_b",
+        "shard_c"
+      ],
+      "note": "One node is not enough: Redis Cluster splits the keyspace into 16,384 hash slots across shards, each a primary with replicas and failover, so adding a shard moves some slots instead of rehashing everything."
+    },
+    {
+      "adds": [
+        "l1_near"
+      ],
+      "note": "A remote cache is a network hop, too slow for the very hottest keys at high QPS: the L1 near cache kills the hottest reads and shields Redis shards from hot keys, at the cost of a second consistency layer (pub/sub invalidation or a short L1 TTL)."
+    }
+  ],
+  "caption": "Sharding, replication, and tiering make the cache tier a distributed system of its own; never bring it online cold under full load."
+}
 \`\`\`
 
 Recap: pick Redis for structures/persistence/replication or Memcached for a lean multi-core blob
