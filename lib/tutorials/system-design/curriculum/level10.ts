@@ -800,6 +800,47 @@ A code execution sandbox (an online judge like LeetCode, a CI runner, or this pl
 
 From weakest and cheapest to strongest and heaviest: a plain OS process with rlimits is trivially escapable and unacceptable for hostile code. A container (Docker) is convenient and starts fast but shares the host kernel, so a kernel vulnerability is a full escape; a container alone is not a security boundary for hostile code. A hardened container (seccomp to whitelist syscalls, AppArmor or SELinux, non-root user, read-only filesystem, dropped capabilities) is a reasonable middle ground that shrinks the attack surface dramatically. gVisor puts a user-space kernel between the code and the host kernel, intercepting syscalls so a kernel bug is much harder to reach, at some performance cost. A microVM (Firecracker) or Kata Containers gives each submission its own tiny virtual machine with its own guest kernel and hardware-virtualization isolation, which is near-VM strength but boots in about 100ms, making it the strong default for untrusted code.
 
+\`\`\`csdiagram
+{
+  "type": "ladder",
+  "title": "The isolation spectrum: weakest and cheapest to strongest and heaviest",
+  "scale": "linear",
+  "bands": [
+    {
+      "label": "Plain OS process (rlimits)",
+      "value": 1,
+      "display": "trivially escapable",
+      "note": "Starts instantly and costs nothing, but the wall is paper: trivially escapable and unacceptable for hostile code."
+    },
+    {
+      "label": "Container (Docker)",
+      "value": 2,
+      "display": "shares the host kernel",
+      "note": "Convenient and fast to start, but one kernel vulnerability is a full escape. A container alone is not a security boundary for hostile code."
+    },
+    {
+      "label": "Hardened container (seccomp, AppArmor/SELinux)",
+      "value": 3,
+      "display": "shrunken attack surface",
+      "note": "Syscall whitelist, non-root user, read-only filesystem, dropped capabilities: a reasonable middle ground that shrinks the attack surface dramatically at little extra startup cost."
+    },
+    {
+      "label": "gVisor (user-space kernel)",
+      "value": 4,
+      "display": "kernel bugs hard to reach",
+      "note": "A user-space kernel intercepts syscalls so a host kernel bug is much harder to reach, at some performance cost."
+    },
+    {
+      "label": "microVM (Firecracker) / Kata",
+      "value": 5,
+      "display": "own guest kernel, boots ~100ms",
+      "note": "Hardware-virtualization isolation with its own guest kernel: near-VM strength that still boots in about 100ms, the strong default for untrusted code."
+    }
+  ],
+  "caption": "Each rung up buys isolation and pays startup and performance cost. Name the spectrum and commit: Firecracker microVMs as the strong default, a hardened seccomp container as the fallback."
+}
+\`\`\`
+
 **Interview nuance:** the senior move is to name the spectrum and commit: "I would use Firecracker microVMs for true kernel isolation with fast startup, falling back to a hardened seccomp container if microVMs are not available." Saying "run it in a Docker container" and stopping there fails the security bar, because a container shares the host kernel.
 
 ## Resource limits and architecture
