@@ -285,6 +285,282 @@ Observability rests on three kinds of telemetry, and the skill is knowing which 
 
 **Traces** capture the causal path of a single request as it fans across services. A trace is a tree of **spans**; each span is one unit of work (an HTTP handler, a DB query, a cache lookup) with a start time, duration, and attributes. Traces answer the question metrics and logs alone cannot: "this checkout took 1.4s, *where* did the time go across the 12 hops?" That is the pillar most teams under-invest in and most regret skipping.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Trace waterfall: where did 1.4s go?",
+  "frames": [
+    {
+      "note": "A checkout request hits api-gateway, which starts the root span of the trace (20ms of its own work) and sends the traceparent header downstream, so every service can attach child spans to the same trace.",
+      "rows": [
+        {
+          "label": "api-gateway",
+          "cells": [
+            {
+              "text": "20ms",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "outbound",
+          "cells": [
+            {
+              "text": "traceparent header ->",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "order-svc reads the traceparent and starts a child span: 200ms. Inside it, the postgres write is a nested span of 40ms. Each span is one unit of work with a start time, duration, and attributes.",
+      "rows": [
+        {
+          "label": "api-gateway",
+          "cells": [
+            {
+              "text": "20ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "order-svc",
+          "cells": [
+            {
+              "text": "============",
+              "state": "active"
+            },
+            {
+              "text": "200ms",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "-> postgres write",
+          "cells": [
+            {
+              "text": "====",
+              "state": "new"
+            },
+            {
+              "text": "40ms",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "payment-svc and its nested fraud-check gRPC call land, then notify-svc closes it out: checkout took 1.4s across the hops. Metrics said checkout is slow; the waterfall shows where the time sits.",
+      "rows": [
+        {
+          "label": "trace total",
+          "cells": [
+            {
+              "text": "checkout 1.4s",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "api-gateway",
+          "cells": [
+            {
+              "text": "20ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "order-svc",
+          "cells": [
+            {
+              "text": "============",
+              "state": "dim"
+            },
+            {
+              "text": "200ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "-> postgres write",
+          "cells": [
+            {
+              "text": "====",
+              "state": "dim"
+            },
+            {
+              "text": "40ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "payment-svc",
+          "cells": [
+            {
+              "text": "================================",
+              "state": "new"
+            },
+            {
+              "text": "1.1s",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "-> fraud-check gRPC",
+          "cells": [
+            {
+              "text": "============================",
+              "state": "new"
+            },
+            {
+              "text": "1.0s",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "notify-svc",
+          "cells": [
+            {
+              "text": "30ms",
+              "state": "new"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "Checkout took 1.4s. Which unit of work do you optimize?",
+        "options": [
+          "order-svc (200ms)",
+          "payment-svc's own code",
+          "fraud-check gRPC (1.0s)",
+          "postgres write (40ms)"
+        ]
+      }
+    },
+    {
+      "note": "Open payment-svc: its 1.1s is almost entirely the nested fraud-check gRPC span, 1.0s of waiting on one downstream call. Tuning payment-svc's own code wins almost nothing; the culprit is the fraud-check hop.",
+      "rows": [
+        {
+          "label": "trace total",
+          "cells": [
+            {
+              "text": "checkout 1.4s",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "api-gateway",
+          "cells": [
+            {
+              "text": "20ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "order-svc",
+          "cells": [
+            {
+              "text": "============",
+              "state": "dim"
+            },
+            {
+              "text": "200ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "-> postgres write",
+          "cells": [
+            {
+              "text": "====",
+              "state": "dim"
+            },
+            {
+              "text": "40ms",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "payment-svc",
+          "cells": [
+            {
+              "text": "================================",
+              "state": "dim"
+            },
+            {
+              "text": "1.1s",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "-> fraud-check gRPC",
+          "cells": [
+            {
+              "text": "============================",
+              "state": "active"
+            },
+            {
+              "text": "1.0s",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "notify-svc",
+          "cells": [
+            {
+              "text": "30ms",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The shared trace id makes this findable: propagated in the traceparent header, stamped on every log line, and attached to metrics as an exemplar, so a metric spike pivots to the exact trace and then to the logs for exactly that request.",
+      "rows": [
+        {
+          "label": "pivot",
+          "cells": [
+            {
+              "text": "metric spike",
+              "state": "normal"
+            },
+            {
+              "text": "exemplar trace id",
+              "state": "new"
+            },
+            {
+              "text": "full trace",
+              "state": "active"
+            },
+            {
+              "text": "logs for that request",
+              "state": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "One trace, a tree of spans: the waterfall turns 'checkout is slow' into 'the fraud-check gRPC call inside payment-svc costs 1.0s'."
+}
+\`\`\`
+
 \`\`\`
   Trace: checkout (1.4s)
   |-- api-gateway            [ 20ms ]
