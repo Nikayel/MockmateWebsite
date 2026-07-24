@@ -49,6 +49,36 @@ A rate limiter is a reusable component, so the interview is really about two thi
 
 Fixed window counts requests per calendar minute: it is trivial (one counter, one TTL) but allows a 2x burst at the boundary, because 100 requests at 0:59 and another 100 at 1:00 both pass. Sliding window log keeps a timestamp per request and counts those within the last 60s: perfectly accurate but O(N) memory per key, which is expensive for hot keys. Sliding window counter approximates the log by weighting the previous window's count by how much of it overlaps the current one; it is the usual production choice because it kills the boundary burst with O(1) memory. Token bucket refills tokens at a fixed rate up to a capacity and spends one per request: it explicitly allows controlled bursts (up to the bucket size) while bounding the long-run rate, which is why AWS and Stripe use it. Leaky bucket smooths output to a constant rate (a queue drained at fixed speed), best when a downstream needs a steady feed rather than burst tolerance.
 
+\`\`\`cswidget
+{
+  "type": "rate-limiter",
+  "title": "Fixed window vs sliding window vs token bucket",
+  "predictPrompt": {
+    "question": "Steady traffic stays under 10 requests per 10-tick window. Then a burst of 20 extra requests lands on ticks 38 to 42, straddling the tick-40 window boundary. How many requests can fixed window admit in a single 10-tick span?",
+    "options": [
+      "Exactly 10, the limit is the limit",
+      "About 18, nearly double the limit",
+      "All 30 requests in the span",
+      "None, bursts are always rejected"
+    ]
+  },
+  "workedExample": "At the initial settings the limiter is fixed window with the burst off: 60 requests spread over 80 ticks never exceed 10 in any 10-tick window, so all 60 pass and the worst trailing window holds exactly 10. Toggle the boundary burst and 20 extra requests land on ticks 38 to 42, straddling the tick-40 boundary: fixed window admits 18 in a single trailing 10-tick span, close to the 2x boundary leak, the miniature version of 100 requests at 0:59 and another 100 at 1:00 both passing. Now switch algorithms: sliding window holds every trailing span at exactly 10, the accurate hard cap, while token bucket admits the most requests overall, 72 of 80, spending saved tokens on the burst and then throttling to its refill rate, the controlled burst tolerance that makes it the AWS and Stripe choice.",
+  "algorithms": [
+    "fixed-window",
+    "sliding-window",
+    "token-bucket"
+  ],
+  "limit": 10,
+  "windowSize": 10,
+  "seed": "per-key",
+  "requests": 60,
+  "horizon": 80,
+  "burstAt": 40,
+  "burstSize": 20,
+  "caption": "One API key, scaled down: 10 per 10-tick window stands in for 100 req/min. Toggle the burst at the tick-40 boundary, then switch algorithms to compare burst tolerance (token bucket) against the accurate hard cap (sliding window counter)."
+}
+\`\`\`
+
 **Interview nuance:** when asked to "enforce 100 req/min," clarify whether bursts are acceptable. If yes, token bucket. If you need a hard, accurate cap with cheap memory, sliding window counter. Naming the burst-vs-accuracy tradeoff is what separates a strong answer.
 
 ## Placement and distributed correctness
