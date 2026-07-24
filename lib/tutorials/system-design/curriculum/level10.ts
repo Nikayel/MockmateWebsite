@@ -2108,6 +2108,229 @@ An order-matching engine is the interview where the usual web instincts (throw i
 
 The matching rule is price-time priority over a limit order book: for buys, highest price first; for sells, lowest price first; and at the same price, the earliest order wins (time priority). A limit order rests in the book until matched; a market order takes the best available price immediately; a cancel removes a resting order. The book is two sorted structures (bids descending, asks ascending) grouped by price level, each level a FIFO queue of orders. Matching pops the best price levels and fills in time order.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Order book: rest, sweep, new spread",
+  "frames": [
+    {
+      "note": "A limit order book for one symbol: asks sorted ascending, bids descending, a FIFO queue within each price level. Best bid 100.90, best ask 101.10, spread 0.20. At 101.10 two resting sells queue in arrival order: o5 (120 sh) ahead of o6 (80 sh).",
+      "rows": [
+        {
+          "label": "ask 101.20",
+          "cells": [
+            {
+              "text": "o7 300sh"
+            }
+          ]
+        },
+        {
+          "label": "ask 101.10",
+          "cells": [
+            {
+              "text": "o5 120sh"
+            },
+            {
+              "text": "o6 80sh"
+            }
+          ]
+        },
+        {
+          "label": "spread",
+          "cells": [
+            {
+              "text": "0.20",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.90",
+          "cells": [
+            {
+              "text": "o3 150sh"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.80",
+          "cells": [
+            {
+              "text": "o4 250sh"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "A limit buy o8 arrives at 100.95 for 100 sh. It does not cross the best ask at 101.10, so it rests in the book as the new best bid. The spread narrows to 0.15.",
+      "rows": [
+        {
+          "label": "ask 101.20",
+          "cells": [
+            {
+              "text": "o7 300sh",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "ask 101.10",
+          "cells": [
+            {
+              "text": "o5 120sh",
+              "state": "dim"
+            },
+            {
+              "text": "o6 80sh",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "spread",
+          "cells": [
+            {
+              "text": "0.15",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.95",
+          "cells": [
+            {
+              "text": "o8 100sh",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.90",
+          "cells": [
+            {
+              "text": "o3 150sh",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.80",
+          "cells": [
+            {
+              "text": "o4 250sh",
+              "state": "dim"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "A market buy for 250 sh arrives. At what prices does it fill?",
+        "options": [
+          "All 250 at 101.10",
+          "200 at 101.10, then 50 at 101.20",
+          "At the best bid, 100.95"
+        ]
+      }
+    },
+    {
+      "note": "Price-time priority: the market buy takes the best ask level first. o5 fills before o6 because it arrived earlier at the same price; 120 + 80 = 200 sh empties the 101.10 level. The remaining 50 sh sweep up to 101.20 and partially fill o7.",
+      "rows": [
+        {
+          "label": "ask 101.20",
+          "cells": [
+            {
+              "text": "o7 -50sh",
+              "state": "active"
+            },
+            {
+              "text": "250sh left",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "ask 101.10",
+          "cells": [
+            {
+              "text": "o5 120sh",
+              "state": "dropped"
+            },
+            {
+              "text": "o6 80sh",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "mkt buy 250sh",
+          "cells": [
+            {
+              "text": "200 @ 101.10",
+              "state": "active"
+            },
+            {
+              "text": "50 @ 101.20",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "After the sweep the 101.10 level is gone: best ask is now 101.20 with 250 sh of o7 left, best bid is still o8 at 100.95, and the spread widened from 0.15 to 0.25. The market order consumed liquidity, and the book shows it.",
+      "rows": [
+        {
+          "label": "ask 101.20",
+          "cells": [
+            {
+              "text": "o7 250sh",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "spread",
+          "cells": [
+            {
+              "text": "0.25",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.95",
+          "cells": [
+            {
+              "text": "o8 100sh"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.90",
+          "cells": [
+            {
+              "text": "o3 150sh",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "bid 100.80",
+          "cells": [
+            {
+              "text": "o4 250sh",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Price-time priority in action: a resting limit, a two-level market sweep, and the spread it leaves behind."
+}
+\`\`\`
+
 ## Single-writer, single-threaded
 
 The counterintuitive core: use a single-writer, single-threaded matching engine, not a database with locks. Why is single-threaded faster and more correct here? Because a lock per order in a general database adds milliseconds and nondeterminism (thread scheduling decides tie-breaks), and this domain needs microseconds and reproducibility. A sequencer assigns a total order to all inbound events (every order, cancel, and modify gets a monotonic sequence number), and a single thread processes them one at a time from an in-memory ring buffer (the LMAX Disruptor pattern), with no locks, cache-friendly memory access, and no cross-thread nondeterminism. Horizontal scale comes from sharding by instrument: each symbol (AAPL, TSLA) gets its own single-writer engine, and there is no cross-symbol coordination on the hot path.
