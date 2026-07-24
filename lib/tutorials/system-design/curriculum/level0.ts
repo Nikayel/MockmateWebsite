@@ -187,6 +187,45 @@ stories) is a variation or an add-on that assumes these three exist. Post, follo
 irreducible core. Deferring the rest is safe precisely because they do not change the shape of the
 core system: adding likes later is a new table and endpoint, not a redesign.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort these statements for a photo-sharing app: which are functional requirements, and which are implementation details leaking in too early?",
+  "buckets": [
+    "Functional requirement",
+    "Implementation detail"
+  ],
+  "items": [
+    {
+      "label": "Users can post a photo with a caption",
+      "bucket": "Functional requirement",
+      "feedback": "A user capability: it hands you the noun Photo and the verb post, which becomes 'POST /photos'."
+    },
+    {
+      "label": "The system stores photos in S3",
+      "bucket": "Implementation detail",
+      "feedback": "Tempting because it sounds concrete and technical, but where the bytes live is a design decision you make after scoping and estimating, not a requirement."
+    },
+    {
+      "label": "Users can follow other users",
+      "bucket": "Functional requirement",
+      "feedback": "A capability that seeds the Follow entity. Without the graph, a feed has no meaning."
+    },
+    {
+      "label": "The feed is precomputed into a Redis cache",
+      "bucket": "Implementation detail",
+      "feedback": "That is a fan-out strategy, a choice your estimates should drive later. Committing to it now is premature."
+    },
+    {
+      "label": "Users can view a feed of photos from people they follow",
+      "bucket": "Functional requirement",
+      "feedback": "The consumption capability, and the one that will force the fan-out decision when you design the read path."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** Phrase requirements as user capabilities, not system features. "The system stores
 photos in S3" is not a functional requirement, it is an implementation detail leaking in too early.
 "Users can post a photo" is the requirement; where the bytes live is a design decision you make later.
@@ -200,6 +239,30 @@ versus peripheral.
 
 Recap: State exactly the three user capabilities that define the core loop as "users can X," extract
 nouns as entities and verbs as endpoints, and defer everything else out loud with a reason it is safe.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your three requirements for a video site are: users can upload a video, users can subscribe to a channel, users can view a feed of new videos. What should fall out of them almost mechanically?",
+  "options": [
+    {
+      "label": "Three entities (Video, Subscription, Feed) and one endpoint per verb",
+      "correct": true,
+      "feedback": "Right. Nouns become entities and verbs become endpoints: upload becomes 'POST /videos', subscribe becomes 'POST /subscriptions', view feed becomes 'GET /feed'. Well-phrased requirements seed the whole design."
+    },
+    {
+      "label": "A fully normalized schema with every column and index",
+      "feedback": "Tempting, it feels rigorous. But enumerating columns now burns time without revealing systems thinking. At this stage you only need the nouns and their shape."
+    },
+    {
+      "label": "Nothing yet; requirements are throwaway context and the real design starts with boxes",
+      "feedback": "This is the trap the lesson closes: requirements phrased as 'users can X' are the seed of the data model and the API, not throwaway prose."
+    }
+  ],
+  "reveal": "In your design write below, state exactly three 'users can X' requirements, pull the nouns into entities and the verbs into endpoints, and defer the rest with one sentence on why deferral is safe."
+}
+\`\`\`
 `.trim()
 
 const nonfunctionalRequirementsTeach = `
