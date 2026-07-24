@@ -1500,10 +1500,88 @@ component with an explicit justification, and finally walk one request end to en
 
 Almost every system begins as the same skeleton:
 
-\`\`\`
-[Client] --> [Load Balancer] --> [App Servers] --> [Database]
-                                       |
-                                    [Cache]
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The skeleton, then each box with a reason",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client",
+      "kind": "client"
+    },
+    {
+      "id": "lb",
+      "label": "Load Balancer",
+      "kind": "lb"
+    },
+    {
+      "id": "app",
+      "label": "App Servers",
+      "kind": "service"
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db"
+    },
+    {
+      "id": "cache",
+      "label": "Cache (Redis)",
+      "kind": "cache"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "lb",
+      "kind": "sync",
+      "label": "HTTPS request"
+    },
+    {
+      "from": "lb",
+      "to": "app",
+      "kind": "sync",
+      "label": "routes to a server"
+    },
+    {
+      "from": "app",
+      "to": "db",
+      "kind": "sync",
+      "label": "reads and writes"
+    },
+    {
+      "from": "app",
+      "to": "cache",
+      "kind": "sync",
+      "label": "hot-key reads"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "client",
+        "lb",
+        "app"
+      ],
+      "note": "Start with the simplest set of boxes that can serve a request: clients reach stateless app servers through a load balancer."
+    },
+    {
+      "adds": [
+        "db"
+      ],
+      "note": "The functional requirements need data to outlive the request, so app servers persist to a database. This is already a complete, working system for a huge class of problems."
+    },
+    {
+      "adds": [
+        "cache"
+      ],
+      "note": "Add Redis only with a justification: reads are 10x writes and the same hot keys repeat, so caching cuts p99 and datastore QPS."
+    }
+  ],
+  "caption": "Every box enters with a requirement-tied reason, and every arrow is labeled with what flows and how. A box without a justification is the most common wrong turn."
+}
 \`\`\`
 
 That is a complete, working system for a huge class of problems. Only now do you add components, and
