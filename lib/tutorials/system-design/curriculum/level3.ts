@@ -657,6 +657,29 @@ even spread but forces "all posts in this group" to scatter-gather. \`group_id\`
 posts for cheap reads but hotspots a giant group. Naming the tension and committing to a side
 (usually: align to the dominant query, then mitigate the resulting hotspot) is the senior move.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your social graph is sharded by 'user_id' with consistent hashing and vnodes. A celebrity with 100M followers drives 1000x normal traffic. Does the hashing setup absorb it?",
+  "options": [
+    {
+      "label": "Yes, vnodes spread every user's load across many nodes",
+      "feedback": "Tempting, because vnodes do spread aggregate load beautifully. But they spread many keys; this is one key, and everything for that 'user_id' hashes to a single owner."
+    },
+    {
+      "label": "No, one key maps to one node no matter how it hashes",
+      "correct": true,
+      "feedback": "Right. Consistent hashing balances load across keys; it cannot split load within a key. A hot key needs key-level surgery: salting, sub-partitioning, or a dedicated shard."
+    },
+    {
+      "label": "Only if the celebrity also writes a lot",
+      "feedback": "Reads alone are enough: 1000x read traffic aimed at one partition overwhelms its node regardless of write volume."
+    }
+  ]
+}
+\`\`\`
+
 ### The celebrity / hot-key problem
 
 Shard a social graph by \`user_id\` and one celebrity with 100M followers and 1000x normal traffic
@@ -692,6 +715,42 @@ Recap: a good shard key is high-cardinality, evenly accessed, and aligned to the
 celebrity problem defeats plain hashing because one key is one node, so mitigate with salting,
 sub-partitioning, or dedicated shards; use entity groups and compound keys to keep transactions
 single-shard; and plan resharding and online migration early.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the first mitigation you would reach for in each situation.",
+  "buckets": [
+    "Salt or split the hot key",
+    "Dedicated shard",
+    "Co-locate on one shard"
+  ],
+  "items": [
+    {
+      "label": "A handful of known celebrity keys take 1000x the write traffic of normal keys",
+      "bucket": "Salt or split the hot key",
+      "feedback": "Append a bucket suffix so one logical key spans K partitions; writes pick a bucket, reads fan out to K and merge. Reserve it for the known whales."
+    },
+    {
+      "label": "One mega-tenant's traffic starves every neighbor in a multi-tenant SaaS",
+      "bucket": "Dedicated shard",
+      "feedback": "Route the whale to its own isolated nodes so its load cannot touch normal users. Pair with compound keys like '(tenant_id, entity_id)' for everyone else."
+    },
+    {
+      "label": "An order and its line items must commit together atomically",
+      "bucket": "Co-locate on one shard",
+      "feedback": "Entity groups: shard both by 'order_id' so the common transaction stays single-shard."
+    },
+    {
+      "label": "Reading one group's posts currently scatter-gathers across every partition",
+      "bucket": "Co-locate on one shard",
+      "feedback": "Aligning the key to the dominant query pulls the group's rows onto one partition, then you watch for the giant-group hotspot this creates."
+    }
+  ],
+  "reveal": "The interview conversation runs in order: the three shard-key properties, the tension between them, the hot-key mitigation, and the resharding plan. In the design write, name your shard key, the query it aligns to, the hotspot it creates, and the mitigation plus logical pre-split you pair with it."
+}
+\`\`\`
 `.trim()
 
 const crossShardOpsTeach = `
