@@ -1832,6 +1832,29 @@ cannot use a normal B-tree index effectively (two independent range predicates) 
 Worse, distance on a sphere is not Euclidean. The real problem is turning a **2D nearest-neighbor
 query into a 1D or hierarchical key** you can index, shard, and range-scan.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You add B-tree indexes on lat and lng and run 'WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?'. Why does this stay slow at scale?",
+  "options": [
+    {
+      "label": "The database can use an index for only one of the two range predicates; the other still filters a huge candidate strip",
+      "correct": true,
+      "feedback": "Right. Two independent range predicates do not compose in one B-tree, so the query scans an entire latitude band and filters the rest. That is exactly why we encode both dimensions into a single indexable key."
+    },
+    {
+      "label": "B-trees cannot index floating point columns",
+      "feedback": "Tempting if you have heard B-trees prefer discrete keys, but they index floats fine. The blocker is the shape of the query, not the column type."
+    },
+    {
+      "label": "The query plan is fine; the only real issue is that Euclidean distance is wrong on a sphere",
+      "feedback": "Spherical distance is a real second problem, but even with perfect distance math the two-range predicate cannot use a B-tree effectively. The index shape fails first."
+    }
+  ]
+}
+\`\`\`
+
 ### Geohash: nearby points share a prefix
 
 Interleave the bits of latitude and longitude and encode them base-32 into a short string. The magic
@@ -1861,6 +1884,42 @@ Hexagons matter because every neighbor is equidistant (a square has 4 close and 
 neighbors), which makes movement, coverage, and radius queries cleaner: exactly what a rideshare or
 delivery system wants.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Three indexing schemes, four signature properties. Sort each property under its scheme.",
+  "buckets": [
+    "Geohash",
+    "Quadtree",
+    "H3"
+  ],
+  "items": [
+    {
+      "label": "Nearby points share a string prefix, so it stores in any B-tree or Redis sorted set",
+      "bucket": "Geohash",
+      "feedback": "Bit interleaving plus base-32 encoding turns proximity into a prefix range scan."
+    },
+    {
+      "label": "Subdivides only where points are dense; an ocean stays one coarse cell",
+      "bucket": "Quadtree",
+      "feedback": "Adaptive splitting handles non-uniform density, at the cost of maintaining a tree instead of flat key math."
+    },
+    {
+      "label": "Hexagonal cells where every neighbor sits at the same distance",
+      "bucket": "H3",
+      "feedback": "Uniform neighbor distance is why movement, coverage, and ring queries in rideshare systems prefer it."
+    },
+    {
+      "label": "Two points a meter apart can share almost no prefix across a cell edge",
+      "bucket": "Geohash",
+      "feedback": "The boundary flaw: this is why you always query the center cell plus its 8 neighbors."
+    }
+  ],
+  "reveal": "S2 rounds out the set: Hilbert-curve cell ordering gives it tight range scans and true spherical geometry, landing between geohash's simplicity and H3's hexagon advantages."
+}
+\`\`\`
+
 ### Cell size, hot cells, and moving points
 
 The central tuning knob is **cell size versus cell count**. Finer cells hold fewer points (cheap
@@ -1884,6 +1943,30 @@ Recap: encode points into a prefix-shareable or hierarchical cell key (geohash, 
 proximity becomes an indexable/shardable range query, query the cell plus a neighbor ring to beat
 boundary misses, tune cell size to your query radius, and defuse hot cells by adaptive subdivision,
 per-cell caps, separate sharding, and caching.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A concert ends and thirty thousand riders and drivers flood the single cell around the stadium. What fails, and what is the fix?",
+  "options": [
+    {
+      "label": "Nothing fails: the cell key still indexes every point, so queries stay fast",
+      "feedback": "The index stays correct, but one cell now holds a giant point set on one shard, so every nearby query scans it and every ping writes to it. Correctness survives; the hotspot does not."
+    },
+    {
+      "label": "One hot cell hammers a single shard on reads and writes; subdivide it to a finer resolution, cap points per cell, shard it separately, and cache results",
+      "correct": true,
+      "feedback": "Right. The hot cell is the failure mode that separates senior answers, and the fix is deliberate: adaptive subdivision plus caps, separate sharding, and caching, not a bigger machine."
+    },
+    {
+      "label": "The geohash or H3 library automatically splits hot cells for you",
+      "feedback": "Tempting because the schemes are hierarchical, so finer levels always exist, but nothing switches levels on your behalf. Deciding when and where to drop to a finer resolution is your design decision."
+    }
+  ],
+  "reveal": "You now hold the full toolkit: encode 2D points into cell keys so proximity becomes a range query, ring-query neighbors to beat boundary misses, size cells to the typical query radius, keep moving points in a fast store with a short TTL, and defuse hot cells deliberately. In your design write, name the scheme you pick and why, the neighbor-ring query, and your hot-cell plan."
+}
+\`\`\`
 `.trim()
 
 const denormFanoutTeach = `
