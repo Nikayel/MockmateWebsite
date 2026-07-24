@@ -1861,6 +1861,46 @@ tradeoff, and what happens when Redis is down (fail-open vs fail-closed). A staf
 additionally frames whose traffic and which tier, argues the cost of per-user vs per-IP granularity,
 and picks a degradation policy tied to a business risk.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Same prompt, 'Design a rate limiter.' Which target level does each answer move signal most strongly?",
+  "buckets": [
+    "Junior",
+    "Senior",
+    "Staff+"
+  ],
+  "items": [
+    {
+      "label": "Draws client to LB to API to Redis to DB and finishes with a clean 429 plus Retry-After, no holes anywhere",
+      "bucket": "Junior",
+      "feedback": "Completeness beats depth at this level: a correct end-to-end design with no holes is exactly the junior bar."
+    },
+    {
+      "label": "Unprompted, raises the race when two instances update the shared counter and fixes it with an atomic increment",
+      "bucket": "Senior",
+      "feedback": "Finding the concurrency bottleneck without being asked is the unaided-depth move that marks a senior answer."
+    },
+    {
+      "label": "Asks whose traffic is being limited and weighs per-user vs per-IP keying by what each choice costs the business",
+      "bucket": "Staff+",
+      "feedback": "Framing the ambiguity and tying granularity to business cost extends past the technical, which is the staff signal."
+    },
+    {
+      "label": "Compares fixed window, sliding window, and token bucket, then commits to one with a quantified reason",
+      "bucket": "Senior",
+      "feedback": "Quantified tradeoffs plus a commitment are senior moves. A junior is not expected to derive them; a staff answer goes further, into org, cost, and evolution."
+    },
+    {
+      "label": "Names what not to build in v1 and sketches how the limiter evolves over the next two years",
+      "bucket": "Staff+",
+      "feedback": "Evolution thinking and deliberate cuts are the staff extras layered on top of an already-senior answer."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** Match estimation depth and deep-dive count to the level. A junior doing three
 deep dives runs out of time on the basics. A senior who does zero looks shallow. Budget roughly one
 deep dive for senior, two for staff, in a 45-minute round.
@@ -1872,6 +1912,30 @@ deep, so you always have a finished answer before you gamble time on depth.
 Recap: Aim depth and breadth at the target rubric; junior wants a complete correct design, senior
 wants unaided bottleneck-finding and quantified tradeoffs, staff wants ambiguity-framing plus
 org/cost/reliability and evolution thinking.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are about to write your own rate limiter answer and you do not know the target level. What is the safest way to structure it?",
+  "options": [
+    {
+      "label": "Open with your deepest material, the distributed-counter race and the degradation policy, since depth impresses at every level",
+      "feedback": "Tempting, because depth is what separates the levels going up. But depth-first risks the classic failure: the clock runs out on deep dives and the design never finishes. Depth only counts on top of a complete backbone."
+    },
+    {
+      "label": "Build a complete, correct backbone first, then layer deep dives and ambiguity-framing on top",
+      "correct": true,
+      "feedback": "Right. A finished junior-plus design is the floor every level grades from. From there you add unaided bottleneck dives for senior, and business framing, cost, and evolution for staff."
+    },
+    {
+      "label": "Mirror the interviewer's energy and improvise the structure round by round",
+      "feedback": "Reading the room helps you calibrate, but it is not a structure. Without backbone-first you can still end the round with an unfinished answer, which fails at every level."
+    }
+  ],
+  "reveal": "Backbone first, depth second. In the design exercise coming up, show the complete request path end to end before you spend words on your one or two deep dives, and say out loud which level you are aiming the depth at."
+}
+\`\`\`
 `.trim()
 
 const templatePitfallsTeach = `
