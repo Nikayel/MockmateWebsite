@@ -446,11 +446,37 @@ does not live for free on one node.
 hits one partition, that one is scatter-gather bounded by the slowest node." Interviewers are
 checking whether you know which reads got expensive, not just that you sprinkled the word "shard."
 
-\`\`\`
-RANGE                    HASH                     DIRECTORY
-A-F | G-M | N-Z          h(k)%N spreads evenly    lookup table -> partition
-+ range scans hit 1      + no sequential hotspot  + surgical rebalance/split
-- seq keys = hot p       - range scan = fan-out   - extra hop + HA routing svc
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Strategy",
+    "How keys map",
+    "Wins",
+    "Costs"
+  ],
+  "rows": [
+    [
+      "Range",
+      "Contiguous key ranges (A-F, G-M, N-Z) or time ranges",
+      "Range scans hit 1 or 2 partitions",
+      "Sequential keys hotspot the highest partition"
+    ],
+    [
+      "Hash",
+      "hash(key) mod N scatters adjacent keys",
+      "Even spread, no sequential hotspot",
+      "Range scans fan out to every partition; changing N remaps almost every key"
+    ],
+    [
+      "Directory",
+      "Explicit lookup table maps keys to partitions",
+      "Surgical rebalance: split a hot range, move a heavy tenant",
+      "Extra lookup hop plus a routing service that must stay highly available"
+    ]
+  ],
+  "caption": "Map the dominant queries onto the scheme out loud: which reads hit one partition, and which became scatter-gather."
+}
 \`\`\`
 
 Recap: horizontal partitioning is the only way to scale writes and data past one node; range wins
