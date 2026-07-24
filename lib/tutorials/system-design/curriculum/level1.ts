@@ -1811,6 +1811,45 @@ intermediary or client can safely auto-retry \`GET\`/\`PUT\`/\`DELETE\` after a 
 must not blindly auto-retry \`POST\` (that is what idempotency keys are for). Safe methods are also
 the cacheable ones.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "A network blip cuts the connection before the response arrives, so the client cannot tell whether the server did the work. Sort each call by whether the client can safely fire it again.",
+  "buckets": [
+    "Safe to auto-retry",
+    "Do not blindly retry"
+  ],
+  "items": [
+    {
+      "label": "'GET' a document",
+      "bucket": "Safe to auto-retry",
+      "feedback": "Safe and idempotent: reading twice changes nothing, so clients and intermediaries retry it freely."
+    },
+    {
+      "label": "'PUT' the full updated document",
+      "bucket": "Safe to auto-retry",
+      "feedback": "It writes, but replaying the same full body lands the same final state. Idempotent does not mean read-only."
+    },
+    {
+      "label": "'DELETE' a document",
+      "bucket": "Safe to auto-retry",
+      "feedback": "Tempting to treat destructive as unrepeatable, but deleting twice still ends with the document gone. Same final state, so retry is safe."
+    },
+    {
+      "label": "'POST' to create an order",
+      "bucket": "Do not blindly retry",
+      "feedback": "Each replay can create another order. This is exactly the gap idempotency keys exist to close."
+    },
+    {
+      "label": "'PATCH' that appends an entry to a list",
+      "bucket": "Do not blindly retry",
+      "feedback": "An append applied twice appends twice, so this 'PATCH' is not idempotent and a blind retry duplicates data."
+    }
+  ]
+}
+\`\`\`
+
 Status families are a contract with the client:
 
 - \`2xx\` success: \`200\` OK, \`201\` Created (return a \`Location\` header pointing at the new
@@ -1850,6 +1889,30 @@ client that asked for XML, or a Brotli body to a client that cannot decode it.
 Recap: use safe/idempotent method semantics to drive retry and caching, add Cache-Control plus ETag
 for cheap conditional GETs (304), and use ETag + If-Match -> 412 for optimistic concurrency that
 prevents lost updates.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two editors both fetch a document at version 'v5'. Editor A saves a change; moments later Editor B saves an edit still based on 'v5'. Your API returns '200 OK' to both and applies each write as it arrives. What happened to A's change?",
+  "options": [
+    {
+      "label": "Nothing bad, the server merged both edits",
+      "feedback": "Tempting, but plain HTTP has no merge step. The server simply stored whichever body arrived last."
+    },
+    {
+      "label": "B's write silently overwrote it: a lost update",
+      "correct": true,
+      "feedback": "Right. Last-write-wins destroyed A's edit with no error anywhere. ETag plus 'If-Match' turns this silent loss into an explicit '412 Precondition Failed' that forces B to re-read and merge."
+    },
+    {
+      "label": "The server rejected B because the version had moved on",
+      "feedback": "Only if B sent 'If-Match: v5' and the server checked it. Version checking is opt-in; an API that answers '200' to everything checked nothing."
+    }
+  ],
+  "reveal": "This bug is the whole lesson in one scene: method semantics decide what is retryable and cacheable, 'Cache-Control' plus an ETag makes reads cheap via '304 Not Modified', and the same ETag with 'If-Match' gives optimistic concurrency. In the design exercise, have every read return an ETag, require 'If-Match' on every update, and name '412' as the conflict signal."
+}
+\`\`\`
 `.trim()
 
 const serializationCompressionTeach = `
