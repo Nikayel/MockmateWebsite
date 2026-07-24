@@ -238,6 +238,29 @@ piece it left open, the algorithm that picks which backend serves the next reque
 balancer has a pool of healthy backends, it needs a rule for **which one gets the next request**. The
 rule matters because the wrong one creates hotspots: some nodes melt while others sit idle.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A fleet serves mostly 5ms requests, but a few take 2 seconds. The balancer is plain round robin, and one node has caught several of the 2-second requests. What happens to that node?",
+  "options": [
+    {
+      "label": "Round robin skips it until its in-flight work clears",
+      "feedback": "Tempting, but that is least-connections behavior. Round robin keeps no view of how busy a node is; it only counts turns."
+    },
+    {
+      "label": "It keeps receiving its full share of new requests and buries deeper",
+      "correct": true,
+      "feedback": "Right. Round robin is blind to in-flight load, so the buried node gets its turn anyway. Routing around it is exactly what least-connections adds."
+    },
+    {
+      "label": "The slow requests average out, so no node stays hot",
+      "feedback": "Averaging out is what happens when durations are uniform. With high-variance durations, the slow requests concentrate on whoever caught them, and rotation does nothing to relieve it."
+    }
+  ]
+}
+\`\`\`
+
 - **Round robin (RR):** hand requests out in rotation. **Weighted RR** biases toward bigger nodes. RR
   is perfect when every node is identical and every request costs about the same. It is blind to how
   busy a node actually is.
@@ -265,6 +288,40 @@ re-hitting the same node avoids a cold miss. But affinity has two real costs. Fi
 pinning means the balancer can no longer freely spread traffic, so a few heavy users skew load onto
 their pinned nodes. Second, **lost state on node death**: when the pinned node dies, everything it
 held is gone, and those users reconnect cold.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Same mechanism, different justification. Sort each pinning decision.",
+  "buckets": [
+    "Sound engineering",
+    "Design smell"
+  ],
+  "items": [
+    {
+      "label": "Consistent hashing so each user re-hits the node holding their warm cache",
+      "bucket": "Sound engineering",
+      "feedback": "Affinity here buys a real cache-hit win, and the state being protected is a rebuildable cache, not the only copy."
+    },
+    {
+      "label": "Sticky sessions because sessions live in process memory and moving them is on the backlog",
+      "bucket": "Design smell",
+      "feedback": "This is affinity compensating for state that should be externalized: load skews toward pinned nodes and a node death logs out everyone it held."
+    },
+    {
+      "label": "Hashing on meeting ID so one room's traffic clusters on one node",
+      "bucket": "Sound engineering",
+      "feedback": "Deliberate sharding of hot state, with the hash keeping reshuffles to about 1/N of keys when the pool changes."
+    },
+    {
+      "label": "Pinning by client IP so per-user counters can stay in local memory",
+      "bucket": "Design smell",
+      "feedback": "Those local counters are the only copy, so a node death silently loses them; the pin exists to avoid externalizing state."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the crisp story: "round robin for homogeneous stateless nodes; least-connections
 when request durations vary; power-of-two-choices when the pool is large; consistent hashing when I
@@ -305,6 +362,47 @@ Recap: round robin for identical stateless nodes, least-connections for variable
 power-of-two-choices as the O(1) no-herd default for large pools, and consistent/rendezvous hashing
 for sticky routing or sharded state; session affinity keeps a user on a cache-warm node but costs
 even load and loses that node's state when it dies, so use it deliberately.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Pick the balancing rule this lesson would reach for in each situation.",
+  "buckets": [
+    "Round robin",
+    "Least-connections or P2C",
+    "Consistent hashing"
+  ],
+  "items": [
+    {
+      "label": "Identical nodes where every request costs about the same",
+      "bucket": "Round robin",
+      "feedback": "Homogeneous work is the one case where blind rotation is genuinely perfect."
+    },
+    {
+      "label": "Request durations range from 5ms to 2 seconds",
+      "bucket": "Least-connections or P2C",
+      "feedback": "In-flight counts route around the buried node automatically, which rotation cannot do."
+    },
+    {
+      "label": "A very large pool where an O(N) scan and herding both hurt",
+      "bucket": "Least-connections or P2C",
+      "feedback": "Power-of-two-choices: pick two at random, send to the lighter. O(1), no global state, and it provably avoids herding."
+    },
+    {
+      "label": "Each session must land on the node holding its warm cache",
+      "bucket": "Consistent hashing",
+      "feedback": "Sticky routing without a lookup table, and only about 1/N of keys move when the pool changes."
+    },
+    {
+      "label": "Sharded in-memory state keyed by user ID",
+      "bucket": "Consistent hashing",
+      "feedback": "Stable key-to-node mapping is the whole point of the ring."
+    }
+  ],
+  "reveal": "For the design write: name the algorithm and justify it from workload shape (duration variance, pool size, need for stickiness). If you choose affinity, say out loud what state it protects and what is lost when the pinned node dies."
+}
+\`\`\`
 `.trim()
 
 const healthChecksTeach = `
