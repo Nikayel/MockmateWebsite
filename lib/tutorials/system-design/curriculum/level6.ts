@@ -807,6 +807,29 @@ The immediate ceiling: **group parallelism is capped by partition count.** With 
 consumer sits idle. This is the number one scaling mistake: adding consumers past the partition count
 does nothing. You scale reads by having enough partitions in the first place.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 12-partition topic is falling behind, so the team scales its consumer group from 12 to 16 consumers. What improves?",
+  "options": [
+    {
+      "label": "Nothing: each partition is assigned to at most one consumer in the group, so four consumers sit idle",
+      "correct": true,
+      "feedback": "Right: group parallelism is capped by partition count, and consumers past that cap do nothing."
+    },
+    {
+      "label": "Throughput rises by a third, since the work is now split 16 ways",
+      "feedback": "Partitions, not consumers, are the unit of parallelism; 12 partitions cannot be split 16 ways."
+    },
+    {
+      "label": "Latency drops, because idle consumers share reads with the partition owners",
+      "feedback": "An idle consumer takes over only after a rebalance; it never reads a partition concurrently with its owner."
+    }
+  ]
+}
+\`\`\`
+
 ### Offsets and delivery semantics
 
 Each consumer tracks its position per partition as a committed offset in the internal
@@ -822,6 +845,29 @@ Each consumer tracks its position per partition as a committed offset in the int
 
 Because the safe choice is at-least-once, **your consumer handlers must be idempotent.** Duplicates
 are guaranteed around every crash and every rebalance.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A consumer commits offsets only after its payment side effect is durably done. It crashes after processing but before committing. What happens on restart?",
+  "options": [
+    {
+      "label": "The message is reprocessed, so the handler sees a duplicate: this is at-least-once, and the handler must be idempotent",
+      "correct": true,
+      "feedback": "Right: commit-after-process trades lost work for duplicate work, and duplicates surround every crash and rebalance."
+    },
+    {
+      "label": "The message is skipped, because the broker saw it delivered once already",
+      "feedback": "The broker only knows the committed offset; an uncommitted message is redelivered, not skipped."
+    },
+    {
+      "label": "Kafka rolls back the payment so the retry starts clean",
+      "feedback": "Kafka cannot undo your external side effect; neutralizing the repeat is the handler's job, which is why idempotency is required."
+    }
+  ]
+}
+\`\`\`
 
 ### Rebalancing, the sharp edge
 
@@ -1040,6 +1086,30 @@ count; offset-commit timing sets the delivery guarantee, and commit-after-proces
 so handlers must be idempotent; rebalancing is stop-the-world in the eager protocol but made
 incremental by cooperative rebalancing, static membership, and KIP-848; and consumer lag is the
 metric you scale and alert on.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Consumer lag keeps rising on a 12-partition topic, and the group already runs 12 consumers on healthy CPUs. What actually helps?",
+  "options": [
+    {
+      "label": "Make handlers faster or add partitions: lag is the right signal, but autoscaling consumers stopped working at the partition ceiling",
+      "correct": true,
+      "feedback": "Right: scale on lag, but only up to partition count; at the ceiling the fix moves to per-message cost or more partitions."
+    },
+    {
+      "label": "Add four more consumers, since rising lag says scale out",
+      "feedback": "Lag is the right trigger, but consumers 13 through 16 would sit idle; the partition cap binds first."
+    },
+    {
+      "label": "Switch the autoscaler to CPU, since lag is clearly misleading here",
+      "feedback": "CPU can look healthy while the group drowns; lag is still the truth, the bottleneck is just past the consumer count."
+    }
+  ],
+  "reveal": "Two rules combine: lag, not CPU, is the health signal, and group parallelism is capped by partition count. When lag rises at the cap, the lever is per-message speed or partition count, not more consumers."
+}
+\`\`\`
 `.trim()
 
 const compactionRetentionTeach = `
