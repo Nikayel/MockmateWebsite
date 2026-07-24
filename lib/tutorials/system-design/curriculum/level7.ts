@@ -808,6 +808,61 @@ Cells also transform deploys: you roll a change **cell by cell** (a form of cana
 
 Shuffle sharding sharpens isolation for shared-worker pools where full cells are too coarse. Suppose 8 workers and you assign each customer 2 of them at random. With plain sharding (each customer pinned to 1 worker), a customer who sends poison traffic takes down everyone on that worker. With shuffle sharding, each customer gets a *unique combination* of 2 workers out of 8 (28 possible pairs). A noisy or malicious customer degrades only their 2 workers; another customer overlapping on at most one of those workers still has a second healthy worker and stays up. With enough workers and picks, the probability that two customers share their *entire* combination is tiny, so one poison tenant is isolated to a handful of others rather than everyone. AWS Route 53 and API Gateway use this to contain abusive customers.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Shuffle-shard overlap odds (3 workers per customer)",
+  "predictPrompt": {
+    "question": "The lesson's 8 workers with 2 picks gave 28 combinations, so full overlap is 1 in 28. Keep 8 workers but give each customer 3 picks instead. What happens to the chance another customer shares your ENTIRE combination?",
+    "options": [
+      "It rises: sharing more workers means more overlap",
+      "It halves, to 1 in 56, because 8 choose 3 is 56 combinations",
+      "It is unchanged: the pool is still 8 workers"
+    ]
+  },
+  "workedExample": "With 8 workers and 3 picks per customer there are 56 possible combinations (8 choose 3), so the chance a specific other customer holds your exact trio is 3/8 x 2/7 x 1/6 = 1/56, about 1.8 percent. With 1000 customers, expect about 1000 x 1/56, roughly 18 customers who fully share your combination. Slide workers to 16 and the odds drop to 3/16 x 2/15 x 1/14 = 1/560, about 0.18 percent: roughly 2 of the same 1000 customers.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "n",
+      "label": "Workers in the pool",
+      "min": 4,
+      "max": 32,
+      "step": 1,
+      "scale": "linear",
+      "initial": 8
+    },
+    {
+      "kind": "slider",
+      "id": "customers",
+      "label": "Customers in the pool",
+      "min": 100,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 1000
+    }
+  ],
+  "outputs": [
+    {
+      "id": "comboProb",
+      "label": "Chance another customer shares your ENTIRE trio",
+      "expr": "3 / n * (2 / (n - 1)) * (1 / (n - 2))",
+      "format": "percent"
+    },
+    {
+      "id": "expectedFullOverlap",
+      "label": "Expected customers sharing your exact trio",
+      "expr": "customers * comboProb",
+      "format": "number",
+      "sparkline": {
+        "over": "n"
+      }
+    }
+  ],
+  "caption": "Three picks means all three must match: the odds now fall with roughly n cubed, which is why enough workers and picks make one poison customer a rounding error."
+}
+\`\`\`
+
 Blast radius is a lens you apply everywhere, not just to compute: **deploys** (canary/cell-by-cell), **data** (partition so one corrupt shard is not the whole dataset), and **dependencies** (bulkheads and circuit breakers so one slow downstream does not exhaust every thread).
 
 ## Control plane vs data plane, and static stability
