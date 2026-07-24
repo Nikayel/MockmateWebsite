@@ -1596,13 +1596,88 @@ stopwords, and expand **synonyms** ("tv" also indexes as "television"). The same
 index time and query time so the terms match. Typo tolerance comes from **fuzzy matching** (edit
 distance) or n-gram indexing, so "hedphones" still finds "headphones".
 
-\`\`\`
-  doc: "Wireless Bluetooth Headphones"
-   -> analyze -> [wireless, bluetooth, headphone]
-  inverted index:
-    headphone -> [doc7, doc19, doc204, ...]
-    wireless  -> [doc7, doc44, doc204, ...]
-  query "wireless headphone" -> intersect posting lists -> [doc7, doc204] ranked by BM25
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "From documents to a queryable inverted index",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "docs",
+      "label": "Docs in the primary DB (doc7: 'Wireless Bluetooth Headphones')",
+      "kind": "db"
+    },
+    {
+      "id": "analyzer",
+      "label": "Analyzer: tokenize, lowercase, stem, stopwords, synonyms",
+      "kind": "service"
+    },
+    {
+      "id": "postings",
+      "label": "Inverted index: term -> posting list",
+      "kind": "db"
+    },
+    {
+      "id": "searcher",
+      "label": "Query: 'wireless headphone'",
+      "kind": "client"
+    },
+    {
+      "id": "search_tier",
+      "label": "Search tier: intersect postings, rank by BM25",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "docs",
+      "to": "analyzer",
+      "kind": "async",
+      "label": "doc text at index time"
+    },
+    {
+      "from": "analyzer",
+      "to": "postings",
+      "kind": "async",
+      "label": "terms: wireless, bluetooth, headphone"
+    },
+    {
+      "from": "searcher",
+      "to": "search_tier",
+      "kind": "sync",
+      "label": "same analyzer at query time"
+    },
+    {
+      "from": "search_tier",
+      "to": "postings",
+      "kind": "sync",
+      "label": "intersect 'wireless' AND 'headphone' -> doc7, doc204"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "docs",
+        "analyzer"
+      ],
+      "note": "Terms never enter the index raw: the analysis pipeline tokenizes, lowercases, stems ('running' collapses to 'run'), drops stopwords, and expands synonyms."
+    },
+    {
+      "adds": [
+        "postings"
+      ],
+      "note": "The index inverts the mapping: each term points to a posting list of the docs that contain it ('headphone' -> doc7, doc19, doc204), which is what a LIKE full scan can never give you."
+    },
+    {
+      "adds": [
+        "searcher",
+        "search_tier"
+      ],
+      "note": "The query runs the SAME analyzer so terms match, then the engine intersects posting lists in milliseconds and ranks the survivors with BM25."
+    }
+  ],
+  "caption": "The build path (docs -> analyzer -> posting lists) and the query path meet at the inverted index; both sides must share one analyzer."
+}
 \`\`\`
 
 ### Ranking, queries, and filters
