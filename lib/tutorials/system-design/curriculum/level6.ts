@@ -432,6 +432,191 @@ all its partitions, then the group reassigns from scratch, so the entire group s
 rebalance (hundreds of ms to seconds). A deploy that restarts 30 consumers one by one can trigger 30
 rebalances, each a latency and duplicate spike.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "A deploy triggers a rebalance",
+  "actors": [
+    {
+      "id": "coordinator",
+      "label": "Group coordinator"
+    },
+    {
+      "id": "c1",
+      "label": "Consumer 1"
+    },
+    {
+      "id": "c2",
+      "label": "Consumer 2"
+    },
+    {
+      "id": "c3",
+      "label": "Consumer 3"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "deploy",
+      "label": "Deploy restarts consumer 2",
+      "description": "A rolling deploy takes consumer 2 down mid-batch, long enough to miss heartbeats."
+    }
+  ],
+  "steps": [
+    {
+      "from": "coordinator",
+      "to": "c1",
+      "label": "Assign p0,p1",
+      "kind": "event",
+      "status": "ok"
+    },
+    {
+      "from": "coordinator",
+      "to": "c2",
+      "label": "Assign p2,p3",
+      "kind": "event",
+      "status": "ok"
+    },
+    {
+      "from": "coordinator",
+      "to": "c3",
+      "label": "Assign p4,p5",
+      "kind": "event",
+      "status": "ok"
+    },
+    {
+      "from": "c2",
+      "to": "coordinator",
+      "label": "Heartbeat",
+      "kind": "request",
+      "status": "ok",
+      "when": "!deploy"
+    },
+    {
+      "from": "c2",
+      "label": "Steady consumption, lag flat",
+      "kind": "note",
+      "status": "ok",
+      "when": "!deploy",
+      "state": {
+        "duplicates": "0"
+      }
+    },
+    {
+      "from": "coordinator",
+      "label": "No rebalance needed",
+      "kind": "note",
+      "status": "ok",
+      "when": "!deploy",
+      "state": {
+        "duplicates": "0"
+      }
+    },
+    {
+      "from": "c2",
+      "label": "Deploy: consumer 2 restarts",
+      "kind": "note",
+      "status": "ok",
+      "when": "deploy",
+      "state": {
+        "duplicates": "0"
+      }
+    },
+    {
+      "from": "c2",
+      "to": "coordinator",
+      "label": "Heartbeat missed",
+      "kind": "request",
+      "status": "lost",
+      "when": "deploy"
+    },
+    {
+      "from": "coordinator",
+      "label": "session.timeout.ms expires",
+      "kind": "timer",
+      "status": "late",
+      "when": "deploy"
+    },
+    {
+      "from": "coordinator",
+      "to": "c1",
+      "label": "Rebalance: revoke all (eager)",
+      "kind": "event",
+      "status": "error",
+      "when": "deploy",
+      "predict": {
+        "question": "Consumer 2 had processed part of a batch on p2 but not yet committed the offsets. What happens to that in-flight work at the rebalance?",
+        "options": [
+          "It is lost forever: at-most-once",
+          "The new owner reprocesses it, so duplicates appear",
+          "The coordinator finishes the batch itself"
+        ]
+      }
+    },
+    {
+      "from": "c1",
+      "label": "Work pauses: stop-the-world",
+      "kind": "note",
+      "status": "error",
+      "when": "deploy"
+    },
+    {
+      "from": "c3",
+      "label": "p4,p5 paused too",
+      "kind": "note",
+      "status": "error",
+      "when": "deploy"
+    },
+    {
+      "from": "coordinator",
+      "to": "c1",
+      "label": "Assign p0,p1,p2",
+      "kind": "event",
+      "status": "ok",
+      "when": "deploy"
+    },
+    {
+      "from": "coordinator",
+      "to": "c3",
+      "label": "Assign p3,p4,p5",
+      "kind": "event",
+      "status": "ok",
+      "when": "deploy"
+    },
+    {
+      "from": "c1",
+      "label": "Redo uncommitted p2 work",
+      "kind": "note",
+      "status": "late",
+      "when": "deploy",
+      "state": {
+        "duplicates": "7"
+      }
+    },
+    {
+      "from": "c3",
+      "label": "Redo uncommitted p3 work",
+      "kind": "note",
+      "status": "late",
+      "when": "deploy",
+      "state": {
+        "duplicates": "14"
+      }
+    },
+    {
+      "from": "coordinator",
+      "label": "Idempotent handlers required",
+      "kind": "note",
+      "status": "ok",
+      "when": "deploy",
+      "state": {
+        "duplicates": "14"
+      }
+    }
+  ],
+  "caption": "Commit-after-process is at-least-once, so every rebalance handoff makes the new owner reprocess uncommitted work: duplicates are guaranteed, and only idempotent handlers neutralize them. Cooperative rebalancing moves only p2,p3 instead of revoking everything, and static group membership (group.instance.id) lets a restarting consumer rejoin with its old assignment so a rolling deploy causes no rebalance at all."
+}
+\`\`\`
+
 \`\`\`
 Group "ranking", topic 6 partitions, 3 consumers:
   C1 -> p0,p1   C2 -> p2,p3   C3 -> p4,p5
