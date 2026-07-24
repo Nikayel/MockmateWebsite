@@ -764,6 +764,341 @@ matters: a **row-oriented** page stores whole rows together, great for "give me 
 **column-oriented** layout stores each column contiguously across rows, great for "sum revenue over
 10M rows" (OLAP) because you read only the columns you need and they compress extremely well.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Row page vs column scan",
+  "frames": [
+    {
+      "note": "Three orders on a row-oriented page: each row's fields live side by side. A page holds many rows like these, plus a header and a slot directory.",
+      "rows": [
+        {
+          "label": "row 101",
+          "cells": [
+            {
+              "text": "id=101"
+            },
+            {
+              "text": "cust=ana"
+            },
+            {
+              "text": "status=paid"
+            },
+            {
+              "text": "rev=40"
+            }
+          ]
+        },
+        {
+          "label": "row 102",
+          "cells": [
+            {
+              "text": "id=102"
+            },
+            {
+              "text": "cust=bo"
+            },
+            {
+              "text": "status=paid"
+            },
+            {
+              "text": "rev=25"
+            }
+          ]
+        },
+        {
+          "label": "row 103",
+          "cells": [
+            {
+              "text": "id=103"
+            },
+            {
+              "text": "cust=cy"
+            },
+            {
+              "text": "status=ship"
+            },
+            {
+              "text": "rev=90"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The OLTP question, give me this order, is what row layout is built for: order 102 comes back whole in a single page read, every field already adjacent.",
+      "rows": [
+        {
+          "label": "row 101",
+          "cells": [
+            {
+              "text": "id=101",
+              "state": "dim"
+            },
+            {
+              "text": "cust=ana",
+              "state": "dim"
+            },
+            {
+              "text": "status=paid",
+              "state": "dim"
+            },
+            {
+              "text": "rev=40",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "row 102",
+          "cells": [
+            {
+              "text": "id=102",
+              "state": "active"
+            },
+            {
+              "text": "cust=bo",
+              "state": "active"
+            },
+            {
+              "text": "status=paid",
+              "state": "active"
+            },
+            {
+              "text": "rev=25",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "row 103",
+          "cells": [
+            {
+              "text": "id=103",
+              "state": "dim"
+            },
+            {
+              "text": "cust=cy",
+              "state": "dim"
+            },
+            {
+              "text": "status=ship",
+              "state": "dim"
+            },
+            {
+              "text": "rev=90",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Now the OLAP question, sum revenue. The query needs only rev, but the row page drags every id, cust, and status along to reach 3 revenue values. Scale that to 10M rows and almost every byte read is wasted.",
+      "rows": [
+        {
+          "label": "row 101",
+          "cells": [
+            {
+              "text": "id=101",
+              "state": "dropped"
+            },
+            {
+              "text": "cust=ana",
+              "state": "dropped"
+            },
+            {
+              "text": "status=paid",
+              "state": "dropped"
+            },
+            {
+              "text": "rev=40",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "row 102",
+          "cells": [
+            {
+              "text": "id=102",
+              "state": "dropped"
+            },
+            {
+              "text": "cust=bo",
+              "state": "dropped"
+            },
+            {
+              "text": "status=paid",
+              "state": "dropped"
+            },
+            {
+              "text": "rev=25",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "row 103",
+          "cells": [
+            {
+              "text": "id=103",
+              "state": "dropped"
+            },
+            {
+              "text": "cust=cy",
+              "state": "dropped"
+            },
+            {
+              "text": "status=ship",
+              "state": "dropped"
+            },
+            {
+              "text": "rev=90",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "at scale",
+          "cells": [
+            {
+              "text": "x 10M rows",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "A column-oriented layout stores each column contiguously across rows. The same 3 orders regroup into 4 runs, each holding one column's values for every row.",
+      "rows": [
+        {
+          "label": "id col",
+          "cells": [
+            {
+              "text": "101",
+              "state": "dim"
+            },
+            {
+              "text": "102",
+              "state": "dim"
+            },
+            {
+              "text": "103",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "cust col",
+          "cells": [
+            {
+              "text": "ana",
+              "state": "dim"
+            },
+            {
+              "text": "bo",
+              "state": "dim"
+            },
+            {
+              "text": "cy",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "status col",
+          "cells": [
+            {
+              "text": "paid",
+              "state": "dim"
+            },
+            {
+              "text": "paid",
+              "state": "dim"
+            },
+            {
+              "text": "ship",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "rev col",
+          "cells": [
+            {
+              "text": "40",
+              "state": "new"
+            },
+            {
+              "text": "25",
+              "state": "new"
+            },
+            {
+              "text": "90",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "Same bytes, regrouped by column. Why do column stores also compress far better than row pages?",
+        "options": [
+          "Adjacent values share a type and range",
+          "Columnar pages are physically larger",
+          "Columnar layouts keep fewer rows per page"
+        ]
+      },
+      "note": "Sum revenue now reads one contiguous run: 40, 25, 90 and nothing else, so SUM=155 costs a fraction of the bytes. And because adjacent values share a type and range, the run compresses extremely well. OLAP scans want columns; the single-order lookup keeps its row page.",
+      "rows": [
+        {
+          "label": "rev col",
+          "cells": [
+            {
+              "text": "40",
+              "state": "active"
+            },
+            {
+              "text": "25",
+              "state": "active"
+            },
+            {
+              "text": "90",
+              "state": "active"
+            },
+            {
+              "text": "SUM=155",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "untouched",
+          "cells": [
+            {
+              "text": "id col",
+              "state": "dim"
+            },
+            {
+              "text": "cust col",
+              "state": "dim"
+            },
+            {
+              "text": "status col",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Pages move whole; layout decides whether the bytes you move are the bytes you need."
+}
+\`\`\`
+
 ### Buffer pool
 
 The database keeps hot pages in an in-memory **buffer pool** (the biggest knob in most databases,
