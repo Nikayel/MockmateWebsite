@@ -20,6 +20,29 @@ with follower count. It does **not** scale writes: every follower must apply eve
 leader's write throughput is still the ceiling. That asymmetry is the whole point to internalize.
 Adding replicas buys read capacity and read-path fault tolerance, nothing more.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your write throughput is at 90 percent of what the leader can absorb. You add three more read replicas. What happens to write capacity?",
+  "options": [
+    {
+      "label": "It roughly doubles, since writes now spread across more machines",
+      "feedback": "Tempting, because reads really do spread this way. But every follower must apply every write to stay in sync, so the leader remains the write ceiling no matter how many replicas you add."
+    },
+    {
+      "label": "Nothing changes, the leader is still the ceiling",
+      "correct": true,
+      "feedback": "Right. Replication fans out reads, but each write is replayed on every follower. When writes outgrow one leader, the lever is sharding, not more replicas."
+    },
+    {
+      "label": "It gets slightly worse",
+      "feedback": "Closer than it sounds: more followers mean more replication work, and under synchronous settings more waiting. But the headline answer is that write capacity does not scale; the leader still bounds it."
+    }
+  ]
+}
+\`\`\`
+
 ### How the leader waits for followers
 
 The core tradeoff trades durability and read freshness against write latency:
@@ -65,6 +88,30 @@ Recap: single-leader replication scales reads by fanning them across followers b
 writes; choose async, sync, or semi-sync by trading write latency against durability and staleness,
 watch replication lag, add followers online for zero-downtime read capacity, and shard once writes or
 dataset size outgrow one leader.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A product's database is melting and your first instinct is 'add replicas'. In which situation does that instinct actually fix the problem?",
+  "options": [
+    {
+      "label": "Read traffic saturates the primary and writes are modest",
+      "correct": true,
+      "feedback": "Right. This is exactly what read replicas buy: reads fan out across followers added online with zero downtime, while the modest write stream stays within one leader's capacity."
+    },
+    {
+      "label": "Write bursts are saturating the primary",
+      "feedback": "Tempting because replicas feel like generic capacity, but every follower replays every write, so more replicas add zero write headroom. This case forces sharding."
+    },
+    {
+      "label": "The dataset no longer fits on one machine",
+      "feedback": "Each replica holds a full copy of the data, so replication multiplies the storage problem instead of splitting it. Partitioning the data across nodes is the fix."
+    }
+  ],
+  "reveal": "Replication is the read lever: cheap, online, and linear in follower count, but bounded by one leader for writes and one machine for data. In the design exercise, say which workload is read-bound before you reach for replicas, and name the replication-lag consequence you are accepting."
+}
+\`\`\`
 `.trim()
 
 const replicationTopologiesTeach = `
