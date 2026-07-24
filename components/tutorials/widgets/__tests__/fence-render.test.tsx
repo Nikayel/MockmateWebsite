@@ -94,7 +94,51 @@ describe("cswidget fence through the markdown pipeline", () => {
   })
 })
 
+const calcSpec = {
+  type: "calc",
+  title: "From DAU to peak QPS",
+  predictPrompt: {
+    question: "1M DAU, 10 actions each. Roughly what average QPS is that?",
+    options: ["About 100", "About 1,000", "About 100,000"],
+  },
+  workedExample: "At the initial values this is about 116 QPS average.",
+  inputs: [
+    {
+      kind: "slider",
+      id: "dau",
+      label: "Daily active users",
+      min: 10000,
+      max: 100000000,
+      scale: "log",
+      initial: 1000000,
+      unit: "users",
+    },
+  ],
+  outputs: [{ id: "avgQps", label: "Average QPS", expr: "dau * 10 / 86400", format: "compact" }],
+}
+
+describe("calc fence through the markdown pipeline", () => {
+  it("intercepts a calc fence and renders the predict phase server-side", () => {
+    const html = render(fence(calcSpec))
+    expect(html).toContain('data-cswidget="calc"')
+    expect(html).not.toContain("language-cswidget")
+  })
+})
+
 describe("widget components server-render (SSR safety)", () => {
+  it("renders a calc body in its predict phase without touching window", async () => {
+    const parsed = parseWidgetSpec(JSON.stringify(calcSpec))
+    if (!parsed.ok) throw new Error(parsed.error)
+    const html = renderToStaticMarkup(createElement(WidgetBody, { spec: parsed.spec }))
+    expect(html).toContain("Explore the math")
+    expect(html).toContain("From DAU to peak QPS")
+    expect(html).toContain("Roughly what average QPS")
+    expect(html).toContain("About 1,000")
+    // The ramp: no slider or output is visible before the prediction commits.
+    expect(html).not.toContain('type="range"')
+    expect(html).not.toContain("Average QPS")
+  })
+
   it("renders a predict check body without touching window", () => {
     const parsed = parseWidgetSpec(JSON.stringify(predictSpec))
     if (!parsed.ok) throw new Error(parsed.error)
