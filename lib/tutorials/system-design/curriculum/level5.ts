@@ -2215,6 +2215,49 @@ lattice (for a counter, element-wise max; for a set, union).
   by design.
 - **RGA / sequence CRDTs**: ordered lists for collaborative text (the basis of Yjs and Automerge).
 
+\`\`\`cswidget
+{
+  "type": "partition-sim",
+  "title": "A PN-Counter Merge Loses Nothing",
+  "predictPrompt": {
+    "question": "A partition splits two replicas of a counter and offline devices keep incrementing on both sides. When the partition heals and the replicas merge, what is the value?",
+    "options": [
+      "The sum of every increment from both sides, each counted exactly once",
+      "Whichever side's total carries the later timestamp; the other side's edits are discarded",
+      "A double-counted total wherever gossip delivered an update twice"
+    ]
+  },
+  "workedExample": "Each replica owns its own slot in the counter and only ever raises that slot. Cut the link and fire the increments on both sides yourself: each side's slot grows locally while the other side sees nothing. Heal, and the merge takes the element-wise max of every slot. Because max is commutative, associative, and idempotent, the updates can arrive in any order, even duplicated, and every increment from both sides survives. Compare that with last-write-wins, which would keep one side's state and silently discard the other's concurrent edits. One honest caveat: the heal step here is doing anti-entropy's job. The merge is only the safe math; gossip and Merkle-tree reconciliation are what actually deliver the missed updates to merge.",
+  "kind": "counter",
+  "writes": [
+    {
+      "side": "A",
+      "value": "3",
+      "label": "Phone increments while offline"
+    },
+    {
+      "side": "B",
+      "value": "2",
+      "label": "Laptop increments on the other side"
+    },
+    {
+      "side": "A",
+      "value": "1",
+      "label": "Phone increments again"
+    },
+    {
+      "side": "B",
+      "value": "4",
+      "label": "A second device on side B increments"
+    }
+  ],
+  "strategies": [
+    "crdt-counter"
+  ],
+  "caption": "Per-replica slots merged with element-wise max: no coordination, no lost update, and duplicated deliveries are no-ops."
+}
+\`\`\`
+
 Costs are real and interviewers probe them. OR-Set elements carry add/remove tags, and removed
 elements leave **tombstones** so a late-arriving add does not resurrect deleted data. Metadata and
 tombstones grow, so you need **garbage collection**, which itself needs some coordination or a
