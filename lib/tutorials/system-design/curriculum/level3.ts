@@ -253,6 +253,28 @@ miss storm that stampedes the database; for a database it means moving nearly th
 add one machine. Since adding and removing nodes is the entire point of horizontal scale, mod N is
 the wrong primitive.
 
+\`\`\`cswidget
+{
+  "type": "hash-ring",
+  "title": "Feel the remap: mod N versus the ring",
+  "predictPrompt": {
+    "question": "You add one node to a 4-node cluster placed by hash(key) mod N. What fraction of keys change owner?",
+    "options": [
+      "About 1 in 5",
+      "About half",
+      "Almost all of them"
+    ]
+  },
+  "workedExample": "The scene opens in mod-N mode: 48 keys colored by owner across nodes A to D. Add node E and read the remap number; it lands near 80 percent. Then switch to the consistent-hash ring and add or remove a node again: the number collapses to roughly 1 in N, and virtual nodes flatten the shares.",
+  "initialNodes": 4,
+  "maxNodes": 7,
+  "keys": 48,
+  "initialMode": "modulo",
+  "vnodeFactor": 16,
+  "caption": "The interview phrase this earns: only about 1/N of keys move on the ring."
+}
+\`\`\`
+
 ### The ring
 
 **Consistent hashing** fixes the remap cost. Imagine a ring of hash values from 0 to 2^32 - 1. Hash
