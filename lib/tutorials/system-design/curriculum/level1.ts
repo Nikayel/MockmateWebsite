@@ -245,6 +245,118 @@ roughly 1 more RTT (TLS 1.2 added 2). So a brand-new HTTPS connection is about 2
 first request byte, then more RTTs for the response. Over a 200ms link that is 400ms+ of overhead
 spent on nothing but ceremony.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "TCP handshake cost vs a reused connection",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client (200ms RTT away)"
+    },
+    {
+      "id": "server",
+      "label": "Server"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "reuse",
+      "label": "Connection reuse",
+      "description": "keep-alive: the warm connection and its congestion window survive"
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "label": "cold start: no connection",
+      "kind": "note",
+      "when": "!reuse"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "SYN",
+      "kind": "request",
+      "when": "!reuse"
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "SYN-ACK",
+      "kind": "response",
+      "when": "!reuse"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "ACK",
+      "kind": "request",
+      "when": "!reuse",
+      "state": {
+        "rtts_spent": "1"
+      }
+    },
+    {
+      "from": "client",
+      "label": "1 RTT of pure setup burned",
+      "kind": "timer",
+      "when": "!reuse"
+    },
+    {
+      "from": "client",
+      "label": "keep-alive: warm connection",
+      "kind": "note",
+      "when": "reuse",
+      "state": {
+        "rtts_spent": "0"
+      }
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "label": "'GET /api/orders'",
+      "kind": "request",
+      "predict": {
+        "question": "How many round trips passed before this first request byte left the client?",
+        "options": [
+          "0",
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "response, 2 RTTs total",
+      "kind": "response",
+      "when": "!reuse",
+      "state": {
+        "rtts_spent": "2"
+      }
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "label": "response, 1 RTT total",
+      "kind": "response",
+      "when": "reuse",
+      "state": {
+        "rtts_spent": "1"
+      }
+    },
+    {
+      "from": "client",
+      "label": "reuse saved 200ms of ceremony",
+      "kind": "timer",
+      "when": "reuse"
+    }
+  ],
+  "caption": "On a 200ms link the handshake is a visible stall before any data flows. Reuse keeps the connection warm and keeps the opened congestion window, so you also skip slow start's ramp."
+}
+\`\`\`
+
 TCP earns that cost by giving reliability: every byte has a sequence number, the receiver ACKs what
 it got, and unacknowledged data is retransmitted, so the application sees an ordered, gap-free
 stream. It also runs **congestion control**: a new connection starts in slow start with a small
