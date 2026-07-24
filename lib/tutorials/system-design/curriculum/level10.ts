@@ -150,6 +150,82 @@ Store each post once keyed by author. When Bob loads his timeline, fetch the rec
 
 Fan-out-on-write for the common case, fan-out-on-read for celebrities. When you post, you push to normal followers' timelines. Accounts above a follower threshold (say 100K) are marked "celebrity" and are NOT pushed. At read time you take a user's precomputed timeline and merge in the recent posts of the handful of celebrities they follow, pulled live and cached briefly. Most users follow only a few celebrities, so the read-time merge is small and bounded. This caps write amplification and keeps reads fast.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Fan-out write cost: push vs pull vs hybrid",
+  "predictPrompt": {
+    "question": "The platform sees 250 posts/sec and the average author has 200 followers. Roughly what does pure fan-out-on-write cost in timeline writes per second?",
+    "options": [
+      "About 500",
+      "About 5,000",
+      "About 50,000",
+      "About 500,000"
+    ]
+  },
+  "workedExample": "At the initial settings, 250 posts/sec times 200 average followers is 50,000 timeline writes/sec under pure push, and hybrid matches it because 200 sits far below the 100K celebrity cutoff, while pull costs just 250 writes/sec (one insert per post) by moving all the work to reads. Slide followers past 100K and hybrid drops to zero timeline writes because celebrity posts are pulled at read time, while pure push climbs to 250 million writes/sec at 1M followers. That cliff is why the hybrid is the senior answer.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "posts_per_sec",
+      "label": "Posts per second",
+      "min": 1,
+      "max": 10000,
+      "scale": "log",
+      "initial": 250,
+      "unit": "posts/s"
+    },
+    {
+      "kind": "slider",
+      "id": "avg_followers",
+      "label": "Followers per author",
+      "min": 10,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 200,
+      "unit": "followers"
+    },
+    {
+      "kind": "slider",
+      "id": "celeb_cutoff",
+      "label": "Celebrity cutoff",
+      "min": 1000,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 100000,
+      "unit": "followers"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "push_write_qps",
+      "label": "Push: timeline writes/sec",
+      "expr": "posts_per_sec * avg_followers",
+      "format": "compact",
+      "unit": "writes/s"
+    },
+    {
+      "id": "hybrid_write_qps",
+      "label": "Hybrid: timeline writes/sec",
+      "expr": "push_write_qps * min(1, floor(celeb_cutoff / avg_followers))",
+      "format": "compact",
+      "unit": "writes/s",
+      "sparkline": {
+        "over": "avg_followers"
+      }
+    },
+    {
+      "id": "pull_write_qps",
+      "label": "Pull: writes/sec (one insert per post)",
+      "expr": "posts_per_sec",
+      "format": "compact",
+      "unit": "writes/s"
+    }
+  ],
+  "caption": "Hybrid pushes only authors at or below the cutoff; above it, readers pull, so the write cost vanishes and the cost moves to the read path."
+}
+\`\`\`
+
 \`\`\`
 Alice posts
   |
