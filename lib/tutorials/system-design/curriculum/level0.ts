@@ -444,6 +444,109 @@ happens.
 query time) so a single tweet does not trigger tens of millions of feed inserts. Naming this hybrid is
 a senior signal.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Fan-out: what the delivery strategy does to write QPS",
+  "predictPrompt": {
+    "question": "50M DAU post 0.5 times a day with 200 followers each. With push (fan-out on write), what is the effective feed-insert QPS?",
+    "options": [
+      "About 250",
+      "About 5,000",
+      "About 50,000",
+      "About 500,000"
+    ]
+  },
+  "workedExample": "At the initial values (50M DAU, 0.5 posts per user per day, 200 followers, push delivery) the posts table sees only 250 average write QPS, but push fan-out multiplies that into 50,000 feed inserts per second, while feed reads at 20 opens per user per day run 10,000 QPS for a 40:1 read:write ratio. Switch the strategy to pull to collapse the fan-out back to 250, then drag followers toward 10M to see why celebrities break pure push and why the hybrid caps the damage.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "dau",
+      "label": "Daily active users",
+      "min": 1000000,
+      "max": 2000000000,
+      "scale": "log",
+      "initial": 50000000,
+      "unit": "users"
+    },
+    {
+      "kind": "slider",
+      "id": "posts_per_user",
+      "label": "Posts per user per day",
+      "min": 0.1,
+      "max": 5,
+      "scale": "linear",
+      "step": 0.1,
+      "initial": 0.5
+    },
+    {
+      "kind": "slider",
+      "id": "followers",
+      "label": "Average followers per user",
+      "min": 1,
+      "max": 10000000,
+      "scale": "log",
+      "initial": 200,
+      "unit": "followers"
+    },
+    {
+      "kind": "select",
+      "id": "strategy_cap",
+      "label": "Delivery strategy",
+      "options": [
+        {
+          "label": "Push: fan out on write to every follower",
+          "value": 100000000
+        },
+        {
+          "label": "Pull: write once, merge at read time",
+          "value": 1
+        },
+        {
+          "label": "Hybrid: push, capped at a 100k-follower celebrity cutoff",
+          "value": 100000
+        }
+      ],
+      "initial": 0
+    }
+  ],
+  "outputs": [
+    {
+      "id": "write_qps",
+      "label": "Average post write QPS",
+      "expr": "dau * posts_per_user / 100000",
+      "format": "compact",
+      "unit": "QPS"
+    },
+    {
+      "id": "fanout_write_qps",
+      "label": "Effective fan-out write QPS",
+      "expr": "write_qps * min(followers, strategy_cap)",
+      "format": "compact",
+      "unit": "QPS",
+      "sparkline": {
+        "over": "followers"
+      }
+    },
+    {
+      "id": "read_qps",
+      "label": "Average feed read QPS (20 opens per user per day)",
+      "expr": "dau * 20 / 100000",
+      "format": "compact",
+      "unit": "QPS"
+    },
+    {
+      "id": "rw_ratio",
+      "label": "Read:write ratio",
+      "expr": "read_qps / write_qps",
+      "format": "number",
+      "unit": ":1"
+    }
+  ],
+  "caption": "The naive write QPS understates the real load: the strategy multiplier decides where the fan-out cost lands."
+}
+\`\`\`
+
 ### Averages lie: design for the hot key
 
 Access is Zipfian: a small number of hot keys (viral posts, celebrity accounts, trending products)
