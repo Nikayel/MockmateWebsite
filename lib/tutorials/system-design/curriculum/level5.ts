@@ -1281,6 +1281,27 @@ guaranteed to observe at least one copy of the freshest value.
 
 \`\`\`cswidget
 {
+  "type": "quorum",
+  "title": "R + W > N: the dial and the trap",
+  "predictPrompt": {
+    "question": "N=3, W=2, and you drop R to 1 to make reads fast. A write was just acknowledged by 2 replicas. What can that single-replica read return?",
+    "options": [
+      "Always the latest value: the write already reached a majority",
+      "Possibly the old value: the one replica you ask may be the one the write missed",
+      "An error: reads must wait until all 3 replicas converge"
+    ]
+  },
+  "workedExample": "Start at N=3, R=1, W=2. A write is acknowledged once nodes 1 and 2 have it. A read asks a single replica, and R + W = 1 + 2 = 3, which is not greater than N = 3, so the read set and the write set can be disjoint: ask node 3 and you get the old value even though the write was acknowledged. Slide R to 2 and R + W = 4 beats N, so any read must overlap any acknowledged write in at least one node, exactly the diagram's read from nodes 2 and 3 touching node 2. Then remember what you bought: quorum consistency, a read sees at least one copy of the latest acknowledged write. Not linearizability.",
+  "preset": "dynamo",
+  "n": 3,
+  "r": 1,
+  "w": 2,
+  "caption": "Find every configuration where R + W > N holds, then ask what it still does not promise."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "prompt": "N=3, R=2, W=2, so 'R + W > N' holds and every read set overlaps every acknowledged write set. Does this configuration give you strong consistency (linearizability)?",
