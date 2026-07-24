@@ -618,6 +618,41 @@ Replication and quorums are the heart. With N replicas, a write is acknowledged 
 
 Conflicts happen because two clients can write the same key on different replicas during a partition. Resolution options: last-write-wins (LWW) by timestamp is simple but silently drops one write and is vulnerable to clock skew. Vector clocks track causality so you can detect true concurrency and either merge or hand both versions (siblings) to the application. Cassandra uses LWW; Dynamo used vector clocks. Replicas that drift are reconciled two ways: read-repair (on a read, if replicas disagree, push the newest to the stale ones) and anti-entropy using Merkle trees (nodes exchange hash trees of their ranges and only sync the differing subtrees, avoiding a full scan).
 
+\`\`\`cswidget
+{
+  "type": "partition-sim",
+  "title": "Concurrent writes to one key: LWW vs vector clocks",
+  "predictPrompt": {
+    "question": "During the partition, side A accepts city = Detroit while side B accepts city = Ann Arbor for the same key. When the link heals, what does last-write-wins by timestamp do with these two writes?",
+    "options": [
+      "It keeps both values as siblings and hands them to the application",
+      "It keeps whichever write carries the later timestamp and silently drops the other",
+      "It rejects both writes and asks the clients to retry",
+      "It blocks reads on that key until an operator resolves the conflict"
+    ]
+  },
+  "workedExample": "Cut the link and both replicas keep accepting writes, the availability choice a Dynamo-style store makes: one client sets the city to Detroit on side A while another sets it to Ann Arbor on side B, and neither replica knows about the other write. Heal the partition and compare the strategies. Last-write-wins by timestamp keeps whichever write happens to carry the later timestamp and silently drops the other, and clock skew between replicas can make the dropped write the one the user actually intended. A vector clock instead tracks causality: neither write descends from the other, so this is true concurrency, and the store hands both versions back as siblings for the application to merge or choose. That is the exact tradeoff in the prose above: Cassandra accepts the simple silent resolution, Dynamo surfaces siblings so no write is lost without the application deciding.",
+  "kind": "register",
+  "writes": [
+    {
+      "side": "A",
+      "value": "Detroit",
+      "label": "Client 1 sets city = Detroit on side A"
+    },
+    {
+      "side": "B",
+      "value": "Ann Arbor",
+      "label": "Client 2 sets city = Ann Arbor on side B"
+    }
+  ],
+  "strategies": [
+    "lww",
+    "version-vector"
+  ],
+  "caption": "Quorum overlap cannot save you here: these writes are concurrent, so the store must either drop one (LWW) or surface both (siblings). Read-repair then pushes the resolved value to stale replicas."
+}
+\`\`\`
+
 ## The LSM write path
 
 A write appends to a commit log for durability, then updates an in-memory sorted structure (memtable). When the memtable fills, it flushes to an immutable sorted file on disk (SSTable). Reads may check several SSTables, so a bloom filter per SSTable skips ones that cannot contain the key. Background compaction merges SSTables, drops tombstones (deletes), and keeps read amplification bounded. This design makes writes sequential and fast.
