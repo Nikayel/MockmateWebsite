@@ -664,6 +664,34 @@ You cut the infinite stream into finite chunks. *Tumbling* windows are fixed, no
 
 A watermark is the engine's assertion "I believe I have now seen all events with event time <= T." It is a heuristic, usually \`max_event_time_seen - allowed_lateness\`. When the watermark passes a window's end, the window *fires* and emits its result. This is the mechanism that lets an unbounded stream produce bounded, timely output. You tune the lateness bound: a tight bound (say 5s) gives low latency but drops stragglers; a loose bound (say 5 min) waits longer but captures late data. *Allowed lateness* additionally keeps a window's state around after firing so a late event can trigger an updated (retracted/corrected) result instead of being dropped.
 
+\`\`\`cswidget
+{
+  "type": "watermark-sim",
+  "title": "Watermarks: when does a window fire?",
+  "predictPrompt": {
+    "question": "A phone buffers events in a tunnel and flushes them well after they happened. With allowed lateness at zero, what happens to those events when they arrive after the watermark already fired their window?",
+    "options": [
+      "They are dropped and the fired count stays silently wrong",
+      "The window's state is still around, so it emits a corrected result",
+      "They are counted in whichever window is currently open"
+    ]
+  },
+  "workedExample": "Events stream in mostly on time, but a seeded slice arrives well behind its event time, like a phone flushing after a tunnel. The watermark trails the max event time seen by a small delay, and when it passes a window's end that window fires and emits. With the lateness slider at zero, stragglers arriving after their window fired are dropped, so the emitted count is silently short. Drag the slider up: the window's state is kept around after firing, a late event triggers an updated, corrected result, and you pay with later finality. The slider is exactly the trade the lesson names: a tight bound gives low latency but drops stragglers, a loose bound waits longer but captures late data.",
+  "seed": "l6-stream-watermarks",
+  "count": 60,
+  "horizon": 120,
+  "skew": 12,
+  "windowSize": 20,
+  "watermarkDelay": 6,
+  "allowedLateness": 0,
+  "maxLateness": 30,
+  "modes": [
+    "event-time"
+  ],
+  "caption": "Tune the lateness bound and watch windows fire: tight fires fast but drops stragglers, loose waits and captures them. Whatever you pick, never drop late data silently; route it to a side output or emit a correction."
+}
+\`\`\`
+
 **Interview nuance:** the single most common wrong answer is "just use processing time and drop late events." Say out loud what you do with late data: route to a side output / dead-letter, or emit a correction. Silent drops are a correctness bug that never pages anyone.
 
 ## Fault-tolerant state
