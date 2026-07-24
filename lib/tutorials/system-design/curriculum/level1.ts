@@ -1007,6 +1007,62 @@ least one of 20 is slow is 1 minus 0.99^20, roughly 18%. So a backend p99 become
 Fan-out turns rare tails into common ones, which is why Google's "tail at scale" work pushes
 techniques like hedged requests (send a duplicate after the p95 mark, take the first to answer).
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Fan-out tail explorer",
+  "predictPrompt": {
+    "question": "Each of 20 backends misses its p99 (runs slow) only 1% of the time. What fraction of user requests hit at least one slow backend call?",
+    "options": [
+      "About 1%",
+      "About 5%",
+      "About 18%",
+      "Nearly half"
+    ]
+  },
+  "workedExample": "At the initial values, a 0.01 miss probability across 20 backends, the chance every call dodges its tail is 0.99 to the 20th power, about 81.8%, so about 18.2% of requests hit at least one slow call: your per-service p99 is a p82 experience for the user. Drag the fan-out toward 50 and watch the sparkline; the slow fraction climbs to nearly 40%.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "p_slow",
+      "label": "Per-service p99 miss probability",
+      "min": 0.001,
+      "max": 0.05,
+      "scale": "log",
+      "initial": 0.01
+    },
+    {
+      "kind": "slider",
+      "id": "n_services",
+      "label": "Backend calls per request (fan-out)",
+      "min": 1,
+      "max": 50,
+      "scale": "linear",
+      "step": 1,
+      "initial": 20
+    }
+  ],
+  "outputs": [
+    {
+      "id": "all_fast",
+      "label": "Chance every call is fast (your effective percentile)",
+      "expr": "pow(1 - p_slow, n_services)",
+      "format": "percent"
+    },
+    {
+      "id": "any_slow",
+      "label": "Requests hitting at least one slow call",
+      "expr": "1 - all_fast",
+      "format": "percent",
+      "sparkline": {
+        "over": "n_services"
+      }
+    }
+  ],
+  "caption": "Fan-out turns a rare per-service tail into the common case: the user experiences the slowest of N calls."
+}
+\`\`\`
+
 ### Little's Law
 
 \`L = arrival_rate x latency\`, where L is the average number of requests concurrently in the system.
