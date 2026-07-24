@@ -633,15 +633,39 @@ Disaster recovery is not "we have backups." It is a set of promises about how fa
 
 These numbers set your strategy, because recovery speed costs money. The industry ladder, cheapest and slowest first:
 
-\`\`\`
- cost / readiness  ->  higher
- RTO/RPO           ->  lower (better)
-
- Backup & Restore   Pilot Light      Warm Standby        Multi-site Active/Active
- (hours/days)       (10s of min)     (minutes)           (near zero)
- restore from S3    core data live,  scaled-down full    full stack live in 2+
- into new infra     app off; scale   stack always on;    regions; DNS shifts;
-                    up on disaster   scale up on failover instant, most expensive
+\`\`\`csdiagram
+{
+  "type": "ladder",
+  "title": "The DR strategy ladder: readiness and cost rise, RTO/RPO fall",
+  "scale": "linear",
+  "bands": [
+    {
+      "label": "Backup & restore",
+      "value": 1,
+      "display": "RTO hours to days",
+      "note": "Periodic snapshots to durable storage (S3, cross-region); on disaster you provision infra and restore. RPO is only as good as your backup cadence. Cheapest; fine for non-critical tiers."
+    },
+    {
+      "label": "Pilot light",
+      "value": 2,
+      "display": "RTO tens of minutes",
+      "note": "Critical data continuously replicated and a minimal always-on core (the database) in the DR region; app servers stay off until you start and scale them on disaster."
+    },
+    {
+      "label": "Warm standby",
+      "value": 3,
+      "display": "RTO minutes",
+      "note": "A scaled-down but fully functional copy runs in the DR region all the time; on disaster you fail over and scale up."
+    },
+    {
+      "label": "Multi-site active/active",
+      "value": 4,
+      "display": "RTO and RPO near zero",
+      "note": "Full capacity live in 2+ regions with traffic already flowing to both, so a region loss is just a traffic shift. The most expensive rung by far."
+    }
+  ],
+  "caption": "Tier your systems and pick the cheapest rung that meets each tier's numbers: the payment ledger might warrant warm standby while the recommendation model lives on backup & restore."
+}
 \`\`\`
 
 - **Backup & restore**: periodic snapshots to durable storage (S3, cross-region). On disaster you provision infra and restore. Cheapest, RTO in hours, RPO as good as your backup cadence. Fine for non-critical tiers.
