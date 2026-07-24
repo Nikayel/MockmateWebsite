@@ -275,6 +275,45 @@ changes no decision. A real NFR is quantified and testable. Compare "the feed sh
 "p99 feed load latency under 200ms." Only the second one tells you whether you need a cache, and only
 the second one can be verified against a dashboard.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort these candidate NFRs: which could you put on a dashboard and alert on, and which are filler that changes no decision?",
+  "buckets": [
+    "Testable, drives a decision",
+    "Filler"
+  ],
+  "items": [
+    {
+      "label": "p99 feed load latency under 200ms",
+      "bucket": "Testable, drives a decision",
+      "feedback": "A percentile with a number: it tells you whether you need a cache, and a Grafana panel can verify it."
+    },
+    {
+      "label": "The system should be scalable and reliable",
+      "bucket": "Filler",
+      "feedback": "True of every system ever built, so it changes nothing. This is the classic faked NFR."
+    },
+    {
+      "label": "Average latency should stay low",
+      "bucket": "Filler",
+      "feedback": "Tempting because it mentions a metric, but 'low' is not a number, and averages hide the tail latency users actually feel. The next paragraph explains why percentiles win."
+    },
+    {
+      "label": "99.99% availability on the read path",
+      "bucket": "Testable, drives a decision",
+      "feedback": "A specific count of nines: about 52 minutes of downtime a year, which forces the multi-region conversation."
+    },
+    {
+      "label": "Sustain 50k peak QPS at 100M DAU",
+      "bucket": "Testable, drives a decision",
+      "feedback": "Concrete scale you can load-test against, and the number that forces sharding."
+    }
+  ]
+}
+\`\`\`
+
 The rule: every NFR must be a number you could put on a Grafana panel and alert on. That means
 percentiles, not averages (p99, not "average latency"), because tail latency is what users feel and
 averages hide it. It means specific availability targets (99.99%, which is about 52 minutes of downtime
@@ -292,6 +331,29 @@ sharding.
 - **Durability:** can you ever lose committed data? Lever: replication factor, write-ahead logs,
   quorum writes.
 - **Consistency:** strong or eventual, and where. Lever: this is your CAP/PACELC stance.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "For the feed you promise both strong consistency and 99.99% availability. Then a network partition splits your replicas. What are your options?",
+  "options": [
+    {
+      "label": "Keep both promises; that is what replication is for",
+      "feedback": "Tempting, replication solves many things. But during a partition the replicas cannot talk: serving reads risks stale data, and refusing them sacrifices availability. There is no third door."
+    },
+    {
+      "label": "Pick one: serve possibly stale data (availability) or refuse requests (consistency)",
+      "correct": true,
+      "feedback": "Right. Under a partition it is availability or consistency, never both. For a feed, a few seconds of staleness beats an error page, which is the AP stance the next paragraph defends."
+    },
+    {
+      "label": "Invest in better network hardware so partitions never happen",
+      "feedback": "Partitions are a when, not an if, in any distributed system. A design that assumes they never happen has no answer when the interviewer forces the choice."
+    }
+  ]
+}
+\`\`\`
 
 ### Take a consistency stance out loud
 
@@ -324,6 +386,30 @@ drive architecture. If an NFR does not force a lever, it is filler and you shoul
 
 Recap: Write NFRs as quantified, testable numbers (percentiles, nines, QPS), take an explicit
 consistency stance, split read and write SLAs, and tie each NFR to the specific design lever it forces.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are about to write NFRs for your own design below. You write 'p99 feed read under 200ms'. What must the very next sentence do?",
+  "options": [
+    {
+      "label": "Name the lever it forces: a cache tier and CDN on the read path",
+      "correct": true,
+      "feedback": "Right. NFR then lever is the habit that separates a candidate who lists requirements from one who uses them to drive the architecture."
+    },
+    {
+      "label": "Add more NFRs so the list looks thorough",
+      "feedback": "Tempting, coverage feels safe. But an NFR that forces no lever is filler, and a long list of them reads as padding rather than rigor."
+    },
+    {
+      "label": "Soften it to 'reads should generally be fast' in case you miss the target",
+      "feedback": "That un-quantifies the requirement: no dashboard can verify 'generally fast', so it can no longer drive or defend any decision."
+    }
+  ],
+  "reveal": "In your design write, give each NFR three parts: a number (a percentile, nines, or QPS), the lever it forces, and, for consistency, an explicit AP or CP stance with the reason your system tolerates staleness or cannot."
+}
+\`\`\`
 `.trim()
 
 const coreEntitiesApiTeach = `
