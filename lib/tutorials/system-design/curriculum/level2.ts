@@ -923,6 +923,29 @@ self-cleans. When memory fills, Redis evicts by policy: \`allkeys-lru\` for a pu
 \`volatile-lru\` to only evict keys that have a TTL, \`noeviction\` to fail writes instead of
 dropping data (what you want for a source of truth).
 
+\`\`\`cswidget
+{
+  "type": "cache-sim",
+  "title": "A KV cache in front of the database: TTL, eviction, and the hot key",
+  "predictPrompt": {
+    "question": "Redis fronts the real database as a cache with room for only 6 of the 16 keys, and about half of all requests hit one hot key. Once the stream settles, what does the hit ratio look like?",
+    "options": [
+      "Low, because most of the keyspace can never fit in memory at once",
+      "High, because the LRU keeps the hot key and its frequent neighbors resident while cold keys churn",
+      "Roughly capacity divided by keys, since each key is equally likely to be requested"
+    ]
+  },
+  "workedExample": "This is the cache-in-front-of-the-store setup: 16 distinct keys, memory for only 6, a 60-tick TTL, and a 6-tick trip to the real database on every miss. If traffic were uniform the hit ratio would be poor, but the stream is skewed: roughly half of all requests go to one hot key, and the LRU eviction policy keeps that key and its most frequent neighbors resident while the cold tail churns in and out. So the settled hit ratio lands well above what raw capacity over keys suggests. Lower the TTL toward the rebuild time and expiries start costing real database reads; the stampede toggle pushes TTL below the rebuild latency so you can watch requests pile onto the expired hot key mid-rebuild. Everything on screen is cache-configured Redis behavior: TTLs self-clean, eviction drops keys under memory pressure, and none of it is acceptable for data whose only copy lives here.",
+  "seed": "kv-cache-front-l2",
+  "keys": 16,
+  "ticks": 240,
+  "capacity": 6,
+  "ttl": 60,
+  "rebuildTicks": 6,
+  "caption": "These knobs are the cache side of the cache-or-source-of-truth split; a source of truth gets noeviction, persistence, and a replica instead."
+}
+\`\`\`
+
 **Redis is more than KV.** It ships data structures that make it a Swiss-army server: sorted sets
 (leaderboards, sliding-window rate limits, priority queues), lists (simple queues), hashes (store a
 session as fields you can update individually), streams (append-only log with consumer groups),
