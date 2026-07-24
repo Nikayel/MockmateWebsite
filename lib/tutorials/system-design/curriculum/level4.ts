@@ -1015,10 +1015,140 @@ what its client needs and is owned by that client's team, so a mobile change doe
 the web contract. GraphQL is one way to give clients field-level selection and reduce the need for
 many hand-written BFFs, at the cost of its own query-cost and caching complexity.
 
-\`\`\`
-web  -> bff-web    \\
-mobile -> bff-mobile -> [API gateway: authn, rate limit, routing] -> services
-partner -> bff-partner /                                   (mesh handles east-west)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "BFFs, the gateway, and the north-south / east-west boundary",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "web",
+      "label": "web SPA",
+      "kind": "client"
+    },
+    {
+      "id": "mobile",
+      "label": "mobile app",
+      "kind": "client"
+    },
+    {
+      "id": "partner",
+      "label": "partner client",
+      "kind": "client"
+    },
+    {
+      "id": "bff_web",
+      "label": "bff-web",
+      "kind": "service"
+    },
+    {
+      "id": "bff_mobile",
+      "label": "bff-mobile",
+      "kind": "service"
+    },
+    {
+      "id": "bff_partner",
+      "label": "bff-partner",
+      "kind": "service"
+    },
+    {
+      "id": "gateway",
+      "label": "API gateway (authn, rate limit, routing)",
+      "kind": "lb"
+    },
+    {
+      "id": "svc_orders",
+      "label": "order service",
+      "kind": "service"
+    },
+    {
+      "id": "svc_users",
+      "label": "user service",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "web",
+      "to": "bff_web",
+      "kind": "sync"
+    },
+    {
+      "from": "mobile",
+      "to": "bff_mobile",
+      "kind": "sync"
+    },
+    {
+      "from": "partner",
+      "to": "bff_partner",
+      "kind": "sync"
+    },
+    {
+      "from": "bff_web",
+      "to": "gateway",
+      "kind": "sync",
+      "label": "north-south"
+    },
+    {
+      "from": "bff_mobile",
+      "to": "gateway",
+      "kind": "sync"
+    },
+    {
+      "from": "bff_partner",
+      "to": "gateway",
+      "kind": "sync"
+    },
+    {
+      "from": "gateway",
+      "to": "svc_orders",
+      "kind": "sync"
+    },
+    {
+      "from": "gateway",
+      "to": "svc_users",
+      "kind": "sync"
+    },
+    {
+      "from": "svc_orders",
+      "to": "svc_users",
+      "kind": "sync",
+      "label": "east-west via mesh"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "web",
+        "mobile",
+        "partner"
+      ],
+      "note": "Three client types need different payloads: mobile wants a small denormalized response in one round trip, the web SPA wants richer data, and the partner needs stable versioned contracts. One generic endpoint over-fetches or under-fetches."
+    },
+    {
+      "adds": [
+        "bff_web",
+        "bff_mobile",
+        "bff_partner"
+      ],
+      "note": "A thin BFF per client type aggregates and shapes exactly what its client needs and is owned by that client's team, so a mobile change does not ripple through the web contract."
+    },
+    {
+      "adds": [
+        "gateway"
+      ],
+      "note": "The gateway is the single north-south entry point owning TLS termination, authentication, rate limiting, routing, and observability, kept horizontally scaled and stateless because every request pays this hop."
+    },
+    {
+      "adds": [
+        "svc_orders",
+        "svc_users"
+      ],
+      "note": "Business logic lives inside the owning services. Service-to-service east-west traffic is the service mesh's job (mTLS, retries, load balancing); routing internal calls through the public gateway is a common design error."
+    }
+  ],
+  "caption": "North-south traffic enters through a per-client BFF and the gateway; east-west traffic between services belongs to the mesh, and domain rules stay in the services."
+}
 \`\`\`
 
 ### The two big risks
