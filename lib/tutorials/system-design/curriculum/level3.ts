@@ -132,12 +132,75 @@ The price is brutal: two leaders can accept **conflicting writes** to the same k
 you must define how to merge them. Use it when local write latency or offline/multi-datacenter
 operation genuinely requires it, not by default.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two regional leaders accept concurrent edits to the same profile field. A teammate proposes: just keep whichever write carries the later timestamp. Is that a safe default?",
+  "options": [
+    {
+      "label": "Yes, it is deterministic and simple",
+      "feedback": "Tempting, and it is even Cassandra's default. But deterministic is not the same as safe: one of the two users' edits is silently discarded, and 'later' depends on clocks that drift. The next section covers the alternatives."
+    },
+    {
+      "label": "No, it silently throws away one user's write",
+      "correct": true,
+      "feedback": "Right. Last-write-wins resolves the conflict by destroying data, and clock skew can even pick the wrong 'later'. Version vectors, CRDTs, or an application merge preserve both writes instead."
+    },
+    {
+      "label": "Conflicts cannot happen if replication is fast enough",
+      "feedback": "Tempting, but speed does not help: both leaders accepted their write before either heard about the other. Concurrency creates the conflict, not lag."
+    }
+  ]
+}
+\`\`\`
+
 **Leaderless (Dynamo-style):** any replica accepts a write, and the client (or a coordinator) writes
 to and reads from multiple replicas. Cassandra, DynamoDB, and Riak work this way. Consistency comes
 from **quorums**: with N replicas, if you require W replicas to ack a write and R to answer a read,
 then **R + W > N** guarantees the read set and write set overlap on at least one node, so a read sees
 the latest acked write. Common config is N=3, W=2, R=2. Tuning W and R trades consistency against
 availability and latency: W=1 is fast but weakly durable, R=1 can read stale data.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each behavior to the replication topology that produces it.",
+  "buckets": [
+    "Single-leader",
+    "Multi-leader",
+    "Leaderless"
+  ],
+  "items": [
+    {
+      "label": "No write-write conflicts, because one node serializes every write",
+      "bucket": "Single-leader",
+      "feedback": "One serialization point is exactly what buys conflict-freedom, at the cost of a write SPOF."
+    },
+    {
+      "label": "Low-latency local writes in every region, with concurrent conflicting writes to merge",
+      "bucket": "Multi-leader",
+      "feedback": "The capability and the anomaly arrive together: local writes everywhere means two leaders can accept clashing writes."
+    },
+    {
+      "label": "Any replica accepts writes; reads are safe when 'R + W > N'",
+      "bucket": "Leaderless",
+      "feedback": "Quorum overlap is the whole consistency story here: the read set and write set must share at least one node."
+    },
+    {
+      "label": "Write availability hinges on risky failover when one node dies",
+      "bucket": "Single-leader",
+      "feedback": "The leader is the write SPOF; promoting a follower brings split-brain and lost-write risks."
+    },
+    {
+      "label": "Sloppy quorums and hinted handoff keep writes flowing during node failures",
+      "bucket": "Leaderless",
+      "feedback": "Stand-in nodes accept writes for downed replicas, trading consistency for availability, then hand the data back."
+    }
+  ]
+}
+\`\`\`
 
 Two more leaderless mechanics interviewers probe. **Sloppy quorums with hinted handoff** keep the
 system available during failures by letting writes land on temporary "stand-in" nodes when the home
@@ -175,6 +238,30 @@ Recap: single-leader avoids conflicts but has a write SPOF; multi-leader enables
 at the cost of write-write conflicts; leaderless uses R + W > N quorums (plus sloppy quorums, hinted
 handoff, read repair, and Merkle trees) for availability; resolve conflicts with LWW (lossy), version
 vectors, CRDTs, or app merge, and reason with PACELC and named anomalies rather than CAP.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The interviewer asks: 'So is your store CP or AP?' What is the strongest move?",
+  "options": [
+    {
+      "label": "Pick one of the two letters confidently",
+      "feedback": "Tempting because it sounds decisive, but the CAP binary hides the normal-operation tradeoff and says nothing about what a user actually experiences."
+    },
+    {
+      "label": "Reason with PACELC and name the concrete anomaly a user would see",
+      "correct": true,
+      "feedback": "Right. During a partition: availability or consistency; else: latency or consistency. Then ground it: 'under last-write-wins, one region's edit silently overwrites the other'. That shows you reason about data, not letters."
+    },
+    {
+      "label": "Say the system is both, as long as quorums are configured correctly",
+      "feedback": "Tempting, because 'R + W > N' feels like consistency for free. But sloppy quorums, hinted handoff, and the latency cost of larger W and R mean you are still choosing tradeoffs; quorums tune the dial, they do not remove it."
+    }
+  ],
+  "reveal": "Every topology buys its capability by exposing an anomaly: single-leader pays with a write SPOF, multi-leader with merge conflicts, leaderless with staleness and conflict windows. In your design write, name the topology you chose, the anomaly you accepted, and the conflict-resolution or quorum setting that contains it."
+}
+\`\`\`
 `.trim()
 
 const replicationLagSessionTeach = `
